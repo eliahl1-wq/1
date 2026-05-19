@@ -255,8 +255,8 @@ export default function Lobby() {
                             </button>
                             {depositStatusMessage && (
                                 <p style={{ 
-                                    fontSize: '0.9rem', 
-                                    color: depositStatusMessage.startsWith('❌') ? '#FF3B30' : 'rgba(255,255,255,0.7)', 
+                                    fontSize: '0.9rem',
+                                    color: depositStatusMessage.includes('failed') ? '#FF3B30' : 'rgba(255,255,255,0.7)',
                                     marginTop: '15px' 
                                 }}>
                                     {depositStatusMessage}
