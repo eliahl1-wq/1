@@ -20,14 +20,10 @@ export default function LoginPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-            console.log('Login Response Status:', res.status);
             const data = await res.json();
-            console.log('Login Response Data:', data);
 
             if (res.ok) {
-                console.log('LoginPage: Loggar in användare i Context...');
                 login(data.user, data.token);
-                console.log('LoginPage: Navigerar till /lobby');
                 navigate('/lobby', { replace: true });
             } else {
                 // Visa felmeddelande från servern, annars ett generellt fel

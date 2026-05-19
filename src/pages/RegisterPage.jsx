@@ -12,16 +12,13 @@ export default function RegisterPage() {
         e.preventDefault();
         setMessage(''); // Clear previous messages
         setIsLoading(true);
-        console.log('RegisterPage: Försöker registrera med:', username);
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-            console.log('RegisterPage: Serverns svarstatus:', res.status);
             const data = await res.json();
-            console.log('Register Response Data:', data);
 
             if (res.ok) {
                 console.log("Registrering lyckades!");
