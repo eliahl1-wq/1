@@ -46,13 +46,13 @@ export default function Lobby() {
     // Funktion för att hantera insättning (Skicka SOL)
     const handleDeposit = async () => {
         if (!publicKey || !connected) {
-            setDepositStatusMessage('❌ Connect wallet first.');
+            setDepositStatusMessage('Connect wallet first.');
             return;
         }
 
         const amountUSD = parseFloat(depositAmount);
         if (isNaN(amountUSD) || amountUSD < minimumDepositUSD) {
-            setDepositStatusMessage(`❌ Minimum deposit is $${minimumDepositUSD}.`);
+            setDepositStatusMessage(`Minimum deposit is $${minimumDepositUSD}.`);
             return;
         }
 

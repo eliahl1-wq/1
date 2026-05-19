@@ -31,7 +31,7 @@ export default function LoginPage() {
                 navigate('/lobby', { replace: true });
             } else {
                 // Visa felmeddelande från servern, annars ett generellt fel
-                setError(data.message || 'Inloggning misslyckades. Försök igen.');
+                setError(data.message || 'Login failed. Please try again.');
             }
         } catch (err) {
             setError("Kunde inte ansluta till servern");

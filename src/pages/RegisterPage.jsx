@@ -46,7 +46,12 @@ export default function RegisterPage() {
                 <p style={{ marginBottom: '35px', color: 'rgba(255,255,255,0.4)', fontSize: '1rem' }}>Create your gladiator</p>
                 
                 {message && (
-                    <div style={{ background: message.startsWith('❌') ? 'rgba(255,59,48,0.1)' : 'rgba(0,122,255,0.1)', color: message.startsWith('❌') ? '#FF3B30' : '#007AFF', padding: '12px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.9rem', border: message.startsWith('❌') ? '0.5px solid rgba(255,59,48,0.2)' : '0.5px solid rgba(0,122,255,0.2)' }}>
+                    <div style={{ 
+                        background: (message.includes('failed') || message.includes('error')) ? 'rgba(255,59,48,0.1)' : 'rgba(0,122,255,0.1)', 
+                        color: (message.includes('failed') || message.includes('error')) ? '#FF3B30' : '#007AFF', 
+                        padding: '12px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.9rem', 
+                        border: (message.includes('failed') || message.includes('error')) ? '0.5px solid rgba(255,59,48,0.2)' : '0.5px solid rgba(0,122,255,0.2)' 
+                    }}>
                         {message}
                     </div>
                 )}
