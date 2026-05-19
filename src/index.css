@@ -1,0 +1,77 @@
+:root {
+  --text: #cbd5e1;
+  --text-h: #f8fafc;
+  --bg: #020617;
+  --border: #334155;
+  --code-bg: #1e293b;
+  --accent: #38bdf8;
+  --accent-bg: rgba(56, 189, 248, 0.1);
+  --accent-border: rgba(56, 189, 248, 0.5);
+  --social-bg: rgba(15, 23, 42, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #94a3b8;
+    --text-h: #f8fafc;
+    --bg: #000;
+    --border: #1e293b;
+    --code-bg: #0f172a;
+    --accent: #3b82f6;
+    --accent-bg: rgba(59, 130, 246, 0.15);
+    --accent-border: rgba(59, 130, 246, 0.5);
+    --social-bg: rgba(15, 23, 42, 0.5);
+    --shadow:
+      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
+
+  #social .button-icon {
+    filter: invert(1) brightness(2);
+  }
+}
+
+/* Optimering för bakgrund och cell-fysik */
+body {
+  margin: 0;
+  color: #f8fafc;
+  overflow: hidden;
+  font-family: var(--sans);
+  background-color: #000;
+}
+
+/* Fastare Agar-fysik (mindre liquid) */
+@keyframes blobWobble {
+  0%, 100% { border-radius: 50%; transform: scale(1.0); }
+  50% { border-radius: 48% 52% 51% 49% / 49% 51% 52% 48%; transform: scale(1.01); }
+}
+
+/* Linjär rörelse genom arenan */
+@keyframes blobDrift {
+  0% { transform: translate(-15vw, -10vh); }
+  100% { transform: translate(15vw, 10vh); }
+}
+
+/* Animation för att "krocka" eller pulsera */
+@keyframes blobPulse {
+  0%, 100% { scale: 1; opacity: 0.12; }
+  50% { scale: 1.05; opacity: 0.18; }
+}
