@@ -23,13 +23,16 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState([]);
 
     useEffect(() => {
-        if (!user || !token) return;
+        // Anslut bara om vi har en token och inte redan har en aktiv anslutning
+        if (!token || !user?.username || socketRef.current) return;
 
-        // Anslut till servern
+        console.log('Connecting to arena...');
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         socketRef.current = io(apiUrl, {
             auth: { token },
-            transports: ['websocket'] // Tvingar WebSocket för att slippa 404-polling fel på Render
+            transports: ['websocket'], // Tvingar WebSocket för Render
+            reconnection: true,
+            reconnectionAttempts: 5
         });
 
         const socket = socketRef.current;
@@ -77,10 +80,11 @@ export default function Game() {
             socket.off('tick');
             socket.off('init');
             socket.off('died');
-            socket.close();
+            socket.disconnect();
+            socketRef.current = null;
             window.removeEventListener('resize', handleResize);
         };
-    }, [user, token]); // Måste lyssna på user och token så vi ansluter när de är redo
+    }, [token, user?.username]); // Lyssna bara på token och användarnamn, inte hela user-objektet
 
     const handleResize = () => {
         const canvas = canvasRef.current;
