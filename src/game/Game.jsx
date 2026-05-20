@@ -10,6 +10,7 @@ export default function Game() {
     const canvasRef = useRef(null);
     const { user, token } = useAuth();
     const socketRef = useRef(null);
+    // Liten ändring för att trigga Vercel deployment
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const playersRef = useRef([]);
