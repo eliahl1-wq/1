@@ -47,8 +47,9 @@ export default function Game() {
         socket.on('connect', () => {
             console.log('Connected to socket server');
             setIsConnected(true); // Uppdatera state för att visa att vi är anslutna
-            // Om token och användarnamn redan finns, skicka joinGame direkt
+            // Skicka joinGame först när vi vet att pipan är öppen och vi inte redan har skickat det
             if (token && user?.username && !hasJoinedGameRef.current) {
+                console.log('Emitting joinGame after successful connection.');
                 socket.emit('joinGame', { username: user.username, token });
             }
         });
@@ -82,6 +83,12 @@ export default function Game() {
         socket.on('disconnect', () => {
             console.log('Socket disconnected.');
             setIsConnected(false);
+            hasJoinedGameRef.current = false; // Återställ flaggan vid disconnect
+            // Om servern kopplar ner oss, kan det vara pga auth-fel eller liknande.
+            // I så fall vill vi inte att klienten försöker återansluta oändligt.
+            if (socket.io.reconnecting) {
+                console.log('Socket is trying to reconnect...');
+            }
         });
 
         socket.on('connect_error', (err) => {
@@ -101,31 +108,17 @@ export default function Game() {
         handleResize();
 
         return () => {
-            console.log('Cleaning up socket connection...');
-            // Ta bort alla lyssnare och stäng socketen vid unmount
-            socket.off('tick');
-            socket.off('init');
-            socket.off('died');
-            socket.off('error');
-            socket.off('connect_error');
-            socket.off('connect');
-            socket.off('disconnect');
-            socket.disconnect(); // Stäng anslutningen snyggt
-            socketRef.current = null;
-            hasJoinedGameRef.current = false; // Återställ flaggan
-            window.removeEventListener('resize', handleResize);
+            // Cleanup function for the effect
+            if (socketRef.current) {
+                console.log('Cleaning up socket connection...');
+                socketRef.current.off(); // Ta bort alla lyssnare
+                socketRef.current.disconnect(); // Stäng anslutningen
+                socketRef.current = null;
+                hasJoinedGameRef.current = false; // Återställ flaggan
+            }
+            window.removeEventListener('resize', handleResize); // Ta bort resize-lyssnare
         };
-    }, []); // Tom dependency array: körs bara en gång vid mount och cleanup vid unmount
-
-    // Effekt för att skicka 'joinGame' när token och användardata är redo OCH socketen är ansluten
-    useEffect(() => {
-        const socket = socketRef.current;
-        if (socket && socket.connected && token && user?.username && !hasJoinedGameRef.current) {
-            console.log('Socket is connected and user data is available. Emitting joinGame.');
-            socket.emit('joinGame', { username: user.username, token });
-            hasJoinedGameRef.current = true;
-        }
-    }, [token, user?.username, isConnected]); // Lyssna på dessa för att trigga joinGame om de blir tillgängliga senare
+    }, [token, user?.username]); // Denna effekt körs när token eller användarnamn ändras
 
     const handleResize = () => {
         const canvas = canvasRef.current;
