@@ -4,17 +4,18 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [token, setToken] = useState(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
 
     // Kontrollera om det finns en sparad inloggning när sidan startar
     useEffect(() => {
         const checkLoggedIn = async () => {
-            const token = localStorage.getItem('token');
-            if (token) {
+            const storedToken = localStorage.getItem('token');
+            if (storedToken) {
                 console.log('AuthContext: Token hittades i localStorage, försöker validera.');
                 try {
-                    const res = await fetch('http://localhost:5000/api/me', {
-                        headers: { 'Authorization': `Bearer ${token}` }
+                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
+                        headers: { 'Authorization': `Bearer ${storedToken}` }
                     });
                     if (res.ok) {
                         const userData = await res.json();
@@ -23,10 +24,12 @@ export const AuthProvider = ({ children }) => {
                     } else {
                         console.log('AuthContext: /api/me misslyckades, tar bort token.');
                         localStorage.removeItem('token'); // Token ogiltig, ta bort den
+                        setToken(null);
                     }
                 } catch (err) {
                     console.error("AuthContext: Validering av token misslyckades:", err);
                     localStorage.removeItem('token'); // Ta bort token vid nätverksfel eller andra fel
+                    setToken(null);
                 }
             }
             setLoading(false);
@@ -34,20 +37,22 @@ export const AuthProvider = ({ children }) => {
         checkLoggedIn();
     }, []);
 
-    const login = (userData, token) => {
-        localStorage.setItem('token', token);
+    const login = (userData, newToken) => {
+        localStorage.setItem('token', newToken);
         setUser(userData);
+        setToken(newToken);
         console.log('AuthContext: Användare inloggad, token sparad, user-state uppdaterad:', userData);
     };
 
     const logout = () => {
         localStorage.removeItem('token');
         setUser(null);
+        setToken(null);
         console.log('AuthContext: Användare utloggad, token borttagen, user-state rensad.');
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, token, login, logout, loading, isAuthenticated: !!user }}>
             {!loading && children}
         </AuthContext.Provider>
     );
