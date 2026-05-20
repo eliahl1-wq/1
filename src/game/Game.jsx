@@ -29,8 +29,7 @@ export default function Game() {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         socketRef.current = io(apiUrl, {
             auth: { token },
-            transports: ['websocket'], // Tvingar WebSocket för att slippa 404-polling fel
-            upgrade: false
+            transports: ['websocket'] // Tvingar WebSocket för att slippa 404-polling fel på Render
         });
 
         const socket = socketRef.current;
@@ -38,9 +37,9 @@ export default function Game() {
         socket.on('connect', () => {
             console.log('Connected to socket server');
             setIsConnected(true);
+            // Skicka joinGame först när vi vet att pipan är öppen
+            socket.emit('joinGame', { username: user?.username, token });
         });
-
-        socket.emit('joinGame', { username: user?.username, token });
 
         socket.on('init', (data) => {
             myIdRef.current = data.id;
@@ -115,163 +114,3 @@ export default function Game() {
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.scale(zoom, zoom);
             ctx.translate(-myPlayer.x, -myPlayer.y);
-
-            // Rita Grid
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            ctx.lineWidth = 2;
-            for (let x = 0; x <= WORLD_SIZE; x += 200) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
-            }
-            for (let y = 0; y <= WORLD_SIZE; y += 200) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke();
-            }
-
-            // Rita World Border
-            ctx.strokeStyle = '#FF3B30';
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
-
-            // Rita Mat
-            foodRef.current.forEach(f => {
-                ctx.fillStyle = f.color;
-                ctx.beginPath(); ctx.arc(f.x, f.y, 8, 0, Math.PI * 2); ctx.fill();
-            });
-
-            // Rita alla spelare
-            playersRef.current.forEach(cell => {
-                const radius = Math.sqrt(cell.mass * 100);
-                ctx.fillStyle = cell.color;
-                ctx.strokeStyle = cell.id === myIdRef.current ? 'white' : 'rgba(0,0,0,0.5)';
-                ctx.lineWidth = radius * 0.05;
-                ctx.beginPath();
-                ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                
-                // Namn & Massa
-                ctx.fillStyle = 'white';
-                ctx.textAlign = 'center';
-                ctx.font = `bold ${Math.max(12, radius * 0.4)}px system-ui`;
-                ctx.fillText(cell.username, cell.x, cell.y);
-            });
-
-            ctx.restore();
-        };
-
-        update();
-        return () => cancelAnimationFrame(animationFrameId);
-    }, []); // En renderingsloop för hela livscykeln
-
-    const handleMouseMove = (e) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        socketRef.current?.emit('mouseMove', {
-            x: e.clientX - rect.left - canvas.width / 2,
-            y: e.clientY - rect.top - canvas.height / 2
-        });
-    };
-
-    return (
-        <div style={{ 
-            width: '100vw', 
-            height: '100vh', 
-            background: '#0a0a0c', 
-            overflow: 'hidden', 
-            position: 'fixed', 
-            top: 0, 
-            left: 0,
-            fontFamily: 'system-ui'
-        }}>
-            <canvas
-                ref={canvasRef}
-                onMouseMove={handleMouseMove}
-                style={{ display: 'block' }}
-            />
-
-            {!isConnected && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <h2 style={{ marginBottom: '10px' }}>Connecting to Arena...</h2>
-                        <p style={{ opacity: 0.5 }}>Make sure you have at least $10 balance.</p>
-                    </div>
-                </div>
-            )}
-
-            {/* UI Overlay */}
-            <div style={{ 
-                position: 'absolute', 
-                top: '30px', 
-                left: '30px', 
-                pointerEvents: 'none' 
-            }}>
-                <div style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    backdropFilter: 'blur(20px)',
-                    padding: '15px 25px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white'
-                }}>
-                    <h3 style={{ margin: 0, opacity: 0.5, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Current Balance</h3>
-                    <div style={{ fontSize: '1.8rem', fontWeight: '800' }}>
-                        ${currentBalance.toFixed(2)}
-                    </div>
-                </div>
-            </div>
-
-            {/* Controls Info */}
-            <div style={{ 
-                position: 'absolute', 
-                bottom: '30px', 
-                left: '30px', 
-                color: 'rgba(255,255,255,0.3)',
-                fontSize: '0.9rem'
-            }}>
-                SPACE to Split • W to Eject • Mouse to Move
-            </div>
-
-            {/* Logo/Name */}
-            <div style={{ 
-                position: 'absolute', 
-                top: '30px', 
-                right: '30px', 
-                textAlign: 'right' 
-            }}>
-                <h2 style={{ 
-                    margin: 0, 
-                    color: 'white', 
-                    fontWeight: '900', 
-                    letterSpacing: '-1px',
-                    fontStyle: 'italic'
-                }}>
-                    AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
-                </h2>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
-            </div>
-
-            {/* Mock Leaderboard */}
-            <div style={{
-                position: 'absolute',
-                top: '120px',
-                right: '30px',
-                width: '180px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                padding: '20px',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                color: 'white'
-            }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.7rem', opacity: 0.4, letterSpacing: '1px' }}>LEADERBOARD</h4>
-                <div style={{ fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {leaderboard.map((p, i) => (
-                        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', opacity: p.id === myIdRef.current ? 1 : 0.5 }}>
-                            <span style={{ fontWeight: p.id === myIdRef.current ? '700' : '400' }}>{i + 1}. {p.username}</span>
-                            <span>${p.balance.toFixed(2)}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
