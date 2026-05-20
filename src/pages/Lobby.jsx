@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+giimport { useNavigate } from 'react-router-dom';
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -9,6 +10,7 @@ export default function Lobby() {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
+    const navigate = useNavigate();
 
     // --- STATS FÖR DEPOSIT ---
     const [depositAmount, setDepositAmount] = useState('');
@@ -273,8 +275,7 @@ export default function Lobby() {
                                 setArenaError(`Please deposit at least $${minimumDepositUSD} to enter the arena.`);
                             } else {
                                 setArenaError('');
-                                alert('Entering the Arena...');
-                                // Här lägger du senare: navigate('/game');
+                                navigate('/game');
                             }
                         }}
                         style={{ 
