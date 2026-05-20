@@ -10,6 +10,7 @@ export default function Game() {
     const canvasRef = useRef(null);
     const { user, token } = useAuth();
     const socketRef = useRef(null);
+    const hasJoinedGameRef = useRef(false); // Ny ref för att spåra om joinGame har skickats
     // Liten ändring för att trigga Vercel deployment
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
@@ -24,18 +25,20 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState([]);
 
     useEffect(() => {
-        // Om anslutningen redan finns eller vi saknar credentials, gör ingenting
-        if (!token || !user?.username || (socketRef.current && socketRef.current.connected)) return;
+        // Skapa socket-instansen bara en gång vid komponentens första mount
+        if (socketRef.current) return;
 
         console.log('Connecting to arena...');
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         
         // Skapa instansen
         socketRef.current = io(apiUrl, {
-            auth: { token },
+            // Auth skickas inte här, utan i joinGame eventet när token är garanterat tillgänglig
+            // Detta förhindrar att socketen försöker ansluta med en tom token vid första render
+            // och att den stängs ner av cleanup i StrictMode.
+            // auth: { token }, // Flyttas till joinGame
             transports: ['websocket'], // Tvinga websocket för att undvika Render polling-problem
             reconnection: true,
-            forceNew: true, // Viktigt för att undvika att återanvända trasiga anslutningar
             reconnectionAttempts: 5
         });
 
@@ -43,7 +46,11 @@ export default function Game() {
 
         socket.on('connect', () => {
             console.log('Connected to socket server');
-            socket.emit('joinGame', { username: user?.username, token });
+            setIsConnected(true); // Uppdatera state för att visa att vi är anslutna
+            // Om token och användarnamn redan finns, skicka joinGame direkt
+            if (token && user?.username && !hasJoinedGameRef.current) {
+                socket.emit('joinGame', { username: user.username, token });
+            }
         });
 
         socket.on('init', (data) => {
@@ -72,6 +79,11 @@ export default function Game() {
             window.location.assign('/lobby');
         });
 
+        socket.on('disconnect', () => {
+            console.log('Socket disconnected.');
+            setIsConnected(false);
+        });
+
         socket.on('connect_error', (err) => {
             console.error('Socket connection error:', err);
         });
@@ -84,21 +96,36 @@ export default function Game() {
             }
         });
 
+        // Hantera fönsterstorleksändringar
         window.addEventListener('resize', handleResize);
         handleResize();
 
         return () => {
             console.log('Cleaning up socket connection...');
+            // Ta bort alla lyssnare och stäng socketen vid unmount
             socket.off('tick');
             socket.off('init');
             socket.off('died');
             socket.off('error');
             socket.off('connect_error');
+            socket.off('connect');
+            socket.off('disconnect');
             socket.disconnect(); // Stäng anslutningen snyggt
             socketRef.current = null;
+            hasJoinedGameRef.current = false; // Återställ flaggan
             window.removeEventListener('resize', handleResize);
         };
-    }, [token, user?.username]);
+    }, []); // Tom dependency array: körs bara en gång vid mount och cleanup vid unmount
+
+    // Effekt för att skicka 'joinGame' när token och användardata är redo OCH socketen är ansluten
+    useEffect(() => {
+        const socket = socketRef.current;
+        if (socket && socket.connected && token && user?.username && !hasJoinedGameRef.current) {
+            console.log('Socket is connected and user data is available. Emitting joinGame.');
+            socket.emit('joinGame', { username: user.username, token });
+            hasJoinedGameRef.current = true;
+        }
+    }, [token, user?.username, isConnected]); // Lyssna på dessa för att trigga joinGame om de blir tillgängliga senare
 
     const handleResize = () => {
         const canvas = canvasRef.current;
