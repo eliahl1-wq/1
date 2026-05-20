@@ -28,7 +28,8 @@ function PublicRoute({ children }) {
 }
 
 function App() {
-  const endpoint = useMemo(() => clusterApiUrl('mainnet-beta'), []);
+  // Byter till 'devnet' för gratis testning. För mainnet i framtiden bör du skaffa en privat RPC (t.ex. från Helius) för att slippa 403-fel.
+  const endpoint = useMemo(() => clusterApiUrl('devnet'), []);
   const wallets = useMemo(() => [], []);
 
   return (

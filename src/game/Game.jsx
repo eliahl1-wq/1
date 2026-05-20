@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 
@@ -11,44 +11,75 @@ export default function Game() {
     const { user, token } = useAuth();
     const socketRef = useRef(null);
     
-    // --- KONSTANTER ---
+    // Använd Refs för data som ändras ofta för att slippa starta om loopen
+    const playersRef = useRef([]);
+    const foodRef = useRef([]);
+    const myIdRef = useRef(null);
+    
     const WORLD_SIZE = 5000;
     
-    // --- STATE ---
-    const [players, setPlayers] = useState([]);
-    const [food, setFood] = useState([]);
-    const [myId, setMyId] = useState(null);
+    const [isConnected, setIsConnected] = useState(false);
+    const [currentBalance, setCurrentBalance] = useState(0);
+    const [leaderboard, setLeaderboard] = useState([]);
 
     useEffect(() => {
+        if (!user || !token) return;
+
         // Anslut till servern
-        socketRef.current = io(import.meta.env.VITE_API_URL);
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        socketRef.current = io(apiUrl, {
+            auth: { token }
+        });
+
         const socket = socketRef.current;
+
+        socket.on('connect', () => {
+            console.log('Connected to socket server');
+            setIsConnected(true);
+        });
 
         socket.emit('joinGame', { username: user?.username, token });
 
         socket.on('init', (data) => {
-            setMyId(data.id);
-            setFood(data.food);
+            myIdRef.current = data.id;
+            foodRef.current = data.food;
         });
 
         socket.on('tick', (data) => {
-            setPlayers(data.players);
-            setFood(data.food);
+            playersRef.current = data.players;
+            foodRef.current = data.food;
+
+            // Uppdatera UI-state mer sällan för prestanda
+            const me = data.players.find(p => p.id === myIdRef.current);
+            if (me) setCurrentBalance(me.balance);
+            
+            // Enkel leaderboard-sortering
+            const topPlayers = [...data.players]
+                .sort((a, b) => b.mass - a.mass)
+                .slice(0, 5);
+            setLeaderboard(topPlayers);
         });
 
         socket.on('died', () => {
             alert('Game Over!');
-            window.location.href = '/lobby';
+            window.location.assign('/lobby');
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err);
         });
 
         window.addEventListener('resize', handleResize);
         handleResize();
 
         return () => {
-            socket.disconnect();
+            socket.off('tick');
+            socket.off('init');
+            socket.off('died');
+            socket.close();
             window.removeEventListener('resize', handleResize);
         };
-    }, [user, token]);
+    }, []); // Körs bara en gång vid mount
 
     const handleResize = () => {
         const canvas = canvasRef.current;
@@ -57,7 +88,7 @@ export default function Game() {
         canvas.height = window.innerHeight;
     };
 
-    // Game Loop
+    // Riktig renderingsloop som körs oberoende av Reacts state-ändringar
     useEffect(() => {
         let animationFrameId;
         const update = () => {
@@ -70,7 +101,7 @@ export default function Game() {
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             
-            const myPlayer = players.find(p => p.id === myId);
+            const myPlayer = playersRef.current.find(p => p.id === myIdRef.current);
             if (!myPlayer) return;
 
             const zoom = Math.max(0.15, Math.min(1, 1 / (1 + Math.pow(myPlayer.mass / 500, 0.5))));
@@ -86,10 +117,10 @@ export default function Game() {
             // Rita Grid
             ctx.strokeStyle = 'rgba(255,255,255,0.05)';
             ctx.lineWidth = 2;
-            for (let x = 0; x <= WORLD_SIZE; x += 100) {
+            for (let x = 0; x <= WORLD_SIZE; x += 200) {
                 ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
             }
-            for (let y = 0; y <= WORLD_SIZE; y += 100) {
+            for (let y = 0; y <= WORLD_SIZE; y += 200) {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke();
             }
 
@@ -99,16 +130,16 @@ export default function Game() {
             ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
             // Rita Mat
-            food.forEach(f => {
+            foodRef.current.forEach(f => {
                 ctx.fillStyle = f.color;
                 ctx.beginPath(); ctx.arc(f.x, f.y, 8, 0, Math.PI * 2); ctx.fill();
             });
 
-            // Rita Spelare
-            players.forEach(cell => {
+            // Rita alla spelare
+            playersRef.current.forEach(cell => {
                 const radius = Math.sqrt(cell.mass * 100);
                 ctx.fillStyle = cell.color;
-                ctx.strokeStyle = cell.id === myId ? 'white' : 'rgba(0,0,0,0.5)';
+                ctx.strokeStyle = cell.id === myIdRef.current ? 'white' : 'rgba(0,0,0,0.5)';
                 ctx.lineWidth = radius * 0.05;
                 ctx.beginPath();
                 ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
@@ -127,7 +158,7 @@ export default function Game() {
 
         update();
         return () => cancelAnimationFrame(animationFrameId);
-    }, [players, food, myId]);
+    }, []); // En renderingsloop för hela livscykeln
 
     const handleMouseMove = (e) => {
         const canvas = canvasRef.current;
@@ -156,6 +187,15 @@ export default function Game() {
                 style={{ display: 'block' }}
             />
 
+            {!isConnected && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <h2 style={{ marginBottom: '10px' }}>Connecting to Arena...</h2>
+                        <p style={{ opacity: 0.5 }}>Make sure you have at least $10 balance.</p>
+                    </div>
+                </div>
+            )}
+
             {/* UI Overlay */}
             <div style={{ 
                 position: 'absolute', 
@@ -173,7 +213,7 @@ export default function Game() {
                 }}>
                     <h3 style={{ margin: 0, opacity: 0.5, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Current Balance</h3>
                     <div style={{ fontSize: '1.8rem', fontWeight: '800' }}>
-                        ${(players.find(p => p.id === myId)?.balance || 0).toFixed(2)}
+                        ${currentBalance.toFixed(2)}
                     </div>
                 </div>
             </div>
@@ -222,18 +262,12 @@ export default function Game() {
             }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '0.7rem', opacity: 0.4, letterSpacing: '1px' }}>LEADERBOARD</h4>
                 <div style={{ fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: '700' }}>1. You</span>
-                        <span>${(players.find(p => p.id === myId)?.balance || 0).toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.5 }}>
-                        <span>2. Bot_Alpha</span>
-                        <span>$0.45</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.5 }}>
-                        <span>3. CryptoKing</span>
-                        <span>$0.12</span>
-                    </div>
+                    {leaderboard.map((p, i) => (
+                        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', opacity: p.id === myIdRef.current ? 1 : 0.5 }}>
+                            <span style={{ fontWeight: p.id === myIdRef.current ? '700' : '400' }}>{i + 1}. {p.username}</span>
+                            <span>${p.balance.toFixed(2)}</span>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>
