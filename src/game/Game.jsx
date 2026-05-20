@@ -273,30 +273,34 @@ export default function Game() {
 
             // Rita Grid
             ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            for (let x = 0; x <= worldSize; x += 100) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, worldSize); ctx.stroke();
+            ctx.lineWidth = 2;
+            for (let x = 0; x <= WORLD_SIZE; x += 100) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
             }
-            for (let y = 0; y <= worldSize; y += 100) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(worldSize, y); ctx.stroke();
+            for (let y = 0; y <= WORLD_SIZE; y += 100) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke();
             }
 
-            ctx.strokeStyle = '#FF3B30'; ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, worldSize, worldSize);
+            // Rita World Border
+            ctx.strokeStyle = '#FF3B30';
+            ctx.lineWidth = 10;
+            ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
             // Rita Mat
-            gameState.food.forEach(f => {
+            food.forEach(f => {
                 ctx.fillStyle = f.color;
                 ctx.beginPath();
-                ctx.arc(f.x, f.y, 8, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+                ctx.arc(f.x, f.y, 8, 0, Math.PI * 2); ctx.fill();
             });
 
             // Rita Virus
-            gameState.viruses.forEach(v => {
+            viruses.forEach(v => {
                 ctx.fillStyle = '#34C759';
                 ctx.strokeStyle = '#248a3d';
                 ctx.lineWidth = 5;
                 ctx.beginPath();
+                // Rita "taggig" cirkel
                 for (let i = 0; i < 20; i++) {
                     const angle = (i / 20) * Math.PI * 2;
                     const r = i % 2 === 0 ? v.radius : v.radius * 0.9;
@@ -307,23 +311,31 @@ export default function Game() {
                 ctx.stroke();
             });
 
-            // Rita alla spelare
-            Object.values(gameState.players).forEach(p => {
-                p.cells.forEach(cell => {
-                    const radius = Math.sqrt(cell.mass * 100);
-                    ctx.fillStyle = p.color;
-                    ctx.strokeStyle = 'white';
-                    ctx.lineWidth = radius * 0.05;
-                    ctx.beginPath();
-                    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
-                    ctx.fill(); ctx.stroke();
-                    
-                    ctx.fillStyle = 'white'; ctx.textAlign = 'center';
-                    ctx.font = `bold ${radius * 0.4}px system-ui`;
-                    ctx.fillText(p.username, cell.x, cell.y);
-                    ctx.font = `${radius * 0.2}px system-ui`;
-                    ctx.fillText(Math.floor(cell.mass), cell.x, cell.y + radius * 0.3);
-                });
+            // Rita Ejected Mass
+            ejectedMass.forEach(m => {
+                ctx.fillStyle = m.color;
+                ctx.beginPath(); ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(m.x, m.y, 12, 0, Math.PI * 2); ctx.fill();
+            });
+
+            // Rita Spelaren
+            playerCells.forEach(cell => {
+                const radius = Math.sqrt(cell.mass * 100);
+                ctx.fillStyle = cell.color;
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = radius * 0.05;
+                ctx.beginPath();
+                ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Namn & Massa
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.font = `bold ${radius * 0.4}px system-ui`;
+                ctx.fillText(user?.username || 'Guest', cell.x, cell.y);
+                ctx.font = `${radius * 0.2}px system-ui`;
+                ctx.fillText(Math.floor(cell.mass), cell.x, cell.y + radius * 0.3);
             });
 
             ctx.restore();
@@ -331,16 +343,17 @@ export default function Game() {
 
         update();
         return () => cancelAnimationFrame(animationFrameId);
-    }, [gameState, myId]);
+    }, [playerCells, food, mousePos, ejectedMass, viruses, totalMass]);
 
     const handleMouseMove = (e) => {
-        socketRef.current?.emit('updateInput', {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        setMousePos({
             x: e.clientX - rect.left - canvas.width / 2,
             y: e.clientY - rect.top - canvas.height / 2
         });
     };
-
-    const rect = canvasRef.current?.getBoundingClientRect() || { left: 0, top: 0 };
 
     return (
         <div style={{ 
@@ -374,16 +387,10 @@ export default function Game() {
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'white'
                 }}>
-                    <h3 style={{ margin: 0, opacity: 0.5, fontSize: '0.8rem', textTransform: 'uppercase' }}>Live Balance</h3>
+                    <h3 style={{ margin: 0, opacity: 0.5, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Current Balance</h3>
                     <div style={{ fontSize: '1.8rem', fontWeight: '800' }}>
-                        ${gameState.players[myId]?.balance.toFixed(2) || '0.00'}
+                        ${((user?.balance || 0) + (totalMass * 0.01)).toFixed(2)}
                     </div>
-                    <button 
-                        style={{ marginTop: '10px', width: '100%', background: '#34C759', color: 'white', border: 'none', padding: '8px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}
-                        onClick={() => alert("Cashing out...")}
-                    >
-                        CASH OUT
-                    </button>
                 </div>
             </div>
 
