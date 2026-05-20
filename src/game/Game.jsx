@@ -28,7 +28,9 @@ export default function Game() {
         // Anslut till servern
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         socketRef.current = io(apiUrl, {
-            auth: { token }
+            auth: { token },
+            transports: ['websocket'], // Tvingar WebSocket för att slippa 404-polling fel
+            upgrade: false
         });
 
         const socket = socketRef.current;
@@ -79,7 +81,7 @@ export default function Game() {
             socket.close();
             window.removeEventListener('resize', handleResize);
         };
-    }, []); // Körs bara en gång vid mount
+    }, [user, token]); // Måste lyssna på user och token så vi ansluter när de är redo
 
     const handleResize = () => {
         const canvas = canvasRef.current;
