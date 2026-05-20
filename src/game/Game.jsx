@@ -10,31 +10,40 @@ export default function Game() {
     const canvasRef = useRef(null);
     const { user } = useAuth();
     
-    // --- GAME CONSTANTS ---
-    const WORLD_SIZE = 4000;
-    const INITIAL_RADIUS = 30;
-    const MIN_SPLIT_RADIUS = 50;
-    const MAX_CELLS = 16;
-    const DECAY_RATE = 0.0001; // Hur snabbt man tappar massa
+    // --- KONSTANTER ---
+    const WORLD_SIZE = 5000;
+    const INITIAL_MASS = 20;
+    const MIN_SPLIT_MASS = 35;
+    const MAX_PLAYER_CELLS = 16;
+    const DECAY_BASE = 0.000001;
     
-    // --- GAME STATE ---
+    // --- STATE ---
     const [playerCells, setPlayerCells] = useState([
-        { id: 1, x: 2000, y: 2000, radius: INITIAL_RADIUS, vx: 0, vy: 0, color: '#007AFF' }
+        { 
+            id: Math.random(), 
+            x: WORLD_SIZE / 2, 
+            y: WORLD_SIZE / 2, 
+            mass: INITIAL_MASS, 
+            vx: 0, 
+            vy: 0, 
+            canMergeTime: 0,
+            color: '#007AFF' 
+        }
     ]);
     const [food, setFood] = useState([]);
     const [viruses, setViruses] = useState([]);
     const [ejectedMass, setEjectedMass] = useState([]);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const [score, setScore] = useState(0);
+    const [totalMass, setTotalMass] = useState(INITIAL_MASS);
 
-    // Initiera mat och virus
+    // Initiera banan
     useEffect(() => {
-        const initialFood = Array.from({ length: 200 }, () => ({
+        const initialFood = Array.from({ length: 400 }, () => ({
             id: Math.random(),
             x: Math.random() * WORLD_SIZE,
             y: Math.random() * WORLD_SIZE,
-            radius: 8,
-            color: `hsl(${Math.random() * 360}, 70%, 60%)`
+            mass: 1,
+            color: `hsl(${Math.random() * 360}, 80%, 60%)`
         }));
 
         const initialViruses = Array.from({ length: 15 }, () => ({
@@ -48,110 +57,141 @@ export default function Game() {
         setViruses(initialViruses);
     }, []);
 
-    // --- INPUT HANDLING ---
+    // Input
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.code === 'Space') splitPlayer();
             if (e.code === 'KeyW') ejectMass();
         };
         window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('resize', handleResize);
+        handleResize();
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [playerCells]);
+    }, [playerCells, mousePos]);
 
-    const handleMouseMove = (e) => {
+    const handleResize = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        setMousePos({
-            x: e.clientX - rect.left - canvas.width / 2,
-            y: e.clientY - rect.top - canvas.height / 2
-        });
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
     };
 
-    // --- CORE LOGIC FUNCTIONS ---
     const splitPlayer = () => {
         setPlayerCells(prev => {
-            if (prev.length >= MAX_CELLS) return prev;
+            if (prev.length >= MAX_PLAYER_CELLS) return prev;
             let newCells = [...prev];
-            let canSplit = false;
+            const angle = Math.atan2(mousePos.y, mousePos.x);
 
             prev.forEach(cell => {
-                if (cell.radius >= MIN_SPLIT_RADIUS && newCells.length < MAX_CELLS) {
-                    cell.radius /= 1.414; // Halvera ytan (r / sqrt(2))
-                    const angle = Math.atan2(mousePos.y, mousePos.x);
+                if (cell.mass >= MIN_SPLIT_MASS && newCells.length < MAX_PLAYER_CELLS) {
+                    cell.mass /= 2;
                     newCells.push({
                         id: Math.random(),
                         x: cell.x,
                         y: cell.y,
-                        radius: cell.radius,
-                        vx: Math.cos(angle) * 25,
-                        vy: Math.sin(angle) * 25,
+                        mass: cell.mass,
+                        vx: Math.cos(angle) * 35,
+                        vy: Math.sin(angle) * 35,
                         color: cell.color,
-                        splitTimer: 20 // Tid innan de kan mergas igen
+                        canMergeTime: Date.now() + 15000 // Kan merga efter 15 sek
                     });
-                    canSplit = true;
+                    cell.canMergeTime = Date.now() + 15000;
                 }
             });
-            return canSplit ? newCells : prev;
+            return newCells;
         });
     };
 
     const ejectMass = () => {
-        // Implementation för att skjuta ut massa (W)
         setPlayerCells(prev => {
-            const updated = [...prev];
-            const cell = updated[0]; // Förenklat för demo
-            if (cell.radius > 40) {
-                cell.radius -= 2;
-                const angle = Math.atan2(mousePos.y, mousePos.x);
-                setEjectedMass(prevE => [...prevE, {
-                    id: Math.random(),
-                    x: cell.x + Math.cos(angle) * cell.radius,
-                    y: cell.y + Math.sin(angle) * cell.radius,
-                    radius: 12,
-                    vx: Math.cos(angle) * 15,
-                    vy: Math.sin(angle) * 15,
-                    color: cell.color
-                }]);
-            }
-            return updated;
+            return prev.map(cell => {
+                if (cell.mass > 35) {
+                    cell.mass -= 1.5;
+                    const angle = Math.atan2(mousePos.y, mousePos.x);
+                    const dist = Math.sqrt(cell.mass * 100);
+                    setEjectedMass(prevE => [...prevE, {
+                        id: Math.random(),
+                        x: cell.x + Math.cos(angle) * (dist + 5),
+                        y: cell.y + Math.sin(angle) * (dist + 5),
+                        mass: 1.2,
+                        vx: Math.cos(angle) * 15,
+                        vy: Math.sin(angle) * 15,
+                        color: cell.color
+                    }]);
+                }
+                return cell;
+            });
         });
     };
 
-    // --- GAME LOOP ---
+    // Game Loop
     useEffect(() => {
         let animationFrameId;
 
         const update = () => {
-            setPlayerCells(currentCells => {
-                return currentCells.map(cell => {
-                    // 1. Beräkna hastighet baserat på mus (desto större cell, desto långsammare)
-                    const speedScale = 4 / (1 + Math.pow(cell.radius / 30, 0.44));
+            setPlayerCells(prevCells => {
+                let cells = [...prevCells];
+                
+                // 1. Rörelse & Friktion
+                cells = cells.map(cell => {
+                    const radius = Math.sqrt(cell.mass * 100);
+                    const speed = 3.5 / Math.pow(cell.mass, 0.4);
                     const angle = Math.atan2(mousePos.y, mousePos.x);
                     
-                    // Friktion för split-hastighet
+                    // Basrörelse + "kick" från split
+                    cell.x += (Math.cos(angle) * speed) + cell.vx;
+                    cell.y += (Math.sin(angle) * speed) + cell.vy;
+                    
                     cell.vx *= 0.9;
                     cell.vy *= 0.9;
 
-                    let targetVx = Math.cos(angle) * speedScale;
-                    let targetVy = Math.sin(angle) * speedScale;
-
-                    // Move cell
-                    let newX = cell.x + targetVx + cell.vx;
-                    let newY = cell.y + targetVy + cell.vy;
-
-                    // Boundary checks
-                    newX = Math.max(cell.radius, Math.min(WORLD_SIZE - cell.radius, newX));
-                    newY = Math.max(cell.radius, Math.min(WORLD_SIZE - cell.radius, newY));
-
-                    // Mass decay
-                    const newRadius = cell.radius > INITIAL_RADIUS ? cell.radius * (1 - DECAY_RATE) : cell.radius;
-
-                    return { ...cell, x: newX, y: newY, radius: newRadius };
+                    // Världsgränser
+                    cell.x = Math.max(radius, Math.min(WORLD_SIZE - radius, cell.x));
+                    cell.y = Math.max(radius, Math.min(WORLD_SIZE - radius, cell.y));
+                    
+                    // Decay
+                    cell.mass *= (1 - DECAY_BASE * cell.mass);
+                    return cell;
                 });
+
+                // 2. Intern kollision (studsa eller merga egna celler)
+                for (let i = 0; i < cells.length; i++) {
+                    for (let j = i + 1; j < cells.length; j++) {
+                        const c1 = cells[i];
+                        const c2 = cells[j];
+                        const dist = Math.hypot(c1.x - c2.x, c1.y - c2.y);
+                        const r1 = Math.sqrt(c1.mass * 100);
+                        const r2 = Math.sqrt(c2.mass * 100);
+
+                        if (dist < r1 + r2) {
+                            const now = Date.now();
+                            if (now > c1.canMergeTime && now > c2.canMergeTime) {
+                                // MERGE
+                                c1.mass += c2.mass;
+                                cells.splice(j, 1);
+                                j--;
+                            } else {
+                                // BOUNCE (Push away)
+                                const angle = Math.atan2(c1.y - c2.y, c1.x - c2.x);
+                                const overlap = (r1 + r2) - dist;
+                                c1.x += Math.cos(angle) * overlap * 0.1;
+                                c1.y += Math.sin(angle) * overlap * 0.1;
+                                c2.x -= Math.cos(angle) * overlap * 0.1;
+                                c2.y -= Math.sin(angle) * overlap * 0.1;
+                            }
+                        }
+                    }
+                }
+                return cells;
             });
 
-            // Uppdatera utskjuten massa
+            // Mat & Kollisioner
+            setTotalMass(prevM => {
+                let currentTotal = 0;
+                playerCells.forEach(c => currentTotal += c.mass);
+                return currentTotal;
+            });
+
             setEjectedMass(prev => prev.map(m => ({
                 ...m,
                 x: m.x + m.vx,
@@ -160,35 +200,55 @@ export default function Game() {
                 vy: m.vy * 0.9
             })).filter(m => Math.abs(m.vx) > 0.1));
 
-            // Collision Detection: Player vs Food
             setFood(prevFood => {
-                let newScoreAdd = 0;
-                const remaining = prevFood.filter(f => {
-                    let eaten = false;
+                return prevFood.filter(f => {
+                    let alive = true;
                     playerCells.forEach(cell => {
+                        const radius = Math.sqrt(cell.mass * 100);
                         const dist = Math.hypot(cell.x - f.x, cell.y - f.y);
-                        if (dist < cell.radius) {
-                            eaten = true;
-                            cell.radius += 0.5; // Väx lite
-                            newScoreAdd += 1;
+                        if (dist < radius) {
+                            cell.mass += 0.2;
+                            alive = false;
                         }
                     });
-                    return !eaten;
+                    return alive;
                 });
-                if (newScoreAdd > 0) setScore(s => s + newScoreAdd);
-                return remaining;
             });
 
             // Virus collision
             viruses.forEach(v => {
-                playerCells.forEach(cell => {
+                playerCells.forEach((cell, idx) => {
+                    const radius = Math.sqrt(cell.mass * 100);
                     const dist = Math.hypot(cell.x - v.x, cell.y - v.y);
-                    if (dist < cell.radius && cell.radius > v.radius * 1.1) {
-                        // Trigger split-bomb (förenklat för demo: tappar bara massa)
-                        cell.radius *= 0.8;
+                    if (dist < radius && cell.mass > v.radius) {
+                        // EXPLODE
+                        explodePlayer(idx);
                     }
                 });
             });
+
+            function explodePlayer(index) {
+                setPlayerCells(prev => {
+                    const cells = [...prev];
+                    const cell = cells[index];
+                    if (cells.length >= MAX_PLAYER_CELLS) return prev;
+                    
+                    const pieces = Math.min(8, MAX_PLAYER_CELLS - cells.length);
+                    const newMass = cell.mass / (pieces + 1);
+                    cell.mass = newMass;
+                    cell.canMergeTime = Date.now() + 20000;
+                    
+                    for(let i=0; i<pieces; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        cells.push({
+                            id: Math.random(), x: cell.x, y: cell.y, mass: newMass,
+                            vx: Math.cos(angle) * 20, vy: Math.sin(angle) * 20,
+                            color: cell.color, canMergeTime: Date.now() + 20000
+                        });
+                    }
+                    return cells;
+                });
+            }
 
             render();
             animationFrameId = requestAnimationFrame(update);
@@ -197,24 +257,16 @@ export default function Game() {
         const render = () => {
             const canvas = canvasRef.current;
             if (!canvas) return;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { alpha: false }); // Performance optimization
             
-            // Dynamisk skärmstorlek
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-
-            // Beräkna center of mass för kameran
             const avgX = playerCells.reduce((sum, c) => sum + c.x, 0) / playerCells.length;
             const avgY = playerCells.reduce((sum, c) => sum + c.y, 0) / playerCells.length;
-            const totalMass = playerCells.reduce((sum, c) => sum + c.radius, 0);
-            
-            // Dynamisk zoom
-            const zoom = Math.max(0.2, Math.min(1, 1 / (1 + Math.pow(totalMass / 300, 0.5))));
+            const zoom = Math.max(0.15, Math.min(1, 1 / (1 + Math.pow(totalMass / 500, 0.5))));
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0a0a0c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             
-            // Transformera kameran
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.scale(zoom, zoom);
             ctx.translate(-avgX, -avgY);
@@ -239,7 +291,7 @@ export default function Game() {
                 ctx.fillStyle = f.color;
                 ctx.beginPath();
                 ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.arc(f.x, f.y, 8, 0, Math.PI * 2); ctx.fill();
             });
 
             // Rita Virus
@@ -263,21 +315,27 @@ export default function Game() {
             ejectedMass.forEach(m => {
                 ctx.fillStyle = m.color;
                 ctx.beginPath(); ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(m.x, m.y, 12, 0, Math.PI * 2); ctx.fill();
             });
 
             // Rita Spelaren
             playerCells.forEach(cell => {
+                const radius = Math.sqrt(cell.mass * 100);
                 ctx.fillStyle = cell.color;
                 ctx.strokeStyle = 'white';
-                ctx.lineWidth = 4;
+                ctx.lineWidth = radius * 0.05;
                 ctx.beginPath();
-                ctx.arc(cell.x, cell.y, cell.radius, 0, Math.PI * 2);
+                ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
                 
-                // Glöd-effekt (iOS stil)
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = cell.color;
+                // Namn & Massa
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.font = `bold ${radius * 0.4}px system-ui`;
+                ctx.fillText(user?.username || 'Guest', cell.x, cell.y);
+                ctx.font = `${radius * 0.2}px system-ui`;
+                ctx.fillText(Math.floor(cell.mass), cell.x, cell.y + radius * 0.3);
             });
 
             ctx.restore();
@@ -285,7 +343,17 @@ export default function Game() {
 
         update();
         return () => cancelAnimationFrame(animationFrameId);
-    }, [playerCells, food, mousePos, ejectedMass, viruses]);
+    }, [playerCells, food, mousePos, ejectedMass, viruses, totalMass]);
+
+    const handleMouseMove = (e) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        setMousePos({
+            x: e.clientX - rect.left - canvas.width / 2,
+            y: e.clientY - rect.top - canvas.height / 2
+        });
+    };
 
     return (
         <div style={{ 
@@ -321,7 +389,7 @@ export default function Game() {
                 }}>
                     <h3 style={{ margin: 0, opacity: 0.5, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Current Balance</h3>
                     <div style={{ fontSize: '1.8rem', fontWeight: '800' }}>
-                        ${((user?.balance || 0) + (score * 0.01)).toFixed(2)}
+                        ${((user?.balance || 0) + (totalMass * 0.01)).toFixed(2)}
                     </div>
                 </div>
             </div>
@@ -372,7 +440,7 @@ export default function Game() {
                 <div style={{ fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontWeight: '700' }}>1. You</span>
-                        <span>${(score * 0.01).toFixed(2)}</span>
+                        <span>${(totalMass * 0.01).toFixed(2)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.5 }}>
                         <span>2. Bot_Alpha</span>
