@@ -11,16 +11,22 @@ function PrivateRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
+function PublicRoute({ children }) {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <Navigate to="/lobby" /> : children;
+}
+
 function App() {
   return (
     <Router>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/lobby" element={<PrivateRoute><Lobby /></PrivateRoute>} />
-          <Route path="/game" element={<Game />} /> {/* Lägg till en rutt för spelet */}
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/game" element={<PrivateRoute><Game /></PrivateRoute>} />
+          {/* Skicka till lobby som standard - den sköter redirect till login om det behövs */}
+          <Route path="/" element={<Navigate to="/lobby" />} />
         </Routes>
       </AuthProvider>
     </Router>

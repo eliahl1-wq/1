@@ -1,73 +1,54 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { io } from 'socket.io-client';
 
 /**
- * AgarStake Core Game Component (Single Player Demo Version)
- * Denna fil innehåller grundmekaniken för spelet.
+ * AgarStake Core Game Component (Multiplayer Engine)
  */
 
 export default function Game() {
     const canvasRef = useRef(null);
-    const { user } = useAuth();
+    const { user, token } = useAuth();
+    const socketRef = useRef(null);
     
     // --- KONSTANTER ---
     const WORLD_SIZE = 5000;
-    const INITIAL_MASS = 20;
-    const MIN_SPLIT_MASS = 35;
-    const MAX_PLAYER_CELLS = 16;
-    const DECAY_BASE = 0.000001;
     
     // --- STATE ---
-    const [playerCells, setPlayerCells] = useState([
-        { 
-            id: Math.random(), 
-            x: WORLD_SIZE / 2, 
-            y: WORLD_SIZE / 2, 
-            mass: INITIAL_MASS, 
-            vx: 0, 
-            vy: 0, 
-            canMergeTime: 0,
-            color: '#007AFF' 
-        }
-    ]);
+    const [players, setPlayers] = useState([]);
     const [food, setFood] = useState([]);
-    const [viruses, setViruses] = useState([]);
-    const [ejectedMass, setEjectedMass] = useState([]);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const [totalMass, setTotalMass] = useState(INITIAL_MASS);
+    const [myId, setMyId] = useState(null);
 
-    // Initiera banan
     useEffect(() => {
-        const initialFood = Array.from({ length: 400 }, () => ({
-            id: Math.random(),
-            x: Math.random() * WORLD_SIZE,
-            y: Math.random() * WORLD_SIZE,
-            mass: 1,
-            color: `hsl(${Math.random() * 360}, 80%, 60%)`
-        }));
+        // Anslut till servern
+        socketRef.current = io(import.meta.env.VITE_API_URL);
+        const socket = socketRef.current;
 
-        const initialViruses = Array.from({ length: 15 }, () => ({
-            id: Math.random(),
-            x: Math.random() * WORLD_SIZE,
-            y: Math.random() * WORLD_SIZE,
-            radius: 80
-        }));
+        socket.emit('joinGame', { username: user?.username, token });
 
-        setFood(initialFood);
-        setViruses(initialViruses);
-    }, []);
+        socket.on('init', (data) => {
+            setMyId(data.id);
+            setFood(data.food);
+        });
 
-    // Input
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.code === 'Space') splitPlayer();
-            if (e.code === 'KeyW') ejectMass();
-        };
-        window.addEventListener('keydown', handleKeyDown);
+        socket.on('tick', (data) => {
+            setPlayers(data.players);
+            setFood(data.food);
+        });
+
+        socket.on('died', () => {
+            alert('Game Over!');
+            window.location.href = '/lobby';
+        });
+
         window.addEventListener('resize', handleResize);
         handleResize();
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [playerCells, mousePos]);
+
+        return () => {
+            socket.disconnect();
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [user, token]);
 
     const handleResize = () => {
         const canvas = canvasRef.current;
