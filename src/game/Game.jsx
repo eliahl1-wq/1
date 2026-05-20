@@ -24,15 +24,18 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState([]);
 
     useEffect(() => {
-        // Anslut bara om vi har en token och inte redan har en aktiv anslutning
-        if (!token || !user?.username || socketRef.current) return;
+        // Om anslutningen redan finns eller vi saknar credentials, gör ingenting
+        if (!token || !user?.username || (socketRef.current && socketRef.current.connected)) return;
 
         console.log('Connecting to arena...');
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        
+        // Skapa instansen
         socketRef.current = io(apiUrl, {
             auth: { token },
-            transports: ['websocket'], // Tvingar WebSocket för Render
+            transports: ['websocket'], // Tvinga websocket för att undvika Render polling-problem
             reconnection: true,
+            forceNew: true, // Viktigt för att undvika att återanvända trasiga anslutningar
             reconnectionAttempts: 5
         });
 
@@ -40,13 +43,12 @@ export default function Game() {
 
         socket.on('connect', () => {
             console.log('Connected to socket server');
-            setIsConnected(true);
-            // Skicka joinGame först när vi vet att pipan är öppen
             socket.emit('joinGame', { username: user?.username, token });
         });
 
         socket.on('init', (data) => {
-            myIdRef.current = data.id;
+            myIdRef.current = data.id; 
+            setIsConnected(true); // Vi är först "anslutna" när vi fått init-data
             foodRef.current = data.food;
         });
 
@@ -74,18 +76,29 @@ export default function Game() {
             console.error('Socket connection error:', err);
         });
 
+        socket.on('error', (msg) => {
+            console.error('Game logic error:', msg);
+            if (msg.includes('balance')) {
+                alert(msg);
+                window.location.assign('/lobby');
+            }
+        });
+
         window.addEventListener('resize', handleResize);
         handleResize();
 
         return () => {
+            console.log('Cleaning up socket connection...');
             socket.off('tick');
             socket.off('init');
             socket.off('died');
-            socket.disconnect();
+            socket.off('error');
+            socket.off('connect_error');
+            socket.disconnect(); // Stäng anslutningen snyggt
             socketRef.current = null;
             window.removeEventListener('resize', handleResize);
         };
-    }, [token, user?.username]); // Lyssna bara på token och användarnamn, inte hela user-objektet
+    }, [token, user?.username]);
 
     const handleResize = () => {
         const canvas = canvasRef.current;
