@@ -1,9 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
+import global from './global.js';
+import Canvas from './canvas.js';
+import ChatClient from './chat-client.js';
+import * as renderUtils from './render.js';
 
 /**
  * Version v11 - Full Agar.io Clone Logic Integrated
+ * Version v12 - Full Agar.io Clone Logic Integrated (Frontend)
  * AgarStake Core Game Component (Multiplayer Engine)
  */
 
@@ -14,10 +19,9 @@ export default function Game() {
     const hasJoinedGameRef = useRef(false); // Ny ref för att spåra om joinGame har skickats
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
-    const playersRef = useRef([]);
-    const foodRef = useRef([]);
-    const virusesRef = useRef([]); // Ny ref för virus
-    const ejectedRef = useRef([]);
+    const gameData = useRef({ players: [], food: [], viruses: [], ejected: [] });
+    const camera = useRef({ x: 2500, y: 2500, z: 1 });
+    const targetCamera = useRef({ x: 2500, y: 2500, z: 1 });
     const myIdRef = useRef(null);
     
     const WORLD_SIZE = 5000;
@@ -69,6 +73,7 @@ export default function Game() {
             console.log('Game initialized');
             myIdRef.current = data.id;
             foodRef.current = data.food; // Initial mat
+            foodRef.current = data.food;
             virusesRef.current = data.viruses || []; // Initiala virus
         });
 
@@ -145,101 +150,33 @@ export default function Game() {
         canvas.height = window.innerHeight;
     };
 
-    // Riktig renderingsloop som körs oberoende av Reacts state-ändringar
     useEffect(() => {
-        let animationFrameId;
-        const update = () => {
-            render();
-            animationFrameId = requestAnimationFrame(update);
-        };
-
-        const render = () => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            
-            const me = playersRef.current.find(p => p.id === myIdRef.current);
-            if (!me || !me.cells || !me.cells.length) return;
-
-            // Fokusera kameran på mitten av alla dina celler
-            const avgX = me.cells.reduce((a, b) => a + b.x, 0) / me.cells.length;
-            const avgY = me.cells.reduce((a, b) => a + b.y, 0) / me.cells.length;
-            const totalMass = me.cells.reduce((a, b) => a + b.mass, 0);
-
-            const zoom = Math.max(0.1, Math.min(1, 1 / (1 + Math.pow(totalMass / 1000, 0.5))));
-
-            ctx.fillStyle = '#0a0a0c';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.scale(zoom, zoom);
-            ctx.translate(-avgX, -avgY);
-
-            // Rita Grid
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            ctx.lineWidth = 2;
-            for (let x = 0; x <= WORLD_SIZE; x += 200) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
+        if (!socketRef.current) return;
+        
+        // Koppla ihop global.js med Socket.io
+        global.socket = socketRef.current;
+        const canvas = new Canvas();
+        const chat = new ChatClient();
+        
+        const graph = canvasRef.current.getContext('2d');
+        
+        // Använd renderings-logiken från render.js
+        const gameLoop = () => {
+            if (isConnected) {
+                graph.fillStyle = global.backgroundColor;
+                graph.fillRect(0, 0, window.innerWidth, window.innerHeight);
+                
+                const me = gameData.current.players.find(p => p.id === myIdRef.current);
+                if (me) {
+                    renderUtils.drawGrid(global, me, { width: window.innerWidth, height: window.innerHeight }, graph);
+                    renderUtils.drawFood(gameData.current.food, graph);
+                    renderUtils.drawVirus(gameData.current.viruses, graph);
+                    // etc... (anropa funktionerna i render.js med data från gameData.current)
+                }
             }
-            for (let y = 0; y <= WORLD_SIZE; y += 200) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke();
-            }
-
-            // Rita World Border
-            ctx.strokeStyle = '#FF3B30';
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
-
-            // Rita Mat
-            foodRef.current.forEach(f => {
-                ctx.fillStyle = f.color;
-                ctx.beginPath(); ctx.arc(f.x, f.y, 8, 0, Math.PI * 2); ctx.fill();
-            });
-
-            // Rita virus
-            virusesRef.current.forEach(v => {
-                ctx.fillStyle = v.color;
-                ctx.beginPath(); ctx.arc(v.x, v.y, Math.sqrt(v.mass * 100), 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            // Rita utkastad massa
-            ejectedRef.current.forEach(m => {
-                ctx.fillStyle = m.color;
-                ctx.beginPath(); ctx.arc(m.x, m.y, 15, 0, Math.PI * 2); ctx.fill();
-            });
-
-            // Rita alla spelare och deras celler
-            playersRef.current.forEach(player => {
-                if (!player.cells) return;
-                // Sortera cellerna så att de största ritas sist (överlappar mindre)
-                const sortedCells = [...player.cells].sort((a, b) => a.mass - b.mass);
-
-                sortedCells.forEach(cell => {
-                    const radius = Math.sqrt(cell.mass * 100);
-                    ctx.fillStyle = player.color;
-                    ctx.strokeStyle = player.id === myIdRef.current ? 'white' : 'rgba(0,0,0,0.5)';
-                    ctx.lineWidth = radius * 0.05;
-                    ctx.beginPath();
-                    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.stroke();
-                    
-                    // Namn (bara på största cellen för att inte kladda ner)
-                    ctx.fillStyle = 'white';
-                    ctx.textAlign = 'center'; // Centrera texten
-                    ctx.textBaseline = 'middle'; // Centrera vertikalt
-                    // Rita namnet bara på den största cellen för att undvika överlappning
-                    if (cell === sortedCells[sortedCells.length - 1]) { // Endast den största cellen
-                    ctx.font = `bold ${Math.max(12, radius * 0.4)}px system-ui`;
-                    ctx.fillText(player.username, cell.x, cell.y);
-                    }
-                });
-            });
-
-            ctx.restore();
+            requestAnimationFrame(gameLoop);
         };
+        gameLoop();
 
         update();
         return () => cancelAnimationFrame(animationFrameId);
