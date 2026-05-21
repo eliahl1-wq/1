@@ -157,7 +157,7 @@ export default function Game() {
             const screen = { width: window.innerWidth, height: window.innerHeight };
             
             if (isConnected && player.x !== undefined) {
-                graph.fillStyle = global.backgroundColor;
+                graph.fillStyle = '#f2fbff';
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
                 renderUtils.drawGrid(global, player, screen, graph);

@@ -26,6 +26,6 @@ export default {
     continuity: false,
     startPingTime: 0,
     toggleMassState: 0,
-    backgroundColor: '#0a0a0c', // Svart/Mörkgrå bakgrund
-    lineColor: '#222222',       // Mörkgråa rutnätslinjer
+    backgroundColor: '#f2fbff',
+    lineColor: '#000000',
 };
