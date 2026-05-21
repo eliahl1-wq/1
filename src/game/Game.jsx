@@ -76,7 +76,14 @@ export default function Game() {
             ejectedRef.current = data.ejectedMass || [];
             const me = data.players.find(p => p.id === myIdRef.current);
             if (me) setCurrentBalance(me.balance);
-            setLeaderboard([...data.players].sort((a, b) => b.mass - a.mass).slice(0, 5));
+            
+            // Sortera leaderboard baserat på total massa (summan av alla celler)
+            const sorted = [...data.players].sort((a, b) => {
+                const massA = a.cells?.reduce((sum, c) => sum + cell.mass, 0) || 0;
+                const massB = b.cells?.reduce((sum, c) => sum + cell.mass, 0) || 0;
+                return massB - massA;
+            }).slice(0, 5);
+            setLeaderboard(sorted);
         });
 
         socket.on('died', () => {
@@ -149,7 +156,7 @@ export default function Game() {
             const ctx = canvas.getContext('2d');
             
             const me = playersRef.current.find(p => p.id === myIdRef.current);
-            if (!me || !me.cells.length) return;
+            if (!me || !me.cells || !me.cells.length) return;
 
             // Fokusera kameran på mitten av alla dina celler
             const avgX = me.cells.reduce((a, b) => a + b.x, 0) / me.cells.length;
@@ -195,6 +202,7 @@ export default function Game() {
 
             // Rita alla spelare och deras celler
             playersRef.current.forEach(player => {
+                if (!player.cells) return;
                 player.cells.forEach(cell => {
                     const radius = Math.sqrt(cell.mass * 100);
                     ctx.fillStyle = player.color;
