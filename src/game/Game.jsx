@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 
 /**
- * Version v10 - Adding Split (Space) and Eject (W) mechanics
+ * Version v11 - Full Agar.io Clone Logic Integrated
  * AgarStake Core Game Component (Multiplayer Engine)
  */
 
@@ -16,6 +16,7 @@ export default function Game() {
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const playersRef = useRef([]);
     const foodRef = useRef([]);
+    const virusesRef = useRef([]); // Ny ref för virus
     const ejectedRef = useRef([]);
     const myIdRef = useRef(null);
     
@@ -67,20 +68,22 @@ export default function Game() {
         socket.on('init', (data) => {
             console.log('Game initialized');
             myIdRef.current = data.id;
-            foodRef.current = data.food;
+            foodRef.current = data.food; // Initial mat
+            virusesRef.current = data.viruses || []; // Initiala virus
         });
 
         socket.on('tick', (data) => {
             playersRef.current = data.players;
             foodRef.current = data.food;
             ejectedRef.current = data.ejectedMass || [];
+            virusesRef.current = data.viruses || [];
             const me = data.players.find(p => p.id === myIdRef.current);
             if (me) setCurrentBalance(me.balance);
             
             // Sortera leaderboard baserat på total massa (summan av alla celler)
             const sorted = [...data.players].sort((a, b) => {
-                const massA = a.cells?.reduce((sum, c) => sum + cell.mass, 0) || 0;
-                const massB = b.cells?.reduce((sum, c) => sum + cell.mass, 0) || 0;
+                const massA = a.cells?.reduce((sum, c) => sum + c.mass, 0) || 0;
+                const massB = b.cells?.reduce((sum, c) => sum + c.mass, 0) || 0;
                 return massB - massA;
             }).slice(0, 5);
             setLeaderboard(sorted);
@@ -194,6 +197,13 @@ export default function Game() {
                 ctx.beginPath(); ctx.arc(f.x, f.y, 8, 0, Math.PI * 2); ctx.fill();
             });
 
+            // Rita virus
+            virusesRef.current.forEach(v => {
+                ctx.fillStyle = v.color;
+                ctx.beginPath(); ctx.arc(v.x, v.y, Math.sqrt(v.mass * 100), 0, Math.PI * 2);
+                ctx.fill();
+            });
+
             // Rita utkastad massa
             ejectedRef.current.forEach(m => {
                 ctx.fillStyle = m.color;
@@ -203,7 +213,10 @@ export default function Game() {
             // Rita alla spelare och deras celler
             playersRef.current.forEach(player => {
                 if (!player.cells) return;
-                player.cells.forEach(cell => {
+                // Sortera cellerna så att de största ritas sist (överlappar mindre)
+                const sortedCells = [...player.cells].sort((a, b) => a.mass - b.mass);
+
+                sortedCells.forEach(cell => {
                     const radius = Math.sqrt(cell.mass * 100);
                     ctx.fillStyle = player.color;
                     ctx.strokeStyle = player.id === myIdRef.current ? 'white' : 'rgba(0,0,0,0.5)';
@@ -215,9 +228,13 @@ export default function Game() {
                     
                     // Namn (bara på största cellen för att inte kladda ner)
                     ctx.fillStyle = 'white';
-                    ctx.textAlign = 'center';
+                    ctx.textAlign = 'center'; // Centrera texten
+                    ctx.textBaseline = 'middle'; // Centrera vertikalt
+                    // Rita namnet bara på den största cellen för att undvika överlappning
+                    if (cell === sortedCells[sortedCells.length - 1]) { // Endast den största cellen
                     ctx.font = `bold ${Math.max(12, radius * 0.4)}px system-ui`;
                     ctx.fillText(player.username, cell.x, cell.y);
+                    }
                 });
             });
 
