@@ -16,7 +16,7 @@ export default function Game() {
     const canvasRef = useRef(null);
     const { user, token } = useAuth();
     const socketRef = useRef(null);
-    const hasJoinedGameRef = useRef(false); // Ny ref för att spåra om joinGame har skickats
+    const hasJoinedGameRef = useRef(false);
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [] });
@@ -24,7 +24,7 @@ export default function Game() {
     const animationFrameId = useRef(null);
     
     const WORLD_SIZE = 5000;
-    
+
     const [isConnected, setIsConnected] = useState(false);
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
@@ -35,7 +35,7 @@ export default function Game() {
             // Om vi har en socket men token/användarnamn blev null (t.ex. utloggning), koppla bort den
             if (socketRef.current && (!token || !user?.username)) {
                 console.log('Auth data lost or changed, disconnecting socket.');
-                socketRef.current.disconnect();
+                socketRef.current.disconnect(); // Disconnect existing socket
                 socketRef.current = null;
                 setIsConnected(false);
                 hasJoinedGameRef.current = false;
@@ -82,7 +82,7 @@ export default function Game() {
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList) => {
             gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList };
             const me = userData.find(p => p.id === myIdRef.current);
-            if (me) setCurrentBalance(me.balance);
+            setCurrentBalance(me?.balance ?? 0); // Use nullish coalescing to default to 0 if me or me.balance is undefined
         });
 
         socket.on('leaderboard', (data) => {
@@ -235,7 +235,7 @@ export default function Game() {
                 }}>
                     <h3 style={{ margin: 0, opacity: 0.5, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Current Balance</h3>
                     <div style={{ fontSize: '1.8rem', fontWeight: '800' }}>
-                        ${currentBalance.toFixed(2)}
+                        ${(currentBalance ?? 0).toFixed(2)}
                     </div>
                 </div>
             </div>
@@ -264,7 +264,7 @@ export default function Game() {
                     fontWeight: '900', 
                     letterSpacing: '-1px',
                     fontStyle: 'italic'
-                }}>
+                }} className="game-title">
                     AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
                 </h2>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
@@ -286,8 +286,8 @@ export default function Game() {
                 <div style={{ fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {leaderboard.map((p, i) => (
                         <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', opacity: p.id === myIdRef.current ? 1 : 0.5 }}>
-                            <span style={{ fontWeight: p.id === myIdRef.current ? '700' : '400' }}>{i + 1}. {p.username}</span>
-                            <span>${p.balance.toFixed(2)}</span>
+                            <span style={{ fontWeight: p.id === myIdRef.current ? '700' : '400' }}>{i + 1}. {p.name || 'An unnamed cell'}</span>
+                            <span>${(p.balance ?? 0).toFixed(2)}</span>
                         </div>
                     ))}
                 </div>
