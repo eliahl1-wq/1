@@ -113,8 +113,8 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
 
 const drawGrid = (global, player, screen, graph) => {
     graph.lineWidth = 1;
-    graph.strokeStyle = global.lineColor;
-    graph.globalAlpha = 0.15;
+    graph.strokeStyle = '#ffffff';
+    graph.globalAlpha = 0.08; // Väldigt svagt rutnät för proffsig känsla
     graph.beginPath();
 
     for (let x = -player.x; x < screen.width; x += screen.height / 18) {
