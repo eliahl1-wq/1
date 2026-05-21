@@ -26,27 +26,28 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState([]);
 
     useEffect(() => {
-        // Förhindra dubbla anslutningar och vänta på inloggning
-        if (!token || !user?.username || isSocketInitialized.current) return;
-        
-        isSocketInitialized.current = true;
+        // 1. Säkerställ att vi har data och inte redan anslutit
+        if (!token || !user?.username || socketRef.current) return;
 
         console.log('Connecting to arena...');
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         
-        socketRef.current = io(apiUrl, {
+        // 2. Skapa socket-instansen med robusta inställningar för Render
+        const socket = io(apiUrl, {
             auth: { token },
-            transports: ['websocket'], // Tvinga websocket för att undvika Render polling-problem
+            transports: ['websocket'], // Render kräver ofta direkt websocket för att undvika 404-polling fel
             reconnection: true,
-            reconnectionAttempts: 5
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000,
+            timeout: 20000 // Ge Render tid att svara om den "sover"
         });
 
-        const socket = socketRef.current;
+        socketRef.current = socket;
+        isSocketInitialized.current = true;
 
         socket.on('connect', () => {
             console.log('Connected to socket server');
             setIsConnected(true);
-            
             if (!hasJoinedGameRef.current) {
                 console.log('Emitting joinGame...');
                 socket.emit('joinGame', { username: user.username, token });
@@ -55,24 +56,17 @@ export default function Game() {
         });
 
         socket.on('init', (data) => {
-            myIdRef.current = data.id; 
-            setIsConnected(true); // Vi är först "anslutna" när vi fått init-data
+            console.log('Game initialized');
+            myIdRef.current = data.id;
             foodRef.current = data.food;
         });
 
         socket.on('tick', (data) => {
             playersRef.current = data.players;
             foodRef.current = data.food;
-
-            // Uppdatera UI-state mer sällan för prestanda
             const me = data.players.find(p => p.id === myIdRef.current);
             if (me) setCurrentBalance(me.balance);
-            
-            // Enkel leaderboard-sortering
-            const topPlayers = [...data.players]
-                .sort((a, b) => b.mass - a.mass)
-                .slice(0, 5);
-            setLeaderboard(topPlayers);
+            setLeaderboard([...data.players].sort((a, b) => b.mass - a.mass).slice(0, 5));
         });
 
         socket.on('died', () => {
@@ -83,41 +77,28 @@ export default function Game() {
         socket.on('disconnect', () => {
             console.log('Socket disconnected.');
             setIsConnected(false);
-            hasJoinedGameRef.current = false; // Återställ flaggan vid disconnect
-            // Om servern kopplar ner oss, kan det vara pga auth-fel eller liknande.
-            // I så fall vill vi inte att klienten försöker återansluta oändligt.
-            if (socket.io.reconnecting) {
-                console.log('Socket is trying to reconnect...');
-            }
         });
 
         socket.on('connect_error', (err) => {
-            console.error('Socket connection error:', err);
+            console.error('Connection failed, retrying...', err.message);
         });
 
         socket.on('error', (msg) => {
-            console.error('Game logic error:', msg);
             if (msg.includes('balance')) {
                 alert(msg);
                 window.location.assign('/lobby');
             }
         });
 
-        // Hantera fönsterstorleksändringar
         window.addEventListener('resize', handleResize);
         handleResize();
 
         return () => {
-            if (socketRef.current) {
-                console.log('Cleaning up socket connection...');
-                socketRef.current.disconnect();
-                socketRef.current = null;
-            }
-            isSocketInitialized.current = false;
-            hasJoinedGameRef.current = false;
-            window.removeEventListener('resize', handleResize);
+            // VIKTIGT: Koppla endast bort om vi faktiskt lämnar sidan, 
+            // inte vid Reacts interna StrictMode-renderings.
+            // Vi nollställer inte socketRef här för att tillåta återanslutning.
         };
-    }, [token, user?.username]);
+    }, [token, user?.username]); // Körs när vi har inloggningsdata
 
     const handleResize = () => {
         const canvas = canvasRef.current;
