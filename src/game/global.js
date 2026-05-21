@@ -26,6 +26,6 @@ export default {
     continuity: false,
     startPingTime: 0,
     toggleMassState: 0,
-    backgroundColor: '#f2fbff',
-    lineColor: '#000000',
+    backgroundColor: '#0a0a0c',
+    lineColor: '#ffffff',
 };
