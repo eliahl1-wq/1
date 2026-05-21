@@ -11,8 +11,6 @@ export default function Game() {
     const { user, token } = useAuth();
     const socketRef = useRef(null);
     const hasJoinedGameRef = useRef(false); // Ny ref för att spåra om joinGame har skickats
-    const isSocketInitialized = useRef(false); // Ny ref för att spåra om socket har initierats
-    // Liten ändring för att trigga Vercel deployment
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const playersRef = useRef([]);
@@ -26,24 +24,33 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState([]);
 
     useEffect(() => {
-        // 1. Säkerställ att vi har data och inte redan anslutit
-        if (!token || !user?.username || socketRef.current) return;
+        // Endast anslut om vi har en token och användarnamn, OCH ingen socket är aktiv
+        if (!token || !user?.username || socketRef.current) {
+            // Om vi har en socket men token/användarnamn blev null (t.ex. utloggning), koppla bort den
+            if (socketRef.current && (!token || !user?.username)) {
+                console.log('Auth data lost or changed, disconnecting socket.');
+                socketRef.current.disconnect();
+                socketRef.current = null;
+                setIsConnected(false);
+                hasJoinedGameRef.current = false;
+            }
+            console.log('useEffect: Skipping socket creation (token/user missing or socket exists).');
+            return;
+        }
 
-        console.log('Connecting to arena...');
+        console.log('useEffect: Attempting to create new socket with valid auth data...');
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         
-        // 2. Skapa socket-instansen med robusta inställningar för Render
         const socket = io(apiUrl, {
             auth: { token },
-            transports: ['websocket'], // Render kräver ofta direkt websocket för att undvika 404-polling fel
+            transports: ['websocket'], // Tvinga websocket för Render
             reconnection: true,
             reconnectionAttempts: 10,
             reconnectionDelay: 2000,
-            timeout: 20000 // Ge Render tid att svara om den "sover"
+            timeout: 20000 // Längre timeout för Render cold starts
         });
 
-        socketRef.current = socket;
-        isSocketInitialized.current = true;
+        socketRef.current = socket; // Spara instansen i ref
 
         socket.on('connect', () => {
             console.log('Connected to socket server');
@@ -74,16 +81,19 @@ export default function Game() {
             window.location.assign('/lobby');
         });
 
-        socket.on('disconnect', () => {
-            console.log('Socket disconnected.');
+        socket.on('disconnect', (reason) => {
+            console.log('Socket disconnected:', reason);
             setIsConnected(false);
+            hasJoinedGameRef.current = false; // Återställ för eventuell återanslutning
         });
 
         socket.on('connect_error', (err) => {
             console.error('Connection failed, retrying...', err.message);
+            setIsConnected(false); // Reflektera att vi inte är anslutna i UI
         });
 
         socket.on('error', (msg) => {
+            console.error('Server error:', msg); // Logga server-side fel
             if (msg.includes('balance')) {
                 alert(msg);
                 window.location.assign('/lobby');
@@ -94,9 +104,14 @@ export default function Game() {
         handleResize();
 
         return () => {
-            // VIKTIGT: Koppla endast bort om vi faktiskt lämnar sidan, 
-            // inte vid Reacts interna StrictMode-renderings.
-            // Vi nollställer inte socketRef här för att tillåta återanslutning.
+            console.log('Cleaning up socket connection on component unmount or auth change...');
+            if (socketRef.current) {
+                socketRef.current.off(); // Ta bort alla lyssnare
+                socketRef.current.disconnect(); // Koppla bort socketen
+                socketRef.current = null; // Nollställ ref
+            }
+            hasJoinedGameRef.current = false; // Återställ flaggan
+            window.removeEventListener('resize', handleResize);
         };
     }, [token, user?.username]); // Körs när vi har inloggningsdata
 
