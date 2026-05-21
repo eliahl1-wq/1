@@ -16,6 +16,7 @@ export default function Game() {
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const playersRef = useRef([]);
     const foodRef = useRef([]);
+    const ejectedRef = useRef([]);
     const myIdRef = useRef(null);
     
     const WORLD_SIZE = 5000;
@@ -72,6 +73,7 @@ export default function Game() {
         socket.on('tick', (data) => {
             playersRef.current = data.players;
             foodRef.current = data.food;
+            ejectedRef.current = data.ejectedMass || [];
             const me = data.players.find(p => p.id === myIdRef.current);
             if (me) setCurrentBalance(me.balance);
             setLeaderboard([...data.players].sort((a, b) => b.mass - a.mass).slice(0, 5));
@@ -146,10 +148,15 @@ export default function Game() {
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             
-            const myPlayer = playersRef.current.find(p => p.id === myIdRef.current);
-            if (!myPlayer) return;
+            const me = playersRef.current.find(p => p.id === myIdRef.current);
+            if (!me || !me.cells.length) return;
 
-            const zoom = Math.max(0.15, Math.min(1, 1 / (1 + Math.pow(myPlayer.mass / 500, 0.5))));
+            // Fokusera kameran på mitten av alla dina celler
+            const avgX = me.cells.reduce((a, b) => a + b.x, 0) / me.cells.length;
+            const avgY = me.cells.reduce((a, b) => a + b.y, 0) / me.cells.length;
+            const totalMass = me.cells.reduce((a, b) => a + b.mass, 0);
+
+            const zoom = Math.max(0.1, Math.min(1, 1 / (1 + Math.pow(totalMass / 1000, 0.5))));
 
             ctx.fillStyle = '#0a0a0c';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -157,7 +164,7 @@ export default function Game() {
             
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.scale(zoom, zoom);
-            ctx.translate(-myPlayer.x, -myPlayer.y);
+            ctx.translate(-avgX, -avgY);
 
             // Rita Grid
             ctx.strokeStyle = 'rgba(255,255,255,0.05)';
@@ -180,22 +187,30 @@ export default function Game() {
                 ctx.beginPath(); ctx.arc(f.x, f.y, 8, 0, Math.PI * 2); ctx.fill();
             });
 
-            // Rita alla spelare
-            playersRef.current.forEach(cell => {
-                const radius = Math.sqrt(cell.mass * 100);
-                ctx.fillStyle = cell.color;
-                ctx.strokeStyle = cell.id === myIdRef.current ? 'white' : 'rgba(0,0,0,0.5)';
-                ctx.lineWidth = radius * 0.05;
-                ctx.beginPath();
-                ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                
-                // Namn & Massa
-                ctx.fillStyle = 'white';
-                ctx.textAlign = 'center';
-                ctx.font = `bold ${Math.max(12, radius * 0.4)}px system-ui`;
-                ctx.fillText(cell.username, cell.x, cell.y);
+            // Rita utkastad massa
+            ejectedRef.current.forEach(m => {
+                ctx.fillStyle = m.color;
+                ctx.beginPath(); ctx.arc(m.x, m.y, 15, 0, Math.PI * 2); ctx.fill();
+            });
+
+            // Rita alla spelare och deras celler
+            playersRef.current.forEach(player => {
+                player.cells.forEach(cell => {
+                    const radius = Math.sqrt(cell.mass * 100);
+                    ctx.fillStyle = player.color;
+                    ctx.strokeStyle = player.id === myIdRef.current ? 'white' : 'rgba(0,0,0,0.5)';
+                    ctx.lineWidth = radius * 0.05;
+                    ctx.beginPath();
+                    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Namn (bara på största cellen för att inte kladda ner)
+                    ctx.fillStyle = 'white';
+                    ctx.textAlign = 'center';
+                    ctx.font = `bold ${Math.max(12, radius * 0.4)}px system-ui`;
+                    ctx.fillText(player.username, cell.x, cell.y);
+                });
             });
 
             ctx.restore();
