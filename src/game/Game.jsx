@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 
 /**
+ * Git push trigger comment.
  * AgarStake Core Game Component (Multiplayer Engine)
  */
 
