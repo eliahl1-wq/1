@@ -76,6 +76,8 @@ export default function Game() {
             console.log('Welcome to Arena');
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
+            global.game.width = gameSizes.width;
+            global.game.height = gameSizes.height;
             setIsConnected(true);
         });
 
@@ -152,34 +154,47 @@ export default function Game() {
         
         const gameLoop = () => {
             const { player, users, food, viruses, ejected } = gameData.current;
+            const screen = { width: window.innerWidth, height: window.innerHeight };
             
             if (isConnected && player.x !== undefined) {
                 graph.fillStyle = '#f2fbff';
-                graph.fillRect(0, 0, window.innerWidth, window.innerHeight);
+                graph.fillRect(0, 0, screen.width, screen.height);
                 
-                renderUtils.drawGrid(global, player, { width: window.innerWidth, height: window.innerHeight }, graph);
+                renderUtils.drawGrid(global, player, screen, graph);
                 
                 food.forEach(f => {
-                    const pos = { x: f.x - player.x + window.innerWidth/2, y: f.y - player.y + window.innerHeight/2 };
+                    const pos = { x: f.x - player.x + screen.width/2, y: f.y - player.y + screen.height/2 };
                     renderUtils.drawFood(pos, f, graph);
                 });
 
                 viruses.forEach(v => {
-                    const pos = { x: v.x - player.x + window.innerWidth/2, y: v.y - player.y + window.innerHeight/2 };
+                    const pos = { x: v.x - player.x + screen.width/2, y: v.y - player.y + screen.height/2 };
                     renderUtils.drawVirus(pos, v, graph);
                 });
 
+                let borders = {
+                    left: screen.width / 2 - player.x,
+                    right: screen.width / 2 + global.game.width - player.x,
+                    top: screen.height / 2 - player.y,
+                    bottom: screen.height / 2 + global.game.height - player.y
+                };
+
                 // Rita celler
                 const cellsToDraw = users.flatMap(u => u.cells.map(c => ({
-                    ...c, name: u.username, color: u.color.fill || u.color, borderColor: u.color.border || '#000',
-                    x: c.x - player.x + window.innerWidth/2, y: c.y - player.y + window.innerHeight/2
+                    ...c, 
+                    name: u.username, 
+                    color: u.color.fill || u.color, 
+                    borderColor: u.color.border || '#000',
+                    x: c.x - player.x + screen.width/2, 
+                    y: c.y - player.y + screen.height/2
                 })));
                 
-                renderUtils.drawCells(cellsToDraw, { border: 6, textBorderSize: 3, textColor: '#fff', textBorder: '#000' }, 1, {}, graph);
+                renderUtils.drawCells(cellsToDraw, { border: 6, textBorderSize: 3, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
             }
             animationFrameId.current = requestAnimationFrame(gameLoop);
         };
         gameLoop();
+        return () => cancelAnimationFrame(animationFrameId.current);
     }, [isConnected]); 
 
     const handleMouseMove = (e) => {
