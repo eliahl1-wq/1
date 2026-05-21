@@ -1,10 +1,10 @@
-var io = require('socket.io-client');
-var render = require('./render');
-var ChatClient = require('./chat-client');
-var Canvas = require('./canvas');
-var global = require('./global');
+import { io } from 'socket.io-client';
+import * as render from './render.js';
+import ChatClient from './chat-client.js';
+import Canvas from './canvas.js';
+import global from './global.js';
 
-var playerNameInput = document.getElementById('playerNameInput');
+var playerNameInput = { value: "" }; // Placeholder då React sköter inloggning
 var socket;
 
 var debug = function (args) {

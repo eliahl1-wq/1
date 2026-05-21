@@ -1,6 +1,6 @@
-var global = require('./global');
+import global from './global.js';
 
-class ChatClient {
+export default class ChatClient {
     constructor(params) {
         this.canvas = global.canvas;
         this.socket = global.socket;
@@ -218,5 +218,3 @@ class ChatClient {
         }
     }
 }
-
-module.exports = ChatClient;

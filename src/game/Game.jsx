@@ -19,10 +19,9 @@ export default function Game() {
     const hasJoinedGameRef = useRef(false); // Ny ref för att spåra om joinGame har skickats
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
-    const gameData = useRef({ players: [], food: [], viruses: [], ejected: [] });
-    const camera = useRef({ x: 2500, y: 2500, z: 1 });
-    const targetCamera = useRef({ x: 2500, y: 2500, z: 1 });
+    const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [] });
     const myIdRef = useRef(null);
+    const animationFrameId = useRef(null);
     
     const WORLD_SIZE = 5000;
     
@@ -70,33 +69,28 @@ export default function Game() {
         });
 
         socket.on('init', (data) => {
-            console.log('Game initialized');
-            myIdRef.current = data.id;
-            foodRef.current = data.food; // Initial mat
-            foodRef.current = data.food;
-            virusesRef.current = data.viruses || []; // Initiala virus
+            // Denna används inte längre då servern skickar 'welcome'
         });
 
-        socket.on('tick', (data) => {
-            playersRef.current = data.players;
-            foodRef.current = data.food;
-            ejectedRef.current = data.ejectedMass || [];
-            virusesRef.current = data.viruses || [];
-            const me = data.players.find(p => p.id === myIdRef.current);
+        socket.on('welcome', (playerSettings, gameSizes) => {
+            console.log('Welcome to Arena');
+            myIdRef.current = playerSettings.id;
+            gameData.current.player = playerSettings;
+            setIsConnected(true);
+        });
+
+        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList) => {
+            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList };
+            const me = userData.find(p => p.id === myIdRef.current);
             if (me) setCurrentBalance(me.balance);
-            
-            // Sortera leaderboard baserat på total massa (summan av alla celler)
-            const sorted = [...data.players].sort((a, b) => {
-                const massA = a.cells?.reduce((sum, c) => sum + c.mass, 0) || 0;
-                const massB = b.cells?.reduce((sum, c) => sum + c.mass, 0) || 0;
-                return massB - massA;
-            }).slice(0, 5);
-            setLeaderboard(sorted);
+        });
+
+        socket.on('leaderboard', (data) => {
+            setLeaderboard(data.leaderboard);
         });
 
         socket.on('died', () => {
-            alert('Game Over!');
-            window.location.assign('/lobby');
+            window.location.assign('/lobby'); 
         });
 
         socket.on('disconnect', (reason) => {
@@ -119,10 +113,10 @@ export default function Game() {
         });
 
         const handleKeyDown = (e) => {
-            if (e.code === 'Space') {
-                socketRef.current?.emit('split');
+            if (e.code === 'Space') { 
+                socketRef.current?.emit('2'); // Split
             } else if (e.code === 'KeyW') {
-                socketRef.current?.emit('eject');
+                socketRef.current?.emit('1'); // Eject
             }
         };
 
@@ -131,6 +125,7 @@ export default function Game() {
         handleResize();
 
         return () => {
+            cancelAnimationFrame(animationFrameId.current);
             console.log('Cleaning up socket connection on component unmount or auth change...');
             window.removeEventListener('keydown', handleKeyDown);
             if (socketRef.current) {
@@ -151,42 +146,47 @@ export default function Game() {
     };
 
     useEffect(() => {
-        if (!socketRef.current) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const graph = canvas.getContext('2d');
         
-        // Koppla ihop global.js med Socket.io
-        global.socket = socketRef.current;
-        const canvas = new Canvas();
-        const chat = new ChatClient();
-        
-        const graph = canvasRef.current.getContext('2d');
-        
-        // Använd renderings-logiken från render.js
         const gameLoop = () => {
-            if (isConnected) {
-                graph.fillStyle = global.backgroundColor;
+            const { player, users, food, viruses, ejected } = gameData.current;
+            
+            if (isConnected && player.x !== undefined) {
+                graph.fillStyle = '#f2fbff';
                 graph.fillRect(0, 0, window.innerWidth, window.innerHeight);
                 
-                const me = gameData.current.players.find(p => p.id === myIdRef.current);
-                if (me) {
-                    renderUtils.drawGrid(global, me, { width: window.innerWidth, height: window.innerHeight }, graph);
-                    renderUtils.drawFood(gameData.current.food, graph);
-                    renderUtils.drawVirus(gameData.current.viruses, graph);
-                    // etc... (anropa funktionerna i render.js med data från gameData.current)
-                }
+                renderUtils.drawGrid(global, player, { width: window.innerWidth, height: window.innerHeight }, graph);
+                
+                food.forEach(f => {
+                    const pos = { x: f.x - player.x + window.innerWidth/2, y: f.y - player.y + window.innerHeight/2 };
+                    renderUtils.drawFood(pos, f, graph);
+                });
+
+                viruses.forEach(v => {
+                    const pos = { x: v.x - player.x + window.innerWidth/2, y: v.y - player.y + window.innerHeight/2 };
+                    renderUtils.drawVirus(pos, v, graph);
+                });
+
+                // Rita celler
+                const cellsToDraw = users.flatMap(u => u.cells.map(c => ({
+                    ...c, name: u.username, color: u.color.fill || u.color, borderColor: u.color.border || '#000',
+                    x: c.x - player.x + window.innerWidth/2, y: c.y - player.y + window.innerHeight/2
+                })));
+                
+                renderUtils.drawCells(cellsToDraw, { border: 6, textBorderSize: 3, textColor: '#fff', textBorder: '#000' }, 1, {}, graph);
             }
-            requestAnimationFrame(gameLoop);
+            animationFrameId.current = requestAnimationFrame(gameLoop);
         };
         gameLoop();
-
-        update();
-        return () => cancelAnimationFrame(animationFrameId);
-    }, []); // En renderingsloop för hela livscykeln
+    }, [isConnected]); 
 
     const handleMouseMove = (e) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
-        socketRef.current?.emit('mouseMove', {
+        socketRef.current?.emit('0', { // Agario-protokoll '0' för move
             x: e.clientX - rect.left - canvas.width / 2,
             y: e.clientY - rect.top - canvas.height / 2
         });
