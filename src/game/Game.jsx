@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 
 /**
- * Deployment trigger: Version v6 - Emergency Sync Test.
+ * Version v10 - Adding Split (Space) and Eject (W) mechanics
  * AgarStake Core Game Component (Multiplayer Engine)
  */
 
@@ -101,11 +101,21 @@ export default function Game() {
             }
         });
 
+        const handleKeyDown = (e) => {
+            if (e.code === 'Space') {
+                socketRef.current?.emit('split');
+            } else if (e.code === 'KeyW') {
+                socketRef.current?.emit('eject');
+            }
+        };
+
         window.addEventListener('resize', handleResize);
+        window.addEventListener('keydown', handleKeyDown);
         handleResize();
 
         return () => {
             console.log('Cleaning up socket connection on component unmount or auth change...');
+            window.removeEventListener('keydown', handleKeyDown);
             if (socketRef.current) {
                 socketRef.current.off(); // Ta bort alla lyssnare
                 socketRef.current.disconnect(); // Koppla bort socketen
