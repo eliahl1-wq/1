@@ -159,7 +159,7 @@ export default function Lobby() {
                             }}
                         >
                             <span style={{ fontWeight: '500', fontSize: '1rem' }}>{user.username}</span>
-ad                            <span style={{ color: '#34C759', fontWeight: '700', fontSize: '1rem' }}>
+                            <span style={{ color: '#34C759', fontWeight: '700', fontSize: '1rem' }}>
                                 ${user.balance?.toFixed(2) || '0.00'}
                             </span>
                         </div>
