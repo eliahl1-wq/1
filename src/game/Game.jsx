@@ -28,6 +28,7 @@ export default function Game() {
     const [isConnected, setIsConnected] = useState(false);
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
+    const [cashedAmount, setCashedAmount] = useState(null);
 
     useEffect(() => {
         // Endast anslut om vi har en token och användarnamn, OCH ingen socket är aktiv
@@ -89,6 +90,14 @@ export default function Game() {
 
         socket.on('leaderboard', (data) => {
             setLeaderboard(data.leaderboard);
+        });
+
+        socket.on('cashOutSuccess', ({ amount }) => {
+            setCashedAmount(amount);
+            // Visa animationen i 4 sekunder innan redirect
+            setTimeout(() => {
+                window.location.assign('/lobby');
+            }, 4000);
         });
 
         socket.on('died', () => {
@@ -224,6 +233,38 @@ export default function Game() {
                 onMouseMove={handleMouseMove}
                 style={{ display: 'block' }}
             />
+
+            {cashedAmount !== null && (
+                <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 2000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(0,0,0,0.9)',
+                    backdropFilter: 'blur(15px)',
+                    animation: 'fadeInOverlay 0.5s ease forwards'
+                }}>
+                    <div style={{ textAlign: 'center', animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards' }}>
+                        <div style={{ fontSize: '1.2rem', color: '#34C759', fontWeight: '800', letterSpacing: '5px', marginBottom: '10px' }}>CASHOUT SECURED</div>
+                        <h1 style={{ color: '#FFD700', fontSize: '7rem', margin: 0, fontWeight: '900', textShadow: '0 0 50px rgba(255, 215, 0, 0.7)', letterSpacing: '-4px' }}>
+                            ${cashedAmount.toFixed(2)}
+                        </h1>
+                        <p style={{ color: 'white', fontSize: '1.2rem', opacity: 0.5, marginTop: '30px', fontWeight: '500' }}>Transferring to your account...</p>
+                    </div>
+                    <style>{`
+                        @keyframes fadeInOverlay {
+                            from { opacity: 0; }
+                            to { opacity: 1; }
+                        }
+                        @keyframes scalePop {
+                            from { transform: scale(0.3); opacity: 0; }
+                            to { transform: scale(1); opacity: 1; }
+                        }
+                    `}</style>
+                </div>
+            )}
 
             {!isConnected && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
