@@ -6,7 +6,7 @@ import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana
 import { useNavigate } from 'react-router-dom';
 
 export default function Lobby() {
-    const { user, logout } = useAuth();
+    const { user, logout, token, login } = useAuth();
     const navigate = useNavigate();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const { connected, publicKey, sendTransaction } = useWallet();
@@ -44,6 +44,28 @@ export default function Lobby() {
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showUserMenu, handleClickOutside]);
+
+    // Uppdaterar användardata när komponenten laddas (löser problemet med bakåt-navigering)
+    useEffect(() => {
+        const refreshUser = async () => {
+            if (!token) return;
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'bypass-tunnel-reminders': 'true'
+                    }
+                });
+                if (res.ok) {
+                    const freshUser = await res.json();
+                    login(freshUser, token); // Uppdaterar AuthContext state
+                }
+            } catch (err) {
+                console.error("Lobby: Error refreshing user:", err);
+            }
+        };
+        refreshUser();
+    }, [token, login]);
 
     // Funktion för att hantera insättning (Skicka SOL)
     const handleDeposit = async () => {
@@ -166,6 +188,23 @@ export default function Lobby() {
                 animation: 'float-glow 20s infinite alternate-reverse'
             }} />
 
+            {/* Blurry Background Gameplay Simulation */}
+            {[...Array(6)].map((_, i) => (
+                <div 
+                    key={i}
+                    className="bg-blob"
+                    style={{
+                        background: i % 2 === 0 ? '#007AFF' : i % 3 === 0 ? '#34C759' : '#5E5CE6',
+                        top: `${10 + Math.random() * 80}%`,
+                        left: `${5 + Math.random() * 90}%`,
+                        width: `${120 + Math.random() * 250}px`,
+                        height: `${120 + Math.random() * 250}px`,
+                        animationDelay: `${Math.random() * -20}s`,
+                        animationDuration: `${25 + Math.random() * 15}s`
+                    }}
+                />
+            ))}
+
             <style>{`
                 @keyframes float-glow {
                     from { transform: translate(0, 0) scale(1); opacity: 0.5; }
@@ -177,6 +216,18 @@ export default function Lobby() {
                 }
                 .btn-hover:active {
                     transform: translateY(0);
+                }
+                .bg-blob {
+                    position: absolute;
+                    border-radius: 50%;
+                    filter: blur(110px);
+                    opacity: 0.12;
+                    z-index: 1;
+                    animation: float-blob infinite alternate ease-in-out;
+                }
+                @keyframes float-blob {
+                    from { transform: translate(0, 0) scale(1); }
+                    to { transform: translate(120px, 60px) scale(1.15); }
                 }
             `}</style>
 
@@ -257,34 +308,36 @@ export default function Lobby() {
             <div style={{ zIndex: 5, fontFamily: 'system-ui', textAlign: 'center' }}>
                 <h1 style={{ 
                     color: 'white',
-                    fontSize: '5rem',
+                    fontSize: '5.5rem',
                     fontWeight: '900',
                     marginBottom: '5px',
-                    letterSpacing: '-4px',
-                    textShadow: '0 10px 30px rgba(0,0,0,0.3)'
+                    letterSpacing: '-5px',
+                    textShadow: '0 15px 40px rgba(0,0,0,0.4)',
+                    lineHeight: '1'
                 }}>
-                    Hello, {user?.username}
+                    Welcome, {user?.username}
                 </h1>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.4rem', marginBottom: '50px', fontWeight: '500', letterSpacing: '-0.5px' }}>The arena awaits your stake.</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.5rem', marginBottom: '45px', fontWeight: '500', letterSpacing: '-0.8px' }}>Stake your claim and dominate the arena.</p>
 
                 <div style={{ 
-                    background: 'rgba(255, 255, 255, 0.03)', 
-                    padding: '60px', 
+                    background: 'rgba(255, 255, 255, 0.04)', 
+                    padding: '50px 60px', 
                     borderRadius: '48px', 
-                    border: '1px solid rgba(255, 255, 255, 0.08)', 
+                    border: '1px solid rgba(255, 255, 255, 0.07)', 
                     textAlign: 'center', 
                     width: '480px', 
-                    backdropFilter: 'blur(60px)',
-                    boxShadow: '0 40px 120px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255,255,255,0.05)',
+                    backdropFilter: 'blur(80px)',
+                    boxShadow: '0 40px 120px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255,255,255,0.05)',
                     position: 'relative'
                 }}>
                     <h2 style={{ 
-                        fontSize: '0.9rem', 
-                        margin: '0 0 15px 0', 
-                        letterSpacing: '8px', 
-                        fontWeight: '800', 
-                        color: 'rgba(255,255,255,0.3)',
-                        textTransform: 'uppercase'
+                        fontSize: '1.1rem', 
+                        margin: '0 0 25px 0', 
+                        letterSpacing: '14px', 
+                        fontWeight: '900', 
+                        color: 'rgba(255,255,255,0.12)',
+                        textTransform: 'uppercase',
+                        textIndent: '14px'
                     }}>ARENA</h2>
                     
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px', marginTop: '20px' }}>
