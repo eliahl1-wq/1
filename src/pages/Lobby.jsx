@@ -236,7 +236,7 @@ export default function Lobby() {
                                     // Vi ändrar till -60% för att dra upp tecknet lite mer än mitten
                                     transform: 'translateY(-60%)', 
                                     color: 'rgba(255,255,255,0.4)',
-                                    fontSize: '1rem',
+                                    fontSize: '1.2rem',
                                     fontFamily: 'inherit',
                                     pointerEvents: 'none'
                                 }}>$</span>
@@ -248,7 +248,7 @@ export default function Lobby() {
                                     style={{
                                         width: '100%',
                                         boxSizing: 'border-box',
-                                        padding: '12px 12px 12px 42px', // Ökad padding så siffrorna inte nuddar $
+                                        padding: '12px 12px 12px 45px', // Ökad padding så siffrorna inte nuddar $
                                         borderRadius: '12px',
                                         border: '1px solid rgba(255,255,255,0.1)',
                                         background: 'rgba(0,0,0,0.2)',
