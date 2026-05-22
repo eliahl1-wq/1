@@ -119,7 +119,12 @@ export default function Lobby() {
             setDepositAmount(''); // Rensa insättningsfältet
         } catch (error) {
             console.error('Deposit error:', error);
-            setDepositStatusMessage(`❌ Deposit failed: ${error.message}`);
+            // Fånga specifika Solana/Phantom-fel för att visa vänligare meddelanden
+            if (error.message.includes('TransactionExpiredTimeoutError') || error.message.toLowerCase().includes('insufficient')) {
+                setDepositStatusMessage('❌ Not enough SOL in wallet to cover the transaction fees.');
+            } else {
+                setDepositStatusMessage(`❌ Deposit failed: ${error.message}`);
+            }
         }
     };
 
@@ -220,23 +225,34 @@ export default function Lobby() {
                     {connected && (
                         <div style={{ marginTop: '20px', marginBottom: '20px', padding: '20px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '18px', border: '0.5px solid rgba(255, 255, 255, 0.1)' }}>
                             <h3 style={{ fontSize: '1.5rem', margin: '0 0 15px 0', color: 'white' }}>Deposit</h3>
-                            <input
-                                type="number"
-                                placeholder="Enter deposit amount..."
-                                value={depositAmount}
-                                onChange={(e) => setDepositAmount(e.target.value)}
-                                style={{
-                                    width: 'calc(100% - 20px)',
-                                    padding: '12px',
-                                    borderRadius: '12px',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    background: 'rgba(0,0,0,0.2)',
-                                    color: 'white',
-                                    fontSize: '1rem',
-                                    marginBottom: '10px',
-                                    outline: 'none'
-                                }}
-                            />
+                            <div style={{ position: 'relative', width: '100%', marginBottom: '10px' }}>
+                                <span style={{ 
+                                    position: 'absolute', 
+                                    left: '15px', 
+                                    top: '50%', 
+                                    transform: 'translateY(-50%)', 
+                                    color: 'rgba(255,255,255,0.4)',
+                                    fontWeight: 'bold',
+                                    pointerEvents: 'none'
+                                }}>$</span>
+                                <input
+                                    type="number"
+                                    placeholder="Enter deposit amount..."
+                                    value={depositAmount}
+                                    onChange={(e) => setDepositAmount(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                        padding: '12px 12px 12px 30px', // Extra padding till vänster för $
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        color: 'white',
+                                        fontSize: '1rem',
+                                        outline: 'none'
+                                    }}
+                                />
+                            </div>
                             <button
                                 onClick={handleDeposit}
                                 style={{
