@@ -251,13 +251,14 @@ export default function Game() {
                         animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '30px' 
+                        gap: '50px', // Ökat gap för att sprida ut texten
+                        padding: '0 20px'
                     }}>
-                        <div style={{ fontSize: '1.2rem', color: '#34C759', fontWeight: '800', letterSpacing: '5px' }}>CASHOUT SECURED</div>
-                        <h1 style={{ color: '#FFD700', fontSize: '8rem', margin: '20px 0', fontWeight: '900', textShadow: '0 0 50px rgba(255, 215, 0, 0.7)', letterSpacing: '-4px' }}>
+                        <div style={{ fontSize: '1.4rem', color: '#34C759', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Profit Secured</div>
+                        <h1 style={{ color: '#FFD700', fontSize: '9rem', margin: '10px 0', fontWeight: '900', textShadow: '0 0 60px rgba(255, 215, 0, 0.6)', letterSpacing: '-5px' }}>
                             ${cashedAmount.toFixed(2)}
                         </h1>
-                        <p style={{ color: 'white', fontSize: '1.4rem', opacity: 0.5, margin: 0, fontWeight: '500' }}>Transferring to your account...</p>
+                        <p style={{ color: 'white', fontSize: '1.4rem', opacity: 0.4, margin: 0, fontWeight: '500', letterSpacing: '1px' }}>Funds added to your balance.</p>
                     </div>
                     <style>{`
                         @keyframes fadeInOverlay {

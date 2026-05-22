@@ -215,8 +215,8 @@ export default function Lobby() {
                                 boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                             }}
                         >
-                            <span style={{ fontWeight: '600', fontSize: '1.05rem', letterSpacing: '-0.3px' }}>{user.username}</span>
-                            <span style={{ color: '#34C759', fontWeight: '800', fontSize: '1.05rem' }}>
+                            <span style={{ fontWeight: '600', fontSize: '1.1rem', letterSpacing: '-0.3px' }}>{user.username}</span>
+                            <span style={{ color: '#34C759', fontWeight: '700', fontSize: '1.1rem' }}>
                                 ${user.balance?.toFixed(2) || '0.00'}
                             </span>
                         </div>

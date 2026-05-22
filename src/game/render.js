@@ -58,7 +58,7 @@ const regulatePoint = (point, borders) => ({
     y: valueInRange(borders.top, borders.bottom, point.y)
 });
 
-const drawOrganicCell = (cell, borders, graph) => {
+function drawOrganicCell(cell, borders, graph) {
     // Dynamiskt antal punkter baserat på storlek för prestanda/utseende
     let pointCount = Math.min(Math.max(~~(cell.radius), 24), 60);
     let points = [];
@@ -84,7 +84,7 @@ const drawOrganicCell = (cell, borders, graph) => {
     graph.closePath();
     graph.fill();
     graph.stroke();
-};
+}
 
 const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
     for (let cell of cells) {
