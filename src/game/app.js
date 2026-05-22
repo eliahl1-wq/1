@@ -348,6 +348,8 @@ function gameLoop() {
                     mass: users[i].cells[j].mass,
                     name: users[i].name,
                     radius: users[i].cells[j].radius,
+                    vX: users[i].cells[j].vX, // Hastighet för sliminess
+                    vY: users[i].cells[j].vY,
                     x: users[i].cells[j].x - player.x + global.screen.width / 2,
                     y: users[i].cells[j].y - player.y + global.screen.height / 2
                 });

@@ -24,7 +24,8 @@ const drawVirus = (position, virus, graph) => {
     graph.beginPath();
     for (let i = 0; i < sides; i++) {
         let theta = (i / sides) * FULL_ANGLE;
-        let r = (i % 2 === 0) ? virus.radius : virus.radius * 1.08; // 
+        let r = (i % 2 === 0) ? virus.radius : virus.radius * 1.08;
+        let point = circlePoint(position, r, theta);
         graph.lineTo(point.x, point.y);
     }
     graph.closePath();
@@ -57,11 +58,22 @@ const regulatePoint = (point, borders) => ({
     y: valueInRange(borders.top, borders.bottom, point.y)
 });
 
-const drawCellWithLines = (cell, borders, graph) => {
-    let pointCount = 30 + ~~(cell.mass / 5);
+const drawOrganicCell = (cell, borders, graph) => {
+    // Dynamiskt antal punkter baserat på storlek för prestanda/utseende
+    let pointCount = Math.min(Math.max(~~(cell.radius), 24), 60);
     let points = [];
-    for (let theta = 0; theta < FULL_ANGLE; theta += FULL_ANGLE / pointCount) {
-        let point = circlePoint(cell, cell.radius, theta);
+    let time = Date.now() * 0.002;
+    let moveAngle = Math.atan2(cell.vY || 0, cell.vX || 0);
+    let speed = Math.sqrt((cell.vX || 0)**2 + (cell.vY || 0)**2);
+
+    for (let i = 0; i < pointCount; i++) {
+        let theta = (i / pointCount) * FULL_ANGLE;
+        // Wobble skapar den "slimiga" effekten (vibration i kanterna)
+        let wobble = Math.sin(time + theta * 5) * (cell.radius * 0.02);
+        // Stretch deformerar cirkeln i den riktning den rör sig (vX/vY kommer från servern)
+        let stretch = Math.cos(theta - moveAngle) * (speed * 0.7);
+        
+        let point = circlePoint(cell, cell.radius + wobble + stretch, theta);
         points.push(regulatePoint(point, borders));
     }
     graph.beginPath();
@@ -72,18 +84,16 @@ const drawCellWithLines = (cell, borders, graph) => {
     graph.closePath();
     graph.fill();
     graph.stroke();
-}
+};
 
 const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
     for (let cell of cells) {
-        // Draw the cell itself
         graph.fillStyle = cell.color;
         graph.strokeStyle = cell.borderColor;
         graph.lineWidth = 6;
-        if (cellTouchingBor
-            // Border corrections are not needed, the cell can be drawn as a circle
-            drawRoundObject(cell, cell.radius, graph);
-        }
+        
+        // Använd den organiska ritningen för slimy-effekt
+        drawOrganicCell(cell, borders, graph);
 
         // Draw the name of the player
         let fontSize = Math.max(cell.radius / 3, 12);
