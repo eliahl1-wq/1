@@ -234,9 +234,9 @@ export default function Lobby() {
                                     left: '18px', 
                                     top: '50%',
                                     // Vi ändrar till -60% för att dra upp tecknet lite mer än mitten
-                                    transform: 'translateY(-60%)', 
+                                    transform: 'translateY(-55%)', 
                                     color: 'rgba(255,255,255,0.4)',
-                                    fontSize: '1.2rem',
+                                    fontSize: '1.1rem',
                                     fontFamily: 'inherit',
                                     pointerEvents: 'none'
                                 }}>$</span>
