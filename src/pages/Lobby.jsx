@@ -231,9 +231,10 @@ export default function Lobby() {
                             <div style={{ position: 'relative', width: '100%', marginBottom: '10px' }}>
                                 <span style={{ 
                                     position: 'absolute', 
-                                    left: '15px', 
-                                    top: '50%', 
-                                    transform: 'translateY(-50%)', 
+                                    left: '18px', 
+                                    top: '50%',
+                                    // Vi ändrar till -60% för att dra upp tecknet lite mer än mitten
+                                    transform: 'translateY(-60%)', 
                                     color: 'rgba(255,255,255,0.4)',
                                     fontWeight: 'bold',
                                     pointerEvents: 'none'
@@ -246,7 +247,7 @@ export default function Lobby() {
                                     style={{
                                         width: '100%',
                                         boxSizing: 'border-box',
-                                        padding: '12px 12px 12px 30px', // Extra padding till vänster för $
+                                        padding: '12px 12px 12px 42px', // Ökad padding så siffrorna inte nuddar $
                                         borderRadius: '12px',
                                         border: '1px solid rgba(255,255,255,0.1)',
                                         background: 'rgba(0,0,0,0.2)',
