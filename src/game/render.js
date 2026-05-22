@@ -92,9 +92,14 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.strokeStyle = cell.borderColor;
         graph.lineWidth = 6;
         
-        // High-stakes glow effect
-        graph.shadowBlur = 15;
-        graph.shadowColor = cell.color;
+        // High-stakes glow effect: Guld-glöd för High Rollers (över $50)
+        if (cell.balance > 50) {
+            graph.shadowBlur = 40; // Starkare glöd
+            graph.shadowColor = '#FFD700'; // Guld-färg
+        } else {
+            graph.shadowBlur = 15;
+            graph.shadowColor = cell.color;
+        }
         
         // Använd den organiska ritningen för slimy-effekt
         drawOrganicCell(cell, borders, graph);

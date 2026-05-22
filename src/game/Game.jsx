@@ -239,7 +239,7 @@ export default function Game() {
                 position: 'absolute', 
                 top: '30px', 
                 left: '30px', 
-                pointerEvents: 'none' 
+                zIndex: 100
             }}>
                 <div style={{
                     background: 'rgba(255, 255, 255, 0.05)',
@@ -248,12 +248,38 @@ export default function Game() {
                     borderRadius: '20px',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)'
+                    boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '12px'
                 }}>
-                    <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#34C759' }}>In-Game Stake</h3>
-                    <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                        ${(currentBalance ?? 0).toFixed(2)}
+                    <div style={{ textAlign: 'center' }}>
+                        <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#34C759' }}>In-Game Stake</h3>
+                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
+                            ${(currentBalance ?? 0).toFixed(2)}
+                        </div>
                     </div>
+
+                    <button 
+                        onClick={() => socketRef.current?.emit('cashOut')}
+                        style={{
+                            width: '100%',
+                            background: '#34C759',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 0',
+                            borderRadius: '12px',
+                            fontWeight: '800',
+                            fontSize: '0.8rem',
+                            letterSpacing: '1px',
+                            cursor: 'pointer',
+                            transition: '0.2s all ease',
+                            boxShadow: '0 4px 15px rgba(52, 199, 89, 0.4)'
+                        }}
+                    >
+                        CASH OUT
+                    </button>
                 </div>
             </div>
 

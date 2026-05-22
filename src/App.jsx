@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
+import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-wallets';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 function PrivateRoute({ children }) {
@@ -30,7 +31,14 @@ function PublicRoute({ children }) {
 function App() {
   // Byter till 'devnet' för gratis testning. För mainnet i framtiden bör du skaffa en privat RPC (t.ex. från Helius) för att slippa 403-fel.
   const endpoint = useMemo(() => clusterApiUrl('devnet'), []);
-  const wallets = useMemo(() => [], []);
+
+  const wallets = useMemo(
+    () => [
+      // Genom att lägga till denna manuellt dyker WalletConnect upp igen
+      new WalletConnectWalletAdapter({ network: 'devnet', options: { projectId: 'DIN_WALLETCONNECT_PROJECT_ID' } }),
+    ],
+    []
+  );
 
   return (
     <ConnectionProvider endpoint={endpoint}>
