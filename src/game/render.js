@@ -19,12 +19,13 @@ const drawVirus = (position, virus, graph) => {
     graph.strokeStyle = virus.stroke;
     graph.fillStyle = virus.fill;
     graph.lineWidth = virus.strokeWidth;
-    let theta = 0;
-    let sides = 20;
+    let sides = 40; // Fler sidor för taggigare virus
 
     graph.beginPath();
-    for (let theta = 0; theta < FULL_ANGLE; theta += FULL_ANGLE / sides) {
-        let point = circlePoint(position, virus.radius, theta);
+    for (let i = 0; i < sides; i++) {
+        let theta = (i / sides) * FULL_ANGLE;
+        let r = (i % 2 === 0) ? virus.radius : virus.radius * 1.08; // Varannan punkt är längre ut (taggar)
+        let point = circlePoint(position, r, theta);
         graph.lineTo(point.x, point.y);
     }
     graph.closePath();
@@ -80,13 +81,9 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.fillStyle = cell.color;
         graph.strokeStyle = cell.borderColor;
         graph.lineWidth = 6;
-        if (cellTouchingBorders(cell, borders)) {
-            // Asssemble the cell from lines
-            drawCellWithLines(cell, borders, graph);
-        } else {
-            // Border corrections are not needed, the cell can be drawn as a circle
-            drawRoundObject(cell, cell.radius, graph);
-        }
+        
+        // Använd alltid den organiska ritningen för att få "slimy" jiggle-effekten
+        drawOrganicCell(cell, borders, graph);
 
         // Draw the name of the player
         let fontSize = Math.max(cell.radius / 3, 12);
