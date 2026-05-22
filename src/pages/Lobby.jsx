@@ -236,7 +236,8 @@ export default function Lobby() {
                                     // Vi ändrar till -60% för att dra upp tecknet lite mer än mitten
                                     transform: 'translateY(-60%)', 
                                     color: 'rgba(255,255,255,0.4)',
-                                    fontWeight: 'bold',
+                                    fontSize: '1rem',
+                                    fontFamily: 'inherit',
                                     pointerEvents: 'none'
                                 }}>$</span>
                                 <input
