@@ -233,8 +233,8 @@ export default function Lobby() {
                                     position: 'absolute', 
                                     left: '18px', 
                                     top: '50%',
-                                    // Höjer tecknet till -65% för att motverka typsnittets baseline
-                                    transform: 'translateY(-65%)', 
+                            
+                                    transform: 'translateY(-55%)', 
                                     color: 'rgba(255,255,255,0.4)',
                                     fontSize: '1.1rem',
                                     fontFamily: 'inherit',
