@@ -132,41 +132,98 @@ export default function Lobby() {
     };
 
     return (
-        <div style={{ width: '100vw', height: '100vh', position: 'relative', color: 'white', userSelect: 'none' }}>
+        <div style={{ 
+            width: '100vw', 
+            height: '100vh', 
+            position: 'relative', 
+            color: 'white', 
+            userSelect: 'none',
+            background: '#050505',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        }}>
+            {/* Background Glows for Depth */}
+            <div style={{
+                position: 'absolute',
+                top: '-15%',
+                left: '-5%',
+                width: '50%',
+                height: '50%',
+                background: 'radial-gradient(circle, rgba(0, 122, 255, 0.1) 0%, transparent 70%)',
+                filter: 'blur(100px)',
+                animation: 'float-glow 15s infinite alternate'
+            }} />
+            <div style={{
+                position: 'absolute',
+                bottom: '-15%',
+                right: '-5%',
+                width: '60%',
+                height: '60%',
+                background: 'radial-gradient(circle, rgba(52, 199, 89, 0.07) 0%, transparent 70%)',
+                filter: 'blur(100px)',
+                animation: 'float-glow 20s infinite alternate-reverse'
+            }} />
+
+            <style>{`
+                @keyframes float-glow {
+                    from { transform: translate(0, 0) scale(1); opacity: 0.5; }
+                    to { transform: translate(5%, 5%) scale(1.1); opacity: 0.8; }
+                }
+                .btn-hover:hover {
+                    transform: translateY(-2px);
+                    filter: brightness(1.1);
+                }
+                .btn-hover:active {
+                    transform: translateY(0);
+                }
+            `}</style>
+
             {/* Logo Top Left */}
-            <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 10 }}>
-                <h2 style={{ margin: 0, color: 'white', letterSpacing: '-0.5px', fontWeight: '700', fontSize: '1.4rem' }}>AgarArena</h2>
+            <div style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 10 }}>
+                <h2 style={{ 
+                    margin: 0, 
+                    color: 'white', 
+                    letterSpacing: '-1.5px', 
+                    fontWeight: '900', 
+                    fontSize: '1.8rem',
+                    fontStyle: 'italic'
+                }}>
+                    AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                </h2>
             </div>
 
             {/* iOS Style User Pill */}
-            <div style={{ position: 'absolute', top: '30px', right: '30px', zIndex: 100 }}>
+            <div style={{ position: 'absolute', top: '40px', right: '40px', zIndex: 100 }}>
                 {user && (
                     <div style={{ position: 'relative', fontFamily: 'system-ui' }}>
                         <div 
                             ref={userPillRef}
                             onClick={() => setShowUserMenu(!showUserMenu)}
                             style={{
-                                background: 'rgba(255, 255, 255, 0.1)',
-                                padding: '10px 24px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                padding: '12px 28px',
                                 borderRadius: '100px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '12px',
                                 transition: '0.2s all ease',
-                                backdropFilter: 'blur(25px)',
-                                border: showUserMenu ? '1px solid #007AFF' : '1px solid rgba(255, 255, 255, 0.1)'
+                                backdropFilter: 'blur(30px)',
+                                border: showUserMenu ? '1px solid #007AFF' : '1px solid rgba(255, 255, 255, 0.08)',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
                             }}
                         >
-                            <span style={{ fontWeight: '500', fontSize: '1rem' }}>{user.username}</span>
-                            <span style={{ color: '#34C759', fontWeight: '700', fontSize: '1rem' }}>
+                            <span style={{ fontWeight: '600', fontSize: '1.05rem', letterSpacing: '-0.3px' }}>{user.username}</span>
+                            <span style={{ color: '#34C759', fontWeight: '800', fontSize: '1.05rem' }}>
                                 ${user.balance?.toFixed(2) || '0.00'}
                             </span>
                         </div>
 
                         {showUserMenu && (
                             <div ref={userMenuRef} style={{
-                                position: 'absolute', top: '55px', right: '0', width: '180px',
+                                position: 'absolute', top: '65px', right: '0', width: '200px',
                                 background: 'rgba(28, 28, 30, 0.95)',
                                 borderRadius: '14px',
                                 overflow: 'hidden',
@@ -197,38 +254,54 @@ export default function Lobby() {
             </div>
 
             {/* Center Content */}
-            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 5, fontFamily: 'system-ui' }}>
+            <div style={{ zIndex: 5, fontFamily: 'system-ui', textAlign: 'center' }}>
                 <h1 style={{ 
                     color: 'white',
-                    fontSize: '4.5rem',
-                    fontWeight: '800',
-                    marginBottom: '10px',
-                    letterSpacing: '-2px'
+                    fontSize: '5rem',
+                    fontWeight: '900',
+                    marginBottom: '5px',
+                    letterSpacing: '-4px',
+                    textShadow: '0 10px 30px rgba(0,0,0,0.3)'
                 }}>
                     Hello, {user?.username}
                 </h1>
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.2rem', marginBottom: '40px' }}>Welcome back to the Arena.</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.4rem', marginBottom: '50px', fontWeight: '500', letterSpacing: '-0.5px' }}>The arena awaits your stake.</p>
 
                 <div style={{ 
-                    background: 'rgba(255, 255, 255, 0.05)', 
+                    background: 'rgba(255, 255, 255, 0.03)', 
                     padding: '60px', 
-                    borderRadius: '36px', 
-                    border: '0.5px solid rgba(255, 255, 255, 0.15)', 
+                    borderRadius: '48px', 
+                    border: '1px solid rgba(255, 255, 255, 0.08)', 
                     textAlign: 'center', 
-                    width: '460px', 
-                    backdropFilter: 'blur(40px)',
-                    boxShadow: '0 40px 100px rgba(0, 0, 0, 0.6)'
+                    width: '480px', 
+                    backdropFilter: 'blur(60px)',
+                    boxShadow: '0 40px 120px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255,255,255,0.05)',
+                    position: 'relative'
                 }}>
-                    <h2 style={{ fontSize: '2rem', margin: '0 0 10px 0', letterSpacing: '10px', fontWeight: '300', color: 'white' }}>ARENA</h2>
+                    <h2 style={{ 
+                        fontSize: '0.9rem', 
+                        margin: '0 0 15px 0', 
+                        letterSpacing: '8px', 
+                        fontWeight: '800', 
+                        color: 'rgba(255,255,255,0.3)',
+                        textTransform: 'uppercase'
+                    }}>ARENA</h2>
                     
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '45px', marginTop: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px', marginTop: '20px' }}>
                         <WalletMultiButton />
                     </div>
 
                     {connected && (
-                        <div style={{ marginTop: '20px', marginBottom: '20px', padding: '20px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '18px', border: '0.5px solid rgba(255, 255, 255, 0.1)' }}>
-                            <h3 style={{ fontSize: '1.5rem', margin: '0 0 15px 0', color: 'white' }}>Deposit</h3>
-                            <div style={{ position: 'relative', width: '100%', marginBottom: '10px' }}>
+                        <div style={{ 
+                            marginTop: '20px', 
+                            marginBottom: '30px', 
+                            padding: '25px', 
+                            background: 'rgba(255, 255, 255, 0.04)', 
+                            borderRadius: '28px', 
+                            border: '1px solid rgba(255, 255, 255, 0.05)' 
+                        }}>
+                            <h3 style={{ fontSize: '1.2rem', margin: '0 0 20px 0', color: '#fff', fontWeight: '700', textAlign: 'left', opacity: 0.9 }}>Deposit Funds</h3>
+                            <div style={{ position: 'relative', width: '100%', marginBottom: '15px' }}>
                                 <span style={{ 
                                     position: 'absolute', 
                                     left: '18px', 
@@ -260,26 +333,28 @@ export default function Lobby() {
                             </div>
                             <button
                                 onClick={handleDeposit}
+                                className="btn-hover"
                                 style={{
                                     width: '100%',
-                                    padding: '15px',
-                                    fontSize: '1.1rem',
-                                    borderRadius: '14px',
+                                    padding: '16px',
+                                    fontSize: '1.05rem',
+                                    borderRadius: '16px',
                                     border: 'none',
                                     background: '#34C759', // Grön för insättning
                                     color: 'white',
-                                    fontWeight: '600',
+                                    fontWeight: '700',
                                     cursor: 'pointer',
-                                    transition: '0.3s all ease',
-                                    boxShadow: '0 8px 20px rgba(52, 199, 89, 0.3)'
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    boxShadow: '0 8px 25px rgba(52, 199, 89, 0.2)'
                                 }}
                             >
                                 DEPOSIT
                             </button>
                             {depositStatusMessage && (
                                 <p style={{ 
-                                    fontSize: '0.9rem',
+                                    fontSize: '0.85rem',
                                     color: depositStatusMessage.includes('failed') ? '#FF3B30' : 'rgba(255,255,255,0.7)',
+                                    fontWeight: '500',
                                     marginTop: '15px' 
                                 }}>
                                     {depositStatusMessage}
@@ -299,18 +374,20 @@ export default function Lobby() {
                                 navigate('/game');
                             }
                         }}
+                        className="btn-hover"
                         style={{ 
                             width: '100%', 
-                            padding: '20px', 
-                            fontSize: '1.3rem', 
-                            borderRadius: '18px', 
+                            padding: '22px', 
+                            fontSize: '1.4rem', 
+                            borderRadius: '22px', 
                             border: 'none', 
-                            background: '#007AFF', 
+                            background: 'linear-gradient(180deg, #007AFF 0%, #005DCB 100%)', 
                             color: 'white', 
-                            fontWeight: '600', 
+                            fontWeight: '800', 
                             cursor: 'pointer', 
-                            transition: '0.3s all ease',
-                            boxShadow: '0 10px 25px rgba(0, 122, 255, 0.3)',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            boxShadow: '0 15px 35px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+                            letterSpacing: '0.5px'
                         }}
                     >
                         ENTER GAME
