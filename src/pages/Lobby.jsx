@@ -21,8 +21,21 @@ export default function Lobby() {
     // Din mottagaradress
     const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
 
+    // Memoize bakgrundsblobs så de inte skapas på nytt vid varje re-render (fixar "snabba blobs")
+    const backgroundBlobs = useMemo(() => [...Array(6)].map((_, i) => ({
+        id: i,
+        color: i % 2 === 0 ? '#007AFF' : i % 3 === 0 ? '#34C759' : '#5E5CE6',
+        top: `${10 + Math.random() * 80}%`,
+        left: `${5 + Math.random() * 90}%`,
+        size: `${150 + Math.random() * 300}px`,
+        duration: `${20 + Math.random() * 20}s`,
+        delay: `${Math.random() * -20}s`,
+        opacity: 0.08 + Math.random() * 0.08
+    })), []);
+
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
+    const hasRefreshedRef = useRef(false); // För att stoppa loopen
 
     // Stäng menyn om man klickar utanför
     const handleClickOutside = useCallback((event) => {
@@ -47,8 +60,9 @@ export default function Lobby() {
 
     // Uppdaterar användardata när komponenten laddas (löser problemet med bakåt-navigering)
     useEffect(() => {
+        if (!token || hasRefreshedRef.current) return;
+
         const refreshUser = async () => {
-            if (!token) return;
             try {
                 const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
                     headers: { 
@@ -58,7 +72,8 @@ export default function Lobby() {
                 });
                 if (res.ok) {
                     const freshUser = await res.json();
-                    login(freshUser, token); // Uppdaterar AuthContext state
+                    hasRefreshedRef.current = true; // Markera som klar innan login() körs
+                    login(freshUser, token); 
                 }
             } catch (err) {
                 console.error("Lobby: Error refreshing user:", err);
@@ -188,19 +203,20 @@ export default function Lobby() {
                 animation: 'float-glow 20s infinite alternate-reverse'
             }} />
 
-            {/* Blurry Background Gameplay Simulation */}
-            {[...Array(6)].map((_, i) => (
+            {/* Blurry Background Blobs (Nu stabila via useMemo) */}
+            {backgroundBlobs.map((blob) => (
                 <div 
-                    key={i}
+                    key={blob.id}
                     className="bg-blob"
                     style={{
-                        background: i % 2 === 0 ? '#007AFF' : i % 3 === 0 ? '#34C759' : '#5E5CE6',
-                        top: `${10 + Math.random() * 80}%`,
-                        left: `${5 + Math.random() * 90}%`,
-                        width: `${120 + Math.random() * 250}px`,
-                        height: `${120 + Math.random() * 250}px`,
-                        animationDelay: `${Math.random() * -20}s`,
-                        animationDuration: `${25 + Math.random() * 15}s`
+                        background: blob.color,
+                        top: blob.top,
+                        left: blob.left,
+                        width: blob.size,
+                        height: blob.size,
+                        animationDelay: blob.delay,
+                        animationDuration: blob.duration,
+                        opacity: blob.opacity
                     }}
                 />
             ))}
@@ -331,13 +347,14 @@ export default function Lobby() {
                     position: 'relative'
                 }}>
                     <h2 style={{ 
-                        fontSize: '1.1rem', 
-                        margin: '0 0 25px 0', 
-                        letterSpacing: '14px', 
+                        fontSize: '1.4rem', 
+                        margin: '0 0 35px 0', 
+                        letterSpacing: '22px', 
                         fontWeight: '900', 
-                        color: 'rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.07)',
+                        textShadow: '0 0 20px rgba(255,255,255,0.05)',
                         textTransform: 'uppercase',
-                        textIndent: '14px'
+                        textIndent: '22px'
                     }}>ARENA</h2>
                     
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px', marginTop: '20px' }}>
