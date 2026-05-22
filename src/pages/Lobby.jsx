@@ -119,11 +119,14 @@ export default function Lobby() {
             setDepositAmount(''); // Rensa insättningsfältet
         } catch (error) {
             console.error('Deposit error:', error);
-            // Fånga specifika Solana/Phantom-fel för att visa vänligare meddelanden
-            if (error.message.includes('TransactionExpiredTimeoutError') || error.message.toLowerCase().includes('insufficient')) {
-                setDepositStatusMessage('❌ Not enough SOL in wallet to cover the transaction fees.');
+            const msg = error.message || "";
+            
+            if (msg.includes('TransactionExpiredTimeoutError') || msg.toLowerCase().includes('insufficient')) {
+                setDepositStatusMessage('❌ Not enough funds in wallet for transaction and fees.');
+            } else if (msg.includes('User rejected')) {
+                setDepositStatusMessage('❌ Transaction cancelled in Phantom.');
             } else {
-                setDepositStatusMessage(`❌ Deposit failed: ${error.message}`);
+                setDepositStatusMessage(`❌ Deposit failed. Check your wallet balance.`);
             }
         }
     };
