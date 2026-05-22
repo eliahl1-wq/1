@@ -185,6 +185,7 @@ export default function Game() {
                     name: u.username, 
                     color: u.color.fill || u.color, 
                     borderColor: u.color.border || '#000',
+                    balance: u.balance, // Skicka med balansen till ritaren
                     x: c.x - player.x + screen.width/2, 
                     y: c.y - player.y + screen.height/2
                 })));
@@ -246,10 +247,11 @@ export default function Game() {
                     padding: '15px 25px',
                     borderRadius: '20px',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white'
+                    color: 'white',
+                    boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)'
                 }}>
-                    <h3 style={{ margin: 0, opacity: 0.5, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Current Balance</h3>
-                    <div style={{ fontSize: '1.8rem', fontWeight: '800' }}>
+                    <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#34C759' }}>In-Game Stake</h3>
+                    <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
                         ${(currentBalance ?? 0).toFixed(2)}
                     </div>
                 </div>

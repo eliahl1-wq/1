@@ -92,12 +92,20 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.strokeStyle = cell.borderColor;
         graph.lineWidth = 6;
         
+        // High-stakes glow effect
+        graph.shadowBlur = 15;
+        graph.shadowColor = cell.color;
+        
         // Använd den organiska ritningen för slimy-effekt
         drawOrganicCell(cell, borders, graph);
 
         // Draw the name of the player
         let fontSize = Math.max(cell.radius / 3, 12);
         graph.lineWidth = playerConfig.textBorderSize;
+        
+        // Reset shadow for text to keep it crisp
+        graph.shadowBlur = 0;
+        
         graph.fillStyle = playerConfig.textColor;
         graph.strokeStyle = playerConfig.textBorder;
         graph.miterLimit = 1;
@@ -108,13 +116,12 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.strokeText(cell.name, cell.x, cell.y);
         graph.fillText(cell.name, cell.x, cell.y);
 
-        // Draw the mass (if enabled)
-        if (toggleMassState === 1) {
-            graph.font = 'bold ' + Math.max(fontSize / 3 * 2, 10) + 'px sans-serif';
-            if (cell.name.length === 0) fontSize = 0;
-            graph.strokeText(Math.round(cell.mass), cell.x, cell.y + fontSize);
-            graph.fillText(Math.round(cell.mass), cell.x, cell.y + fontSize);
-        }
+        // Visa alltid Dollar-saldot istället för massa för maximal dopamin
+        let balanceFontSize = Math.max(fontSize / 3 * 2, 11);
+        graph.font = 'bold ' + balanceFontSize + 'px sans-serif';
+        let balanceText = '$' + (cell.balance || 0).toFixed(2);
+        graph.strokeText(balanceText, cell.x, cell.y + fontSize);
+        graph.fillText(balanceText, cell.x, cell.y + fontSize);
     }
 };
 
