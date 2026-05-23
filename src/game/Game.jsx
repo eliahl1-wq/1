@@ -298,11 +298,11 @@ export default function Game() {
                         animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '20px',
+                        gap: '30px',
                         padding: '0 20px'
                     }}>
                         <div style={{ fontSize: '1.4rem', color: '#FF3B30', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Eliminated</div>
-                        <h1 style={{ color: '#fff', fontSize: '7rem', margin: '10px 0', fontWeight: '900', textShadow: '0 0 40px rgba(255, 59, 48, 0.6)', letterSpacing: '-2px' }}>
+                        <h1 style={{ color: '#fff', fontSize: '7rem', margin: '25px 0', fontWeight: '900', textShadow: '0 0 40px rgba(255, 59, 48, 0.6)', letterSpacing: '-2px' }}>
                             YOU DIED
                         </h1>
                         <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: 0, fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
@@ -376,6 +376,38 @@ export default function Game() {
                     >
                         CASH OUT
                     </button>
+
+                    {/* Reward Info Panel */}
+                    <div style={{
+                        marginTop: '20px',
+                        padding: '15px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: '15px',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        textAlign: 'left',
+                        fontSize: '0.75rem',
+                        lineHeight: '1.6',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                    }}>
+                        <div style={{ color: '#34C759', fontWeight: '800', marginBottom: '8px', letterSpacing: '1px' }}>ARENA REWARDS</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.6 }}>
+                            <span>Kill Reward</span>
+                            <span style={{ color: '#fff' }}>$3.00</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.6 }}>
+                            <span>Mass Multiplier</span>
+                            <span style={{ color: '#fff' }}>$0.01/u</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.6 }}>
+                            <span>Rank 1 Bonus</span>
+                            <span style={{ color: '#fff' }}>$50.00</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.6 }}>
+                            <span>Rank 2-3 Bonus</span>
+                            <span style={{ color: '#fff' }}>$15.00</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
