@@ -298,14 +298,16 @@ export default function Game() {
                         animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '45px',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '15px',
                         padding: '0 20px'
                     }}>
                         <div style={{ fontSize: '1.4rem', color: '#FF3B30', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Eliminated</div>
-                        <h1 style={{ color: '#fff', fontSize: '7.5rem', margin: '35px 0', fontWeight: '900', textShadow: '0 0 50px rgba(255, 59, 48, 0.7)', letterSpacing: '-2px' }}>
+                        <h1 style={{ color: '#fff', fontSize: '7.5rem', margin: '0', fontWeight: '900', textShadow: '0 0 50px rgba(255, 59, 48, 0.7)', letterSpacing: '-2px', lineHeight: '1.1' }}>
                             YOU DIED
                         </h1>
-                        <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: 0, fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
+                        <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: '10px 0 0 0', fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
                     </div>
                 </div>
             )}
