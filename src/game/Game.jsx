@@ -19,7 +19,7 @@ export default function Game() {
     const hasJoinedGameRef = useRef(false);
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
-    const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [] });
+    const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], zoneSize: 10000 });
     const myIdRef = useRef(null);
     const animationFrameId = useRef(null);
     
@@ -83,8 +83,8 @@ export default function Game() {
             setIsConnected(true);
         });
 
-        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList) => {
-            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList };
+        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, zSize) => {
+            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, zoneSize: zSize };
             const me = userData.find(p => p.id === myIdRef.current);
             setCurrentBalance(me?.balance ?? 0); // Use nullish coalescing to default to 0 if me or me.balance is undefined
         });
@@ -167,7 +167,7 @@ export default function Game() {
         const graph = canvas.getContext('2d');
         
         const gameLoop = () => {
-            const { player, users, food, viruses, ejected } = gameData.current;
+            const { player, users, food, viruses, ejected, zoneSize } = gameData.current;
             const screen = { width: window.innerWidth, height: window.innerHeight };
             
             if (isConnected && player.x !== undefined) {
@@ -185,6 +185,19 @@ export default function Game() {
                     const pos = { x: v.x - player.x + screen.width/2, y: v.y - player.y + screen.height/2 };
                     renderUtils.drawVirus(pos, v, graph);
                 });
+
+                // Rita Zonen (Röd streckad linje)
+                const halfZone = zoneSize / 2;
+                const centerX = 12000 / 2; // Matcha backends worldWidth
+                const centerY = 12000 / 2;
+                const zoneLeft = centerX - halfZone - player.x + screen.width/2;
+                const zoneTop = centerY - halfZone - player.y + screen.height/2;
+                
+                graph.strokeStyle = '#FF3B30';
+                graph.lineWidth = 15;
+                graph.setLineDash([40, 20]);
+                graph.strokeRect(zoneLeft, zoneTop, zoneSize, zoneSize);
+                graph.setLineDash([]);
 
                 let borders = {
                     left: screen.width / 2 - player.x,
