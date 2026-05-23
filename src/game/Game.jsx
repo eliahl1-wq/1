@@ -29,6 +29,7 @@ export default function Game() {
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
     const [cashedAmount, setCashedAmount] = useState(null);
+    const [isDead, setIsDead] = useState(false);
 
     useEffect(() => {
         // Endast anslut om vi har en token och användarnamn, OCH ingen socket är aktiv
@@ -101,7 +102,11 @@ export default function Game() {
         });
 
         socket.on('died', () => {
-            window.location.assign('/lobby'); 
+            setIsDead(true);
+            // Visa döds-skärmen i 4 sekunder innan vi skickar tillbaka till lobbyn
+            setTimeout(() => {
+                window.location.assign('/lobby'); 
+            }, 4000);
         });
 
         socket.on('disconnect', (reason) => {
@@ -251,27 +256,57 @@ export default function Game() {
                         animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '50px', // Ökat gap för att sprida ut texten
+                        gap: '50px',
                         padding: '0 20px'
                     }}>
                         <div style={{ fontSize: '1.4rem', color: '#34C759', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Profit Secured</div>
                         <h1 style={{ color: '#FFD700', fontSize: '9rem', margin: '10px 0', fontWeight: '900', textShadow: '0 0 60px rgba(255, 215, 0, 0.6)', letterSpacing: '-5px' }}>
                             ${cashedAmount.toFixed(2)}
                         </h1>
-                        <p style={{ color: 'white', fontSize: '1.4rem', opacity: 0.4, margin: 0, fontWeight: '500', letterSpacing: '1px' }}>Funds added to your balance.</p>
+                        <p style={{ color: 'white', fontSize: '1.4rem', opacity: 0.4, margin: 0, fontWeight: '500', letterSpacing: '1px' }}>Funds added to your account.</p>
                     </div>
-                    <style>{`
-                        @keyframes fadeInOverlay {
-                            from { opacity: 0; }
-                            to { opacity: 1; }
-                        }
-                        @keyframes scalePop {
-                            from { transform: scale(0.3); opacity: 0; }
-                            to { transform: scale(1); opacity: 1; }
-                        }
-                    `}</style>
                 </div>
             )}
+
+            {isDead && (
+                <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 2000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(30, 0, 0, 0.9)', // Mörk röd bakgrund
+                    backdropFilter: 'blur(15px)',
+                    animation: 'fadeInOverlay 0.5s ease forwards'
+                }}>
+                    <div style={{ 
+                        textAlign: 'center', 
+                        animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '20px',
+                        padding: '0 20px'
+                    }}>
+                        <div style={{ fontSize: '1.4rem', color: '#FF3B30', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Eliminated</div>
+                        <h1 style={{ color: '#fff', fontSize: '7rem', margin: '10px 0', fontWeight: '900', textShadow: '0 0 40px rgba(255, 59, 48, 0.6)', letterSpacing: '-2px' }}>
+                            YOU DIED
+                        </h1>
+                        <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: 0, fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes fadeInOverlay {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes scalePop {
+                    from { transform: scale(0.3); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+            `}</style>
 
             {!isConnected && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
