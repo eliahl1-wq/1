@@ -128,7 +128,10 @@ export default function Lobby() {
             // --- KRITISKT STEG: Skicka signaturen till din backend för verifiering ---
             const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'bypass-tunnel-reminders': 'true'
+                },
                 body: JSON.stringify({ 
                     signature: signature, 
                     amountUSD: amountUSD,

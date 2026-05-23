@@ -15,7 +15,10 @@ export default function RegisterPage() {
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'bypass-tunnel-reminders': 'true'
+                },
                 body: JSON.stringify({ username, password })
             });
             const data = await res.json();
