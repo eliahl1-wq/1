@@ -300,11 +300,11 @@ export default function Game() {
                         flexDirection: 'column',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        gap: '15px',
+                        gap: '30px',
                         padding: '0 20px'
                     }}>
                         <div style={{ fontSize: '1.4rem', color: '#FF3B30', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Eliminated</div>
-                        <h1 style={{ color: '#fff', fontSize: '7.5rem', margin: '0', fontWeight: '900', textShadow: '0 0 50px rgba(255, 59, 48, 0.7)', letterSpacing: '-2px', lineHeight: '1.1' }}>
+                        <h1 style={{ color: '#fff', fontSize: '7.5rem', margin: '20px 0', fontWeight: '900', textShadow: '0 0 50px rgba(255, 59, 48, 0.7)', letterSpacing: '-2px', lineHeight: '1.1' }}>
                             YOU DIED
                         </h1>
                         <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: '10px 0 0 0', fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
