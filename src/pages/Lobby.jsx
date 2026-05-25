@@ -444,7 +444,7 @@ export default function Lobby() {
                                 setArenaError(`Please deposit at least $${minimumDepositUSD} to enter the arena.`);
                             } else {
                                 setArenaError('');
-                                navigate('/game');
+                                navigate('/pre-game');
                             }
                         }}
                         className="btn-hover"

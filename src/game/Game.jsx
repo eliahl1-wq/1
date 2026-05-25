@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import global from './global.js';
 import Canvas from './canvas.js';
+import { useLocation } from 'react-router-dom';
 import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
 
@@ -15,6 +16,7 @@ import * as renderUtils from './render.js';
 export default function Game() {
     const canvasRef = useRef(null);
     const { user, token } = useAuth();
+    const location = useLocation();
     const socketRef = useRef(null);
     const hasJoinedGameRef = useRef(false);
     
@@ -65,7 +67,8 @@ export default function Game() {
             setIsConnected(true);
             if (!hasJoinedGameRef.current) {
                 console.log('Emitting joinGame...');
-                socket.emit('joinGame', { username: user.username, token });
+                const matchNickname = location.state?.nickname || user?.username || 'Guest';
+                socket.emit('joinGame', { username: matchNickname, token });
                 hasJoinedGameRef.current = true;
             }
         });
