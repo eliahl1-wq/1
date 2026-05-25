@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Lobby from './pages/Lobby';
+import PreGame from './pages/PreGame';
 import Game from './game/Game'; // Importera ditt nya spel
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -50,6 +51,7 @@ function App() {
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/lobby" element={<PrivateRoute><Lobby /></PrivateRoute>} />
+                <Route path="/pre-game" element={<PrivateRoute><PreGame /></PrivateRoute>} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
                 {/* Skicka till lobby som standard - den sköter redirect till login om det behövs */}
                 <Route path="/" element={<Navigate to="/lobby" />} />
