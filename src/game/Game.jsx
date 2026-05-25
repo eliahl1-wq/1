@@ -199,7 +199,6 @@ export default function Game() {
                     name: u.username, 
                     color: u.color.fill || u.color, 
                     borderColor: u.color.border || '#000',
-                    balance: u.balance, // Skicka med balansen till ritaren
                     x: c.x - player.x + screen.width/2, 
                     y: c.y - player.y + screen.height/2
                 })));

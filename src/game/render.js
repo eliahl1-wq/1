@@ -120,6 +120,13 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.font = 'bold ' + fontSize + 'px sans-serif';
         graph.strokeText(cell.name, cell.x, cell.y);
         graph.fillText(cell.name, cell.x, cell.y);
+
+        // Visa Dollar-saldot (endast det som faktiskt påverkar storleken på cellen)
+        let balanceFontSize = Math.max(fontSize / 3 * 2, 11);
+        graph.font = 'bold ' + balanceFontSize + 'px sans-serif';
+        let balanceText = '$' + (cell.balance || 0).toFixed(2);
+        graph.strokeText(balanceText, cell.x, cell.y + fontSize);
+        graph.fillText(balanceText, cell.x, cell.y + fontSize);
     }
 };
 
