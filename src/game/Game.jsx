@@ -186,19 +186,6 @@ export default function Game() {
                     renderUtils.drawVirus(pos, v, graph);
                 });
 
-                // Rita Zonen (Röd streckad linje)
-                const halfZone = zoneSize / 2;
-                const centerX = 12000 / 2; // Matcha backends worldWidth
-                const centerY = 12000 / 2;
-                const zoneLeft = centerX - halfZone - player.x + screen.width/2;
-                const zoneTop = centerY - halfZone - player.y + screen.height/2;
-                
-                graph.strokeStyle = '#FF3B30';
-                graph.lineWidth = 15;
-                graph.setLineDash([40, 20]);
-                graph.strokeRect(zoneLeft, zoneTop, zoneSize, zoneSize);
-                graph.setLineDash([]);
-
                 let borders = {
                     left: screen.width / 2 - player.x,
                     right: screen.width / 2 + global.game.width - player.x,
@@ -300,14 +287,14 @@ export default function Game() {
                         flexDirection: 'column',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        gap: '30px',
+                        gap: '45px',
                         padding: '0 20px'
                     }}>
                         <div style={{ fontSize: '1.4rem', color: '#FF3B30', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Eliminated</div>
                         <h1 style={{ color: '#fff', fontSize: '7.5rem', margin: '20px 0', fontWeight: '900', textShadow: '0 0 50px rgba(255, 59, 48, 0.7)', letterSpacing: '-2px', lineHeight: '1.1' }}>
                             YOU DIED
                         </h1>
-                        <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: '10px 0 0 0', fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
+                        <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: '0', fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
                     </div>
                 </div>
             )}
@@ -396,18 +383,18 @@ export default function Game() {
                     color: 'white',
                     boxShadow: '0 15px 40px rgba(0,0,0,0.4)'
                 }}>
-                    <div style={{ color: '#34C759', fontWeight: '900', marginBottom: '15px', letterSpacing: '2px', fontSize: '0.85rem' }}>ARENA REWARDS</div>
+                    <div style={{ color: '#34C759', fontWeight: '900', marginBottom: '15px', letterSpacing: '2px', fontSize: '0.85rem' }}>ECONOMY RULES</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ opacity: 0.6 }}>Kill Reward</span>
-                        <span style={{ fontWeight: '800' }}>$3.00</span>
+                        <span style={{ opacity: 0.6 }}>Start Balance</span>
+                        <span style={{ fontWeight: '800' }}>$1.00</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ opacity: 0.6 }}>Rank 1 Bonus</span>
-                        <span style={{ fontWeight: '800' }}>$50.00</span>
+                        <span style={{ opacity: 0.6 }}>Food Blob</span>
+                        <span style={{ fontWeight: '800' }}>$0.01</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ opacity: 0.6 }}>Rank 2-3 Bonus</span>
-                        <span style={{ fontWeight: '800' }}>$15.00</span>
+                        <span style={{ opacity: 0.6 }}>Player Absorption</span>
+                        <span style={{ fontWeight: '800' }}>100%</span>
                     </div>
                 </div>
             </div>
