@@ -50,13 +50,13 @@ export default function PreGame() {
                 <div style={inputWrapperStyle}>
                     <span style={currencyPrefixStyle}>$</span>
                     <input 
-                        type="number" 
+                        type="text" 
                         placeholder="0.00" 
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
                         style={modalInputStyle} 
                     />
-                    <button 
+                    <button
                         style={maxBtnStyle}
                         onClick={() => setAmount(type === 'withdraw' ? user?.balance?.toFixed(2) : '100')}
                     >MAX</button>
@@ -65,7 +65,7 @@ export default function PreGame() {
                     Confirm {type === 'deposit' ? 'Deposit' : 'Withdrawal'}
                 </button>
                 <p style={modalSubtextView}>
-                    {type === 'deposit' ? 'Connected: Phantom Wallet (Devnet)' : 'Processing: 1-2 minutes to your wallet'}
+                    {type === 'deposit' ? 'Network: Solana Devnet' : 'Processing: 1-2 minutes to your wallet'}
                 </p>
             </div>
         </div>
@@ -80,111 +80,268 @@ export default function PreGame() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start',
+            justifyContent: 'center',
             fontFamily: 'system-ui',
-            overflowY: 'auto',
-            padding: '120px 20px 60px 20px',
-            boxSizing: 'border-box'
+            overflow: 'hidden',
+            position: 'relative'
         }}>
             <style>{`
                 @keyframes pulse {
                     0% { transform: scale(1); opacity: 1; }
-                    50% { transform: scale(1.5); opacity: 0.5; }
+                    50% { transform: scale(1.4); opacity: 0.4; }
                     100% { transform: scale(1); opacity: 1; }
                 }
                 .pulse-dot {
-                    width: 8px;
-                    height: 8px;
+                    width: 6px;
+                    height: 6px;
                     background: #34C759;
                     border-radius: 50%;
                     display: inline-block;
-                    margin-right: 8px;
                     animation: pulse 2s infinite;
                 }
                 button { transition: all 0.2s ease !important; }
-                button:hover { transform: scale(1.02); filter: brightness(1.2); }
+                button:hover:not(:disabled) { transform: scale(1.02); filter: brightness(1.1); }
                 button:active { transform: scale(0.98); }
                 input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+                .mono { font-family: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace; }
             `}</style>
+
+            {/* Background Map/Grid Effect */}
+            <div style={backgroundStyle} />
 
             {activeModal && <Modal type={activeModal} />}
 
             {/* Top Bar */}
             <div style={topBarStyle}>
                 <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
-                <div style={{ position: 'relative' }}>
-                    <div ref={userPillRef} onClick={() => setShowUserMenu(!showUserMenu)} style={avatarPillStyle}>
-                        <div style={avatarCircleStyle}>{user?.username?.charAt(0).toUpperCase()}</div>
-                        <span style={{ fontWeight: '600' }}>{user?.username}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: '600' }}>
+                        <div className="pulse-dot" />
+                        ${user?.balance?.toFixed(2) || '0.00'}
                     </div>
+                    <div style={{ position: 'relative' }}>
+                        <div ref={userPillRef} onClick={() => setShowUserMenu(!showUserMenu)} style={avatarPillStyle}>
+                            <span style={{ fontWeight: '600', fontSize: '0.85rem', opacity: 0.8 }}>{user?.username}</span>
+                            <div style={avatarCircleStyle}>{user?.username?.charAt(0).toUpperCase()}</div>
+                        </div>
                     {showUserMenu && (
                         <div ref={userMenuRef} style={userMenuContainerStyle}>
                             <button style={userMenuItemStyle}>Settings</button>
                             <button style={userMenuItemStyle}>Transaction History</button>
-                            <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30', borderTop: '1px solid rgba(255,255,255,0.05)' }}>Log Out</button>
+                            <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30', borderTop: '1px solid rgba(255,255,255,0.03)' }}>Log Out</button>
                         </div>
+                    )}
+                    </div>
+                </div>
+            </div>
+
+            {/* CENTER CARD — Join Game */}
+            <div style={centerCardStyle}>
+                <label style={inputLabelStyle}>Enter nickname</label>
+                <input 
+                    type="text" 
+                    value={nickname} 
+                    onChange={(e) => setNickname(e.target.value.substring(0, 15))}
+                    placeholder="Your name..."
+                    style={nicknameInputStyle}
+                />
+                
+                <div style={dividerStyle} />
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                    <span style={{ fontSize: '0.85rem', opacity: 0.4, fontWeight: '600' }}>Entry fee:</span>
+                    <span className="mono" style={{ fontSize: '0.85rem', fontWeight: '700' }}>$10.00</span>
+                </div>
+
+                <button 
+                    onClick={handleStartMatch} 
+                    disabled={!canJoin}
+                    style={{ 
+                        ...playBtnStyle, 
+                        background: canJoin ? '#007AFF' : '#252529',
+                        color: canJoin ? 'white' : '#5a5a5e',
+                        cursor: canJoin ? 'pointer' : 'not-allowed'
+                    }}
+                >
+                    {canJoin ? `Play — $${entryFee.toFixed(2)}` : 'Insufficient balance'}
+                </button>
+
+                <div style={howItWorksContainerStyle}>
+                    <div onClick={() => setShowHowItWorks(!showHowItWorks)} style={howItWorksToggleStyle}>
+                        <span>ℹ How it works</span>
+                        <span style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.3s' }}>▾</span>
+                    </div>
+                    {showHowItWorks && (
+                        <p style={howItWorksTextStyle}>
+                            Your $10 entry is distributed: $1.00 starting stake, $7.00 added to the food pool ($0.01/blob), and $2.00 house fee. 
+                            Grow by consuming food or absorbing 100% of other players' balance. Cash out at any time.
+                        </p>
                     )}
                 </div>
             </div>
 
-            {/* Main Container */}
-            <div style={mainContentStyle}>
-                {/* Hero / Balance Section */}
-                <div style={heroSectionStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                        <h1 style={balanceTextStyle}>${user?.balance?.toFixed(2) || '0.00'}</h1>
-                        <div className="pulse-dot"></div>
-                    </div>
-                    <p style={balanceSubtextStyle}>Available balance</p>
-                    
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '25px', width: '100%' }}>
-                        <button onClick={() => setActiveModal('deposit')} style={depositPillStyle}>+ Deposit</button>
-                        <button onClick={() => setActiveModal('withdraw')} style={withdrawPillStyle}>↑ Withdraw</button>
-                    </div>
+            {/* BOTTOM LEFT CARD — Wallet */}
+            <div style={bottomLeftCardStyle}>
+                <label style={cardSmallLabelStyle}>Wallet</label>
+                <h3 className="mono" style={walletBalanceStyle}>${user?.balance?.toFixed(2) || '0.00'}</h3>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                    <button onClick={() => setActiveModal('deposit')} style={walletBtnSmallStyle}>+ Deposit</button>
+                    <button onClick={() => setActiveModal('withdraw')} style={walletBtnGhostStyle}>↑ Withdraw</button>
                 </div>
+            </div>
 
-                {/* Game Info Card */}
-                <div style={gameCardStyle}>
-                    <div style={entryFeeBoxStyle}>
-                        <span style={entryFeeLabelStyle}>ENTRY FEE</span>
-                        <h2 style={entryFeeValueStyle}>$10.00 <span style={{ fontSize: '1rem', opacity: 0.4 }}>to join</span></h2>
-                    </div>
-
-                    <div style={statsBoxStyle}>
-                        <div style={statRowStyle}>
-                            <span><span className="pulse-dot"></span> Players online</span>
-                            <span style={monoStyle}>42</span>
-                        </div>
-                        <div style={statRowStyle}>
-                            <span>⚔️ Active games</span>
-                            <span style={monoStyle}>12</span>
-                        </div>
-                        <div style={statRowStyle}>
-                            <span>💰 Biggest cash out today</span>
-                            <span style={monoStyle}>$542.20</span>
-                        </div>
-                    </div>
-
-                    <div style={howItWorksContainerStyle}>
-                        <div onClick={() => setShowHowItWorks(!showHowItWorks)} style={howItWorksToggleStyle}>
-                            <span>How it works</span>
-                            <span style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.3s' }}>▼</span>
-                        </div>
-                        {showHowItWorks && (
-                            <p style={howItWorksTextStyle}>
-                                AgarStake is a growth-based economy arena. Your $10 entry is split: $4 platform fee, 
-                                $1 starting cell size ($ balance), and $5 is distributed as food blobs ($0.01 each) 
-                                across the map. Grow by eating food or absorbing 100% of other players' stakes. 
-                                Cash out at any time to secure your current balance. Top 3 players receive 
-                                additional payout bonuses.
-                            </p>
-                        )}
-                    </div>
+            {/* BOTTOM RIGHT CARD — Live Stats */}
+            <div style={bottomRightCardStyle}>
+                <div style={statItemStyle}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className="pulse-dot" /> Players online
+                    </span>
+                    <span className="mono">142</span>
                 </div>
+                <div style={statItemStyle}>
+                    <span>⚔️ Active games</span>
+                    <span className="mono">8</span>
+                </div>
+                <div style={statItemStyle}>
+                    <span>💰 Biggest cash out today</span>
+                    <span className="mono">$84.20</span>
+                </div>
+            </div>
 
-                {/* Nickname Input */}
-                <div style={{ width: '100%', marginBottom: '20px' }}>
-                    <label style={inputLabelStyle}>MATCH NICKNAME</label>
+            {/* Footer Links */}
+            <div style={footerContainerStyle}>
+                <span>Terms of Service</span>
+                <span>·</span>
+                <span>Provably Fair</span>
+                <span>·</span>
+                <span>Support</span>
+            </div>
+        </div>
+    );
+}
+
+// --- Styles ---
+const backgroundStyle = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: -1,
+    background: '#050505',
+    backgroundImage: `
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
+    `,
+    backgroundSize: '50px 50px',
+    filter: 'blur(0.5px)'
+};
+
+const topBarStyle = {
+    position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 12, 0.6)',
+    backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+};
+
+const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1.2px', fontSize: '1.2rem' };
+
+const avatarPillStyle = {
+    display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 4px 4px 12px',
+    borderRadius: '100px', cursor: 'pointer', background: 'rgba(255, 255, 255, 0.03)',
+    border: '1px solid rgba(255, 255, 255, 0.05)'
+};
+
+const avatarCircleStyle = {
+    width: '28px', height: '28px', background: '#007AFF', borderRadius: '50%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.75rem'
+};
+
+const centerCardStyle = {
+    width: '320px', background: 'rgba(20, 20, 22, 0.8)', backdropFilter: 'blur(24px)',
+    borderRadius: '24px', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '24px',
+    boxShadow: '0 30px 60px rgba(0,0,0,0.4)', zIndex: 10
+};
+
+const inputLabelStyle = { display: 'block', fontSize: '0.7rem', fontWeight: '700', opacity: 0.3, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' };
+
+const nicknameInputStyle = {
+    width: '100%', background: 'transparent', border: 'none', color: 'white',
+    fontSize: '1rem', fontWeight: '600', outline: 'none', padding: '4px 0',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)', boxSizing: 'border-box', marginBottom: '20px'
+};
+
+const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.04)', margin: '0 0 20px 0' };
+
+const playBtnStyle = {
+    width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
+    fontSize: '1rem', fontWeight: '800', letterSpacing: '-0.2px'
+};
+
+const howItWorksContainerStyle = { marginTop: '16px', textAlign: 'center' };
+const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', cursor: 'pointer', opacity: 0.3, fontSize: '0.7rem', fontWeight: '700' };
+const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.4', opacity: 0.3, marginTop: '12px', textAlign: 'left', padding: '0 4px' };
+
+const bottomLeftCardStyle = {
+    position: 'fixed', bottom: '32px', left: '32px', width: '260px',
+    background: 'rgba(20, 20, 22, 0.7)', backdropFilter: 'blur(16px)',
+    borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '20px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+};
+
+const cardSmallLabelStyle = { display: 'block', fontSize: '0.65rem', fontWeight: '700', opacity: 0.3, textTransform: 'uppercase', marginBottom: '4px' };
+const walletBalanceStyle = { margin: 0, fontSize: '1.4rem', fontWeight: '800' };
+
+const walletBtnSmallStyle = { flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#34C759', color: 'white', fontWeight: '700', fontSize: '0.75rem', cursor: 'pointer' };
+const walletBtnGhostStyle = { flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', background: 'transparent', color: 'white', fontWeight: '700', fontSize: '0.75rem', cursor: 'pointer' };
+
+const bottomRightCardStyle = {
+    position: 'fixed', bottom: '32px', right: '32px', width: '260px',
+    background: 'rgba(20, 20, 22, 0.7)', backdropFilter: 'blur(16px)',
+    borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '16px 20px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px'
+};
+
+const statItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: '500', opacity: 0.6 };
+
+const footerContainerStyle = {
+    position: 'fixed', bottom: '12px', left: 0, right: 0, display: 'flex',
+    justifyContent: 'center', gap: '12px', fontSize: '0.65rem', opacity: 0.15, fontWeight: '700'
+};
+
+const userMenuContainerStyle = {
+    position: 'absolute', top: '48px', right: 0, width: '180px', background: '#1c1c1e',
+    borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)'
+};
+
+const userMenuItemStyle = {
+    width: '100%', padding: '10px 16px', background: 'none', border: 'none',
+    color: 'white', textAlign: 'left', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer'
+};
+
+const modalOverlayStyle = {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px'
+};
+
+const modalCardStyle = {
+    width: '100%', maxWidth: '340px', background: '#141416', borderRadius: '24px',
+    padding: '32px', position: 'relative', border: '1px solid rgba(255, 255, 255, 0.05)',
+    boxShadow: '0 40px 80px rgba(0,0,0,0.5)'
+};
+
+const inputWrapperStyle = {
+    position: 'relative', display: 'flex', alignItems: 'center', background: '#0a0a0c',
+    borderRadius: '12px', padding: '8px 16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.05)'
+};
+
+const modalInputStyle = {
+    width: '100%', background: 'none', border: 'none', color: 'white',
+    fontSize: '1.5rem', fontWeight: '700', outline: 'none', fontFamily: 'ui-monospace, monospace'
+};
+
+const currencyPrefixStyle = { fontSize: '1.2rem', fontWeight: '700', opacity: 0.2, marginRight: '8px' };
+const maxBtnStyle = { background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '4px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '0.6rem', cursor: 'pointer' };
+const modalConfirmBtnStyle = { width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: '#007AFF', color: 'white', fontWeight: '800', fontSize: '0.95rem', cursor: 'pointer' };
+const modalSubtextView = { fontSize: '0.7rem', opacity: 0.2, marginTop: '16px', textAlign: 'center', fontWeight: '600' };
+const closeBtnStyle = { position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'white', opacity: 0.2, fontSize: '1rem', cursor: 'pointer' };
                     <input 
                         type="text" 
                         value={nickname} 
