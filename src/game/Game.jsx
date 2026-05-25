@@ -222,6 +222,10 @@ export default function Game() {
         });
     };
 
+    // Beräkna potentiell bonus baserat på leaderboard-position
+    const myRank = leaderboard.findIndex(p => p.id === myIdRef.current) + 1;
+    const potentialBonus = myRank === 1 ? 20 : (myRank > 1 && myRank <= 3 ? 10 : 0);
+
     return (
         <div style={{ 
             width: '100vw', 
@@ -344,6 +348,12 @@ export default function Game() {
                         <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
                             ${(currentBalance ?? 0).toFixed(2)}
                         </div>
+                        
+                        {potentialBonus > 0 && (
+                            <div style={{ fontSize: '0.85rem', color: '#FFD700', fontWeight: '800', marginTop: '2px', letterSpacing: '1px' }}>
+                                + ${potentialBonus.toFixed(2)} RANK BONUS
+                            </div>
+                        )}
                     </div>
 
                     <button 
@@ -367,34 +377,27 @@ export default function Game() {
                     </button>
                 </div>
 
-                {/* Reward Info Panel - Moved to its own separate card with larger text */}
+                {/* Reward Info Panel */}
                 <div style={{
-                    marginTop: '15px',
-                    padding: '25px',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    backdropFilter: 'blur(30px)',
-                    borderRadius: '24px',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    marginTop: '20px',
+                    padding: '15px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '15px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
                     textAlign: 'left',
-                    fontSize: '1rem',
-                    lineHeight: '2.2',
+                    fontSize: '0.75rem',
+                    lineHeight: '1.6',
                     width: '100%',
-                    boxSizing: 'border-box',
-                    color: 'white',
-                    boxShadow: '0 15px 40px rgba(0,0,0,0.4)'
+                    boxSizing: 'border-box'
                 }}>
-                    <div style={{ color: '#34C759', fontWeight: '900', marginBottom: '15px', letterSpacing: '2px', fontSize: '0.85rem' }}>ECONOMY RULES</div>
+                    <div style={{ color: '#34C759', fontWeight: '800', marginBottom: '8px', letterSpacing: '1px' }}>ARENA REWARDS</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ opacity: 0.6 }}>Start Balance</span>
-                        <span style={{ fontWeight: '800' }}>$1.00</span>
+                        <span>Rank 1 Bonus</span>
+                        <span style={{ color: '#fff' }}>$20.00</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ opacity: 0.6 }}>Food Blob</span>
-                        <span style={{ fontWeight: '800' }}>$0.01</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ opacity: 0.6 }}>Player Absorption</span>
-                        <span style={{ fontWeight: '800' }}>100%</span>
+                        <span>Rank 2-3 Bonus</span>
+                        <span style={{ color: '#fff' }}>$10.00</span>
                     </div>
                 </div>
             </div>
