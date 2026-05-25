@@ -19,7 +19,7 @@ export default function Game() {
     const hasJoinedGameRef = useRef(false);
     
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
-    const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], zoneSize: 10000 });
+    const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], rewardsUnlocked: false });
     const myIdRef = useRef(null);
     const animationFrameId = useRef(null);
     
@@ -83,8 +83,8 @@ export default function Game() {
             setIsConnected(true);
         });
 
-        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, zSize) => {
-            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, zoneSize: zSize };
+        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardsUnlocked) => {
+            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardsUnlocked };
             const me = userData.find(p => p.id === myIdRef.current);
             setCurrentBalance(me?.balance ?? 0); // Use nullish coalescing to default to 0 if me or me.balance is undefined
         });
@@ -223,7 +223,8 @@ export default function Game() {
 
     // Beräkna potentiell bonus baserat på leaderboard-position
     const myRank = leaderboard.findIndex(p => p.id === myIdRef.current) + 1;
-    const potentialBonus = myRank === 1 ? 20 : (myRank > 1 && myRank <= 3 ? 10 : 0);
+    const rewardsUnlocked = gameData.current.rewardsUnlocked;
+    const potentialBonus = rewardsUnlocked ? (myRank === 1 ? 20 : (myRank > 1 && myRank <= 3 ? 10 : 0)) : 0;
 
     return (
         <div style={{ 
@@ -389,7 +390,9 @@ export default function Game() {
                     width: '100%',
                     boxSizing: 'border-box'
                 }}>
-                    <div style={{ color: '#34C759', fontWeight: '800', marginBottom: '8px', letterSpacing: '1px' }}>ARENA REWARDS</div>
+                    <div style={{ color: '#34C759', fontWeight: '800', marginBottom: '8px', letterSpacing: '1px' }}>
+                        ARENA REWARDS {!rewardsUnlocked && "(LOCKED)"}
+                    </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Rank 1 Bonus</span>
                         <span style={{ color: '#fff' }}>$20.00</span>
