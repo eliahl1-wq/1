@@ -373,7 +373,8 @@ function gameLoop() {
             let color = 'hsl(' + users[i].hue + ', 100%, 50%)';
             let borderColor = 'hsl(' + users[i].hue + ', 100%, 45%)';
             // Säkrare kontroll för att identifiera "mig själv"
-            const isItMe = (users[i].id === player.id || users[i].id === global.player?.id);
+            const isItMe = (users[i].id === socket?.id || users[i].id === global.socket?.id || 
+                           users[i].id === player.id || users[i].username === global.playerName);
             
             for (var j = 0; j < users[i].cells.length; j++) {
                 cellsToDraw.push({
