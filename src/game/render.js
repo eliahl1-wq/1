@@ -135,11 +135,11 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.fillText(balanceText, cell.x, cell.y + fontSize);
 
         // Visa Cashout-timer för mig själv
-        if (cell.isMe && cell.isCashingOut && global.cashOutTimer > 0) {
+        if (cell.isMe && global.cashOutTimer > 0) {
             graph.fillStyle = '#FFD700';
             graph.strokeStyle = '#000';
-            graph.lineWidth = 3;
-            graph.font = 'bold ' + (fontSize * 0.8) + 'px monospace';
+            graph.lineWidth = 2; // Tunnare kantlinje för bättre läsbarhet
+            graph.font = 'bold ' + Math.max(fontSize * 0.8, 14) + 'px monospace';
             let timerText = `⏱️ ${global.cashOutTimer}s`;
             graph.strokeText(timerText, cell.x, cell.y - cell.radius - 20);
             graph.fillText(timerText, cell.x, cell.y - cell.radius - 20);

@@ -179,6 +179,9 @@ function setupSocket(socket) {
             global.cashOutTimer--;
             if (btn) btn.innerText = `EXITING IN: ${global.cashOutTimer}s`;
             
+            // Om spelaren dör (gameStart blir false), stoppa timern
+            if (!global.gameStart) clearInterval(timerInterval);
+
             if (global.cashOutTimer <= 0) {
                 clearInterval(timerInterval);
                 if (btn) {
