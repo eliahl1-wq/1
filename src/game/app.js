@@ -372,18 +372,21 @@ function gameLoop() {
         for (var i = 0; i < users.length; i++) {
             let color = 'hsl(' + users[i].hue + ', 100%, 50%)';
             let borderColor = 'hsl(' + users[i].hue + ', 100%, 45%)';
+            // Säkrare kontroll för att identifiera "mig själv"
+            const isItMe = (users[i].id === player.id || users[i].id === global.player?.id);
+            
             for (var j = 0; j < users[i].cells.length; j++) {
                 cellsToDraw.push({
                     color: color,
                     borderColor: borderColor,
                     mass: users[i].cells[j].mass,
-                    balance: users[i].balance, // Viktigt: skicka med balans för visning
-                    name: users[i].name,
+                    balance: users[i].balance || 0,
+                    name: users[i].username || users[i].name || 'An unnamed cell',
                     radius: users[i].cells[j].radius,
                     vX: users[i].cells[j].vX, // Hastighet för sliminess
                     vY: users[i].cells[j].vY,
-                    isCashingOut: users[i].isCashingOut, // Skicka med status till render
-                    isMe: users[i].id === global.player.id, // Markera om det är jag
+                    isCashingOut: users[i].isCashingOut || false,
+                    isMe: isItMe,
                     x: users[i].cells[j].x - player.x + global.screen.width / 2,
                     y: users[i].cells[j].y - player.y + global.screen.height / 2
                 });

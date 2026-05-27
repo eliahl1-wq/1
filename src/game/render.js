@@ -135,17 +135,22 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.fillText(balanceText, cell.x, cell.y + fontSize);
 
         // Visa Cashout-timer för mig själv
-        if (cell.isMe && global.cashOutTimer > 0) {
+        if (cell.isMe && (global.cashOutTimer > 0 || cell.isCashingOut)) {
             graph.shadowBlur = 0;
-            graph.fillStyle = '#FF3B30'; // Röd färg för att det ska synas (fara!)
-            graph.strokeStyle = '#000000';
+            graph.fillStyle = '#FFD700'; // Guld-gul färg för utbetalning
+            graph.strokeStyle = '#FFFFFF';
             graph.lineWidth = 3;
-            const timerFontSize = Math.max(fontSize, 16);
-            graph.font = '900 ' + timerFontSize + 'px sans-serif';
-            let timerText = `EXIT IN: ${global.cashOutTimer}s`;
-            // Rita den under saldot (cell.y + fontSize + extra marginal)
-            graph.strokeText(timerText, cell.x, cell.y + fontSize + (timerFontSize * 1.2));
-            graph.fillText(timerText, cell.x, cell.y + fontSize + (timerFontSize * 1.2));
+            
+            // Mycket större och tydligare font (minst 24px)
+            const timerFontSize = Math.max(fontSize * 1.2, 24);
+            graph.font = 'bold ' + timerFontSize + 'px sans-serif';
+            
+            let timeRemaining = global.cashOutTimer > 0 ? global.cashOutTimer : 30;
+            let timerText = `EXITING: ${timeRemaining}s`;
+            
+            // Rita den OVANFÖR cellen så den syns tydligt oavsett storlek
+            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 30);
+            graph.fillText(timerText, cell.x, cell.y - cell.radius - 30);
         }
     }
 };
