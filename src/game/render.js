@@ -153,26 +153,29 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
             graph.fillText(timerText, cell.x, cell.y - cell.radius - 45);
         }
     }
+};
 
-    // --- HUD TIMER (Går inte att missa) ---
-    if (global.cashOutTimer > 0 && global.gameStart) { // Visa bara om spelet är igång
+const drawHUD = (global, graph) => {
+    if (global.cashOutTimer > 0) {
         graph.save();
-        graph.setTransform(1, 0, 0, 1, 0, 0); // Återställ till skärm-koordinater
-        
-        // En röd varningspanel högst upp
-        graph.fillStyle = 'rgba(255, 59, 48, 0.8)'; // Mycket tydligare röd bakgrund
-        graph.fillRect(0, 0, global.screen.width, 80); // Större höjd
-        
-        graph.fillStyle = '#FF3B30';
-        graph.strokeStyle = '#FFFFFF'; // Vit kant
-        graph.lineWidth = 6; // Tjockare kant
-        graph.font = '900 50px sans-serif'; // Ännu större font
+        // Tvinga till skärm-koordinater (ignorera kamerans position)
+        graph.setTransform(1, 0, 0, 1, 0, 0); 
+
+        const hudHeight = 100;
+        graph.fillStyle = 'rgba(255, 59, 48, 0.95)';
+        graph.fillRect(0, 0, window.innerWidth, hudHeight);
+
+        graph.fillStyle = '#FFFFFF';
+        graph.strokeStyle = '#000000';
+        graph.lineWidth = 4;
+        graph.font = '900 42px sans-serif';
         graph.textAlign = 'center';
-        
-        const hudText = `🚨 SURVIVE FOR ${global.cashOutTimer}s 🚨`;
-        graph.strokeText(hudText, global.screen.width / 2, 55); // Centrera vertikalt
-        graph.fillText(hudText, global.screen.width / 2, 55);
-        
+        graph.textBaseline = 'middle';
+
+        const hudText = `⚠️ SURVIVE: ${global.cashOutTimer}s ⚠️`;
+        graph.strokeText(hudText, window.innerWidth / 2, hudHeight / 2);
+        graph.fillText(hudText, window.innerWidth / 2, hudHeight / 2);
+
         graph.restore();
     }
 };
@@ -218,4 +221,4 @@ const drawErrorMessage = (message, graph, screen) => {
     graph.fillText(message, screen.width / 2, screen.height / 2);
 }
 
-export { drawFood, drawVirus, drawFireFood, drawCells, drawErrorMessage, drawGrid, drawBorder, drawOrganicCell };
+export { drawFood, drawVirus, drawFireFood, drawCells, drawErrorMessage, drawGrid, drawBorder, drawOrganicCell, drawHUD };
