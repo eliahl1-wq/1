@@ -155,23 +155,23 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
     }
 
     // --- HUD TIMER (Går inte att missa) ---
-    if (global.cashOutTimer > 0) {
+    if (global.cashOutTimer > 0 && global.gameStart) { // Visa bara om spelet är igång
         graph.save();
-        graph.resetTransform(); // Rita statiskt på skärmen, inte i spelvärlden
+        graph.setTransform(1, 0, 0, 1, 0, 0); // Återställ till skärm-koordinater
         
         // En röd varningspanel högst upp
-        graph.fillStyle = 'rgba(255, 59, 48, 0.15)';
-        graph.fillRect(0, 0, global.screen.width, 70);
+        graph.fillStyle = 'rgba(255, 59, 48, 0.8)'; // Mycket tydligare röd bakgrund
+        graph.fillRect(0, 0, global.screen.width, 80); // Större höjd
         
         graph.fillStyle = '#FF3B30';
-        graph.strokeStyle = '#000000';
-        graph.lineWidth = 5;
-        graph.font = '900 42px sans-serif';
+        graph.strokeStyle = '#FFFFFF'; // Vit kant
+        graph.lineWidth = 6; // Tjockare kant
+        graph.font = '900 50px sans-serif'; // Ännu större font
         graph.textAlign = 'center';
         
-        const hudText = `⚠️ SURVIVE FOR ${global.cashOutTimer} SECONDS ⚠️`;
-        graph.strokeText(hudText, global.screen.width / 2, 45);
-        graph.fillText(hudText, global.screen.width / 2, 45);
+        const hudText = `🚨 SURVIVE FOR ${global.cashOutTimer}s 🚨`;
+        graph.strokeText(hudText, global.screen.width / 2, 55); // Centrera vertikalt
+        graph.fillText(hudText, global.screen.width / 2, 55);
         
         graph.restore();
     }

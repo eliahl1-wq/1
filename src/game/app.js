@@ -28,15 +28,14 @@ function startGame(type) {
     document.getElementById('gameAreaWrapper').style.opacity = 1;
     if (!socket) {
         socket = io({ query: "type=" + type });
+        global.socket = socket;
         setupSocket(socket);
     }
     if (!global.animLoopHandle)
         animloop();
     socket.emit('respawn');
     window.chat.socket = socket;
-    window.chat.registerFunctions();
     window.canvas.socket = socket;
-    global.socket = socket;
 }
 
 // Checks if the nick chosen contains valid alphanumeric characters (and underscores).
@@ -157,30 +156,36 @@ function handleDisconnect() {
 
 // socket stuff.
 function setupSocket(socket) {
+    console.log("Socket setup initiated.");
     // Handle ping.
     socket.on('pongcheck', function () {
         var latency = Date.now() - global.startPingTime;
         debug('Latency: ' + latency + 'ms');
         window.chat.addSystemLine('Ping: ' + latency + 'ms');
     });
+    window.chat.registerFunctions();
 
     // Hantera början på cashout-timer
     socket.on('cashOutStarting', (data) => {
+        console.log("%c💰 CASHOUT STARTING:", "color: gold; font-size: 20px; font-weight: bold;", data);
         global.cashOutTimer = data.seconds;
-        const btn = document.getElementById('cashout'); // Eller vad din knapp har för ID
-
-        // Felsöknings-klocka bredvid knappen
-        let debugClock = document.getElementById('cashout-debug-clock');
-        if (!debugClock && btn && btn.parentNode) {
-            debugClock = document.createElement('span');
-            debugClock.id = 'cashout-debug-clock';
-            debugClock.style.marginLeft = '15px';
-            debugClock.style.color = '#FF3B30';
-            debugClock.style.fontWeight = '900';
-            debugClock.style.fontSize = '22px';
-            btn.parentNode.insertBefore(debugClock, btn.nextSibling);
+        
+        // Skapa en absolut klocka i hörnet som INTE kan ligga bakom något
+        let timerOverlay = document.getElementById('global-timer-overlay');
+        if (!timerOverlay) {
+            timerOverlay = document.createElement('div');
+            timerOverlay.id = 'global-timer-overlay';
+            timerOverlay.style.cssText = `
+                position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+                z-index: 10000; background: rgba(255, 59, 48, 0.9);
+                color: white; padding: 15px 40px; border-radius: 50px;
+                font-family: sans-serif; font-weight: 900; font-size: 32px;
+                box-shadow: 0 0 30px rgba(255, 59, 48, 0.5); border: 2px solid white;
+            `;
+            document.body.appendChild(timerOverlay);
         }
         
+        const btn = document.getElementById('cashout');
         if (btn) {
             btn.disabled = true;
             btn.style.opacity = "0.5";
@@ -188,12 +193,16 @@ function setupSocket(socket) {
         }
 
         const timerInterval = setInterval(() => {
+            console.log("Timer tick:", global.cashOutTimer);
             global.cashOutTimer--;
-            if (btn) btn.innerText = `⚠️ EXIT IN: ${global.cashOutTimer}s`;
-            if (debugClock) debugClock.innerText = `⏱️ ${global.cashOutTimer}s`;
+            if (btn) btn.innerText = `WAIT: ${global.cashOutTimer}s`;
+            if (timerOverlay) timerOverlay.innerText = `DEBUG TIMER: ${global.cashOutTimer}s`;
             
             // Om spelaren dör (gameStart blir false), stoppa timern
-            if (!global.gameStart) clearInterval(timerInterval);
+            if (!global.gameStart) {
+                clearInterval(timerInterval);
+                if (timerOverlay) timerOverlay.remove();
+            }
 
             if (global.cashOutTimer <= 0) {
                 clearInterval(timerInterval);
@@ -202,8 +211,8 @@ function setupSocket(socket) {
                     btn.disabled = false;
                     btn.style.opacity = "1";
                     btn.innerText = `CASH OUT`;
-                    if (debugClock) debugClock.remove();
                 }
+                if (timerOverlay) timerOverlay.remove();
             }
         }, 1000);
     });
@@ -214,10 +223,12 @@ function setupSocket(socket) {
 
     // Handle connection.
     socket.on('welcome', function (playerSettings, gameSizes) {
+        console.log("Welcome event received", playerSettings);
         player = playerSettings;
         player.name = global.playerName;
         player.screenWidth = global.screen.width;
         player.screenHeight = global.screen.height;
+        player.id = socket.id; // Sätt spelarens ID här
         player.target = window.canvas.target;
         global.player = player;
         window.chat.player = player;
@@ -386,11 +397,8 @@ function gameLoop() {
         for (var i = 0; i < users.length; i++) {
             let color = 'hsl(' + users[i].hue + ', 100%, 50%)';
             let borderColor = 'hsl(' + users[i].hue + ', 100%, 45%)';
-            // Säkrare kontroll för att identifiera "mig själv"
-            const isItMe = (users[i].id === socket?.id || 
-                           (users[i].id && users[i].id === player.id) || 
-                           (users[i].username && users[i].username === global.playerName));
-            
+            const isMe = (users[i].id === socket.id);
+
             for (var j = 0; j < users[i].cells.length; j++) {
                 cellsToDraw.push({
                     color: color,
@@ -402,7 +410,7 @@ function gameLoop() {
                     vX: users[i].cells[j].vX, // Hastighet för sliminess
                     vY: users[i].cells[j].vY,
                     isCashingOut: users[i].isCashingOut || false,
-                    isMe: isItMe,
+                    isMe: isMe,
                     x: users[i].cells[j].x - player.x + global.screen.width / 2,
                     y: users[i].cells[j].y - player.y + global.screen.height / 2
                 });
