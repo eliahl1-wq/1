@@ -136,13 +136,16 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
 
         // Visa Cashout-timer för mig själv
         if (cell.isMe && global.cashOutTimer > 0) {
-            graph.fillStyle = '#FFD700';
-            graph.strokeStyle = '#000';
-            graph.lineWidth = 2; // Tunnare kantlinje för bättre läsbarhet
-            graph.font = 'bold ' + Math.max(fontSize * 0.8, 14) + 'px monospace';
-            let timerText = `⏱️ ${global.cashOutTimer}s`;
-            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 20);
-            graph.fillText(timerText, cell.x, cell.y - cell.radius - 20);
+            graph.shadowBlur = 0;
+            graph.fillStyle = '#FF3B30'; // Röd färg för att det ska synas (fara!)
+            graph.strokeStyle = '#000000';
+            graph.lineWidth = 3;
+            const timerFontSize = Math.max(fontSize, 16);
+            graph.font = '900 ' + timerFontSize + 'px sans-serif';
+            let timerText = `EXIT IN: ${global.cashOutTimer}s`;
+            // Rita den under saldot (cell.y + fontSize + extra marginal)
+            graph.strokeText(timerText, cell.x, cell.y + fontSize + (timerFontSize * 1.2));
+            graph.fillText(timerText, cell.x, cell.y + fontSize + (timerFontSize * 1.2));
         }
     }
 };
