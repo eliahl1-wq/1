@@ -182,6 +182,7 @@ function setupSocket(socket) {
             if (global.cashOutTimer <= 0) {
                 clearInterval(timerInterval);
                 if (btn) {
+                    global.cashOutTimer = 0;
                     btn.disabled = false;
                     btn.style.opacity = "1";
                     btn.innerText = `CASH OUT`;
@@ -280,6 +281,7 @@ function setupSocket(socket) {
     // Death.
     socket.on('RIP', function () {
         global.gameStart = false;
+        global.cashOutTimer = 0;
         render.drawErrorMessage('You died!', graph, global.screen);
         window.setTimeout(() => {
             document.getElementById('gameAreaWrapper').style.opacity = 0;
@@ -372,6 +374,7 @@ function gameLoop() {
                     color: color,
                     borderColor: borderColor,
                     mass: users[i].cells[j].mass,
+                    balance: users[i].balance, // Viktigt: skicka med balans för visning
                     name: users[i].name,
                     radius: users[i].cells[j].radius,
                     vX: users[i].cells[j].vX, // Hastighet för sliminess

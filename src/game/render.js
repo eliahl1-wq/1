@@ -1,3 +1,5 @@
+import global from './global.js';
+
 const FULL_ANGLE = 2 * Math.PI;
 
 const drawRoundObject = (position, radius, graph) => {
