@@ -28,4 +28,5 @@ export default {
     toggleMassState: 0,
     backgroundColor: '#0a0a0c', // Din mörka bakgrund
     lineColor: '#ffffff',       // Vita linjer för rutnätet
+    cashOutTimer: 0,            // Nedräkning för uttag
 };

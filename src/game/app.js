@@ -164,6 +164,32 @@ function setupSocket(socket) {
         window.chat.addSystemLine('Ping: ' + latency + 'ms');
     });
 
+    // Hantera början på cashout-timer
+    socket.on('cashOutStarting', (data) => {
+        global.cashOutTimer = data.seconds;
+        const btn = document.getElementById('cashout'); // Eller vad din knapp har för ID
+        
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+        }
+
+        const timerInterval = setInterval(() => {
+            global.cashOutTimer--;
+            if (btn) btn.innerText = `EXITING IN: ${global.cashOutTimer}s`;
+            
+            if (global.cashOutTimer <= 0) {
+                clearInterval(timerInterval);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = "1";
+                    btn.innerText = `CASH OUT`;
+                }
+            }
+        }, 1000);
+    });
+
     // Handle error.
     socket.on('connect_error', handleDisconnect);
     socket.on('disconnect', handleDisconnect);
@@ -350,6 +376,8 @@ function gameLoop() {
                     radius: users[i].cells[j].radius,
                     vX: users[i].cells[j].vX, // Hastighet för sliminess
                     vY: users[i].cells[j].vY,
+                    isCashingOut: users[i].isCashingOut, // Skicka med status till render
+                    isMe: users[i].id === player.id,     // Markera om det är jag
                     x: users[i].cells[j].x - player.x + global.screen.width / 2,
                     y: users[i].cells[j].y - player.y + global.screen.height / 2
                 });

@@ -92,8 +92,12 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.strokeStyle = cell.borderColor;
         graph.lineWidth = 6;
         
-        // High-stakes glow effect: Guld-glöd för High Rollers (över $50)
-        if (cell.balance > 50) {
+        // High-stakes glow effect
+        if (cell.isCashingOut) {
+            // Guld-glöd för spelare som håller på att casha ut
+            graph.shadowBlur = 50;
+            graph.shadowColor = '#FFD700'; 
+        } else if (cell.balance > 50) {
             graph.shadowBlur = 40; // Starkare glöd
             graph.shadowColor = '#FFD700'; // Guld-färg
         } else {
@@ -127,6 +131,17 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         let balanceText = '$' + (cell.balance || 0).toFixed(2);
         graph.strokeText(balanceText, cell.x, cell.y + fontSize);
         graph.fillText(balanceText, cell.x, cell.y + fontSize);
+
+        // Visa Cashout-timer för mig själv
+        if (cell.isMe && cell.isCashingOut && global.cashOutTimer > 0) {
+            graph.fillStyle = '#FFD700';
+            graph.strokeStyle = '#000';
+            graph.lineWidth = 3;
+            graph.font = 'bold ' + (fontSize * 0.8) + 'px monospace';
+            let timerText = `⏱️ ${global.cashOutTimer}s`;
+            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 20);
+            graph.fillText(timerText, cell.x, cell.y - cell.radius - 20);
+        }
     }
 };
 
