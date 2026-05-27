@@ -153,6 +153,28 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
             graph.fillText(timerText, cell.x, cell.y - cell.radius - 45);
         }
     }
+
+    // --- HUD TIMER (Går inte att missa) ---
+    if (global.cashOutTimer > 0) {
+        graph.save();
+        graph.resetTransform(); // Rita statiskt på skärmen, inte i spelvärlden
+        
+        // En röd varningspanel högst upp
+        graph.fillStyle = 'rgba(255, 59, 48, 0.15)';
+        graph.fillRect(0, 0, global.screen.width, 70);
+        
+        graph.fillStyle = '#FF3B30';
+        graph.strokeStyle = '#000000';
+        graph.lineWidth = 5;
+        graph.font = '900 42px sans-serif';
+        graph.textAlign = 'center';
+        
+        const hudText = `⚠️ SURVIVE FOR ${global.cashOutTimer} SECONDS ⚠️`;
+        graph.strokeText(hudText, global.screen.width / 2, 45);
+        graph.fillText(hudText, global.screen.width / 2, 45);
+        
+        graph.restore();
+    }
 };
 
 const drawGrid = (global, player, screen, graph) => {

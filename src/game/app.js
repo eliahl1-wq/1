@@ -168,6 +168,18 @@ function setupSocket(socket) {
     socket.on('cashOutStarting', (data) => {
         global.cashOutTimer = data.seconds;
         const btn = document.getElementById('cashout'); // Eller vad din knapp har för ID
+
+        // Felsöknings-klocka bredvid knappen
+        let debugClock = document.getElementById('cashout-debug-clock');
+        if (!debugClock && btn && btn.parentNode) {
+            debugClock = document.createElement('span');
+            debugClock.id = 'cashout-debug-clock';
+            debugClock.style.marginLeft = '15px';
+            debugClock.style.color = '#FF3B30';
+            debugClock.style.fontWeight = '900';
+            debugClock.style.fontSize = '22px';
+            btn.parentNode.insertBefore(debugClock, btn.nextSibling);
+        }
         
         if (btn) {
             btn.disabled = true;
@@ -177,7 +189,8 @@ function setupSocket(socket) {
 
         const timerInterval = setInterval(() => {
             global.cashOutTimer--;
-            if (btn) btn.innerText = `EXITING IN: ${global.cashOutTimer}s`;
+            if (btn) btn.innerText = `⚠️ EXIT IN: ${global.cashOutTimer}s`;
+            if (debugClock) debugClock.innerText = `⏱️ ${global.cashOutTimer}s`;
             
             // Om spelaren dör (gameStart blir false), stoppa timern
             if (!global.gameStart) clearInterval(timerInterval);
@@ -189,6 +202,7 @@ function setupSocket(socket) {
                     btn.disabled = false;
                     btn.style.opacity = "1";
                     btn.innerText = `CASH OUT`;
+                    if (debugClock) debugClock.remove();
                 }
             }
         }, 1000);
@@ -373,8 +387,9 @@ function gameLoop() {
             let color = 'hsl(' + users[i].hue + ', 100%, 50%)';
             let borderColor = 'hsl(' + users[i].hue + ', 100%, 45%)';
             // Säkrare kontroll för att identifiera "mig själv"
-            const isItMe = (users[i].id === socket?.id || users[i].id === global.socket?.id || 
-                           users[i].id === player.id || users[i].username === global.playerName);
+            const isItMe = (users[i].id === socket?.id || 
+                           (users[i].id && users[i].id === player.id) || 
+                           (users[i].username && users[i].username === global.playerName));
             
             for (var j = 0; j < users[i].cells.length; j++) {
                 cellsToDraw.push({
