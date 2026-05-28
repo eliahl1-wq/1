@@ -28,7 +28,7 @@ export default {
     continuity: false,
     startPingTime: 0,
     toggleMassState: 0,
-    backgroundColor: '#FFFFFF', // AGGRESSIVE TEST: VIT
-    lineColor: '#000000',       // AGGRESSIVE TEST: SVART
+    backgroundColor: '#0a0a0c', // Mörk bakgrund
+    lineColor: '#ffffff',       // Vitt rutnät
     cashOutTimer: 0,            // Nedräkning för uttag
 };

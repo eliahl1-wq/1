@@ -4,6 +4,8 @@ import ChatClient from './chat-client.js';
 import Canvas from './canvas.js';
 import global from './global.js';
 
+console.log("Game Logic (app.js) initialized");
+
 var playerNameInput = { value: "" }; // Placeholder då React sköter inloggning
 var socket;
 
@@ -338,11 +340,11 @@ function animloop() {
 }
 
 function gameLoop() {
-    if (global.gameStart) {
-        console.log("Current background color:", global.backgroundColor); // Felsökning: Visa bakgrundsfärg
-        graph.fillStyle = global.backgroundColor;
-        graph.fillRect(0, 0, global.screen.width, global.screen.height);
+    // Rita alltid bakgrunden så vi vet att renderingsmotorn lever
+    graph.fillStyle = global.backgroundColor;
+    graph.fillRect(0, 0, global.screen.width, global.screen.height);
 
+    if (global.gameStart) {
         render.drawGrid(global, player, global.screen, graph);
         foods.forEach(food => {
             let position = getPosition(food, player, global.screen);

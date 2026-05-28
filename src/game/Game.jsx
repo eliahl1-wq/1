@@ -86,6 +86,18 @@ export default function Game() {
             setIsConnected(true);
         });
 
+        socket.on('cashOutStarting', (data) => {
+            console.log("💰 CASHOUT STARTING (React):", data);
+            global.cashOutTimer = data.seconds;
+            const timerInterval = setInterval(() => {
+                global.cashOutTimer--;
+                if (global.cashOutTimer <= 0) {
+                    clearInterval(timerInterval);
+                }
+                if (!socketRef.current?.connected) clearInterval(timerInterval);
+            }, 1000);
+        });
+
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardsUnlocked) => {
             gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardsUnlocked };
             const me = userData.find(p => p.id === myIdRef.current);
@@ -174,7 +186,7 @@ export default function Game() {
             const screen = { width: window.innerWidth, height: window.innerHeight };
             
             if (isConnected && player.x !== undefined) {
-                graph.fillStyle = '#0a0a0c';
+                graph.fillStyle = global.backgroundColor;
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
                 renderUtils.drawGrid(global, player, screen, graph);
@@ -200,6 +212,8 @@ export default function Game() {
                 const cellsToDraw = users.flatMap(u => u.cells.map(c => ({
                     ...c, 
                     name: u.username, 
+                    isMe: u.id === myIdRef.current,
+                    isCashingOut: u.isCashingOut,
                     color: u.color.fill || u.color, 
                     borderColor: u.color.border || '#000',
                     x: c.x - player.x + screen.width/2, 
@@ -207,6 +221,7 @@ export default function Game() {
                 })));
                 
                 renderUtils.drawCells(cellsToDraw, { border: 6, textBorderSize: 3, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
+                renderUtils.drawHUD(global, graph);
             }
             animationFrameId.current = requestAnimationFrame(gameLoop);
         };
