@@ -6,32 +6,37 @@ export default function PreGame() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [isWalletOpen, setIsWalletOpen] = useState(false);
+    const [walletTab, setWalletTab] = useState('deposit'); // 'deposit' | 'withdraw'
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
+    const walletPanelRef = useRef(null);
     
     const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
-    const [activeModal, setActiveModal] = useState(null); // null, 'deposit', 'withdraw'
     const [amount, setAmount] = useState('');
+    const [isMatchmaking, setIsMatchmaking] = useState(false);
 
     const entryFee = 10.00;
     const canJoin = (user?.balance || 0) >= entryFee;
 
     const handleStartMatch = () => {
         if (!canJoin) return;
+        setIsMatchmaking(true);
         localStorage.setItem('match_nickname', nickname);
-        navigate('/game', { state: { nickname } });
+        setTimeout(() => {
+            navigate('/game', { state: { nickname } });
+        }, 1200);
     };
 
-    // Stäng menyn om man klickar utanför
     const handleClickOutside = useCallback((event) => {
         if (userMenuRef.current && !userMenuRef.current.contains(event.target) &&
             userPillRef.current && !userPillRef.current.contains(event.target)) {
             setShowUserMenu(false);
         }
-        if (event.target.id === 'modal-overlay') {
-            setActiveModal(null);
-            setAmount('');
+        if (walletPanelRef.current && !walletPanelRef.current.contains(event.target) && 
+            !event.target.closest('#wallet-trigger')) {
+            setIsWalletOpen(false);
         }
     }, []);
 
@@ -39,37 +44,6 @@ export default function PreGame() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
-
-    const Modal = ({ type }) => (
-        <div id="modal-overlay" style={modalOverlayStyle}>
-            <div style={modalCardStyle}>
-                <button onClick={() => setActiveModal(null)} style={closeBtnStyle}>✕</button>
-                <h3 style={{ margin: '0 0 20px 0', fontSize: '1.2rem', fontWeight: '800' }}>
-                    {type === 'deposit' ? 'Deposit Funds' : 'Withdraw Funds'}
-                </h3>
-                <div style={inputWrapperStyle}>
-                    <span style={currencyPrefixStyle}>$</span>
-                    <input 
-                        type="text" 
-                        placeholder="0.00" 
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        style={modalInputStyle} 
-                    />
-                    <button
-                        style={maxBtnStyle}
-                        onClick={() => setAmount(type === 'withdraw' ? user?.balance?.toFixed(2) : '100')}
-                    >MAX</button>
-                </div>
-                <button style={modalConfirmBtnStyle} onClick={() => setActiveModal(null)}>
-                    Confirm {type === 'deposit' ? 'Deposit' : 'Withdrawal'}
-                </button>
-                <p style={modalSubtextView}>
-                    {type === 'deposit' ? 'Network: Solana Devnet' : 'Processing: 1-2 minutes to your wallet'}
-                </p>
-            </div>
-        </div>
-    );
 
     return (
         <div style={{
@@ -221,124 +195,40 @@ export default function PreGame() {
 }
 
 // --- Styles ---
-const backgroundStyle = {
-    position: 'fixed',
-    inset: 0,
-    zIndex: -1,
-    background: '#050505',
-    backgroundImage: `
-        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
-    `,
-    backgroundSize: '50px 50px',
-    filter: 'blur(0.5px)'
-};
-
-const topBarStyle = {
-    position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 12, 0.6)',
-    backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-};
-
-const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1.2px', fontSize: '1.2rem' };
-
-const avatarPillStyle = {
-    display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 4px 4px 12px',
-    borderRadius: '100px', cursor: 'pointer', background: 'rgba(255, 255, 255, 0.03)',
-    border: '1px solid rgba(255, 255, 255, 0.05)'
-};
-
-const avatarCircleStyle = {
-    width: '28px', height: '28px', background: '#007AFF', borderRadius: '50%',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.75rem'
-};
-
-const centerCardStyle = {
-    width: '320px', background: 'rgba(20, 20, 22, 0.8)', backdropFilter: 'blur(24px)',
-    borderRadius: '24px', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '24px',
-    boxShadow: '0 30px 60px rgba(0,0,0,0.4)', zIndex: 10
-};
-
-const inputLabelStyle = { display: 'block', fontSize: '0.7rem', fontWeight: '700', opacity: 0.3, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' };
-
-const nicknameInputStyle = {
-    width: '100%', background: 'transparent', border: 'none', color: 'white',
-    fontSize: '1rem', fontWeight: '600', outline: 'none', padding: '4px 0',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)', boxSizing: 'border-box', marginBottom: '20px'
-};
-
-const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.04)', margin: '0 0 20px 0' };
-
-const playBtnStyle = {
-    width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
-    fontSize: '1rem', fontWeight: '800', letterSpacing: '-0.2px'
-};
-
-const howItWorksContainerStyle = { marginTop: '16px', textAlign: 'center' };
-const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', cursor: 'pointer', opacity: 0.3, fontSize: '0.7rem', fontWeight: '700' };
-const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.4', opacity: 0.3, marginTop: '12px', textAlign: 'left', padding: '0 4px' };
-
-const bottomLeftCardStyle = {
-    position: 'fixed', bottom: '32px', left: '32px', width: '260px',
-    background: 'rgba(20, 20, 22, 0.7)', backdropFilter: 'blur(16px)',
-    borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '20px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
-};
-
-const cardSmallLabelStyle = { display: 'block', fontSize: '0.65rem', fontWeight: '700', opacity: 0.3, textTransform: 'uppercase', marginBottom: '4px' };
-const walletBalanceStyle = { margin: 0, fontSize: '1.4rem', fontWeight: '800' };
-
-const walletBtnSmallStyle = { flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#34C759', color: 'white', fontWeight: '700', fontSize: '0.75rem', cursor: 'pointer' };
-const walletBtnGhostStyle = { flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', background: 'transparent', color: 'white', fontWeight: '700', fontSize: '0.75rem', cursor: 'pointer' };
-
-const bottomRightCardStyle = {
-    position: 'fixed', bottom: '32px', right: '32px', width: '260px',
-    background: 'rgba(20, 20, 22, 0.7)', backdropFilter: 'blur(16px)',
-    borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.05)', padding: '16px 20px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px'
-};
-
-const statItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: '500', opacity: 0.6 };
-
-const footerContainerStyle = {
-    position: 'fixed', bottom: '12px', left: 0, right: 0, display: 'flex',
-    justifyContent: 'center', gap: '12px', fontSize: '0.65rem', opacity: 0.15, fontWeight: '700'
-};
-
-const userMenuContainerStyle = {
-    position: 'absolute', top: '48px', right: 0, width: '180px', background: '#1c1c1e',
-    borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)'
-};
-
-const userMenuItemStyle = {
-    width: '100%', padding: '10px 16px', background: 'none', border: 'none',
-    color: 'white', textAlign: 'left', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer'
-};
-
-const modalOverlayStyle = {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px'
-};
-
-const modalCardStyle = {
-    width: '100%', maxWidth: '340px', background: '#141416', borderRadius: '24px',
-    padding: '32px', position: 'relative', border: '1px solid rgba(255, 255, 255, 0.05)',
-    boxShadow: '0 40px 80px rgba(0,0,0,0.5)'
-};
-
-const inputWrapperStyle = {
-    position: 'relative', display: 'flex', alignItems: 'center', background: '#0a0a0c',
-    borderRadius: '12px', padding: '8px 16px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.05)'
-};
-
-const modalInputStyle = {
-    width: '100%', background: 'none', border: 'none', color: 'white',
-    fontSize: '1.5rem', fontWeight: '700', outline: 'none', fontFamily: 'ui-monospace, monospace'
-};
-
-const currencyPrefixStyle = { fontSize: '1.2rem', fontWeight: '700', opacity: 0.2, marginRight: '8px' };
-const maxBtnStyle = { background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '4px 8px', borderRadius: '6px', fontWeight: '800', fontSize: '0.6rem', cursor: 'pointer' };
-const modalConfirmBtnStyle = { width: '100%', padding: '14px', borderRadius: '12px', border: 'none', background: '#007AFF', color: 'white', fontWeight: '800', fontSize: '0.95rem', cursor: 'pointer' };
-const modalSubtextView = { fontSize: '0.7rem', opacity: 0.2, marginTop: '16px', textAlign: 'center', fontWeight: '600' };
-const closeBtnStyle = { position: 'absolute', top: '25px', right: '25px', background: 'none', border: 'none', color: 'white', opacity: 0.3, fontSize: '1.2rem', cursor: 'pointer' };
+const containerStyle = { width: '100vw', height: '100vh', background: '#020203', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
+const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#020203', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
+const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', zIndex: 1000, background: 'rgba(10, 10, 12, 0.8)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' };
+const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1rem' };
+const depositWithdrawBtnStyle = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700' };
+const avatarPillStyle = { width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.15)', padding: '2px' };
+const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.65rem' };
+const walletExpandPanelStyle = { position: 'absolute', top: '56px', left: '50%', transform: 'translateX(-50%)', width: '280px', padding: '16px', borderRadius: '16px', boxShadow: '0 24px 48px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1100 };
+const walletCloseX = { position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', color: 'white', opacity: 0.3, padding: '4px' };
+const walletPanelHeader = { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' };
+const walletPanelBalance = { fontSize: '1.25rem', fontWeight: '800' };
+const walletTabContainer = { display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '3px', borderRadius: '10px' };
+const walletTabBtn = { flex: 1, padding: '6px', border: 'none', background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: '700', borderRadius: '8px' };
+const walletTabActive = { background: 'rgba(255,255,255,0.08)', color: 'white' };
+const walletInputArea = { position: 'relative', display: 'flex', alignItems: 'center' };
+const walletInputPrefix = { position: 'absolute', left: '12px', fontSize: '0.85rem', opacity: 0.2, fontWeight: '800' };
+const walletInput = { width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 10px 10px 24px', color: 'white', fontWeight: '700', fontSize: '0.9rem', outline: 'none' };
+const walletMaxBtn = { position: 'absolute', right: '8px', background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: '800' };
+const walletConfirmBtn = { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: '#007AFF', color: 'white', fontWeight: '800', fontSize: '0.8rem' };
+const walletPanelFooter = { textAlign: 'center', fontSize: '0.6rem', opacity: 0.2, fontWeight: '700', marginTop: '4px' };
+const userMenuContainerStyle = { position: 'absolute', top: '40px', right: 0, width: '160px', background: '#1c1c1e', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 16px 32px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)' };
+const userMenuHeader = { padding: '10px 14px', fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)' };
+const userMenuItemStyle = { width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: 'white', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600' };
+const centerCardStyle = { width: '320px', borderRadius: '20px', padding: '24px', zIndex: 10 };
+const inputLabelStyle = { display: 'block', fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '8px' };
+const nicknameInputStyle = { width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', color: 'white', fontSize: '0.95rem', fontWeight: '700', outline: 'none', padding: '12px 16px', borderRadius: '12px', boxSizing: 'border-box', marginBottom: '24px' };
+const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.05)', margin: '0 0 24px 0' };
+const playBtnStyle = { width: '100%', padding: '14px', borderRadius: '12px', border: 'none', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '0.01em', boxShadow: '0 8px 16px rgba(0, 122, 255, 0.25)' };
+const howItWorksContainerStyle = { marginTop: '16px' };
+const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: 0.2, fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase' };
+const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.5', opacity: 0.25, marginTop: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontWeight: '600' };
+const bottomLeftCardStyle = { position: 'fixed', bottom: '24px', left: '24px', width: '180px', borderRadius: '16px', padding: '12px 16px', boxShadow: '0 8px 16px rgba(0,0,0,0.2)' };
+const cardSmallLabelStyle = { display: 'block', fontSize: '0.6rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', marginBottom: '4px' };
+const walletBalanceStyle = { fontSize: '1.15rem', fontWeight: '800' };
+const bottomRightCardStyle = { position: 'fixed', bottom: '24px', right: '24px', width: '200px', borderRadius: '16px', padding: '16px', boxShadow: '0 8px 16px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '12px' };
+const statItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: '600', opacity: 0.5 };
+const footerContainerStyle = { position: 'fixed', bottom: '12px', left: '24px', right: '24px', display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '0.6rem', opacity: 0.2, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' };
