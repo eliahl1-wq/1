@@ -132,7 +132,7 @@ export default function PreGame() {
 
             <div style={topBarStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-                    <h2 style={logoStyle}>AGAR<span style={{ color: '#22C55E' }}>STAKE</span></h2>
+                    <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
                     <div style={walletSummaryStyle}>
                         <span style={walletSummaryLabelStyle}>Wallet balance</span>
                         <span className="mono" style={walletSummaryValueStyle}>${user?.balance?.toFixed(2) || '0.00'}</span>
@@ -142,15 +142,9 @@ export default function PreGame() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <button
                         onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); }}
-                        style={{ ...walletActionBtnStyle, ...walletActionPrimaryStyle }}
+                        style={depositWithdrawBtnStyle}
                     >
-                        Deposit
-                    </button>
-                    <button
-                        onClick={() => { setWalletTab('withdraw'); setIsWalletOpen(true); }}
-                        style={walletActionBtnStyle}
-                    >
-                        Withdraw
+                        Deposit / Withdraw
                     </button>
 
                     <div style={{ position: 'relative' }}>
@@ -172,8 +166,10 @@ export default function PreGame() {
                     <div ref={walletPanelRef} className="glass dropdown-anim" style={walletExpandPanelStyle}>
                         <button style={walletCloseX} onClick={() => setIsWalletOpen(false)}>✕</button>
                         <div style={walletPanelHeader}>
-                            <div className="mono" style={walletPanelBalance}>${user?.balance?.toFixed(2) || '0.00'}</div>
-                            <div className="live-indicator" />
+                            <div>
+                                <div style={{ fontSize: '0.75rem', opacity: 0.55, marginBottom: '4px' }}>Wallet balance</div>
+                                <div className="mono" style={walletPanelBalance}>${user?.balance?.toFixed(2) || '0.00'}</div>
+                            </div>
                         </div>
                         <div style={walletTabContainer}>
                             <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? walletTabActive : {})}}>Deposit</button>
@@ -277,8 +273,8 @@ const walletSummaryStyle = { display: 'flex', flexDirection: 'column', justifyCo
 const walletSummaryLabelStyle = { fontSize: '0.7rem', fontWeight: '700', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' };
 const walletSummaryValueStyle = { fontSize: '1rem', fontWeight: '900', letterSpacing: '0.02em' };
 const walletActionBtnStyle = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '11px 18px', borderRadius: '14px', fontSize: '0.76rem', fontWeight: '800', minWidth: '100px', boxShadow: '0 14px 30px rgba(0,0,0,0.20)' };
-const walletActionPrimaryStyle = { background: 'linear-gradient(135deg, #22C55E, #10B981)', border: '1px solid rgba(34,197,94,0.35)' };
-const depositWithdrawBtnStyle = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '10px 16px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '800', boxShadow: '0 14px 30px rgba(0,0,0,0.20)' };
+const walletActionPrimaryStyle = { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' };
+const depositWithdrawBtnStyle = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '12px 18px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: '800', boxShadow: '0 16px 34px rgba(0,0,0,0.20)', minWidth: '140px' };
 const avatarPillStyle = { width: '34px', height: '34px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.18)', padding: '3px', background: 'rgba(255,255,255,0.04)' };
 const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.75rem', letterSpacing: '0.02em' };
 const walletExpandPanelStyle = { position: 'absolute', top: '62px', left: '50%', transform: 'translateX(-50%)', width: '320px', minWidth: '280px', padding: '20px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '14px', zIndex: 1100, background: 'rgba(12, 12, 16, 0.92)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 36px 80px rgba(0,0,0,0.32)' };
@@ -302,7 +298,7 @@ const inputLabelStyle = { display: 'block', fontSize: '0.68rem', fontWeight: '80
 const nicknameInputStyle = { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', fontSize: '0.95rem', fontWeight: '700', outline: 'none', padding: '16px 18px', borderRadius: '16px', boxSizing: 'border-box', marginBottom: '24px' };
 const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '0 0 26px 0' };
 const entryFeeRowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '20px', color: 'rgba(255,255,255,0.78)', fontSize: '0.82rem', fontWeight: '700' };
-const playBtnStyle = { width: '240px', padding: '14px 0', borderRadius: '20px', border: 'none', fontSize: '0.92rem', fontWeight: '900', letterSpacing: '0.02em', boxShadow: '0 20px 38px rgba(16, 185, 129, 0.24)', display: 'block', margin: '0 auto' };
+const playBtnStyle = { width: '100%', padding: '14px 0', borderRadius: '20px', border: 'none', fontSize: '0.92rem', fontWeight: '900', letterSpacing: '0.02em', boxShadow: '0 20px 38px rgba(16, 185, 129, 0.24)', display: 'block', maxWidth: '280px', margin: '0 auto' };
 const howItWorksContainerStyle = { marginTop: '20px' };
 const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: 0.35, fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' };
 const howItWorksTextStyle = { fontSize: '0.78rem', lineHeight: '1.6', opacity: 0.38, marginTop: '14px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', fontWeight: '600', border: '1px solid rgba(255,255,255,0.05)' };
