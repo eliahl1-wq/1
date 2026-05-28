@@ -27,6 +27,7 @@ function startGame(type) {
     document.getElementById('startMenuWrapper').style.maxHeight = '0px';
     document.getElementById('gameAreaWrapper').style.opacity = 1;
     if (!socket) {
+        console.log("Initializing socket connection...");
         socket = io({ query: "type=" + type });
         setupSocket(socket);
     }
@@ -34,7 +35,7 @@ function startGame(type) {
         animloop();
     socket.emit('respawn');
     window.chat.socket = socket;
-    window.chat.registerFunctions();
+    window.chat.registerFunctions(); // Registrera chattfunktioner här
     window.canvas.socket = socket;
     global.socket = socket;
 }
@@ -166,6 +167,7 @@ function setupSocket(socket) {
 
     // Hantera början på cashout-timer
     socket.on('cashOutStarting', (data) => {
+        console.log("%c💰 CASHOUT STARTING (Client):", "color: gold; font-size: 20px; font-weight: bold;", data);
         global.cashOutTimer = data.seconds;
         const btn = document.getElementById('cashout'); // Eller vad din knapp har för ID
         
@@ -177,6 +179,7 @@ function setupSocket(socket) {
 
         const timerInterval = setInterval(() => {
             global.cashOutTimer--;
+            console.log("Timer tick:", global.cashOutTimer);
             if (btn) btn.innerText = `EXITING IN: ${global.cashOutTimer}s`;
             
             if (global.cashOutTimer <= 0) {
@@ -193,6 +196,7 @@ function setupSocket(socket) {
     // Handle error.
     socket.on('connect_error', handleDisconnect);
     socket.on('disconnect', handleDisconnect);
+    socket.on('welcome', function (playerSettings, gameSizes) {
 
     // Handle connection.
     socket.on('welcome', function (playerSettings, gameSizes) {
@@ -200,6 +204,7 @@ function setupSocket(socket) {
         player.name = global.playerName;
         player.screenWidth = global.screen.width;
         player.screenHeight = global.screen.height;
+        player.id = socket.id; // Se till att player.id är satt
         player.target = window.canvas.target;
         global.player = player;
         window.chat.player = player;
@@ -377,7 +382,7 @@ function gameLoop() {
                     vX: users[i].cells[j].vX, // Hastighet för sliminess
                     vY: users[i].cells[j].vY,
                     isCashingOut: users[i].isCashingOut, // Skicka med status till render
-                    isMe: users[i].id === player.id,     // Markera om det är jag
+                    isMe: users[i].id === player.id, // Markera om det är jag
                     x: users[i].cells[j].x - player.x + global.screen.width / 2,
                     y: users[i].cells[j].y - player.y + global.screen.height / 2
                 });

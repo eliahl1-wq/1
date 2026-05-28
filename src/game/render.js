@@ -135,22 +135,22 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.fillText(balanceText, cell.x, cell.y + fontSize);
 
         // Visa Cashout-timer för mig själv
-        if (cell.isMe && (global.cashOutTimer > 0 || cell.isCashingOut === true)) {
+        if (cell.isMe && global.cashOutTimer > 0) {
             graph.shadowBlur = 0;
-            graph.fillStyle = '#FF3B30'; // Intensiv röd (iOS varningsfärg) för att synas tydligt
-            graph.strokeStyle = '#000000';
-            graph.lineWidth = 4;
+            graph.fillStyle = '#FFFFFF'; // Vit text
+            graph.strokeStyle = '#000000'; // Svart kant
+            graph.lineWidth = 5; // Tjockare kant
             
-            // Ännu större och fetare font
-            const timerFontSize = Math.max(fontSize * 1.5, 32);
+            // Mycket större och fetare font, minst 24px
+            const timerFontSize = Math.max(fontSize * 1.5, 24);
             graph.font = 'bold ' + timerFontSize + 'px sans-serif';
             
             let timeRemaining = global.cashOutTimer > 0 ? global.cashOutTimer : 30;
-            let timerText = `EXIT IN: ${timeRemaining}s`;
+            let timerText = `EXITING: ${timeRemaining}s`;
             
             // Rita den ännu högre upp för att undvika överlappning
-            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 45);
-            graph.fillText(timerText, cell.x, cell.y - cell.radius - 45);
+            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 30);
+            graph.fillText(timerText, cell.x, cell.y - cell.radius - 30);
         }
     }
 };
