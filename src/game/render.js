@@ -135,22 +135,22 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.fillText(balanceText, cell.x, cell.y + fontSize);
 
         // Visa Cashout-timer för mig själv
-        if (cell.isMe && global.cashOutTimer > 0) {
+        if (cell.isMe && global.cashOutTimer > 0) { // Återställd till tidigare tillstånd för felsökning
             graph.shadowBlur = 0;
-            graph.fillStyle = '#FFFFFF'; // Vit text
-            graph.strokeStyle = '#000000'; // Svart kant
-            graph.lineWidth = 5; // Tjockare kant
+            graph.fillStyle = '#FFD700'; // Guld-gul färg för utbetalning
+            graph.strokeStyle = '#FFFFFF'; // Vit kant
+            graph.lineWidth = 3;
             
-            // Mycket större och fetare font, minst 24px
-            const timerFontSize = Math.max(fontSize * 1.5, 24);
+            // Mycket större och tydligare font (minst 24px)
+            const timerFontSize = Math.max(fontSize * 1.2, 24);
             graph.font = 'bold ' + timerFontSize + 'px sans-serif';
             
             let timeRemaining = global.cashOutTimer > 0 ? global.cashOutTimer : 30;
-            let timerText = `EXITING: ${timeRemaining}s`;
+            let timerText = `EXITING: ${timeRemaining}s`; // Återställd text
             
             // Rita den ännu högre upp för att undvika överlappning
-            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 30);
-            graph.fillText(timerText, cell.x, cell.y - cell.radius - 30);
+            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 30); // Återställd position
+            graph.fillText(timerText, cell.x, cell.y - cell.radius - 30); // Återställd position
         }
     }
 };
@@ -182,7 +182,7 @@ const drawHUD = (global, graph) => {
 
 const drawGrid = (global, player, screen, graph) => {
     graph.lineWidth = 1;
-    graph.strokeStyle = '#000000'; // TEST: Svart rutnät för vit bakgrund
+    graph.strokeStyle = global.lineColor; // Använd global.lineColor
     graph.globalAlpha = 0.08; // Väldigt svagt rutnät för proffsig känsla
     graph.beginPath();
 

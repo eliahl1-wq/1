@@ -1,3 +1,5 @@
+console.log("Global.js loaded!");
+
 export default {
     // Keys and other mathematical constants
     KEY_ESC: 27,
@@ -26,7 +28,7 @@ export default {
     continuity: false,
     startPingTime: 0,
     toggleMassState: 0,
-    backgroundColor: '#ffffff', // TEST: Ändrad till vit
-    lineColor: '#000000',       // TEST: Ändrad till svart
+    backgroundColor: '#FFFFFF', // AGGRESSIVE TEST: VIT
+    lineColor: '#000000',       // AGGRESSIVE TEST: SVART
     cashOutTimer: 0,            // Nedräkning för uttag
 };

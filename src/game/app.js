@@ -196,9 +196,8 @@ function setupSocket(socket) {
     // Handle error.
     socket.on('connect_error', handleDisconnect);
     socket.on('disconnect', handleDisconnect);
-    socket.on('welcome', function (playerSettings, gameSizes) {
 
-    // Handle connection.
+    // Handle connection. (Original welcome handler)
     socket.on('welcome', function (playerSettings, gameSizes) {
         player = playerSettings;
         player.name = global.playerName;
@@ -340,6 +339,7 @@ function animloop() {
 
 function gameLoop() {
     if (global.gameStart) {
+        console.log("Current background color:", global.backgroundColor); // Felsökning: Visa bakgrundsfärg
         graph.fillStyle = global.backgroundColor;
         graph.fillRect(0, 0, global.screen.width, global.screen.height);
 
@@ -382,7 +382,7 @@ function gameLoop() {
                     vX: users[i].cells[j].vX, // Hastighet för sliminess
                     vY: users[i].cells[j].vY,
                     isCashingOut: users[i].isCashingOut, // Skicka med status till render
-                    isMe: users[i].id === player.id, // Markera om det är jag
+                    isMe: users[i].id === player.id,     // Markera om det är jag
                     x: users[i].cells[j].x - player.x + global.screen.width / 2,
                     y: users[i].cells[j].y - player.y + global.screen.height / 2
                 });
