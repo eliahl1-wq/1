@@ -82,6 +82,13 @@ export default function Lobby() {
         refreshUser();
     }, [token, login]);
 
+    // Om användaren redan har balans, skicka dem direkt till PreGame
+    useEffect(() => {
+        if (user && (user.balance || 0) >= 10) {
+            navigate('/pre-game');
+        }
+    }, [user, navigate]);
+
     // Funktion för att hantera insättning (Skicka SOL)
     const handleDeposit = async () => {
         if (!publicKey || !connected) {

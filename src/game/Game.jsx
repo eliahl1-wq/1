@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import global from './global.js';
 import Canvas from './canvas.js';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
 
@@ -17,6 +17,7 @@ export default function Game() {
     const canvasRef = useRef(null);
     const { user, token } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
     const socketRef = useRef(null);
     const hasJoinedGameRef = useRef(false);
     
@@ -32,6 +33,7 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState([]);
     const [cashedAmount, setCashedAmount] = useState(null);
     const [isDead, setIsDead] = useState(false);
+    const [localTimer, setLocalTimer] = useState(0);
 
     useEffect(() => {
         // Endast anslut om vi har en token och användarnamn, OCH ingen socket är aktiv
@@ -89,8 +91,10 @@ export default function Game() {
         socket.on('cashOutStarting', (data) => {
             console.log("💰 CASHOUT STARTING (React):", data);
             global.cashOutTimer = data.seconds;
+            setLocalTimer(data.seconds);
             const timerInterval = setInterval(() => {
                 global.cashOutTimer--;
+                setLocalTimer(prev => prev - 1);
                 if (global.cashOutTimer <= 0) {
                     clearInterval(timerInterval);
                 }
@@ -112,15 +116,15 @@ export default function Game() {
             setCashedAmount(amount);
             // Visa animationen i 4 sekunder innan redirect
             setTimeout(() => {
-                window.location.assign('/lobby');
+                navigate('/pre-game');
             }, 4000);
         });
 
         socket.on('died', () => {
             setIsDead(true);
-            // Visa döds-skärmen i 4 sekunder innan vi skickar tillbaka till lobbyn
+            // Visa döds-skärmen i 4 sekunder innan vi skickar tillbaka till pre-game
             setTimeout(() => {
-                window.location.assign('/lobby'); 
+                navigate('/pre-game'); 
             }, 4000);
         });
 
@@ -139,7 +143,7 @@ export default function Game() {
             console.error('Server error:', msg); // Logga server-side fel
             if (msg.includes('balance')) {
                 alert(msg);
-                window.location.assign('/lobby');
+                navigate('/pre-game');
             }
         });
 
@@ -185,7 +189,8 @@ export default function Game() {
             const { player, users, food, viruses, ejected, zoneSize } = gameData.current;
             const screen = { width: window.innerWidth, height: window.innerHeight };
             
-            if (isConnected && player.x !== undefined) {
+            // CRASH FIX: Kontrollera att vi inte är döda och att spelardata finns
+            if (isConnected && !isDead && player && player.x !== undefined) {
                 graph.fillStyle = global.backgroundColor;
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
@@ -223,11 +228,11 @@ export default function Game() {
                 renderUtils.drawCells(cellsToDraw, { border: 6, textBorderSize: 3, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
                 renderUtils.drawHUD(global, graph);
             }
-            animationFrameId.current = requestAnimationFrame(gameLoop);
+            if (!isDead) animationFrameId.current = requestAnimationFrame(gameLoop);
         };
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);
-    }, [isConnected]); 
+    }, [isConnected, isDead]); 
 
     const handleMouseMove = (e) => {
         const canvas = canvasRef.current;
@@ -375,10 +380,11 @@ export default function Game() {
                     </div>
 
                     <button 
-                        onClick={() => socketRef.current?.emit('cashOut')}
+                        onClick={() => localTimer <= 0 && socketRef.current?.emit('cashOut')}
+                        disabled={localTimer > 0}
                         style={{
                             width: '100%',
-                            background: '#34C759',
+                            background: localTimer > 0 ? '#444' : '#34C759',
                             color: 'white',
                             border: 'none',
                             padding: '10px 0',
@@ -386,12 +392,13 @@ export default function Game() {
                             fontWeight: '800',
                             fontSize: '0.8rem',
                             letterSpacing: '1px',
-                            cursor: 'pointer',
+                            cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
                             transition: '0.2s all ease',
-                            boxShadow: '0 4px 15px rgba(52, 199, 89, 0.4)'
+                            boxShadow: localTimer > 0 ? 'none' : '0 4px 15px rgba(52, 199, 89, 0.4)',
+                            opacity: localTimer > 0 ? 0.7 : 1
                         }}
                     >
-                        CASH OUT
+                        {localTimer > 0 ? `WAIT ${localTimer}s` : 'CASH OUT'}
                     </button>
                 </div>
 

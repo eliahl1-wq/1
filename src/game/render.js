@@ -156,28 +156,8 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
 };
 
 const drawHUD = (global, graph) => {
-    if (global.cashOutTimer > 0) {
-        graph.save();
-        // Tvinga till skärm-koordinater (ignorera kamerans position)
-        graph.setTransform(1, 0, 0, 1, 0, 0); 
-
-        const hudHeight = 100;
-        graph.fillStyle = 'rgba(255, 59, 48, 0.95)';
-        graph.fillRect(0, 0, window.innerWidth, hudHeight);
-
-        graph.fillStyle = '#FFFFFF';
-        graph.strokeStyle = '#000000';
-        graph.lineWidth = 4;
-        graph.font = '900 42px sans-serif';
-        graph.textAlign = 'center';
-        graph.textBaseline = 'middle';
-
-        const hudText = `⚠️ SURVIVE: ${global.cashOutTimer}s ⚠️`;
-        graph.strokeText(hudText, window.innerWidth / 2, hudHeight / 2);
-        graph.fillText(hudText, window.innerWidth / 2, hudHeight / 2);
-
-        graph.restore();
-    }
+    // HUD-bannern borttagen enligt önskemål. 
+    // Timern visas nu istället på knappen i Game.jsx
 };
 
 const drawGrid = (global, player, screen, graph) => {
