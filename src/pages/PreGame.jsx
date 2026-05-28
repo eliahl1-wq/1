@@ -110,8 +110,8 @@ export default function PreGame() {
             </div>
 
             {/* CENTER CARD — Join Game */}
-            <div style={centerCardStyle}>
-                <label style={inputLabelStyle}>Enter nickname</label>
+            <div className="glass" style={centerCardStyle}>
+                <label style={inputLabelStyle}>Nickname</label>
                 <input 
                     type="text" 
                     value={nickname} 
@@ -122,9 +122,9 @@ export default function PreGame() {
                 
                 <div style={dividerStyle} />
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                    <span style={{ fontSize: '0.85rem', opacity: 0.4, fontWeight: '600' }}>Entry fee:</span>
-                    <span className="mono" style={{ fontSize: '0.85rem', fontWeight: '700' }}>$10.00</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.35, fontWeight: '600' }}>Starting balance</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '700', color: '#34C759' }}>$1.00</span>
                 </div>
 
                 <button 
@@ -137,47 +137,57 @@ export default function PreGame() {
                         cursor: canJoin ? 'pointer' : 'not-allowed'
                     }}
                 >
-                    {canJoin ? `Play — $${entryFee.toFixed(2)}` : 'Insufficient balance'}
+                    {isMatchmaking ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                            Joining...
+                        </div>
+                    ) : (canJoin ? 'Play' : 'Insufficient Balance')}
                 </button>
 
                 <div style={howItWorksContainerStyle}>
                     <div onClick={() => setShowHowItWorks(!showHowItWorks)} style={howItWorksToggleStyle}>
-                        <span>ℹ How it works</span>
-                        <span style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.3s' }}>▾</span>
+                        <span>How it works</span>
+                        <svg style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.3s' }} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
                     {showHowItWorks && (
-                        <p style={howItWorksTextStyle}>
-                            Your $10 entry is distributed: $1.00 starting stake, $7.00 added to the food pool ($0.01/blob), and $2.00 house fee. 
-                            Grow by consuming food or absorbing 100% of other players' balance. Cash out at any time.
-                        </p>
+                        <div style={howItWorksTextStyle}>
+                            <div>• Entry fee is $10.00</div>
+                            <div>• Grow by eating food and players</div>
+                            <div>• Cash out your balance anytime</div>
+                            <div style={{ marginTop: '8px', opacity: 0.5 }}>Top 3 players are rewarded:</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}><span>1st Place</span><span>$20.00</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>2nd Place</span><span>$10.00</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>3rd Place</span><span>$10.00</span></div>
+                        </div>
                     )}
                 </div>
             </div>
 
             {/* BOTTOM LEFT CARD — Wallet */}
-            <div style={bottomLeftCardStyle}>
+            <div className="glass" style={bottomLeftCardStyle}>
                 <label style={cardSmallLabelStyle}>Wallet</label>
-                <h3 className="mono" style={walletBalanceStyle}>${user?.balance?.toFixed(2) || '0.00'}</h3>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                    <button onClick={() => setActiveModal('deposit')} style={walletBtnSmallStyle}>+ Deposit</button>
-                    <button onClick={() => setActiveModal('withdraw')} style={walletBtnGhostStyle}>↑ Withdraw</button>
-                </div>
+                <div className="mono" style={walletBalanceStyle}>${user?.balance?.toFixed(2) || '0.00'}</div>
             </div>
 
             {/* BOTTOM RIGHT CARD — Live Stats */}
-            <div style={bottomRightCardStyle}>
+            <div className="glass" style={bottomRightCardStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Stats</div>
+                    <div className="live-indicator" />
+                </div>
                 <div style={statItemStyle}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span className="pulse-dot" /> Players online
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.4"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m8-10a4 4 0 100-8 4 4 0 000 8z"/></svg>
+                        Players online
+                    </div>
                     <span className="mono">142</span>
                 </div>
                 <div style={statItemStyle}>
-                    <span>⚔️ Active games</span>
-                    <span className="mono">8</span>
-                </div>
-                <div style={statItemStyle}>
-                    <span>💰 Biggest cash out today</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.4"><path d="M12 1v22m5-18H7a3 3 0 000 6h10a3 3 0 010 6H7"/></svg>
+                        Biggest payout today
+                    </div>
                     <span className="mono">$84.20</span>
                 </div>
             </div>
@@ -185,10 +195,9 @@ export default function PreGame() {
             {/* Footer Links */}
             <div style={footerContainerStyle}>
                 <span>Terms of Service</span>
-                <span>·</span>
                 <span>Provably Fair</span>
-                <span>·</span>
                 <span>Support</span>
+                <span style={{ opacity: 0.4 }}>EU-West · Stable</span>
             </div>
         </div>
     );
