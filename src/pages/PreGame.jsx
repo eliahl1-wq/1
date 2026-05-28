@@ -8,6 +8,7 @@ export default function PreGame() {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [walletTab, setWalletTab] = useState('deposit'); // 'deposit' | 'withdraw'
+    const [stats, setStats] = useState({ playersOnline: 0, biggestPayout: 0 });
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
     const walletPanelRef = useRef(null);
@@ -44,6 +45,30 @@ export default function PreGame() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
+
+    useEffect(() => {
+        let mounted = true;
+        const loadStats = async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stats`);
+                if (!res.ok) throw new Error('Stats fetch failed');
+                const data = await res.json();
+                if (!mounted) return;
+                setStats({
+                    playersOnline: data.playersOnline ?? 0,
+                    biggestPayout: data.biggestPayout ?? 0
+                });
+            } catch (err) {
+                console.warn('Failed to load stats', err);
+            }
+        };
+        loadStats();
+        const interval = setInterval(loadStats, 20000);
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
+    }, []);
 
     return (
         <div style={containerStyle}>
@@ -101,19 +126,31 @@ export default function PreGame() {
             `}</style>
 
             <div style={backgroundStyle} />
+            <div style={gameBlurStyle} />
             <div style={backgroundOverlayStyle} />
             <div style={vignetteStyle} />
 
             <div style={topBarStyle}>
-                <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <button 
-                        id="wallet-trigger"
-                        onClick={() => setIsWalletOpen(!isWalletOpen)}
-                        style={depositWithdrawBtnStyle}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+                    <h2 style={logoStyle}>AGAR<span style={{ color: '#22C55E' }}>STAKE</span></h2>
+                    <div style={walletSummaryStyle}>
+                        <span style={walletSummaryLabelStyle}>Wallet balance</span>
+                        <span className="mono" style={walletSummaryValueStyle}>${user?.balance?.toFixed(2) || '0.00'}</span>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                        onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); }}
+                        style={{ ...walletActionBtnStyle, ...walletActionPrimaryStyle }}
                     >
-                        Deposit / Withdraw
+                        Deposit
+                    </button>
+                    <button
+                        onClick={() => { setWalletTab('withdraw'); setIsWalletOpen(true); }}
+                        style={walletActionBtnStyle}
+                    >
+                        Withdraw
                     </button>
 
                     <div style={{ position: 'relative' }}>
@@ -165,9 +202,9 @@ export default function PreGame() {
                 
                 <div style={dividerStyle} />
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.35, fontWeight: '600' }}>Starting balance</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '700', color: '#34C759' }}>$1.00</span>
+                <div style={entryFeeRowStyle}>
+                    <span>Entry fee</span>
+                    <span className="mono">${entryFee.toFixed(0)}</span>
                 </div>
 
                 <button 
@@ -175,8 +212,8 @@ export default function PreGame() {
                     disabled={!canJoin || isMatchmaking}
                     style={{ 
                         ...playBtnStyle, 
-                        background: canJoin ? '#007AFF' : '#252529',
-                        color: canJoin ? 'white' : 'rgba(255,255,255,0.2)',
+                        background: canJoin ? 'linear-gradient(135deg, #22C55E, #10B981)' : 'rgba(255,255,255,0.06)',
+                        color: canJoin ? 'white' : 'rgba(255,255,255,0.45)',
                         cursor: canJoin ? 'pointer' : 'not-allowed'
                     }}
                 >
@@ -204,11 +241,6 @@ export default function PreGame() {
                 </div>
             </div>
 
-            <div className="glass" style={bottomLeftCardStyle}>
-                <label style={cardSmallLabelStyle}>Wallet</label>
-                <div className="mono" style={walletBalanceStyle}>${user?.balance?.toFixed(2) || '0.00'}</div>
-            </div>
-
             <div className="glass" style={bottomRightCardStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <div style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase' }}>Live Stats</div>
@@ -216,11 +248,11 @@ export default function PreGame() {
                 </div>
                 <div style={statItemStyle}>
                     <span>Players online</span>
-                    <span className="mono">142</span>
+                    <span className="mono">{stats.playersOnline.toLocaleString()}</span>
                 </div>
                 <div style={statItemStyle}>
                     <span>Biggest payout today</span>
-                    <span className="mono">$84.20</span>
+                    <span className="mono">${stats.biggestPayout.toFixed(2)}</span>
                 </div>
             </div>
 
@@ -235,11 +267,17 @@ export default function PreGame() {
 }
 // --- Styles ---
 const containerStyle = { width: '100vw', minHeight: '100vh', background: '#050507', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em', paddingTop: '56px' };
-const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -3, background: '#050507', backgroundImage: `radial-gradient(circle at 20% 15%, rgba(0,122,255,0.14) 0%, transparent 18%), radial-gradient(circle at 80% 20%, rgba(52,199,89,0.08) 0%, transparent 17%), radial-gradient(circle at 50% 80%, rgba(255,255,255,0.04) 0%, transparent 30%)`, opacity: 1 };
+const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -3, background: '#050507', backgroundImage: `radial-gradient(circle at 20% 15%, rgba(0,122,255,0.12) 0%, transparent 16%), radial-gradient(circle at 80% 20%, rgba(52,199,89,0.08) 0%, transparent 15%), radial-gradient(circle at 50% 80%, rgba(255,255,255,0.04) 0%, transparent 24%)`, opacity: 1 };
+const gameBlurStyle = { position: 'fixed', inset: 0, zIndex: -4, backgroundImage: `radial-gradient(circle at 18% 18%, rgba(255,255,255,0.12) 0%, transparent 14%), radial-gradient(circle at 82% 22%, rgba(0,122,255,0.10) 0%, transparent 16%), radial-gradient(circle at 42% 72%, rgba(52,199,89,0.08) 0%, transparent 14%), radial-gradient(circle at 66% 78%, rgba(255,255,255,0.06) 0%, transparent 18%)`, filter: 'blur(24px)', opacity: 0.92 };
 const backgroundOverlayStyle = { position: 'fixed', inset: 0, zIndex: -2, background: 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.82) 100%)' };
 const vignetteStyle = { position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle at center, transparent 45%, rgba(0,0,0,0.65) 100%)' };
-const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', zIndex: 1000, background: 'rgba(8, 8, 12, 0.86)', backdropFilter: 'blur(22px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
+const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', zIndex: 1000, background: 'rgba(8, 8, 12, 0.88)', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-0.04em', fontSize: '1.05rem' };
+const walletSummaryStyle = { display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '12px 14px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', minWidth: '170px', gap: '4px', boxShadow: '0 14px 32px rgba(0,0,0,0.22)' };
+const walletSummaryLabelStyle = { fontSize: '0.7rem', fontWeight: '700', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' };
+const walletSummaryValueStyle = { fontSize: '1rem', fontWeight: '900', letterSpacing: '0.02em' };
+const walletActionBtnStyle = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '11px 18px', borderRadius: '14px', fontSize: '0.76rem', fontWeight: '800', minWidth: '100px', boxShadow: '0 14px 30px rgba(0,0,0,0.20)' };
+const walletActionPrimaryStyle = { background: 'linear-gradient(135deg, #22C55E, #10B981)', border: '1px solid rgba(34,197,94,0.35)' };
 const depositWithdrawBtnStyle = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '10px 16px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '800', boxShadow: '0 14px 30px rgba(0,0,0,0.20)' };
 const avatarPillStyle = { width: '34px', height: '34px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.18)', padding: '3px', background: 'rgba(255,255,255,0.04)' };
 const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.75rem', letterSpacing: '0.02em' };
@@ -263,7 +301,8 @@ const centerCardStyle = { width: '360px', maxWidth: '92vw', borderRadius: '24px'
 const inputLabelStyle = { display: 'block', fontSize: '0.68rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' };
 const nicknameInputStyle = { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', fontSize: '0.95rem', fontWeight: '700', outline: 'none', padding: '16px 18px', borderRadius: '16px', boxSizing: 'border-box', marginBottom: '24px' };
 const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '0 0 26px 0' };
-const playBtnStyle = { width: '100%', padding: '16px', borderRadius: '16px', border: 'none', fontSize: '0.92rem', fontWeight: '900', letterSpacing: '0.02em', boxShadow: '0 18px 34px rgba(0, 122, 255, 0.18)' };
+const entryFeeRowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '20px', color: 'rgba(255,255,255,0.78)', fontSize: '0.82rem', fontWeight: '700' };
+const playBtnStyle = { width: '240px', padding: '14px 0', borderRadius: '20px', border: 'none', fontSize: '0.92rem', fontWeight: '900', letterSpacing: '0.02em', boxShadow: '0 20px 38px rgba(16, 185, 129, 0.24)', display: 'block', margin: '0 auto' };
 const howItWorksContainerStyle = { marginTop: '20px' };
 const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: 0.35, fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' };
 const howItWorksTextStyle = { fontSize: '0.78rem', lineHeight: '1.6', opacity: 0.38, marginTop: '14px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', fontWeight: '600', border: '1px solid rgba(255,255,255,0.05)' };
