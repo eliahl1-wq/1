@@ -182,7 +182,7 @@ const drawHUD = (global, graph) => {
 
 const drawGrid = (global, player, screen, graph) => {
     graph.lineWidth = 1;
-    graph.strokeStyle = '#ffffff';
+    graph.strokeStyle = '#000000'; // TEST: Svart rutnät för vit bakgrund
     graph.globalAlpha = 0.08; // Väldigt svagt rutnät för proffsig känsla
     graph.beginPath();
 

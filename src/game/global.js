@@ -26,7 +26,7 @@ export default {
     continuity: false,
     startPingTime: 0,
     toggleMassState: 0,
-    backgroundColor: '#0a0a0c', // Din mörka bakgrund
-    lineColor: '#ffffff',       // Vita linjer för rutnätet
+    backgroundColor: '#ffffff', // TEST: Ändrad till vit
+    lineColor: '#000000',       // TEST: Ändrad till svart
     cashOutTimer: 0,            // Nedräkning för uttag
 };
