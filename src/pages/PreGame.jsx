@@ -204,129 +204,6 @@ export default function PreGame() {
     );
 }
 
-            {/* Background Map/Grid Effect */}
-            <div style={backgroundStyle} />
-
-            {activeModal && <Modal type={activeModal} />}
-
-            {/* Top Bar */}
-            <div style={topBarStyle}>
-                <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: '600' }}>
-                        <div className="pulse-dot" />
-                        ${user?.balance?.toFixed(2) || '0.00'}
-                    </div>
-                    <div style={{ position: 'relative' }}>
-                        <div ref={userPillRef} onClick={() => setShowUserMenu(!showUserMenu)} style={avatarPillStyle}>
-                            <span style={{ fontWeight: '600', fontSize: '0.85rem', opacity: 0.8 }}>{user?.username}</span>
-                            <div style={avatarCircleStyle}>{user?.username?.charAt(0).toUpperCase()}</div>
-                        </div>
-                    {showUserMenu && (
-                        <div ref={userMenuRef} style={userMenuContainerStyle}>
-                            <button style={userMenuItemStyle}>Settings</button>
-                            <button style={userMenuItemStyle}>Transaction History</button>
-                            <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30', borderTop: '1px solid rgba(255,255,255,0.03)' }}>Log Out</button>
-                        </div>
-                    )}
-                    </div>
-                </div>
-            </div>
-
-            {/* CENTER CARD — Join Game */}
-            <div className="glass" style={centerCardStyle}>
-                <label style={inputLabelStyle}>Nickname</label>
-                <input 
-                    type="text" 
-                    value={nickname} 
-                    onChange={(e) => setNickname(e.target.value.substring(0, 15))}
-                    placeholder="Your name..."
-                    style={nicknameInputStyle}
-                />
-                
-                <div style={dividerStyle} />
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.35, fontWeight: '600' }}>Starting balance</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '700', color: '#34C759' }}>$1.00</span>
-                </div>
-
-                <button 
-                    onClick={handleStartMatch} 
-                    disabled={!canJoin}
-                    style={{ 
-                        ...playBtnStyle, 
-                        background: canJoin ? '#007AFF' : '#252529',
-                        color: canJoin ? 'white' : '#5a5a5e',
-                        cursor: canJoin ? 'pointer' : 'not-allowed'
-                    }}
-                >
-                    {isMatchmaking ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                            <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
-                            Joining...
-                        </div>
-                    ) : (canJoin ? 'Play' : 'Insufficient Balance')}
-                </button>
-
-                <div style={howItWorksContainerStyle}>
-                    <div onClick={() => setShowHowItWorks(!showHowItWorks)} style={howItWorksToggleStyle}>
-                        <span>How it works</span>
-                        <svg style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.3s' }} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                    </div>
-                    {showHowItWorks && (
-                        <div style={howItWorksTextStyle}>
-                            <div>• Entry fee is $10.00</div>
-                            <div>• Grow by eating food and players</div>
-                            <div>• Cash out your balance anytime</div>
-                            <div style={{ marginTop: '8px', opacity: 0.5 }}>Top 3 players are rewarded:</div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}><span>1st Place</span><span>$20.00</span></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>2nd Place</span><span>$10.00</span></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>3rd Place</span><span>$10.00</span></div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* BOTTOM LEFT CARD — Wallet */}
-            <div className="glass" style={bottomLeftCardStyle}>
-                <label style={cardSmallLabelStyle}>Wallet</label>
-                <div className="mono" style={walletBalanceStyle}>${user?.balance?.toFixed(2) || '0.00'}</div>
-            </div>
-
-            {/* BOTTOM RIGHT CARD — Live Stats */}
-            <div className="glass" style={bottomRightCardStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Stats</div>
-                    <div className="live-indicator" />
-                </div>
-                <div style={statItemStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.4"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m8-10a4 4 0 100-8 4 4 0 000 8z"/></svg>
-                        Players online
-                    </div>
-                    <span className="mono">142</span>
-                </div>
-                <div style={statItemStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.4"><path d="M12 1v22m5-18H7a3 3 0 000 6h10a3 3 0 010 6H7"/></svg>
-                        Biggest payout today
-                    </div>
-                    <span className="mono">$84.20</span>
-                </div>
-            </div>
-
-            {/* Footer Links */}
-            <div style={footerContainerStyle}>
-                <span>Terms of Service</span>
-                <span>Provably Fair</span>
-                <span>Support</span>
-                <span style={{ opacity: 0.4 }}>EU-West · Stable</span>
-            </div>
-        </div>
-    );
-}
-
 // --- Styles ---
 const containerStyle = { width: '100vw', height: '100vh', background: '#020203', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
 const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#020203', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
@@ -362,6 +239,6 @@ const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.5', opacity: 0.
 const bottomLeftCardStyle = { position: 'fixed', bottom: '24px', left: '24px', width: '180px', borderRadius: '16px', padding: '12px 16px', boxShadow: '0 8px 16px rgba(0,0,0,0.2)' };
 const cardSmallLabelStyle = { display: 'block', fontSize: '0.6rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', marginBottom: '4px' };
 const walletBalanceStyle = { fontSize: '1.15rem', fontWeight: '800' };
-const bottomRightCardStyle = { position: 'fixed', bottom: '24px', right: '24px', width: '200px', borderRadius: '16px', padding: '16px', boxShadow: '0 8px 16px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '12px' };
+const bottomRightCardStyle = { position: 'fixed', bottom: '24px', right: '24px', width: '200px', borderRadius: '16px', padding: '16px', boxShadow: '0 8px 16px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' };
 const statItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: '600', opacity: 0.5 };
 const footerContainerStyle = { position: 'fixed', bottom: '12px', left: '24px', right: '24px', display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '0.6rem', opacity: 0.2, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' };
