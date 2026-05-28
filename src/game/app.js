@@ -387,9 +387,12 @@ function gameLoop() {
             return obj1.mass - obj2.mass;
         });
         render.drawCells(cellsToDraw, playerConfig, global.toggleMassState, borders, graph);
-        render.drawHUD(global, graph);
 
         socket.emit('0', window.canvas.target); // playerSendTarget "Heartbeat".
+    }
+    // Rita HUD även om gameStart är tveksamt, så länge timern tickar
+    if (global.cashOutTimer > 0) {
+        render.drawHUD(global, graph);
     }
 }
 
