@@ -29,6 +29,7 @@ export default function PreGame() {
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
+    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0 });
     const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
 
     const formatBalance = (val) => {
@@ -244,6 +245,21 @@ export default function PreGame() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
 
+    useEffect(() => {
+        let mounted = true;
+        const fetchStats = async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stats`);
+                if (!res.ok) return;
+                const d = await res.json();
+                if (mounted) setLiveStats(d);
+            } catch (e) {}
+        };
+        fetchStats();
+        const id = setInterval(fetchStats, 5000);
+        return () => { mounted = false; clearInterval(id); };
+    }, []);
+
     const adjustedWalletExpandPanelStyle = {
         ...walletExpandPanelStyle,
         left: panelPosition.x !== null ? panelPosition.x : '50%',
@@ -331,14 +347,14 @@ export default function PreGame() {
                             <div ref={walletDropdownRef} className="glass" style={walletDropdownCardStyle}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                     <span style={{ fontSize: '12px', fontWeight: '600', opacity: 0.4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Value</span>
-                                    <div style={{ display: 'flex', gap: '6px' }}>
-                                        <button className="pill-tab active">Balance</button>
-                                        <button className="pill-tab">History</button>
-                                    </div>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button onClick={() => {}} style={{ padding: '6px 10px', borderRadius: 10, background: 'transparent', border: 'none', color: 'white', fontWeight: 800 }}>Balance</button>
+                                            <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }} style={{ padding: '6px 10px', borderRadius: 10, background: 'transparent', border: 'none', color: 'white', fontWeight: 800 }}>Transaction History</button>
+                                        </div>
                                 </div>
                                 
-                                <div className="mono" style={{ fontSize: '28px', fontWeight: '800', marginBottom: '16px' }}>
-                                    ${user?.balance?.toFixed(2) || '0.00'}
+                                <div className="mono" style={{ fontSize: '28px', fontWeight: '800', marginBottom: '16px', color: '#6EEB80' }}>
+                                    ${formatBalance(user?.balance)}
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
@@ -349,7 +365,7 @@ export default function PreGame() {
 
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span className="mono" style={{ fontSize: '13px', opacity: 0.8 }}>${user?.balance?.toFixed(2)}</span>
+                                        <span className="mono" style={{ fontSize: '13px', opacity: 0.8, color: '#6EEB80' }}>${formatBalance(user?.balance)}</span>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{opacity: 0.4}}><path d="M20 11a8.1 8.1 0 00-15.5-2m-.5 5v5h5m10-1a8.1 8.1 0 01-15.5 2m.5-5h5"/></svg>
                                     </div>
                                 </div>
@@ -377,7 +393,7 @@ export default function PreGame() {
                         <div ref={userMenuRef} style={userMenuContainerStyle}>
                             <div style={userMenuHeader}>{user?.username}</div>
                             <button style={userMenuItemStyle}>Settings</button>
-                            <button style={userMenuItemStyle}>History</button>
+                            <button onClick={() => { setShowUserMenu(false); navigate('/transactions'); }} style={userMenuItemStyle}>Transactions</button>
                             <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30' }}>Log Out</button>
                         </div>
                     )}
@@ -488,11 +504,11 @@ export default function PreGame() {
                 </div>
                 <div style={statItemStyle}>
                     <span>Players online</span>
-                    <span className="mono">142</span>
+                    <span className="mono">{liveStats.playersOnline ?? 0}</span>
                 </div>
                 <div style={statItemStyle}>
                     <span>Biggest payout today</span>
-                    <span className="mono">$84.20</span>
+                    <span className="mono">${(liveStats.biggestPayout || 0).toFixed(2)}</span>
                 </div>
             </div>
 
@@ -541,8 +557,8 @@ const walletStatusDisconnected = { background: 'rgba(255, 59, 48, 0.14)', color:
 const walletOptionRow = { display: 'flex', justifyContent: 'center' };
 const walletPanelBalance = { fontSize: '1.25rem', fontWeight: '800' };
 const walletTabContainer = { display: 'flex', gap: '6px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '14px' };
-const walletTabBtn = { flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.55)', fontSize: '0.82rem', fontWeight: '800', borderRadius: '12px', cursor: 'pointer' };
-const walletTabActive = { background: 'rgba(255,255,255,0.12)', color: 'white' };
+const walletTabBtn = { flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: '800', borderRadius: '12px', cursor: 'pointer' };
+const walletTabActive = { background: 'rgba(255,255,255,0.06)', color: 'white' };
 const walletInputArea = { position: 'relative', display: 'flex', alignItems: 'center', width: '100%' };
 const walletInputPrefix = { position: 'absolute', left: '14px', fontSize: '0.85rem', opacity: 0.4, fontWeight: '800' };
 const walletInput = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 14px 14px 32px', color: 'white', fontWeight: '700', fontSize: '0.95rem', outline: 'none' };
