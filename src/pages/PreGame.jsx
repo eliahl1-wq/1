@@ -255,15 +255,20 @@ export default function PreGame() {
                 <div ref={walletExpandRef} className="glass" style={walletExpandPanelStyle}>
                     <button style={walletCloseX} onClick={() => setIsWalletExpanded(false)}>✕</button>
                     <div style={walletPanelHeader}>
-                        <div className="mono" style={walletPanelBalance}>${user?.balance?.toFixed(2) || '0.00'}</div>
-                        <div className="live-indicator" />
+                        <div>
+                            <div style={walletPanelTitle}>Wallet</div>
+                            <div style={walletPanelSubtitle}>{connected ? `Connected to ${publicKey?.toString().slice(0, 4)}...${publicKey?.toString().slice(-4)}` : 'Connect to begin deposit'}</div>
+                        </div>
+                        <div style={{ ...walletStatusBadge, ...(connected ? walletStatusConnected : walletStatusDisconnected) }}>
+                            {connected ? 'Connected' : 'Disconnected'}
+                        </div>
+                    </div>
+                    <div style={walletOptionRow}>
+                        <WalletMultiButton />
                     </div>
                     <div style={walletTabContainer}>
                         <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? walletTabActive : {})}}>Deposit</button>
                         <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? walletTabActive : {})}}>Withdraw</button>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
-                        <WalletMultiButton />
                     </div>
                     <div style={walletInputArea}>
                         <div style={walletInputPrefix}>$</div>
@@ -276,7 +281,7 @@ export default function PreGame() {
                         } else {
                             setDepositStatusMessage('Withdrawal is not implemented yet.');
                         }
-                    }}>Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}</button>
+                    }}>{walletTab === 'deposit' ? 'Deposit' : 'Withdraw'}</button>
                     {depositStatusMessage && (
                         <div style={{ marginTop: '14px', fontSize: '0.85rem', color: depositStatusMessage.startsWith('✅') ? '#34C759' : '#FF3B30', textAlign: 'center' }}>
                             {depositStatusMessage}
@@ -376,9 +381,9 @@ const walletPillButtonStyle = { display: 'flex', alignItems: 'center', backgroun
 const standaloneDepositButtonStyle = { background: 'linear-gradient(to right, #4052ee, #a13bf7)', border: 'none', color: 'white', padding: '8px 20px', borderRadius: '100px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(64, 82, 238, 0.3)' };
 const depositWithdrawBtnStyle = walletPillButtonStyle;
 
-const walletDropdownCardStyle = { position: 'absolute', top: '48px', left: '50%', transform: 'translateX(-50%)', width: '380px', padding: '24px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', zIndex: 1100, animation: 'slideDown 0.2s ease-out' };
-const dropdownPrimaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'linear-gradient(to right, #4052ee, #a13bf7)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
-const dropdownSecondaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'rgba(255,255,255,0.05)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
+const walletDropdownCardStyle = { position: 'absolute', top: '48px', left: '50%', transform: 'translateX(-50%)', width: '360px', padding: '24px', borderRadius: '24px', boxShadow: '0 24px 50px rgba(0,0,0,0.45)', zIndex: 1100, animation: 'slideDown 0.2s ease-out' };
+const dropdownPrimaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'linear-gradient(to right, #4052ee, #a13bf7)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer', minWidth: '120px' };
+const dropdownSecondaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer', minWidth: '120px' };
 
 const modalOverlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const depositModalCardStyle = { width: '400px', padding: '40px', borderRadius: '28px', position: 'relative' };
@@ -391,19 +396,25 @@ const modalFooterTextStyle = { textAlign: 'center', marginTop: '24px', fontSize:
 
 const avatarPillStyle = { width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.15)', padding: '2px' };
 const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.65rem' };
-const walletExpandPanelStyle = { position: 'absolute', top: '56px', left: '50%', transform: 'translateX(-50%)', width: '280px', padding: '16px', borderRadius: '16px', boxShadow: '0 24px 48px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1100 };
-const walletCloseX = { position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', color: 'white', opacity: 0.3, padding: '4px' };
-const walletPanelHeader = { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' };
+const walletExpandPanelStyle = { position: 'absolute', top: '60px', left: '50%', transform: 'translateX(-50%)', width: '360px', maxWidth: '92vw', padding: '22px', borderRadius: '24px', boxShadow: '0 30px 70px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100 };
+const walletCloseX = { position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'white', opacity: 0.35, padding: '4px', cursor: 'pointer' };
+const walletPanelHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' };
+const walletPanelTitle = { fontSize: '0.8rem', letterSpacing: '0.24em', textTransform: 'uppercase', opacity: 0.65, fontWeight: '800' };
+const walletPanelSubtitle = { marginTop: '4px', fontSize: '1rem', fontWeight: '800', color: 'white', opacity: 0.9 };
+const walletStatusBadge = { padding: '7px 14px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' };
+const walletStatusConnected = { background: 'rgba(52, 199, 89, 0.16)', color: '#34C759' };
+const walletStatusDisconnected = { background: 'rgba(255, 59, 48, 0.14)', color: '#FF3B30' };
+const walletOptionRow = { display: 'flex', justifyContent: 'center' };
 const walletPanelBalance = { fontSize: '1.25rem', fontWeight: '800' };
-const walletTabContainer = { display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '3px', borderRadius: '10px' };
-const walletTabBtn = { flex: 1, padding: '6px', border: 'none', background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: '700', borderRadius: '8px' };
-const walletTabActive = { background: 'rgba(255,255,255,0.08)', color: 'white' };
-const walletInputArea = { position: 'relative', display: 'flex', alignItems: 'center' };
-const walletInputPrefix = { position: 'absolute', left: '12px', fontSize: '0.85rem', opacity: 0.2, fontWeight: '800' };
-const walletInput = { width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 10px 10px 24px', color: 'white', fontWeight: '700', fontSize: '0.9rem', outline: 'none' };
-const walletMaxBtn = { position: 'absolute', right: '8px', background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: '800' };
-const walletConfirmBtn = { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: '#007AFF', color: 'white', fontWeight: '800', fontSize: '0.8rem' };
-const walletPanelFooter = { textAlign: 'center', fontSize: '0.6rem', opacity: 0.2, fontWeight: '700', marginTop: '4px' };
+const walletTabContainer = { display: 'flex', gap: '6px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '14px' };
+const walletTabBtn = { flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.55)', fontSize: '0.82rem', fontWeight: '800', borderRadius: '12px', cursor: 'pointer' };
+const walletTabActive = { background: 'rgba(255,255,255,0.12)', color: 'white' };
+const walletInputArea = { position: 'relative', display: 'flex', alignItems: 'center', width: '100%' };
+const walletInputPrefix = { position: 'absolute', left: '14px', fontSize: '0.85rem', opacity: 0.4, fontWeight: '800' };
+const walletInput = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 14px 14px 32px', color: 'white', fontWeight: '700', fontSize: '0.95rem', outline: 'none' };
+const walletMaxBtn = { position: 'absolute', right: '10px', background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer' };
+const walletConfirmBtn = { width: '100%', padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '800', fontSize: '0.92rem', boxShadow: '0 12px 30px rgba(69, 127, 255, 0.25)', cursor: 'pointer' };
+const walletPanelFooter = { textAlign: 'center', fontSize: '0.75rem', opacity: 0.35, fontWeight: '700', marginTop: '8px' };
 const userMenuContainerStyle = { position: 'absolute', top: '40px', right: 0, width: '160px', background: '#1c1c1e', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 16px 32px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)' };
 const userMenuHeader = { padding: '10px 14px', fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)' };
 const userMenuItemStyle = { width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: 'white', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600' };
