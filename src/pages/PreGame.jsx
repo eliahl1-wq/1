@@ -39,7 +39,9 @@ export default function PreGame() {
     };
 
     const handleClickOutside = useCallback((event) => {
-        const isWalletAdapterModalClick = event.target.closest('.wallet-adapter-modal, .wallet-adapter-modal-overlay, .wallet-adapter-modal-panel, .wallet-adapter-modal-dialog');
+        const isWalletAdapterModalClick = event.target.closest(
+            '.wallet-adapter-modal, .wallet-adapter-modal-overlay, .wallet-adapter-modal-container, .wallet-adapter-modal-wrapper, .wallet-adapter-modal-list, .wallet-adapter-modal-middle, .wallet-adapter-modal-button-close, .wallet-adapter-modal-list-more, .wallet-adapter-modal-title, .wallet-adapter-button'
+        );
 
         if (userMenuRef.current && !userMenuRef.current.contains(event.target) &&
             userPillRef.current && !userPillRef.current.contains(event.target)) {
@@ -176,8 +178,10 @@ export default function PreGame() {
                 .wallet-adapter-modal,
                 .wallet-adapter-modal-overlay,
                 .wallet-adapter-modal-container,
+                .wallet-adapter-modal-wrapper,
                 .wallet-adapter-modal-dialog,
-                .wallet-adapter-modal-panel {
+                .wallet-adapter-modal-panel,
+                .wallet-adapter-button {
                     z-index: 99999 !important;
                 }
                 .wallet-adapter-modal-overlay {
