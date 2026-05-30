@@ -19,6 +19,11 @@ export default function PreGame() {
     const userPillRef = useRef(null);
     const walletDropdownRef = useRef(null);
     const walletExpandRef = useRef(null);
+    const dragOffsetRef = useRef({ x: 0, y: 0 });
+    
+    const [panelPosition, setPanelPosition] = useState({ x: null, y: 60 });
+    const [isDraggingPanel, setIsDraggingPanel] = useState(false);
+    const [walletModalActive, setWalletModalActive] = useState(false);
     
     const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -71,6 +76,72 @@ export default function PreGame() {
         if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
             setIsWalletExpanded(false);
         }
+    }, []);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        const checkWalletModal = () => {
+            setWalletModalActive(Boolean(document.querySelector('.wallet-adapter-modal, wcm-modal')));
+        };
+
+        const observer = new MutationObserver(checkWalletModal);
+        observer.observe(document.body, { childList: true, subtree: true });
+        checkWalletModal();
+
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (walletModalActive && isWalletExpanded) {
+            setPanelPosition((pos) => ({ x: 40, y: pos.y ?? 60 }));
+        }
+    }, [walletModalActive, isWalletExpanded]);
+
+    useEffect(() => {
+        if (!isWalletExpanded) {
+            setPanelPosition({ x: null, y: 60 });
+        }
+    }, [isWalletExpanded]);
+
+    useEffect(() => {
+        if (!isDraggingPanel) return;
+
+        const move = (event) => {
+            const clientX = event.clientX ?? (event.touches && event.touches[0]?.clientX);
+            const clientY = event.clientY ?? (event.touches && event.touches[0]?.clientY);
+            if (clientX === undefined || clientY === undefined) return;
+            const newX = Math.max(16, Math.min(window.innerWidth - 360 - 16, clientX - dragOffsetRef.current.x));
+            const newY = Math.max(16, Math.min(window.innerHeight - 200 - 16, clientY - dragOffsetRef.current.y));
+            setPanelPosition({ x: newX, y: newY });
+        };
+
+        const stop = () => setIsDraggingPanel(false);
+
+        document.addEventListener('mousemove', move);
+        document.addEventListener('touchmove', move, { passive: false });
+        document.addEventListener('mouseup', stop);
+        document.addEventListener('touchend', stop);
+
+        return () => {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('touchmove', move);
+            document.removeEventListener('mouseup', stop);
+            document.removeEventListener('touchend', stop);
+        };
+    }, [isDraggingPanel]);
+
+    const handlePanelDragStart = useCallback((event) => {
+        const clientX = event.clientX ?? (event.touches && event.touches[0]?.clientX);
+        const clientY = event.clientY ?? (event.touches && event.touches[0]?.clientY);
+        if (clientX === undefined || clientY === undefined) return;
+
+        const rect = walletExpandRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        event.preventDefault();
+        dragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
+        setIsDraggingPanel(true);
     }, []);
 
     const handleDeposit = async () => {
@@ -162,6 +233,15 @@ export default function PreGame() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
+
+    const adjustedWalletExpandPanelStyle = {
+        ...walletExpandPanelStyle,
+        left: panelPosition.x !== null ? panelPosition.x : '50%',
+        top: panelPosition.y,
+        transform: panelPosition.x !== null ? 'none' : 'translateX(-50%)',
+        cursor: isDraggingPanel ? 'grabbing' : 'grab',
+        transition: isDraggingPanel ? 'none' : 'left 0.2s ease, top 0.2s ease',
+    };
 
     return (
         <div style={{...containerStyle, background: '#0f1118'}}>
@@ -296,9 +376,9 @@ export default function PreGame() {
             </div>
 
             {isWalletExpanded && (
-                <div ref={walletExpandRef} className="glass" style={walletExpandPanelStyle}>
+                <div ref={walletExpandRef} className="glass" style={adjustedWalletExpandPanelStyle}>
                     <button style={walletCloseX} onClick={() => setIsWalletExpanded(false)}>✕</button>
-                    <div style={walletPanelHeader}>
+                    <div style={walletPanelHeader} onMouseDown={handlePanelDragStart} onTouchStart={handlePanelDragStart}>
                         <div>
                             <div style={walletPanelTitle}>Wallet</div>
                             <div style={walletPanelSubtitle}>{connected ? `Connected to ${publicKey?.toString().slice(0, 4)}...${publicKey?.toString().slice(-4)}` : 'Connect to begin deposit'}</div>
