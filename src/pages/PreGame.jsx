@@ -294,7 +294,7 @@ export default function PreGame() {
                     font-variant-numeric: tabular-nums;
                 }
                 .glass {
-                    background: rgba(30, 32, 45, 0.75);
+                    background: rgba(18, 18, 22, 0.8);
                     backdrop-filter: blur(24px);
                     border: 1px solid rgba(255, 255, 255, 0.05);
                 }
@@ -463,8 +463,9 @@ export default function PreGame() {
                     disabled={!canJoin || isMatchmaking}
                     style={{ 
                         ...playBtnStyle, 
-                        background: canJoin ? '#34C759' : '#252529',
-                        color: canJoin ? 'white' : 'rgba(255,255,255,0.2)',
+                        background: canJoin ? '#14F195' : '#1e1f26',
+                        color: canJoin ? '#050505' : 'rgba(255,255,255,0.2)',
+                        boxShadow: canJoin ? '0 8px 24px rgba(20, 241, 149, 0.35)' : 'none',
                         cursor: canJoin ? 'pointer' : 'not-allowed'
                     }}
                 >
@@ -520,9 +521,9 @@ export default function PreGame() {
     );
 }
 // --- Styles ---
-const containerStyle = { width: '100vw', height: '100vh', background: '#0f111a', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
-const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#0f111a', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
-const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(20, 22, 32, 0.85)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
+const containerStyle = { width: '100vw', height: '100vh', background: '#050505', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
+const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#050505', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
+const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1rem' };
 
 const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 16px', borderRadius: '100px', fontSize: '13px', cursor: 'pointer' };
@@ -570,7 +571,7 @@ const centerCardStyle = { width: '320px', borderRadius: '20px', padding: '24px',
 const inputLabelStyle = { display: 'block', fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '8px' };
 const nicknameInputStyle = { width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', color: 'white', fontSize: '0.95rem', fontWeight: '700', outline: 'none', padding: '12px 16px', borderRadius: '12px', boxSizing: 'border-box', marginBottom: '24px' };
 const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.05)', margin: '0 0 24px 0' };
-const playBtnStyle = { width: '100%', padding: '10px', borderRadius: '12px', border: 'none', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '0.01em', boxShadow: '0 8px 16px rgba(52, 199, 89, 0.25)' };
+const playBtnStyle = { width: '100%', padding: '10px', borderRadius: '12px', border: 'none', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '0.01em' };
 const howItWorksContainerStyle = { marginTop: '16px' };
 const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: 0.2, fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase' };
 const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.5', opacity: 0.25, marginTop: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontWeight: '600' };
