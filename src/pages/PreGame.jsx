@@ -78,6 +78,9 @@ export default function PreGame() {
                 <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div className="mono" style={{ color: '#34C759', fontWeight: '700', fontSize: '0.9rem' }}>
+                        ${user?.balance?.toFixed(2) || '0.00'}
+                    </div>
                     <button 
                         id="wallet-trigger"
                         onClick={() => setIsWalletOpen(!isWalletOpen)}
@@ -172,11 +175,6 @@ export default function PreGame() {
                         </div>
                     )}
                 </div>
-            </div>
-
-            <div className="glass" style={bottomLeftCardStyle}>
-                <label style={cardSmallLabelStyle}>Wallet</label>
-                <div className="mono" style={walletBalanceStyle}>${user?.balance?.toFixed(2) || '0.00'}</div>
             </div>
 
             <div className="glass" style={bottomRightCardStyle}>
