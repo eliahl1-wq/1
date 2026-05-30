@@ -9,7 +9,6 @@ export default function PreGame() {
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [walletTab, setWalletTab] = useState('deposit'); // 'deposit' | 'withdraw'
-    const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
     const walletDropdownRef = useRef(null);
@@ -145,7 +144,7 @@ export default function PreGame() {
                     </div>
 
                     <button 
-                        onClick={() => setIsDepositModalOpen(true)}
+                        onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('deposit'); }}
                         style={standaloneDepositButtonStyle}
                     >
                         Deposit
@@ -195,39 +194,6 @@ export default function PreGame() {
             )}
 
             {/* Standalone Deposit Modal */}
-            {isDepositModalOpen && (
-                <div style={modalOverlayStyle}>
-                    <div className="glass" style={depositModalCardStyle}>
-                        <button style={modalCloseXStyle} onClick={() => setIsDepositModalOpen(false)}>✕</button>
-                        
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', padding: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '100px', width: 'fit-content' }}>
-                            <button onClick={() => setWalletTab('deposit')} className={`pill-tab ${walletTab === 'deposit' ? 'active' : ''}`}>Deposit</button>
-                            <button onClick={() => setWalletTab('withdraw')} className={`pill-tab ${walletTab === 'withdraw' ? 'active' : ''}`}>Withdraw</button>
-                        </div>
-
-                        <div style={modalInputContainer}>
-                            <span className="mono" style={modalInputPrefix}>$</span>
-                            <input 
-                                type="number" 
-                                placeholder="0.00" 
-                                value={amount} 
-                                onChange={(e) => setAmount(e.target.value)} 
-                                style={modalInputField} 
-                            />
-                        </div>
-
-                        <button style={modalConfirmButtonStyle} onClick={() => {
-                            if (walletTab === 'deposit') redirectToLobbyForDeposit(amount);
-                        }}>
-                            Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}
-                        </button>
-
-                        <div style={modalFooterTextStyle}>
-                            Network: Solana Devnet • {user?.username}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             <div className="glass" style={centerCardStyle}>
                 <label style={inputLabelStyle}>Nickname</label>
