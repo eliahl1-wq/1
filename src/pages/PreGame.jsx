@@ -78,7 +78,7 @@ export default function PreGame() {
                 <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div className="mono" style={{ color: '#34C759', fontWeight: '700', fontSize: '0.9rem' }}>
+                    <div style={{ color: '#34C759', fontWeight: '700', fontSize: '0.9rem' }}>
                         ${user?.balance?.toFixed(2) || '0.00'}
                     </div>
                     <button 
@@ -86,7 +86,7 @@ export default function PreGame() {
                         onClick={() => setIsWalletOpen(!isWalletOpen)}
                         style={depositWithdrawBtnStyle}
                     >
-                        Deposit / Withdraw
+                        Deposit
                     </button>
 
                     <div style={{ position: 'relative' }}>
@@ -209,7 +209,7 @@ const containerStyle = { width: '100vw', height: '100vh', background: '#020203',
 const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#020203', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
 const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', zIndex: 1000, background: 'rgba(10, 10, 12, 0.8)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1rem' };
-const depositWithdrawBtnStyle = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700' };
+const depositWithdrawBtnStyle = { background: '#007AFF', border: 'none', color: 'white', padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700' };
 const avatarPillStyle = { width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.15)', padding: '2px' };
 const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.65rem' };
 const walletExpandPanelStyle = { position: 'absolute', top: '56px', left: '50%', transform: 'translateX(-50%)', width: '280px', padding: '16px', borderRadius: '16px', boxShadow: '0 24px 48px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1100 };
@@ -232,7 +232,7 @@ const centerCardStyle = { width: '320px', borderRadius: '20px', padding: '24px',
 const inputLabelStyle = { display: 'block', fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '8px' };
 const nicknameInputStyle = { width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', color: 'white', fontSize: '0.95rem', fontWeight: '700', outline: 'none', padding: '12px 16px', borderRadius: '12px', boxSizing: 'border-box', marginBottom: '24px' };
 const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.05)', margin: '0 0 24px 0' };
-const playBtnStyle = { width: '100%', padding: '14px', borderRadius: '12px', border: 'none', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '0.01em', boxShadow: '0 8px 16px rgba(0, 122, 255, 0.25)' };
+const playBtnStyle = { width: '100%', padding: '10px', borderRadius: '12px', border: 'none', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '0.01em', boxShadow: '0 8px 16px rgba(52, 199, 89, 0.25)' };
 const howItWorksContainerStyle = { marginTop: '16px' };
 const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: 0.2, fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase' };
 const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.5', opacity: 0.25, marginTop: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontWeight: '600' };
