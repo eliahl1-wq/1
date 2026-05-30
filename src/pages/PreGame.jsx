@@ -348,7 +348,7 @@ export default function PreGame() {
     }, [bgCanvasRef]);
 
     return (
-        <div style={{...containerStyle, background: '#0f1118'}}>
+        <div style={{...containerStyle, background: 'transparent'}}>
             <style>{`
                 @keyframes pulse-live {
                     0% { opacity: 1; transform: scale(1); }
