@@ -139,8 +139,8 @@ export default function PreGame() {
                 <div style={dividerStyle} />
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.35, fontWeight: '600' }}>Starting balance</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '700', color: '#34C759' }}>$1.00</span>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.35, fontWeight: '600' }}>Entry Fee</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '700' }}>$10.00</span>
                 </div>
 
                 <button 
@@ -148,7 +148,7 @@ export default function PreGame() {
                     disabled={!canJoin || isMatchmaking}
                     style={{ 
                         ...playBtnStyle, 
-                        background: canJoin ? '#007AFF' : '#252529',
+                        background: canJoin ? '#34C759' : '#252529',
                         color: canJoin ? 'white' : 'rgba(255,255,255,0.2)',
                         cursor: canJoin ? 'pointer' : 'not-allowed'
                     }}
@@ -168,10 +168,13 @@ export default function PreGame() {
                     </div>
                     {showHowItWorks && (
                         <div style={howItWorksTextStyle}>
-                            <div>• Entry fee is $10.00</div>
-                            <div>• Grow by eating food and players</div>
+                            <div>• Entry Fee: $10.00</div>
+                            <div>• Starting Balance: $1.00</div>
+                            <div>• Grow by eating food and other players</div>
                             <div>• Cash out your balance anytime</div>
-                            <div style={{ marginTop: '8px', opacity: 0.5 }}>Top 3 Rewards: $20, $10, $10</div>
+                            <div style={{ marginTop: '8px', opacity: 0.5 }}>Leaderboard Rewards:</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>1st Place Bonus</span><span>$20.00</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>2nd & 3rd Place Bonus</span><span>$10.00</span></div>
                         </div>
                     )}
                 </div>
