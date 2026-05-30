@@ -86,10 +86,65 @@ export default function PreGame() {
                     <div style={{ color: '#34C759', fontWeight: '700', fontSize: '0.9rem' }}>
                         ${user?.balance?.toFixed(2) || '0.00'}
                     </div>
+
                     <button 
                         id="wallet-trigger"
                         onClick={() => setIsWalletOpen(!isWalletOpen)}
                         style={depositWithdrawBtnStyle}
+                    >
+                        Deposit
+                    </button>
+
+                    {/* Wallet Balance Pill */}
+                    <div style={{ position: 'relative' }}>
+                        <button 
+                            id="wallet-trigger"
+                            onClick={() => setIsWalletOpen(!isWalletOpen)}
+                            style={walletPillButtonStyle}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', opacity: 0.7}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
+                            <span className="mono" style={{fontWeight: '700'}}>${user?.balance?.toFixed(3) || '0.000'}</span>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '8px', opacity: 0.5}}><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+
+                        {isWalletOpen && (
+                            <div ref={walletPanelRef} className="glass" style={walletDropdownCardStyle}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                    <span style={{ fontSize: '12px', fontWeight: '600', opacity: 0.4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Value</span>
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button className="pill-tab active">Balance</button>
+                                        <button className="pill-tab">History</button>
+                                    </div>
+                                </div>
+                                
+                                <div className="mono" style={{ fontSize: '28px', fontWeight: '800', marginBottom: '16px' }}>
+                                    ${user?.balance?.toFixed(2) || '0.00'}
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                                    <button className="pill-tab active" style={{fontSize: '10px', padding: '4px 10px'}}>USD</button>
+                                </div>
+
+                                <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '0 -24px 16px -24px' }} />
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span className="mono" style={{ fontSize: '13px', opacity: 0.8 }}>${user?.balance?.toFixed(2)}</span>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{opacity: 0.4}}><path d="M20 11a8.1 8.1 0 00-15.5-2m-.5 5v5h5m10-1a8.1 8.1 0 01-15.5 2m.5-5h5"/></svg>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <button onClick={() => { setIsWalletOpen(false); setIsDepositModalOpen(true); }} style={dropdownPrimaryBtn}>Deposit</button>
+                                    <button style={dropdownSecondaryBtn}>Withdraw</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <button 
+                        onClick={() => setIsDepositModalOpen(true)}
+                        style={standaloneDepositButtonStyle}
                     >
                         Deposit
                     </button>
@@ -109,6 +164,27 @@ export default function PreGame() {
                     </div>
                 </div>
             </div>
+
+            {isWalletOpen && (
+                <div ref={walletPanelRef} className="glass" style={walletExpandPanelStyle}>
+                    <button style={walletCloseX} onClick={() => setIsWalletOpen(false)}>✕</button>
+                    <div style={walletPanelHeader}>
+                        <div className="mono" style={walletPanelBalance}>${user?.balance?.toFixed(2) || '0.00'}</div>
+                        <div className="live-indicator" />
+                    </div>
+                    <div style={walletTabContainer}>
+                        <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? walletTabActive : {})}}>Deposit</button>
+                        <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? walletTabActive : {})}}>Withdraw</button>
+                    </div>
+                    <div style={walletInputArea}>
+                        <div style={walletInputPrefix}>$</div>
+                        <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
+                        <button style={walletMaxBtn} onClick={() => setAmount(walletTab === 'withdraw' ? user?.balance?.toFixed(2) : '100')}>MAX</button>
+                    </div>
+                    <button style={walletConfirmBtn}>Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}</button>
+                    <div style={walletPanelFooter}>Solana Devnet · Secure Processing</div>
+                </div>
+            )}
 
             {/* Standalone Deposit Modal */}
             {isDepositModalOpen && (
