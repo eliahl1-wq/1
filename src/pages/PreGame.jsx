@@ -192,6 +192,15 @@ export default function PreGame() {
                     backdrop-filter: blur(24px);
                     border: 1px solid rgba(255, 255, 255, 0.05);
                 }
+                :root {
+                    --wcm-z-index: 100002 !important;
+                }
+                wcm-modal,
+                wcm-modal *,
+                wcm-modal-backcard,
+                wcm-modal-content {
+                    z-index: 100002 !important;
+                }
                 .wallet-adapter-modal,
                 .wallet-adapter-modal-container,
                 .wallet-adapter-modal-overlay,
