@@ -46,6 +46,13 @@ export default function PreGame() {
         }
     }, []);
 
+    const redirectToLobbyForDeposit = (amt) => {
+        try {
+            localStorage.setItem('pending_deposit', String(amt || amount || ''));
+        } catch (e) {}
+        navigate('/lobby');
+    };
+
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -176,7 +183,13 @@ export default function PreGame() {
                         <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
                         <button style={walletMaxBtn} onClick={() => setAmount(walletTab === 'withdraw' ? user?.balance?.toFixed(2) : '100')}>MAX</button>
                     </div>
-                    <button style={walletConfirmBtn}>Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}</button>
+                    <button style={walletConfirmBtn} onClick={() => {
+                        if (walletTab === 'deposit') {
+                            redirectToLobbyForDeposit(amount);
+                        } else {
+                            // Withdraw flow (not implemented now)
+                        }
+                    }}>Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}</button>
                     <div style={walletPanelFooter}>Solana Devnet · Secure Processing</div>
                 </div>
             )}
@@ -203,7 +216,9 @@ export default function PreGame() {
                             />
                         </div>
 
-                        <button style={modalConfirmButtonStyle}>
+                        <button style={modalConfirmButtonStyle} onClick={() => {
+                            if (walletTab === 'deposit') redirectToLobbyForDeposit(amount);
+                        }}>
                             Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}
                         </button>
 

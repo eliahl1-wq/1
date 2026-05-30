@@ -12,6 +12,18 @@ export default function Lobby() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
 
+    // If redirected from PreGame with a pending deposit, prefill the deposit amount
+    useEffect(() => {
+        try {
+            const pending = localStorage.getItem('pending_deposit');
+            if (pending) {
+                setDepositAmount(pending);
+                localStorage.removeItem('pending_deposit');
+                setDepositStatusMessage('Amount prefilled — complete deposit below.');
+            }
+        } catch (e) {}
+    }, [connected]);
+
     // --- STATS FÖR DEPOSIT ---
     const [depositAmount, setDepositAmount] = useState('');
     const [minimumDepositUSD, setMinimumDepositUSD] = useState(10); // Ändra till t.ex. 0.01 för att testa billigt
