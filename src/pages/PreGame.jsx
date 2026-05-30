@@ -8,13 +8,14 @@ export default function PreGame() {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [walletTab, setWalletTab] = useState('deposit'); // 'deposit' | 'withdraw'
+    const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
     const walletPanelRef = useRef(null);
     
     const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
-    const [amount, setAmount] = useState('');
+    const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
 
     const entryFee = 10.00;
@@ -46,12 +47,16 @@ export default function PreGame() {
     }, [handleClickOutside]);
 
     return (
-        <div style={containerStyle}>
+        <div style={{...containerStyle, background: '#0f1118'}}>
             <style>{`
                 @keyframes pulse-live {
                     0% { opacity: 1; transform: scale(1); }
                     50% { opacity: 0.4; transform: scale(0.95); }
                     100% { opacity: 1; transform: scale(1); }
+                }
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translate(-50%, -10px); }
+                    to { opacity: 1; transform: translate(-50%, 0); }
                 }
                 .live-indicator { width: 5px; height: 5px; background: #34C759; border-radius: 50%; animation: pulse-live 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
                 @keyframes spin {
@@ -103,28 +108,40 @@ export default function PreGame() {
                     )}
                     </div>
                 </div>
-
-                {isWalletOpen && (
-                    <div ref={walletPanelRef} className="glass" style={walletExpandPanelStyle}>
-                        <button style={walletCloseX} onClick={() => setIsWalletOpen(false)}>✕</button>
-                        <div style={walletPanelHeader}>
-                            <div className="mono" style={walletPanelBalance}>${user?.balance?.toFixed(2) || '0.00'}</div>
-                            <div className="live-indicator" />
-                        </div>
-                        <div style={walletTabContainer}>
-                            <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? walletTabActive : {})}}>Deposit</button>
-                            <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? walletTabActive : {})}}>Withdraw</button>
-                        </div>
-                        <div style={walletInputArea}>
-                            <div style={walletInputPrefix}>$</div>
-                            <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
-                            <button style={walletMaxBtn} onClick={() => setAmount(walletTab === 'withdraw' ? user?.balance?.toFixed(2) : '100')}>MAX</button>
-                        </div>
-                        <button style={walletConfirmBtn}>Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}</button>
-                        <div style={walletPanelFooter}>Solana Devnet · Secure Processing</div>
-                    </div>
-                )}
             </div>
+
+            {/* Standalone Deposit Modal */}
+            {isDepositModalOpen && (
+                <div style={modalOverlayStyle}>
+                    <div className="glass" style={depositModalCardStyle}>
+                        <button style={modalCloseXStyle} onClick={() => setIsDepositModalOpen(false)}>✕</button>
+                        
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', padding: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '100px', width: 'fit-content' }}>
+                            <button onClick={() => setWalletTab('deposit')} className={`pill-tab ${walletTab === 'deposit' ? 'active' : ''}`}>Deposit</button>
+                            <button onClick={() => setWalletTab('withdraw')} className={`pill-tab ${walletTab === 'withdraw' ? 'active' : ''}`}>Withdraw</button>
+                        </div>
+
+                        <div style={modalInputContainer}>
+                            <span className="mono" style={modalInputPrefix}>$</span>
+                            <input 
+                                type="number" 
+                                placeholder="0.00" 
+                                value={amount} 
+                                onChange={(e) => setAmount(e.target.value)} 
+                                style={modalInputField} 
+                            />
+                        </div>
+
+                        <button style={modalConfirmButtonStyle}>
+                            Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}
+                        </button>
+
+                        <div style={modalFooterTextStyle}>
+                            Network: Solana Devnet • {user?.username}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="glass" style={centerCardStyle}>
                 <label style={inputLabelStyle}>Nickname</label>
@@ -207,9 +224,25 @@ export default function PreGame() {
 // --- Styles ---
 const containerStyle = { width: '100vw', height: '100vh', background: '#020203', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
 const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#020203', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
-const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', zIndex: 1000, background: 'rgba(10, 10, 12, 0.8)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' };
+const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 11, 16, 0.8)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1rem' };
-const depositWithdrawBtnStyle = { background: '#007AFF', border: 'none', color: 'white', padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700' };
+
+const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 16px', borderRadius: '100px', fontSize: '13px', cursor: 'pointer' };
+const standaloneDepositButtonStyle = { background: 'linear-gradient(to right, #4052ee, #a13bf7)', border: 'none', color: 'white', padding: '8px 20px', borderRadius: '100px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(64, 82, 238, 0.3)' };
+
+const walletDropdownCardStyle = { position: 'absolute', top: '48px', left: '50%', transform: 'translateX(-50%)', width: '380px', padding: '24px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', zIndex: 1100, animation: 'slideDown 0.2s ease-out' };
+const dropdownPrimaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'linear-gradient(to right, #4052ee, #a13bf7)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
+const dropdownSecondaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'rgba(255,255,255,0.05)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
+
+const modalOverlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const depositModalCardStyle = { width: '400px', padding: '40px', borderRadius: '28px', position: 'relative' };
+const modalCloseXStyle = { position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'white', opacity: 0.3, cursor: 'pointer', fontSize: '18px' };
+const modalInputContainer = { position: 'relative', marginBottom: '32px' };
+const modalInputPrefix = { position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)', fontSize: '32px', fontWeight: '600', opacity: 0.2 };
+const modalInputField = { width: '100%', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '48px', fontWeight: '800', outline: 'none', padding: '8px 0 8px 32px' };
+const modalConfirmButtonStyle = { width: '100%', padding: '18px', borderRadius: '100px', border: 'none', background: 'linear-gradient(to right, #4052ee, #a13bf7)', color: 'white', fontWeight: '800', fontSize: '16px', cursor: 'pointer', boxShadow: '0 8px 20px rgba(64, 82, 238, 0.4)' };
+const modalFooterTextStyle = { textAlign: 'center', marginTop: '24px', fontSize: '11px', opacity: 0.3, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' };
+
 const avatarPillStyle = { width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.15)', padding: '2px' };
 const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.65rem' };
 const walletExpandPanelStyle = { position: 'absolute', top: '56px', left: '50%', transform: 'translateX(-50%)', width: '280px', padding: '16px', borderRadius: '16px', boxShadow: '0 24px 48px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1100 };
