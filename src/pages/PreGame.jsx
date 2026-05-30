@@ -31,6 +31,16 @@ export default function PreGame() {
     const [isMatchmaking, setIsMatchmaking] = useState(false);
     const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
 
+    const formatBalance = (val) => {
+        const v = Number(val || 0);
+        if (!isFinite(v)) return '0';
+        if (v >= 10000) return Math.round(v).toString();
+        if (v >= 1000) return Number(v.toFixed(1)).toString();
+        if (v >= 1) return Number(v.toFixed(2)).toString();
+        if (v > 0) return Number(v.toFixed(4)).toString();
+        return '0';
+    };
+
     const entryFee = 10.00;
     const canJoin = (user?.balance || 0) >= entryFee;
 
@@ -313,7 +323,7 @@ export default function PreGame() {
                             style={walletPillButtonStyle}
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', opacity: 0.7}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
-                            <span className="mono" style={{fontWeight: '700'}}>${user?.balance?.toFixed(3) || '0.000'}</span>
+                            <span className="mono" style={{fontWeight: '800', fontSize: '14px', color: '#34C759'}}>${formatBalance(user?.balance)}</span>
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '8px', opacity: 0.5}}><path d="M6 9l6 6 6-6"/></svg>
                         </button>
 
