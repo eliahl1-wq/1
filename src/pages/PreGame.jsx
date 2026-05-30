@@ -39,10 +39,26 @@ export default function PreGame() {
     };
 
     const handleClickOutside = useCallback((event) => {
+        const path = event.composedPath ? event.composedPath() : [];
+        const isWalletAdapterModalClick = path.some((element) => {
+            return element instanceof HTMLElement && (
+                element.classList.contains('wallet-adapter-modal') ||
+                element.classList.contains('wallet-adapter-modal-overlay') ||
+                element.classList.contains('wallet-adapter-modal-container') ||
+                element.classList.contains('wallet-adapter-modal-wrapper') ||
+                element.classList.contains('wallet-adapter-modal-list') ||
+                element.classList.contains('wallet-adapter-modal-middle') ||
+                element.classList.contains('wallet-adapter-modal-button-close') ||
+                element.classList.contains('wallet-adapter-modal-list-more') ||
+                element.classList.contains('wallet-adapter-modal-title') ||
+                element.classList.contains('wallet-adapter-button')
+            );
+        });
         const walletModalOpen = !!document.querySelector('.wallet-adapter-modal');
-        const isWalletAdapterModalClick = event.target.closest(
-            '.wallet-adapter-modal, .wallet-adapter-modal-overlay, .wallet-adapter-modal-container, .wallet-adapter-modal-wrapper, .wallet-adapter-modal-list, .wallet-adapter-modal-middle, .wallet-adapter-modal-button-close, .wallet-adapter-modal-list-more, .wallet-adapter-modal-title, .wallet-adapter-button'
-        );
+
+        if (walletModalOpen) {
+            return;
+        }
 
         if (userMenuRef.current && !userMenuRef.current.contains(event.target) &&
             userPillRef.current && !userPillRef.current.contains(event.target)) {
@@ -52,7 +68,7 @@ export default function PreGame() {
             !event.target.closest('#wallet-trigger')) {
             setIsWalletOpen(false);
         }
-        if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !walletModalOpen && !isWalletAdapterModalClick) {
+        if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
             setIsWalletExpanded(false);
         }
     }, []);
