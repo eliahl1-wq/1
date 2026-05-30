@@ -229,6 +229,7 @@ const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpa
 
 const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 16px', borderRadius: '100px', fontSize: '13px', cursor: 'pointer' };
 const standaloneDepositButtonStyle = { background: 'linear-gradient(to right, #4052ee, #a13bf7)', border: 'none', color: 'white', padding: '8px 20px', borderRadius: '100px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(64, 82, 238, 0.3)' };
+const depositWithdrawBtnStyle = walletPillButtonStyle;
 
 const walletDropdownCardStyle = { position: 'absolute', top: '48px', left: '50%', transform: 'translateX(-50%)', width: '380px', padding: '24px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', zIndex: 1100, animation: 'slideDown 0.2s ease-out' };
 const dropdownPrimaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'linear-gradient(to right, #4052ee, #a13bf7)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
