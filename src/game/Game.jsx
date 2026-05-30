@@ -26,7 +26,7 @@ export default function Game() {
     const myIdRef = useRef(null);
     const animationFrameId = useRef(null);
     
-    const WORLD_SIZE = 5000;
+    const WORLD_SIZE = 15000; // Synka med serverns nya storlek
 
     const [isConnected, setIsConnected] = useState(false);
     const [currentBalance, setCurrentBalance] = useState(0);
