@@ -20,6 +20,7 @@ export default function PreGame() {
     const walletDropdownRef = useRef(null);
     const walletExpandRef = useRef(null);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
+    const bgCanvasRef = useRef(null);
     
     const [panelPosition, setPanelPosition] = useState({ x: null, y: 60 });
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
@@ -269,6 +270,83 @@ export default function PreGame() {
         transition: isDraggingPanel ? 'none' : 'left 0.2s ease, top 0.2s ease',
     };
 
+    useEffect(() => {
+        const canvas = bgCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let raf = null;
+        let width = 0;
+        let height = 0;
+        const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+        const particles = [];
+        const PARTICLE_COUNT = 24; // light-weight
+
+        function createParticles() {
+            particles.length = 0;
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    r: Math.random() * 28 + 8,
+                    vx: (Math.random() - 0.5) * 0.6,
+                    vy: (Math.random() - 0.5) * 0.6,
+                    hue: 200 + Math.random() * 120,
+                    alpha: 0.35 + Math.random() * 0.45
+                });
+            }
+        }
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            canvas.width = Math.floor(width * DPR);
+            canvas.height = Math.floor(height * DPR);
+            ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+            createParticles();
+        }
+
+        function step() {
+            ctx.clearRect(0, 0, width, height);
+            // subtle gradient background
+            const g = ctx.createLinearGradient(0, 0, width, height);
+            g.addColorStop(0, 'rgba(6,8,15,0.6)');
+            g.addColorStop(1, 'rgba(2,4,12,0.6)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, width, height);
+
+            for (let p of particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < -100) p.x = width + 100;
+                if (p.x > width + 100) p.x = -100;
+                if (p.y < -100) p.y = height + 100;
+                if (p.y > height + 100) p.y = -100;
+
+                // draw blurred circle by multiple arcs with low alpha
+                ctx.beginPath();
+                const col = `hsla(${p.hue}, 80%, 60%, ${p.alpha})`;
+                ctx.fillStyle = col;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            raf = requestAnimationFrame(step);
+        }
+
+        resize();
+        window.addEventListener('resize', resize);
+        raf = requestAnimationFrame(step);
+
+        return () => {
+            window.removeEventListener('resize', resize);
+            cancelAnimationFrame(raf);
+        };
+    }, [bgCanvasRef]);
+
     return (
         <div style={{...containerStyle, background: '#0f1118'}}>
             <style>{`
@@ -323,7 +401,7 @@ export default function PreGame() {
                 }
             `}</style>
 
-            <div style={backgroundStyle} />
+            <canvas ref={bgCanvasRef} style={backgroundCanvasStyle} />
 
             <div style={topBarStyle}>
                 <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
@@ -524,6 +602,7 @@ export default function PreGame() {
 // --- Styles ---
 const containerStyle = { width: '100vw', height: '100vh', background: '#020203', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
 const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#020203', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
+const backgroundCanvasStyle = { position: 'fixed', inset: 0, zIndex: -1, filter: 'blur(6px) brightness(0.75)', pointerEvents: 'none' };
 const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 11, 16, 0.8)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1rem' };
 
