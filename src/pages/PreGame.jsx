@@ -417,7 +417,7 @@ export default function PreGame() {
                             style={walletPillButtonStyle}
                         >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', opacity: 0.7}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
-                            <span className="mono" style={{fontWeight: '800', fontSize: '14px', color: '#34C759'}}>${formatBalance(user?.balance)}</span>
+                            <span className="mono" style={{fontWeight: '800', fontSize: '14px', color: '#7CFF9E', textShadow: '0 0 10px rgba(124,255,158,0.45)'}}>${formatBalance(user?.balance)}</span>
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '8px', opacity: 0.5}}><path d="M6 9l6 6 6-6"/></svg>
                         </button>
 
@@ -431,7 +431,7 @@ export default function PreGame() {
                                         </div>
                                 </div>
                                 
-                                <div className="mono" style={{ fontSize: '28px', fontWeight: '800', marginBottom: '16px', color: '#6EEB80' }}>
+                                <div className="mono" style={{ fontSize: '28px', fontWeight: '800', marginBottom: '16px', color: 'white' }}>
                                     ${formatBalance(user?.balance)}
                                 </div>
 
@@ -443,7 +443,7 @@ export default function PreGame() {
 
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span className="mono" style={{ fontSize: '13px', opacity: 0.8, color: '#6EEB80' }}>${formatBalance(user?.balance)}</span>
+                                        <span className="mono" style={{ fontSize: '13px', opacity: 0.8, color: 'white' }}>${formatBalance(user?.balance)}</span>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{opacity: 0.4}}><path d="M20 11a8.1 8.1 0 00-15.5-2m-.5 5v5h5m10-1a8.1 8.1 0 01-15.5 2m.5-5h5"/></svg>
                                     </div>
                                 </div>
