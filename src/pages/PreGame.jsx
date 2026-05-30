@@ -39,6 +39,7 @@ export default function PreGame() {
     };
 
     const handleClickOutside = useCallback((event) => {
+        const walletModalOpen = !!document.querySelector('.wallet-adapter-modal');
         const isWalletAdapterModalClick = event.target.closest(
             '.wallet-adapter-modal, .wallet-adapter-modal-overlay, .wallet-adapter-modal-container, .wallet-adapter-modal-wrapper, .wallet-adapter-modal-list, .wallet-adapter-modal-middle, .wallet-adapter-modal-button-close, .wallet-adapter-modal-list-more, .wallet-adapter-modal-title, .wallet-adapter-button'
         );
@@ -51,7 +52,7 @@ export default function PreGame() {
             !event.target.closest('#wallet-trigger')) {
             setIsWalletOpen(false);
         }
-        if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
+        if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !walletModalOpen && !isWalletAdapterModalClick) {
             setIsWalletExpanded(false);
         }
     }, []);
