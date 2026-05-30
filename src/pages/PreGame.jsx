@@ -109,6 +109,13 @@ export default function PreGame() {
         }
     }, [walletModalActive, isWalletExpanded]);
 
+    // When the wallet modal closes, move the deposit panel back to center
+    useEffect(() => {
+        if (!walletModalActive && isWalletExpanded) {
+            setPanelPosition((pos) => ({ x: null, y: pos.y ?? 60 }));
+        }
+    }, [walletModalActive, isWalletExpanded]);
+
     useEffect(() => {
         if (!isWalletExpanded) {
             setPanelPosition({ x: null, y: 60 });
