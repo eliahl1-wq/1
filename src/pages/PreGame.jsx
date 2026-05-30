@@ -465,7 +465,7 @@ export default function PreGame() {
                         ...playBtnStyle, 
                         background: canJoin ? '#14F195' : '#1e1f26',
                         color: canJoin ? '#050505' : 'rgba(255,255,255,0.2)',
-                        boxShadow: canJoin ? '0 8px 24px rgba(20, 241, 149, 0.35)' : 'none',
+                        boxShadow: canJoin ? '0 4px 12px rgba(20, 241, 149, 0.2)' : 'none',
                         cursor: canJoin ? 'pointer' : 'not-allowed'
                     }}
                 >
