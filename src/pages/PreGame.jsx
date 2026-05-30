@@ -1,14 +1,20 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 export default function PreGame() {
-    const { user, logout } = useAuth();
+    const { user, logout, token, login } = useAuth();
     const navigate = useNavigate();
+    const { connected, publicKey, sendTransaction } = useWallet();
+    const { connection } = useConnection();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [walletTab, setWalletTab] = useState('deposit'); // 'deposit' | 'withdraw'
+    const [depositStatusMessage, setDepositStatusMessage] = useState('');
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
     const walletDropdownRef = useRef(null);
@@ -18,6 +24,7 @@ export default function PreGame() {
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
+    const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
 
     const entryFee = 10.00;
     const canJoin = (user?.balance || 0) >= entryFee;
@@ -45,11 +52,89 @@ export default function PreGame() {
         }
     }, []);
 
-    const redirectToLobbyForDeposit = (amt) => {
+    const handleDeposit = async () => {
+        if (!publicKey || !connected) {
+            setDepositStatusMessage('Connect wallet first.');
+            return;
+        }
+
+        const amountUSD = parseFloat(amount);
+        const minimumDepositUSD = 10;
+        if (isNaN(amountUSD) || amountUSD < minimumDepositUSD) {
+            setDepositStatusMessage(`Minimum deposit is $${minimumDepositUSD}.`);
+            return;
+        }
+
+        setDepositStatusMessage('Waiting for approval in Phantom...');
+
         try {
-            localStorage.setItem('pending_deposit', String(amt || amount || ''));
-        } catch (e) {}
-        navigate('/lobby');
+            const SOL_USD_RATE = 150;
+            const solAmount = amountUSD / SOL_USD_RATE;
+            const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
+
+            const transaction = new Transaction().add(
+                SystemProgram.transfer({
+                    fromPubkey: publicKey,
+                    toPubkey: RECIPIENT_SOLANA_ADDRESS,
+                    lamports: lamports,
+                })
+            );
+
+            const { blockhash } = await connection.getLatestBlockhash();
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = publicKey;
+
+            const signature = await sendTransaction(transaction, connection);
+            setDepositStatusMessage('Confirming transaction on blockchain...');
+
+            const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+            if (confirmation.value.err) {
+                throw new Error('Transaction failed on-chain.');
+            }
+
+            setDepositStatusMessage('Verifying deposit with backend...');
+            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'bypass-tunnel-reminders': 'true'
+                },
+                body: JSON.stringify({
+                    signature: signature,
+                    amountUSD: amountUSD,
+                    solAmount: solAmount,
+                    walletAddress: publicKey.toString()
+                })
+            });
+
+            if (!verifyRes.ok) {
+                const errorData = await verifyRes.json();
+                throw new Error(errorData.message || 'Backend verification failed.');
+            }
+
+            if (token) {
+                const meRes = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (meRes.ok) {
+                    const freshUser = await meRes.json();
+                    login(freshUser, token);
+                }
+            }
+
+            setDepositStatusMessage(`✅ Success! ${solAmount.toFixed(4)} SOL deposited and verified.`);
+            setAmount('');
+        } catch (error) {
+            console.error('Deposit error:', error);
+            const msg = error.message || '';
+            if (msg.includes('TransactionExpiredTimeoutError') || msg.toLowerCase().includes('insufficient')) {
+                setDepositStatusMessage('❌ Not enough funds in wallet for transaction and fees.');
+            } else if (msg.includes('User rejected')) {
+                setDepositStatusMessage('❌ Transaction cancelled in Phantom.');
+            } else {
+                setDepositStatusMessage('❌ Deposit failed. Check your wallet balance.');
+            }
+        }
     };
 
     useEffect(() => {
@@ -177,6 +262,9 @@ export default function PreGame() {
                         <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? walletTabActive : {})}}>Deposit</button>
                         <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? walletTabActive : {})}}>Withdraw</button>
                     </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
+                        <WalletMultiButton />
+                    </div>
                     <div style={walletInputArea}>
                         <div style={walletInputPrefix}>$</div>
                         <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
@@ -184,11 +272,16 @@ export default function PreGame() {
                     </div>
                     <button style={walletConfirmBtn} onClick={() => {
                         if (walletTab === 'deposit') {
-                            redirectToLobbyForDeposit(amount);
+                            handleDeposit();
                         } else {
-                            // Withdraw flow (not implemented now)
+                            setDepositStatusMessage('Withdrawal is not implemented yet.');
                         }
                     }}>Confirm {walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'}</button>
+                    {depositStatusMessage && (
+                        <div style={{ marginTop: '14px', fontSize: '0.85rem', color: depositStatusMessage.startsWith('✅') ? '#34C759' : '#FF3B30', textAlign: 'center' }}>
+                            {depositStatusMessage}
+                        </div>
+                    )}
                     <div style={walletPanelFooter}>Solana Devnet · Secure Processing</div>
                 </div>
             )}
