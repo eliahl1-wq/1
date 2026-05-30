@@ -7,11 +7,13 @@ export default function PreGame() {
     const navigate = useNavigate();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
+    const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [walletTab, setWalletTab] = useState('deposit'); // 'deposit' | 'withdraw'
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
-    const walletPanelRef = useRef(null);
+    const walletDropdownRef = useRef(null);
+    const walletExpandRef = useRef(null);
     
     const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -35,9 +37,12 @@ export default function PreGame() {
             userPillRef.current && !userPillRef.current.contains(event.target)) {
             setShowUserMenu(false);
         }
-        if (walletPanelRef.current && !walletPanelRef.current.contains(event.target) && 
+        if (walletDropdownRef.current && !walletDropdownRef.current.contains(event.target) && 
             !event.target.closest('#wallet-trigger')) {
             setIsWalletOpen(false);
+        }
+        if (walletExpandRef.current && !walletExpandRef.current.contains(event.target)) {
+            setIsWalletExpanded(false);
         }
     }, []);
 
@@ -83,17 +88,7 @@ export default function PreGame() {
                 <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ color: '#34C759', fontWeight: '700', fontSize: '0.9rem' }}>
-                        ${user?.balance?.toFixed(2) || '0.00'}
-                    </div>
-
-                    <button 
-                        id="wallet-trigger"
-                        onClick={() => setIsWalletOpen(!isWalletOpen)}
-                        style={depositWithdrawBtnStyle}
-                    >
-                        Deposit
-                    </button>
+                    {/* Wallet Balance (removed) */}
 
                     {/* Wallet Balance Pill */}
                     <div style={{ position: 'relative' }}>
@@ -108,7 +103,7 @@ export default function PreGame() {
                         </button>
 
                         {isWalletOpen && (
-                            <div ref={walletPanelRef} className="glass" style={walletDropdownCardStyle}>
+                            <div ref={walletDropdownRef} className="glass" style={walletDropdownCardStyle}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                     <span style={{ fontSize: '12px', fontWeight: '600', opacity: 0.4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Value</span>
                                     <div style={{ display: 'flex', gap: '6px' }}>
@@ -135,8 +130,8 @@ export default function PreGame() {
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px' }}>
-                                    <button onClick={() => { setIsWalletOpen(false); setIsDepositModalOpen(true); }} style={dropdownPrimaryBtn}>Deposit</button>
-                                    <button style={dropdownSecondaryBtn}>Withdraw</button>
+                                    <button onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('deposit'); }} style={dropdownPrimaryBtn}>Deposit</button>
+                                    <button onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('withdraw'); }} style={dropdownSecondaryBtn}>Withdraw</button>
                                 </div>
                             </div>
                         )}
@@ -165,9 +160,9 @@ export default function PreGame() {
                 </div>
             </div>
 
-            {isWalletOpen && (
-                <div ref={walletPanelRef} className="glass" style={walletExpandPanelStyle}>
-                    <button style={walletCloseX} onClick={() => setIsWalletOpen(false)}>✕</button>
+            {isWalletExpanded && (
+                <div ref={walletExpandRef} className="glass" style={walletExpandPanelStyle}>
+                    <button style={walletCloseX} onClick={() => setIsWalletExpanded(false)}>✕</button>
                     <div style={walletPanelHeader}>
                         <div className="mono" style={walletPanelBalance}>${user?.balance?.toFixed(2) || '0.00'}</div>
                         <div className="live-indicator" />
