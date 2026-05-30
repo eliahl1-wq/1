@@ -193,15 +193,17 @@ export default function PreGame() {
                     border: 1px solid rgba(255, 255, 255, 0.05);
                 }
                 .wallet-adapter-modal,
-                .wallet-adapter-modal-overlay,
                 .wallet-adapter-modal-container,
+                .wallet-adapter-modal-overlay,
                 .wallet-adapter-modal-wrapper,
-                .wallet-adapter-modal-dialog,
-                .wallet-adapter-modal-panel,
                 .wallet-adapter-button {
                     z-index: 99999 !important;
                 }
+                .wallet-adapter-modal-wrapper {
+                    z-index: 100001 !important;
+                }
                 .wallet-adapter-modal-overlay {
+                    z-index: 100000 !important;
                     background: rgba(0,0,0,0.72) !important;
                 }
             `}</style>
