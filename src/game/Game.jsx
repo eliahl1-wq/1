@@ -86,19 +86,27 @@ export default function Game() {
             // Denna används inte längre då servern skickar 'welcome'
         });
 
-        socket.on('welcome', (playerSettings, gameSizes) => {
+        socket.on('welcome', (playerSettings, gameSizes, extra) => {
             console.log('Welcome to Arena');
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
             global.game.width = gameSizes.width;
             global.game.height = gameSizes.height;
             setIsConnected(true);
+            
+            // Återuppta cashout-timer om man refreashar mitt i
+            if (gameSizes.cashOutRemaining > 0) {
+                startCashoutCountdown(gameSizes.cashOutRemaining);
+            }
         });
 
         socket.on('cashOutStarting', (data) => {
-            console.log("💰 CASHOUT STARTING (React):", data);
-            global.cashOutTimer = data.seconds;
-            setLocalTimer(data.seconds);
+            startCashoutCountdown(data.seconds);
+        });
+
+        const startCashoutCountdown = (seconds) => {
+            global.cashOutTimer = seconds;
+            setLocalTimer(seconds);
             const timerInterval = setInterval(() => {
                 global.cashOutTimer--;
                 setLocalTimer(prev => prev - 1);
@@ -107,7 +115,7 @@ export default function Game() {
                 }
                 if (!socketRef.current?.connected) clearInterval(timerInterval);
             }, 1000);
-        });
+        };
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
             gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardInfo };
@@ -147,6 +155,11 @@ export default function Game() {
                 navigate('/pre-game'); 
             }, 4000);
         };
+
+        socket.on('forcedDisconnect', () => {
+            alert("Connected from another window. Closing this session.");
+            navigate('/pre-game');
+        });
 
         socket.on('died', handleDeath);
         socket.on('RIP', handleDeath); // Fixar frysningen när man blir uppäten

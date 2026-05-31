@@ -77,7 +77,7 @@ export default function LoginPage() {
                     <button 
                         type="submit" 
                         disabled={isLoading}
-                        style={{ padding: '18px', borderRadius: '18px', border: 'none', background: '#007AFF', color: 'white', fontSize: '1.2rem', cursor: 'pointer', fontWeight: '600', marginTop: '15px', boxShadow: '0 10px 25px rgba(0,122,255,0.4)' }}
+                        style={{ padding: '18px', borderRadius: '18px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontSize: '1.2rem', cursor: 'pointer', fontWeight: '800', marginTop: '15px', boxShadow: '0 8px 25px rgba(69, 127, 255, 0.3)' }}
                     >
                         {isLoading ? 'Logging in...' : 'LOGIN'}
                     </button>

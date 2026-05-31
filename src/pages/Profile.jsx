@@ -1,18 +1,40 @@
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useAuth, refreshUser } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 
 export default function Profile() {
-    const { user } = useAuth();
+    const { user, token, refreshUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
+    const [gameLogs, setGameLogs] = useState([]);
+
+    useEffect(() => {
+        const fetchLogs = async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                setGameLogs(data.filter(tx => tx.type === 'withdraw' && tx.meta?.reason === 'Arena Cashout'));
+            } catch (e) {}
+        };
+        fetchLogs();
+        refreshUser();
+    }, [token, refreshUser]);
 
     // Mockdata för diagrammet (PnL över tid)
     const chartData = [10, 15, 8, 25, 22, 45, 38, 60];
-    const maxVal = Math.max(...chartData);
-    const points = chartData.map((val, i) => `${(i / (chartData.length - 1)) * 100},${100 - (val / maxVal) * 100}`).join(' ');
+    const points = chartData.map((val, i) => `${(i / (chartData.length - 1)) * 100},${90 - (val / 70) * 80}`).join(' ');
+
+    const formatPlaytime = (ms) => {
+        const hours = Math.floor(ms / (1000 * 60 * 60));
+        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        return `${hours}h ${mins}m`;
+    };
+
+    const totalPnL = gameLogs.reduce((acc, log) => acc + log.amount, 0);
 
     return (
         <div style={containerStyle}>
@@ -45,16 +67,16 @@ export default function Profile() {
                             <div style={statsView}>
                                 <div style={statsGrid}>
                                     <div style={statCard}>
-                                        <div style={statLabel}>Total PnL</div>
-                                        <div style={{...statValue, color: '#14F195'}}>+$242.50</div>
+                                        <div style={statLabel}>Total Earnings</div>
+                                        <div style={{...statValue, color: '#14F195'}}>+${totalPnL.toFixed(2)}</div>
                                     </div>
                                     <div style={statCard}>
                                         <div style={statLabel}>Win Rate</div>
                                         <div style={statValue}>68%</div>
                                     </div>
                                     <div style={statCard}>
-                                        <div style={statLabel}>Arena Time</div>
-                                        <div style={statValue}>14.5h</div>
+                                        <div style={statLabel}>Playtime</div>
+                                        <div style={statValue}>{formatPlaytime(user?.playtime || 0)}</div>
                                     </div>
                                 </div>
 
@@ -79,6 +101,22 @@ export default function Profile() {
                                     <div style={chartLabels}>
                                         <span>Last 30 Days</span>
                                         <span className="mono" style={{color: '#007AFF'}}>All Sessions</span>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '20px' }}>
+                                    <div style={statLabel}>Session History</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+                                        {gameLogs.slice(0, 5).map(log => (
+                                            <div key={log._id} className="glass" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
+                                                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                                                    <div style={{ color: '#14F195', fontWeight: '800' }}>SUCCESS</div>
+                                                    <div style={{ opacity: 0.4, fontSize: '0.8rem' }}>{new Date(log.createdAt).toLocaleDateString()}</div>
+                                                </div>
+                                                <div style={{ fontWeight: '800' }}>+${log.amount.toFixed(2)}</div>
+                                            </div>
+                                        ))}
+                                        {gameLogs.length === 0 && <div style={{ opacity: 0.2, textAlign: 'center', padding: '20px' }}>No session data found</div>}
                                     </div>
                                 </div>
                             </div>

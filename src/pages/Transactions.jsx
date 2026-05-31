@@ -18,7 +18,8 @@ export default function Transactions() {
                 });
                 if (!res.ok) throw new Error('no tx');
                 const data = await res.json();
-                setTxs(data);
+                // Visa endast insättningar och riktiga uttag till plånbok
+                setTxs(data.filter(tx => tx.type !== 'game' && tx.meta?.reason !== 'Arena Cashout'));
             } catch (err) {
                 setTxs([]);
             } finally {

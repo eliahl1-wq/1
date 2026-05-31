@@ -475,16 +475,16 @@ export default function Lobby() {
                             fontSize: '1.4rem', 
                             borderRadius: '22px', 
                             border: 'none', 
-                            background: 'linear-gradient(180deg, #007AFF 0%, #005DCB 100%)', 
+                            background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', 
                             color: 'white', 
                             fontWeight: '800', 
                             cursor: 'pointer', 
                             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            boxShadow: '0 15px 35px rgba(0, 122, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+                            boxShadow: '0 8px 25px rgba(69, 127, 255, 0.3)',
                             letterSpacing: '0.5px'
                         }}
                     >
-                        {isAlreadyInGame ? 'REJOIN ARENA' : 'ENTER GAME'}
+                        {isAlreadyInGame ? 'Reconnect' : 'ENTER GAME'}
                     </button>
 
                     {arenaError && (

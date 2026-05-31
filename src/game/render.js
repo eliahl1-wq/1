@@ -171,11 +171,13 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
             const pillX = cell.x - pillW / 2;
             const pillY = cell.y - cell.radius - 55;
 
-            // Rita Pill-rutan (Guld-tema)
-            graph.fillStyle = '#FFD700';
+            // Rita Pill-rutan (Svart tema)
+            graph.fillStyle = '#000000';
             graph.beginPath();
             graph.roundRect(pillX, pillY, pillW, pillH, pillH / 2);
             graph.fill();
+            graph.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+            graph.stroke();
 
             // Rita en liten pil nedåt mot bloben
             graph.beginPath();
@@ -185,8 +187,8 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
             graph.closePath();
             graph.fill();
             
-            // Rita texten inuti pillen
-            graph.fillStyle = '#000'; // Svart text för bäst kontrast på guld
+            // Rita texten inuti pillen (Guld text)
+            graph.fillStyle = '#FFD700';
             graph.textAlign = 'center';
             graph.textBaseline = 'middle';
             graph.fillText(timerText, cell.x, pillY + pillH / 2 + 1);
