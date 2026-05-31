@@ -242,8 +242,10 @@ export default function PreGame() {
     };
 
     useEffect(() => {
-        refreshUser(); // Hämta senaste saldot från DB när man kommer till denna sida
-    }, []);
+        refreshUser();
+        const id = setInterval(refreshUser, 5000); // Polla balans var 5:e sekund
+        return () => clearInterval(id);
+    }, [refreshUser]);
 
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
@@ -254,7 +256,12 @@ export default function PreGame() {
         let mounted = true;
         const fetchStats = async () => {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stats`);
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stats?t=${Date.now()}`, {
+                    headers: { 
+                        'bypass-tunnel-reminders': 'true',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
                 if (!res.ok) return;
                 const d = await res.json();
                 if (mounted) setLiveStats(d);

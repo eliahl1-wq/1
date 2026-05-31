@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext();
 
@@ -14,8 +14,12 @@ export const AuthProvider = ({ children }) => {
             if (storedToken) {
                 console.log('AuthContext: Token hittades i localStorage, försöker validera.');
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
-                        headers: { 'Authorization': `Bearer ${storedToken}` }
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/me?t=${Date.now()}`, {
+                        headers: { 
+                            'Authorization': `Bearer ${storedToken}`,
+                            'bypass-tunnel-reminders': 'true',
+                            'Cache-Control': 'no-cache'
+                        }
                     });
                     if (res.ok) {
                         const userData = await res.json();
@@ -37,11 +41,15 @@ export const AuthProvider = ({ children }) => {
         checkLoggedIn();
     }, []);
 
-    const refreshUser = async () => {
+    const refreshUser = useCallback(async () => {
         if (!token) return;
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/me?t=${Date.now()}`, {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'bypass-tunnel-reminders': 'true',
+                    'Cache-Control': 'no-cache'
+                }
             });
             if (res.ok) {
                 const userData = await res.json();
@@ -51,7 +59,7 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
             console.error("AuthContext: Kunde inte uppdatera användardata:", err);
         }
-    };
+    }, [token]);
 
     const login = (userData, newToken) => {
         localStorage.setItem('token', newToken);

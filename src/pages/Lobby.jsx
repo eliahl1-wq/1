@@ -74,8 +74,10 @@ export default function Lobby() {
     useEffect(() => {
         if (token) {
             refreshUser();
+            const id = setInterval(refreshUser, 5000); // Polla var 5:e sekund
+            return () => clearInterval(id);
         }
-    }, [token]);
+    }, [token, refreshUser]);
 
     // Om användaren redan har balans, skicka dem direkt till PreGame
     useEffect(() => {
