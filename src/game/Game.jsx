@@ -353,22 +353,25 @@ export default function Game() {
             <style>{`
                 .modern-overlay-backdrop {
                     position: fixed;
-                    inset: 0;
-                    z-index: 3000;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    z-index: 9999;
                     display: flex;
                     align-items: center;
                     justifyContent: center;
-                    background: rgba(10, 10, 12, 0.96);
+                    background: rgba(8, 8, 10, 0.98);
                     backdrop-filter: blur(20px);
                     animation: overlayIn 0.3s ease-out forwards;
                 }
-                .modern-overlay-backdrop.death { background: rgba(12, 8, 8, 0.98); }
+                .modern-overlay-backdrop.death { background: rgba(15, 5, 5, 0.98); }
                 
                 .modern-overlay-card {
                     text-align: center;
-                    width: 100%;
-                    max-width: 440px;
-                    padding: 0 20px;
+                    width: 90%;
+                    max-width: 500px;
+                    padding: 40px 20px;
                     animation: contentIn 0.6s cubic-bezier(0.2, 1, 0.2, 1) forwards;
                 }
 
@@ -380,7 +383,7 @@ export default function Game() {
                     font-weight: 800;
                     text-transform: uppercase;
                     letter-spacing: 1.2px;
-                    margin-bottom: 30px;
+                    margin-bottom: 45px;
                 }
                 .overlay-badge.success { background: rgba(20, 241, 149, 0.1); color: #14F195; }
                 .overlay-badge.error { background: rgba(255, 59, 48, 0.1); color: #FF3B30; }
@@ -389,27 +392,30 @@ export default function Game() {
                     color: white;
                     font-size: 2.2rem;
                     font-weight: 800;
-                    margin: 0 0 12px 0;
+                    margin: 0 0 25px 0;
                     letter-spacing: -0.5px;
+                    line-height: 1.2;
                 }
 
                 .overlay-amount {
-                    font-size: 6rem;
+                    font-size: 5rem;
                     font-weight: 900;
                     letter-spacing: -3px;
                     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                    margin-bottom: 40px;
+                    line-height: 1;
                 }
                 .overlay-amount.success { color: #14F195; text-shadow: 0 0 40px rgba(20, 241, 149, 0.15); }
                 .overlay-amount .unit { opacity: 0.2; margin-right: 4px; }
 
-                .overlay-icon { margin: 20px 0; opacity: 0.7; }
+                .overlay-icon { margin: 40px 0; opacity: 0.7; }
                 .overlay-icon.error { color: #FF3B30; }
 
                 .overlay-divider {
                     width: 32px;
                     height: 2px;
                     background: rgba(255, 255, 255, 0.1);
-                    margin: 35px auto;
+                    margin: 40px auto;
                 }
 
                 .overlay-caption {
