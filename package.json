@@ -16,6 +16,7 @@
     "@solana/web3.js": "latest",
     "@walletconnect/modal": "^2.7.0",
     "buffer": "^6.0.3",
+    "bufferutil": "^4.1.0",
     "events": "^3.3.0",
     "process": "^0.11.10",
     "react": "^18.2.0",
@@ -23,6 +24,7 @@
     "react-router-dom": "^7.15.0",
     "socket.io-client": "^4.7.2",
     "stream-browserify": "^3.0.0",
+    "utf-8-validate": "^6.0.6",
     "util": "^0.12.5"
   },
   "devDependencies": {

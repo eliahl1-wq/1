@@ -27,6 +27,7 @@ export default function Profile() {
         };
         fetchLogs();
         refreshUser();
+        document.title = "AgarStake | Profile";
     }, [token, refreshUser]);
 
     const processedLogs = [...gameLogs].reverse().map(log => {
@@ -142,8 +143,8 @@ export default function Profile() {
                                             const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
                                             const index = Math.round((mouseX / 100) * (chartPointsRaw.length - 1));
                                             const safeIndex = Math.max(0, Math.min(index, chartPointsRaw.length - 1));
-                                            const label = safeIndex === 0 ? "START $0" : 
-                                                `${processedLogs[safeIndex-1].netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${processedLogs[safeIndex-1].netProfit >= 0 ? '' : '-'}$${Math.abs(processedLogs[safeIndex-1].netProfit).toFixed(0)}`;
+                                            const logAtIdx = processedLogs[safeIndex - 1];
+                                            const label = safeIndex === 0 ? "START $0" : `${logAtIdx.netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${logAtIdx.netProfit >= 0 ? '' : '-'}$${Math.abs(logAtIdx.netProfit).toFixed(0)}`;
                                             setHoveredPoint({ index: safeIndex, label });
                                         }}
                                         onMouseLeave={() => setHoveredPoint(null)}
@@ -207,7 +208,7 @@ export default function Profile() {
                                                         {log.type === 'game' && ` • Balance Lost $${Math.abs(log.netProfit).toFixed(2)}`}
                                                     </div>
                                                 </div>
-                                                <div style={{ fontWeight: '400', fontSize: '0.75rem', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
+                                                <div style={{ fontWeight: '400', fontSize: '0.7rem', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
                                                     Profit {log.netProfit >= 0 ? '' : '-'}${Math.abs(log.netProfit).toFixed(2)}
                                                 </div>
                                             </div>
