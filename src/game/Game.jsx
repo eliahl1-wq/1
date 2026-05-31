@@ -287,6 +287,21 @@ export default function Game() {
         return "LOCKED";
     };
 
+    const formatResetTimer = () => {
+        if (!rewardInfo?.resetTime) return null;
+        const remaining = Math.max(0, rewardInfo.resetTime - currentTime);
+        const totalSeconds = Math.floor(remaining / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+        
+        const timeStr = hours > 0 
+            ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+            : `${mins}:${secs.toString().padStart(2, '0')}`;
+            
+        return `ARENA RESET IN: ${timeStr}`;
+    };
+
     return (
         <div style={{ 
             width: '100vw', 
@@ -537,6 +552,9 @@ export default function Game() {
                     AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
                 </h2>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
+                <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>
+                    {formatResetTimer()}
+                </div>
             </div>
 
             {/* Mock Leaderboard */}
