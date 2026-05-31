@@ -20,9 +20,10 @@ export default function Game() {
     const navigate = useNavigate();
     const socketRef = useRef(null);
     const hasJoinedGameRef = useRef(false);
-    
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
-    const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], rewardsUnlocked: false });
+    const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null });
     const myIdRef = useRef(null);
     const animationFrameId = useRef(null);
     
@@ -34,6 +35,11 @@ export default function Game() {
     const [cashedAmount, setCashedAmount] = useState(null);
     const [isDead, setIsDead] = useState(false);
     const [localTimer, setLocalTimer] = useState(0);
+
+    useEffect(() => {
+        const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
+        return () => clearInterval(itv);
+    }, []);
 
     useEffect(() => {
         // Endast anslut om vi har en token och användarnamn, OCH ingen socket är aktiv
@@ -102,8 +108,8 @@ export default function Game() {
             }, 1000);
         });
 
-        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardsUnlocked) => {
-            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardsUnlocked };
+        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
+            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardInfo };
             const me = userData.find(p => p.id === myIdRef.current);
             setCurrentBalance(me?.balance ?? 0); // Use nullish coalescing to default to 0 if me or me.balance is undefined
         });
@@ -245,9 +251,23 @@ export default function Game() {
     };
 
     // Beräkna potentiell bonus baserat på leaderboard-position
+    const rewardInfo = gameData.current.rewardInfo;
     const myRank = leaderboard.findIndex(p => p.id === myIdRef.current) + 1;
-    const rewardsUnlocked = gameData.current.rewardsUnlocked;
+    const rewardsUnlocked = rewardInfo?.unlocked;
     const potentialBonus = rewardsUnlocked ? (myRank === 1 ? 20 : (myRank > 1 && myRank <= 3 ? 10 : 0)) : 0;
+
+    const formatUnlockTimer = () => {
+        if (!rewardInfo) return "LOCKED";
+        const remaining = Math.max(0, rewardInfo.unlockTime - currentTime);
+        if (remaining > 0) {
+            const totalSeconds = Math.floor(remaining / 1000);
+            const mins = Math.floor(totalSeconds / 60);
+            const secs = totalSeconds % 60;
+            return `UNLOCKS IN ${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        if (rewardInfo.playerCount < 4) return "NEED 4 PLAYERS";
+        return "LOCKED";
+    };
 
     return (
         <div style={{ 
@@ -416,7 +436,7 @@ export default function Game() {
                     boxSizing: 'border-box'
                 }}>
                     <div style={{ color: '#34C759', fontWeight: '800', marginBottom: '8px', letterSpacing: '1px' }}>
-                        ARENA REWARDS {!rewardsUnlocked && "(LOCKED)"}
+                        ARENA REWARDS {!rewardsUnlocked && `(${formatUnlockTimer()})`}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Rank 1 Bonus</span>
