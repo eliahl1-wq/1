@@ -83,8 +83,12 @@ export default function Lobby() {
                     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
                         headers: { 'Authorization': `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
                     });
-                    const data = await res.json();
-                    setIsAlreadyInGame(data.inGame);
+                    
+                    const contentType = res.headers.get("content-type");
+                    if (res.ok && contentType && contentType.includes("application/json")) {
+                        const data = await res.json();
+                        setIsAlreadyInGame(data.inGame);
+                    }
                 } catch (e) {}
             };
             checkStatus();

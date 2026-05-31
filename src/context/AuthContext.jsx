@@ -52,6 +52,10 @@ export const AuthProvider = ({ children }) => {
 
         const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
         const url = `${baseUrl}/api/me?t=${Date.now()}`;
+        
+        if (!baseUrl && !window.location.hostname.includes('localhost')) {
+            console.error("❌ AuthContext: VITE_API_URL är inte definierad! Backend-anrop kommer misslyckas.");
+        }
 
         try {
             const res = await fetch(url, {
@@ -62,7 +66,9 @@ export const AuthProvider = ({ children }) => {
                     'Pragma': 'no-cache'
                 }
             });
-            if (res.ok) {
+            
+            const contentType = res.headers.get("content-type");
+            if (res.ok && contentType && contentType.includes("application/json")) {
                 const userData = await res.json();
                 console.log(`[AuthContext] Refresh lyckades. Ny balans: ${userData.balance}. URL: ${url}`);
                 setUser(userData);
