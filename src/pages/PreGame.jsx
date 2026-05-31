@@ -565,7 +565,7 @@ const modalFooterTextStyle = { textAlign: 'center', marginTop: '24px', fontSize:
 
 const avatarPillStyle = { width: '40px', height: '40px', borderRadius: '50%', border: '2px solid rgba(255, 255, 255, 0.15)', padding: '3px', cursor: 'pointer' };
 const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.9rem' };
-const walletExpandPanelStyle = { position: 'absolute', top: '76px', left: '50%', transform: 'translateX(-50%)', width: '360px', maxWidth: '92vw', padding: '22px', borderRadius: '24px', boxShadow: '0 30px 70px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100 };
+const walletExpandPanelStyle = { position: 'absolute', top: '60px', left: '50%', transform: 'translateX(-50%)', width: '360px', maxWidth: '92vw', padding: '22px', borderRadius: '24px', boxShadow: '0 30px 70px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100 };
 const walletCloseX = { position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'white', opacity: 0.35, padding: '4px', cursor: 'pointer' };
 const walletPanelHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' };
 const walletPanelTitle = { fontSize: '0.8rem', letterSpacing: '0.24em', textTransform: 'uppercase', opacity: 0.65, fontWeight: '800' };

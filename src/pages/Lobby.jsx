@@ -284,7 +284,7 @@ export default function Lobby() {
                     color: 'white', 
                     letterSpacing: '-1.5px', 
                     fontWeight: '900', 
-                    fontSize: '3.5rem',
+                    fontSize: '1.8rem',
                     fontStyle: 'italic'
                 }}>
                     AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
