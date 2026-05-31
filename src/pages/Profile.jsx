@@ -17,7 +17,11 @@ export default function Profile() {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
-                setGameLogs(data.filter(tx => tx.type === 'withdraw' && tx.meta?.reason === 'Arena Cashout'));
+                // Hämta både vinster (withdraw/Cashout) och förluster (game/Death)
+                setGameLogs(data.filter(tx => 
+                    (tx.type === 'withdraw' && tx.meta?.reason === 'Arena Cashout') || 
+                    (tx.type === 'game' && tx.meta?.reason === 'Arena Death')
+                ));
             } catch (e) {}
         };
         fetchLogs();
@@ -26,10 +30,15 @@ export default function Profile() {
 
     // Mockdata för diagrammet (PnL över tid)
     const chartData = [10, 15, 8, 25, 22, 45, 38, 60];
-    // Justerad Y-skalning för att garantera att den håller sig inom 0-100 koordinatsystemet
     const maxValInData = Math.max(...chartData, 70);
-    const points = chartData.map((val, i) => 
+    
+    // Fixar SVG-syntaxen för path och polyline separat
+    const polylinePoints = chartData.map((val, i) => 
         `${(i / (chartData.length - 1)) * 100},${90 - (val / maxValInData) * 80}`
+    ).join(' ');
+
+    const pathPoints = chartData.map((val, i) => 
+        `L ${(i / (chartData.length - 1)) * 100} ${90 - (val / maxValInData) * 80}`
     ).join(' ');
 
     const formatPlaytime = (ms) => {
@@ -93,12 +102,12 @@ export default function Profile() {
                                                 <stop offset="100%" stopColor="#007AFF" stopOpacity="0" />
                                             </linearGradient>
                                         </defs>
-                                        <path d={`M 0,100 L ${points} L 100,100 Z`} fill="url(#lineGradient)" />
+                                        <path d={`M 0 100 ${pathPoints} L 100 100 Z`} fill="url(#lineGradient)" />
                                         <polyline
                                             fill="none"
                                             stroke="#007AFF"
                                             strokeWidth="1.5"
-                                            points={points}
+                                            points={polylinePoints}
                                             strokeLinejoin="round"
                                         />
                                     </svg>
