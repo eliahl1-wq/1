@@ -373,8 +373,8 @@ export default function Game() {
                     align-items: center;
                     justify-content: center;
                     width: 100%;
-                    max-width: 540px;
-                    padding: 80px 20px;
+                    max-width: 640px;
+                    padding: 100px 40px;
                     animation: contentIn 0.6s cubic-bezier(0.2, 1, 0.2, 1) forwards;
                 }
 
@@ -386,7 +386,7 @@ export default function Game() {
                     font-weight: 800;
                     text-transform: uppercase;
                     letter-spacing: 1.2px;
-                    margin-bottom: 60px;
+                    margin-bottom: 80px;
                 }
                 .overlay-badge.success { background: rgba(20, 241, 149, 0.1); color: #14F195; }
                 .overlay-badge.error { background: rgba(255, 59, 48, 0.1); color: #FF3B30; }
@@ -395,19 +395,19 @@ export default function Game() {
                     color: white;
                     font-size: 2.2rem;
                     font-weight: 800;
-                    margin: 0 0 45px 0;
+                    margin: 0 0 40px 0;
                     letter-spacing: -0.5px;
                     line-height: 1.2;
                     text-align: center;
                 }
 
                 .overlay-amount {
-                    font-size: 4.5rem;
+                    font-size: 6rem;
                     font-weight: 900;
                     letter-spacing: -3px;
                     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                    line-height: 1;
-                    margin-bottom: 65px;
+                    line-height: 0.9;
+                    margin-bottom: 90px;
                     text-align: center;
                 }
                 .overlay-amount.success { color: #14F195; text-shadow: 0 0 40px rgba(20, 241, 149, 0.15); }
@@ -420,7 +420,7 @@ export default function Game() {
                     width: 32px;
                     height: 2px;
                     background: rgba(255, 255, 255, 0.1);
-                    margin: 60px auto;
+                    margin: 80px auto;
                 }
 
                 .overlay-caption {

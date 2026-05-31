@@ -355,29 +355,19 @@ export default function PreGame() {
 
                         {isWalletOpen && (
                             <div ref={walletDropdownRef} className="glass" style={walletDropdownCardStyle}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: '600', opacity: 0.4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Value</span>
-                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                            <button onClick={() => {}} style={{ padding: '6px 10px', borderRadius: 10, background: 'transparent', border: 'none', color: 'white', fontWeight: 800 }}>Balance</button>
-                                            <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }} style={{ padding: '6px 10px', borderRadius: 10, background: 'transparent', border: 'none', color: 'white', fontWeight: 800 }}>Transaction History</button>
-                                        </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                                    <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }} 
+                                            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                                        Transaction History
+                                    </button>
                                 </div>
                                 
-                                <div className="mono" style={{ fontSize: '28px', fontWeight: '800', marginBottom: '16px', color: 'white' }}>
+                                <div className="mono" style={{ fontSize: '36px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>
                                     ${formatBalance(user?.balance)}
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                                    <button className="pill-tab active" style={{fontSize: '10px', padding: '4px 10px'}}>USD</button>
-                                </div>
-
-                                <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '0 -24px 16px -24px' }} />
-
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span className="mono" style={{ fontSize: '13px', opacity: 0.8, color: 'white' }}>${formatBalance(user?.balance)}</span>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{opacity: 0.4}}><path d="M20 11a8.1 8.1 0 00-15.5-2m-.5 5v5h5m10-1a8.1 8.1 0 01-15.5 2m.5-5h5"/></svg>
-                                    </div>
+                                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.2)' }}>USD</span>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px' }}>
