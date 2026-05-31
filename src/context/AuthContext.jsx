@@ -14,11 +14,15 @@ export const AuthProvider = ({ children }) => {
             if (storedToken) {
                 console.log('AuthContext: Token hittades i localStorage, försöker validera.');
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/me?t=${Date.now()}`, {
+                    const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+                    const url = `${baseUrl}/api/me?t=${Date.now()}`;
+                    
+                    const res = await fetch(url, {
                         headers: { 
                             'Authorization': `Bearer ${storedToken}`,
                             'bypass-tunnel-reminders': 'true',
-                            'Cache-Control': 'no-cache'
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
                         }
                     });
                     if (res.ok) {
@@ -43,16 +47,22 @@ export const AuthProvider = ({ children }) => {
 
     const refreshUser = useCallback(async () => {
         if (!token) return;
+
+        const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+        const url = `${baseUrl}/api/me?t=${Date.now()}`;
+
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/me?t=${Date.now()}`, {
+            const res = await fetch(url, {
                 headers: { 
                     'Authorization': `Bearer ${token}`,
                     'bypass-tunnel-reminders': 'true',
-                    'Cache-Control': 'no-cache'
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
                 }
             });
             if (res.ok) {
                 const userData = await res.json();
+                console.log(`[AuthContext] Refresh lyckades. Ny balans: ${userData.balance}. URL: ${url}`);
                 setUser(userData);
                 return userData;
             }
