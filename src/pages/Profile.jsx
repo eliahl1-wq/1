@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, refreshUser } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 
 export default function Profile() {
-    const { user, token, refreshUser } = useAuth();
+    const { user, token, refreshUser } = useAuth(); // Hämta refreshUser från useAuth-hooken
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
