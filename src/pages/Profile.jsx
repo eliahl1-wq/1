@@ -26,7 +26,11 @@ export default function Profile() {
 
     // Mockdata för diagrammet (PnL över tid)
     const chartData = [10, 15, 8, 25, 22, 45, 38, 60];
-    const points = chartData.map((val, i) => `${(i / (chartData.length - 1)) * 100},${90 - (val / 70) * 80}`).join(' ');
+    // Justerad Y-skalning för att garantera att den håller sig inom 0-100 koordinatsystemet
+    const maxValInData = Math.max(...chartData, 70);
+    const points = chartData.map((val, i) => 
+        `${(i / (chartData.length - 1)) * 100},${90 - (val / maxValInData) * 80}`
+    ).join(' ');
 
     const formatPlaytime = (ms) => {
         const hours = Math.floor(ms / (1000 * 60 * 60));
@@ -110,10 +114,14 @@ export default function Profile() {
                                         {gameLogs.slice(0, 5).map(log => (
                                             <div key={log._id} className="glass" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
                                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                                                    <div style={{ color: '#14F195', fontWeight: '800' }}>SUCCESS</div>
+                                                    <div style={{ color: log.amount >= 0 ? '#14F195' : '#FF3B30', fontWeight: '800', textTransform: 'uppercase' }}>
+                                                        {log.amount >= 0 ? 'Cashout' : 'Loss'}
+                                                    </div>
                                                     <div style={{ opacity: 0.4, fontSize: '0.8rem' }}>{new Date(log.createdAt).toLocaleDateString()}</div>
                                                 </div>
-                                                <div style={{ fontWeight: '800' }}>+${log.amount.toFixed(2)}</div>
+                                                <div style={{ fontWeight: '800', color: log.amount >= 0 ? '#14F195' : '#FF3B30' }}>
+                                                    {log.amount >= 0 ? '+' : '-'}${Math.abs(log.amount).toFixed(2)}
+                                                </div>
                                             </div>
                                         ))}
                                         {gameLogs.length === 0 && <div style={{ opacity: 0.2, textAlign: 'center', padding: '20px' }}>No session data found</div>}
@@ -177,12 +185,14 @@ const chartWrapper = {
     borderRadius: '20px', 
     padding: '24px', 
     height: '250px', 
+    minHeight: '200px',
     display: 'flex', 
     flexDirection: 'column',
-    border: '1px solid rgba(255,255,255,0.02)'
+    border: '1px solid rgba(255,255,255,0.02)',
+    overflow: 'hidden'
 };
 const chartHeader = { fontSize: '0.8rem', fontWeight: '800', opacity: 0.2, marginBottom: '20px', textTransform: 'uppercase' };
-const svgStyle = { width: '100%', flex: 1, overflow: 'visible' };
+const svgStyle = { width: '100%', height: '100%', flex: 1, overflow: 'hidden' };
 const chartLabels = { display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '0.7rem', fontWeight: '800', opacity: 0.2 };
 
 const settingsView = { maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' };
