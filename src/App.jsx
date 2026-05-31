@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import Lobby from './pages/Lobby';
 import PreGame from './pages/PreGame';
 import Transactions from './pages/Transactions';
+import Profile from './pages/Profile';
 import Game from './game/Game'; // Importera ditt nya spel
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -56,6 +57,7 @@ function App() {
                 <Route path="/pre-game" element={<PrivateRoute><PreGame /></PrivateRoute>} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
+                <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                 {/* Skicka till lobby som standard - den sköter redirect till login om det behövs */}
                 <Route path="/" element={<Navigate to="/lobby" />} />
               </Routes>

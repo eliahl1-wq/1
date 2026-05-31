@@ -29,6 +29,7 @@ export default function Lobby() {
     const [minimumDepositUSD, setMinimumDepositUSD] = useState(10); // Ändra till t.ex. 0.01 för att testa billigt
     const [depositStatusMessage, setDepositStatusMessage] = useState(''); // Statusmeddelanden för insättning
     const [arenaError, setArenaError] = useState('');
+    const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
 
     // Din mottagaradress
     const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
@@ -74,14 +75,30 @@ export default function Lobby() {
     useEffect(() => {
         if (token) {
             refreshUser();
+            
+            // Kolla om vi redan spelar
+            const checkStatus = async () => {
+                try {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
+                        headers: { 'Authorization': `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
+                    });
+                    const data = await res.json();
+                    setIsAlreadyInGame(data.inGame);
+                } catch (e) {}
+            };
+            checkStatus();
+
             const id = setInterval(refreshUser, 5000); // Polla var 5:e sekund
             return () => clearInterval(id);
         }
     }, [token, refreshUser]);
 
-    // Om användaren redan har balans, skicka dem direkt till PreGame
+    // Om användaren redan har balans och INTE är i ett game, skicka dem till PreGame
     useEffect(() => {
-        if (user && (user.balance || 0) >= 10) {
+        if (user && (user.balance || 0) >= 10 && !isAlreadyInGame) {
+            navigate('/pre-game');
+        } else if (isAlreadyInGame) {
+            // Om man redan är i ett game, tvinga in dem i PreGame (eller Game direkt om du vill)
             navigate('/pre-game');
         }
     }, [user, navigate]);
@@ -444,7 +461,7 @@ export default function Lobby() {
                         onClick={() => {
                             if (!connected) { // Kontrollera om plånbok är ansluten
                                 setArenaError('Please connect your wallet first.');
-                            } else if (!user?.balance || user.balance < minimumDepositUSD) { // Kontrollera användarens faktiska saldo
+                            } else if (!isAlreadyInGame && (!user?.balance || user.balance < minimumDepositUSD)) { 
                                 setArenaError(`Please deposit at least $${minimumDepositUSD} to enter the arena.`);
                             } else {
                                 setArenaError('');
@@ -467,7 +484,7 @@ export default function Lobby() {
                             letterSpacing: '0.5px'
                         }}
                     >
-                        ENTER GAME
+                        {isAlreadyInGame ? 'REJOIN ARENA' : 'ENTER GAME'}
                     </button>
 
                     {arenaError && (

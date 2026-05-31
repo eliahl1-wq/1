@@ -29,6 +29,7 @@ export default function PreGame() {
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
+    const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0 });
     const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
 
@@ -242,6 +243,17 @@ export default function PreGame() {
     };
 
     useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
+                });
+                const data = await res.json();
+                setIsAlreadyInGame(data.inGame);
+            } catch (e) {}
+        };
+        checkStatus();
+
         refreshUser();
         const id = setInterval(refreshUser, 5000); // Polla balans var 5:e sekund
         return () => clearInterval(id);
@@ -392,7 +404,8 @@ export default function PreGame() {
                     {showUserMenu && (
                         <div ref={userMenuRef} style={userMenuContainerStyle}>
                             <div style={userMenuHeader}>{user?.username}</div>
-                            <button style={userMenuItemStyle}>Settings</button>
+                            <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'profile' } }); }} style={userMenuItemStyle}>Profile</button>
+                            <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }} style={userMenuItemStyle}>Stats</button>
                             <button onClick={() => { setShowUserMenu(false); navigate('/transactions'); }} style={userMenuItemStyle}>Transactions</button>
                             <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30' }}>Log Out</button>
                         </div>
@@ -463,13 +476,13 @@ export default function PreGame() {
 
                 <button 
                     onClick={handleStartMatch} 
-                    disabled={!canJoin || isMatchmaking}
+                    disabled={(!canJoin && !isAlreadyInGame) || isMatchmaking}
                     style={{ 
                         ...playBtnStyle, 
-                        background: canJoin ? '#34C759' : '#1e1f26',
-                        color: canJoin ? 'white' : 'rgba(255,255,255,0.2)',
-                        boxShadow: canJoin ? '0 4px 12px rgba(52, 199, 89, 0.2)' : 'none',
-                        cursor: canJoin ? 'pointer' : 'not-allowed'
+                        background: isAlreadyInGame ? 'linear-gradient(180deg, #007AFF 0%, #005DCB 100%)' : (canJoin ? '#34C759' : '#1e1f26'),
+                        color: (canJoin || isAlreadyInGame) ? 'white' : 'rgba(255,255,255,0.2)',
+                        boxShadow: isAlreadyInGame ? '0 4px 12px rgba(0, 122, 255, 0.3)' : (canJoin ? '0 4px 12px rgba(52, 199, 89, 0.2)' : 'none'),
+                        cursor: (canJoin || isAlreadyInGame) ? 'pointer' : 'not-allowed'
                     }}
                 >
                     {isMatchmaking ? (
@@ -477,7 +490,7 @@ export default function PreGame() {
                             <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
                             Joining...
                         </div>
-                    ) : (canJoin ? 'Play' : 'Insufficient Balance')}
+                    ) : (isAlreadyInGame ? 'REJOIN ARENA' : (canJoin ? 'Play' : 'Insufficient Balance'))}
                 </button>
 
                 <div style={howItWorksContainerStyle}>
