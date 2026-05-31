@@ -265,7 +265,7 @@ export default function Game() {
             const secs = totalSeconds % 60;
             return `UNLOCKS IN ${mins}:${secs.toString().padStart(2, '0')}`;
         }
-        if (rewardInfo.playerCount < 4) return "NEED 4 PLAYERS";
+        if (rewardInfo.playerCount < 4) return "NOT ENOUGH PLAYERS";
         return "LOCKED";
     };
 
@@ -433,11 +433,17 @@ export default function Game() {
                     fontSize: '0.75rem',
                     lineHeight: '1.6',
                     width: '100%',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    opacity: rewardsUnlocked ? 1 : 0.5
                 }}>
-                    <div style={{ color: '#34C759', fontWeight: '800', marginBottom: '8px', letterSpacing: '1px' }}>
-                        ARENA REWARDS {!rewardsUnlocked && `(${formatUnlockTimer()})`}
+                    <div style={{ color: '#34C759', fontWeight: '800', marginBottom: rewardsUnlocked ? '8px' : '2px', letterSpacing: '1px' }}>
+                        ARENA REWARDS
                     </div>
+                    {!rewardsUnlocked && (
+                        <div style={{ fontSize: '0.65rem', color: '#FF3B30', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', opacity: 0.8 }}>
+                            {formatUnlockTimer()}
+                        </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Rank 1 Bonus</span>
                         <span style={{ color: '#fff' }}>$20.00</span>
