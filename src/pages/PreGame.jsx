@@ -543,8 +543,8 @@ export default function PreGame() {
 // --- Styles ---
 const containerStyle = { width: '100vw', height: '100vh', background: '#050505', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
 const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#050505', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
-const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '88px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 48px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
-const logoStyle = { margin: 0, fontWeight: '950', fontStyle: 'italic', letterSpacing: '-2px', fontSize: '2.4rem' };
+const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '96px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 56px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.94)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' };
+const logoStyle = { margin: 0, fontWeight: '950', fontStyle: 'italic', letterSpacing: '-2.5px', fontSize: '2.8rem' };
 
 const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '12px 26px', borderRadius: '100px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' };
 const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '14px 30px', borderRadius: '100px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', boxShadow: '0 6px 20px rgba(69, 127, 255, 0.3)' };

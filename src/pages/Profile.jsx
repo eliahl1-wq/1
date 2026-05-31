@@ -208,7 +208,7 @@ export default function Profile() {
                                                     </div>
                                                 </div>
                                                 <div style={{ fontWeight: '400', fontSize: '0.75rem', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
-                                                    Profit {log.netProfit >= 0 ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
+                                                    Profit {log.netProfit >= 0 ? '' : '-'}${Math.abs(log.netProfit).toFixed(2)}
                                                 </div>
                                             </div>
                                         ))}
