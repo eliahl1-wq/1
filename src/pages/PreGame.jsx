@@ -463,9 +463,9 @@ export default function PreGame() {
                     disabled={!canJoin || isMatchmaking}
                     style={{ 
                         ...playBtnStyle, 
-                        background: canJoin ? '#14F195' : '#1e1f26',
-                        color: canJoin ? '#050505' : 'rgba(255,255,255,0.2)',
-                        boxShadow: canJoin ? '0 4px 12px rgba(20, 241, 149, 0.2)' : 'none',
+                        background: canJoin ? '#34C759' : '#1e1f26',
+                        color: canJoin ? 'white' : 'rgba(255,255,255,0.2)',
+                        boxShadow: canJoin ? '0 4px 12px rgba(52, 199, 89, 0.2)' : 'none',
                         cursor: canJoin ? 'pointer' : 'not-allowed'
                     }}
                 >
