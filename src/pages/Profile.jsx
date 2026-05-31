@@ -143,8 +143,8 @@ export default function Profile() {
                                             const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
                                             const index = Math.round((mouseX / 100) * (chartPointsRaw.length - 1));
                                             const safeIndex = Math.max(0, Math.min(index, chartPointsRaw.length - 1));
-                                            const logAtIdx = processedLogs[safeIndex - 1];
-                                            const label = safeIndex === 0 ? "START $0" : `${logAtIdx.netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${logAtIdx.netProfit >= 0 ? '' : '-'}$${Math.abs(logAtIdx.netProfit).toFixed(0)}`;
+                                            const logAtIdx = safeIndex > 0 ? processedLogs[safeIndex - 1] : null;
+                                            const label = safeIndex === 0 ? "START $0" : `${logAtIdx?.netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${logAtIdx?.netProfit >= 0 ? '' : '-'}$${Math.abs(logAtIdx?.netProfit || 0).toFixed(0)}`;
                                             setHoveredPoint({ index: safeIndex, label });
                                         }}
                                         onMouseLeave={() => setHoveredPoint(null)}

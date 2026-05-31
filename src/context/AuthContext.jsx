@@ -25,7 +25,9 @@ export const AuthProvider = ({ children }) => {
                             'Pragma': 'no-cache'
                         }
                     });
-                    if (res.ok) {
+                    
+                    const contentType = res.headers.get("content-type");
+                    if (res.ok && contentType && contentType.includes("application/json")) {
                         const userData = await res.json();
                         setUser(userData);
                         console.log('AuthContext: Användardata från /api/me:', userData);
