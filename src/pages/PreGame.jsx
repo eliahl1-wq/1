@@ -364,9 +364,9 @@ export default function PreGame() {
                             onClick={() => setIsWalletOpen(!isWalletOpen)}
                             style={walletPillButtonStyle}
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', opacity: 0.7}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
-                            <span className="mono" style={{fontWeight: '800', fontSize: '14px', color: '#14F195'}}>${formatBalance(user?.balance)}</span>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '8px', opacity: 0.5}}><path d="M6 9l6 6 6-6"/></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '10px', opacity: 0.8}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
+                            <span className="mono" style={{fontWeight: '800', fontSize: '17px', color: '#fff'}}>${formatBalance(user?.balance)}</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '10px', opacity: 0.6}}><path d="M6 9l6 6 6-6"/></svg>
                         </button>
 
                         {isWalletOpen && (
@@ -546,7 +546,7 @@ const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '
 const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1.15rem' };
 
-const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '8px 18px', borderRadius: '100px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' };
+const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 12px', borderRadius: '100px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' };
 const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '9px 22px', borderRadius: '100px', fontSize: '13.5px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(69, 127, 255, 0.25)' };
 const depositWithdrawBtnStyle = walletPillButtonStyle;
 
