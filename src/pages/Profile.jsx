@@ -28,26 +28,48 @@ export default function Profile() {
         refreshUser();
     }, [token, refreshUser]);
 
-    // Mockdata för diagrammet (PnL över tid)
-    const chartData = [10, 15, 8, 25, 22, 45, 38, 60];
-    const maxValInData = Math.max(...chartData, 70);
-    
-    // Fixar SVG-syntaxen för path och polyline separat
-    const polylinePoints = chartData.map((val, i) => 
-        `${(i / (chartData.length - 1)) * 100},${90 - (val / maxValInData) * 80}`
-    ).join(' ');
+    // Processa loggar för att räkna ut Net PnL (faktisk vinst efter entry fee)
+    const processedLogs = [...gameLogs].reverse().map(log => {
+        const isCashout = log.type === 'withdraw' && log.meta?.reason === 'Arena Cashout';
+        // Om cashout: (Utbetalt belopp - 10$ entry fee). Om död: Redan loggat som -10.00.
+        const netProfit = isCashout ? log.amount - 10 : log.amount;
+        return { ...log, netProfit };
+    });
 
-    const pathPoints = chartData.map((val, i) => 
-        `L ${(i / (chartData.length - 1)) * 100} ${90 - (val / maxValInData) * 80}`
-    ).join(' ');
+    const totalPnL = processedLogs.reduce((acc, log) => acc + log.netProfit, 0);
+    const winRate = gameLogs.length > 0 
+        ? Math.round((gameLogs.filter(l => l.meta?.reason === 'Arena Cashout').length / gameLogs.length) * 100) 
+        : 0;
+
+    // Generera data för Equity-kurvan baserat på kumulativ vinst/förlust
+    let cumulative = 0;
+    const chartPointsRaw = [0, ...processedLogs.map(log => {
+        cumulative += log.netProfit;
+        return cumulative;
+    })];
+
+    // Normalisera punkter för SVG viewbox (0-100)
+    const minVal = Math.min(...chartPointsRaw, -20);
+    const maxVal = Math.max(...chartPointsRaw, 20);
+    const pnlRange = (maxVal - minVal) || 1;
+
+    const polylinePoints = chartPointsRaw.map((val, i) => {
+        const x = (i / (chartPointsRaw.length - 1)) * 100;
+        const y = 90 - ((val - minVal) / pnlRange) * 80;
+        return `${x},${y}`;
+    }).join(' ');
+
+    const pathPoints = chartPointsRaw.map((val, i) => {
+        const x = (i / (chartPointsRaw.length - 1)) * 100;
+        const y = 90 - ((val - minVal) / pnlRange) * 80;
+        return `L ${x} ${y}`;
+    }).join(' ');
 
     const formatPlaytime = (ms) => {
         const hours = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
         return `${hours}h ${mins}m`;
     };
-
-    const totalPnL = gameLogs.reduce((acc, log) => acc + log.amount, 0);
 
     return (
         <div style={containerStyle}>
@@ -81,11 +103,13 @@ export default function Profile() {
                                 <div style={statsGrid}>
                                     <div style={statCard}>
                                         <div style={statLabel}>Total Earnings</div>
-                                        <div style={{...statValue, color: '#14F195'}}>+${totalPnL.toFixed(2)}</div>
+                                        <div style={{...statValue, color: totalPnL >= 0 ? '#14F195' : '#FF3B30'}}>
+                                            {totalPnL >= 0 ? '+' : '-'}${Math.abs(totalPnL).toFixed(2)}
+                                        </div>
                                     </div>
                                     <div style={statCard}>
                                         <div style={statLabel}>Win Rate</div>
-                                        <div style={statValue}>68%</div>
+                                        <div style={statValue}>{winRate}%</div>
                                     </div>
                                     <div style={statCard}>
                                         <div style={statLabel}>Playtime</div>
@@ -98,14 +122,14 @@ export default function Profile() {
                                     <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={svgStyle}>
                                         <defs>
                                             <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#007AFF" stopOpacity="0.5" />
+                                                <stop offset="0%" stopColor={totalPnL >= 0 ? "#14F195" : "#FF3B30"} stopOpacity="0.5" />
                                                 <stop offset="100%" stopColor="#007AFF" stopOpacity="0" />
                                             </linearGradient>
                                         </defs>
                                         <path d={`M 0 100 ${pathPoints} L 100 100 Z`} fill="url(#lineGradient)" />
                                         <polyline
                                             fill="none"
-                                            stroke="#007AFF"
+                                            stroke={totalPnL >= 0 ? "#14F195" : "#FF3B30"}
                                             strokeWidth="1.5"
                                             points={polylinePoints}
                                             strokeLinejoin="round"
@@ -113,7 +137,7 @@ export default function Profile() {
                                     </svg>
                                     <div style={chartLabels}>
                                         <span>Last 30 Days</span>
-                                        <span className="mono" style={{color: '#007AFF'}}>All Sessions</span>
+                                        <span className="mono" style={{color: totalPnL >= 0 ? '#14F195' : '#FF3B30'}}>All Arena Sessions</span>
                                     </div>
                                 </div>
 
@@ -123,13 +147,15 @@ export default function Profile() {
                                         {gameLogs.slice(0, 5).map(log => (
                                             <div key={log._id} className="glass" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
                                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                                                    <div style={{ color: log.amount >= 0 ? '#14F195' : '#FF3B30', fontWeight: '800', textTransform: 'uppercase' }}>
-                                                        {log.amount >= 0 ? 'Cashout' : 'Loss'}
+                                                    <div style={{ color: log.netProfit >= 0 ? '#14F195' : '#FF3B30', fontWeight: '800', textTransform: 'uppercase' }}>
+                                                        {log.netProfit >= 0 ? 'Cashout' : 'Eliminated'}
                                                     </div>
                                                     <div style={{ opacity: 0.4, fontSize: '0.8rem' }}>{new Date(log.createdAt).toLocaleDateString()}</div>
                                                 </div>
-                                                <div style={{ fontWeight: '800', color: log.amount >= 0 ? '#14F195' : '#FF3B30' }}>
-                                                    {log.amount >= 0 ? '+' : '-'}${Math.abs(log.amount).toFixed(2)}
+                                                <div style={{ fontWeight: '800', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
+                                                    {log.netProfit >= 0 ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
+                                                    <span style={{ fontSize: '0.7rem', opacity: 0.3, marginLeft: '5px' }}>NET</span>
+                                                </div>
                                                 </div>
                                             </div>
                                         ))}
