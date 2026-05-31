@@ -126,13 +126,16 @@ export default function Game() {
             }, 4000);
         });
 
-        socket.on('died', () => {
+        const handleDeath = () => {
             setIsDead(true);
             // Visa döds-skärmen i 4 sekunder innan vi skickar tillbaka till pre-game
             setTimeout(() => {
                 navigate('/pre-game'); 
             }, 4000);
-        });
+        };
+
+        socket.on('died', handleDeath);
+        socket.on('RIP', handleDeath); // Fixar frysningen när man blir uppäten
 
         socket.on('disconnect', (reason) => {
             console.log('Socket disconnected:', reason);

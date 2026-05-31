@@ -446,7 +446,8 @@ export default function PreGame() {
                 <input 
                     type="text" 
                     value={nickname} 
-                    onChange={(e) => setNickname(e.target.value.substring(0, 20))}
+                    onChange={(e) => setNickname(e.target.value)}
+                    maxLength={15}
                     placeholder="Your name..."
                     style={nicknameInputStyle}
                 />

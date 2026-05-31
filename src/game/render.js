@@ -111,10 +111,11 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         drawOrganicCell(cell, borders, graph);
 
         // Draw the name of the player
-        let fontSize = Math.max(cell.radius / 3, 12);
-        graph.lineWidth = playerConfig.textBorderSize;
+        // Dynamisk fontstorlek: mindre om namnet är långt
+        let fontSize = Math.max(cell.radius / 3.2, 14);
+        if (cell.name.length > 10) fontSize *= 0.8;
         
-        // Reset shadow for text to keep it crisp
+        graph.lineWidth = playerConfig.textBorderSize;
         graph.shadowBlur = 0;
         
         graph.fillStyle = playerConfig.textColor;
@@ -124,15 +125,34 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.textAlign = 'center';
         graph.textBaseline = 'middle';
         graph.font = 'bold ' + fontSize + 'px sans-serif';
-        graph.strokeText(cell.name, cell.x, cell.y);
-        graph.fillText(cell.name, cell.x, cell.y);
+        
+        const nameY = cell.y - (cell.radius * 0.1);
+        graph.strokeText(cell.name, cell.x, nameY);
+        graph.fillText(cell.name, cell.x, nameY);
 
-        // Visa Dollar-saldot (endast det som faktiskt påverkar storleken på cellen)
-        let balanceFontSize = Math.max(fontSize / 3 * 2, 11);
-        graph.font = 'bold ' + balanceFontSize + 'px sans-serif';
+        // Visa Dollar-saldot i en snygg ruta under namnet
+        let balanceFontSize = Math.max(fontSize * 0.7, 12);
+        graph.font = '900 ' + balanceFontSize + 'px ui-monospace, monospace';
         let balanceText = '$' + (cell.balance || 0).toFixed(2);
-        graph.strokeText(balanceText, cell.x, cell.y + fontSize);
-        graph.fillText(balanceText, cell.x, cell.y + fontSize);
+        
+        const textWidth = graph.measureText(balanceText).width;
+        const rectW = textWidth + 16;
+        const rectH = balanceFontSize + 10;
+        const rectX = cell.x - rectW / 2;
+        const rectY = nameY + fontSize / 1.5;
+
+        // Rita mörk ruta för balans
+        graph.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        graph.beginPath();
+        graph.roundRect(rectX, rectY, rectW, rectH, 8);
+        graph.fill();
+        graph.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        graph.lineWidth = 1;
+        graph.stroke();
+
+        // Rita själva pengarna i grönt (#14F195)
+        graph.fillStyle = '#14F195';
+        graph.fillText(balanceText, cell.x, rectY + rectH / 2 + 1);
 
         // Visa Cashout-timer för mig själv
         if (cell.isMe && global.cashOutTimer > 0) { // Återställd till tidigare tillstånd för felsökning
