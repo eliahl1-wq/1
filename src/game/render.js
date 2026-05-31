@@ -111,9 +111,13 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         drawOrganicCell(cell, borders, graph);
 
         // Draw the name of the player
-        // Dynamisk fontstorlek: mindre om namnet är långt
-        let fontSize = Math.max(cell.radius / 3.2, 14);
-        if (cell.name.length > 10) fontSize *= 0.8;
+        // Dynamisk fontstorlek: aggressivare skalning för korta namn (som 'eli')
+        let fontSize = cell.radius / 1.8;
+        let lengthMultiplier = 1;
+        if (cell.name.length > 3) lengthMultiplier = 0.7;
+        if (cell.name.length > 7) lengthMultiplier = 0.5;
+        if (cell.name.length > 12) lengthMultiplier = 0.35;
+        fontSize = Math.max(fontSize * lengthMultiplier, 14);
         
         graph.lineWidth = playerConfig.textBorderSize;
         graph.shadowBlur = 0;
@@ -155,22 +159,37 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.fillText(balanceText, cell.x, rectY + rectH / 2 + 1);
 
         // Visa Cashout-timer för mig själv
-        if (cell.isMe && global.cashOutTimer > 0) { // Återställd till tidigare tillstånd för felsökning
+        if (cell.isMe && global.cashOutTimer > 0) {
             graph.shadowBlur = 0;
-            graph.fillStyle = '#FFD700'; // Guld-gul färg för utbetalning
-            graph.strokeStyle = '#FFFFFF'; // Vit kant
-            graph.lineWidth = 3;
+            const timerFontSize = 15;
+            graph.font = '900 ' + timerFontSize + 'px sans-serif';
+            const timerText = `EXITING: ${global.cashOutTimer}s`;
             
-            // Mycket större och tydligare font (minst 24px)
-            const timerFontSize = Math.max(fontSize * 1.2, 24);
-            graph.font = 'bold ' + timerFontSize + 'px sans-serif';
+            const textWidth = graph.measureText(timerText).width;
+            const pillW = textWidth + 24;
+            const pillH = timerFontSize + 12;
+            const pillX = cell.x - pillW / 2;
+            const pillY = cell.y - cell.radius - 55;
+
+            // Rita Pill-rutan (Guld-tema)
+            graph.fillStyle = '#FFD700';
+            graph.beginPath();
+            graph.roundRect(pillX, pillY, pillW, pillH, pillH / 2);
+            graph.fill();
+
+            // Rita en liten pil nedåt mot bloben
+            graph.beginPath();
+            graph.moveTo(cell.x - 7, pillY + pillH);
+            graph.lineTo(cell.x + 7, pillY + pillH);
+            graph.lineTo(cell.x, pillY + pillH + 8);
+            graph.closePath();
+            graph.fill();
             
-            let timeRemaining = global.cashOutTimer > 0 ? global.cashOutTimer : 30;
-            let timerText = `EXITING: ${timeRemaining}s`; // Återställd text
-            
-            // Rita den ännu högre upp för att undvika överlappning
-            graph.strokeText(timerText, cell.x, cell.y - cell.radius - 30); // Återställd position
-            graph.fillText(timerText, cell.x, cell.y - cell.radius - 30); // Återställd position
+            // Rita texten inuti pillen
+            graph.fillStyle = '#000'; // Svart text för bäst kontrast på guld
+            graph.textAlign = 'center';
+            graph.textBaseline = 'middle';
+            graph.fillText(timerText, cell.x, pillY + pillH / 2 + 1);
         }
     }
 };
