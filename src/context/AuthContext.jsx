@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
             if (storedToken) {
                 console.log('AuthContext: Token hittades i localStorage, försöker validera.');
                 try {
-                    const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+                    const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
                     const url = `${baseUrl}/api/me?t=${Date.now()}`;
                     
                     const res = await fetch(url, {
@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }) => {
     const refreshUser = useCallback(async () => {
         if (!token) return;
 
-        const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+        const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
         const url = `${baseUrl}/api/me?t=${Date.now()}`;
         
         if (!baseUrl && !window.location.hostname.includes('localhost')) {

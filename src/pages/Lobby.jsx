@@ -80,7 +80,8 @@ export default function Lobby() {
             // Kolla om vi redan spelar
             const checkStatus = async () => {
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
+                    const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+                    const res = await fetch(`${baseUrl}/api/game-status`, {
                         headers: { 'Authorization': `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
                     });
                     
@@ -283,7 +284,7 @@ export default function Lobby() {
                     color: 'white', 
                     letterSpacing: '-1.5px', 
                     fontWeight: '900', 
-                    fontSize: '2.8rem',
+                    fontSize: '3.5rem',
                     fontStyle: 'italic'
                 }}>
                     AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
