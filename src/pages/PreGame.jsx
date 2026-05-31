@@ -6,7 +6,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 export default function PreGame() {
-    const { user, logout, token, login } = useAuth();
+    const { user, logout, token, login, refreshUser } = useAuth();
     const navigate = useNavigate();
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
@@ -48,6 +48,7 @@ export default function PreGame() {
     const handleStartMatch = () => {
         if (!canJoin) return;
         setIsMatchmaking(true);
+        refreshUser(); // En extra koll precis innan start
         localStorage.setItem('match_nickname', nickname);
         setTimeout(() => {
             navigate('/game', { state: { nickname } });
@@ -239,6 +240,10 @@ export default function PreGame() {
             }
         }
     };
+
+    useEffect(() => {
+        refreshUser(); // Hämta senaste saldot från DB när man kommer till denna sida
+    }, []);
 
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);

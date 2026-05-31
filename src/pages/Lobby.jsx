@@ -6,7 +6,7 @@ import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana
 import { useNavigate } from 'react-router-dom';
 
 export default function Lobby() {
-    const { user, logout, token, login } = useAuth();
+    const { user, logout, token, login, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const { connected, publicKey, sendTransaction } = useWallet();
@@ -72,27 +72,10 @@ export default function Lobby() {
 
     // Uppdaterar användardata när komponenten laddas (löser problemet med bakåt-navigering)
     useEffect(() => {
-        if (!token || hasRefreshedRef.current) return;
-
-        const refreshUser = async () => {
-            try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'bypass-tunnel-reminders': 'true'
-                    }
-                });
-                if (res.ok) {
-                    const freshUser = await res.json();
-                    hasRefreshedRef.current = true; // Markera som klar innan login() körs
-                    login(freshUser, token); 
-                }
-            } catch (err) {
-                console.error("Lobby: Error refreshing user:", err);
-            }
-        };
-        refreshUser();
-    }, [token, login]);
+        if (token) {
+            refreshUser();
+        }
+    }, [token]);
 
     // Om användaren redan har balans, skicka dem direkt till PreGame
     useEffect(() => {

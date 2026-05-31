@@ -37,6 +37,22 @@ export const AuthProvider = ({ children }) => {
         checkLoggedIn();
     }, []);
 
+    const refreshUser = async () => {
+        if (!token) return;
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const userData = await res.json();
+                setUser(userData);
+                return userData;
+            }
+        } catch (err) {
+            console.error("AuthContext: Kunde inte uppdatera användardata:", err);
+        }
+    };
+
     const login = (userData, newToken) => {
         localStorage.setItem('token', newToken);
         setUser(userData);
@@ -52,7 +68,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, loading, isAuthenticated: !!user }}>
+        <AuthContext.Provider value={{ user, token, login, logout, refreshUser, loading, isAuthenticated: !!user }}>
             {!loading && children}
         </AuthContext.Provider>
     );
