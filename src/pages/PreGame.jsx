@@ -546,7 +546,7 @@ const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '
 const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '72px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 32px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
 const logoStyle = { margin: 0, fontWeight: '950', fontStyle: 'italic', letterSpacing: '-1.5px', fontSize: '1.4rem' };
 
-const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '11px 24px', borderRadius: '100px', fontSize: '14.5px', fontWeight: '600', cursor: 'pointer' };
+const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px 22px', borderRadius: '100px', fontSize: '14.5px', fontWeight: '600', cursor: 'pointer' };
 const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '11px 26px', borderRadius: '100px', fontSize: '14.5px', fontWeight: '800', cursor: 'pointer', boxShadow: '0 6px 20px rgba(69, 127, 255, 0.3)' };
 const depositWithdrawBtnStyle = walletPillButtonStyle;
 
