@@ -143,7 +143,7 @@ export default function Profile() {
                                             const index = Math.round((mouseX / 100) * (chartPointsRaw.length - 1));
                                             const safeIndex = Math.max(0, Math.min(index, chartPointsRaw.length - 1));
                                             const label = safeIndex === 0 ? "START $0" : 
-                                                `${processedLogs[safeIndex-1].netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${processedLogs[safeIndex-1].netProfit >= 0 ? '+' : '-'}$${Math.abs(processedLogs[safeIndex-1].netProfit).toFixed(0)}`;
+                                                `${processedLogs[safeIndex-1].netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${processedLogs[safeIndex-1].netProfit >= 0 ? '' : '-'}$${Math.abs(processedLogs[safeIndex-1].netProfit).toFixed(0)}`;
                                             setHoveredPoint({ index: safeIndex, label });
                                         }}
                                         onMouseLeave={() => setHoveredPoint(null)}
@@ -204,9 +204,10 @@ export default function Profile() {
                                                     <div style={{ opacity: 0.4, fontSize: '0.75rem' }}>
                                                         {new Date(log.createdAt).toLocaleDateString()}
                                                         {log.type === 'withdraw' && ` • Collected $${log.grossAmount.toFixed(2)}`}
+                                                        {log.type === 'game' && ` • Balance Lost $${Math.abs(log.netProfit).toFixed(2)}`}
                                                     </div>
                                                 </div>
-                                                <div style={{ fontWeight: '400', fontSize: '0.85rem', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
+                                                <div style={{ fontWeight: '400', fontSize: '0.8rem', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
                                                     Profit {log.netProfit >= 0 ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
                                                 </div>
                                             </div>
