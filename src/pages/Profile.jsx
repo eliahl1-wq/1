@@ -195,7 +195,7 @@ export default function Profile() {
                                         gap: '10px', 
                                         marginTop: '15px',
                                     }}>
-                                        {processedLogs.reverse().map(log => (
+                                        {[...processedLogs].reverse().map(log => (
                                             <div key={log._id} className="glass" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
                                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                                                     <div style={{ color: log.netProfit >= 0 ? '#14F195' : '#FF3B30', fontWeight: '800', textTransform: 'uppercase' }}>
