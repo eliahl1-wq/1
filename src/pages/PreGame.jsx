@@ -46,6 +46,10 @@ export default function PreGame() {
     const entryFee = 10.00;
     const canJoin = (user?.balance || 0) >= entryFee;
 
+    useEffect(() => {
+        document.title = "AgarStake | Arena Lobby";
+    }, []);
+
     const handleStartMatch = () => {
         if (!canJoin) return;
         setIsMatchmaking(true);
@@ -379,7 +383,7 @@ export default function PreGame() {
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.2)' }}>USD</span>
+                                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'rgba(255,255,255,0.2)' }}>USD</span>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px' }}>
@@ -539,14 +543,14 @@ export default function PreGame() {
 // --- Styles ---
 const containerStyle = { width: '100vw', height: '100vh', background: '#050505', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
 const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#050505', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
-const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '56px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' };
-const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1rem' };
+const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '72px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 32px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' };
+const logoStyle = { margin: 0, fontWeight: '950', fontStyle: 'italic', letterSpacing: '-1.5px', fontSize: '1.4rem' };
 
-const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 16px', borderRadius: '100px', fontSize: '13px', cursor: 'pointer' };
-const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '8px 20px', borderRadius: '100px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(69, 127, 255, 0.25)' };
+const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px 22px', borderRadius: '100px', fontSize: '14.5px', fontWeight: '600', cursor: 'pointer' };
+const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '11px 26px', borderRadius: '100px', fontSize: '14.5px', fontWeight: '800', cursor: 'pointer', boxShadow: '0 6px 20px rgba(69, 127, 255, 0.3)' };
 const depositWithdrawBtnStyle = walletPillButtonStyle;
 
-const walletDropdownCardStyle = { position: 'absolute', top: '48px', left: '50%', transform: 'translateX(-50%)', width: '360px', padding: '24px', borderRadius: '24px', boxShadow: '0 24px 50px rgba(0,0,0,0.45)', zIndex: 1100, animation: 'slideDown 0.2s ease-out' };
+const walletDropdownCardStyle = { position: 'absolute', top: '64px', left: '50%', transform: 'translateX(-50%)', width: '380px', padding: '28px', borderRadius: '24px', boxShadow: '0 24px 60px rgba(0,0,0,0.5)', zIndex: 1100, animation: 'slideDown 0.2s ease-out' };
 const dropdownPrimaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer', minWidth: '120px' };
 const dropdownSecondaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer', minWidth: '120px' };
 
@@ -559,9 +563,9 @@ const modalInputField = { width: '100%', background: 'none', border: 'none', bor
 const modalConfirmButtonStyle = { width: '100%', padding: '18px', borderRadius: '100px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '800', fontSize: '16px', cursor: 'pointer', boxShadow: '0 8px 20px rgba(69, 127, 255, 0.25)' };
 const modalFooterTextStyle = { textAlign: 'center', marginTop: '24px', fontSize: '11px', opacity: 0.3, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' };
 
-const avatarPillStyle = { width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.15)', padding: '2px' };
-const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.65rem' };
-const walletExpandPanelStyle = { position: 'absolute', top: '60px', left: '50%', transform: 'translateX(-50%)', width: '360px', maxWidth: '92vw', padding: '22px', borderRadius: '24px', boxShadow: '0 30px 70px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100 };
+const avatarPillStyle = { width: '40px', height: '40px', borderRadius: '50%', border: '2px solid rgba(255, 255, 255, 0.15)', padding: '3px', cursor: 'pointer' };
+const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.9rem' };
+const walletExpandPanelStyle = { position: 'absolute', top: '76px', left: '50%', transform: 'translateX(-50%)', width: '360px', maxWidth: '92vw', padding: '22px', borderRadius: '24px', boxShadow: '0 30px 70px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100 };
 const walletCloseX = { position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'white', opacity: 0.35, padding: '4px', cursor: 'pointer' };
 const walletPanelHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' };
 const walletPanelTitle = { fontSize: '0.8rem', letterSpacing: '0.24em', textTransform: 'uppercase', opacity: 0.65, fontWeight: '800' };
@@ -583,11 +587,11 @@ const walletPanelFooter = { textAlign: 'center', fontSize: '0.75rem', opacity: 0
 const userMenuContainerStyle = { position: 'absolute', top: '40px', right: 0, width: '160px', background: '#1c1c1e', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 16px 32px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)' };
 const userMenuHeader = { padding: '10px 14px', fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)' };
 const userMenuItemStyle = { width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: 'white', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600' };
-const centerCardStyle = { width: '320px', borderRadius: '20px', padding: '24px', zIndex: 10 };
+const centerCardStyle = { width: '360px', borderRadius: '28px', padding: '32px', zIndex: 10 };
 const inputLabelStyle = { display: 'block', fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '8px' };
 const nicknameInputStyle = { width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', color: 'white', fontSize: '0.95rem', fontWeight: '700', outline: 'none', padding: '12px 16px', borderRadius: '12px', boxSizing: 'border-box', marginBottom: '24px' };
 const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.05)', margin: '0 0 24px 0' };
-const playBtnStyle = { width: '100%', padding: '10px', borderRadius: '12px', border: 'none', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '0.01em' };
+const playBtnStyle = { width: '100%', padding: '14px', borderRadius: '14px', border: 'none', fontSize: '1.1rem', fontWeight: '900', letterSpacing: '0.02em' };
 const howItWorksContainerStyle = { marginTop: '16px' };
 const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: 0.2, fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase' };
 const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.5', opacity: 0.25, marginTop: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontWeight: '600' };

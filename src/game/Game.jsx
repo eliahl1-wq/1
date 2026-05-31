@@ -39,6 +39,7 @@ export default function Game() {
 
     useEffect(() => {
         const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
+        document.title = "AgarStake | In Game";
         return () => clearInterval(itv);
     }, []);
 

@@ -8,6 +8,7 @@ export default function Profile() {
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
+    const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs] = useState([]);
 
     useEffect(() => {
@@ -118,8 +119,35 @@ export default function Profile() {
                                 </div>
 
                                 <div style={chartWrapper}>
-                                    <div style={chartHeader}>Equity Curve</div>
-                                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={svgStyle}>
+                                    <div style={{ ...chartHeader, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span>Equity Curve</span>
+                                        {hoveredPoint && (
+                                            <span style={{ 
+                                                color: hoveredPoint.label.includes('PROFIT') ? '#14F195' : '#FF3B30', 
+                                                fontWeight: '800', 
+                                                fontSize: '0.75rem', 
+                                                letterSpacing: '0.5px' 
+                                            }}>
+                                                {hoveredPoint.label}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <svg 
+                                        viewBox="0 0 100 100" 
+                                        preserveAspectRatio="none" 
+                                        style={svgStyle}
+                                        onMouseMove={(e) => {
+                                            if (chartPointsRaw.length < 2) return;
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
+                                            const index = Math.round((mouseX / 100) * (chartPointsRaw.length - 1));
+                                            const safeIndex = Math.max(0, Math.min(index, chartPointsRaw.length - 1));
+                                            const label = safeIndex === 0 ? "START $0" : 
+                                                `${processedLogs[safeIndex-1].netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${processedLogs[safeIndex-1].netProfit >= 0 ? '+' : '-'}$${Math.abs(processedLogs[safeIndex-1].netProfit).toFixed(0)}`;
+                                            setHoveredPoint({ index: safeIndex, label });
+                                        }}
+                                        onMouseLeave={() => setHoveredPoint(null)}
+                                    >
                                         <defs>
                                             <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="0%" stopColor={totalPnL >= 0 ? "#14F195" : "#FF3B30"} stopOpacity="0.5" />
@@ -134,9 +162,27 @@ export default function Profile() {
                                             points={polylinePoints}
                                             strokeLinejoin="round"
                                         />
+                                        {hoveredPoint && (
+                                            <>
+                                                <line 
+                                                    x1={(hoveredPoint.index / (chartPointsRaw.length - 1)) * 100} 
+                                                    y1="0" 
+                                                    x2={(hoveredPoint.index / (chartPointsRaw.length - 1)) * 100} 
+                                                    y2="100" 
+                                                    stroke="rgba(255,255,255,0.1)" 
+                                                    strokeWidth="0.5" 
+                                                />
+                                                <circle 
+                                                    cx={(hoveredPoint.index / (chartPointsRaw.length - 1)) * 100} 
+                                                    cy={95 - ((chartPointsRaw[hoveredPoint.index] - minVal) / pnlRange) * 90} 
+                                                    r="1.5" 
+                                                    fill="white" 
+                                                />
+                                            </>
+                                        )}
                                     </svg>
                                     <div style={chartLabels}>
-                                        <span>Last 30 Days</span>
+                                        <span>Last {processedLogs.length} Sessions</span>
                                         <span className="mono" style={{color: totalPnL >= 0 ? '#14F195' : '#FF3B30'}}>All Arena Sessions</span>
                                     </div>
                                 </div>
@@ -148,9 +194,6 @@ export default function Profile() {
                                         flexDirection: 'column', 
                                         gap: '10px', 
                                         marginTop: '15px',
-                                        maxHeight: '450px',
-                                        overflowY: 'auto',
-                                        paddingRight: '8px'
                                     }}>
                                         {processedLogs.reverse().map(log => (
                                             <div key={log._id} className="glass" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
@@ -163,9 +206,8 @@ export default function Profile() {
                                                         {log.type === 'withdraw' && ` • Collected $${log.grossAmount.toFixed(2)}`}
                                                     </div>
                                                 </div>
-                                                <div style={{ fontWeight: '400', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
-                                                    {log.netProfit >= 0 ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
-                                                    <span style={{ fontSize: '0.7rem', opacity: 0.3, marginLeft: '8px' }}>NET</span>
+                                                <div style={{ fontWeight: '400', fontSize: '0.85rem', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
+                                                    Profit {log.netProfit >= 0 ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
                                                 </div>
                                             </div>
                                         ))}
@@ -207,7 +249,7 @@ export default function Profile() {
     );
 }
 
-const containerStyle = { width: '100vw', minHeight: '100vh', background: '#050505', color: 'white', display: 'flex', justifyContent: 'center', padding: '100px 20px', boxSizing: 'border-box' };
+const containerStyle = { width: '100vw', height: '100vh', overflowY: 'auto', background: '#050505', color: 'white', display: 'flex', justifyContent: 'center', padding: '100px 20px', boxSizing: 'border-box' };
 const contentWrapper = { width: '100%', maxWidth: '800px' };
 const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' };
 const titleStyle = { fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-1.5px', margin: 0 };

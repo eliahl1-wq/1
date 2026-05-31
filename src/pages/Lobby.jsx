@@ -75,6 +75,7 @@ export default function Lobby() {
     useEffect(() => {
         if (token) {
             refreshUser();
+            document.title = "AgarStake | Lobby";
             
             // Kolla om vi redan spelar
             const checkStatus = async () => {
