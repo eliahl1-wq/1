@@ -156,7 +156,6 @@ export default function Profile() {
                                                     {log.netProfit >= 0 ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
                                                     <span style={{ fontSize: '0.7rem', opacity: 0.3, marginLeft: '5px' }}>NET</span>
                                                 </div>
-                                                </div>
                                             </div>
                                         ))}
                                         {gameLogs.length === 0 && <div style={{ opacity: 0.2, textAlign: 'center', padding: '20px' }}>No session data found</div>}
