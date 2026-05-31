@@ -28,40 +28,40 @@ export default function Profile() {
         refreshUser();
     }, [token, refreshUser]);
 
-    // Processa loggar för att räkna ut Net PnL (faktisk vinst efter entry fee)
     const processedLogs = [...gameLogs].reverse().map(log => {
         const isCashout = log.type === 'withdraw' && log.meta?.reason === 'Arena Cashout';
-        // Om cashout: (Utbetalt belopp - 10$ entry fee). Om död: Redan loggat som -10.00.
-        const netProfit = isCashout ? log.amount - 10 : log.amount;
-        return { ...log, netProfit };
+        const amount = Number(log.amount) || 0;
+        // Netto: (Utbetalt - 10) för cashout, annars bara beloppet (-10 vid död)
+        const netProfit = isCashout ? amount - 10 : amount;
+        return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount };
     });
 
     const totalPnL = processedLogs.reduce((acc, log) => acc + log.netProfit, 0);
-    const winRate = gameLogs.length > 0 
-        ? Math.round((gameLogs.filter(l => l.meta?.reason === 'Arena Cashout').length / gameLogs.length) * 100) 
+    
+    // Win Rate baserat på sessioner med vinst (Net Profit > 0)
+    const winRate = processedLogs.length > 0 
+        ? Math.round((processedLogs.filter(l => l.netProfit > 0).length / processedLogs.length) * 100) 
         : 0;
 
-    // Generera data för Equity-kurvan baserat på kumulativ vinst/förlust
     let cumulative = 0;
     const chartPointsRaw = [0, ...processedLogs.map(log => {
         cumulative += log.netProfit;
         return cumulative;
     })];
 
-    // Normalisera punkter för SVG viewbox (0-100)
-    const minVal = Math.min(...chartPointsRaw, -20);
-    const maxVal = Math.max(...chartPointsRaw, 20);
+    const minVal = Math.min(...chartPointsRaw, -10);
+    const maxVal = Math.max(...chartPointsRaw, 10);
     const pnlRange = (maxVal - minVal) || 1;
 
     const polylinePoints = chartPointsRaw.map((val, i) => {
         const x = (i / (chartPointsRaw.length - 1)) * 100;
-        const y = 90 - ((val - minVal) / pnlRange) * 80;
+        const y = 95 - ((val - minVal) / pnlRange) * 90;
         return `${x},${y}`;
     }).join(' ');
 
     const pathPoints = chartPointsRaw.map((val, i) => {
         const x = (i / (chartPointsRaw.length - 1)) * 100;
-        const y = 90 - ((val - minVal) / pnlRange) * 80;
+        const y = 95 - ((val - minVal) / pnlRange) * 90;
         return `L ${x} ${y}`;
     }).join(' ');
 
@@ -143,18 +143,29 @@ export default function Profile() {
 
                                 <div style={{ marginTop: '20px' }}>
                                     <div style={statLabel}>Session History</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
-                                        {gameLogs.slice(0, 5).map(log => (
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        flexDirection: 'column', 
+                                        gap: '10px', 
+                                        marginTop: '15px',
+                                        maxHeight: '450px',
+                                        overflowY: 'auto',
+                                        paddingRight: '8px'
+                                    }}>
+                                        {processedLogs.reverse().map(log => (
                                             <div key={log._id} className="glass" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
                                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                                                     <div style={{ color: log.netProfit >= 0 ? '#14F195' : '#FF3B30', fontWeight: '800', textTransform: 'uppercase' }}>
-                                                        {log.netProfit >= 0 ? 'Cashout' : 'Eliminated'}
+                                                        {log.type === 'withdraw' ? 'Cashout' : 'Eliminated'}
                                                     </div>
-                                                    <div style={{ opacity: 0.4, fontSize: '0.8rem' }}>{new Date(log.createdAt).toLocaleDateString()}</div>
+                                                    <div style={{ opacity: 0.4, fontSize: '0.75rem' }}>
+                                                        {new Date(log.createdAt).toLocaleDateString()}
+                                                        {log.type === 'withdraw' && ` • Collected $${log.grossAmount.toFixed(2)}`}
+                                                    </div>
                                                 </div>
-                                                <div style={{ fontWeight: '800', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
+                                                <div style={{ fontWeight: '400', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
                                                     {log.netProfit >= 0 ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
-                                                    <span style={{ fontSize: '0.7rem', opacity: 0.3, marginLeft: '5px' }}>NET</span>
+                                                    <span style={{ fontSize: '0.7rem', opacity: 0.3, marginLeft: '8px' }}>NET</span>
                                                 </div>
                                             </div>
                                         ))}
