@@ -33,6 +33,7 @@ export default function Game() {
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
     const [cashedAmount, setCashedAmount] = useState(null);
+    const [displayCashedAmount, setDisplayCashedAmount] = useState(0);
     const [isDead, setIsDead] = useState(false);
     const [localTimer, setLocalTimer] = useState(0);
 
@@ -120,14 +121,27 @@ export default function Game() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             setCashedAmount(amount);
-            // Visa animationen i 4 sekunder innan redirect
+            
+            // Professional count-up animation for money being "added" to balance
+            const startTime = performance.now();
+            const duration = 1200;
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 4); // Ease-out Quart
+                setDisplayCashedAmount(eased * amount);
+                if (progress < 1) requestAnimationFrame(animate);
+            };
+            requestAnimationFrame(animate);
+
             setTimeout(() => {
                 navigate('/pre-game');
-            }, 4000);
+            }, 4500);
         });
 
         const handleDeath = () => {
             setIsDead(true);
+            global.cashOutTimer = 0; // Nollställ timern vid död
             // Visa döds-skärmen i 4 sekunder innan vi skickar tillbaka till pre-game
             setTimeout(() => {
                 navigate('/pre-game'); 
@@ -177,6 +191,7 @@ export default function Game() {
                 socketRef.current.disconnect(); // Koppla bort socketen
                 socketRef.current = null; // Nollställ ref
             }
+            global.cashOutTimer = 0; // FIX: Nollställ global timer när man lämnar spelet (unmount/back button)
             hasJoinedGameRef.current = false; // Återställ flaggan
             window.removeEventListener('resize', handleResize);
         };
@@ -290,73 +305,109 @@ export default function Game() {
             />
 
             {cashedAmount !== null && (
-                <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    zIndex: 2000,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(0,0,0,0.9)',
-                    backdropFilter: 'blur(15px)',
-                    animation: 'fadeInOverlay 0.5s ease forwards'
-                }}>
-                    <div style={{ 
-                        textAlign: 'center', 
-                        animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '50px',
-                        padding: '0 20px'
-                    }}>
-                        <div style={{ fontSize: '1.4rem', color: '#34C759', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Profit Secured</div>
-                        <h1 style={{ color: '#FFD700', fontSize: '9rem', margin: '10px 0', fontWeight: '900', textShadow: '0 0 60px rgba(255, 215, 0, 0.6)', letterSpacing: '-5px' }}>
-                            ${cashedAmount.toFixed(2)}
-                        </h1>
-                        <p style={{ color: 'white', fontSize: '1.4rem', opacity: 0.4, margin: 0, fontWeight: '500', letterSpacing: '1px' }}>Funds added to your account.</p>
+                <div className="modern-overlay-backdrop">
+                    <div className="modern-overlay-card success">
+                        <div className="overlay-badge success">Transaction Confirmed</div>
+                        <h2 className="overlay-heading">Profit Secured</h2>
+                        <div className="overlay-amount success">
+                            <span className="unit">$</span>{displayCashedAmount.toFixed(2)}
+                        </div>
+                        <div className="overlay-divider" />
+                        <p className="overlay-caption">Capital has been successfully reconciled to your account balance.</p>
                     </div>
                 </div>
             )}
 
             {isDead && (
-                <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    zIndex: 2000,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(30, 0, 0, 0.9)', // Mörk röd bakgrund
-                    backdropFilter: 'blur(15px)',
-                    animation: 'fadeInOverlay 0.5s ease forwards'
-                }}>
-                    <div style={{ 
-                        textAlign: 'center', 
-                        animation: 'scalePop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        gap: '45px',
-                        padding: '0 20px'
-                    }}>
-                        <div style={{ fontSize: '1.4rem', color: '#FF3B30', fontWeight: '800', letterSpacing: '8px', textTransform: 'uppercase' }}>Eliminated</div>
-                        <h1 style={{ color: '#fff', fontSize: '7.5rem', margin: '20px 0', fontWeight: '900', textShadow: '0 0 50px rgba(255, 59, 48, 0.7)', letterSpacing: '-2px', lineHeight: '1.1' }}>
-                            YOU DIED
-                        </h1>
-                        <p style={{ color: 'white', fontSize: '1.3rem', opacity: 0.5, margin: '0', fontWeight: '500' }}>Your stake has been collected. Returning to lobby...</p>
+                <div className="modern-overlay-backdrop death">
+                    <div className="modern-overlay-card death">
+                        <div className="overlay-badge error">Session Terminated</div>
+                        <h2 className="overlay-heading">Eliminated</h2>
+                        <div className="overlay-icon error">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </div>
+                        <div className="overlay-divider" />
+                        <p className="overlay-caption">Your stake has been liquidated. Redirecting to terminal...</p>
                     </div>
                 </div>
             )}
 
             <style>{`
-                @keyframes fadeInOverlay {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
+                .modern-overlay-backdrop {
+                    position: fixed;
+                    inset: 0;
+                    z-index: 3000;
+                    display: flex;
+                    align-items: center;
+                    justifyContent: center;
+                    background: rgba(10, 10, 12, 0.96);
+                    backdrop-filter: blur(20px);
+                    animation: overlayIn 0.3s ease-out forwards;
                 }
-                @keyframes scalePop {
-                    from { transform: scale(0.3); opacity: 0; }
-                    to { transform: scale(1); opacity: 1; }
+                .modern-overlay-backdrop.death { background: rgba(12, 8, 8, 0.98); }
+                
+                .modern-overlay-card {
+                    text-align: center;
+                    width: 100%;
+                    max-width: 440px;
+                    padding: 0 20px;
+                    animation: contentIn 0.6s cubic-bezier(0.2, 1, 0.2, 1) forwards;
+                }
+
+                .overlay-badge {
+                    display: inline-block;
+                    padding: 6px 12px;
+                    border-radius: 100px;
+                    font-size: 0.65rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 1.2px;
+                    margin-bottom: 30px;
+                }
+                .overlay-badge.success { background: rgba(20, 241, 149, 0.1); color: #14F195; }
+                .overlay-badge.error { background: rgba(255, 59, 48, 0.1); color: #FF3B30; }
+
+                .overlay-heading {
+                    color: white;
+                    font-size: 2.2rem;
+                    font-weight: 800;
+                    margin: 0 0 12px 0;
+                    letter-spacing: -0.5px;
+                }
+
+                .overlay-amount {
+                    font-size: 6rem;
+                    font-weight: 900;
+                    letter-spacing: -3px;
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                }
+                .overlay-amount.success { color: #14F195; text-shadow: 0 0 40px rgba(20, 241, 149, 0.15); }
+                .overlay-amount .unit { opacity: 0.2; margin-right: 4px; }
+
+                .overlay-icon { margin: 20px 0; opacity: 0.7; }
+                .overlay-icon.error { color: #FF3B30; }
+
+                .overlay-divider {
+                    width: 32px;
+                    height: 2px;
+                    background: rgba(255, 255, 255, 0.1);
+                    margin: 35px auto;
+                }
+
+                .overlay-caption {
+                    color: rgba(255, 255, 255, 0.4);
+                    font-size: 0.95rem;
+                    font-weight: 500;
+                    line-height: 1.5;
+                }
+
+                @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes contentIn {
+                    from { opacity: 0; transform: translateY(40px) scale(0.96); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
                 }
             `}</style>
 
