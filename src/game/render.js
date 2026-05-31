@@ -97,7 +97,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         // High-stakes glow effect
         if (cell.isCashingOut) {
             // Guld-glöd för spelare som håller på att casha ut
-            graph.shadowBlur = 50;
+            graph.shadowBlur = 25; 
             graph.shadowColor = '#FFD700'; 
         } else if (cell.balance > 50) {
             graph.shadowBlur = 40; // Starkare glöd
