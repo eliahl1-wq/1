@@ -31,13 +31,13 @@ export const AuthProvider = ({ children }) => {
                         console.log('AuthContext: Användardata från /api/me:', userData);
                     } else {
                         console.log('AuthContext: /api/me misslyckades, tar bort token.');
-                        localStorage.removeItem('token'); // Token ogiltig, ta bort den
-                        setToken(null);
+                        if (res.status === 401 || res.status === 403) {
+                            localStorage.removeItem('token');
+                            setToken(null);
+                        }
                     }
                 } catch (err) {
                     console.error("AuthContext: Validering av token misslyckades:", err);
-                    localStorage.removeItem('token'); // Ta bort token vid nätverksfel eller andra fel
-                    setToken(null);
                 }
             }
             setLoading(false);
@@ -86,7 +86,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, refreshUser, loading, isAuthenticated: !!user }}>
+        <AuthContext.Provider value={{ user, token, login, logout, refreshUser, loading, isAuthenticated: !!token }}>
             {!loading && children}
         </AuthContext.Provider>
     );

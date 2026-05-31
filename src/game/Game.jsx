@@ -353,25 +353,28 @@ export default function Game() {
             <style>{`
                 .modern-overlay-backdrop {
                     position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    z-index: 9999;
+                    inset: 0;
+                    z-index: 99999;
                     display: flex;
+                    flex-direction: column;
                     align-items: center;
                     justifyContent: center;
-                    background: rgba(8, 8, 10, 0.98);
+                    background: rgba(5, 5, 7, 0.98);
                     backdrop-filter: blur(20px);
                     animation: overlayIn 0.3s ease-out forwards;
+                    width: 100vw;
+                    height: 100vh;
                 }
-                .modern-overlay-backdrop.death { background: rgba(15, 5, 5, 0.98); }
+                .modern-overlay-backdrop.death { background: rgba(12, 3, 3, 0.98); }
                 
                 .modern-overlay-card {
-                    text-align: center;
-                    width: 90%;
-                    max-width: 500px;
-                    padding: 40px 20px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    max-width: 540px;
+                    padding: 80px 20px;
                     animation: contentIn 0.6s cubic-bezier(0.2, 1, 0.2, 1) forwards;
                 }
 
@@ -383,7 +386,7 @@ export default function Game() {
                     font-weight: 800;
                     text-transform: uppercase;
                     letter-spacing: 1.2px;
-                    margin-bottom: 45px;
+                    margin-bottom: 60px;
                 }
                 .overlay-badge.success { background: rgba(20, 241, 149, 0.1); color: #14F195; }
                 .overlay-badge.error { background: rgba(255, 59, 48, 0.1); color: #FF3B30; }
@@ -392,30 +395,32 @@ export default function Game() {
                     color: white;
                     font-size: 2.2rem;
                     font-weight: 800;
-                    margin: 0 0 25px 0;
+                    margin: 0 0 45px 0;
                     letter-spacing: -0.5px;
                     line-height: 1.2;
+                    text-align: center;
                 }
 
                 .overlay-amount {
-                    font-size: 5rem;
+                    font-size: 4.5rem;
                     font-weight: 900;
                     letter-spacing: -3px;
                     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                    margin-bottom: 40px;
                     line-height: 1;
+                    margin-bottom: 65px;
+                    text-align: center;
                 }
                 .overlay-amount.success { color: #14F195; text-shadow: 0 0 40px rgba(20, 241, 149, 0.15); }
                 .overlay-amount .unit { opacity: 0.2; margin-right: 4px; }
 
-                .overlay-icon { margin: 40px 0; opacity: 0.7; }
+                .overlay-icon { margin: 40px 0; opacity: 0.7; display: flex; justify-content: center; }
                 .overlay-icon.error { color: #FF3B30; }
 
                 .overlay-divider {
                     width: 32px;
                     height: 2px;
                     background: rgba(255, 255, 255, 0.1);
-                    margin: 40px auto;
+                    margin: 60px auto;
                 }
 
                 .overlay-caption {
