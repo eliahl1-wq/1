@@ -13,7 +13,7 @@ export default function LoginPage() {
     // Om vi redan är inloggade, dra till lobbyn direkt
     useEffect(() => {
         if (isAuthenticated) {
-            if (user && (user.balance || 0) >= 0) {
+            if (user && (user.balance || 0) >= 10) {
                 navigate('/pre-game', { replace: true });
             } else {
                 navigate('/lobby', { replace: true });
@@ -38,7 +38,7 @@ export default function LoginPage() {
 
             if (res.ok) {
                 login(data.user, data.token);
-                if ((data.user.balance || 0) >= 0) {
+                if ((data.user.balance || 0) >= 10) {
                     navigate('/pre-game', { replace: true });
                 } else {
                     navigate('/lobby', { replace: true });

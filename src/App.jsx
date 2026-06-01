@@ -24,7 +24,7 @@ function ArenaRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (user && (user.balance || 0) < 0) return <Navigate to="/lobby" />;
+  if (user && (user.balance || 0) < 10) return <Navigate to="/lobby" />;
   return children;
 }
 
@@ -32,7 +32,7 @@ function PublicRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (isAuthenticated) {
-    return (user?.balance || 0) >= 0 ? <Navigate to="/pre-game" /> : <Navigate to="/lobby" />;
+    return (user?.balance || 0) >= 10 ? <Navigate to="/pre-game" /> : <Navigate to="/lobby" />;
   }
   return children;
 }

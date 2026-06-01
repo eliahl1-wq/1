@@ -467,8 +467,8 @@ export default function Lobby() {
                         onClick={() => {
                             if (!connected) { // Kontrollera om plånbok är ansluten
                                 setArenaError('Please connect your wallet first.');
-                            } else if (!isAlreadyInGame && (!user?.balance || user.balance < minimumDepositUSD)) { 
-                                setArenaError(`Please deposit at least $${minimumDepositUSD} to enter the arena.`);
+                            } else if (!isAlreadyInGame && ((user?.balance ?? 0) < 10)) { 
+                                setArenaError(`Please deposit at least $10 to enter the arena.`);
                             } else {
                                 setArenaError('');
                                 navigate('/pre-game');
