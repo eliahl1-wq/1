@@ -25,7 +25,6 @@ export default function PreGame() {
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
     const [showManual, setShowManual] = useState(false);
-    const [manualSig, setManualSig] = useState('');
     
     const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -263,41 +262,6 @@ export default function PreGame() {
         }
     };
 
-    const handleManualVerify = async () => {
-        if (!manualSig) {
-            setDepositStatusMessage('Please paste the transaction signature.');
-            return;
-        }
-        setDepositStatusMessage('Verifying manual deposit...');
-        try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    'bypass-tunnel-reminders': 'true'
-                },
-                body: JSON.stringify({
-                    signature: manualSig,
-                    manual: true,
-                    walletAddress: publicKey?.toString() || 'manual_transfer'
-                })
-            });
-
-            if (!verifyRes.ok) {
-                const errorData = await verifyRes.json();
-                throw new Error(errorData.message || 'Verification failed.');
-            }
-
-            await refreshUser();
-            setDepositStatusMessage('✅ Deposit verified and added to balance!');
-            setManualSig('');
-            setShowManual(false);
-        } catch (error) {
-            setDepositStatusMessage(`❌ Error: ${error.message}`);
-        }
-    };
-
     useEffect(() => {
         const checkStatus = async () => {
             if (!token) return;
@@ -526,18 +490,20 @@ export default function PreGame() {
                                 <div className="mono" style={{ fontSize: '11px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px' }}>
                                     {RECIPIENT_SOLANA_ADDRESS.toString()}
                                 </div>
+                                <button 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(RECIPIENT_SOLANA_ADDRESS.toString());
+                                        setDepositStatusMessage('Address copied!');
+                                    }}
+                                    style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '8px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}
+                                >
+                                    COPY ADDRESS
+                                </button>
                             </div>
-                            <input 
-                                type="text" 
-                                placeholder="Paste Transaction Signature..." 
-                                value={manualSig} 
-                                onChange={(e) => setManualSig(e.target.value)} 
-                                style={{ ...walletInput, padding: '12px', fontSize: '0.8rem' }} 
-                            />
-                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                                <button onClick={() => setShowManual(false)} style={{ ...walletConfirmBtn, flex: 1, background: 'rgba(255,255,255,0.05)', boxShadow: 'none' }}>Back</button>
-                                <button onClick={handleManualVerify} style={{ ...walletConfirmBtn, flex: 2 }}>Verify Deposit</button>
+                            <div style={{ textAlign: 'center', fontSize: '11px', opacity: 0.5, marginTop: '8px', lineHeight: '1.4' }}>
+                                Deposit is detected automatically.<br/>Please wait a few moments after sending.
                             </div>
+                            <button onClick={() => setShowManual(false)} style={{ ...walletConfirmBtn, background: 'rgba(255,255,255,0.05)', boxShadow: 'none', marginTop: '8px' }}>Back</button>
                         </div>
                     ) : (
                         <>

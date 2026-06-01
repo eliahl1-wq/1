@@ -4,12 +4,15 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 
 export default function Profile() {
-    const { user, token, refreshUser } = useAuth(); // Hämta refreshUser från useAuth-hooken
+    const { user, token, refreshUser, login } = useAuth(); 
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs] = useState([]);
+    const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [updateMsg, setUpdateMsg] = useState('');
 
     useEffect(() => {
         const fetchLogs = async () => {
@@ -71,6 +74,32 @@ export default function Profile() {
         const hours = Math.floor(ms / (1000 * 60 * 60));
         const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
         return `${hours}h ${mins}m`;
+    };
+
+    const handleUpdateWallet = async () => {
+        if (!walletInput || walletInput === user?.walletAddress) return;
+        setIsUpdating(true);
+        setUpdateMsg('');
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ walletAddress: walletInput })
+            });
+            const data = await res.ok ? await res.json() : null;
+            if (res.ok && data) {
+                login(data.user, token); // Uppdatera lokalt state
+                setUpdateMsg('✅ Wallet linked! Manual deposits will now be tracked.');
+            } else {
+                setUpdateMsg('❌ Failed to link wallet. Check address format.');
+            }
+        } catch (e) {
+            setUpdateMsg('❌ Server error.');
+        }
+        setIsUpdating(false);
     };
 
     return (
@@ -225,9 +254,35 @@ export default function Profile() {
                                 </div>
                                 <div style={inputGroup}>
                                     <label style={labelStyle}>Wallet Address</label>
-                                    <div className="glass" style={inputStatic}>
-                                        {user?.walletAddress || 'Not linked'}
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <input 
+                                            value={walletInput}
+                                            onChange={(e) => setWalletInput(e.target.value)}
+                                            placeholder="Paste Solana Address (for manual deposits)"
+                                            className="glass"
+                                            style={{ ...inputStatic, flex: 1, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', outline: 'none' }}
+                                        />
+                                        <button 
+                                            onClick={handleUpdateWallet}
+                                            disabled={isUpdating || walletInput === user?.walletAddress}
+                                            style={{
+                                                padding: '0 20px',
+                                                borderRadius: '14px',
+                                                background: '#007AFF',
+                                                color: 'white',
+                                                fontWeight: '700',
+                                                fontSize: '0.8rem',
+                                                opacity: (isUpdating || walletInput === user?.walletAddress) ? 0.3 : 1,
+                                                cursor: (isUpdating || walletInput === user?.walletAddress) ? 'not-allowed' : 'pointer'
+                                            }}
+                                        >
+                                            {isUpdating ? '...' : 'LINK'}
+                                        </button>
                                     </div>
+                                    {updateMsg && <div style={{ fontSize: '0.7rem', color: updateMsg.includes('✅') ? '#14F195' : '#FF3B30', marginTop: '5px' }}>{updateMsg}</div>}
+                                    <p style={{ fontSize: '0.65rem', opacity: 0.3, marginTop: '10px' }}>
+                                        Link the wallet you intend to send SOL from. Our system uses this to automatically identify your manual deposits.
+                                    </p>
                                 </div>
                                 <div style={{marginTop: '40px', opacity: 0.3, fontSize: '0.8rem', textAlign: 'center'}}>
                                     Profile customization features coming soon.

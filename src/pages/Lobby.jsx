@@ -31,7 +31,6 @@ export default function Lobby() {
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [showManual, setShowManual] = useState(false);
-    const [manualSig, setManualSig] = useState('');
 
     // Din mottagaradress
     const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
@@ -205,41 +204,6 @@ export default function Lobby() {
             } else {
                 setDepositStatusMessage(`❌ Deposit failed. Check your wallet balance.`);
             }
-        }
-    };
-
-    const handleManualVerify = async () => {
-        if (!manualSig) {
-            setDepositStatusMessage('Please paste the transaction signature.');
-            return;
-        }
-        setDepositStatusMessage('Verifying manual deposit...');
-        try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    'bypass-tunnel-reminders': 'true'
-                },
-                body: JSON.stringify({
-                    signature: manualSig,
-                    manual: true,
-                    walletAddress: publicKey?.toString() || 'manual_transfer'
-                })
-            });
-
-            if (!verifyRes.ok) {
-                const errorData = await verifyRes.json();
-                throw new Error(errorData.message || 'Verification failed.');
-            }
-
-            await refreshUser();
-            setDepositStatusMessage('✅ Deposit verified!');
-            setManualSig('');
-            setShowManual(false);
-        } catch (error) {
-            setDepositStatusMessage(`❌ Error: ${error.message}`);
         }
     };
 
@@ -490,29 +454,25 @@ export default function Lobby() {
                                     <div style={{ fontSize: '10px', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px', color: '#14F195', textAlign: 'left', fontFamily: 'monospace' }}>
                                         {RECIPIENT_SOLANA_ADDRESS.toString()}
                                     </div>
+                                    <button 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(RECIPIENT_SOLANA_ADDRESS.toString());
+                                            setDepositStatusMessage('Address copied!');
+                                        }}
+                                        style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '8px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}
+                                    >
+                                        COPY ADDRESS
+                                    </button>
                                 </div>
-                                <input
-                                    type="text"
-                                    placeholder="Paste Transaction Signature..."
-                                    value={manualSig}
-                                    onChange={(e) => setManualSig(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        boxSizing: 'border-box',
-                                        padding: '12px',
-                                        borderRadius: '12px',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        background: 'rgba(0,0,0,0.2)',
-                                        color: 'white',
-                                        fontSize: '0.85rem',
-                                        outline: 'none'
-                                    }}
-                                />
+                                <div style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: '5px', lineHeight: '1.4' }}>
+                                    Deposit is detected automatically.<br/>Please wait a few moments after sending.
+                                </div>
                             </div>
                         )}
 
-                        <button
-                            onClick={showManual ? handleManualVerify : handleDeposit}
+                        {!showManual && (
+                            <button
+                            onClick={handleDeposit}
                             className="btn-hover"
                             style={{
                                 width: '100%',
@@ -528,8 +488,9 @@ export default function Lobby() {
                                 boxShadow: '0 8px 25px rgba(52, 199, 89, 0.2)'
                             }}
                         >
-                            {showManual ? 'VERIFY SIGNATURE' : 'DEPOSIT SOL'}
+                            DEPOSIT SOL
                         </button>
+                        )}
 
                         <button 
                             onClick={() => { setShowManual(!showManual); setDepositStatusMessage(''); }}
