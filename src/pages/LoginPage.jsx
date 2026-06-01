@@ -13,9 +13,13 @@ export default function LoginPage() {
     // Om vi redan är inloggade, dra till lobbyn direkt
     useEffect(() => {
         if (isAuthenticated) {
-            navigate('/lobby', { replace: true });
+            if (user && (user.balance || 0) >= 10) {
+                navigate('/pre-game', { replace: true });
+            } else {
+                navigate('/lobby', { replace: true });
+            }
         }
-    }, [isAuthenticated, navigate]);
+    }, [isAuthenticated, user, navigate]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -34,7 +38,11 @@ export default function LoginPage() {
 
             if (res.ok) {
                 login(data.user, data.token);
-                navigate('/lobby', { replace: true });
+                if ((data.user.balance || 0) >= 10) {
+                    navigate('/pre-game', { replace: true });
+                } else {
+                    navigate('/lobby', { replace: true });
+                }
             } else {
                 // Visa felmeddelande från servern, annars ett generellt fel
                 setError(data.message || 'Login failed. Please try again.');

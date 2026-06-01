@@ -6,7 +6,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 export default function PreGame() {
-    const { user, logout, token, login, refreshUser } = useAuth();
+    const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
     const navigate = useNavigate();
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
@@ -51,7 +51,14 @@ export default function PreGame() {
     }, []);
 
     const handleStartMatch = () => {
-        if (!canJoin) return;
+        if (!isAuthenticated) {
+            navigate('/login');
+            return;
+        }
+        if (!canJoin && !isAlreadyInGame) {
+            navigate('/lobby');
+            return;
+        }
         setIsMatchmaking(true);
         refreshUser(); // En extra koll precis innan start
         localStorage.setItem('match_nickname', nickname);
@@ -248,10 +255,13 @@ export default function PreGame() {
 
     useEffect(() => {
         const checkStatus = async () => {
+            if (!token) return;
             try {
                 const res = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
                     headers: { 'Authorization': `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
                 });
+                const contentType = res.headers.get("content-type");
+                if (!res.ok || !contentType || !contentType.includes("application/json")) return;
                 const data = await res.json();
                 setIsAlreadyInGame(data.inGame);
             } catch (e) {}
@@ -355,11 +365,11 @@ export default function PreGame() {
                 <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    {/* Wallet Balance (removed) */}
-
-                    {/* Wallet Balance Pill */}
-                    <div style={{ position: 'relative' }}>
-                        <button 
+                    {isAuthenticated ? (
+                        <>
+                            {/* Wallet Balance Pill */}
+                            <div style={{ position: 'relative' }}>
+                                <button 
                             id="wallet-trigger"
                             onClick={() => setIsWalletOpen(!isWalletOpen)}
                             style={walletPillButtonStyle}
@@ -392,29 +402,35 @@ export default function PreGame() {
                                 </div>
                             </div>
                         )}
-                    </div>
+                            </div>
 
-                    <button 
-                        onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('deposit'); }}
-                        style={standaloneDepositButtonStyle}
-                    >
-                        Deposit
-                    </button>
+                            <button 
+                                onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('deposit'); }}
+                                style={standaloneDepositButtonStyle}
+                            >
+                                Deposit
+                            </button>
 
-                    <div style={{ position: 'relative' }}>
-                        <div ref={userPillRef} onClick={() => setShowUserMenu(!showUserMenu)} style={avatarPillStyle}>
-                            <div style={avatarCircleStyle}>{user?.username?.charAt(0).toUpperCase()}</div>
-                        </div>
-                    {showUserMenu && (
-                        <div ref={userMenuRef} style={userMenuContainerStyle}>
-                            <div style={userMenuHeader}>{user?.username}</div>
-                            <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'profile' } }); }} style={userMenuItemStyle}>Profile</button>
-                            <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }} style={userMenuItemStyle}>Stats</button>
-                            <button onClick={() => { setShowUserMenu(false); navigate('/transactions'); }} style={userMenuItemStyle}>Transactions</button>
-                            <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30' }}>Log Out</button>
-                        </div>
+                            <div style={{ position: 'relative' }}>
+                                <div ref={userPillRef} onClick={() => setShowUserMenu(!showUserMenu)} style={avatarPillStyle}>
+                                    <div style={avatarCircleStyle}>{user?.username?.charAt(0).toUpperCase()}</div>
+                                </div>
+                                {showUserMenu && (
+                                    <div ref={userMenuRef} style={userMenuContainerStyle}>
+                                        <div style={userMenuHeader}>{user?.username}</div>
+                                        <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'profile' } }); }} style={userMenuItemStyle}>Profile</button>
+                                        <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }} style={userMenuItemStyle}>Stats</button>
+                                        <button onClick={() => { setShowUserMenu(false); navigate('/transactions'); }} style={userMenuItemStyle}>Transactions</button>
+                                        <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30' }}>Log Out</button>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <button onClick={() => navigate('/login')} style={standaloneDepositButtonStyle}>
+                            Login
+                        </button>
                     )}
-                    </div>
                 </div>
             </div>
 
@@ -480,13 +496,13 @@ export default function PreGame() {
 
                 <button 
                     onClick={handleStartMatch} 
-                    disabled={(!canJoin && !isAlreadyInGame) || isMatchmaking}
+                    disabled={isMatchmaking}
                     style={{ 
                         ...playBtnStyle, 
-                        background: isAlreadyInGame ? 'linear-gradient(180deg, #007AFF 0%, #005DCB 100%)' : (canJoin ? '#34C759' : '#1e1f26'),
-                        color: (canJoin || isAlreadyInGame) ? 'white' : 'rgba(255,255,255,0.2)',
-                        boxShadow: isAlreadyInGame ? '0 4px 12px rgba(0, 122, 255, 0.3)' : (canJoin ? '0 4px 12px rgba(52, 199, 89, 0.2)' : 'none'),
-                        cursor: (canJoin || isAlreadyInGame) ? 'pointer' : 'not-allowed'
+                        background: !isAuthenticated ? 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)' : (isAlreadyInGame ? 'linear-gradient(180deg, #007AFF 0%, #005DCB 100%)' : (canJoin ? '#34C759' : '#1e1f26')),
+                        color: 'white',
+                        boxShadow: isAlreadyInGame ? '0 4px 12px rgba(0, 122, 255, 0.3)' : (canJoin || !isAuthenticated ? '0 4px 12px rgba(52, 199, 89, 0.2)' : 'none'),
+                        cursor: 'pointer'
                     }}
                 >
                     {isMatchmaking ? (
@@ -494,7 +510,7 @@ export default function PreGame() {
                             <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
                             Joining...
                         </div>
-                    ) : (isAlreadyInGame ? 'REJOIN ARENA' : (canJoin ? 'Play' : 'Insufficient Balance'))}
+                    ) : (!isAuthenticated ? 'Play' : (isAlreadyInGame ? 'REJOIN ARENA' : (canJoin ? 'Play' : 'Deposit to Play')))}
                 </button>
 
                 <div style={howItWorksContainerStyle}>

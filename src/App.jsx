@@ -28,8 +28,12 @@ function ArenaRoute({ children }) {
 }
 
 function PublicRoute({ children }) {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Navigate to="/lobby" /> : children;
+  const { user, isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  if (isAuthenticated) {
+    return (user?.balance || 0) >= 10 ? <Navigate to="/pre-game" /> : <Navigate to="/lobby" />;
+  }
+  return children;
 }
 
 function App() {
@@ -54,12 +58,12 @@ function App() {
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/lobby" element={<PrivateRoute><Lobby /></PrivateRoute>} />
-                <Route path="/pre-game" element={<PrivateRoute><PreGame /></PrivateRoute>} />
+                <Route path="/pre-game" element={<PreGame />} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-                {/* Skicka till lobby som standard - den sköter redirect till login om det behövs */}
-                <Route path="/" element={<Navigate to="/lobby" />} />
+                {/* Pregame lobbyn är nu startsidan */}
+                <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>
             </AuthProvider>
           </Router>
