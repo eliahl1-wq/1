@@ -43,7 +43,7 @@ function App() {
   const wallets = useMemo(
     () => [
       // Genom att lägga till denna manuellt dyker WalletConnect upp igen
-      new WalletConnectWalletAdapter({ network: 'devnet', options: { projectId: '8b2f78d206bbaec981376e03d9d15376' } }),
+      new WalletConnectWalletAdapter({ network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1', options: { projectId: '8b2f78d206bbaec981376e03d9d15376' } }),
     ],
     []
   );
