@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
 export default function RegisterPage() {
+    const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
@@ -19,7 +20,7 @@ export default function RegisterPage() {
                     'Content-Type': 'application/json',
                     'bypass-tunnel-reminders': 'true'
                 },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email, username, password })
             });
             const data = await res.json();
 
@@ -57,6 +58,14 @@ export default function RegisterPage() {
                 )}
 
                 <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <input 
+                        type="email" 
+                        placeholder="Email Address" 
+                        value={email}
+                        onChange={e => setEmail(e.target.value)} 
+                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem' }}
+                        required
+                    />
                     <input 
                         type="text" 
                         placeholder="Username" 

@@ -10,7 +10,16 @@ export const AuthProvider = ({ children }) => {
     // Kontrollera om det finns en sparad inloggning när sidan startar
     useEffect(() => {
         const checkLoggedIn = async () => {
-            const storedToken = localStorage.getItem('token');
+            // Kolla om vi har en token i URL:en (från Google OAuth redirect)
+            const params = new URLSearchParams(window.location.search);
+            const urlToken = params.get('token');
+            if (urlToken) {
+                localStorage.setItem('token', urlToken);
+                setToken(urlToken);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            const storedToken = urlToken || localStorage.getItem('token');
             if (storedToken) {
                 console.log('AuthContext: Token hittades i localStorage, försöker validera.');
                 try {
