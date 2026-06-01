@@ -37,13 +37,18 @@ function PublicRoute({ children }) {
 }
 
 function App() {
-  // Byter till 'devnet' för gratis testning. För mainnet i framtiden bör du skaffa en privat RPC (t.ex. från Helius) för att slippa 403-fel.
-  const endpoint = useMemo(() => clusterApiUrl('devnet'), []);
+  // TIPS: Ersätt clusterApiUrl med din personliga RPC-länk från Helius för bättre stabilitet
+  const endpoint = useMemo(() => 
+    "https://mainnet.helius-rpc.com/?api-key=b83e640e-2370-4f65-bc06-efe5166084a4", []);
 
   const wallets = useMemo(
     () => [
       // Genom att lägga till denna manuellt dyker WalletConnect upp igen
-      new WalletConnectWalletAdapter({ network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1', options: { projectId: '8b2f78d206bbaec981376e03d9d15376' } }),
+      new WalletConnectWalletAdapter({ 
+        // Använd den officiella CAIP-2 identifieraren för Solana Mainnet för att undvika varningar
+        network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqAQfSS1Y', 
+        options: { projectId: '8b2f78d206bbaec981376e03d9d15376' } 
+      }),
     ],
     []
   );

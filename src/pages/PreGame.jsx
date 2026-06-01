@@ -470,7 +470,7 @@ export default function PreGame() {
                             {depositStatusMessage}
                         </div>
                     )}
-                    <div style={walletPanelFooter}>Solana Devnet · Secure Processing</div>
+                    <div style={walletPanelFooter}>Solana Mainnet · Secure Processing</div>
                 </div>
             )}
 
