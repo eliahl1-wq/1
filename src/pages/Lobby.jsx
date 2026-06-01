@@ -548,6 +548,7 @@ export default function Lobby() {
                                 {depositStatusMessage}
                             </p>
                         )}
+                        </div>
                     )}
                     
                     <button 
