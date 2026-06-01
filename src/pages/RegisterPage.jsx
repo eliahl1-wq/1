@@ -40,6 +40,10 @@ export default function RegisterPage() {
         setIsLoading(false);
     };
 
+    const handleGoogleLogin = () => {
+        window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`;
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'white' }}>
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '50px', borderRadius: '32px', border: '0.5px solid rgba(255, 255, 255, 0.1)', width: '100%', maxWidth: '380px', textAlign: 'center', backdropFilter: 'blur(40px)', boxShadow: '0 30px 60px rgba(0,0,0,0.5)' }}>
@@ -88,6 +92,26 @@ export default function RegisterPage() {
                         style={{ padding: '16px', borderRadius: '16px', border: 'none', background: '#007AFF', color: 'white', fontSize: '1.1rem', cursor: 'pointer', fontWeight: '600', marginTop: '10px', boxShadow: '0 10px 20px rgba(0,122,255,0.3)' }}
                     >
                         {isLoading ? 'Creating account...' : 'REGISTER'}
+                    </button>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '15px 0', opacity: 0.2 }}>
+                        <div style={{ flex: 1, height: '1px', background: 'white' }} />
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700' }}>OR</span>
+                        <div style={{ flex: 1, height: '1px', background: 'white' }} />
+                    </div>
+
+                    <button 
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        style={{ 
+                            padding: '16px', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.1)', 
+                            background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '1rem', 
+                            cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', 
+                            justifyContent: 'center', gap: '10px' 
+                        }}
+                    >
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '18px' }} />
+                        Continue with Google
                     </button>
                 </form>
                 <p style={{ marginTop: '25px', fontSize: '14px', color: 'rgba(255,255,255,0.5)' }}>
