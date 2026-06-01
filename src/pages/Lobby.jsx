@@ -101,7 +101,7 @@ export default function Lobby() {
 
     // Om användaren redan har balans och INTE är i ett game, skicka dem till PreGame
     useEffect(() => {
-        if (user && (user.balance || 0) >= 0 && !isAlreadyInGame) {
+        if (user && (user.balance || 0) >= 10 && !isAlreadyInGame) {
             navigate('/pre-game');
         } else if (isAlreadyInGame) {
             // Om man redan är i ett game, tvinga in dem i PreGame (eller Game direkt om du vill)
@@ -412,9 +412,32 @@ export default function Lobby() {
                             borderRadius: '28px', 
                             border: '1px solid rgba(255, 255, 255, 0.05)' 
                         }}>
-                            <h3 style={{ fontSize: '1.2rem', margin: '0 0 20px 0', color: '#fff', fontWeight: '700', textAlign: 'left', opacity: 0.9 }}>Deposit Funds</h3>
-                        
-                        {!showManual ? (
+                            <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '20px' }}>
+                                <button 
+                                    onClick={() => { setDepositMethod('wallet'); setDepositStatusMessage(''); }}
+                                    style={{
+                                        flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
+                                        background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                        color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.4)',
+                                        transition: '0.2s'
+                                    }}
+                                >
+                                    Wallet Connect
+                                </button>
+                                <button 
+                                    onClick={() => { setDepositMethod('manual'); setDepositStatusMessage(''); }}
+                                    style={{
+                                        flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
+                                        background: depositMethod === 'manual' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                        color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
+                                        transition: '0.2s'
+                                    }}
+                                >
+                                    Manual / QR
+                                </button>
+                            </div>
+
+                        {depositMethod === 'wallet' ? (
                             <div style={{ position: 'relative', width: '100%', marginBottom: '15px' }}>
                                 <span style={{ 
                                     position: 'absolute', 
@@ -462,45 +485,30 @@ export default function Lobby() {
                                             if (depositAddress) navigator.clipboard.writeText(depositAddress);
                                             setDepositStatusMessage('Address copied!');
                                         }}
-                                        style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '8px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}
+                                        style={{ background: 'rgba(0,122,255,0.1)', border: '1px solid rgba(0,122,255,0.2)', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '10px', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', width: '100%' }}
                                     >
                                         COPY ADDRESS
                                     </button>
                                 </div>
-                                <div style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: '5px', lineHeight: '1.4' }}>
-                                    Deposit is detected automatically.<br/>Please wait a few moments after sending.
+                                <div style={{ fontSize: '0.75rem', opacity: 0.3, marginTop: '5px', lineHeight: '1.4', fontStyle: 'italic' }}>
+                                    Detected automatically after sending.
                                 </div>
                             </div>
                         )}
 
-                        {!showManual && (
+                        {depositMethod === 'wallet' && (
                             <button
-                            onClick={handleDeposit}
-                            className="btn-hover"
-                            style={{
-                                width: '100%',
-                                padding: '16px',
-                                fontSize: '1.05rem',
-                                borderRadius: '16px',
-                                border: 'none',
-                                background: '#34C759', 
-                                color: 'white',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: '0 8px 25px rgba(52, 199, 89, 0.2)'
-                            }}
-                        >
-                            DEPOSIT SOL
-                        </button>
+                                onClick={handleDeposit}
+                                className="btn-hover"
+                                style={{
+                                    width: '100%', padding: '16px', fontSize: '1rem', borderRadius: '16px', border: 'none',
+                                    background: '#34C759', color: 'white', fontWeight: '700', cursor: 'pointer',
+                                    boxShadow: '0 8px 20px rgba(52, 199, 89, 0.2)'
+                                }}
+                            >
+                                DEPOSIT VIA WALLET
+                            </button>
                         )}
-
-                        <button 
-                            onClick={() => { setShowManual(!showManual); setDepositStatusMessage(''); }}
-                            style={{ background: 'none', border: 'none', color: '#007AFF', fontSize: '0.8rem', fontWeight: '700', marginTop: '12px', cursor: 'pointer', opacity: 0.8 }}
-                        >
-                            {showManual ? '← Use Connected Wallet' : 'Use QR Code / Direct Address'}
-                        </button>
 
                         {depositStatusMessage && (
                             <p style={{ 
