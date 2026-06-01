@@ -32,8 +32,7 @@ export default function Lobby() {
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [showManual, setShowManual] = useState(false);
 
-    // Din mottagaradress
-    const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
+    const depositAddress = user?.depositAddress;
 
     // Memoize bakgrundsblobs så de inte skapas på nytt vid varje re-render (fixar "snabba blobs")
     const backgroundBlobs = useMemo(() => [...Array(6)].map((_, i) => ({
@@ -116,6 +115,10 @@ export default function Lobby() {
             setDepositStatusMessage('Connect wallet first.');
             return;
         }
+        if (!depositAddress) {
+            setDepositStatusMessage('❌ No deposit address found.');
+            return;
+        }
 
         const amountUSD = parseFloat(depositAmount);
         if (isNaN(amountUSD) || amountUSD < minimumDepositUSD) {
@@ -134,7 +137,7 @@ export default function Lobby() {
             const transaction = new Transaction().add(
                 SystemProgram.transfer({
                     fromPubkey: publicKey,
-                    toPubkey: RECIPIENT_SOLANA_ADDRESS,
+                    toPubkey: new PublicKey(depositAddress),
                     lamports: lamports,
                 })
             );
@@ -445,18 +448,18 @@ export default function Lobby() {
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
                                 <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${RECIPIENT_SOLANA_ADDRESS.toString()}`}
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${depositAddress || ''}`}
                                     alt="Deposit QR"
                                     style={{ borderRadius: '8px', border: '3px solid white', width: '100px', height: '100px' }}
                                 />
                                 <div style={{ width: '100%' }}>
                                     <div style={{ fontSize: '9px', opacity: 0.4, textAlign: 'left', marginBottom: '4px', textTransform: 'uppercase' }}>Recipient Address</div>
                                     <div style={{ fontSize: '10px', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px', color: '#14F195', textAlign: 'left', fontFamily: 'monospace' }}>
-                                        {RECIPIENT_SOLANA_ADDRESS.toString()}
+                                        {depositAddress || 'Generating...'}
                                     </div>
                                     <button 
                                         onClick={() => {
-                                            navigator.clipboard.writeText(RECIPIENT_SOLANA_ADDRESS.toString());
+                                            if (depositAddress) navigator.clipboard.writeText(depositAddress);
                                             setDepositStatusMessage('Address copied!');
                                         }}
                                         style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '8px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}
