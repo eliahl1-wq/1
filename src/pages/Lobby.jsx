@@ -30,6 +30,8 @@ export default function Lobby() {
     const [depositStatusMessage, setDepositStatusMessage] = useState(''); // Statusmeddelanden för insättning
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
+    const [showManual, setShowManual] = useState(false);
+    const [manualSig, setManualSig] = useState('');
 
     // Din mottagaradress
     const RECIPIENT_SOLANA_ADDRESS = useMemo(() => new PublicKey('ASAdMwhmCmcsWiGYaYw5xPddgQuDZHfESMLCDREVUMfb'), []);
@@ -157,6 +159,7 @@ export default function Lobby() {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
                     'bypass-tunnel-reminders': 'true'
                 },
                 body: JSON.stringify({ 
@@ -168,8 +171,15 @@ export default function Lobby() {
             });
 
             if (!verifyRes.ok) {
-                const errorData = await verifyRes.json();
-                throw new Error(errorData.message || 'Backend verification failed.');
+                let errorMessage = 'Backend verification failed.';
+                const contentType = verifyRes.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    const errorData = await verifyRes.json();
+                    errorMessage = errorData.message || errorMessage;
+                } else {
+                    errorMessage = await verifyRes.text();
+                }
+                throw new Error(errorMessage);
             }
 
             // TODO: Skicka signature till backend här för att uppdatera databasen
@@ -195,6 +205,41 @@ export default function Lobby() {
             } else {
                 setDepositStatusMessage(`❌ Deposit failed. Check your wallet balance.`);
             }
+        }
+    };
+
+    const handleManualVerify = async () => {
+        if (!manualSig) {
+            setDepositStatusMessage('Please paste the transaction signature.');
+            return;
+        }
+        setDepositStatusMessage('Verifying manual deposit...');
+        try {
+            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'bypass-tunnel-reminders': 'true'
+                },
+                body: JSON.stringify({
+                    signature: manualSig,
+                    manual: true,
+                    walletAddress: publicKey?.toString() || 'manual_transfer'
+                })
+            });
+
+            if (!verifyRes.ok) {
+                const errorData = await verifyRes.json();
+                throw new Error(errorData.message || 'Verification failed.');
+            }
+
+            await refreshUser();
+            setDepositStatusMessage('✅ Deposit verified!');
+            setManualSig('');
+            setShowManual(false);
+        } catch (error) {
+            setDepositStatusMessage(`❌ Error: ${error.message}`);
         }
     };
 
@@ -401,6 +446,8 @@ export default function Lobby() {
                             border: '1px solid rgba(255, 255, 255, 0.05)' 
                         }}>
                             <h3 style={{ fontSize: '1.2rem', margin: '0 0 20px 0', color: '#fff', fontWeight: '700', textAlign: 'left', opacity: 0.9 }}>Deposit Funds</h3>
+                        
+                        {!showManual ? (
                             <div style={{ position: 'relative', width: '100%', marginBottom: '15px' }}>
                                 <span style={{ 
                                     position: 'absolute', 
@@ -421,7 +468,7 @@ export default function Lobby() {
                                     style={{
                                         width: '100%',
                                         boxSizing: 'border-box',
-                                        padding: '12px 12px 12px 45px', // Ökad padding så siffrorna inte nuddar $
+                                        padding: '12px 12px 12px 45px', 
                                         borderRadius: '12px',
                                         border: '1px solid rgba(255,255,255,0.1)',
                                         background: 'rgba(0,0,0,0.2)',
@@ -431,36 +478,76 @@ export default function Lobby() {
                                     }}
                                 />
                             </div>
-                            <button
-                                onClick={handleDeposit}
-                                className="btn-hover"
-                                style={{
-                                    width: '100%',
-                                    padding: '16px',
-                                    fontSize: '1.05rem',
-                                    borderRadius: '16px',
-                                    border: 'none',
-                                    background: '#34C759', // Grön för insättning
-                                    color: 'white',
-                                    fontWeight: '700',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    boxShadow: '0 8px 25px rgba(52, 199, 89, 0.2)'
-                                }}
-                            >
-                                DEPOSIT
-                            </button>
-                            {depositStatusMessage && (
-                                <p style={{ 
-                                    fontSize: '0.85rem',
-                                    color: depositStatusMessage.includes('failed') ? '#FF3B30' : 'rgba(255,255,255,0.7)',
-                                    fontWeight: '500',
-                                    marginTop: '15px' 
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${RECIPIENT_SOLANA_ADDRESS.toString()}`}
+                                    alt="Deposit QR"
+                                    style={{ borderRadius: '8px', border: '3px solid white', width: '100px', height: '100px' }}
+                                />
+                                <div style={{ width: '100%' }}>
+                                    <div style={{ fontSize: '9px', opacity: 0.4, textAlign: 'left', marginBottom: '4px', textTransform: 'uppercase' }}>Recipient Address</div>
+                                    <div style={{ fontSize: '10px', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px', color: '#14F195', textAlign: 'left', fontFamily: 'monospace' }}>
+                                        {RECIPIENT_SOLANA_ADDRESS.toString()}
+                                    </div>
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Paste Transaction Signature..."
+                                    value={manualSig}
+                                    onChange={(e) => setManualSig(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                        padding: '12px',
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        color: 'white',
+                                        fontSize: '0.85rem',
+                                        outline: 'none'
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        <button
+                            onClick={showManual ? handleManualVerify : handleDeposit}
+                            className="btn-hover"
+                            style={{
+                                width: '100%',
+                                padding: '16px',
+                                fontSize: '1.05rem',
+                                borderRadius: '16px',
+                                border: 'none',
+                                background: '#34C759', 
+                                color: 'white',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                boxShadow: '0 8px 25px rgba(52, 199, 89, 0.2)'
+                            }}
+                        >
+                            {showManual ? 'VERIFY SIGNATURE' : 'DEPOSIT SOL'}
+                        </button>
+
+                        <button 
+                            onClick={() => { setShowManual(!showManual); setDepositStatusMessage(''); }}
+                            style={{ background: 'none', border: 'none', color: '#007AFF', fontSize: '0.8rem', fontWeight: '700', marginTop: '12px', cursor: 'pointer', opacity: 0.8 }}
+                        >
+                            {showManual ? '← Use Connected Wallet' : 'Use QR Code / Direct Address'}
+                        </button>
+
+                        {depositStatusMessage && (
+                            <p style={{ 
+                                fontSize: '0.85rem',
+                                color: (depositStatusMessage.includes('failed') || depositStatusMessage.includes('Error')) ? '#FF3B30' : 'rgba(255,255,255,0.7)',
+                                fontWeight: '500',
+                                marginTop: '15px' 
                                 }}>
-                                    {depositStatusMessage}
-                                </p>
-                            )}
-                        </div>
+                                {depositStatusMessage}
+                            </p>
+                        )}
                     )}
                     
                     <button 

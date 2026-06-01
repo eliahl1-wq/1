@@ -24,6 +24,8 @@ export default function PreGame() {
     const [panelPosition, setPanelPosition] = useState({ x: null, y: 60 });
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
+    const [showManual, setShowManual] = useState(false);
+    const [manualSig, setManualSig] = useState('');
     
     const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -213,6 +215,7 @@ export default function PreGame() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
                     'bypass-tunnel-reminders': 'true'
                 },
                 body: JSON.stringify({
@@ -224,8 +227,15 @@ export default function PreGame() {
             });
 
             if (!verifyRes.ok) {
-                const errorData = await verifyRes.json();
-                throw new Error(errorData.message || 'Backend verification failed.');
+                let errorMessage = 'Backend verification failed.';
+                const contentType = verifyRes.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    const errorData = await verifyRes.json();
+                    errorMessage = errorData.message || errorMessage;
+                } else {
+                    errorMessage = await verifyRes.text();
+                }
+                throw new Error(errorMessage);
             }
 
             if (token) {
@@ -250,6 +260,41 @@ export default function PreGame() {
             } else {
                 setDepositStatusMessage('❌ Deposit failed. Check your wallet balance.');
             }
+        }
+    };
+
+    const handleManualVerify = async () => {
+        if (!manualSig) {
+            setDepositStatusMessage('Please paste the transaction signature.');
+            return;
+        }
+        setDepositStatusMessage('Verifying manual deposit...');
+        try {
+            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'bypass-tunnel-reminders': 'true'
+                },
+                body: JSON.stringify({
+                    signature: manualSig,
+                    manual: true,
+                    walletAddress: publicKey?.toString() || 'manual_transfer'
+                })
+            });
+
+            if (!verifyRes.ok) {
+                const errorData = await verifyRes.json();
+                throw new Error(errorData.message || 'Verification failed.');
+            }
+
+            await refreshUser();
+            setDepositStatusMessage('✅ Deposit verified and added to balance!');
+            setManualSig('');
+            setShowManual(false);
+        } catch (error) {
+            setDepositStatusMessage(`❌ Error: ${error.message}`);
         }
     };
 
@@ -453,18 +498,58 @@ export default function PreGame() {
                         <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? walletTabActive : {})}}>Deposit</button>
                         <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? walletTabActive : {})}}>Withdraw</button>
                     </div>
-                    <div style={walletInputArea}>
-                        <div style={walletInputPrefix}>$</div>
-                        <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
-                        <button style={walletMaxBtn} onClick={() => setAmount(walletTab === 'withdraw' ? user?.balance?.toFixed(2) : '100')}>MAX</button>
-                    </div>
-                    <button style={walletConfirmBtn} onClick={() => {
-                        if (walletTab === 'deposit') {
-                            handleDeposit();
-                        } else {
-                            setDepositStatusMessage('Withdrawal is not implemented yet.');
-                        }
-                    }}>{walletTab === 'deposit' ? 'Deposit' : 'Withdraw'}</button>
+
+                    {walletTab === 'deposit' && !showManual ? (
+                        <>
+                            <div style={walletInputArea}>
+                                <div style={walletInputPrefix}>$</div>
+                                <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
+                                <button style={walletMaxBtn} onClick={() => setAmount('100')}>MAX</button>
+                            </div>
+                            <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit via Wallet</button>
+                            <button 
+                                onClick={() => setShowManual(true)}
+                                style={{ background: 'none', border: 'none', color: '#007AFF', fontSize: '11px', fontWeight: '700', marginTop: '8px', cursor: 'pointer' }}
+                            >
+                                Use QR Code / Manual Address
+                            </button>
+                        </>
+                    ) : walletTab === 'deposit' && showManual ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '16px' }}>
+                            <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${RECIPIENT_SOLANA_ADDRESS.toString()}`}
+                                alt="Deposit QR"
+                                style={{ borderRadius: '8px', border: '4px solid white', width: '120px', height: '120px' }}
+                            />
+                            <div style={{ textAlign: 'center', width: '100%' }}>
+                                <div style={{ fontSize: '10px', opacity: 0.4, marginBottom: '4px' }}>SOLANA ADDRESS</div>
+                                <div className="mono" style={{ fontSize: '11px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px' }}>
+                                    {RECIPIENT_SOLANA_ADDRESS.toString()}
+                                </div>
+                            </div>
+                            <input 
+                                type="text" 
+                                placeholder="Paste Transaction Signature..." 
+                                value={manualSig} 
+                                onChange={(e) => setManualSig(e.target.value)} 
+                                style={{ ...walletInput, padding: '12px', fontSize: '0.8rem' }} 
+                            />
+                            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                <button onClick={() => setShowManual(false)} style={{ ...walletConfirmBtn, flex: 1, background: 'rgba(255,255,255,0.05)', boxShadow: 'none' }}>Back</button>
+                                <button onClick={handleManualVerify} style={{ ...walletConfirmBtn, flex: 2 }}>Verify Deposit</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div style={walletInputArea}>
+                                <div style={walletInputPrefix}>$</div>
+                                <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
+                                <button style={walletMaxBtn} onClick={() => setAmount(user?.balance?.toFixed(2))}>MAX</button>
+                            </div>
+                            <button style={walletConfirmBtn} onClick={() => setDepositStatusMessage('Withdrawal is not implemented yet.')}>Withdraw</button>
+                        </>
+                    )}
+
                     {depositStatusMessage && (
                         <div style={{ marginTop: '14px', fontSize: '0.85rem', color: depositStatusMessage.startsWith('✅') ? '#34C759' : '#FF3B30', textAlign: 'center' }}>
                             {depositStatusMessage}
