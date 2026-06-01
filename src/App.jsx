@@ -8,6 +8,7 @@ import Transactions from './pages/Transactions';
 import Profile from './pages/Profile';
 import Game from './game/Game'; // Importera ditt nya spel
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
@@ -45,8 +46,7 @@ function App() {
     () => [
       // Genom att lägga till denna manuellt dyker WalletConnect upp igen
       new WalletConnectWalletAdapter({ 
-        // Använd den officiella CAIP-2 identifieraren för Solana Mainnet för att undvika varningar
-        network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqAQfSS1Y', 
+        network: WalletAdapterNetwork.Mainnet, 
         options: { projectId: '8b2f78d206bbaec981376e03d9d15376' } 
       }),
     ],
