@@ -43,7 +43,7 @@ export default function PreGame() {
         return '0';
     };
 
-    const entryFee = 10.00;
+    const entryFee = 0.00;
     const canJoin = (user?.balance || 0) >= entryFee;
 
     useEffect(() => {
@@ -181,7 +181,7 @@ export default function PreGame() {
             return;
         }
 
-        setDepositStatusMessage('Waiting for approval in Phantom...');
+        setDepositStatusMessage('Waiting for approval...');
 
         try {
             const SOL_USD_RATE = 150;
@@ -491,7 +491,7 @@ export default function PreGame() {
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <span style={{ fontSize: '0.75rem', opacity: 0.35, fontWeight: '600' }}>Entry Fee</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '600', opacity: 0.35 }}>$10.00</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '600', opacity: 0.35 }}>$0.00</span>
                 </div>
 
                 <button 
@@ -520,7 +520,7 @@ export default function PreGame() {
                     </div>
                     {showHowItWorks && (
                         <div style={howItWorksTextStyle}>
-                            <div>• Entry Fee: $10.00</div>
+                            <div>• Entry Fee: $0.00</div>
                             <div>• Starting Balance: $1.00</div>
                             <div>• Grow by eating food and other players</div>
                             <div>• Cash out your balance anytime</div>

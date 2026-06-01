@@ -26,7 +26,7 @@ export default function Lobby() {
 
     // --- STATS FÖR DEPOSIT ---
     const [depositAmount, setDepositAmount] = useState('');
-    const [minimumDepositUSD, setMinimumDepositUSD] = useState(10); // Ändra till t.ex. 0.01 för att testa billigt
+    const [minimumDepositUSD, setMinimumDepositUSD] = useState(0); // Gräns borttagen för test
     const [depositStatusMessage, setDepositStatusMessage] = useState(''); // Statusmeddelanden för insättning
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
@@ -101,7 +101,7 @@ export default function Lobby() {
 
     // Om användaren redan har balans och INTE är i ett game, skicka dem till PreGame
     useEffect(() => {
-        if (user && (user.balance || 0) >= 10 && !isAlreadyInGame) {
+        if (user && (user.balance || 0) >= 0 && !isAlreadyInGame) {
             navigate('/pre-game');
         } else if (isAlreadyInGame) {
             // Om man redan är i ett game, tvinga in dem i PreGame (eller Game direkt om du vill)
@@ -122,7 +122,7 @@ export default function Lobby() {
             return;
         }
 
-        setDepositStatusMessage('Waiting for approval in Phantom...');
+        setDepositStatusMessage('Waiting for approval...');
 
         try {
             // Placeholder-kurs: 1 SOL = 150 USD. I framtiden bör du hämta detta via API.
