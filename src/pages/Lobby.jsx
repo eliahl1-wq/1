@@ -157,9 +157,11 @@ export default function Lobby() {
 
             {/* ── Top Bar ── */}
             <nav className="topbar">
-                <div className="logo">
-                    <div className="logo-dot" />
-                    AGAR<span className="logo-accent">STAKE</span>
+                <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: 7, height: 7, background: '#007AFF', borderRadius: '50%', boxShadow: '0 0 10px #007AFF' }} />
+                    <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
+                        AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                    </span>
                 </div>
 
                 {user && (

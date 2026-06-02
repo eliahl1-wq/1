@@ -2,9 +2,9 @@ import React, { useMemo } from 'react';
 
 const Background = () => {
     const blobs = useMemo(() => [
-        { color: 'rgba(153, 69, 255, 0.10)', x: 15, y: 20, size: 500, dur: 55, delay: 0 },
+        { color: 'rgba(0, 122, 255, 0.10)', x: 15, y: 20, size: 500, dur: 55, delay: 0 },
         { color: 'rgba(20, 241, 149, 0.06)',  x: 70, y: 65, size: 420, dur: 70, delay: -20 },
-        { color: 'rgba(77, 140, 255, 0.08)',  x: 55, y: 10, size: 380, dur: 60, delay: -10 },
+        { color: 'rgba(0, 122, 255, 0.08)',  x: 55, y: 10, size: 380, dur: 60, delay: -10 },
         { color: 'rgba(255, 59, 48, 0.04)',   x: 85, y: 80, size: 350, dur: 80, delay: -35 },
     ], []);
 

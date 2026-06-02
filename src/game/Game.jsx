@@ -470,19 +470,19 @@ export default function Game() {
                 <div style={{
                     background: '#0f1118',
                     backdropFilter: 'blur(16px)',
-                    padding: '20px 25px',
+                    padding: '15px 25px',
                     borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     color: 'white',
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                    boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '14px'
+                    gap: '12px'
                 }}>
                     <div style={{ textAlign: 'center' }}>
-                        <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Active Stake</h3>
-                        <div style={{ fontSize: '2.4rem', fontWeight: '800', color: '#fff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', letterSpacing: '-1.5px' }}>
+                        <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Active Stake</h3>
+                        <div style={{ fontSize: '2.2rem', fontWeight: '800', color: '#fff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', letterSpacing: '-1.5px' }}>
                             ${(currentBalance ?? 0).toFixed(4)}
                         </div>
                         
@@ -519,7 +519,7 @@ export default function Game() {
                 {/* Reward Info Panel */}
                 <div style={{
                     marginTop: '20px',
-                    padding: '18px',
+                    padding: '15px',
                     background: '#0f1118',
                     borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -528,13 +528,13 @@ export default function Game() {
                     lineHeight: '1.6',
                     width: '100%',
                     boxSizing: 'border-box',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
                 }}>
-                    <div style={{ color: '#34C759', fontWeight: '900', marginBottom: rewardsUnlocked ? '10px' : '4px', letterSpacing: '1px', fontSize: '0.65rem', textTransform: 'uppercase' }}>
+                    <div style={{ color: '#34C759', fontWeight: '900', marginBottom: rewardsUnlocked ? '8px' : '4px', letterSpacing: '1px', fontSize: '0.6rem', textTransform: 'uppercase' }}>
                         ARENA REWARDS
                     </div>
                     {!rewardsUnlocked && (
-                        <div style={{ fontSize: '0.7rem', color: '#FF3B30', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', opacity: 0.8 }}>
+                        <div style={{ fontSize: '0.65rem', color: '#FF3B30', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', opacity: 0.8 }}>
                             {formatUnlockTimer()}
                         </div>
                     )}
@@ -588,18 +588,19 @@ export default function Game() {
                 top: '120px',
                 right: '30px',
                 width: '180px',
-                background: 'rgba(255, 255, 255, 0.02)',
+                background: '#0f1118',
                 padding: '20px',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                color: 'white'
+                borderRadius: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                color: 'white',
+                boxShadow: '0 15px 35px rgba(0,0,0,0.3)'
             }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.7rem', opacity: 0.4, letterSpacing: '1px' }}>LEADERBOARD</h4>
-                <div style={{ fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>Leaderboard</h4>
+                <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '10px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}>
                     {leaderboard.map((p, i) => (
                         <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', opacity: p.id === myIdRef.current ? 1 : 0.5 }}>
-                            <span style={{ fontWeight: p.id === myIdRef.current ? '700' : '400' }}>{i + 1}. {p.name || 'An unnamed cell'}</span>
-                            <span>${(p.balance ?? 0).toFixed(2)}</span>
+                            <span style={{ fontWeight: p.id === myIdRef.current ? '700' : '400' }}>{i + 1}. {p.name || 'Anonymous'}</span>
+                            <span>${(p.balance ?? 0).toFixed(4)}</span>
                         </div>
                     ))}
                 </div>
