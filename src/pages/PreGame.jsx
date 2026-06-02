@@ -14,6 +14,10 @@ export default function PreGame() {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false); 
+    const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
+    const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [withdrawAddress, setWithdrawAddress] = useState('');
+    const withdrawExpandRef = useRef(null);
     const [depositStatusMessage, setDepositStatusMessage] = useState('');
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
@@ -103,6 +107,9 @@ export default function PreGame() {
         if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
             setIsWalletExpanded(false);
         }
+        if (withdrawExpandRef.current && !withdrawExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
+            setIsWithdrawExpanded(false);
+        }
     }, []);
 
     useEffect(() => {
@@ -126,10 +133,22 @@ export default function PreGame() {
     }, [walletModalActive, isWalletExpanded]);
 
     useEffect(() => {
+        if (publicKey && !withdrawAddress) {
+            setWithdrawAddress(publicKey.toBase58());
+        }
+    }, [publicKey]);
+
+    useEffect(() => {
         if (!isWalletExpanded) {
             setPanelPosition({ x: null, y: 60 });
         }
     }, [isWalletExpanded]);
+
+    useEffect(() => {
+        if (!isWithdrawExpanded) {
+            setPanelPosition({ x: null, y: 120 });
+        }
+    }, [isWithdrawExpanded]);
 
     useEffect(() => {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
@@ -175,7 +194,8 @@ export default function PreGame() {
         const clientY = event.clientY ?? (event.touches && event.touches[0]?.clientY);
         if (clientX === undefined || clientY === undefined) return;
 
-        const rect = walletExpandRef.current?.getBoundingClientRect();
+        const activePanel = walletExpandRef.current || withdrawExpandRef.current;
+        const rect = activePanel?.getBoundingClientRect();
         if (!rect) return;
 
         event.preventDefault();
@@ -278,6 +298,38 @@ export default function PreGame() {
                 setDepositStatusMessage('❌ Deposit failed. Check your wallet balance.');
             }
         }
+    };
+
+    const handleWithdraw = async () => {
+        if (!token) return;
+        if (!withdrawAmount || isNaN(parseFloat(withdrawAmount)) || parseFloat(withdrawAmount) < 1) {
+            setDepositStatusMessage('❌ Minimum withdrawal is $1.00');
+            return;
+        }
+        if (!withdrawAddress) {
+            setDepositStatusMessage('❌ Please enter a destination address.');
+            return;
+        }
+
+        setDepositStatusMessage('⏳ Processing withdrawal...');
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/withdraw`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    amountUSD: parseFloat(withdrawAmount),
+                    destinationAddress: withdrawAddress
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Withdrawal failed');
+            await refreshUser();
+            setDepositStatusMessage(`✅ Success! Funds sent to your wallet.`);
+            setWithdrawAmount('');
+        } catch (error) { setDepositStatusMessage(`❌ ${error.message}`); }
     };
 
     useEffect(() => {
@@ -424,8 +476,17 @@ export default function PreGame() {
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px' }}>
-                                    <button onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); }} style={dropdownPrimaryBtn}>Deposit</button>
-                                    <button onClick={() => { setIsWalletOpen(false); navigate('/profile'); }} style={dropdownSecondaryBtn}>Withdraw</button>
+                                    <button onClick={() => { 
+                                        setIsWalletOpen(false); 
+                                        setIsWithdrawExpanded(false);
+                                        setIsWalletExpanded(true); 
+                                        setDepositMethod('wallet'); 
+                                    }} style={dropdownPrimaryBtn}>Deposit</button>
+                                    <button onClick={() => { 
+                                        setIsWalletOpen(false); 
+                                        setIsWalletExpanded(false);
+                                        setIsWithdrawExpanded(true); 
+                                    }} style={dropdownSecondaryBtn}>Withdraw</button>
                                 </div>
                             </div>
                         )}
@@ -513,7 +574,6 @@ export default function PreGame() {
                             <div style={walletInputArea}>
                                 <div style={walletInputPrefix}>$</div>
                                 <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
-                                <button style={walletMaxBtn} onClick={() => setAmount('100')}>MAX</button>
                             </div>
                             <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
                         </>
@@ -543,6 +603,46 @@ export default function PreGame() {
                         </div>
                     )}
                     <div style={walletPanelFooter}>Solana Mainnet · Secure Processing</div>
+                </div>
+            )}
+
+            {isWithdrawExpanded && (
+                <div ref={withdrawExpandRef} className="glass" style={{...adjustedWalletExpandPanelStyle, top: 120}}>
+                    <button style={walletCloseX} onClick={() => setIsWithdrawExpanded(false)}>✕</button>
+                    <div style={walletPanelHeader} onMouseDown={handlePanelDragStart} onTouchStart={handlePanelDragStart}>
+                        <div style={walletPanelTitle}>Withdraw</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={inputLabelStyle}>Destination Address</div>
+                        <input 
+                            type="text" 
+                            placeholder="Paste Solana Address" 
+                            value={withdrawAddress}
+                            onChange={(e) => setWithdrawAddress(e.target.value)}
+                            style={{...walletInput, padding: '12px'}}
+                        />
+                        <div style={inputLabelStyle}>Amount (USD)</div>
+                        <div style={walletInputArea}>
+                            <div style={walletInputPrefix}>$</div>
+                            <input 
+                                type="number" 
+                                placeholder="0.00" 
+                                value={withdrawAmount} 
+                                onChange={(e) => setWithdrawAmount(e.target.value)} 
+                                style={walletInput} 
+                            />
+                            <button style={walletMaxBtn} onClick={() => setWithdrawAmount(user?.balance?.toFixed(2))}>MAX</button>
+                        </div>
+                        <button style={{...walletConfirmBtn, background: '#FF3B30'}} onClick={handleWithdraw}>
+                            Withdraw to Wallet
+                        </button>
+                    </div>
+                    {depositStatusMessage && (
+                        <div style={{ marginTop: '14px', fontSize: '0.85rem', color: depositStatusMessage.startsWith('✅') ? '#34C759' : '#FF3B30', textAlign: 'center' }}>
+                            {depositStatusMessage}
+                        </div>
+                    )}
+                    <div style={walletPanelFooter}>Custodial Wallet · Secure Transfer</div>
                 </div>
             )}
 

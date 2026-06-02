@@ -429,18 +429,18 @@ export default function Lobby() {
                                 <button 
                                     onClick={() => { setDepositMethod('wallet'); setDepositStatusMessage(''); }}
                                     style={{
-                                        flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
+                                        padding: '8px 18px', border: 'none', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
                                         background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',
                                         color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.4)',
                                         transition: '0.2s'
                                     }}
                                 >
-                                    Wallet Connect
+                                    Wallet
                                 </button>
                                 <button 
                                     onClick={() => { setDepositMethod('manual'); setDepositStatusMessage(''); }}
                                     style={{
-                                        flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
+                                        padding: '8px 18px', border: 'none', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
                                         background: depositMethod === 'manual' ? 'rgba(255,255,255,0.1)' : 'transparent',
                                         color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
                                         transition: '0.2s'
