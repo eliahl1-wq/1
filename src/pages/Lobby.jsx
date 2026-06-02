@@ -37,15 +37,11 @@ export default function Lobby() {
     const qrRef = useRef(null); // Ref for the QR code canvas
 
     const SolanaLogo = ({ size = 14 }) => (
-        <svg width={size} height={size} viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle' }}>
-            <path d="M384 397.7c0 2.6-1.1 5.1-3 7.1L306.9 480c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1c0-2.6 1.1-5.1 3-7.1L77.1 395c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.2 3.2 7.2 7.1zM0 114.3c0-2.6 1.1-5.1 3-7.1L77.1 32c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.1 3.2 7.1 7.1c0 2.6-1.1 5.1-3 7.1l-74.1 74.9c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1zM384 256c0 2.6-1.1 5.1-3 7.1l-74.1 74.9c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1c0-2.6 1.1-5.1 3-7.1l74.1-74.9c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.2 3.2 7.2 7.1z" fill="url(#solana_grad_lobby)"/>
-            <defs>
-                <linearGradient id="solana_grad_lobby" x1="0" y1="256" x2="384" y2="256" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#9945FF"/>
-                    <stop offset="1" stopColor="#14F195"/>
-                </linearGradient>
-            </defs>
-        </svg>
+        <img 
+            src="/solana-sol-logo.png" 
+            alt="SOL" 
+            style={{ width: size, height: size, verticalAlign: 'middle', objectFit: 'contain' }} 
+        />
     );
 
     const depositAddress = user?.depositAddress;
@@ -362,8 +358,8 @@ export default function Lobby() {
                             }}
                         >
                             <span style={{ fontWeight: '600', fontSize: '1.1rem', letterSpacing: '-0.3px' }}>{user.username}</span>
-                            <span style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>
-                                {isDepositAmountInSOL ? <SolanaLogo size={14} /> : '$'}
+                            <span className="mono" style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>
+                                {isDepositAmountInSOL ? <SolanaLogo size={16} /> : '$'}
                                 {isDepositAmountInSOL 
                                     ? (user.balance / solPrice)?.toFixed(4) 
                                     : user.balance?.toFixed(2) || '0.00'}
@@ -385,7 +381,19 @@ export default function Lobby() {
                                     <select 
                                         value={isDepositAmountInSOL ? 'SOL' : 'USD'}
                                         onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')}
-                                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '800', padding: '2px 4px', outline: 'none', cursor: 'pointer' }}
+                                        style={{ 
+                                            background: 'rgba(255,255,255,0.08)', 
+                                            border: '1px solid rgba(255,255,255,0.1)', 
+                                            color: 'white', 
+                                            borderRadius: '8px', 
+                                            fontSize: '0.75rem', 
+                                            fontWeight: '700', 
+                                            padding: '4px 8px', 
+                                            outline: 'none', 
+                                            cursor: 'pointer',
+                                            appearance: 'none',
+                                            textAlign: 'center'
+                                        }}
                                     >
                                         <option value="USD">USD</option>
                                         <option value="SOL">SOL</option>
@@ -487,12 +495,28 @@ export default function Lobby() {
 
                         {depositMethod === 'wallet' ? (
                             <div style={{ width: '100%' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                     <label style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Amount</label>
                                     <select 
                                         value={isDepositAmountInSOL ? 'SOL' : 'USD'} 
                                         onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')} 
-                                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '8px', padding: '4px 12px', fontSize: '0.7rem', fontWeight: '800', outline: 'none', cursor: 'pointer' }}
+                                        style={{ 
+                                            background: 'rgba(255,255,255,0.05)', 
+                                            border: '1px solid rgba(255,255,255,0.1)', 
+                                            color: 'white', 
+                                            borderRadius: '10px', 
+                                            padding: '6px 14px', 
+                                            fontSize: '0.75rem', 
+                                            fontWeight: '700', 
+                                            outline: 'none', 
+                                            cursor: 'pointer',
+                                            appearance: 'none',
+                                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                            backgroundRepeat: 'no-repeat',
+                                            backgroundPosition: 'right 8px center',
+                                            backgroundSize: '12px',
+                                            paddingRight: '28px'
+                                        }}
                                     >
                                         <option value="USD">USD</option>
                                         <option value="SOL">SOL</option>
@@ -501,9 +525,9 @@ export default function Lobby() {
                                 <div style={{ position: 'relative', width: '100%' }}>
                                     <div style={{ 
                                         position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', 
-                                        color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', fontWeight: '800', pointerEvents: 'none', zIndex: 1 
+                                        color: 'rgba(255,255,255,0.3)', fontSize: '1rem', fontWeight: '700', pointerEvents: 'none', zIndex: 1 
                                     }}>
-                                        {isDepositAmountInSOL ? <SolanaLogo size={16} /> : '$'}
+                                        {isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}
                                     </div>
                                     <input
                                         type="number"
