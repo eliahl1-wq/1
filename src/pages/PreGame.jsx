@@ -5,6 +5,9 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
 import { createQR } from '@solana/pay';
+import '../styles/ui.css';
+import CustomDropdown from '../components/CustomDropdown';
+import TokenBadge from '../components/TokenBadge';
 
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
@@ -195,6 +198,20 @@ export default function PreGame() {
             } catch (err) { console.error(err); }
         }
     }, [depositAddress, depositMethod]);
+
+    // Ensure QR cleanup when leaving Deposit view or unmounting
+    useEffect(() => {
+        // Clear QR when depositMethod changes away from manual OR when the wallet panel closes
+        if ((depositMethod !== 'manual' || !isWalletExpanded) && qrRef.current) {
+            qrRef.current.innerHTML = '';
+        }
+    }, [depositMethod, isWalletExpanded]);
+
+    useEffect(() => {
+        return () => {
+            if (qrRef.current) qrRef.current.innerHTML = '';
+        };
+    }, []);
 
     useEffect(() => {
         if (!isDraggingPanel) return;
@@ -545,14 +562,12 @@ export default function PreGame() {
                                     <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         {isDepositAmountInSOL ? `~ $${formatBalance(user?.balance)}` : <>~ {(user?.balance / solPrice)?.toFixed(4)} <SolanaLogo size={14} /></>}
                                     </span>
-                                    <select 
+                                    <CustomDropdown
+                                        options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
                                         value={isDepositAmountInSOL ? 'SOL' : 'USD'}
-                                        onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')}
-                                        style={currencySelectStyle}
-                                    >
-                                        <option value="USD">USD</option>
-                                        <option value="SOL">SOL</option>
-                                    </select>
+                                        onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
+                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>$</div>}
+                                    />
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '10px' }}> {/* Buttons side-by-side */}
@@ -655,10 +670,12 @@ export default function PreGame() {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                 <label style={inputLabelStyle}>Amount</label>
-                                <select value={isDepositAmountInSOL ? 'SOL' : 'USD'} onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')} style={currencySelectStyle}>
-                                    <option value="USD">USD</option>
-                                    <option value="SOL">SOL</option>
-                                </select>
+                                <CustomDropdown
+                                    options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
+                                    value={isDepositAmountInSOL ? 'SOL' : 'USD'}
+                                    onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
+                                    renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>$</div>}
+                                />
                             </div>
                             <div style={walletInputArea}>
                                 <div style={{...walletInputPrefix, top: '50%', transform: 'translateY(-50%)'}}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div>
@@ -741,10 +758,12 @@ export default function PreGame() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginTop: '4px' }}>
                             <label style={inputLabelStyle}>Amount</label>
-                            <select value={isDepositAmountInSOL ? 'SOL' : 'USD'} onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')} style={currencySelectStyle}>
-                                <option value="USD">USD</option>
-                                <option value="SOL">SOL</option>
-                            </select>
+                            <CustomDropdown
+                                options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
+                                value={isDepositAmountInSOL ? 'SOL' : 'USD'}
+                                onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
+                                renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>$</div>}
+                            />
                         </div>
                         <div style={walletInputArea}>
                             <div style={{...walletInputPrefix, top: '50%', transform: 'translateY(-50%)'}}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div>

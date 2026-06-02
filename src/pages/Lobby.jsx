@@ -5,6 +5,9 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
 import { useNavigate } from 'react-router-dom';
 import { createQR } from '@solana/pay';
+import '../styles/ui.css';
+import CustomDropdown from '../components/CustomDropdown';
+import TokenBadge from '../components/TokenBadge';
 
 export default function Lobby() {
     const { user, logout, token, login, refreshUser } = useAuth();
@@ -120,6 +123,12 @@ export default function Lobby() {
             qr.append(qrRef.current);
         }
     }, [depositAddress, depositMethod]);
+
+    // Ensure QR cleanup on unmount or when leaving deposit view
+    useEffect(() => {
+        if (depositMethod !== 'manual' && qrRef.current) qrRef.current.innerHTML = '';
+        return () => { if (qrRef.current) qrRef.current.innerHTML = ''; };
+    }, [depositMethod]);
 
     // Om användaren redan har balans och INTE är i ett game, skicka dem till PreGame
     useEffect(() => {
@@ -378,27 +387,12 @@ export default function Lobby() {
                             }}>
                                 <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '0.75rem', fontWeight: '800', opacity: 0.4 }}>CURRENCY</span>
-                                    <select 
+                                    <CustomDropdown
+                                        options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
                                         value={isDepositAmountInSOL ? 'SOL' : 'USD'}
-                                        onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')}
-                                        style={{ // Sync style with PreGame
-                                            background: '#23262f', 
-                                            border: '1px solid rgba(255,255,255,0.12)', 
-                                            color: 'white', 
-                                            borderRadius: '8px', 
-                                            fontSize: '0.75rem', 
-                                            fontWeight: '700', 
-                                            padding: '4px 8px', 
-                                            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                                            outline: 'none', 
-                                            cursor: 'pointer',
-                                            appearance: 'none',
-                                            textAlign: 'center'
-                                        }}
-                                    >
-                                        <option value="USD">USD</option>
-                                        <option value="SOL">SOL</option>
-                                    </select>
+                                        onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
+                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>USD</div>}
+                                    />
                                 </div>
                                 <button 
                                     onClick={logout}
@@ -498,30 +492,12 @@ export default function Lobby() {
                             <div style={{ width: '100%' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                     <label style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Amount</label>
-                                    <select 
-                                        value={isDepositAmountInSOL ? 'SOL' : 'USD'} 
-                                        onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')} 
-                                        style={{ 
-                                            background: 'rgba(255,255,255,0.05)', 
-                                            border: '1px solid rgba(255,255,255,0.1)', 
-                                            color: 'white', 
-                                            borderRadius: '10px', 
-                                            padding: '6px 14px', 
-                                            fontSize: '0.75rem', 
-                                            fontWeight: '700', 
-                                            outline: 'none', 
-                                            cursor: 'pointer',
-                                            appearance: 'none',
-                                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                                            backgroundRepeat: 'no-repeat',
-                                            backgroundPosition: 'right 8px center',
-                                            backgroundSize: '12px',
-                                            paddingRight: '28px'
-                                        }}
-                                    >
-                                        <option value="USD">USD</option>
-                                        <option value="SOL">SOL</option>
-                                    </select>
+                                    <CustomDropdown
+                                        options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
+                                        value={isDepositAmountInSOL ? 'SOL' : 'USD'}
+                                        onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
+                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>USD</div>}
+                                    />
                                 </div>
                                 <div style={{ position: 'relative', width: '100%' }}>
                                     <div style={{ 

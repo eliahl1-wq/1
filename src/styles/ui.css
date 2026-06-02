@@ -1,0 +1,49 @@
+:root{
+  --primary: #9945FF;
+  --secondary: #14F195;
+  --text: rgba(255,255,255,0.9);
+  --border: rgba(255,255,255,0.08);
+  --bg-1: rgba(255,255,255,0.03);
+  --bg-2: rgba(255,255,255,0.05);
+  --glass-bg: rgba(18,18,22,0.6);
+}
+
+/* Utility layout */
+.glass-card{
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  color: var(--text);
+}
+
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mono{font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+
+.wallet-pill{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:transparent;border:1px solid transparent;cursor:pointer}
+.wallet-pill:hover{background:rgba(255,255,255,0.02)}
+
+.token-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid var(--border)}
+.token-badge img{width:18px;height:18px;display:block}
+
+.glass-panel{padding:18px;border-radius:14px;border:1px solid var(--border);background:var(--glass-bg)}
+
+.btn-primary{background:linear-gradient(180deg,var(--primary),#6f2cf0);color:white;padding:10px 14px;border-radius:10px;border:none;font-weight:800}
+.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px;color:var(--text)}
+
+/* Custom dropdown */
+.dropdown{position:relative;display:inline-block}
+.dropdown-trigger{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);cursor:pointer}
+.dropdown-panel{position:absolute;right:0;top:calc(100% + 8px);min-width:140px;background:var(--glass-bg);border:1px solid var(--border);backdrop-filter:blur(10px);border-radius:10px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,0.45);opacity:0;transform:translateY(-6px);pointer-events:none;transition:all .18s cubic-bezier(.2,.9,.2,1)}
+.dropdown.open .dropdown-panel{opacity:1;transform:translateY(0);pointer-events:auto}
+.dropdown-item{padding:8px 10px;border-radius:8px;color:var(--text);font-weight:700;cursor:pointer}
+.dropdown-item:hover{background:rgba(255,255,255,0.03)}
+.dropdown-item.active{background:linear-gradient(90deg, rgba(153,69,255,0.12), rgba(20,241,149,0.04));border:1px solid rgba(153,69,255,0.08)}
+
+/* QR container */
+.qr-container{background:white;padding:12px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+
+/* Responsive tweaks */
+@media (max-width:720px){
+  .wallet-panel{width:92vw;padding:14px}
+}
