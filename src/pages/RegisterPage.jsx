@@ -52,9 +52,9 @@ export default function RegisterPage() {
                 {/* Logo */}
                 <div style={{ textAlign: 'center', marginBottom: '28px' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                        <div style={{ width: 7, height: 7, background: '#007AFF', borderRadius: '50%', boxShadow: '0 0 10px #007AFF' }} />
                         <span style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-1px', color: 'var(--text-h)' }}>
-                            AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                            AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
                         </span>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-2)', fontWeight: 500 }}>

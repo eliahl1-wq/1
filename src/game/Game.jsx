@@ -339,7 +339,7 @@ export default function Game() {
                         <div className="overlay-badge success">Transaction Confirmed</div>
                         <h2 className="overlay-heading">Profit Secured</h2>
                         <div className="overlay-amount success">
-                            <span className="unit">$</span>{displayCashedAmount.toFixed(2)}
+                            <span className="unit">$</span>{displayCashedAmount.toFixed(4)}
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">Capital has been successfully reconciled to your account balance.</p>
@@ -373,7 +373,7 @@ export default function Game() {
                     flex-direction: column;
                     align-items: center;
                     justifyContent: center;
-                    background: rgba(5, 5, 7, 0.98);
+                    background: rgba(15, 17, 24, 0.98);
                     backdrop-filter: blur(20px);
                     animation: overlayIn 0.3s ease-out forwards;
                     width: 100vw;
@@ -468,22 +468,22 @@ export default function Game() {
                 zIndex: 100
             }}>
                 <div style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    backdropFilter: 'blur(20px)',
-                    padding: '15px 25px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: '#0f1118',
+                    backdropFilter: 'blur(16px)',
+                    padding: '20px 25px',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
                     color: 'white',
-                    boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '12px'
+                    gap: '14px'
                 }}>
                     <div style={{ textAlign: 'center' }}>
-                        <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#34C759' }}>In-Game Stake</h3>
-                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                            ${(currentBalance ?? 0).toFixed(2)}
+                        <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Active Stake</h3>
+                        <div style={{ fontSize: '2.4rem', fontWeight: '800', color: '#fff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', letterSpacing: '-1.5px' }}>
+                            ${(currentBalance ?? 0).toFixed(4)}
                         </div>
                         
                         {potentialBonus > 0 && (
@@ -498,17 +498,17 @@ export default function Game() {
                         disabled={localTimer > 0}
                         style={{
                             width: '100%',
-                            background: localTimer > 0 ? '#444' : '#34C759',
+                            background: localTimer > 0 ? 'rgba(255,255,255,0.05)' : 'linear-gradient(180deg, #34C759 0%, #28a745 100%)',
                             color: 'white',
                             border: 'none',
-                            padding: '10px 0',
-                            borderRadius: '12px',
+                            padding: '12px 0',
+                            borderRadius: '100px',
                             fontWeight: '800',
                             fontSize: '0.8rem',
-                            letterSpacing: '1px',
+                            letterSpacing: '0.5px',
                             cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
                             transition: '0.2s all ease',
-                            boxShadow: localTimer > 0 ? 'none' : '0 4px 15px rgba(52, 199, 89, 0.4)',
+                            boxShadow: localTimer > 0 ? 'none' : '0 8px 20px rgba(52, 199, 89, 0.25)',
                             opacity: localTimer > 0 ? 0.7 : 1
                         }}
                     >
@@ -519,22 +519,22 @@ export default function Game() {
                 {/* Reward Info Panel */}
                 <div style={{
                     marginTop: '20px',
-                    padding: '15px',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    borderRadius: '15px',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    padding: '18px',
+                    background: '#0f1118',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
                     textAlign: 'left',
                     fontSize: '0.75rem',
                     lineHeight: '1.6',
                     width: '100%',
                     boxSizing: 'border-box',
-                    opacity: rewardsUnlocked ? 1 : 0.5
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
                 }}>
-                    <div style={{ color: '#34C759', fontWeight: '800', marginBottom: rewardsUnlocked ? '8px' : '2px', letterSpacing: '1px' }}>
+                    <div style={{ color: '#34C759', fontWeight: '900', marginBottom: rewardsUnlocked ? '10px' : '4px', letterSpacing: '1px', fontSize: '0.65rem', textTransform: 'uppercase' }}>
                         ARENA REWARDS
                     </div>
                     {!rewardsUnlocked && (
-                        <div style={{ fontSize: '0.65rem', color: '#FF3B30', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', opacity: 0.8 }}>
+                        <div style={{ fontSize: '0.7rem', color: '#FF3B30', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', opacity: 0.8 }}>
                             {formatUnlockTimer()}
                         </div>
                     )}
