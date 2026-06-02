@@ -32,6 +32,8 @@ export default function Lobby() {
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet'); // 'wallet' | 'manual'
+    const [isDepositAmountInSOL, setIsDepositAmountInSOL] = useState(false);
+    const [solPrice, setSolPrice] = useState(150); // Placeholder, ideally fetched from an API
     const qrRef = useRef(null); // Ref for the QR code canvas
 
     const depositAddress = user?.depositAddress;
@@ -106,7 +108,7 @@ export default function Lobby() {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
             const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
             qrRef.current.innerHTML = '';
-            const qr = createQR(solanaPayUrl, 120, 'white', 'black');
+            const qr = createQR(solanaPayUrl, 180, 'white', 'black');
             qr.append(qrRef.current);
         }
     }, [depositAddress, depositMethod]);
@@ -141,9 +143,20 @@ export default function Lobby() {
         setDepositStatusMessage('Waiting for approval...');
 
         try {
-            // Placeholder-kurs: 1 SOL = 150 USD. I framtiden bör du hämta detta via API.
-            const SOL_USD_RATE = 150; 
-            const solAmount = amountUSD / SOL_USD_RATE;
+            const currentSolPrice = solPrice; // Use the current SOL price
+            let finalAmountUSD = 0;
+            let finalSolAmount = 0;
+
+            if (isDepositAmountInSOL) {
+                finalSolAmount = amountUSD; // amountUSD here is actually SOL amount from input
+                finalAmountUSD = finalSolAmount * currentSolPrice;
+            } else {
+                finalAmountUSD = amountUSD;
+                finalSolAmount = finalAmountUSD / currentSolPrice;
+            }
+
+            // Use finalSolAmount for lamports calculation
+            const solAmount = finalSolAmount;
             const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
 
             const transaction = new Transaction().add(
@@ -178,7 +191,7 @@ export default function Lobby() {
                 },
                 body: JSON.stringify({ 
                     signature: signature, 
-                    amountUSD: amountUSD,
+                    amountUSD: finalAmountUSD, // Send USD amount to backend
                     solAmount: solAmount,
                     walletAddress: publicKey.toString()
                 })
@@ -375,7 +388,7 @@ export default function Lobby() {
             </div>
 
             {/* Center Content */}
-            <div style={{ zIndex: 5, fontFamily: 'system-ui', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ zIndex: 5, fontFamily: 'system-ui', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
                 <h1 style={{ 
                     color: 'white',
                     fontSize: '5.5rem',
@@ -429,7 +442,7 @@ export default function Lobby() {
                                 <button 
                                     onClick={() => { setDepositMethod('wallet'); setDepositStatusMessage(''); }}
                                     style={{
-                                        padding: '8px 18px', border: 'none', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
+                                        padding: '4px 14px', border: 'none', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '800', cursor: 'pointer',
                                         background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',
                                         color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.4)',
                                         transition: '0.2s'
@@ -440,7 +453,7 @@ export default function Lobby() {
                                 <button 
                                     onClick={() => { setDepositMethod('manual'); setDepositStatusMessage(''); }}
                                     style={{
-                                        padding: '8px 18px', border: 'none', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
+                                        padding: '4px 14px', border: 'none', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '800', cursor: 'pointer',
                                         background: depositMethod === 'manual' ? 'rgba(255,255,255,0.1)' : 'transparent',
                                         color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
                                         transition: '0.2s'
@@ -451,21 +464,16 @@ export default function Lobby() {
                             </div>
 
                         {depositMethod === 'wallet' ? (
-                                    <>
-                                <span style={{ 
-                                    position: 'absolute', 
-                                    left: '18px', 
-                                    top: '50%',
-                            
-                                    transform: 'translateY(-55%)', 
-                                    color: 'rgba(255,255,255,0.4)',
-                                    fontSize: '1.1rem',
-                                    fontFamily: 'inherit',
-                                    pointerEvents: 'none'
-                                }}>$</span>
+                            <div style={{ position: 'relative', width: '100%' }}>
+                                <div style={{ 
+                                    position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', 
+                                    color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', fontWeight: '800', pointerEvents: 'none', zIndex: 1 
+                                }}>
+                                    {isDepositAmountInSOL ? 'SOL' : '$'}
+                                </div>
                                 <input
                                     type="number"
-                                    placeholder="Enter deposit amount..."
+                                    placeholder="0.00"
                                     value={depositAmount}
                                     onChange={(e) => setDepositAmount(e.target.value)}
                                     style={{
@@ -480,15 +488,34 @@ export default function Lobby() {
                                         outline: 'none'
                                     }}
                                 />
+                                <button
+                                    onClick={() => setIsDepositAmountInSOL(!isDepositAmountInSOL)}
+                                    style={{ 
+                                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                                        background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', 
+                                        padding: '6px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800', cursor: 'pointer' 
+                                    }}
+                                >
+                                    {isDepositAmountInSOL ? 'USD' : 'SOL'}
+                                </button>
+
+                                {depositAmount && (
+                                    <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '8px', textAlign: 'right', fontWeight: '600' }}>
+                                        {isDepositAmountInSOL 
+                                            ? `~ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}` 
+                                            : `~ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
+                                    </div>
+                                )}
+
                                         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', marginTop: '15px' }}>
                                             <WalletMultiButton />
                                         </div>
-                                    </>
+                            </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
                                 <div 
                                     ref={qrRef} 
-                                    style={{ borderRadius: '12px', overflow: 'hidden', background: 'white', padding: '8px', display: 'flex' }} 
+                                    style={{ borderRadius: '16px', overflow: 'hidden', background: 'white', padding: '12px', display: 'flex', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }} 
                                 />
                                 <div style={{ width: '100%' }}>
                                     <div style={{ fontSize: '9px', opacity: 0.4, textAlign: 'left', marginBottom: '4px', textTransform: 'uppercase' }}>Recipient Address</div>

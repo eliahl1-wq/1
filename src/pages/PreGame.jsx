@@ -12,6 +12,8 @@ export default function PreGame() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [solPrice, setSolPrice] = useState(150); // Placeholder, ideally fetched from an API
+
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false); 
     const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
@@ -19,6 +21,8 @@ export default function PreGame() {
     const [withdrawAddress, setWithdrawAddress] = useState('');
     const withdrawExpandRef = useRef(null);
     const [depositStatusMessage, setDepositStatusMessage] = useState('');
+    const [isWithdrawAmountInSOL, setIsWithdrawAmountInSOL] = useState(false);
+    const [isDepositAmountInSOL, setIsDepositAmountInSOL] = useState(false);
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
     const qrRef = useRef(null); // Ref for the QR code canvas
@@ -32,13 +36,17 @@ export default function PreGame() {
     const [walletModalActive, setWalletModalActive] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet');
     const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
-    const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0 });
     
     const depositAddress = user?.depositAddress;
+
+    // Solana Address Validation Regex
+    const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+    const [showHowItWorks, setShowHowItWorks] = useState(false); // Moved here
 
     const formatBalance = (val) => {
         const v = Number(val || 0);
@@ -48,6 +56,12 @@ export default function PreGame() {
         if (v >= 1) return Number(v.toFixed(2)).toString();
         if (v > 0) return Number(v.toFixed(4)).toString();
         return '0';
+    };
+    
+    // Helper for shortening Solana addresses
+    const shortenAddress = (address, chars = 6) => {
+        if (!address || address.length <= chars * 2 + 3) return address;
+        return `${address.substring(0, chars)}...${address.substring(address.length - chars)}`;
     };
 
     const entryFee = 10.00;
@@ -151,12 +165,20 @@ export default function PreGame() {
     }, [isWithdrawExpanded]);
 
     useEffect(() => {
+        if (withdrawAddress) {
+            setIsValidWithdrawAddress(SOLANA_ADDRESS_REGEX.test(withdrawAddress));
+        } else {
+            setIsValidWithdrawAddress(true); // No address, no invalid state
+        }
+    }, [withdrawAddress]);
+
+    useEffect(() => {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
             const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
             try {
                 qrRef.current.innerHTML = '';
-                // Skapar QR-koden med Solana-logga (createQR hanterar detta automatiskt)
-                const qr = createQR(solanaPayUrl, 160, 'white', 'black');
+                // Skapar QR-koden med Solana-logga (createQR hanterar detta automatiskt), större storlek och vit bakgrund
+                const qr = createQR(solanaPayUrl, 180, 'white', 'black'); 
                 qr.append(qrRef.current);
             } catch (err) { console.error(err); }
         }
@@ -213,19 +235,28 @@ export default function PreGame() {
             return;
         }
 
-        const amountUSD = parseFloat(amount);
+        const amountToDeposit = parseFloat(amount);
         const minimumDepositUSD = 0;
-        if (isNaN(amountUSD) || amountUSD < minimumDepositUSD) {
+        if (isNaN(amountToDeposit) || amountToDeposit < minimumDepositUSD) {
             setDepositStatusMessage(`Minimum deposit is $${minimumDepositUSD}.`);
             return;
         }
 
         setDepositStatusMessage('Waiting for approval...');
 
+        let finalAmountUSD = 0;
+        let finalSolAmount = 0;
+
+        if (isDepositAmountInSOL) {
+            finalSolAmount = amountToDeposit;
+            finalAmountUSD = finalSolAmount * solPrice;
+        } else {
+            finalAmountUSD = amountToDeposit;
+            finalSolAmount = finalAmountUSD / solPrice;
+        }
+
         try {
-            const SOL_USD_RATE = 150;
-            const solAmount = amountUSD / SOL_USD_RATE;
-            const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
+            const lamports = Math.round(finalSolAmount * LAMPORTS_PER_SOL);
 
             const transaction = new Transaction().add(
                 SystemProgram.transfer({
@@ -257,8 +288,8 @@ export default function PreGame() {
                 },
                 body: JSON.stringify({
                     signature: signature,
-                    amountUSD: amountUSD,
-                    solAmount: solAmount,
+                    amountUSD: finalAmountUSD,
+                    solAmount: finalSolAmount,
                     walletAddress: publicKey.toString()
                 })
             });
@@ -285,7 +316,7 @@ export default function PreGame() {
                 }
             }
 
-            setDepositStatusMessage(`✅ Success! ${solAmount.toFixed(4)} SOL deposited and verified.`);
+            setDepositStatusMessage(`✅ Success! ${finalSolAmount.toFixed(4)} SOL deposited and verified.`);
             setAmount('');
         } catch (error) {
             console.error('Deposit error:', error);
@@ -301,8 +332,13 @@ export default function PreGame() {
     };
 
     const handleWithdraw = async () => {
+        if (!publicKey) {
+            setDepositStatusMessage('❌ Connect your wallet first.');
+            return;
+        }
         if (!token) return;
-        if (!withdrawAmount || isNaN(parseFloat(withdrawAmount)) || parseFloat(withdrawAmount) < 1) {
+        const amountToWithdraw = parseFloat(withdrawAmount);
+        if (isNaN(amountToWithdraw) || amountToWithdraw < 1) {
             setDepositStatusMessage('❌ Minimum withdrawal is $1.00');
             return;
         }
@@ -310,9 +346,16 @@ export default function PreGame() {
             setDepositStatusMessage('❌ Please enter a destination address.');
             return;
         }
+        if (!isValidWithdrawAddress) {
+            setDepositStatusMessage('❌ Invalid Solana address.');
+            return;
+        }
 
         setDepositStatusMessage('⏳ Processing withdrawal...');
         try {
+            const currentSolPrice = solPrice;
+            const finalAmountUSD = isWithdrawAmountInSOL ? amountToWithdraw * currentSolPrice : amountToWithdraw;
+
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/withdraw`, {
                 method: 'POST',
                 headers: {
@@ -320,7 +363,7 @@ export default function PreGame() {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    amountUSD: parseFloat(withdrawAmount),
+                    amountUSD: finalAmountUSD,
                     destinationAddress: withdrawAddress
                 })
             });
@@ -376,6 +419,11 @@ export default function PreGame() {
         const id = setInterval(fetchStats, 5000);
         return () => { mounted = false; clearInterval(id); };
     }, []);
+
+    // Solana Icon (simple text for now)
+    const SolanaTextIcon = () => (
+        <span style={{ fontFamily: 'system-ui', fontWeight: '800', fontSize: '0.9rem' }}>SOL</span>
+    );
 
     const adjustedWalletExpandPanelStyle = {
         ...walletExpandPanelStyle,
@@ -453,22 +501,35 @@ export default function PreGame() {
                             onClick={() => setIsWalletOpen(!isWalletOpen)}
                             style={walletPillButtonStyle}
                         >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '10px', opacity: 0.8}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg>
-                            <span className="mono" style={{fontWeight: '800', fontSize: '17px', color: '#fff'}}>${formatBalance(user?.balance)}</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '10px', opacity: 0.8}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg> {/* Wallet Icon */}
+                            <span className="mono" style={{fontWeight: '800', fontSize: '17px', color: '#fff'}}>
+                                {isDepositAmountInSOL ? `${(user?.balance / solPrice)?.toFixed(4)} SOL` : `$${formatBalance(user?.balance)}`}
+                            </span>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '10px', opacity: 0.6}}><path d="M6 9l6 6 6-6"/></svg>
                         </button>
 
                         {isWalletOpen && (
                             <div ref={walletDropdownRef} className="glass" style={walletDropdownCardStyle}>
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                                    <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }} 
+                                    <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
                                             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
                                         Transaction History
                                     </button>
                                 </div>
                                 
                                 <div className="mono" style={{ fontSize: '36px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>
-                                    ${formatBalance(user?.balance)}
+                                    {isDepositAmountInSOL ? `${(user?.balance / solPrice)?.toFixed(4)} SOL` : `$${formatBalance(user?.balance)}`}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'rgba(255,255,255,0.2)' }}>
+                                        {isDepositAmountInSOL ? `~${formatBalance(user?.balance)} USD` : `~${(user?.balance / solPrice)?.toFixed(4)} SOL`}
+                                    </span>
+                                    <button
+                                        onClick={() => setIsDepositAmountInSOL(!isDepositAmountInSOL)}
+                                        style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', padding: '4px 8px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800', cursor: 'pointer' }}
+                                    >
+                                        {isDepositAmountInSOL ? 'Show USD' : 'Show SOL'}
+                                    </button>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
@@ -572,14 +633,30 @@ export default function PreGame() {
                                 <WalletMultiButton />
                             </div>
                             <div style={walletInputArea}>
-                                <div style={walletInputPrefix}>$</div>
+                                <div style={walletInputPrefix}>{isDepositAmountInSOL ? <SolanaTextIcon /> : '$'}</div>
                                 <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
+                                <button
+                                    onClick={() => setIsDepositAmountInSOL(!isDepositAmountInSOL)}
+                                    style={{ ...walletMaxBtn, right: '10px', width: 'auto', padding: '6px 8px', fontSize: '0.65rem' }}
+                                >
+                                    {isDepositAmountInSOL ? 'USD' : 'SOL'}
+                                </button>
                             </div>
+                            {isDepositAmountInSOL && amount && (
+                                <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>
+                                    ~${(parseFloat(amount) * solPrice).toFixed(2)}
+                                </div>
+                            )}
+                            {!isDepositAmountInSOL && amount && (
+                                <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>
+                                    ~{(parseFloat(amount) / solPrice).toFixed(4)} SOL
+                                </div>
+                            )}
                             <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
                         </>
                     ) : ( // Deposit Address (QR) tab
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px' }}>
-                            <div ref={qrRef} style={{ background: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}></div>
+                            <div ref={qrRef} style={{ background: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}></div>
                             <div style={{ textAlign: 'center', width: '100%' }}>
                                 <div className="mono" style={{ fontSize: '10px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
                                     {depositAddress || 'Generating...'}
@@ -613,28 +690,56 @@ export default function PreGame() {
                         <div style={walletPanelTitle}>Withdraw</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={inputLabelStyle}>Destination Address</div>
-                        <input 
-                            type="text" 
-                            placeholder="Paste Solana Address" 
-                            value={withdrawAddress}
-                            onChange={(e) => setWithdrawAddress(e.target.value)}
-                            style={{...walletInput, padding: '12px'}}
-                        />
-                        <div style={inputLabelStyle}>Amount (USD)</div>
+                        <div style={{...inputLabelStyle, marginBottom: '4px'}}>Destination Address</div>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                            <input 
+                                type="text" 
+                                placeholder="Paste Solana Address" 
+                                value={displayFullWithdrawAddress ? withdrawAddress : shortenAddress(withdrawAddress, 6)}
+                                onFocus={() => setDisplayFullWithdrawAddress(true)}
+                                onBlur={() => setDisplayFullWithdrawAddress(false)}
+                                onChange={(e) => setWithdrawAddress(e.target.value)}
+                                style={{...walletInput, padding: '12px 40px 12px 12px'}} // Adjusted padding for icon
+                            />
+                            <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {isValidWithdrawAddress ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34C759" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.93"></path><path d="M22 4L12 14.01l-3-3"></path></svg>
+                                ) : (
+                                    withdrawAddress && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                )}
+                                <SolanaTextIcon />
+                            </div>
+                        </div>
+                        <div style={{...inputLabelStyle, marginBottom: '4px'}}>Amount ({isWithdrawAmountInSOL ? 'SOL' : 'USD'})</div>
                         <div style={walletInputArea}>
-                            <div style={walletInputPrefix}>$</div>
+                            <div style={walletInputPrefix}>{isWithdrawAmountInSOL ? <SolanaTextIcon /> : '$'}</div>
                             <input 
                                 type="number" 
-                                placeholder="0.00" 
+                            placeholder="Paste Solana Address" 
                                 value={withdrawAmount} 
                                 onChange={(e) => setWithdrawAmount(e.target.value)} 
                                 style={walletInput} 
                             />
                             <button style={walletMaxBtn} onClick={() => setWithdrawAmount(user?.balance?.toFixed(2))}>MAX</button>
+                            <button
+                                onClick={() => setIsWithdrawAmountInSOL(!isWithdrawAmountInSOL)}
+                                style={{ ...walletMaxBtn, right: '60px', width: 'auto', padding: '6px 8px', fontSize: '0.65rem' }}
+                            >
+                                {isWithdrawAmountInSOL ? 'USD' : 'SOL'}
+                            </button>
                         </div>
-                        <button style={{...walletConfirmBtn, background: '#FF3B30'}} onClick={handleWithdraw}>
-                            Withdraw to Wallet
+                        {isWithdrawAmountInSOL && withdrawAmount && (
+                            <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '-8px', textAlign: 'right' }}>
+                                ~${(parseFloat(withdrawAmount) * solPrice).toFixed(2)}
+                            </div>
+                        )}
+                        {!isWithdrawAmountInSOL && withdrawAmount && (
+                            <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '-8px', textAlign: 'right' }}>
+                                ~{(parseFloat(withdrawAmount) / solPrice).toFixed(4)} SOL
+                            </div>
+                        )}
+                        <button style={{...walletConfirmBtn, background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)'}} onClick={handleWithdraw}>
+                            Withdraw
                         </button>
                     </div>
                     {depositStatusMessage && (
