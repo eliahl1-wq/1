@@ -14,7 +14,7 @@ const SolLogo = ({ size = 13 }) => (
     <img
         src="/solana-sol-logo.png"
         alt="SOL"
-        style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, marginBottom: '2px' }}
+        style={{ height: '1.1em', width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, marginBottom: '0.15em' }}
     />
 );
 
@@ -407,7 +407,7 @@ export default function PreGame() {
                                                     value={isCurSOL ? 'SOL' : 'USD'}
                                                     onChange={v => setIsCurSOL(v === 'SOL')}
                                                     renderValue={v => (
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                             {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
                                                         </span>
                                                     )}
@@ -420,15 +420,17 @@ export default function PreGame() {
                                             </div>
 
                                             {/* Balance */}
-                                            <div className="wallet-card-balance">
+                                            <div className="wallet-card-balance" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 {isCurSOL ? (
-                                                    <SolLogo size={24} style={{ marginRight: '10px' }} />
+                                                    <SolLogo size={28} />
                                                 ) : (
                                                     <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>$</span>
                                                 )}
+                                                <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
                                                 {isCurSOL
                                                     ? (user.balance / solPrice).toFixed(4)
                                                     : fmt(user.balance)}
+                                                </span>
                                             </div>
                                             <div className="wallet-card-sub">
                                                 {isCurSOL
@@ -538,7 +540,7 @@ export default function PreGame() {
                                         value={isCurSOL ? 'SOL' : 'USD'}
                                         onChange={v => setIsCurSOL(v === 'SOL')}
                                         renderValue={v => (
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
                                             </span>
                                         )}
@@ -655,7 +657,7 @@ export default function PreGame() {
                                     value={isCurSOL ? 'SOL' : 'USD'}
                                     onChange={v => setIsCurSOL(v === 'SOL')}
                                     renderValue={v => (
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
                                         </span>
                                     )}

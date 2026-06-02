@@ -29,7 +29,7 @@ export default function CustomDropdown({ options, value, onChange, renderValue, 
                 className="dropdown-trigger"
                 onClick={() => setOpen(v => !v)}
                 type="button"
-                style={open ? { borderColor: '#007AFF', boxShadow: '0 0 12px rgba(0, 122, 255, 0.15)' } : {}}
+                style={open ? { borderColor: '#007AFF', boxShadow: '0 0 12px rgba(0, 122, 255, 0.25)' } : {}}
             >
                 {renderValue ? renderValue(value) : (selected?.label ?? value)}
                 <svg
@@ -52,7 +52,7 @@ export default function CustomDropdown({ options, value, onChange, renderValue, 
                         key={opt.value}
                         className={`dropdown-item${opt.value === value ? ' active' : ''}`}
                         onClick={() => { onChange(opt.value); setOpen(false); }}
-                        style={opt.value === value ? { color: '#007AFF', background: 'rgba(0, 122, 255, 0.08)' } : {}}
+                        style={opt.value === value ? { color: '#fff', background: 'rgba(0, 122, 255, 0.2)' } : {}}
                     >
                         {renderOption ? renderOption(opt) : opt.label}
                     </div>
