@@ -14,7 +14,7 @@ const SolLogo = ({ size = 13 }) => (
     <img
         src="/solana-sol-logo.png"
         alt="SOL"
-        style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0 }}
+        style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, marginBottom: '2px' }}
     />
 );
 
@@ -375,9 +375,10 @@ export default function PreGame() {
                                         id="balance-pill"
                                         className="balance-pill mono"
                                         onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
+                                        style={isWalletOpen ? { borderColor: '#007AFF', boxShadow: '0 0 10px rgba(0, 122, 255, 0.15)' } : {}}
                                     >
-                                        <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>
-                                            {isCurSOL ? 'SOL' : 'USD'}
+                                        <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            {isCurSOL ? <SolLogo size={12} /> : 'USD'}
                                         </span>
                                         <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
                                             {isCurSOL
@@ -406,8 +407,13 @@ export default function PreGame() {
                                                     value={isCurSOL ? 'SOL' : 'USD'}
                                                     onChange={v => setIsCurSOL(v === 'SOL')}
                                                     renderValue={v => (
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? 'var(--accent)' : undefined }}>
-                                                            {v === 'SOL' ? 'SOL' : '$USD'}
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
+                                                        </span>
+                                                    )}
+                                                    renderOption={opt => (
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
                                                         </span>
                                                     )}
                                                 />
@@ -415,9 +421,11 @@ export default function PreGame() {
 
                                             {/* Balance */}
                                             <div className="wallet-card-balance">
-                                                <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>
-                                                    {isCurSOL ? '' : '$'}
-                                                </span>
+                                                {isCurSOL ? (
+                                                    <SolLogo size={24} style={{ marginRight: '10px' }} />
+                                                ) : (
+                                                    <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>$</span>
+                                                )}
                                                 {isCurSOL
                                                     ? (user.balance / solPrice).toFixed(4)
                                                     : fmt(user.balance)}
@@ -465,6 +473,7 @@ export default function PreGame() {
                                     ref={userPillRef}
                                     className={`user-pill${showUserMenu ? ' active' : ''}`}
                                     onClick={() => setShowUserMenu(v => !v)}
+                                    style={showUserMenu ? { borderColor: '#007AFF', boxShadow: '0 0 10px rgba(0, 122, 255, 0.15)' } : {}}
                                 >
                                     <div className="avatar">
                                         {user?.username?.charAt(0).toUpperCase()}
@@ -528,7 +537,16 @@ export default function PreGame() {
                                         options={CUR_OPTIONS}
                                         value={isCurSOL ? 'SOL' : 'USD'}
                                         onChange={v => setIsCurSOL(v === 'SOL')}
-                                        renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v === 'SOL' ? 'SOL' : '$USD'}</span>}
+                                        renderValue={v => (
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
+                                            </span>
+                                        )}
+                                        renderOption={opt => (
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
+                                            </span>
+                                        )}
                                     />
                                 </div>
                                 <div className="amount-field">
@@ -636,7 +654,16 @@ export default function PreGame() {
                                     options={CUR_OPTIONS}
                                     value={isCurSOL ? 'SOL' : 'USD'}
                                     onChange={v => setIsCurSOL(v === 'SOL')}
-                                    renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v === 'SOL' ? 'SOL' : '$USD'}</span>}
+                                    renderValue={v => (
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
+                                        </span>
+                                    )}
+                                    renderOption={opt => (
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
+                                        </span>
+                                    )}
                                 />
                             </div>
                             <div className="amount-field">

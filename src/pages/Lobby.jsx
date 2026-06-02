@@ -11,7 +11,7 @@ import Background from '../components/Background';
 
 const SolLogo = ({ size = 13 }) => (
     <img src="/solana-sol-logo.png" alt="SOL"
-        style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0 }} />
+        style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, marginBottom: '2px' }} />
 );
 
 const CUR_OPTIONS = [
@@ -171,6 +171,7 @@ export default function Lobby() {
                                 ref={userPillRef}
                                 className={`user-pill${showUserMenu ? ' active' : ''}`}
                                 onClick={() => setShowUserMenu(v => !v)}
+                                style={showUserMenu ? { borderColor: '#007AFF', boxShadow: '0 0 10px rgba(0, 122, 255, 0.15)' } : {}}
                             >
                                 <div className="avatar">
                                     {user.username?.charAt(0).toUpperCase()}
@@ -178,9 +179,9 @@ export default function Lobby() {
                                 <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-h)' }}>
                                     {user.username}
                                 </span>
-                                <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: isCurSOL ? 'var(--accent)' : 'var(--text-h)' }}>
+                                <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: isCurSOL ? '#007AFF' : 'var(--text-h)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     {isCurSOL
-                                        ? (user.balance / solPrice).toFixed(4)
+                                        ? <>{<SolLogo size={14} />} {(user.balance / solPrice).toFixed(4)}</>
                                         : `$${(user.balance || 0).toFixed(2)}`}
                                 </span>
                                 <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
@@ -198,7 +199,16 @@ export default function Lobby() {
                                             options={CUR_OPTIONS}
                                             value={isCurSOL ? 'SOL' : 'USD'}
                                             onChange={v => setIsCurSOL(v === 'SOL')}
-                                            renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v}</span>}
+                                            renderValue={v => (
+                                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
+                                                </span>
+                                            )}
+                                            renderOption={opt => (
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
+                                                </span>
+                                            )}
                                         />
                                     </div>
                                     <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transaction History</button>
@@ -270,7 +280,16 @@ export default function Lobby() {
                                                 options={CUR_OPTIONS}
                                                 value={isCurSOL ? 'SOL' : 'USD'}
                                                 onChange={v => setIsCurSOL(v === 'SOL')}
-                                                renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v === 'SOL' ? 'SOL' : '$USD'}</span>}
+                                                renderValue={v => (
+                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? '#007AFF' : undefined, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
+                                                    </span>
+                                                )}
+                                                renderOption={opt => (
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
+                                                    </span>
+                                                )}
                                             />
                                         </div>
                                         <div className="amount-field">

@@ -8,7 +8,7 @@ import React, { useState, useRef, useEffect } from 'react';
  *  onChange: (value) => void
  *  renderValue: (value) => ReactNode  — custom render for trigger label
  */
-export default function CustomDropdown({ options, value, onChange, renderValue }) {
+export default function CustomDropdown({ options, value, onChange, renderValue, renderOption }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
 
@@ -29,6 +29,7 @@ export default function CustomDropdown({ options, value, onChange, renderValue }
                 className="dropdown-trigger"
                 onClick={() => setOpen(v => !v)}
                 type="button"
+                style={open ? { borderColor: '#007AFF', boxShadow: '0 0 12px rgba(0, 122, 255, 0.15)' } : {}}
             >
                 {renderValue ? renderValue(value) : (selected?.label ?? value)}
                 <svg
@@ -51,8 +52,9 @@ export default function CustomDropdown({ options, value, onChange, renderValue }
                         key={opt.value}
                         className={`dropdown-item${opt.value === value ? ' active' : ''}`}
                         onClick={() => { onChange(opt.value); setOpen(false); }}
+                        style={opt.value === value ? { color: '#007AFF', background: 'rgba(0, 122, 255, 0.08)' } : {}}
                     >
-                        {opt.label}
+                        {renderOption ? renderOption(opt) : opt.label}
                     </div>
                 ))}
             </div>
