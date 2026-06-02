@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
+import { createQR } from '@solana/pay';
 
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
@@ -11,27 +12,28 @@ export default function PreGame() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
     const [showUserMenu, setShowUserMenu] = useState(false);
-    const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
-    const [walletTab, setWalletTab] = useState('deposit'); // 'deposit' | 'withdraw'
     const [depositStatusMessage, setDepositStatusMessage] = useState('');
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
-    const walletDropdownRef = useRef(null);
+    const walletDropdownRef = useRef(null); // Keep for the dropdown menu
+    const qrRef = useRef(null); // Ref for the QR code canvas
+
     const walletExpandRef = useRef(null);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
     
     const [panelPosition, setPanelPosition] = useState({ x: null, y: 60 });
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
-    const [depositMethod, setDepositMethod] = useState('wallet'); // 'wallet' | 'manual'
+    const [depositMethod, setDepositMethod] = useState('wallet');
     
-    const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
+    const qrRef = useRef(null);
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0 });
+    const { createQR } = require('@solana/pay'); // Import createQR here
     
     const depositAddress = user?.depositAddress;
 
@@ -129,6 +131,17 @@ export default function PreGame() {
             setPanelPosition({ x: null, y: 60 });
         }
     }, [isWalletExpanded]);
+
+    useEffect(() => {
+        if (qrRef.current && depositAddress && depositMethod === 'manual') {
+            const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
+            qrRef.current.innerHTML = '';
+            try {
+                const qr = createQR(solanaPayUrl, 140, 'transparent', 'white');
+                qr.append(qrRef.current);
+            } catch (err) { console.error(err); }
+        }
+    }, [depositAddress, depositMethod]);
 
     useEffect(() => {
         if (!isDraggingPanel) return;
@@ -267,48 +280,6 @@ export default function PreGame() {
         }
     };
 
-    const handleWithdraw = async () => {
-        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-            setDepositStatusMessage('Please enter a valid amount.');
-            return;
-        }
-        if (!publicKey) {
-            setDepositStatusMessage('Please connect your wallet to receive funds.');
-            return;
-        }
-
-        setDepositStatusMessage('Processing withdrawal...');
-        try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/withdraw`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    amountUSD: parseFloat(amount),
-                    destinationAddress: publicKey.toString()
-                })
-            });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Withdrawal failed');
-
-            await refreshUser();
-            setDepositStatusMessage(`✅ Withdrawal successful! Check your wallet.`);
-            setAmount('');
-            
-            // Stäng panelen efter en kort stund
-            setTimeout(() => {
-                setIsWalletExpanded(false);
-                setDepositStatusMessage('');
-            }, 3000);
-
-        } catch (error) {
-            setDepositStatusMessage(`❌ Error: ${error.message}`);
-        }
-    };
-
     useEffect(() => {
         const checkStatus = async () => {
             if (!token) return;
@@ -424,7 +395,7 @@ export default function PreGame() {
                     {isAuthenticated ? (
                         <>
                             {/* Wallet Balance Pill */}
-                            <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'relative', display: (user?.balance || 0) === 0 ? 'none' : 'block' }}>
                                 <button 
                             id="wallet-trigger"
                             onClick={() => setIsWalletOpen(!isWalletOpen)}
@@ -453,14 +424,14 @@ export default function PreGame() {
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px' }}>
-                                    <button onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('deposit'); }} style={dropdownPrimaryBtn}>Deposit</button>
-                                    <button onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('withdraw'); }} style={dropdownSecondaryBtn}>Withdraw</button>
+                                    <button onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); }} style={dropdownPrimaryBtn}>Deposit</button>
+                                    <button onClick={() => { setIsWalletOpen(false); navigate('/profile'); }} style={dropdownSecondaryBtn}>Withdraw</button>
                                 </div>
                             </div>
                         )}
                             </div>
 
-                            <button 
+                            <button
                                 onClick={() => { 
                                     if ((user?.balance || 0) === 0) {
                                         navigate('/lobby');
@@ -507,7 +478,7 @@ export default function PreGame() {
                         </div>
                     </div>
 
-                    {/* Tabs: Wallet vs Deposit Address (Reverted to Pill Style) */}
+                    {/* Tabs: Wallet vs Deposit Address */}
                     <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '16px' }}>
                         <button 
                             onClick={() => setDepositMethod('wallet')}
@@ -533,7 +504,8 @@ export default function PreGame() {
                         </button>
                     </div>
 
-                    {depositMethod === 'wallet' ? (
+                    {/* Content based on selected tab */}
+                    {depositMethod === 'wallet' ? ( // Wallet Connect tab
                         <>
                             <div style={{ display: 'flex', justifyContent: 'center', margin: '5px 0 15px 0' }}>
                                 <WalletMultiButton />
@@ -545,10 +517,10 @@ export default function PreGame() {
                             </div>
                             <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
                         </>
-                    ) : (
+                    ) : ( // Deposit Address (QR) tab
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px', marginTop: '10px' }}>
-                            <img 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=solana:${depositAddress || ''}`}
+                            <canvas
+                                ref={qrRef}
                                 alt="Deposit QR"
                                 style={{ borderRadius: '8px', border: '4px solid white', width: '120px', height: '120px' }}
                             />

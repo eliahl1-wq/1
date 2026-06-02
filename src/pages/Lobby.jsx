@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
 import { useNavigate } from 'react-router-dom';
+import { createQR } from '@solana/pay';
 
 export default function Lobby() {
     const { user, logout, token, login, refreshUser } = useAuth();
@@ -31,6 +32,7 @@ export default function Lobby() {
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet'); // 'wallet' | 'manual'
+    const qrRef = useRef(null);
 
     const depositAddress = user?.depositAddress;
 
@@ -98,6 +100,18 @@ export default function Lobby() {
             return () => clearInterval(id);
         }
     }, [token, refreshUser]);
+
+    // Generate Solana Pay QR code
+    useEffect(() => {
+        if (qrRef.current && depositAddress && depositMethod === 'manual') {
+            const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
+            // Clear previous QR code if any
+            const canvas = qrRef.current;
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            createQR(qrRef.current, solanaPayUrl, 100); // 100px size
+        }
+    }, [depositAddress, depositMethod]);
 
     // Om användaren redan har balans och INTE är i ett game, skicka dem till PreGame
     useEffect(() => {
@@ -467,11 +481,12 @@ export default function Lobby() {
                                         outline: 'none'
                                     }}
                                 />
-                            </div>
+                                        </div>
+                                    </>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
-                                <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=solana:${depositAddress || ''}`}
+                                            <canvas
+                                                ref={qrRef}
                                     alt="Deposit QR"
                                     style={{ borderRadius: '8px', border: '3px solid white', width: '100px', height: '100px' }}
                                 />
