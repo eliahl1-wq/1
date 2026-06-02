@@ -267,6 +267,48 @@ export default function PreGame() {
         }
     };
 
+    const handleWithdraw = async () => {
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            setDepositStatusMessage('Please enter a valid amount.');
+            return;
+        }
+        if (!publicKey) {
+            setDepositStatusMessage('Please connect your wallet to receive funds.');
+            return;
+        }
+
+        setDepositStatusMessage('Processing withdrawal...');
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/withdraw`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    amountUSD: parseFloat(amount),
+                    destinationAddress: publicKey.toString()
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Withdrawal failed');
+
+            await refreshUser();
+            setDepositStatusMessage(`✅ Withdrawal successful! Check your wallet.`);
+            setAmount('');
+            
+            // Stäng panelen efter en kort stund
+            setTimeout(() => {
+                setIsWalletExpanded(false);
+                setDepositStatusMessage('');
+            }, 3000);
+
+        } catch (error) {
+            setDepositStatusMessage(`❌ Error: ${error.message}`);
+        }
+    };
+
     useEffect(() => {
         const checkStatus = async () => {
             if (!token) return;
@@ -525,7 +567,7 @@ export default function PreGame() {
                                 <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
                                 <button style={walletMaxBtn} onClick={() => setAmount(user?.balance?.toFixed(2))}>MAX</button>
                             </div>
-                            <button style={walletConfirmBtn} onClick={() => setDepositStatusMessage('Withdrawal is not implemented yet.')}>Withdraw</button>
+                            <button style={walletConfirmBtn} onClick={handleWithdraw}>Withdraw to Wallet</button>
                         </>
                     )}
 

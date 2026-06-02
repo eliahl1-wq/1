@@ -30,7 +30,7 @@ export default function Lobby() {
     const [depositStatusMessage, setDepositStatusMessage] = useState(''); // Statusmeddelanden för insättning
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [showManual, setShowManual] = useState(false);
+    const [depositMethod, setDepositMethod] = useState('wallet'); // 'wallet' | 'manual'
 
     const depositAddress = user?.depositAddress;
 
