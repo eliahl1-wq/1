@@ -25,10 +25,10 @@
   --text-h:        rgba(255, 255, 255, 0.92);
   --text-bright:   #ffffff;
 
-  /* Brand accent — Solana purple */
-  --accent:        #9945FF;
-  --accent-dim:    rgba(153, 69, 255, 0.12);
-  --accent-border: rgba(153, 69, 255, 0.25);
+  /* Brand accent — Classic blue */
+  --accent:        #007AFF;
+  --accent-dim:    rgba(0, 122, 255, 0.14);
+  --accent-border: rgba(0, 122, 255, 0.25);
 
   /* Solana green — profit/success */
   --green:         #14F195;
