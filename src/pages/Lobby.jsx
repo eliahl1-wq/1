@@ -432,8 +432,8 @@ export default function Lobby() {
                                         color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
                                         transition: '0.2s'
                                     }}
-                                >
-                                    Manual / QR
+                                        >
+                                            Deposit Address
                                 </button>
                             </div>
 
@@ -471,7 +471,7 @@ export default function Lobby() {
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
                                 <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${depositAddress || ''}`}
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=solana:${depositAddress || ''}`}
                                     alt="Deposit QR"
                                     style={{ borderRadius: '8px', border: '3px solid white', width: '100px', height: '100px' }}
                                 />

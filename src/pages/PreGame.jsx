@@ -461,7 +461,14 @@ export default function PreGame() {
                             </div>
 
                             <button 
-                                onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(true); setWalletTab('deposit'); }}
+                                onClick={() => { 
+                                    if ((user?.balance || 0) === 0) {
+                                        navigate('/lobby');
+                                    } else {
+                                        setIsWalletOpen(false); 
+                                        setIsWalletExpanded(true); 
+                                    }
+                                }}
                                 style={standaloneDepositButtonStyle}
                             >
                                 Deposit
@@ -500,17 +507,27 @@ export default function PreGame() {
                         </div>
                     </div>
 
-                    {/* Main Tabs: Wallet vs Deposit Address */}
-                    <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '10px' }}>
+                    {/* Tabs: Wallet vs Deposit Address (Reverted to Pill Style) */}
+                    <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '16px' }}>
                         <button 
                             onClick={() => setDepositMethod('wallet')}
-                            style={{ background: 'none', border: 'none', padding: '10px 0', color: depositMethod === 'wallet' ? '#007AFF' : 'rgba(255,255,255,0.4)', fontSize: '0.85rem', fontWeight: '800', cursor: 'pointer', borderBottom: depositMethod === 'wallet' ? '2px solid #007AFF' : '2px solid transparent', marginBottom: '-1px', transition: '0.2s' }}
+                            style={{
+                                flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
+                                background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.4)',
+                                transition: '0.2s'
+                            }}
                         >
                             Wallet
                         </button>
                         <button 
                             onClick={() => setDepositMethod('manual')}
-                            style={{ background: 'none', border: 'none', padding: '10px 0', color: depositMethod === 'manual' ? '#007AFF' : 'rgba(255,255,255,0.4)', fontSize: '0.85rem', fontWeight: '800', cursor: 'pointer', borderBottom: depositMethod === 'manual' ? '2px solid #007AFF' : '2px solid transparent', marginBottom: '-1px', transition: '0.2s' }}
+                            style={{
+                                flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
+                                background: depositMethod === 'manual' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
+                                transition: '0.2s'
+                            }}
                         >
                             Deposit Address
                         </button>
@@ -518,39 +535,20 @@ export default function PreGame() {
 
                     {depositMethod === 'wallet' ? (
                         <>
-                            <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', margin: '5px 0 15px 0' }}>
                                 <WalletMultiButton />
                             </div>
-
-                            <div style={{ ...walletTabContainer, background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '12px', marginBottom: '15px' }}>
-                                <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? { background: 'rgba(255,255,255,0.05)', color: 'white' } : {})}}>Deposit</button>
-                                <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? { background: 'rgba(255,255,255,0.05)', color: 'white' } : {})}}>Withdraw</button>
+                            <div style={walletInputArea}>
+                                <div style={walletInputPrefix}>$</div>
+                                <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
+                                <button style={walletMaxBtn} onClick={() => setAmount('100')}>MAX</button>
                             </div>
-
-                            {walletTab === 'deposit' ? (
-                                <>
-                                    <div style={walletInputArea}>
-                                        <div style={walletInputPrefix}>$</div>
-                                        <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
-                                        <button style={walletMaxBtn} onClick={() => setAmount('100')}>MAX</button>
-                                    </div>
-                                    <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
-                                </>
-                            ) : (
-                                <>
-                                    <div style={walletInputArea}>
-                                        <div style={walletInputPrefix}>$</div>
-                                        <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
-                                        <button style={walletMaxBtn} onClick={() => setAmount(user?.balance?.toFixed(2))}>MAX</button>
-                                    </div>
-                                    <button style={walletConfirmBtn} onClick={handleWithdraw}>Withdraw to Wallet</button>
-                                </>
-                            )}
+                            <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
                         </>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px', marginTop: '10px' }}>
                             <img 
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${depositAddress || ''}`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=solana:${depositAddress || ''}`}
                                 alt="Deposit QR"
                                 style={{ borderRadius: '8px', border: '4px solid white', width: '120px', height: '120px' }}
                             />
