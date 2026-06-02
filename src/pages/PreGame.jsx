@@ -1,711 +1,571 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
-import TokenBadge from '../components/TokenBadge';
+import Background from '../components/Background';
+
+/* ── Solana logo icon ── */
+const SolLogo = ({ size = 13 }) => (
+    <img
+        src="/solana-sol-logo.png"
+        alt="SOL"
+        style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0 }}
+    />
+);
+
+/* ── Currency toggle options ── */
+const CUR_OPTIONS = [
+    { label: 'USD', value: 'USD' },
+    { label: 'SOL', value: 'SOL' },
+];
 
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
     const navigate = useNavigate();
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
-    const [showUserMenu, setShowUserMenu] = useState(false);
 
-    const SolanaLogo = ({ size = 14 }) => (
-        <img 
-            src="/solana-sol-logo.png" 
-            alt="SOL" 
-            style={{ width: size, height: size, verticalAlign: 'middle', objectFit: 'contain', marginBottom: '2px' }} 
-        />
+    // ── State ──────────────────────────────────────────
+    const [solPrice] = useState(150);
+    const [showUserMenu, setShowUserMenu]       = useState(false);
+    const [isWalletOpen, setIsWalletOpen]       = useState(false);
+    const [isWalletExpanded, setIsWalletExpanded]   = useState(false);
+    const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
+    const [depositMethod, setDepositMethod]     = useState('wallet');
+    const [amount, setAmount]                   = useState('');
+    const [withdrawAmount, setWithdrawAmount]   = useState('');
+    const [withdrawAddress, setWithdrawAddress] = useState('');
+    const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
+    const [displayFullAddress, setDisplayFullAddress] = useState(false);
+    const [isCurSOL, setIsCurSOL]               = useState(false);
+    const [statusMsg, setStatusMsg]             = useState('');
+    const [isMatchmaking, setIsMatchmaking]     = useState(false);
+    const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
+    const [liveStats, setLiveStats]             = useState({ playersOnline: 0, biggestPayout: 0 });
+    const [showHowItWorks, setShowHowItWorks]   = useState(false);
+    const [nickname, setNickname]               = useState(
+        () => localStorage.getItem('match_nickname') || user?.username || ''
     );
 
-    const [solPrice, setSolPrice] = useState(150); // Placeholder, ideally fetched from an API
-
-    const [isWalletOpen, setIsWalletOpen] = useState(false);
-    const [isWalletExpanded, setIsWalletExpanded] = useState(false); 
-    const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
-    const [withdrawAmount, setWithdrawAmount] = useState('');
-    const [withdrawAddress, setWithdrawAddress] = useState('');
-    const withdrawExpandRef = useRef(null);
-    const [depositStatusMessage, setDepositStatusMessage] = useState('');
-    const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
-    const [displayFullWithdrawAddress, setDisplayFullWithdrawAddress] = useState(false);
-    const [isDepositAmountInSOL, setIsDepositAmountInSOL] = useState(false);
-    const [isAddressFocused, setIsAddressFocused] = useState(false);
-    const userMenuRef = useRef(null);
-    const userPillRef = useRef(null);
-    const qrRef = useRef(null); // Ref for the QR code canvas
-    const walletDropdownRef = useRef(null); // Återinförd
-
-    const walletExpandRef = useRef(null);
-    const dragOffsetRef = useRef({ x: 0, y: 0 });
-    
-    const [panelPosition, setPanelPosition] = useState({ x: null, y: 60 }); // Keep for expanded panel
-    const [isDraggingPanel, setIsDraggingPanel] = useState(false);
+    // Panel drag
+    const [panelPos, setPanelPos]       = useState({ x: null, y: 60 });
+    const [isDragging, setIsDragging]   = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
-    const [depositMethod, setDepositMethod] = useState('wallet');
-    const [amount, setAmount] = useState(''); 
-    const [isMatchmaking, setIsMatchmaking] = useState(false);
-    const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0 });
-    
-    const depositAddress = user?.depositAddress;
+    const dragOffsetRef = useRef({ x: 0, y: 0 });
 
-    // Solana Address Validation Regex
-    const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    // Refs
+    const userMenuRef       = useRef(null);
+    const userPillRef       = useRef(null);
+    const walletDropRef     = useRef(null);
+    const walletExpandRef   = useRef(null);
+    const withdrawExpandRef = useRef(null);
+    const qrRef             = useRef(null);
 
-    const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || ''); // Moved here
+    const depositAddress    = user?.depositAddress;
+    const SOL_ADDR_REGEX    = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    const ENTRY_FEE         = 10.00;
+    const canJoin           = (user?.balance || 0) >= ENTRY_FEE;
 
-    const formatBalance = (val) => {
-        const v = Number(val || 0);
-        if (!isFinite(v)) return '0';
-        if (v >= 10000) return Math.round(v).toString();
-        if (v >= 1000) return Number(v.toFixed(1)).toString();
-        if (v >= 1) return Number(v.toFixed(2)).toString();
-        if (v > 0) return Number(v.toFixed(4)).toString();
+    // ── Format helpers ─────────────────────────────────
+    const fmt = (v) => {
+        const n = Number(v || 0);
+        if (!isFinite(n)) return '0';
+        if (n >= 10000) return Math.round(n).toString();
+        if (n >= 1000)  return n.toFixed(1);
+        if (n >= 1)     return n.toFixed(2);
+        if (n > 0)      return n.toFixed(4);
         return '0';
     };
 
-    const [showHowItWorks, setShowHowItWorks] = useState(false); // Moved here
+    const shortAddr = (addr, chars = 5) =>
+        addr && addr.length > chars * 2 + 3
+            ? `${addr.slice(0, chars)}…${addr.slice(-chars)}`
+            : addr;
 
+    const statusClass = statusMsg.startsWith('✅') || statusMsg.includes('copied')
+        ? 'success' : statusMsg.startsWith('❌') ? 'error' : 'info';
 
-    
-    // Helper for shortening Solana addresses
-    const shortenAddress = (address, chars = 6) => {
-        if (!address || address.length <= chars * 2 + 3) return address;
-        return `${address.substring(0, chars)}...${address.substring(address.length - chars)}`;
-    };
-
-    const entryFee = 10.00;
-    const canJoin = (user?.balance || 0) >= entryFee;
+    // ── Effects ────────────────────────────────────────
+    useEffect(() => { document.title = 'AgarStake | Arena'; }, []);
 
     useEffect(() => {
-        document.title = "AgarStake | Arena Lobby";
-    }, []);
-
-    const handleStartMatch = () => {
-        if (!isAuthenticated) {
-            navigate('/login');
-            return;
-        }
-        if (!canJoin && !isAlreadyInGame) {
-            navigate('/lobby');
-            return;
-        }
-        setIsMatchmaking(true);
-        refreshUser(); // En extra koll precis innan start
-        localStorage.setItem('match_nickname', nickname);
-        setTimeout(() => {
-            navigate('/game', { state: { nickname } });
-        }, 1200);
-    };
-
-    const handleClickOutside = useCallback((event) => {
-        const path = event.composedPath ? event.composedPath() : [];
-        const isWalletAdapterModalClick = path.some((element) => {
-            return element instanceof HTMLElement && (
-                element.classList.contains('wallet-adapter-modal') ||
-                element.classList.contains('wallet-adapter-modal-overlay') ||
-                element.classList.contains('wallet-adapter-modal-container') ||
-                element.classList.contains('wallet-adapter-modal-wrapper') ||
-                element.classList.contains('wallet-adapter-modal-list') ||
-                element.classList.contains('wallet-adapter-modal-middle') ||
-                element.classList.contains('wallet-adapter-modal-button-close') ||
-                element.classList.contains('wallet-adapter-modal-list-more') ||
-                element.classList.contains('wallet-adapter-modal-title') ||
-                element.classList.contains('wallet-adapter-button')
-            );
-        });
-        const walletModalOpen = !!document.querySelector('.wallet-adapter-modal');
-
-        if (walletModalOpen) {
-            return;
-        }
-
-        if (userMenuRef.current && !userMenuRef.current.contains(event.target) &&
-            userPillRef.current && !userPillRef.current.contains(event.target)) {
-            setShowUserMenu(false);
-        }
-        if (walletDropdownRef.current && !walletDropdownRef.current.contains(event.target) &&
-            !event.target.closest('#wallet-trigger')) { // Fix: Ensure walletDropdownRef is defined
-            setIsWalletOpen(false);
-        }
-        if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
-            setIsWalletExpanded(false);
-        }
-        if (withdrawExpandRef.current && !withdrawExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
-            setIsWithdrawExpanded(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (typeof document === 'undefined') return;
-
-        const checkWalletModal = () => {
-            setWalletModalActive(Boolean(document.querySelector('.wallet-adapter-modal, wcm-modal')));
-        };
-
-        const observer = new MutationObserver(checkWalletModal);
-        observer.observe(document.body, { childList: true, subtree: true });
-        checkWalletModal();
-
-        return () => observer.disconnect();
-    }, []);
-
-    useEffect(() => {
-        if (walletModalActive && isWalletExpanded) {
-            setPanelPosition((pos) => ({ x: 40, y: pos.y ?? 60 }));
-        }
-    }, [walletModalActive, isWalletExpanded]);
-
-    useEffect(() => {
-        if (publicKey && !withdrawAddress) {
-            setWithdrawAddress(publicKey.toBase58());
-        }
+        if (publicKey && !withdrawAddress) setWithdrawAddress(publicKey.toBase58());
     }, [publicKey]);
 
     useEffect(() => {
-        if (!isWalletExpanded) {
-            setPanelPosition({ x: null, y: 60 });
-        }
-    }, [isWalletExpanded]);
-
-    useEffect(() => {
-        if (!isWithdrawExpanded) {
-            setPanelPosition({ x: null, y: 120 });
-        }
-    }, [isWithdrawExpanded]);
-
-    useEffect(() => {
-        if (withdrawAddress) {
-            setIsValidWithdrawAddress(SOLANA_ADDRESS_REGEX.test(withdrawAddress));
-        } else {
-            setIsValidWithdrawAddress(true); // No address, no invalid state
-        }
+        setIsValidWithdrawAddress(withdrawAddress ? SOL_ADDR_REGEX.test(withdrawAddress) : true);
     }, [withdrawAddress]);
 
     useEffect(() => {
+        if (!isWalletExpanded) setPanelPos({ x: null, y: 60 });
+    }, [isWalletExpanded]);
+
+    useEffect(() => {
+        if (!isWithdrawExpanded) setPanelPos({ x: null, y: 120 });
+    }, [isWithdrawExpanded]);
+
+    useEffect(() => {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
-            const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
+            qrRef.current.innerHTML = '';
             try {
-                qrRef.current.innerHTML = ''; // Clear previous QR code
-                const qr = createQR(solanaPayUrl, 200, 'white', 'black'); // Larger QR code, white background
+                const qr = createQR(
+                    `solana:${depositAddress}?amount=0&label=AgarStake&message=Deposit`,
+                    190, 'white', 'black'
+                );
                 qr.append(qrRef.current);
-            } catch (err) { console.error(err); }
+            } catch (e) {}
         }
     }, [depositAddress, depositMethod]);
 
-    // Ensure QR cleanup when leaving Deposit view or unmounting
     useEffect(() => {
-        // Clear QR when depositMethod changes away from manual OR when the wallet panel closes
         if ((depositMethod !== 'manual' || !isWalletExpanded) && qrRef.current) {
             qrRef.current.innerHTML = '';
         }
     }, [depositMethod, isWalletExpanded]);
 
     useEffect(() => {
-        return () => {
-            if (qrRef.current) qrRef.current.innerHTML = '';
-        };
+        const obs = new MutationObserver(() => {
+            setWalletModalActive(!!document.querySelector('.wallet-adapter-modal, wcm-modal'));
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+        return () => obs.disconnect();
     }, []);
 
     useEffect(() => {
-        if (!isDraggingPanel) return;
+        if (walletModalActive && isWalletExpanded) {
+            setPanelPos(p => ({ x: 40, y: p.y ?? 60 }));
+        }
+    }, [walletModalActive, isWalletExpanded]);
 
-        const move = (event) => {
-            const clientX = event.clientX ?? (event.touches && event.touches[0]?.clientX);
-            const clientY = event.clientY ?? (event.touches && event.touches[0]?.clientY);
-            if (clientX === undefined || clientY === undefined) return;
-            const newX = Math.max(16, Math.min(window.innerWidth - 360 - 16, clientX - dragOffsetRef.current.x));
-            const newY = Math.max(16, Math.min(window.innerHeight - 200 - 16, clientY - dragOffsetRef.current.y));
-            setPanelPosition({ x: newX, y: newY });
-        };
+    // Click outside
+    const handleClickOutside = useCallback((e) => {
+        const walletOpen = !!document.querySelector('.wallet-adapter-modal');
+        if (walletOpen) return;
+        const path = e.composedPath?.() || [];
+        const isWalletAdapter = path.some(el =>
+            el instanceof HTMLElement &&
+            el.className?.toString?.().includes?.('wallet-adapter')
+        );
 
-        const stop = () => setIsDraggingPanel(false);
-
-        document.addEventListener('mousemove', move);
-        document.addEventListener('touchmove', move, { passive: false });
-        document.addEventListener('mouseup', stop);
-        document.addEventListener('touchend', stop);
-
-        return () => {
-            document.removeEventListener('mousemove', move);
-            document.removeEventListener('touchmove', move);
-            document.removeEventListener('mouseup', stop);
-            document.removeEventListener('touchend', stop);
-        };
-    }, [isDraggingPanel]);
-
-    const handlePanelDragStart = useCallback((event) => {
-        const clientX = event.clientX ?? (event.touches && event.touches[0]?.clientX);
-        const clientY = event.clientY ?? (event.touches && event.touches[0]?.clientY);
-        if (clientX === undefined || clientY === undefined) return;
-
-        const activePanel = walletExpandRef.current || withdrawExpandRef.current;
-        const rect = activePanel?.getBoundingClientRect();
-        if (!rect) return;
-
-        event.preventDefault();
-        dragOffsetRef.current = { x: clientX - rect.left, y: clientY - rect.top };
-        setIsDraggingPanel(true);
+        if (userMenuRef.current && !userMenuRef.current.contains(e.target) &&
+            userPillRef.current && !userPillRef.current.contains(e.target)) {
+            setShowUserMenu(false);
+        }
+        if (walletDropRef.current && !walletDropRef.current.contains(e.target) &&
+            !e.target.closest('#balance-pill')) {
+            setIsWalletOpen(false);
+        }
+        if (walletExpandRef.current && !walletExpandRef.current.contains(e.target) && !isWalletAdapter) {
+            setIsWalletExpanded(false);
+        }
+        if (withdrawExpandRef.current && !withdrawExpandRef.current.contains(e.target) && !isWalletAdapter) {
+            setIsWithdrawExpanded(false);
+        }
     }, []);
-
-    const handleDeposit = async () => {
-        if (!publicKey || !connected) {
-            setDepositStatusMessage('Connect wallet first.');
-            return;
-        }
-        if (!depositAddress) {
-            setDepositStatusMessage('❌ No deposit address assigned to your account. Contact support.');
-            return;
-        }
-
-        const amountToDeposit = parseFloat(amount);
-        const minimumDepositUSD = 0;
-        if (isNaN(amountToDeposit) || amountToDeposit < minimumDepositUSD) {
-            setDepositStatusMessage(`Minimum deposit is $${minimumDepositUSD}.`);
-            return;
-        }
-
-        setDepositStatusMessage('Waiting for approval...');
-
-        let finalAmountUSD = 0;
-        let finalSolAmount = 0;
-
-        if (isDepositAmountInSOL) {
-            finalSolAmount = amountToDeposit;
-            finalAmountUSD = finalSolAmount * solPrice;
-        } else {
-            finalAmountUSD = amountToDeposit;
-            finalSolAmount = finalAmountUSD / solPrice;
-        }
-
-        try {
-            const lamports = Math.round(finalSolAmount * LAMPORTS_PER_SOL);
-
-            const transaction = new Transaction().add(
-                SystemProgram.transfer({
-                    fromPubkey: publicKey,
-                    toPubkey: new PublicKey(depositAddress),
-                    lamports: lamports,
-                })
-            );
-
-            const { blockhash } = await connection.getLatestBlockhash();
-            transaction.recentBlockhash = blockhash;
-            transaction.feePayer = publicKey;
-
-            const signature = await sendTransaction(transaction, connection);
-            setDepositStatusMessage('Confirming transaction on blockchain...');
-
-            const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-            if (confirmation.value.err) {
-                throw new Error('Transaction failed on-chain.');
-            }
-
-            setDepositStatusMessage('Verifying deposit with backend...');
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    'bypass-tunnel-reminders': 'true'
-                },
-                body: JSON.stringify({
-                    signature: signature,
-                    amountUSD: finalAmountUSD,
-                    solAmount: finalSolAmount,
-                    walletAddress: publicKey.toString()
-                })
-            });
-
-            if (!verifyRes.ok) {
-                let errorMessage = 'Backend verification failed.';
-                const contentType = verifyRes.headers.get("content-type");
-                if (contentType && contentType.includes("application/json")) {
-                    const errorData = await verifyRes.json();
-                    errorMessage = errorData.message || errorMessage;
-                } else {
-                    errorMessage = await verifyRes.text();
-                }
-                throw new Error(errorMessage);
-            }
-
-            if (token) {
-                const meRes = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (meRes.ok) {
-                    const freshUser = await meRes.json();
-                    login(freshUser, token);
-                }
-            }
-
-            setDepositStatusMessage(`✅ Success! ${finalSolAmount.toFixed(4)} SOL deposited and verified.`);
-            setAmount('');
-        } catch (error) {
-            console.error('Deposit error:', error);
-            const msg = error.message || '';
-            if (msg.includes('TransactionExpiredTimeoutError') || msg.toLowerCase().includes('insufficient')) {
-                setDepositStatusMessage('❌ Not enough funds in wallet for transaction and fees.');
-            } else if (msg.includes('User rejected')) {
-                setDepositStatusMessage('❌ Transaction cancelled in Phantom.');
-            } else {
-                setDepositStatusMessage('❌ Deposit failed. Check your wallet balance.');
-            }
-        }
-    };
-
-    const handleWithdraw = async () => {
-        if (!publicKey) {
-            setDepositStatusMessage('❌ Connect your wallet first.');
-            return;
-        }
-        if (!token) return;
-        const amountToWithdraw = parseFloat(withdrawAmount);
-        if (isNaN(amountToWithdraw) || amountToWithdraw < 1) {
-            setDepositStatusMessage('❌ Minimum withdrawal is $1.00');
-            return;
-        }
-        if (!withdrawAddress) {
-            setDepositStatusMessage('❌ Please enter a destination address.');
-            return;
-        }
-        if (!isValidWithdrawAddress) {
-            setDepositStatusMessage('❌ Invalid Solana address.');
-            return;
-        }
-
-        setDepositStatusMessage('⏳ Processing withdrawal...');
-        try {
-            const currentSolPrice = solPrice;
-            const finalAmountUSD = isDepositAmountInSOL ? amountToWithdraw * currentSolPrice : amountToWithdraw;
-
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/withdraw`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    amountUSD: finalAmountUSD,
-                    destinationAddress: withdrawAddress
-                })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Withdrawal failed');
-            await refreshUser();
-            setDepositStatusMessage(`✅ Success! Funds sent to your wallet.`);
-            setWithdrawAmount('');
-        } catch (error) { setDepositStatusMessage(`❌ ${error.message}`); }
-    };
-
-    useEffect(() => {
-        const checkStatus = async () => {
-            if (!token) return;
-            try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
-                    headers: { 'Authorization': `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
-                });
-                const contentType = res.headers.get("content-type");
-                if (!res.ok || !contentType || !contentType.includes("application/json")) return;
-                const data = await res.json();
-                setIsAlreadyInGame(data.inGame);
-            } catch (e) {}
-        };
-        checkStatus();
-
-        refreshUser();
-        const id = setInterval(refreshUser, 5000); // Polla balans var 5:e sekund
-        return () => clearInterval(id);
-    }, [refreshUser]);
 
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
 
+    // Live stats poll
     useEffect(() => {
-        let mounted = true;
+        let alive = true;
         const fetchStats = async () => {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stats?t=${Date.now()}`, {
-                    headers: { 
-                        'bypass-tunnel-reminders': 'true',
-                        'Cache-Control': 'no-cache'
-                    }
+                const r = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stats?t=${Date.now()}`, {
+                    headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                 });
-                if (!res.ok) return;
-                const d = await res.json();
-                if (mounted) setLiveStats(d);
-            } catch (e) {}
+                if (r.ok && alive) setLiveStats(await r.json());
+            } catch {}
         };
         fetchStats();
         const id = setInterval(fetchStats, 5000);
-        return () => { mounted = false; clearInterval(id); };
+        return () => { alive = false; clearInterval(id); };
     }, []);
 
-    // Solana Icon (simple text for now)
-    const SolanaTextIcon = () => (
-        <span style={{ fontFamily: 'system-ui', fontWeight: '800', fontSize: '0.9rem' }}>SOL</span>
-    );
+    // Balance poll
+    useEffect(() => {
+        refreshUser();
+        const id = setInterval(refreshUser, 5000);
+        return () => clearInterval(id);
+    }, [refreshUser]);
 
-    const adjustedWalletExpandPanelStyle = {
-        ...walletExpandPanelStyle,
-        left: panelPosition.x !== null ? panelPosition.x : '50%',
-        top: panelPosition.y,
-        transform: panelPosition.x !== null ? 'none' : 'translateX(-50%)',
-        cursor: isDraggingPanel ? 'grabbing' : 'grab',
-        transition: isDraggingPanel ? 'none' : 'left 0.2s ease, top 0.2s ease',
+    // Game status check
+    useEffect(() => {
+        if (!token) return;
+        (async () => {
+            try {
+                const r = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
+                    headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
+                });
+                if (r.ok) {
+                    const d = await r.json();
+                    setIsAlreadyInGame(d.inGame);
+                }
+            } catch {}
+        })();
+    }, [token]);
+
+    // ── Drag panel ─────────────────────────────────────
+    useEffect(() => {
+        if (!isDragging) return;
+        const onMove = (e) => {
+            const cx = e.clientX ?? e.touches?.[0]?.clientX;
+            const cy = e.clientY ?? e.touches?.[0]?.clientY;
+            if (cx == null) return;
+            setPanelPos({
+                x: Math.max(16, Math.min(window.innerWidth - 330, cx - dragOffsetRef.current.x)),
+                y: Math.max(16, Math.min(window.innerHeight - 200, cy - dragOffsetRef.current.y)),
+            });
+        };
+        const onStop = () => setIsDragging(false);
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onStop);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onStop);
+        return () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onStop);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onStop);
+        };
+    }, [isDragging]);
+
+    const startDrag = useCallback((e) => {
+        const cx = e.clientX ?? e.touches?.[0]?.clientX;
+        const cy = e.clientY ?? e.touches?.[0]?.clientY;
+        const panel = (walletExpandRef.current || withdrawExpandRef.current);
+        const rect = panel?.getBoundingClientRect();
+        if (!rect || cx == null) return;
+        e.preventDefault();
+        dragOffsetRef.current = { x: cx - rect.left, y: cy - rect.top };
+        setIsDragging(true);
+    }, []);
+
+    // ── Handlers ───────────────────────────────────────
+    const handleStartMatch = () => {
+        if (!isAuthenticated) { navigate('/login'); return; }
+        if (!canJoin && !isAlreadyInGame) { navigate('/lobby'); return; }
+        setIsMatchmaking(true);
+        refreshUser();
+        localStorage.setItem('match_nickname', nickname);
+        setTimeout(() => navigate('/game', { state: { nickname } }), 1200);
     };
 
-    return (
-        <div style={containerStyle}>
-            <style>{`
-                @keyframes pulse-live {
-                    0% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.4; transform: scale(0.95); }
-                    100% { opacity: 1; transform: scale(1); }
-                }
-                @keyframes slideDown {
-                    from { opacity: 0; transform: translate(-50%, -10px); }
-                    to { opacity: 1; transform: translate(-50%, 0); }
-                }
-                .live-indicator { width: 5px; height: 5px; background: #34C759; border-radius: 50%; animation: pulse-live 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-                button { transition: all 0.2s ease !important; cursor: pointer; border: none; outline: none; }
-                button:hover:not(:disabled) { filter: brightness(1.15); }
-                button:active { transform: scale(0.98); }
-                input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-                .mono { 
-                    font-family: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-                    font-variant-numeric: tabular-nums;
-                }
-                .glass {
-                    background: rgba(18, 18, 22, 0.8);
-                    backdrop-filter: blur(24px);
-                    border: 1px solid rgba(255, 255, 255, 0.05);
-                }
-                :root {
-                    --wcm-z-index: 100002 !important;
-                }
-                wcm-modal,
-                wcm-modal *,
-                wcm-modal-backcard,
-                wcm-modal-content {
-                    z-index: 100002 !important;
-                }
-                .wallet-adapter-modal,
-                .wallet-adapter-modal-container,
-                .wallet-adapter-modal-overlay,
-                .wallet-adapter-modal-wrapper,
-                .wallet-adapter-button {
-                    z-index: 99999 !important;
-                }
-                .wallet-adapter-modal-wrapper {
-                    z-index: 100001 !important;
-                }
-                .wallet-adapter-modal-overlay {
-                    z-index: 100000 !important;
-                    background: rgba(0,0,0,0.72) !important;
-                }
-            `}</style>
+    const handleDeposit = async () => {
+        if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return; }
+        if (!depositAddress) { setStatusMsg('❌ No deposit address. Contact support.'); return; }
+        const parsed = parseFloat(amount);
+        if (isNaN(parsed) || parsed <= 0) { setStatusMsg('❌ Enter a valid amount.'); return; }
+        setStatusMsg('Waiting for wallet approval…');
 
-            <div style={topBarStyle}>
-                <h2 style={logoStyle}>AGAR<span style={{ color: '#007AFF' }}>STAKE</span></h2>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        const solAmt = isCurSOL ? parsed : parsed / solPrice;
+        const usdAmt = isCurSOL ? parsed * solPrice : parsed;
+
+        try {
+            const lamports = Math.round(solAmt * LAMPORTS_PER_SOL);
+            const tx = new Transaction().add(
+                SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: new PublicKey(depositAddress), lamports })
+            );
+            const { blockhash } = await connection.getLatestBlockhash();
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = publicKey;
+            const sig = await sendTransaction(tx, connection);
+            setStatusMsg('Confirming on-chain…');
+            const conf = await connection.confirmTransaction(sig, 'confirmed');
+            if (conf.value.err) throw new Error('Transaction failed on-chain.');
+            setStatusMsg('Verifying with backend…');
+            const vr = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' },
+                body: JSON.stringify({ signature: sig, amountUSD: usdAmt, solAmount: solAmt, walletAddress: publicKey.toString() })
+            });
+            if (!vr.ok) {
+                const ct = vr.headers.get('content-type');
+                const err = ct?.includes('application/json') ? (await vr.json()).message : await vr.text();
+                throw new Error(err || 'Backend verification failed.');
+            }
+            if (token) {
+                const mr = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, { headers: { Authorization: `Bearer ${token}` } });
+                if (mr.ok) login(await mr.json(), token);
+            }
+            setStatusMsg(`✅ ${solAmt.toFixed(4)} SOL deposited!`);
+            setAmount('');
+        } catch (err) {
+            const m = err.message || '';
+            if (m.includes('User rejected'))      setStatusMsg('❌ Cancelled in wallet.');
+            else if (m.toLowerCase().includes('insufficient')) setStatusMsg('❌ Insufficient funds.');
+            else setStatusMsg('❌ Deposit failed. Try again.');
+        }
+    };
+
+    const handleWithdraw = async () => {
+        if (!token) return;
+        if (!withdrawAddress || !isValidWithdrawAddress) { setStatusMsg('❌ Invalid Solana address.'); return; }
+        const parsed = parseFloat(withdrawAmount);
+        if (isNaN(parsed) || parsed < 1) { setStatusMsg('❌ Minimum withdrawal is $1.00'); return; }
+        setStatusMsg('⏳ Processing withdrawal…');
+        try {
+            const usdAmt = isCurSOL ? parsed * solPrice : parsed;
+            const r = await fetch(`${import.meta.env.VITE_API_URL}/api/withdraw`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ amountUSD: usdAmt, destinationAddress: withdrawAddress })
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.message || 'Withdrawal failed');
+            await refreshUser();
+            setStatusMsg('✅ Funds sent to your wallet!');
+            setWithdrawAmount('');
+        } catch (e) { setStatusMsg(`❌ ${e.message}`); }
+    };
+
+    // ── Panel position ─────────────────────────────────
+    const panelStyle = {
+        position: 'absolute',
+        left:      panelPos.x !== null ? panelPos.x : '50%',
+        top:       panelPos.y,
+        transform: panelPos.x !== null ? 'none' : 'translateX(-50%)',
+        cursor:    isDragging ? 'grabbing' : 'default',
+        transition: isDragging ? 'none' : undefined,
+    };
+
+    // ── Play button variant ─────────────────────────────
+    const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
+        : isAlreadyInGame ? 'play-btn play-btn-rejoin'
+        : canJoin ? 'play-btn play-btn-ready'
+        : 'play-btn play-btn-disabled';
+
+    const playBtnLabel = isMatchmaking
+        ? <><span className="spinner" /> Joining…</>
+        : !isAuthenticated ? 'Play Now'
+        : isAlreadyInGame  ? 'Rejoin Arena'
+        : canJoin          ? 'Enter Arena'
+        : 'Deposit to Play';
+
+    // ── Render ─────────────────────────────────────────
+    return (
+        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+            <Background />
+
+            {/* ── Top Bar ── */}
+            <nav className="topbar">
+                {/* Logo */}
+                <div className="logo">
+                    <div className="logo-dot" />
+                    AGAR<span className="logo-accent">STAKE</span>
+                </div>
+
+                {/* Nav right */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {isAuthenticated ? (
                         <>
-                            {/* Wallet Balance Pill */}
-                            <div style={{ position: 'relative', display: (user?.balance || 0) === 0 ? 'none' : 'block' }}>
-                                <button 
-                            id="wallet-trigger"
-                            onClick={() => setIsWalletOpen(!isWalletOpen)}
-                            style={walletPillButtonStyle}
-                        >
-                            <span className="mono" style={{fontWeight: '800', fontSize: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                {isDepositAmountInSOL && <SolanaLogo size={14} />}
-                                {isDepositAmountInSOL 
-                                    ? (user?.balance / solPrice)?.toFixed(4) 
-                                    : `$${formatBalance(user?.balance)}`}
-                            </span>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '10px', opacity: 0.6}}><path d="M6 9l6 6 6-6"/></svg>
-                        </button>
-
-                        {isWalletOpen && (
-                            <div ref={walletDropdownRef} className="glass" style={walletDropdownCardStyle}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                                    <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
-                                            style={{ 
-                                                background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', 
-                                                fontSize: '11px', fontWeight: '700', cursor: 'pointer',
-                                                padding: '6px 10px', borderRadius: '8px',
-                                                transition: 'all 0.2s ease'
-                                            }}>
-                                        Transaction History
+                            {/* Balance pill */}
+                            {(user?.balance || 0) > 0 && (
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        id="balance-pill"
+                                        className="balance-pill mono"
+                                        onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
+                                    >
+                                        <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>
+                                            {isCurSOL ? 'SOL' : 'USD'}
+                                        </span>
+                                        <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                                            {isCurSOL
+                                                ? (user.balance / solPrice).toFixed(4)
+                                                : `$${fmt(user.balance)}`}
+                                        </span>
+                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
+                                            <path d="M6 9l6 6 6-6" />
+                                        </svg>
                                     </button>
-                                    <CustomDropdown
-                                        options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
-                                        value={isDepositAmountInSOL ? 'SOL' : 'USD'}
-                                        onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
-                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800,fontSize:'0.75rem'}}>$USD</div>}
-                                    />
-                                </div>
-                                
-                                <div className="mono" style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '6px', color: 'white', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {isDepositAmountInSOL ? <SolanaLogo size={24} /> : '$'}
-                                    {isDepositAmountInSOL ? (user?.balance / solPrice)?.toFixed(4) : formatBalance(user?.balance)}
-                                </div>
-                                <div style={{ display: 'flex', gap: '6px', marginBottom: '20px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255,255,255,0.35)' }}>
-                                        {isDepositAmountInSOL ? `~ $${formatBalance(user?.balance)}` : <>~ {(user?.balance / solPrice)?.toFixed(4)}</>}
-                                    </span>
-                                </div>
 
-                                <div style={{ display: 'flex', gap: '10px' }}> {/* Buttons side-by-side */}
-                                    <button 
-                                        className="btn-hover"
-                                        onClick={() => { 
-                                        setIsWalletOpen(false); 
-                                        setIsWithdrawExpanded(false);
-                                        setIsWalletExpanded(true); 
-                                        setDepositMethod('wallet'); 
-                                    }} style={dropdownPrimaryBtn}>Deposit</button>
-                                    <button onClick={() => { 
-                                        setIsWalletOpen(false); 
-                                        setIsWalletExpanded(false);
-                                        setIsWithdrawExpanded(true); 
-                                    }} style={dropdownSecondaryBtn}>Withdraw</button>
-                                </div>
-                            </div>
-                        )}
-                            </div>
+                                    {isWalletOpen && (
+                                        <div ref={walletDropRef} className="wallet-card">
+                                            {/* Header row */}
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                                <button
+                                                    onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
+                                                    style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer', padding: '2px 0', letterSpacing: '0.04em', textTransform: 'uppercase', transition: 'color 0.1s' }}
+                                                    onMouseEnter={e => e.target.style.color = 'var(--text-h)'}
+                                                    onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
+                                                >
+                                                    History
+                                                </button>
+                                                <CustomDropdown
+                                                    options={CUR_OPTIONS}
+                                                    value={isCurSOL ? 'SOL' : 'USD'}
+                                                    onChange={v => setIsCurSOL(v === 'SOL')}
+                                                    renderValue={v => (
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: v === 'SOL' ? 'var(--accent)' : undefined }}>
+                                                            {v === 'SOL' ? 'SOL' : '$USD'}
+                                                        </span>
+                                                    )}
+                                                />
+                                            </div>
 
+                                            {/* Balance */}
+                                            <div className="wallet-card-balance">
+                                                <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>
+                                                    {isCurSOL ? '' : '$'}
+                                                </span>
+                                                {isCurSOL
+                                                    ? (user.balance / solPrice).toFixed(4)
+                                                    : fmt(user.balance)}
+                                            </div>
+                                            <div className="wallet-card-sub">
+                                                {isCurSOL
+                                                    ? `≈ $${fmt(user.balance)} USD`
+                                                    : `≈ ${(user.balance / solPrice).toFixed(4)} SOL`}
+                                            </div>
+
+                                            {/* Action buttons */}
+                                            <div className="wallet-card-actions">
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => { setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('wallet'); }}
+                                                >
+                                                    Deposit
+                                                </button>
+                                                <button
+                                                    className="btn btn-ghost"
+                                                    onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(false); setIsWithdrawExpanded(true); }}
+                                                >
+                                                    Withdraw
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Deposit button */}
                             <button
-                                onClick={() => { 
-                                    if ((user?.balance || 0) === 0) {
-                                        navigate('/lobby');
-                                    } else {
-                                        setIsWalletOpen(false); 
-                                        setIsWalletExpanded(true); 
-                                    }
+                                className="nav-deposit-btn"
+                                onClick={() => {
+                                    if ((user?.balance || 0) === 0) navigate('/lobby');
+                                    else { setIsWalletOpen(false); setIsWalletExpanded(true); }
                                 }}
-                                style={standaloneDepositButtonStyle}
                             >
-                                Deposit
+                                {(user?.balance || 0) === 0 ? '+ Add funds' : 'Deposit'}
                             </button>
 
+                            {/* User avatar pill */}
                             <div style={{ position: 'relative' }}>
-                                <div ref={userPillRef} onClick={() => setShowUserMenu(!showUserMenu)} style={avatarPillStyle}>
-                                    <div style={avatarCircleStyle}>{user?.username?.charAt(0).toUpperCase()}</div>
+                                <div
+                                    ref={userPillRef}
+                                    className={`user-pill${showUserMenu ? ' active' : ''}`}
+                                    onClick={() => setShowUserMenu(v => !v)}
+                                >
+                                    <div className="avatar">
+                                        {user?.username?.charAt(0).toUpperCase()}
+                                    </div>
                                 </div>
+
                                 {showUserMenu && (
-                                    <div ref={userMenuRef} style={userMenuContainerStyle}>
-                                        <div style={userMenuHeader}>{user?.username}</div>
-                                        <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'profile' } }); }} style={userMenuItemStyle}>Profile</button>
-                                        <button onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }} style={userMenuItemStyle}>Stats</button>
-                                        <button onClick={() => { setShowUserMenu(false); navigate('/transactions'); }} style={userMenuItemStyle}>Transactions</button>
-                                        <button onClick={logout} style={{ ...userMenuItemStyle, color: '#FF3B30' }}>Log Out</button>
+                                    <div ref={userMenuRef} className="user-menu">
+                                        <div className="user-menu-header">{user?.username}</div>
+                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'profile' } }); }}>Profile</button>
+                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }}>Stats</button>
+                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transactions</button>
+                                        <button className="user-menu-item danger" onClick={logout}>Log Out</button>
                                     </div>
                                 )}
                             </div>
                         </>
                     ) : (
-                        <button onClick={() => navigate('/login')} style={standaloneDepositButtonStyle}>
+                        <button className="nav-deposit-btn" onClick={() => navigate('/login')}>
                             Login
                         </button>
                     )}
                 </div>
-            </div>
+            </nav>
 
+            {/* ── Deposit Float Panel ── */}
             {isWalletExpanded && (
-                <div ref={walletExpandRef} className="glass" style={adjustedWalletExpandPanelStyle}>
-                    <button style={walletCloseX} onClick={() => setIsWalletExpanded(false)}>✕</button>
-                    
-                    <div style={walletPanelHeader} onMouseDown={handlePanelDragStart} onTouchStart={handlePanelDragStart}>
-                        <div>
-                            <div style={walletPanelTitle}>Wallet</div>
-                        </div>
+                <div ref={walletExpandRef} className="float-panel" style={panelStyle}>
+                    <div
+                        className="float-panel-header"
+                        onMouseDown={startDrag}
+                        onTouchStart={startDrag}
+                        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                    >
+                        <span className="float-panel-title">Deposit Funds</span>
+                        <button className="float-panel-close" onClick={() => { setIsWalletExpanded(false); setStatusMsg(''); }}>✕</button>
                     </div>
 
-                    {/* Tabs: Wallet vs Deposit Address */}
-                    <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '16px' }}>
-                        <button 
-                            onClick={() => setDepositMethod('wallet')}
-                            style={{
-                                flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
-                                background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.4)',
-                                transition: '0.2s'
-                            }}
-                        >
+                    {/* Tab bar */}
+                    <div className="tab-bar">
+                        <button className={`tab-btn${depositMethod === 'wallet' ? ' active' : ''}`} onClick={() => setDepositMethod('wallet')}>
                             Wallet
                         </button>
-                        <button 
-                            onClick={() => setDepositMethod('manual')}
-                            style={{
-                                flex: 1, padding: '10px 0', border: 'none', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer',
-                                background: depositMethod === 'manual' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
-                                transition: '0.2s'
-                            }}
-                        >
-                            Deposit Address
+                        <button className={`tab-btn${depositMethod === 'manual' ? ' active' : ''}`} onClick={() => setDepositMethod('manual')}>
+                            QR / Address
                         </button>
                     </div>
 
-                    {/* Content based on selected tab */}
-                    {depositMethod === 'wallet' ? ( // Wallet Connect tab
+                    {depositMethod === 'wallet' ? (
                         <>
-                            <div style={{ display: 'flex', justifyContent: 'center', margin: '5px 0 15px 0' }}>
+                            {/* Wallet connect */}
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
                                 <WalletMultiButton />
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                <label style={inputLabelStyle}>Amount</label>
-                                <CustomDropdown
-                                    options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
-                                    value={isDepositAmountInSOL ? 'SOL' : 'USD'}
-                                    onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
-                                    renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>$</div>}
-                                />
-                            </div>
-                            <div style={walletInputArea}>
-                                <div style={{...walletInputPrefix, top: '50%', transform: 'translateY(-50%)'}}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div>
-                                <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={{...walletInput, paddingLeft: '40px'}} />
-                            </div>
-                            {isDepositAmountInSOL && amount && (
-                                <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>
-                                    ~${(parseFloat(amount) * solPrice).toFixed(2)}
+
+                            {/* Amount row */}
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                    <span className="label">Amount</span>
+                                    <CustomDropdown
+                                        options={CUR_OPTIONS}
+                                        value={isCurSOL ? 'SOL' : 'USD'}
+                                        onChange={v => setIsCurSOL(v === 'SOL')}
+                                        renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v === 'SOL' ? 'SOL' : '$USD'}</span>}
+                                    />
                                 </div>
-                            )}
-                            {!isDepositAmountInSOL && amount && (
-                                <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>
-                                    ~{(parseFloat(amount) / solPrice).toFixed(4)} SOL
+                                <div className="amount-field">
+                                    <span className="amount-prefix">
+                                        {isCurSOL ? <SolLogo size={13} /> : <span>$</span>}
+                                    </span>
+                                    <input
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={amount}
+                                        onChange={e => setAmount(e.target.value)}
+                                        className="amount-input"
+                                    />
                                 </div>
-                            )}
-                            <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
+                                {amount && (
+                                    <div className="amount-hint">
+                                        {isCurSOL
+                                            ? `≈ $${(parseFloat(amount) * solPrice).toFixed(2)}`
+                                            : `≈ ${(parseFloat(amount) / solPrice).toFixed(4)} SOL`}
+                                    </div>
+                                )}
+                            </div>
+
+                            <button className="btn btn-primary" style={{ width: '100%', padding: '11px' }} onClick={handleDeposit}>
+                                Deposit SOL
+                            </button>
                         </>
-                    ) : ( // Deposit Address (QR) tab
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px' }}>
-                            <div ref={qrRef} style={{ background: 'white', padding: '12px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}></div> {/* Larger padding, rounded corners, shadow */}
-                            <div style={{ textAlign: 'center', width: '100%' }}>
-                                <div className="mono" style={{ fontSize: '10px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
-                                    {depositAddress || 'Generating...'}
+                    ) : (
+                        /* QR / Address tab */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                            <div ref={qrRef} className="qr-container" />
+                            <div style={{ width: '100%' }}>
+                                <div className="label" style={{ marginBottom: '4px' }}>Deposit Address</div>
+                                <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                                    {depositAddress || 'Generating…'}
                                 </div>
-                                <button 
-                                    onClick={() => {
-                                        if (depositAddress) navigator.clipboard.writeText(depositAddress);
-                                        setDepositStatusMessage('Address copied!');
-                                    }}
-                                    style={{ background: 'rgba(0,122,255,0.1)', border: '1px solid rgba(0,122,255,0.2)', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '10px', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', width: '100%' }}
+                                <button
+                                    onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
+                                    style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: '700', borderRadius: '6px', cursor: 'pointer', letterSpacing: '0.04em' }}
                                 >
                                     COPY ADDRESS
                                 </button>
@@ -713,252 +573,212 @@ export default function PreGame() {
                         </div>
                     )}
 
-                    {depositStatusMessage && (
-                        <div style={{ marginTop: '14px', fontSize: '0.85rem', color: depositStatusMessage.startsWith('✅') ? '#34C759' : '#FF3B30', textAlign: 'center' }}>
-                            {depositStatusMessage}
-                        </div>
-                    )}
-                    <div style={walletPanelFooter}>Custodial Wallet · Secure Processing</div>
+                    {statusMsg && <div className={`status-msg ${statusClass}`}>{statusMsg}</div>}
+                    <div style={{ textAlign: 'center', fontSize: '0.58rem', color: 'var(--text-3)', fontWeight: 600 }}>
+                        Custodial · Secure Processing
+                    </div>
                 </div>
             )}
 
+            {/* ── Withdraw Float Panel ── */}
             {isWithdrawExpanded && (
-                <div ref={withdrawExpandRef} className="glass" style={{...adjustedWalletExpandPanelStyle, top: 120}}>
-                    <button style={walletCloseX} onClick={() => setIsWithdrawExpanded(false)}>✕</button>
-                    <div style={walletPanelHeader} onMouseDown={handlePanelDragStart} onTouchStart={handlePanelDragStart}>
-                        <div style={walletPanelTitle}>Withdraw</div>
+                <div ref={withdrawExpandRef} className="float-panel" style={{ ...panelStyle, top: panelPos.y + 20 }}>
+                    <div
+                        className="float-panel-header"
+                        onMouseDown={startDrag}
+                        onTouchStart={startDrag}
+                        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                    >
+                        <span className="float-panel-title">Withdraw Funds</span>
+                        <button className="float-panel-close" onClick={() => { setIsWithdrawExpanded(false); setStatusMsg(''); }}>✕</button>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{...inputLabelStyle, marginBottom: '4px'}}>Destination Address</div>
-                        <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
-                            <input 
-                                type="text" 
-                                placeholder="Paste Solana Address" 
-                                value={displayFullWithdrawAddress ? withdrawAddress : shortenAddress(withdrawAddress, 6)}
-                                readOnly
-                                onFocus={() => { setDisplayFullWithdrawAddress(true); setIsAddressFocused(true); }}
-                                onBlur={() => { setDisplayFullWithdrawAddress(false); setIsAddressFocused(false); }}
-                                style={{
-                                    ...walletInput, 
-                                    padding: '14px 14px', 
-                                    opacity: 0.8, 
-                                    width: '100%', 
-                                    boxSizing: 'border-box',
-                                    fontSize: '0.85rem',
-                                    paddingRight: isAddressFocused ? '14px' : '40px'
-                                }}
-                            />
-                            {!isAddressFocused && <div style={{ 
-                                position: 'absolute', 
-                                right: '14px', 
-                                pointerEvents: 'none',
-                                display: 'flex',
-                                alignItems: 'center'
-                            }}> <SolanaLogo size={18} /> </div>}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Address */}
+                        <div>
+                            <div className="label" style={{ marginBottom: '5px' }}>Destination Address</div>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Paste Solana address"
+                                    value={displayFullAddress ? withdrawAddress : shortAddr(withdrawAddress)}
+                                    readOnly
+                                    onFocus={() => setDisplayFullAddress(true)}
+                                    onBlur={() => setDisplayFullAddress(false)}
+                                    className="amount-input"
+                                    style={{
+                                        paddingLeft: '12px',
+                                        paddingRight: '32px',
+                                        width: '100%',
+                                        fontFamily: 'var(--mono)',
+                                        fontSize: '0.75rem',
+                                        borderColor: !isValidWithdrawAddress ? 'rgba(255,59,48,0.4)' : undefined,
+                                    }}
+                                />
+                                <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                                    <SolLogo size={11} />
+                                </div>
+                            </div>
+                            {!isValidWithdrawAddress && (
+                                <div style={{ fontSize: '0.65rem', color: 'var(--red)', marginTop: '3px' }}>
+                                    Invalid Solana address
+                                </div>
+                            )}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginTop: '4px' }}>
-                            <label style={inputLabelStyle}>Amount</label>
-                            <CustomDropdown
-                                options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
-                                value={isDepositAmountInSOL ? 'SOL' : 'USD'}
-                                onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
-                                renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>$</div>}
-                            />
-                        </div>
-                        <div style={walletInputArea}>
-                            <div style={{...walletInputPrefix, top: '50%', transform: 'translateY(-50%)'}}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div>
-                            <input 
-                                type="number" 
-                                placeholder="0.00" 
-                                value={withdrawAmount} 
-                                onChange={(e) => setWithdrawAmount(e.target.value)} 
-                                style={{...walletInput, paddingLeft: '40px', paddingRight: '85px'}} 
-                            />
-                            <div style={{ position: 'absolute', right: '8px', display: 'flex', gap: '4px' }}>
-                                <button 
-                                    style={{ background: '#23262f', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '6px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800' }}
+
+                        {/* Amount */}
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                <span className="label">Amount</span>
+                                <CustomDropdown
+                                    options={CUR_OPTIONS}
+                                    value={isCurSOL ? 'SOL' : 'USD'}
+                                    onChange={v => setIsCurSOL(v === 'SOL')}
+                                    renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v === 'SOL' ? 'SOL' : '$USD'}</span>}
+                                />
+                            </div>
+                            <div className="amount-field">
+                                <span className="amount-prefix">
+                                    {isCurSOL ? <SolLogo size={13} /> : <span>$</span>}
+                                </span>
+                                <input
+                                    type="number"
+                                    placeholder="0.00"
+                                    value={withdrawAmount}
+                                    onChange={e => setWithdrawAmount(e.target.value)}
+                                    className="amount-input"
+                                    style={{ paddingRight: '52px' }}
+                                />
+                                <button
+                                    style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
                                     onClick={() => setWithdrawAmount(user?.balance?.toFixed(2))}
                                 >
                                     MAX
                                 </button>
                             </div>
+                            <div className="amount-hint">
+                                {isCurSOL
+                                    ? `≈ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
+                                    : `≈ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(4)} SOL`}
+                            </div>
                         </div>
-                        <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '4px', textAlign: 'left', fontWeight: '600' }}>
-                            {isDepositAmountInSOL ? `~ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}` : `~ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(4)} SOL`}
-                        </div>
-                        <button className="btn-hover" style={{...walletConfirmBtn, background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', marginTop: '10px'}} onClick={handleWithdraw}>
+
+                        <button className="btn btn-primary" style={{ width: '100%', padding: '11px' }} onClick={handleWithdraw}>
                             Withdraw
                         </button>
                     </div>
-                    {depositStatusMessage && (
-                        <div style={{ marginTop: '14px', fontSize: '0.85rem', color: depositStatusMessage.startsWith('✅') ? '#34C759' : '#FF3B30', textAlign: 'center' }}>
-                            {depositStatusMessage}
-                        </div>
-                    )}
-                    <div style={{...walletPanelFooter, marginTop: '12px'}}>Custodial Wallet · Secure Transfer</div>
+
+                    {statusMsg && <div className={`status-msg ${statusClass}`}>{statusMsg}</div>}
+                    <div style={{ textAlign: 'center', fontSize: '0.58rem', color: 'var(--text-3)', fontWeight: 600 }}>
+                        Custodial · Secure Transfer
+                    </div>
                 </div>
             )}
 
-            {/* Standalone Deposit Modal */}
-
-            <div className="glass" style={{...centerCardStyle, background: '#0f1118'}}>
-                <label style={inputLabelStyle}>Nickname</label>
-                <input 
-                    type="text" 
-                    value={nickname} 
-                    onChange={(e) => setNickname(e.target.value)}
-                    maxLength={15}
-                    placeholder="Your name..."
-                    style={nicknameInputStyle}
-                />
-                
-                <div style={dividerStyle} />
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.35, fontWeight: '600' }}>Entry Fee</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', fontWeight: '600', opacity: 0.35 }}>$10.00</span>
+            {/* ── Center Card ── */}
+            <div className="game-card">
+                {/* Nickname field */}
+                <div style={{ marginBottom: '14px' }}>
+                    <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                        Nickname
+                    </label>
+                    <input
+                        type="text"
+                        value={nickname}
+                        onChange={e => setNickname(e.target.value)}
+                        maxLength={15}
+                        placeholder="Enter name…"
+                        className="nickname-input"
+                    />
                 </div>
 
-                <button 
-                    onClick={handleStartMatch} 
+                {/* Divider */}
+                <div className="divider" style={{ marginBottom: '14px' }} />
+
+                {/* Entry fee row */}
+                <div className="entry-row" style={{ marginBottom: '12px' }}>
+                    <span className="label">Entry Fee</span>
+                    <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
+                        $10.00
+                    </span>
+                </div>
+
+                {/* Play button */}
+                <button
+                    className={playBtnClass}
+                    onClick={handleStartMatch}
                     disabled={isMatchmaking}
-                    style={{ 
-                        ...playBtnStyle, 
-                        background: !isAuthenticated ? 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)' : (isAlreadyInGame ? 'linear-gradient(180deg, #007AFF 0%, #005DCB 100%)' : (canJoin ? '#34C759' : '#1e1f26')),
-                        color: 'white',
-                        boxShadow: isAlreadyInGame ? '0 4px 12px rgba(0, 122, 255, 0.3)' : (canJoin || !isAuthenticated ? '0 4px 12px rgba(52, 199, 89, 0.2)' : 'none'),
-                        cursor: 'pointer'
-                    }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
-                    {isMatchmaking ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                            <div style={{ width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
-                            Joining...
-                        </div>
-                    ) : (!isAuthenticated ? 'Play' : (isAlreadyInGame ? 'REJOIN ARENA' : (canJoin ? 'Play' : 'Deposit to Play')))}
+                    {playBtnLabel}
                 </button>
 
-                <div style={howItWorksContainerStyle}>
-                    <div onClick={() => setShowHowItWorks(!showHowItWorks)} style={howItWorksToggleStyle}>
+                {/* How it works */}
+                <div style={{ marginTop: '14px' }}>
+                    <div
+                        className="hiw-toggle"
+                        onClick={() => setShowHowItWorks(v => !v)}
+                    >
                         <span>How it works</span>
-                        <span style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.3s' }}>▼</span>
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                            style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
+                            <path d="M6 9l6 6 6-6" />
+                        </svg>
                     </div>
                     {showHowItWorks && (
-                        <div style={howItWorksTextStyle}>
-                            <div>• Entry Fee: $10.00</div>
-                            <div>• Starting Balance: $1.00</div>
-                            <div>• Grow by eating food and other players</div>
-                            <div>• Cash out your balance anytime</div>
-                            <div style={{ marginTop: '8px', opacity: 0.5 }}>Leaderboard Rewards:</div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>1st Place Bonus</span><span>$20.00</span></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>2nd & 3rd Place Bonus</span><span>$10.00</span></div>
+                        <div className="hiw-content">
+                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                <span>Entry fee</span>
+                                <span className="mono">$10.00</span>
+                            </div>
+                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                <span>Starting balance</span>
+                                <span className="mono">$1.00</span>
+                            </div>
+                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
+                                Eat food & other players. Cash out anytime.
+                            </div>
+                            <div className="divider" style={{ margin: '6px 0' }} />
+                            <div className="stat-row" style={{ marginBottom: '2px' }}>
+                                <span>1st place bonus</span>
+                                <span className="mono text-green">$20.00</span>
+                            </div>
+                            <div className="stat-row">
+                                <span>2nd–3rd place</span>
+                                <span className="mono text-green">$10.00</span>
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            <div className="glass" style={bottomRightCardStyle}>
+            {/* ── Live Stats Card ── */}
+            <div className="stats-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase' }}>Live Stats</div>
-                    <div className="live-indicator" />
+                    <span className="label">Live</span>
+                    <div className="live-dot" />
                 </div>
-                <div style={statItemStyle}>
-                    <span>Players online</span>
-                    <span className="mono">{liveStats.playersOnline ?? 0}</span>
+                <div className="stat-row" style={{ marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                        {liveStats.playersOnline ?? 0}
+                    </span>
                 </div>
-                <div style={statItemStyle}>
-                    <span>Biggest payout today</span>
-                    <span className="mono">${(liveStats.biggestPayout || 0).toFixed(2)}</span>
+                <div className="stat-row">
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top payout</span>
+                    <span className="mono text-green" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                        ${(liveStats.biggestPayout || 0).toFixed(2)}
+                    </span>
                 </div>
             </div>
 
-            <div style={footerContainerStyle}>
-                <span>Terms of Service</span>
+            {/* ── Footer ── */}
+            <div className="footer-links">
+                <span>Terms</span>
                 <span>Provably Fair</span>
                 <span>Support</span>
-                <span style={{ opacity: 0.4 }}>EU-West · Stable</span>
+                <span style={{ opacity: 0.5 }}>EU-West · Online</span>
             </div>
         </div>
     );
 }
-// --- Styles ---
-const containerStyle = { width: '100vw', height: '100vh', background: '#050505', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui', overflow: 'hidden', position: 'relative', letterSpacing: '-0.01em' };
-const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '#050505', backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px)`, backgroundSize: '64px 64px' };
-const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' };
-const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1.15rem' };
-
-const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: '#1c1e26', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '0 16px', height: '34px', borderRadius: '100px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxSizing: 'border-box' };
-const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '0 22px', height: '34px', display: 'flex', alignItems: 'center', borderRadius: '100px', fontSize: '13.5px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(69, 127, 255, 0.25)', boxSizing: 'border-box' };
-const depositWithdrawBtnStyle = walletPillButtonStyle;
-
-const walletDropdownCardStyle = { position: 'absolute', top: '44px', left: '50%', transform: 'translateX(-50%)', width: '320px', padding: '16px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', zIndex: 1100, animation: 'slideDown 0.2s ease-out', background: '#0f1118' };
-const dropdownPrimaryBtn = { flex: 1, padding: '10px', borderRadius: '100px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
-const dropdownSecondaryBtn = { flex: 1, padding: '10px', borderRadius: '100px', border: 'none', background: '#1c1e26', border: '1px solid rgba(255,255,255,0.08)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
-
-const modalOverlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const depositModalCardStyle = { width: '400px', padding: '40px', borderRadius: '28px', position: 'relative' };
-const modalCloseXStyle = { position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'white', opacity: 0.3, cursor: 'pointer', fontSize: '18px' };
-const modalInputContainer = { position: 'relative', marginBottom: '32px' };
-const modalInputPrefix = { position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)', fontSize: '32px', fontWeight: '600', opacity: 0.2 };
-const modalInputField = { width: '100%', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '48px', fontWeight: '800', outline: 'none', padding: '8px 0 8px 32px' };
-const modalConfirmButtonStyle = { width: '100%', padding: '18px', borderRadius: '100px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '800', fontSize: '16px', cursor: 'pointer', boxShadow: '0 8px 20px rgba(69, 127, 255, 0.25)' };
-const modalFooterTextStyle = { textAlign: 'center', marginTop: '24px', fontSize: '11px', opacity: 0.3, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' };
-
-const avatarPillStyle = { width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.15)', padding: '2px', cursor: 'pointer' };
-const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.65rem' };
-const walletExpandPanelStyle = { position: 'absolute', top: '54px', left: '50%', transform: 'translateX(-50%)', width: '340px', maxWidth: '92vw', padding: '20px', borderRadius: '20px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100, background: '#0f1118' };
-const walletCloseX = { position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'white', opacity: 0.35, padding: '4px', cursor: 'pointer' };
-const walletPanelHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' };
-const walletPanelTitle = { fontSize: '0.8rem', letterSpacing: '0.24em', textTransform: 'uppercase', opacity: 0.65, fontWeight: '800' };
-const walletPanelSubtitle = { marginTop: '4px', fontSize: '1rem', fontWeight: '800', color: 'white', opacity: 0.9 };
-const walletStatusBadge = { padding: '7px 14px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' };
-const walletStatusConnected = { background: 'rgba(52, 199, 89, 0.16)', color: '#34C759' };
-const walletStatusDisconnected = { background: 'rgba(255, 59, 48, 0.14)', color: '#FF3B30' };
-const walletOptionRow = { display: 'flex', justifyContent: 'center' };
-const walletPanelBalance = { fontSize: '1.25rem', fontWeight: '800' };
-const walletTabContainer = { display: 'flex', gap: '6px', background: '#1c1e26', padding: '4px', borderRadius: '14px' };
-const walletTabBtn = { flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: '800', borderRadius: '12px', cursor: 'pointer' };
-const walletTabActive = { background: 'rgba(255,255,255,0.06)', color: 'white' };
-const walletInputArea = { position: 'relative', display: 'flex', alignItems: 'center', width: '100%' };
-const walletInputPrefix = { position: 'absolute', left: '14px', fontSize: '0.85rem', opacity: 0.4, fontWeight: '800' };
-const walletInput = { width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 14px 14px 32px', color: 'white', fontWeight: '700', fontSize: '0.95rem', outline: 'none' };
-const walletMaxBtn = { position: 'absolute', right: '10px', background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer' };
-const walletConfirmBtn = { width: '100%', padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '800', fontSize: '0.92rem', boxShadow: '0 12px 30px rgba(69, 127, 255, 0.25)', cursor: 'pointer' };
-const walletPanelFooter = { textAlign: 'center', fontSize: '0.75rem', opacity: 0.35, fontWeight: '700', marginTop: '8px' };
-const currencySelectStyle = {
-    background: '#23262f',
-    border: '1px solid rgba(255,255,255,0.12)',
-    color: 'white',
-    borderRadius: '10px',
-    padding: '6px 14px',
-    fontSize: '0.75rem',
-    fontWeight: '700',
-    outline: 'none',
-    cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-    appearance: 'none',
-    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 8px center',
-    backgroundSize: '12px',
-    paddingRight: '28px',
-    transition: 'all 0.2s ease',
-    textAlign: 'center'
-};
-const userMenuContainerStyle = { position: 'absolute', top: '40px', right: 0, width: '160px', background: '#1c1c1e', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 16px 32px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)' };
-const userMenuHeader = { padding: '10px 14px', fontSize: '0.65rem', fontWeight: '800', opacity: 0.3, textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.05)' };
-const userMenuItemStyle = { width: '100%', padding: '10px 14px', background: 'none', border: 'none', color: 'white', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600' };
-const centerCardStyle = { width: '320px', borderRadius: '20px', padding: '24px', zIndex: 10 };
-const inputLabelStyle = { display: 'block', fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '8px' };
-const nicknameInputStyle = { width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', color: 'white', fontSize: '0.95rem', fontWeight: '700', outline: 'none', padding: '12px 16px', borderRadius: '12px', boxSizing: 'border-box', marginBottom: '24px' };
-const dividerStyle = { height: '1px', background: 'rgba(255, 255, 255, 0.05)', margin: '0 0 24px 0' };
-const playBtnStyle = { width: '100%', padding: '10px', borderRadius: '12px', border: 'none', fontSize: '0.9rem', fontWeight: '900', letterSpacing: '0.01em' };
-const howItWorksContainerStyle = { marginTop: '16px' };
-const howItWorksToggleStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: 0.2, fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase' };
-const howItWorksTextStyle = { fontSize: '0.7rem', lineHeight: '1.5', opacity: 0.25, marginTop: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', fontWeight: '600' };
-const bottomLeftCardStyle = { position: 'fixed', bottom: '24px', left: '24px', width: '180px', borderRadius: '16px', padding: '12px 16px', boxShadow: '0 8px 16px rgba(0,0,0,0.2)' };
-const cardSmallLabelStyle = { display: 'block', fontSize: '0.6rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', marginBottom: '4px' };
-const walletBalanceStyle = { fontSize: '1.15rem', fontWeight: '800' };
-const bottomRightCardStyle = { position: 'fixed', bottom: '24px', right: '24px', width: '200px', borderRadius: '16px', padding: '16px', boxShadow: '0 8px 16px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '12px' };
-const statItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', fontWeight: '600', opacity: 0.5 };
-const footerContainerStyle = { position: 'fixed', bottom: '12px', left: '24px', right: '24px', display: 'flex', justifyContent: 'center', gap: '16px', fontSize: '0.6rem', opacity: 0.2, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' };

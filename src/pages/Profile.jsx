@@ -2,344 +2,368 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
+import '../styles/ui.css';
 
 export default function Profile() {
-    const { user, token, refreshUser, login } = useAuth(); 
-    const navigate = useNavigate();
-    const location = useLocation();
-    const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
+    const { user, token, refreshUser, login } = useAuth();
+    const navigate  = useNavigate();
+    const location  = useLocation();
+    const [activeTab, setActiveTab]     = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
-    const [gameLogs, setGameLogs] = useState([]);
+    const [gameLogs, setGameLogs]       = useState([]);
     const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
-    const [isUpdating, setIsUpdating] = useState(false);
-    const [updateMsg, setUpdateMsg] = useState('');
+    const [isUpdating, setIsUpdating]   = useState(false);
+    const [updateMsg, setUpdateMsg]     = useState('');
 
     useEffect(() => {
+        document.title = 'AgarStake | Profile';
         const fetchLogs = async () => {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
+                    headers: { Authorization: `Bearer ${token}` }
                 });
                 const data = await res.json();
-                // Hämta både vinster (withdraw/Cashout) och förluster (game/Death)
-                setGameLogs(data.filter(tx => 
-                    (tx.type === 'withdraw' && tx.meta?.reason === 'Arena Cashout') || 
-                    (tx.type === 'game' && tx.meta?.reason === 'Arena Death')
+                setGameLogs(data.filter(tx =>
+                    (tx.type === 'withdraw' && tx.meta?.reason === 'Arena Cashout') ||
+                    (tx.type === 'game'     && tx.meta?.reason === 'Arena Death')
                 ));
-            } catch (e) {}
+            } catch {}
         };
         fetchLogs();
         refreshUser();
-        document.title = "AgarStake | Profile";
     }, [token, refreshUser]);
 
+    // ── Chart data ────────────────────────────────────
     const processedLogs = [...gameLogs].reverse().map(log => {
         const isCashout = log.type === 'withdraw' && log.meta?.reason === 'Arena Cashout';
-        const amount = Number(log.amount) || 0;
-        // Netto: (Utbetalt - 10) för cashout, annars bara beloppet (-10 vid död)
+        const amount    = Number(log.amount) || 0;
         const netProfit = isCashout ? amount - 10 : amount;
         return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount };
     });
 
-    const totalPnL = processedLogs.reduce((acc, log) => acc + log.netProfit, 0);
-    
-    // Win Rate baserat på sessioner med vinst (Net Profit > 0)
-    const winRate = processedLogs.length > 0 
-        ? Math.round((processedLogs.filter(l => l.netProfit > 0).length / processedLogs.length) * 100) 
+    const totalPnL = processedLogs.reduce((acc, l) => acc + l.netProfit, 0);
+    const winRate  = processedLogs.length > 0
+        ? Math.round((processedLogs.filter(l => l.netProfit > 0).length / processedLogs.length) * 100)
         : 0;
 
     let cumulative = 0;
-    const chartPointsRaw = [0, ...processedLogs.map(log => {
-        cumulative += log.netProfit;
-        return cumulative;
-    })];
-
-    const minVal = Math.min(...chartPointsRaw, -10);
-    const maxVal = Math.max(...chartPointsRaw, 10);
+    const chartPts = [0, ...processedLogs.map(l => { cumulative += l.netProfit; return cumulative; })];
+    const minVal   = Math.min(...chartPts, -10);
+    const maxVal   = Math.max(...chartPts, 10);
     const pnlRange = (maxVal - minVal) || 1;
 
-    const polylinePoints = chartPointsRaw.map((val, i) => {
-        const x = (i / (chartPointsRaw.length - 1)) * 100;
-        const y = 95 - ((val - minVal) / pnlRange) * 90;
-        return `${x},${y}`;
-    }).join(' ');
+    const toXY = (val, i) => ({
+        x: (i / Math.max(chartPts.length - 1, 1)) * 100,
+        y: 95 - ((val - minVal) / pnlRange) * 90,
+    });
 
-    const pathPoints = chartPointsRaw.map((val, i) => {
-        const x = (i / (chartPointsRaw.length - 1)) * 100;
-        const y = 95 - ((val - minVal) / pnlRange) * 90;
-        return `L ${x} ${y}`;
-    }).join(' ');
+    const polyline = chartPts.map((v, i) => { const p = toXY(v, i); return `${p.x},${p.y}`; }).join(' ');
+    const areaPath = chartPts.map((v, i) => { const p = toXY(v, i); return `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`; }).join(' ');
 
-    const formatPlaytime = (ms) => {
-        const hours = Math.floor(ms / (1000 * 60 * 60));
-        const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-        return `${hours}h ${mins}m`;
-    };
+    const chartColor = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
 
     const handleUpdateWallet = async () => {
         if (!walletInput || walletInput === user?.walletAddress) return;
         setIsUpdating(true);
         setUpdateMsg('');
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
+            const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ walletAddress: walletInput })
             });
-            const data = await res.ok ? await res.json() : null;
+            const data = res.ok ? await res.json() : null;
             if (res.ok && data) {
-                login(data.user, token); // Uppdatera lokalt state
-                setUpdateMsg('✅ Wallet linked! Manual deposits will now be tracked.');
+                login(data.user, token);
+                setUpdateMsg('success');
             } else {
-                setUpdateMsg('❌ Failed to link wallet. Check address format.');
+                setUpdateMsg('error');
             }
-        } catch (e) {
-            setUpdateMsg('❌ Server error.');
-        }
+        } catch { setUpdateMsg('error'); }
         setIsUpdating(false);
     };
 
+    // ── Render ─────────────────────────────────────────
     return (
-        <div style={containerStyle}>
+        <div style={{ width: '100vw', minHeight: '100vh', overflowY: 'auto', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px 60px', boxSizing: 'border-box' }}>
             <Background />
-            
-            <div style={contentWrapper}>
-                <div style={headerStyle}>
-                    <h1 style={titleStyle}>Account</h1>
-                    <button onClick={() => navigate(-1)} style={backBtn}>Back</button>
+
+            <div style={{ width: '100%', maxWidth: '780px', position: 'relative', zIndex: 1 }}>
+
+                {/* ── Page header ── */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '28px' }}>
+                    <div>
+                        <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
+                        <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)', lineHeight: 1 }}>
+                            Account
+                        </h1>
+                    </div>
+                    <button
+                        className="btn btn-ghost"
+                        onClick={() => navigate(-1)}
+                        style={{ padding: '9px 18px', fontSize: '0.78rem', borderRadius: 'var(--r-full)' }}
+                    >
+                        ← Back
+                    </button>
                 </div>
 
-                <div className="glass" style={tabContainer}>
-                    <div style={tabSwitcher}>
-                        <button 
-                            onClick={() => setActiveTab('stats')} 
-                            style={{...tabBtn, ...(activeTab === 'stats' ? activeTabStyle : {})}}
-                        >
-                            Performance
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('profile')} 
-                            style={{...tabBtn, ...(activeTab === 'profile' ? activeTabStyle : {})}}
-                        >
-                            Profile Settings
-                        </button>
+                {/* ── Main card ── */}
+                <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', overflow: 'hidden', boxShadow: 'var(--shadow-xl)' }}>
+
+                    {/* ── Tab bar ── */}
+                    <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 4px' }}>
+                        {[
+                            { id: 'stats',   label: 'Performance' },
+                            { id: 'profile', label: 'Settings' },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                style={{
+                                    padding: '14px 20px',
+                                    background: 'none',
+                                    border: 'none',
+                                    borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent)' : 'transparent'}`,
+                                    color: activeTab === tab.id ? 'var(--text-h)' : 'var(--text-2)',
+                                    fontWeight: 700,
+                                    fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                    fontFamily: 'var(--sans)',
+                                    marginBottom: '-1px',
+                                    letterSpacing: '-0.01em',
+                                }}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
 
-                    <div style={tabContent}>
+                    <div style={{ padding: '24px' }}>
                         {activeTab === 'stats' ? (
-                            <div style={statsView}>
-                                <div style={statsGrid}>
-                                    <div style={statCard}>
-                                        <div style={statLabel}>Total Earnings</div>
-                                        <div style={{...statValue, color: totalPnL >= 0 ? '#14F195' : '#FF3B30'}}>
-                                            {totalPnL >= 0 ? '+' : '-'}${Math.abs(totalPnL).toFixed(2)}
+
+                            /* ══ Stats view ══ */
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                                {/* Stat cards */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                                    {[
+                                        {
+                                            label: 'Total P&L',
+                                            value: `${totalPnL >= 0 ? '+' : ''}$${Math.abs(totalPnL).toFixed(2)}`,
+                                            color: totalPnL >= 0 ? 'var(--green)' : 'var(--red)',
+                                        },
+                                        {
+                                            label: 'Win Rate',
+                                            value: `${winRate}%`,
+                                            color: winRate >= 50 ? 'var(--green)' : 'var(--text-h)',
+                                        },
+                                        {
+                                            label: 'Sessions',
+                                            value: processedLogs.length,
+                                            color: 'var(--text-h)',
+                                        },
+                                    ].map(s => (
+                                        <div key={s.label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px' }}>
+                                            <div className="label" style={{ marginBottom: '8px' }}>{s.label}</div>
+                                            <div className="mono" style={{ fontSize: '1.4rem', fontWeight: 800, color: s.color, letterSpacing: '-0.03em' }}>
+                                                {s.value}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div style={statCard}>
-                                        <div style={statLabel}>Win Rate</div>
-                                        <div style={statValue}>{winRate}%</div>
-                                    </div>
-                                    <div style={statCard}>
-                                        <div style={statLabel}>Playtime</div>
-                                        <div style={statValue}>{formatPlaytime(user?.playtime || 0)}</div>
-                                    </div>
+                                    ))}
                                 </div>
 
-                                <div style={chartWrapper}>
-                                    <div style={{ ...chartHeader, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span>Equity Curve</span>
+                                {/* Equity chart */}
+                                <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '18px', overflow: 'hidden' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                        <span className="label">Equity Curve</span>
                                         {hoveredPoint && (
-                                            <span style={{ 
-                                                color: hoveredPoint.label.includes('PROFIT') ? '#14F195' : '#FF3B30', 
-                                                fontWeight: '800', 
-                                                fontSize: '0.75rem', 
-                                                letterSpacing: '0.5px' 
-                                            }}>
+                                            <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: chartColor }}>
                                                 {hoveredPoint.label}
                                             </span>
                                         )}
                                     </div>
-                                    <svg 
-                                        viewBox="0 0 100 100" 
-                                        preserveAspectRatio="none" 
-                                        style={svgStyle}
-                                        onMouseMove={(e) => {
-                                            if (chartPointsRaw.length < 2) return;
+
+                                    <svg
+                                        viewBox="0 0 100 100"
+                                        preserveAspectRatio="none"
+                                        style={{ width: '100%', height: '160px', display: 'block', overflow: 'hidden' }}
+                                        onMouseMove={e => {
+                                            if (chartPts.length < 2) return;
                                             const rect = e.currentTarget.getBoundingClientRect();
                                             const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
-                                            const index = Math.round((mouseX / 100) * (chartPointsRaw.length - 1));
-                                            const safeIndex = Math.max(0, Math.min(index, chartPointsRaw.length - 1));
-                                            const logAtIdx = safeIndex > 0 ? processedLogs[safeIndex - 1] : null;
-                                            const label = safeIndex === 0 ? "START $0" : `${logAtIdx?.netProfit >= 0 ? 'PROFIT' : 'LOSS'} ${logAtIdx?.netProfit >= 0 ? '' : '-'}$${Math.abs(logAtIdx?.netProfit || 0).toFixed(0)}`;
-                                            setHoveredPoint({ index: safeIndex, label });
+                                            const idx    = Math.max(0, Math.min(
+                                                Math.round((mouseX / 100) * (chartPts.length - 1)),
+                                                chartPts.length - 1
+                                            ));
+                                            const log    = idx > 0 ? processedLogs[idx - 1] : null;
+                                            const label  = idx === 0
+                                                ? 'START $0'
+                                                : `${log?.netProfit >= 0 ? 'PROFIT' : 'LOSS'} $${Math.abs(log?.netProfit || 0).toFixed(2)}`;
+                                            setHoveredPoint({ index: idx, label });
                                         }}
                                         onMouseLeave={() => setHoveredPoint(null)}
                                     >
                                         <defs>
-                                            <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor={totalPnL >= 0 ? "#14F195" : "#FF3B30"} stopOpacity="0.5" />
-                                                <stop offset="100%" stopColor="#007AFF" stopOpacity="0" />
+                                            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor={chartColor} stopOpacity="0.15" />
+                                                <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
                                             </linearGradient>
                                         </defs>
-                                        <path d={`M 0 100 ${pathPoints} L 100 100 Z`} fill="url(#lineGradient)" />
+                                        {/* Area fill */}
+                                        <path d={`${areaPath} L 100 100 L 0 100 Z`} fill="url(#chartGrad)" />
+                                        {/* Line */}
                                         <polyline
                                             fill="none"
-                                            stroke={totalPnL >= 0 ? "#14F195" : "#FF3B30"}
+                                            stroke={chartColor}
                                             strokeWidth="1.5"
-                                            points={polylinePoints}
+                                            points={polyline}
                                             strokeLinejoin="round"
+                                            strokeLinecap="round"
                                         />
-                                        {hoveredPoint && (
-                                            <>
-                                                <line 
-                                                    x1={(hoveredPoint.index / (chartPointsRaw.length - 1)) * 100} 
-                                                    y1="0" 
-                                                    x2={(hoveredPoint.index / (chartPointsRaw.length - 1)) * 100} 
-                                                    y2="100" 
-                                                    stroke="rgba(255,255,255,0.1)" 
-                                                    strokeWidth="0.5" 
-                                                />
-                                                <circle 
-                                                    cx={(hoveredPoint.index / (chartPointsRaw.length - 1)) * 100} 
-                                                    cy={95 - ((chartPointsRaw[hoveredPoint.index] - minVal) / pnlRange) * 90} 
-                                                    r="1.5" 
-                                                    fill="white" 
-                                                />
-                                            </>
-                                        )}
+                                        {/* Hover crosshair */}
+                                        {hoveredPoint && chartPts.length > 1 && (() => {
+                                            const p = toXY(chartPts[hoveredPoint.index], hoveredPoint.index);
+                                            return (
+                                                <>
+                                                    <line x1={p.x} y1="0" x2={p.x} y2="100" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+                                                    <circle cx={p.x} cy={p.y} r="1.8" fill="white" />
+                                                </>
+                                            );
+                                        })()}
                                     </svg>
-                                    <div style={chartLabels}>
-                                        <span>Last {processedLogs.length} Sessions</span>
-                                        <span className="mono" style={{color: totalPnL >= 0 ? '#14F195' : '#FF3B30'}}>All Arena Sessions</span>
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        <span>Start</span>
+                                        <span>{processedLogs.length} sessions</span>
                                     </div>
                                 </div>
 
-                                <div style={{ marginTop: '20px' }}>
-                                    <div style={statLabel}>Session History</div>
-                                    <div style={{ 
-                                        display: 'flex', 
-                                        flexDirection: 'column', 
-                                        gap: '10px', 
-                                        marginTop: '15px',
-                                    }}>
-                                        {[...processedLogs].reverse().map(log => (
-                                            <div key={log._id} className="glass" style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
-                                                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                                                    <div style={{ color: log.netProfit >= 0 ? '#14F195' : '#FF3B30', fontWeight: '800', textTransform: 'uppercase' }}>
-                                                        {log.type === 'withdraw' ? 'Cashout' : 'Eliminated'}
-                                                    </div>
-                                                    <div style={{ opacity: 0.4, fontSize: '0.75rem' }}>
-                                                        {new Date(log.createdAt).toLocaleDateString()}
-                                                        {log.type === 'withdraw' && ` • Collected $${log.grossAmount.toFixed(2)}`}
-                                                        {log.type === 'game' && ` • Balance Lost $${Math.abs(log.netProfit).toFixed(2)}`}
-                                                    </div>
-                                                </div>
-                                                <div style={{ fontWeight: '400', fontSize: '0.7rem', color: log.netProfit >= 0 ? '#14F195' : '#FF3B30' }}>
-                                                    Profit {log.netProfit >= 0 ? '' : '-'}${Math.abs(log.netProfit).toFixed(2)}
-                                                </div>
+                                {/* Session log */}
+                                <div>
+                                    <div className="label" style={{ marginBottom: '10px' }}>Session History</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        {processedLogs.length === 0 ? (
+                                            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-3)', fontSize: '0.78rem', fontWeight: 600 }}>
+                                                No sessions yet
                                             </div>
-                                        ))}
-                                        {gameLogs.length === 0 && <div style={{ opacity: 0.2, textAlign: 'center', padding: '20px' }}>No session data found</div>}
+                                        ) : (
+                                            [...processedLogs].reverse().map(log => {
+                                                const win = log.netProfit >= 0;
+                                                return (
+                                                    <div
+                                                        key={log._id}
+                                                        style={{
+                                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                            padding: '10px 14px',
+                                                            borderRadius: 'var(--r-md)',
+                                                            background: 'rgba(255,255,255,0.02)',
+                                                            border: '1px solid var(--border)',
+                                                            transition: 'background 0.1s',
+                                                        }}
+                                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                                                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                                                    >
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{
+                                                                width: 26, height: 26,
+                                                                borderRadius: 'var(--r-sm)',
+                                                                background: win ? 'var(--green-dim)' : 'var(--red-dim)',
+                                                                border: `1px solid ${win ? 'var(--green-border)' : 'rgba(255,59,48,0.2)'}`,
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontSize: '0.7rem',
+                                                                color: win ? 'var(--green)' : 'var(--red)',
+                                                            }}>
+                                                                {win ? '↑' : '↓'}
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
+                                                                    {log.type === 'withdraw' ? 'Cashout' : 'Eliminated'}
+                                                                </div>
+                                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginTop: '1px' }}>
+                                                                    {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                                    {log.type === 'withdraw'
+                                                                        ? ` · Collected $${log.grossAmount.toFixed(2)}`
+                                                                        : ` · Lost $${Math.abs(log.netProfit).toFixed(2)}`}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
+                                                            {win ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
                                     </div>
                                 </div>
                             </div>
+
                         ) : (
-                            <div style={settingsView}>
-                                <div style={inputGroup}>
-                                    <label style={labelStyle}>Username</label>
-                                    <div className="glass" style={inputStatic}>{user?.username}</div>
+
+                            /* ══ Settings view ══ */
+                            <div style={{ maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+
+                                {/* Username (read-only) */}
+                                <div>
+                                    <label className="label" style={{ display: 'block', marginBottom: '6px' }}>Username</label>
+                                    <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '10px 14px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-h)' }}>
+                                        {user?.username}
+                                    </div>
                                 </div>
-                                <div style={inputGroup}>
-                                    <label style={labelStyle}>Wallet Address</label>
-                                    <div style={{ display: 'flex', gap: '10px' }}>
-                                        <input 
+
+                                {/* Email (read-only) */}
+                                {user?.email && (
+                                    <div>
+                                        <label className="label" style={{ display: 'block', marginBottom: '6px' }}>Email</label>
+                                        <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-2)' }}>
+                                            {user.email}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Wallet link */}
+                                <div>
+                                    <label className="label" style={{ display: 'block', marginBottom: '6px' }}>Linked Wallet Address</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input
                                             value={walletInput}
-                                            onChange={(e) => setWalletInput(e.target.value)}
-                                            placeholder="Paste Solana Address (for manual deposits)"
-                                            className="glass"
-                                            style={{ ...inputStatic, flex: 1, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', outline: 'none' }}
+                                            onChange={e => setWalletInput(e.target.value)}
+                                            placeholder="Paste Solana address…"
+                                            className="input"
+                                            style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: '0.78rem', boxSizing: 'border-box' }}
                                         />
-                                        <button 
+                                        <button
+                                            className="btn btn-primary"
                                             onClick={handleUpdateWallet}
-                                            disabled={isUpdating || walletInput === user?.walletAddress}
-                                            style={{
-                                                padding: '0 20px',
-                                                borderRadius: '14px',
-                                                background: '#007AFF',
-                                                color: 'white',
-                                                fontWeight: '700',
-                                                fontSize: '0.8rem',
-                                                opacity: (isUpdating || walletInput === user?.walletAddress) ? 0.3 : 1,
-                                                cursor: (isUpdating || walletInput === user?.walletAddress) ? 'not-allowed' : 'pointer'
-                                            }}
+                                            disabled={isUpdating || walletInput === user?.walletAddress || !walletInput}
+                                            style={{ padding: '0 18px', fontSize: '0.75rem', flexShrink: 0, borderRadius: 'var(--r-md)' }}
                                         >
-                                            {isUpdating ? '...' : 'LINK'}
+                                            {isUpdating ? <span className="spinner" /> : 'Link'}
                                         </button>
                                     </div>
-                                    {updateMsg && <div style={{ fontSize: '0.7rem', color: updateMsg.includes('✅') ? '#14F195' : '#FF3B30', marginTop: '5px' }}>{updateMsg}</div>}
-                                    <p style={{ fontSize: '0.65rem', opacity: 0.3, marginTop: '10px' }}>
-                                        Link the wallet you intend to send SOL from. Our system uses this to automatically identify your manual deposits.
+                                    {updateMsg && (
+                                        <div className={`status-msg ${updateMsg === 'success' ? 'success' : 'error'}`} style={{ marginTop: '8px' }}>
+                                            {updateMsg === 'success'
+                                                ? '✅ Wallet linked! Manual deposits will be tracked.'
+                                                : '❌ Failed to link. Check address format.'}
+                                        </div>
+                                    )}
+                                    <p style={{ margin: '8px 0 0', fontSize: '0.67rem', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                                        Link the wallet you intend to deposit from. This helps us auto-identify your manual deposits.
                                     </p>
                                 </div>
-                                <div style={{marginTop: '40px', opacity: 0.3, fontSize: '0.8rem', textAlign: 'center'}}>
-                                    Profile customization features coming soon.
+
+                                <div className="divider" />
+
+                                <div style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 500 }}>
+                                    More profile customization coming soon.
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
-
-            <style>{`
-                .mono { font-family: ui-monospace, monospace; }
-                .glass { 
-                    background: rgba(15, 15, 18, 0.6); 
-                    backdrop-filter: blur(40px); 
-                    border: 1px solid rgba(255, 255, 255, 0.05);
-                    border-radius: 24px;
-                }
-            `}</style>
         </div>
     );
 }
-
-const containerStyle = { width: '100vw', height: '100vh', overflowY: 'auto', background: '#050505', color: 'white', display: 'flex', justifyContent: 'center', padding: '100px 20px', boxSizing: 'border-box' };
-const contentWrapper = { width: '100%', maxWidth: '800px' };
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' };
-const titleStyle = { fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-1.5px', margin: 0 };
-const backBtn = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px 20px', borderRadius: '100px', cursor: 'pointer', fontWeight: '700' };
-
-const tabContainer = { padding: '32px' };
-const tabSwitcher = { display: 'flex', gap: '10px', background: 'rgba(0,0,0,0.2)', padding: '5px', borderRadius: '100px', width: 'fit-content', marginBottom: '40px' };
-const tabBtn = { padding: '10px 24px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.4)', borderRadius: '100px', cursor: 'pointer', fontWeight: '800', fontSize: '0.85rem', transition: '0.2s' };
-const activeTabStyle = { background: 'rgba(255,255,255,0.08)', color: 'white' };
-
-const tabContent = { animation: 'fadeIn 0.3s ease-out' };
-const statsView = { display: 'flex', flexDirection: 'column', gap: '30px' };
-const statsGrid = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' };
-const statCard = { background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.03)' };
-const statLabel = { fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.3, marginBottom: '8px', fontWeight: '800' };
-const statValue = { fontSize: '1.5rem', fontWeight: '900', fontFamily: 'ui-monospace, monospace' };
-
-const chartWrapper = { 
-    background: 'rgba(0,0,0,0.2)', 
-    borderRadius: '20px', 
-    padding: '24px', 
-    height: '250px', 
-    minHeight: '200px',
-    display: 'flex', 
-    flexDirection: 'column',
-    border: '1px solid rgba(255,255,255,0.02)',
-    overflow: 'hidden'
-};
-const chartHeader = { fontSize: '0.8rem', fontWeight: '800', opacity: 0.2, marginBottom: '20px', textTransform: 'uppercase' };
-const svgStyle = { width: '100%', height: '100%', flex: 1, overflow: 'hidden' };
-const chartLabels = { display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '0.7rem', fontWeight: '800', opacity: 0.2 };
-
-const settingsView = { maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' };
-const inputGroup = { display: 'flex', flexDirection: 'column', gap: '10px' };
-const labelStyle = { fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: '800', opacity: 0.3, letterSpacing: '1px' };
-const inputStatic = { padding: '16px', borderRadius: '14px', fontSize: '1rem', fontWeight: '600', color: 'rgba(255,255,255,0.8)' };

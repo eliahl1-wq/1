@@ -2,12 +2,22 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { useNavigate } from 'react-router-dom';
 import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
-import TokenBadge from '../components/TokenBadge';
+import Background from '../components/Background';
+
+const SolLogo = ({ size = 13 }) => (
+    <img src="/solana-sol-logo.png" alt="SOL"
+        style={{ width: size, height: size, objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0 }} />
+);
+
+const CUR_OPTIONS = [
+    { label: 'USD', value: 'USD' },
+    { label: 'SOL', value: 'SOL' },
+];
 
 export default function Lobby() {
     const { user, logout, token, login, refreshUser } = useAuth();
@@ -16,614 +26,346 @@ export default function Lobby() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
 
-    // If redirected from PreGame with a pending deposit, prefill the deposit amount
+    const [depositAmount, setDepositAmount]   = useState('');
+    const [statusMsg, setStatusMsg]           = useState('');
+    const [arenaError, setArenaError]         = useState('');
+    const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
+    const [depositMethod, setDepositMethod]   = useState('wallet');
+    const [isCurSOL, setIsCurSOL]             = useState(false);
+    const [solPrice] = useState(150);
+
+    const qrRef       = useRef(null);
+    const userMenuRef = useRef(null);
+    const userPillRef = useRef(null);
+
+    const depositAddress = user?.depositAddress;
+
+    const statusClass = statusMsg.startsWith('✅') || statusMsg.includes('copied')
+        ? 'success' : (statusMsg.includes('failed') || statusMsg.includes('Error') || statusMsg.startsWith('❌'))
+        ? 'error' : 'info';
+
+    // Pre-fill deposit amount from redirect
     useEffect(() => {
         try {
             const pending = localStorage.getItem('pending_deposit');
             if (pending) {
                 setDepositAmount(pending);
                 localStorage.removeItem('pending_deposit');
-                setDepositStatusMessage('Amount prefilled — complete deposit below.');
+                setStatusMsg('Amount prefilled — complete deposit below.');
             }
-        } catch (e) {}
+        } catch {}
     }, [connected]);
 
-    // --- STATS FÖR DEPOSIT ---
-    const [depositAmount, setDepositAmount] = useState('');
-    const [minimumDepositUSD, setMinimumDepositUSD] = useState(0); // Gräns borttagen för test
-    const [depositStatusMessage, setDepositStatusMessage] = useState(''); // Statusmeddelanden för insättning
-    const [arenaError, setArenaError] = useState('');
-    const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [depositMethod, setDepositMethod] = useState('wallet'); // 'wallet' | 'manual'
-    const [isDepositAmountInSOL, setIsDepositAmountInSOL] = useState(false);
-    const [solPrice, setSolPrice] = useState(150); // Placeholder, ideally fetched from an API
-    const qrRef = useRef(null); // Ref for the QR code canvas
-
-    const SolanaLogo = ({ size = 14 }) => (
-        <img 
-            src="/solana-sol-logo.png" 
-            alt="SOL" 
-            style={{ width: size, height: size, verticalAlign: 'middle', objectFit: 'contain', marginBottom: '2px' }} 
-        />
-    );
-
-    const depositAddress = user?.depositAddress;
-
-    // Memoize bakgrundsblobs så de inte skapas på nytt vid varje re-render (fixar "snabba blobs")
-    const backgroundBlobs = useMemo(() => [...Array(6)].map((_, i) => ({
-        id: i,
-        color: i % 2 === 0 ? '#007AFF' : i % 3 === 0 ? '#34C759' : '#5E5CE6',
-        top: `${10 + Math.random() * 80}%`,
-        left: `${5 + Math.random() * 90}%`,
-        size: `${150 + Math.random() * 300}px`,
-        duration: `${20 + Math.random() * 20}s`,
-        delay: `${Math.random() * -20}s`,
-        opacity: 0.08 + Math.random() * 0.08
-    })), []);
-
-    const userMenuRef = useRef(null);
-    const userPillRef = useRef(null);
-    const hasRefreshedRef = useRef(false); // För att stoppa loopen
-
-    // Stäng menyn om man klickar utanför
-    const handleClickOutside = useCallback((event) => {
-        if (
-            userMenuRef.current && 
-            !userMenuRef.current.contains(event.target) &&
-            userPillRef.current &&
-            !userPillRef.current.contains(event.target)
-        ) {
+    // Click outside user menu
+    const handleClickOutside = useCallback((e) => {
+        if (userMenuRef.current && !userMenuRef.current.contains(e.target) &&
+            userPillRef.current && !userPillRef.current.contains(e.target)) {
             setShowUserMenu(false);
         }
     }, []);
 
     useEffect(() => {
-        if (showUserMenu) {
-            document.addEventListener('mousedown', handleClickOutside);
-        } else {
-            document.removeEventListener('mousedown', handleClickOutside);
-        }
+        if (showUserMenu) document.addEventListener('mousedown', handleClickOutside);
+        else document.removeEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showUserMenu, handleClickOutside]);
 
-    // Uppdaterar användardata när komponenten laddas (löser problemet med bakåt-navigering)
     useEffect(() => {
         if (token) {
             refreshUser();
-            document.title = "AgarStake | Lobby";
-            
-            // Kolla om vi redan spelar
-            const checkStatus = async () => {
+            document.title = 'AgarStake | Lobby';
+            const check = async () => {
                 try {
-                    const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
-                    const res = await fetch(`${baseUrl}/api/game-status`, {
-                        headers: { 'Authorization': `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
+                    const r = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/game-status`, {
+                        headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
                     });
-                    
-                    const contentType = res.headers.get("content-type");
-                    if (res.ok && contentType && contentType.includes("application/json")) {
-                        const data = await res.json();
-                        setIsAlreadyInGame(data.inGame);
-                    }
-                } catch (e) {}
+                    if (r.ok) { const d = await r.json(); setIsAlreadyInGame(d.inGame); }
+                } catch {}
             };
-            checkStatus();
-
-            const id = setInterval(refreshUser, 5000); // Polla var 5:e sekund
+            check();
+            const id = setInterval(refreshUser, 5000);
             return () => clearInterval(id);
         }
     }, [token, refreshUser]);
 
-    // Generate Solana Pay QR code
+    // QR code
     useEffect(() => {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
-            const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
             qrRef.current.innerHTML = '';
-            const qr = createQR(solanaPayUrl, 200, 'white', 'black'); // Larger QR code
-            qr.append(qrRef.current);
+            try {
+                const qr = createQR(`solana:${depositAddress}?amount=0&label=AgarStake&message=Deposit`, 190, 'white', 'black');
+                qr.append(qrRef.current);
+            } catch {}
         }
     }, [depositAddress, depositMethod]);
 
-    // Ensure QR cleanup on unmount or when leaving deposit view
     useEffect(() => {
         if (depositMethod !== 'manual' && qrRef.current) qrRef.current.innerHTML = '';
         return () => { if (qrRef.current) qrRef.current.innerHTML = ''; };
     }, [depositMethod]);
 
-    // Om användaren redan har balans och INTE är i ett game, skicka dem till PreGame
+    // Redirect if sufficient balance
     useEffect(() => {
-        if (user && (user.balance || 0) >= 10 && !isAlreadyInGame) {
-            navigate('/pre-game');
-        } else if (isAlreadyInGame) {
-            // Om man redan är i ett game, tvinga in dem i PreGame (eller Game direkt om du vill)
-            navigate('/pre-game');
-        }
+        if (user && (user.balance || 0) >= 10 && !isAlreadyInGame) navigate('/pre-game');
+        else if (isAlreadyInGame) navigate('/pre-game');
     }, [user, navigate]);
 
-    // Funktion för att hantera insättning (Skicka SOL)
     const handleDeposit = async () => {
-        if (!publicKey || !connected) {
-            setDepositStatusMessage('Connect wallet first.');
-            return;
-        }
-        if (!depositAddress) {
-            setDepositStatusMessage('❌ No deposit address found.');
-            return;
-        }
-
-        const amountUSD = parseFloat(depositAmount);
-        if (isNaN(amountUSD) || amountUSD < minimumDepositUSD) {
-            setDepositStatusMessage(`Minimum deposit is $${minimumDepositUSD}.`);
-            return;
-        }
-
-        setDepositStatusMessage('Waiting for approval...');
-
+        if (!publicKey || !connected) { setStatusMsg('Connect your wallet first.'); return; }
+        if (!depositAddress) { setStatusMsg('❌ No deposit address found.'); return; }
+        const parsed = parseFloat(depositAmount);
+        if (isNaN(parsed) || parsed <= 0) { setStatusMsg('❌ Enter a valid amount.'); return; }
+        setStatusMsg('Waiting for wallet approval…');
         try {
-            const currentSolPrice = solPrice; // Use the current SOL price
-            let finalAmountUSD = 0;
-            let finalSolAmount = 0;
-
-            if (isDepositAmountInSOL) {
-                finalSolAmount = amountUSD; // amountUSD here is actually SOL amount from input
-                finalAmountUSD = finalSolAmount * currentSolPrice;
-            } else {
-                finalAmountUSD = amountUSD;
-                finalSolAmount = finalAmountUSD / currentSolPrice;
-            }
-
-            // Use finalSolAmount for lamports calculation
-            const solAmount = finalSolAmount;
-            const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
-
-            const transaction = new Transaction().add(
-                SystemProgram.transfer({
-                    fromPubkey: publicKey,
-                    toPubkey: new PublicKey(depositAddress),
-                    lamports: lamports,
-                })
+            const solAmt = isCurSOL ? parsed : parsed / solPrice;
+            const usdAmt = isCurSOL ? parsed * solPrice : parsed;
+            const lamports = Math.round(solAmt * LAMPORTS_PER_SOL);
+            const tx = new Transaction().add(
+                SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: new PublicKey(depositAddress), lamports })
             );
-
             const { blockhash } = await connection.getLatestBlockhash();
-            transaction.recentBlockhash = blockhash;
-            transaction.feePayer = publicKey;
-
-            const signature = await sendTransaction(transaction, connection);
-            setDepositStatusMessage('Confirming transaction on blockchain...');
-            
-            const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-
-            if (confirmation.value.err) {
-                throw new Error('Transaction failed on-chain.');
-            }
-
-            setDepositStatusMessage('Verifying deposit with backend...');
-            // --- KRITISKT STEG: Skicka signaturen till din backend för verifiering ---
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = publicKey;
+            const sig = await sendTransaction(tx, connection);
+            setStatusMsg('Confirming on-chain…');
+            const conf = await connection.confirmTransaction(sig, 'confirmed');
+            if (conf.value.err) throw new Error('Transaction failed on-chain.');
+            setStatusMsg('Verifying with backend…');
+            const vr = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    'bypass-tunnel-reminders': 'true'
-                },
-                body: JSON.stringify({ 
-                    signature: signature, 
-                    amountUSD: finalAmountUSD, // Send USD amount to backend
-                    solAmount: solAmount,
-                    walletAddress: publicKey.toString()
-                })
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' },
+                body: JSON.stringify({ signature: sig, amountUSD: usdAmt, solAmount: solAmt, walletAddress: publicKey.toString() })
             });
-
-            if (!verifyRes.ok) {
-                let errorMessage = 'Backend verification failed.';
-                const contentType = verifyRes.headers.get("content-type");
-                if (contentType && contentType.includes("application/json")) {
-                    const errorData = await verifyRes.json();
-                    errorMessage = errorData.message || errorMessage;
-                } else {
-                    errorMessage = await verifyRes.text();
-                }
-                throw new Error(errorMessage);
+            if (!vr.ok) {
+                const ct = vr.headers.get('content-type');
+                const err = ct?.includes('json') ? (await vr.json()).message : await vr.text();
+                throw new Error(err || 'Verification failed.');
             }
-
-            // TODO: Skicka signature till backend här för att uppdatera databasen
-            // await fetch(`${import.meta.env.VITE_API_URL}/api/verify-deposit`, {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ signature, amountUSD })
-            // });
-
-            setDepositStatusMessage(`✅ Success! ${solAmount.toFixed(4)} SOL deposited and verified.`);
-            // Efter lyckad backend-verifiering bör din AuthContext uppdatera användarens saldo.
-            // Om din AuthContext inte automatiskt hämtar ny användardata, kan du behöva trigga det här.
-            // Exempel: refreshUserData(); // En funktion i AuthContext som hämtar senaste användardata
-            setDepositAmount(''); // Rensa insättningsfältet
-        } catch (error) {
-            console.error('Deposit error:', error);
-            const msg = error.message || "";
-            
-            if (msg.includes('TransactionExpiredTimeoutError') || msg.toLowerCase().includes('insufficient')) {
-                setDepositStatusMessage('❌ Not enough funds in wallet for transaction and fees.');
-            } else if (msg.includes('User rejected')) {
-                setDepositStatusMessage('❌ Transaction cancelled in Phantom.');
-            } else {
-                setDepositStatusMessage(`❌ Deposit failed. Check your wallet balance.`);
-            }
+            setStatusMsg(`✅ ${solAmt.toFixed(4)} SOL deposited!`);
+            setDepositAmount('');
+        } catch (err) {
+            const m = err.message || '';
+            if (m.includes('User rejected')) setStatusMsg('❌ Cancelled in wallet.');
+            else if (m.toLowerCase().includes('insufficient')) setStatusMsg('❌ Insufficient funds.');
+            else setStatusMsg('❌ Deposit failed. Try again.');
         }
     };
 
     return (
-        <div style={{ 
-            width: '100vw', 
-            height: '100vh', 
-            position: 'relative', 
-            color: 'white', 
-            userSelect: 'none',
-            background: '#050505',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-        }}>
-            {/* Background Glows for Depth */}
-            <div style={{
-                position: 'absolute',
-                top: '-15%',
-                left: '-5%',
-                width: '50%',
-                height: '50%',
-                background: 'radial-gradient(circle, rgba(0, 122, 255, 0.1) 0%, transparent 70%)',
-                filter: 'blur(100px)',
-                animation: 'float-glow 15s infinite alternate'
-            }} />
-            <div style={{
-                position: 'absolute',
-                bottom: '-15%',
-                right: '-5%',
-                width: '60%',
-                height: '60%',
-                background: 'radial-gradient(circle, rgba(52, 199, 89, 0.07) 0%, transparent 70%)',
-                filter: 'blur(100px)',
-                animation: 'float-glow 20s infinite alternate-reverse'
-            }} />
+        <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <Background />
 
-            {/* Blurry Background Blobs (Nu stabila via useMemo) */}
-            {backgroundBlobs.map((blob) => (
-                <div 
-                    key={blob.id}
-                    className="bg-blob"
-                    style={{
-                        background: blob.color,
-                        top: blob.top,
-                        left: blob.left,
-                        width: blob.size,
-                        height: blob.size,
-                        animationDelay: blob.delay,
-                        animationDuration: blob.duration,
-                        opacity: blob.opacity
-                    }}
-                />
-            ))}
+            {/* ── Top Bar ── */}
+            <nav className="topbar">
+                <div className="logo">
+                    <div className="logo-dot" />
+                    AGAR<span className="logo-accent">STAKE</span>
+                </div>
 
-            <style>{`
-                @keyframes float-glow {
-                    from { transform: translate(0, 0) scale(1); opacity: 0.5; }
-                    to { transform: translate(5%, 5%) scale(1.1); opacity: 0.8; }
-                }
-                .btn-hover:hover {
-                    transform: translateY(-2px);
-                    filter: brightness(1.1);
-                }
-                .btn-hover:active {
-                    transform: translateY(0);
-                }
-                .bg-blob {
-                    position: absolute;
-                    border-radius: 50%;
-                    filter: blur(110px);
-                    opacity: 0.12;
-                    z-index: 1;
-                    animation: float-blob infinite alternate ease-in-out;
-                }
-                @keyframes float-blob {
-                    from { transform: translate(0, 0) scale(1); }
-                    to { transform: translate(120px, 60px) scale(1.15); }
-                }
-            `}</style>
-
-            {/* Logo Top Left */}
-            <div style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 10 }}>
-                <h2 style={{ 
-                    margin: 0, 
-                    color: 'white', 
-                    letterSpacing: '-1.5px', 
-                    fontWeight: '900', 
-                    fontSize: '1.8rem',
-                    fontStyle: 'italic'
-                }}>
-                    AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
-                </h2>
-            </div>
-
-            {/* iOS Style User Pill */}
-            <div style={{ position: 'absolute', top: '40px', right: '40px', zIndex: 100 }}>
                 {user && (
-                    <div style={{ position: 'relative', fontFamily: 'system-ui' }}>
-                        <div 
-                            ref={userPillRef}
-                            onClick={() => setShowUserMenu(!showUserMenu)}
-                            style={{
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                padding: '12px 28px',
-                                borderRadius: '100px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                transition: '0.2s all ease',
-                                backdropFilter: 'blur(30px)',
-                                border: showUserMenu ? '1px solid #007AFF' : '1px solid rgba(255, 255, 255, 0.08)',
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
-                            }}
-                        >
-                            <span style={{ fontWeight: '600', fontSize: '1.1rem', letterSpacing: '-0.3px' }}>{user.username}</span>
-                            <span className="mono" style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                {isDepositAmountInSOL && <SolanaLogo size={18} />}
-                                {isDepositAmountInSOL 
-                                    ? (user.balance / solPrice)?.toFixed(4) 
-                                    : `$${user.balance?.toFixed(2) || '0.00'}`}
-                            </span>
-                        </div>
-
-                        {showUserMenu && (
-                            <div ref={userMenuRef} style={{
-                                position: 'absolute', top: '65px', right: '0', width: '200px',
-                                background: 'rgba(28, 28, 30, 0.95)',
-                                borderRadius: '14px',
-                                overflow: 'hidden',
-                                backdropFilter: 'blur(30px)',
-                                border: '0.5px solid rgba(255, 255, 255, 0.2)',
-                                boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
-                            }}>
-                                <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: '800', opacity: 0.4 }}>CURRENCY</span>
-                                    <CustomDropdown
-                                        options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
-                                        value={isDepositAmountInSOL ? 'SOL' : 'USD'}
-                                        onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
-                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>USD</div>}
-                                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ position: 'relative' }}>
+                            <div
+                                ref={userPillRef}
+                                className={`user-pill${showUserMenu ? ' active' : ''}`}
+                                onClick={() => setShowUserMenu(v => !v)}
+                            >
+                                <div className="avatar">
+                                    {user.username?.charAt(0).toUpperCase()}
                                 </div>
-                                <button 
-                                    onClick={logout}
-                                    style={{
-                                        width: '100%',
-                                        padding: '14px 18px',
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#FF3B30',
-                                        fontWeight: '600',
-                                        cursor: 'pointer',
-                                        textAlign: 'left',
-                                        fontSize: '1rem'
-                                    }}
+                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-h)' }}>
+                                    {user.username}
+                                </span>
+                                <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: isCurSOL ? 'var(--accent)' : 'var(--text-h)' }}>
+                                    {isCurSOL
+                                        ? (user.balance / solPrice).toFixed(4)
+                                        : `$${(user.balance || 0).toFixed(2)}`}
+                                </span>
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                                    style={{ opacity: 0.35, transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+
+                            {showUserMenu && (
+                                <div ref={userMenuRef} className="user-menu">
+                                    {/* Currency toggle in menu */}
+                                    <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
+                                        <span className="label">Currency</span>
+                                        <CustomDropdown
+                                            options={CUR_OPTIONS}
+                                            value={isCurSOL ? 'SOL' : 'USD'}
+                                            onChange={v => setIsCurSOL(v === 'SOL')}
+                                            renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v}</span>}
+                                        />
+                                    </div>
+                                    <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transaction History</button>
+                                    <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile'); }}>My Profile</button>
+                                    <button className="user-menu-item danger" onClick={logout}>Log Out</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </nav>
+
+            {/* ── Center Content ── */}
+            <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '0 16px', marginTop: '52px', width: '100%', maxWidth: '440px' }}>
+
+                {/* Header */}
+                <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+                    <h1 style={{ margin: '0 0 6px 0', fontSize: 'clamp(1.8rem, 5vw, 2.8rem)', fontWeight: 900, letterSpacing: '-2px', color: 'var(--text-h)', lineHeight: 1.05 }}>
+                        Fund Your Arena
+                    </h1>
+                    <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 500 }}>
+                        Deposit $10 minimum to enter the arena.
+                    </p>
+                </div>
+
+                {/* Deposit Card */}
+                <div style={{
+                    background: 'var(--bg-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-2xl)',
+                    padding: '22px',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    boxShadow: 'var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,0.03)',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        <span className="label">Deposit</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div className="live-dot" />
+                            <span style={{ fontSize: '0.6rem', color: 'var(--text-3)', fontWeight: 600 }}>ARENA STAKE</span>
+                        </div>
+                    </div>
+
+                    {connected ? (
+                        <>
+                            {/* Tab bar */}
+                            <div className="tab-bar" style={{ marginBottom: '16px' }}>
+                                <button
+                                    className={`tab-btn${depositMethod === 'wallet' ? ' active' : ''}`}
+                                    onClick={() => { if (qrRef.current) qrRef.current.innerHTML = ''; setDepositMethod('wallet'); setStatusMsg(''); }}
                                 >
-                                    Logout
+                                    Wallet Connect
+                                </button>
+                                <button
+                                    className={`tab-btn${depositMethod === 'manual' ? ' active' : ''}`}
+                                    onClick={() => { setDepositMethod('manual'); setStatusMsg(''); }}
+                                >
+                                    QR Deposit
                                 </button>
                             </div>
-                        )}
+
+                            {depositMethod === 'wallet' ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {/* Amount */}
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                            <span className="label">Amount</span>
+                                            <CustomDropdown
+                                                options={CUR_OPTIONS}
+                                                value={isCurSOL ? 'SOL' : 'USD'}
+                                                onChange={v => setIsCurSOL(v === 'SOL')}
+                                                renderValue={v => <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{v === 'SOL' ? 'SOL' : '$USD'}</span>}
+                                            />
+                                        </div>
+                                        <div className="amount-field">
+                                            <span className="amount-prefix">
+                                                {isCurSOL ? <SolLogo size={13} /> : <span>$</span>}
+                                            </span>
+                                            <input
+                                                type="number"
+                                                placeholder="0.00"
+                                                value={depositAmount}
+                                                onChange={e => setDepositAmount(e.target.value)}
+                                                className="amount-input"
+                                            />
+                                        </div>
+                                        {depositAmount && (
+                                            <div className="amount-hint">
+                                                {isCurSOL
+                                                    ? `≈ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}`
+                                                    : `≈ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Wallet button */}
+                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                        <WalletMultiButton />
+                                    </div>
+
+                                    {/* Deposit action */}
+                                    <button
+                                        className="btn btn-green"
+                                        style={{ width: '100%', padding: '12px', fontSize: '0.82rem', borderRadius: 'var(--r-lg)' }}
+                                        onClick={handleDeposit}
+                                    >
+                                        Deposit via Wallet
+                                    </button>
+                                </div>
+                            ) : (
+                                /* QR tab */
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+                                    <div ref={qrRef} className="qr-container" />
+                                    <div style={{ width: '100%' }}>
+                                        <div className="label" style={{ marginBottom: '4px' }}>Recipient Address</div>
+                                        <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
+                                            {depositAddress || 'Generating…'}
+                                        </div>
+                                        <button
+                                            onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
+                                            style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: 700, borderRadius: 'var(--r-md)', cursor: 'pointer', letterSpacing: '0.04em' }}
+                                        >
+                                            COPY ADDRESS
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
+                            <WalletMultiButton />
+                        </div>
+                    )}
+
+                    {statusMsg && (
+                        <div className={`status-msg ${statusClass}`} style={{ marginTop: '10px' }}>
+                            {statusMsg}
+                        </div>
+                    )}
+                </div>
+
+                {/* Enter game button */}
+                <button
+                    className="btn btn-primary"
+                    style={{ width: '100%', padding: '14px', fontSize: '0.9rem', borderRadius: 'var(--r-lg)', letterSpacing: '0.01em' }}
+                    onClick={() => {
+                        if (!connected) { setArenaError('Connect your wallet first.'); return; }
+                        if (!isAlreadyInGame && (user?.balance ?? 0) < 10) {
+                            setArenaError('Deposit at least $10 to enter.'); return;
+                        }
+                        setArenaError('');
+                        navigate('/pre-game');
+                    }}
+                >
+                    {isAlreadyInGame ? 'Rejoin Arena' : 'Enter Arena'}
+                </button>
+
+                {arenaError && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--red)', fontWeight: 600, textAlign: 'center' }}>
+                        {arenaError}
                     </div>
                 )}
             </div>
 
-            {/* Center Content */}
-            <div style={{ zIndex: 5, fontFamily: 'system-ui', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                <h1 style={{ 
-                    color: 'white',
-                    fontSize: '5.5rem',
-                    fontWeight: '900',
-                    marginBottom: '5px',
-                    letterSpacing: '-5px',
-                    textShadow: '0 15px 40px rgba(0,0,0,0.4)',
-                    lineHeight: '1'
-                }}>
-                    Welcome, {user?.username}
-                </h1>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.5rem', marginBottom: '45px', fontWeight: '500', letterSpacing: '-0.8px' }}>Stake your claim and dominate the arena.</p>
-
-                <div style={{ 
-                    background: '#0f1118', // Axiom background color
-                    padding: '50px 60px', 
-                    borderRadius: '48px', 
-                    border: '1px solid rgba(255, 255, 255, 0.07)', 
-                    textAlign: 'center', 
-                    width: '480px', 
-                    margin: '0 auto',
-                    backdropFilter: 'blur(80px)',
-                    boxShadow: '0 40px 120px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255,255,255,0.05)',
-                    position: 'relative'
-                }}>
-                    <h2 style={{ 
-                        fontSize: '1.4rem', 
-                        margin: '0 0 35px 0', 
-                        letterSpacing: '22px', 
-                        fontWeight: '900', 
-                        color: 'rgba(255,255,255,0.07)',
-                        textShadow: '0 0 20px rgba(255,255,255,0.05)',
-                        textTransform: 'uppercase',
-                        textIndent: '22px'
-                    }}>ARENA</h2>
-                    
-                    {connected ? ( // Only show deposit options if wallet is connected
-                        <div style={{ 
-                            marginTop: '20px', 
-                            marginBottom: '30px', 
-                            padding: '25px', 
-                            background: '#161922', // Darker background for inner card
-                            borderRadius: '32px',
-                            border: '1px solid rgba(255, 255, 255, 0.03)'
-                        }}>
-                            <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '20px', width: 'fit-content', margin: '0 auto 20px auto' }}>
-                                <button 
-                                    onClick={() => { if (qrRef.current) qrRef.current.innerHTML = ''; setDepositMethod('wallet'); setDepositStatusMessage(''); }}
-                                    style={{
-                                        padding: '10px 24px', border: 'none', borderRadius: '100px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
-                                        background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                        color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.4)',
-                                        transition: '0.2s'
-                                    }}
-                                >
-                                    Wallet
-                                </button>
-                                <button 
-                                    onClick={() => { setDepositMethod('manual'); setDepositStatusMessage(''); }}
-                                    style={{
-                                        padding: '10px 24px', border: 'none', borderRadius: '100px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
-                                        background: depositMethod === 'manual' ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                        color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
-                                        transition: '0.2s'
-                                    }}
-                                        >
-                                            Deposit Address
-                                </button>
-                            </div>
-
-                        {depositMethod === 'wallet' ? (
-                            <div style={{ width: '100%' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                    <label style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Amount</label>
-                                    <CustomDropdown
-                                        options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
-                                        value={isDepositAmountInSOL ? 'SOL' : 'USD'}
-                                        onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
-                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>USD</div>}
-                                    />
-                                </div>
-                                <div style={{ position: 'relative', width: '100%' }}>
-                                    <div style={{ 
-                                        position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', 
-                                        color: 'rgba(255,255,255,0.3)', fontSize: '1rem', fontWeight: '400', pointerEvents: 'none', zIndex: 1 
-                                    }}>
-                                        {isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}
-                                    </div>
-                                    <input
-                                        type="number"
-                                        placeholder="0.00"
-                                        value={depositAmount}
-                                        onChange={(e) => setDepositAmount(e.target.value)}
-                                        style={{
-                                            width: '100%', boxSizing: 'border-box', padding: '12px 12px 12px 40px', borderRadius: '12px',
-                                            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem', outline: 'none'
-                                        }}
-                                    />
-                                </div>
-
-                                {depositAmount && (
-                                    <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '8px', textAlign: 'left', fontWeight: '600' }}>
-                                        {isDepositAmountInSOL 
-                                            ? `~ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}` 
-                                            : `~ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
-                                    </div>
-                                )}
-
-                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', marginTop: '15px' }}>
-                                            <WalletMultiButton /> {/* Only one WalletMultiButton here */}
-                                        </div>
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
-                                <div 
-                                    ref={qrRef} 
-                                    style={{ borderRadius: '16px', overflow: 'hidden', background: 'white', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}
-                                />
-                                <div style={{ width: '100%' }}>
-                                    <div style={{ fontSize: '9px', opacity: 0.4, textAlign: 'left', marginBottom: '4px', textTransform: 'uppercase' }}>Recipient Address</div>
-                                    <div style={{ fontSize: '10px', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px', color: '#14F195', textAlign: 'left', fontFamily: 'monospace' }}>
-                                        {depositAddress || 'Generating...'}
-                                    </div>
-                                    <button 
-                                        onClick={() => {
-                                            if (depositAddress) navigator.clipboard.writeText(depositAddress);
-                                            setDepositStatusMessage('Address copied!');
-                                        }}
-                                        style={{ background: 'rgba(0,122,255,0.1)', border: '1px solid rgba(0,122,255,0.2)', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '10px', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', width: '100%' }}
-                                    >
-                                        COPY ADDRESS
-                                    </button>
-                                </div>
-                                <div style={{ fontSize: '0.75rem', opacity: 0.3, marginTop: '5px', lineHeight: '1.4', fontStyle: 'italic' }}>
-                                    Detected automatically after sending.
-                                </div>
-                            </div>
-                        )}
-
-                        {depositMethod === 'wallet' && (
-                            <button
-                                onClick={handleDeposit}
-                                className="btn-hover"
-                                style={{ // Deposit button styling
-                                    width: '100%', padding: '16px', fontSize: '1rem', borderRadius: '16px', border: 'none',
-                                    background: '#34C759', color: 'white', fontWeight: '700', cursor: 'pointer',
-                                    boxShadow: '0 8px 20px rgba(52, 199, 89, 0.2)'
-                                }}
-                            >
-                                DEPOSIT VIA WALLET
-                            </button>
-                        )}
-
-                        {depositStatusMessage && (
-                            <p style={{ 
-                                fontSize: '0.85rem',
-                                color: (depositStatusMessage.includes('failed') || depositStatusMessage.includes('Error')) ? '#FF3B30' : 'rgba(255,255,255,0.7)',
-                                fontWeight: '500',
-                                marginTop: '15px' 
-                                }}>
-                                {depositStatusMessage}
-                            </p>
-                        )}
-                        </div>
-                    ) : ( // If not connected, show WalletMultiButton
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px', marginTop: '20px' }}>
-                            <WalletMultiButton />
-                        </div>
-                    )}
-                    
-                    <button 
-                        onClick={() => {
-                            if (!connected) { // Kontrollera om plånbok är ansluten
-                                setArenaError('Please connect your wallet first.');
-                            } else if (!isAlreadyInGame && ((user?.balance ?? 0) < 10)) { 
-                                setArenaError(`Please deposit at least $10 to enter the arena.`);
-                            } else {
-                                setArenaError('');
-                                navigate('/pre-game');
-                            }
-                        }}
-                        className="btn-hover"
-                        style={{ 
-                            width: '100%', 
-                            padding: '22px', 
-                            fontSize: '1.4rem', 
-                            borderRadius: '22px', 
-                            border: 'none', 
-                            background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', 
-                            color: 'white', 
-                            fontWeight: '800', 
-                            cursor: 'pointer', 
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            boxShadow: '0 8px 25px rgba(69, 127, 255, 0.3)',
-                            letterSpacing: '0.5px'
-                        }}
-                    >
-                        {isAlreadyInGame ? 'Reconnect' : 'ENTER GAME'}
-                    </button>
-
-                    {arenaError && (
-                        <p style={{ color: '#FF3B30', fontSize: '0.9rem', marginTop: '15px', fontWeight: '500' }}>
-                            {arenaError}
-                        </p>
-                    )}
-                </div>
+            {/* ── Footer ── */}
+            <div className="footer-links">
+                <span>Terms</span>
+                <span>Provably Fair</span>
+                <span>Support</span>
             </div>
         </div>
     );

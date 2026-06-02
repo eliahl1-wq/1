@@ -1,64 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
-import '../styles/ui.css';
 
-export default function CustomDropdown({ options = [], value, onChange, renderValue }) {
+/**
+ * CustomDropdown — axiom-style compact dropdown
+ * Props:
+ *  options: [{label, value}]
+ *  value: current selected value
+ *  onChange: (value) => void
+ *  renderValue: (value) => ReactNode  — custom render for trigger label
+ */
+export default function CustomDropdown({ options, value, onChange, renderValue }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
-    const listRef = useRef(null);
-
-    useEffect(() => {
-        const onDoc = (e) => {
-            if (!ref.current) return;
-            if (!ref.current.contains(e.target)) setOpen(false);
-        };
-        document.addEventListener('mousedown', onDoc);
-        return () => document.removeEventListener('mousedown', onDoc);
-    }, []);
 
     useEffect(() => {
         if (!open) return;
-        // focus first item
-        const first = listRef.current?.querySelector('[data-index]');
-        first?.focus();
+        const handler = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
     }, [open]);
 
-    const handleKeyDown = (e) => {
-        const items = Array.from(listRef.current?.querySelectorAll('[data-index]') || []);
-        const idx = items.findIndex(i => i === document.activeElement);
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            const next = items[Math.min(items.length - 1, Math.max(0, idx + 1))];
-            next?.focus();
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            const prev = items[Math.max(0, idx - 1)];
-            prev?.focus();
-        } else if (e.key === 'Escape') {
-            setOpen(false);
-        } else if (e.key === 'Enter') {
-            const el = document.activeElement;
-            if (el && el.dataset && el.dataset.value) onChange(el.dataset.value);
-        }
-    };
+    const selected = options.find(o => o.value === value);
 
     return (
-        <div className={`dropdown ${open ? 'open' : ''}`} ref={ref} style={{position:'relative',zIndex:10001}}>
-            <div className="dropdown-trigger" role="button" tabIndex={0} onClick={() => setOpen(s => !s)} onKeyDown={(e) => { if (e.key === 'Enter') setOpen(s => !s); }} style={{position:'relative',zIndex:10001}}>
-                <div style={{display:'flex',alignItems:'center',gap:6}}>{renderValue ? renderValue(value) : value}</div>
-                <svg style={{transform: open ? 'rotate(180deg)' : 'rotate(0deg)',transition:'transform .18s',flexShrink:0}} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-            </div>
+        <div ref={ref} className={`dropdown${open ? ' open' : ''}`}>
+            <button
+                className="dropdown-trigger"
+                onClick={() => setOpen(v => !v)}
+                type="button"
+            >
+                {renderValue ? renderValue(value) : (selected?.label ?? value)}
+                <svg
+                    className="dropdown-chevron"
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    style={{ flexShrink: 0 }}
+                >
+                    <path d="M6 9l6 6 6-6" />
+                </svg>
+            </button>
 
-            <div className="dropdown-panel" role="menu" ref={listRef} onKeyDown={handleKeyDown}>
-                {options.map((opt, i) => (
+            <div className="dropdown-panel">
+                {options.map(opt => (
                     <div
-                        key={i}
-                        role="menuitem"
-                        tabIndex={0}
-                        data-index={i}
-                        data-value={opt.value}
-                        className={`dropdown-item ${opt.value === value ? 'active' : ''}`}
+                        key={opt.value}
+                        className={`dropdown-item${opt.value === value ? ' active' : ''}`}
                         onClick={() => { onChange(opt.value); setOpen(false); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { onChange(opt.value); setOpen(false); } }}
                     >
                         {opt.label}
                     </div>

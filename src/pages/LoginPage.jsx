@@ -1,54 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import Background from '../components/Background';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+    const [error, setError]       = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPw, setShowPw]     = useState(false);
     const { login, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
 
-    // Om vi redan är inloggade, dra till lobbyn direkt
+    useEffect(() => { document.title = 'AgarStake | Login'; }, []);
+
     useEffect(() => {
         if (isAuthenticated) {
-            if (user && (user.balance || 0) >= 10) {
-                navigate('/pre-game', { replace: true });
-            } else {
-                navigate('/lobby', { replace: true });
-            }
+            navigate((user?.balance || 0) >= 10 ? '/pre-game' : '/lobby', { replace: true });
         }
     }, [isAuthenticated, user, navigate]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setError(''); // Rensa tidigare felmeddelanden
+        setError('');
         setIsLoading(true);
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'bypass-tunnel-reminders': 'true'
-                },
-                body: JSON.stringify({ username, password })
+                headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminders': 'true' },
+                body: JSON.stringify({ username, password }),
             });
             const data = await res.json();
-
             if (res.ok) {
                 login(data.user, data.token);
-                if ((data.user.balance || 0) >= 10) {
-                    navigate('/pre-game', { replace: true });
-                } else {
-                    navigate('/lobby', { replace: true });
-                }
+                navigate((data.user.balance || 0) >= 10 ? '/pre-game' : '/lobby', { replace: true });
             } else {
-                // Visa felmeddelande från servern, annars ett generellt fel
-                setError(data.message || 'Login failed. Please try again.');
+                setError(data.message || 'Invalid credentials.');
             }
-        } catch (err) {
-            setError("Kunde inte ansluta till servern");
+        } catch {
+            setError('Could not connect to server.');
         }
         setIsLoading(false);
     };
@@ -58,64 +48,119 @@ export default function LoginPage() {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'white', fontFamily: 'system-ui' }}>
-            <div style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '55px', borderRadius: '36px', border: '0.5px solid rgba(255, 255, 255, 0.15)', width: '100%', maxWidth: '390px', textAlign: 'center', backdropFilter: 'blur(50px)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
-                <h1 style={{ marginBottom: '5px', fontSize: '3rem', fontWeight: '800', letterSpacing: '-2px' }}>AgarArena</h1>
-                <p style={{ marginBottom: '35px', color: 'rgba(255,255,255,0.4)', fontSize: '1rem' }}>Welcome back, gladiator.</p>
-                
-                {error && (
-                    <div style={{ background: 'rgba(255,59,48,0.1)', color: '#FF3B30', padding: '12px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.9rem', border: '0.5px solid rgba(255,59,48,0.2)' }}>
-                        {error}
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative' }}>
+            <Background />
+
+            <div style={{ width: '100%', maxWidth: '360px', position: 'relative', zIndex: 1, animation: 'fadeUp 0.3s ease-out' }}>
+                {/* Logo */}
+                <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                        <span style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-1px', color: 'var(--text-h)' }}>
+                            AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                        </span>
                     </div>
-                )}
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-2)', fontWeight: 500 }}>
+                        Welcome back, gladiator.
+                    </p>
+                </div>
 
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <input 
-                        type="text" 
-                        placeholder="Username or Email" 
-                        value={username}
-                        onChange={e => setUsername(e.target.value)} 
-                        style={{ padding: '16px', borderRadius: '14px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: '1.1rem', marginBottom: '10px', outline: 'none' }}
-                        required
-                    />
-                    <input 
-                        type="password" 
-                        placeholder="Password" 
-                        value={password}
-                        onChange={e => setPassword(e.target.value)} 
-                        style={{ padding: '16px', borderRadius: '14px', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: '1.1rem', outline: 'none' }}
-                        required
-                    />
-                    <button 
-                        type="submit" 
-                        disabled={isLoading}
-                        style={{ padding: '18px', borderRadius: '18px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontSize: '1.2rem', cursor: 'pointer', fontWeight: '800', marginTop: '15px', boxShadow: '0 8px 25px rgba(69, 127, 255, 0.3)' }}
-                    >
-                        {isLoading ? 'Logging in...' : 'LOGIN'}
-                    </button>
+                {/* Card */}
+                <div style={{
+                    background: 'var(--bg-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-2xl)',
+                    padding: '28px 24px',
+                    boxShadow: 'var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,0.03)',
+                }}>
+                    {error && (
+                        <div style={{ background: 'var(--red-dim)', border: '1px solid rgba(255,59,48,0.2)', color: 'var(--red)', padding: '10px 12px', borderRadius: 'var(--r-md)', marginBottom: '16px', fontSize: '0.78rem', fontWeight: 500 }}>
+                            {error}
+                        </div>
+                    )}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '15px 0', opacity: 0.2 }}>
-                        <div style={{ flex: 1, height: '1px', background: 'white' }} />
-                        <span style={{ fontSize: '0.8rem', fontWeight: '700' }}>OR</span>
-                        <div style={{ flex: 1, height: '1px', background: 'white' }} />
-                    </div>
+                    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {/* Username */}
+                        <div>
+                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                                Username or Email
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Enter username"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                className="input"
+                                required
+                                autoComplete="username"
+                                style={{ width: '100%', boxSizing: 'border-box' }}
+                            />
+                        </div>
 
-                    <button 
-                        type="button"
-                        onClick={handleGoogleLogin}
-                        style={{ 
-                            padding: '16px', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.1)', 
-                            background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '1rem', 
-                            cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', 
-                            justifyContent: 'center', gap: '10px' 
-                        }}
-                    >
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '18px' }} />
-                        Continue with Google
-                    </button>
-                </form>
-                <p style={{ marginTop: '25px', fontSize: '14px', color: 'rgba(255,255,255,0.5)' }}>
-                    No account? <Link to="/register" style={{ color: '#007AFF', textDecoration: 'none', fontWeight: '600' }}>Register here</Link>
+                        {/* Password */}
+                        <div>
+                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                                Password
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showPw ? 'text' : 'password'}
+                                    placeholder="Enter password"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    className="input"
+                                    required
+                                    autoComplete="current-password"
+                                    style={{ width: '100%', boxSizing: 'border-box', paddingRight: '40px' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPw(v => !v)}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: '0.7rem', fontWeight: 700, padding: 0 }}
+                                >
+                                    {showPw ? 'HIDE' : 'SHOW'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Submit */}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="btn btn-primary"
+                            style={{ width: '100%', padding: '12px', fontSize: '0.85rem', marginTop: '6px', borderRadius: 'var(--r-lg)' }}
+                        >
+                            {isLoading ? (
+                                <><span className="spinner" /> Signing in…</>
+                            ) : 'Login'}
+                        </button>
+
+                        {/* Divider */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.2 }}>
+                            <div style={{ flex: 1, height: 1, background: 'white' }} />
+                            <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em' }}>OR</span>
+                            <div style={{ flex: 1, height: 1, background: 'white' }} />
+                        </div>
+
+                        {/* Google */}
+                        <button
+                            type="button"
+                            onClick={handleGoogleLogin}
+                            className="btn btn-ghost"
+                            style={{ width: '100%', padding: '11px', fontSize: '0.8rem', borderRadius: 'var(--r-lg)', gap: '8px' }}
+                        >
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style={{ width: 15, height: 15 }} />
+                            Continue with Google
+                        </button>
+                    </form>
+                </div>
+
+                {/* Footer link */}
+                <p style={{ marginTop: '18px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-2)' }}>
+                    No account?{' '}
+                    <Link to="/register" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 700 }}>
+                        Register here
+                    </Link>
                 </p>
             </div>
         </div>

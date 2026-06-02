@@ -1,56 +1,61 @@
 import React, { useMemo } from 'react';
 
 const Background = () => {
-    // Generera blobs en gång för att spara prestanda
-    const blobs = useMemo(() => {
-        const colors = ['#007AFF', '#5856D6', '#AF52DE', '#5AC8FA', '#FF2D55'];
-        return [...Array(6)].map((_, i) => ({
-            size: Math.random() * 100 + 150, // Lite mindre för renare look
-            x: Math.random() * 100,
-            y: Math.random() * 100,
-            color: colors[i % colors.length],
-            duration: Math.random() * 15 + 20, // Något snabbare drift för "direction"
-            delay: Math.random() * -30
-        }));
-    }, []);
+    const blobs = useMemo(() => [
+        { color: 'rgba(153, 69, 255, 0.10)', x: 15, y: 20, size: 500, dur: 55, delay: 0 },
+        { color: 'rgba(20, 241, 149, 0.06)',  x: 70, y: 65, size: 420, dur: 70, delay: -20 },
+        { color: 'rgba(77, 140, 255, 0.08)',  x: 55, y: 10, size: 380, dur: 60, delay: -10 },
+        { color: 'rgba(255, 59, 48, 0.04)',   x: 85, y: 80, size: 350, dur: 80, delay: -35 },
+    ], []);
 
     return (
         <div style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: '#000', // Svart bottenplatta
-            backgroundImage: `
-                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)
-            `,
-            backgroundSize: '60px 60px',
-            zIndex: -1, // Ligger bakom allt
+            inset: 0,
+            backgroundColor: '#08090D',
+            zIndex: -2,
             overflow: 'hidden',
         }}>
-            {blobs.map((blob, i) => (
+            {/* Subtle dot grid */}
+            <div style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)`,
+                backgroundSize: '32px 32px',
+                opacity: 0.4,
+                maskImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, transparent 75%)',
+                WebkitMaskImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, transparent 75%)',
+            }} />
+
+            {/* Glow blobs */}
+            {blobs.map((b, i) => (
                 <div
                     key={i}
                     style={{
                         position: 'absolute',
-                        width: blob.size,
-                        height: blob.size,
-                        backgroundColor: blob.color,
-                        top: `${blob.y}%`,
-                        left: `${blob.x}%`,
-                        filter: 'blur(20px)', // Mindre blurriga för en fastare look
-                        opacity: 0.35, 
+                        width: b.size,
+                        height: b.size,
+                        top: `${b.y}%`,
+                        left: `${b.x}%`,
+                        transform: 'translate(-50%, -50%)',
+                        background: `radial-gradient(circle, ${b.color} 0%, transparent 65%)`,
                         borderRadius: '50%',
-                        animation: `
-                            blobWobble ${blob.duration / 4}s infinite ease-in-out,
-                            blobDrift ${blob.duration}s infinite ease-in-out alternate
-                        `,
-                        animationDelay: `${blob.delay}s`
+                        filter: 'blur(48px)',
+                        animation: `blobWobble ${b.dur / 3}s ease-in-out infinite, blobDrift ${b.dur}s ease-in-out infinite alternate`,
+                        animationDelay: `${b.delay}s`,
+                        pointerEvents: 'none',
+                        willChange: 'transform',
                     }}
                 />
             ))}
+
+            {/* Subtle vignette overlay */}
+            <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(ellipse at center, transparent 40%, rgba(8,9,13,0.6) 100%)',
+                pointerEvents: 'none',
+            }} />
         </div>
     );
 };

@@ -1,41 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import Background from '../components/Background';
 
 export default function RegisterPage() {
-    const [email, setEmail] = useState('');
+    const [email, setEmail]       = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [message, setMessage] = useState('');
+    const [showPw, setShowPw]     = useState(false);
+    const [message, setMessage]   = useState('');
+    const [isSuccess, setIsSuccess] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
+    useEffect(() => { document.title = 'AgarStake | Register'; }, []);
+
     const handleRegister = async (e) => {
         e.preventDefault();
-        setMessage(''); // Clear previous messages
+        setMessage('');
         setIsLoading(true);
         try {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'bypass-tunnel-reminders': 'true'
-                },
-                body: JSON.stringify({ email, username, password })
+                headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminders': 'true' },
+                body: JSON.stringify({ email, username, password }),
             });
             const data = await res.json();
-
             if (res.ok) {
-                console.log("Registrering lyckades!");
-                setMessage("✅ Konto skapat! Skickar dig till inloggning...");
-                setTimeout(() => navigate('/login'), 2000); // Vänta 2 sek så användaren hinner se meddelandet
+                setIsSuccess(true);
+                setMessage('Account created! Redirecting to login…');
+                setTimeout(() => navigate('/login'), 2000);
             } else {
-                console.log("Registrering misslyckades:", data.message);
-                setMessage("❌ " + (data.message || 'Registrering misslyckades'));
+                setIsSuccess(false);
+                setMessage(data.message || 'Registration failed.');
             }
-        } catch (err) {
-            // Fånga nätverksfel eller andra oväntade fel
-            console.error('RegisterPage: Fel vid registrering:', err);
-            setMessage("Kunde inte ansluta till servern. Kontrollera att backend körs.");
+        } catch {
+            setIsSuccess(false);
+            setMessage('Could not connect to server.');
         }
         setIsLoading(false);
     };
@@ -45,77 +45,139 @@ export default function RegisterPage() {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'white' }}>
-            <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '50px', borderRadius: '32px', border: '0.5px solid rgba(255, 255, 255, 0.1)', width: '100%', maxWidth: '380px', textAlign: 'center', backdropFilter: 'blur(40px)', boxShadow: '0 30px 60px rgba(0,0,0,0.5)' }}>
-                <h1 style={{ marginBottom: '10px', fontSize: '2.8rem', fontWeight: '800', letterSpacing: '-1px' }}>Register</h1>
-                <p style={{ marginBottom: '35px', color: 'rgba(255,255,255,0.4)', fontSize: '1rem' }}>Create your gladiator</p>
-                
-                {message && (
-                    <div style={{ 
-                        background: (message.includes('failed') || message.includes('error')) ? 'rgba(255,59,48,0.1)' : 'rgba(0,122,255,0.1)', 
-                        color: (message.includes('failed') || message.includes('error')) ? '#FF3B30' : '#007AFF', 
-                        padding: '12px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.9rem', 
-                        border: (message.includes('failed') || message.includes('error')) ? '0.5px solid rgba(255,59,48,0.2)' : '0.5px solid rgba(0,122,255,0.2)' 
-                    }}>
-                        {message}
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative' }}>
+            <Background />
+
+            <div style={{ width: '100%', maxWidth: '360px', position: 'relative', zIndex: 1, animation: 'fadeUp 0.3s ease-out' }}>
+                {/* Logo */}
+                <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                        <span style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-1px', color: 'var(--text-h)' }}>
+                            AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                        </span>
                     </div>
-                )}
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-2)', fontWeight: 500 }}>
+                        Create your gladiator account.
+                    </p>
+                </div>
 
-                <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <input 
-                        type="email" 
-                        placeholder="Email Address" 
-                        value={email}
-                        onChange={e => setEmail(e.target.value)} 
-                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem' }}
-                        required
-                    />
-                    <input 
-                        type="text" 
-                        placeholder="Username" 
-                        value={username}
-                        onChange={e => setUsername(e.target.value)} 
-                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem' }}
-                        required
-                    />
-                    <input 
-                        type="password" 
-                        placeholder="Password" 
-                        value={password}
-                        onChange={e => setPassword(e.target.value)} 
-                        style={{ padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem' }}
-                        required
-                    />
-                    <button 
-                        type="submit" 
-                        disabled={isLoading}
-                        style={{ padding: '16px', borderRadius: '16px', border: 'none', background: '#007AFF', color: 'white', fontSize: '1.1rem', cursor: 'pointer', fontWeight: '600', marginTop: '10px', boxShadow: '0 10px 20px rgba(0,122,255,0.3)' }}
-                    >
-                        {isLoading ? 'Creating account...' : 'REGISTER'}
-                    </button>
+                {/* Card */}
+                <div style={{
+                    background: 'var(--bg-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-2xl)',
+                    padding: '28px 24px',
+                    boxShadow: 'var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,0.03)',
+                }}>
+                    {message && (
+                        <div style={{
+                            background: isSuccess ? 'var(--green-dim)' : 'var(--red-dim)',
+                            border: `1px solid ${isSuccess ? 'var(--green-border)' : 'rgba(255,59,48,0.2)'}`,
+                            color: isSuccess ? 'var(--green)' : 'var(--red)',
+                            padding: '10px 12px',
+                            borderRadius: 'var(--r-md)',
+                            marginBottom: '16px',
+                            fontSize: '0.78rem',
+                            fontWeight: 500,
+                        }}>
+                            {message}
+                        </div>
+                    )}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '15px 0', opacity: 0.2 }}>
-                        <div style={{ flex: 1, height: '1px', background: 'white' }} />
-                        <span style={{ fontSize: '0.8rem', fontWeight: '700' }}>OR</span>
-                        <div style={{ flex: 1, height: '1px', background: 'white' }} />
-                    </div>
+                    <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {/* Email */}
+                        <div>
+                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>Email Address</label>
+                            <input
+                                type="email"
+                                placeholder="Enter email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                className="input"
+                                required
+                                autoComplete="email"
+                                style={{ width: '100%', boxSizing: 'border-box' }}
+                            />
+                        </div>
 
-                    <button 
-                        type="button"
-                        onClick={handleGoogleLogin}
-                        style={{ 
-                            padding: '16px', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.1)', 
-                            background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '1rem', 
-                            cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', 
-                            justifyContent: 'center', gap: '10px' 
-                        }}
-                    >
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '18px' }} />
-                        Continue with Google
-                    </button>
-                </form>
-                <p style={{ marginTop: '25px', fontSize: '14px', color: 'rgba(255,255,255,0.5)' }}>
-                    Already have an account? <Link to="/login" style={{ color: '#007AFF', textDecoration: 'none', fontWeight: '600' }}>Login here</Link>
+                        {/* Username */}
+                        <div>
+                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>Username</label>
+                            <input
+                                type="text"
+                                placeholder="Choose username"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                className="input"
+                                required
+                                autoComplete="username"
+                                style={{ width: '100%', boxSizing: 'border-box' }}
+                            />
+                        </div>
+
+                        {/* Password */}
+                        <div>
+                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>Password</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showPw ? 'text' : 'password'}
+                                    placeholder="Create password"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    className="input"
+                                    required
+                                    autoComplete="new-password"
+                                    style={{ width: '100%', boxSizing: 'border-box', paddingRight: '40px' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPw(v => !v)}
+                                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: '0.7rem', fontWeight: 700, padding: 0 }}
+                                >
+                                    {showPw ? 'HIDE' : 'SHOW'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Submit */}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="btn btn-primary"
+                            style={{ width: '100%', padding: '12px', fontSize: '0.85rem', marginTop: '6px', borderRadius: 'var(--r-lg)' }}
+                        >
+                            {isLoading ? (
+                                <><span className="spinner" /> Creating account…</>
+                            ) : 'Create Account'}
+                        </button>
+
+                        {/* Divider */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.2 }}>
+                            <div style={{ flex: 1, height: 1, background: 'white' }} />
+                            <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em' }}>OR</span>
+                            <div style={{ flex: 1, height: 1, background: 'white' }} />
+                        </div>
+
+                        {/* Google */}
+                        <button
+                            type="button"
+                            onClick={handleGoogleLogin}
+                            className="btn btn-ghost"
+                            style={{ width: '100%', padding: '11px', fontSize: '0.8rem', borderRadius: 'var(--r-lg)', gap: '8px' }}
+                        >
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style={{ width: 15, height: 15 }} />
+                            Continue with Google
+                        </button>
+                    </form>
+                </div>
+
+                {/* Footer link */}
+                <p style={{ marginTop: '18px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-2)' }}>
+                    Already have an account?{' '}
+                    <Link to="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 700 }}>
+                        Login here
+                    </Link>
                 </p>
             </div>
         </div>
