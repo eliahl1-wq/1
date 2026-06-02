@@ -12,7 +12,8 @@ export default function PreGame() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
     const [showUserMenu, setShowUserMenu] = useState(false);
-    const [isWalletExpanded, setIsWalletExpanded] = useState(false);
+    const [isWalletOpen, setIsWalletOpen] = useState(false); // Återinförd
+    const [isWalletExpanded, setIsWalletExpanded] = useState(false); 
     const [depositStatusMessage, setDepositStatusMessage] = useState('');
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
@@ -21,7 +22,7 @@ export default function PreGame() {
     const walletExpandRef = useRef(null);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
     
-    const [panelPosition, setPanelPosition] = useState({ x: null, y: 60 });
+    const [panelPosition, setPanelPosition] = useState({ x: null, y: 60 }); // Keep for expanded panel
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet');
@@ -94,8 +95,8 @@ export default function PreGame() {
             userPillRef.current && !userPillRef.current.contains(event.target)) {
             setShowUserMenu(false);
         }
-        if (walletDropdownRef.current && !walletDropdownRef.current.contains(event.target) && 
-            !event.target.closest('#wallet-trigger')) {
+        if (walletDropdownRef.current && !walletDropdownRef.current.contains(event.target) &&
+            !event.target.closest('#wallet-trigger')) { // Fix: Ensure walletDropdownRef is defined
             setIsWalletOpen(false);
         }
         if (walletExpandRef.current && !walletExpandRef.current.contains(event.target) && !isWalletAdapterModalClick) {
