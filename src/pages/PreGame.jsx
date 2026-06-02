@@ -493,82 +493,82 @@ export default function PreGame() {
             {isWalletExpanded && (
                 <div ref={walletExpandRef} className="glass" style={adjustedWalletExpandPanelStyle}>
                     <button style={walletCloseX} onClick={() => setIsWalletExpanded(false)}>✕</button>
+                    
                     <div style={walletPanelHeader} onMouseDown={handlePanelDragStart} onTouchStart={handlePanelDragStart}>
                         <div>
                             <div style={walletPanelTitle}>Wallet</div>
-                            <div style={walletPanelSubtitle}>{connected ? `Connected to ${publicKey?.toString().slice(0, 4)}...${publicKey?.toString().slice(-4)}` : 'Connect to begin deposit'}</div>
                         </div>
-                        <div style={{ ...walletStatusBadge, ...(connected ? walletStatusConnected : walletStatusDisconnected) }}>
-                            {connected ? 'Connected' : 'Disconnected'}
-                        </div>
-                    </div>
-                    <div style={walletOptionRow}>
-                        <WalletMultiButton />
-                    </div>
-                    <div style={walletTabContainer}>
-                        <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? walletTabActive : {})}}>Deposit</button>
-                        <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? walletTabActive : {})}}>Withdraw</button>
                     </div>
 
-                    {walletTab === 'deposit' ? (
+                    {/* Main Tabs: Wallet vs Deposit Address */}
+                    <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '10px' }}>
+                        <button 
+                            onClick={() => setDepositMethod('wallet')}
+                            style={{ background: 'none', border: 'none', padding: '10px 0', color: depositMethod === 'wallet' ? '#007AFF' : 'rgba(255,255,255,0.4)', fontSize: '0.85rem', fontWeight: '800', cursor: 'pointer', borderBottom: depositMethod === 'wallet' ? '2px solid #007AFF' : '2px solid transparent', marginBottom: '-1px', transition: '0.2s' }}
+                        >
+                            Wallet
+                        </button>
+                        <button 
+                            onClick={() => setDepositMethod('manual')}
+                            style={{ background: 'none', border: 'none', padding: '10px 0', color: depositMethod === 'manual' ? '#007AFF' : 'rgba(255,255,255,0.4)', fontSize: '0.85rem', fontWeight: '800', cursor: 'pointer', borderBottom: depositMethod === 'manual' ? '2px solid #007AFF' : '2px solid transparent', marginBottom: '-1px', transition: '0.2s' }}
+                        >
+                            Deposit Address
+                        </button>
+                    </div>
+
+                    {depositMethod === 'wallet' ? (
                         <>
-                            <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '12px', marginBottom: '8px' }}>
-                                <button 
-                                    onClick={() => setDepositMethod('wallet')}
-                                    style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.05)' : 'transparent', color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.3)' }}
-                                >
-                                    Wallet
-                                </button>
-                                <button 
-                                    onClick={() => setDepositMethod('manual')}
-                                    style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', background: depositMethod === 'manual' ? 'rgba(255,255,255,0.05)' : 'transparent', color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.3)' }}
-                                >
-                                    QR / Manual
-                                </button>
+                            <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0' }}>
+                                <WalletMultiButton />
                             </div>
 
-                            {depositMethod === 'wallet' ? (
+                            <div style={{ ...walletTabContainer, background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '12px', marginBottom: '15px' }}>
+                                <button onClick={() => setWalletTab('deposit')} style={{...walletTabBtn, ...(walletTab === 'deposit' ? { background: 'rgba(255,255,255,0.05)', color: 'white' } : {})}}>Deposit</button>
+                                <button onClick={() => setWalletTab('withdraw')} style={{...walletTabBtn, ...(walletTab === 'withdraw' ? { background: 'rgba(255,255,255,0.05)', color: 'white' } : {})}}>Withdraw</button>
+                            </div>
+
+                            {walletTab === 'deposit' ? (
                                 <>
                                     <div style={walletInputArea}>
                                         <div style={walletInputPrefix}>$</div>
                                         <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
                                         <button style={walletMaxBtn} onClick={() => setAmount('100')}>MAX</button>
                                     </div>
-                                    <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit via Wallet</button>
+                                    <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
                                 </>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '16px' }}>
-                                    <img 
-                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${depositAddress || ''}`}
-                                        alt="Deposit QR"
-                                        style={{ borderRadius: '8px', border: '3px solid white', width: '100px', height: '100px' }}
-                                    />
-                                    <div style={{ textAlign: 'center', width: '100%' }}>
-                                        <div className="mono" style={{ fontSize: '10px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '8px' }}>
-                                            {depositAddress || 'Generating...'}
-                                        </div>
-                                        <button 
-                                            onClick={() => {
-                                                if (depositAddress) navigator.clipboard.writeText(depositAddress);
-                                                setDepositStatusMessage('Address copied!');
-                                            }}
-                                            style={{ background: 'rgba(0,122,255,0.1)', border: '1px solid rgba(0,122,255,0.2)', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '8px', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', width: '100%' }}
-                                        >
-                                            COPY ADDRESS
-                                        </button>
+                                <>
+                                    <div style={walletInputArea}>
+                                        <div style={walletInputPrefix}>$</div>
+                                        <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
+                                        <button style={walletMaxBtn} onClick={() => setAmount(user?.balance?.toFixed(2))}>MAX</button>
                                     </div>
-                                </div>
+                                    <button style={walletConfirmBtn} onClick={handleWithdraw}>Withdraw to Wallet</button>
+                                </>
                             )}
                         </>
                     ) : (
-                        <>
-                            <div style={walletInputArea}>
-                                <div style={walletInputPrefix}>$</div>
-                                <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
-                                <button style={walletMaxBtn} onClick={() => setAmount(user?.balance?.toFixed(2))}>MAX</button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px', marginTop: '10px' }}>
+                            <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${depositAddress || ''}`}
+                                alt="Deposit QR"
+                                style={{ borderRadius: '8px', border: '4px solid white', width: '120px', height: '120px' }}
+                            />
+                            <div style={{ textAlign: 'center', width: '100%' }}>
+                                <div className="mono" style={{ fontSize: '10px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
+                                    {depositAddress || 'Generating...'}
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        if (depositAddress) navigator.clipboard.writeText(depositAddress);
+                                        setDepositStatusMessage('Address copied!');
+                                    }}
+                                    style={{ background: 'rgba(0,122,255,0.1)', border: '1px solid rgba(0,122,255,0.2)', color: '#007AFF', fontSize: '10px', fontWeight: '800', marginTop: '10px', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', width: '100%' }}
+                                >
+                                    COPY ADDRESS
+                                </button>
                             </div>
-                            <button style={walletConfirmBtn} onClick={handleWithdraw}>Withdraw to Wallet</button>
-                        </>
+                        </div>
                     )}
 
                     {depositStatusMessage && (
