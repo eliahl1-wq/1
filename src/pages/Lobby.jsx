@@ -363,7 +363,10 @@ export default function Lobby() {
                         >
                             <span style={{ fontWeight: '600', fontSize: '1.1rem', letterSpacing: '-0.3px' }}>{user.username}</span>
                             <span style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>
-                                ${user.balance?.toFixed(2) || '0.00'}
+                                {isDepositAmountInSOL ? <SolanaLogo size={14} /> : '$'}
+                                {isDepositAmountInSOL 
+                                    ? (user.balance / solPrice)?.toFixed(4) 
+                                    : user.balance?.toFixed(2) || '0.00'}
                             </span>
                         </div>
 
@@ -377,6 +380,17 @@ export default function Lobby() {
                                 border: '0.5px solid rgba(255, 255, 255, 0.2)',
                                 boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
                             }}>
+                                <div style={{ padding: '14px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: '800', opacity: 0.4 }}>CURRENCY</span>
+                                    <select 
+                                        value={isDepositAmountInSOL ? 'SOL' : 'USD'}
+                                        onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')}
+                                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '800', padding: '2px 4px', outline: 'none', cursor: 'pointer' }}
+                                    >
+                                        <option value="USD">USD</option>
+                                        <option value="SOL">SOL</option>
+                                    </select>
+                                </div>
                                 <button 
                                     onClick={logout}
                                     style={{
@@ -472,43 +486,39 @@ export default function Lobby() {
                             </div>
 
                         {depositMethod === 'wallet' ? (
-                            <div style={{ position: 'relative', width: '100%' }}>
-                                <div style={{ 
-                                    position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', 
-                                    color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', fontWeight: '800', pointerEvents: 'none', zIndex: 1 
-                                }}>
-                                    {isDepositAmountInSOL ? <SolanaLogo size={16} /> : '$'} {/* Use SolanaLogo component */}
+                            <div style={{ width: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <label style={{ fontSize: '0.65rem', fontWeight: '800', opacity: 0.2, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Amount</label>
+                                    <select 
+                                        value={isDepositAmountInSOL ? 'SOL' : 'USD'} 
+                                        onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')} 
+                                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '8px', padding: '4px 12px', fontSize: '0.7rem', fontWeight: '800', outline: 'none', cursor: 'pointer' }}
+                                    >
+                                        <option value="USD">USD</option>
+                                        <option value="SOL">SOL</option>
+                                    </select>
                                 </div>
-                                <input
-                                    type="number"
-                                    placeholder="0.00" // Placeholder for amount
-                                    value={depositAmount}
-                                    onChange={(e) => setDepositAmount(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        boxSizing: 'border-box',
-                                        padding: '12px 12px 12px 45px', 
-                                        borderRadius: '12px',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        background: 'rgba(0,0,0,0.2)',
-                                        color: 'white',
-                                        fontSize: '1rem',
-                                        outline: 'none'
-                                    }}
-                                />
-                                <button
-                                    onClick={() => setIsDepositAmountInSOL(!isDepositAmountInSOL)}
-                                    style={{ 
-                                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', // Position toggle button
-                                        background: '#23262f', border: '1px solid rgba(255,255,255,0.1)', color: 'white', 
-                                        padding: '6px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800', cursor: 'pointer' 
-                                    }}
-                                >
-                                    {isDepositAmountInSOL ? 'USD' : 'SOL'}
-                                </button>
+                                <div style={{ position: 'relative', width: '100%' }}>
+                                    <div style={{ 
+                                        position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', 
+                                        color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', fontWeight: '800', pointerEvents: 'none', zIndex: 1 
+                                    }}>
+                                        {isDepositAmountInSOL ? <SolanaLogo size={16} /> : '$'}
+                                    </div>
+                                    <input
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={depositAmount}
+                                        onChange={(e) => setDepositAmount(e.target.value)}
+                                        style={{
+                                            width: '100%', boxSizing: 'border-box', padding: '12px 12px 12px 45px', borderRadius: '12px',
+                                            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem', outline: 'none'
+                                        }}
+                                    />
+                                </div>
 
                                 {depositAmount && (
-                                    <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '8px', textAlign: 'right', fontWeight: '600' }}>
+                                    <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '8px', textAlign: 'left', fontWeight: '600' }}>
                                         {isDepositAmountInSOL 
                                             ? `~ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}` 
                                             : `~ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
