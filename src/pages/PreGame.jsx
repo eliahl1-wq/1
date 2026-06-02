@@ -12,12 +12,13 @@ export default function PreGame() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
     const [showUserMenu, setShowUserMenu] = useState(false);
-    const [isWalletOpen, setIsWalletOpen] = useState(false); // Återinförd
+    const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false); 
     const [depositStatusMessage, setDepositStatusMessage] = useState('');
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
     const qrRef = useRef(null); // Ref for the QR code canvas
+    const walletDropdownRef = useRef(null); // Återinförd
 
     const walletExpandRef = useRef(null);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
@@ -26,7 +27,7 @@ export default function PreGame() {
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet');
-    
+    const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
