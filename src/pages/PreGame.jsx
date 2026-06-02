@@ -17,7 +17,7 @@ export default function PreGame() {
         <img 
             src="/solana-sol-logo.png" 
             alt="SOL" 
-            style={{ width: size, height: size, verticalAlign: 'middle', objectFit: 'contain' }} 
+            style={{ width: size, height: size, verticalAlign: 'middle', objectFit: 'contain', marginBottom: '2px' }} 
         />
     );
 
@@ -513,13 +513,11 @@ export default function PreGame() {
                             onClick={() => setIsWalletOpen(!isWalletOpen)}
                             style={walletPillButtonStyle}
                         >
-                            <span style={{ marginRight: '8px', display: 'flex', alignItems: 'center' }}>
-                                {isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}
-                            </span>
-                            <span className="mono" style={{fontWeight: '800', fontSize: '1.1rem', color: 'white'}}>
+                            <span className="mono" style={{fontWeight: '800', fontSize: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                {isDepositAmountInSOL && <SolanaLogo size={16} />}
                                 {isDepositAmountInSOL 
                                     ? (user?.balance / solPrice)?.toFixed(4) 
-                                    : formatBalance(user?.balance)}
+                                    : `$${formatBalance(user?.balance)}`}
                             </span>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '10px', opacity: 0.6}}><path d="M6 9l6 6 6-6"/></svg>
                         </button>
@@ -539,12 +537,13 @@ export default function PreGame() {
                                     </button>
                                 </div>
                                 
-                                <div className="mono" style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '4px', color: 'white', lineHeight: '1' }}>
-                                    {isDepositAmountInSOL ? <SolanaLogo size={28} /> : '$'}{isDepositAmountInSOL ? (user?.balance / solPrice)?.toFixed(4) : formatBalance(user?.balance)}
+                                <div className="mono" style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '4px', color: 'white', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isDepositAmountInSOL ? <SolanaLogo size={24} /> : '$'}
+                                    {isDepositAmountInSOL ? (user?.balance / solPrice)?.toFixed(4) : formatBalance(user?.balance)}
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        {isDepositAmountInSOL ? `~ $${formatBalance(user?.balance)}` : <>~ {(user?.balance / solPrice)?.toFixed(4)} <SolanaLogo size={12} /></>} {/* Show converted value */}
+                                    <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        {isDepositAmountInSOL ? `~ $${formatBalance(user?.balance)}` : <>~ {(user?.balance / solPrice)?.toFixed(4)} <SolanaLogo size={14} /></>}
                                     </span>
                                     <select 
                                         value={isDepositAmountInSOL ? 'SOL' : 'USD'}
@@ -662,8 +661,8 @@ export default function PreGame() {
                                 </select>
                             </div>
                             <div style={walletInputArea}>
-                                <div style={walletInputPrefix}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div> {/* Currency prefix */}
-                                <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={{...walletInput, paddingLeft: '45px'}} />
+                                <div style={{...walletInputPrefix, top: '50%', transform: 'translateY(-50%)'}}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div>
+                                <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={{...walletInput, paddingLeft: '40px'}} />
                             </div>
                             {isDepositAmountInSOL && amount && (
                                 <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>
@@ -720,26 +719,25 @@ export default function PreGame() {
                                 placeholder="Paste Solana Address" 
                                 value={displayFullWithdrawAddress ? withdrawAddress : shortenAddress(withdrawAddress, 6)}
                                 readOnly
-                                onFocus={() => setDisplayFullWithdrawAddress(true)}
-                                onBlur={() => setDisplayFullWithdrawAddress(false)}
+                                onFocus={() => { setDisplayFullWithdrawAddress(true); setIsAddressFocused(true); }}
+                                onBlur={() => { setDisplayFullWithdrawAddress(false); setIsAddressFocused(false); }}
                                 style={{
                                     ...walletInput, 
                                     padding: '14px 14px', 
                                     opacity: 0.8, 
                                     width: '100%', 
                                     boxSizing: 'border-box',
-                                    fontSize: '0.85rem'
+                                    fontSize: '0.85rem',
+                                    paddingRight: isAddressFocused ? '14px' : '40px'
                                 }}
                             />
-                            <div style={{ 
+                            {!isAddressFocused && <div style={{ 
                                 position: 'absolute', 
-                                right: '-35px', 
+                                right: '14px', 
                                 pointerEvents: 'none',
                                 display: 'flex',
                                 alignItems: 'center'
-                            }}>
-                                <SolanaLogo size={20} />
-                            </div>
+                            }}> <SolanaLogo size={18} /> </div>}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginTop: '4px' }}>
                             <label style={inputLabelStyle}>Amount</label>
@@ -749,13 +747,13 @@ export default function PreGame() {
                             </select>
                         </div>
                         <div style={walletInputArea}>
-                            <div style={walletInputPrefix}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div>
+                            <div style={{...walletInputPrefix, top: '50%', transform: 'translateY(-50%)'}}>{isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}</div>
                             <input 
                                 type="number" 
                                 placeholder="0.00" 
                                 value={withdrawAmount} 
                                 onChange={(e) => setWithdrawAmount(e.target.value)} 
-                                style={{...walletInput, paddingLeft: '45px', paddingRight: '85px'}} 
+                                style={{...walletInput, paddingLeft: '40px', paddingRight: '85px'}} 
                             />
                             <div style={{ position: 'absolute', right: '8px', display: 'flex', gap: '4px' }}>
                                 <button 
@@ -870,8 +868,8 @@ const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '
 const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1.15rem' };
 
-const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: '#1c1e26', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '9px 16px', height: '38px', borderRadius: '100px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxSizing: 'border-box' };
-const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '0 22px', height: '38px', display: 'flex', alignItems: 'center', borderRadius: '100px', fontSize: '13.5px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(69, 127, 255, 0.25)', boxSizing: 'border-box' };
+const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: '#1c1e26', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '0 16px', height: '34px', borderRadius: '100px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxSizing: 'border-box' };
+const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '0 22px', height: '34px', display: 'flex', alignItems: 'center', borderRadius: '100px', fontSize: '13.5px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(69, 127, 255, 0.25)', boxSizing: 'border-box' };
 const depositWithdrawBtnStyle = walletPillButtonStyle;
 
 const walletDropdownCardStyle = { position: 'absolute', top: '44px', left: '50%', transform: 'translateX(-50%)', width: '320px', padding: '16px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', zIndex: 1100, animation: 'slideDown 0.2s ease-out', background: '#0f1118' };
@@ -909,8 +907,8 @@ const walletMaxBtn = { position: 'absolute', right: '10px', background: 'rgba(25
 const walletConfirmBtn = { width: '100%', padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '800', fontSize: '0.92rem', boxShadow: '0 12px 30px rgba(69, 127, 255, 0.25)', cursor: 'pointer' };
 const walletPanelFooter = { textAlign: 'center', fontSize: '0.75rem', opacity: 0.35, fontWeight: '700', marginTop: '8px' };
 const currencySelectStyle = {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: '#23262f',
+    border: '1px solid rgba(255,255,255,0.12)',
     color: 'white',
     borderRadius: '10px',
     padding: '6px 14px',
@@ -918,6 +916,7 @@ const currencySelectStyle = {
     fontWeight: '700',
     outline: 'none',
     cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
     appearance: 'none',
     backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
     backgroundRepeat: 'no-repeat',

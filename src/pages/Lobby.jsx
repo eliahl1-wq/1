@@ -40,7 +40,7 @@ export default function Lobby() {
         <img 
             src="/solana-sol-logo.png" 
             alt="SOL" 
-            style={{ width: size, height: size, verticalAlign: 'middle', objectFit: 'contain' }} 
+            style={{ width: size, height: size, verticalAlign: 'middle', objectFit: 'contain', marginBottom: '2px' }} 
         />
     );
 
@@ -358,11 +358,11 @@ export default function Lobby() {
                             }}
                         >
                             <span style={{ fontWeight: '600', fontSize: '1.1rem', letterSpacing: '-0.3px' }}>{user.username}</span>
-                            <span className="mono" style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>
-                                {isDepositAmountInSOL ? <SolanaLogo size={16} /> : '$'}
+                            <span className="mono" style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {isDepositAmountInSOL && <SolanaLogo size={18} />}
                                 {isDepositAmountInSOL 
                                     ? (user.balance / solPrice)?.toFixed(4) 
-                                    : user.balance?.toFixed(2) || '0.00'}
+                                    : `$${user.balance?.toFixed(2) || '0.00'}`}
                             </span>
                         </div>
 
@@ -381,14 +381,15 @@ export default function Lobby() {
                                     <select 
                                         value={isDepositAmountInSOL ? 'SOL' : 'USD'}
                                         onChange={(e) => setIsDepositAmountInSOL(e.target.value === 'SOL')}
-                                        style={{ 
-                                            background: 'rgba(255,255,255,0.08)', 
-                                            border: '1px solid rgba(255,255,255,0.1)', 
+                                        style={{ // Sync style with PreGame
+                                            background: '#23262f', 
+                                            border: '1px solid rgba(255,255,255,0.12)', 
                                             color: 'white', 
                                             borderRadius: '8px', 
                                             fontSize: '0.75rem', 
                                             fontWeight: '700', 
                                             padding: '4px 8px', 
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                                             outline: 'none', 
                                             cursor: 'pointer',
                                             appearance: 'none',
@@ -525,7 +526,7 @@ export default function Lobby() {
                                 <div style={{ position: 'relative', width: '100%' }}>
                                     <div style={{ 
                                         position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', 
-                                        color: 'rgba(255,255,255,0.3)', fontSize: '1rem', fontWeight: '700', pointerEvents: 'none', zIndex: 1 
+                                        color: 'rgba(255,255,255,0.3)', fontSize: '1rem', fontWeight: '400', pointerEvents: 'none', zIndex: 1 
                                     }}>
                                         {isDepositAmountInSOL ? <SolanaLogo size={18} /> : '$'}
                                     </div>
@@ -535,7 +536,7 @@ export default function Lobby() {
                                         value={depositAmount}
                                         onChange={(e) => setDepositAmount(e.target.value)}
                                         style={{
-                                            width: '100%', boxSizing: 'border-box', padding: '12px 12px 12px 45px', borderRadius: '12px',
+                                            width: '100%', boxSizing: 'border-box', padding: '12px 12px 12px 40px', borderRadius: '12px',
                                             border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '1rem', outline: 'none'
                                         }}
                                     />
