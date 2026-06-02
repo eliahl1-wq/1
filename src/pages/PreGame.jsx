@@ -21,6 +21,8 @@ export default function PreGame() {
     const [withdrawAddress, setWithdrawAddress] = useState('');
     const withdrawExpandRef = useRef(null);
     const [depositStatusMessage, setDepositStatusMessage] = useState('');
+    const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
+    const [displayFullWithdrawAddress, setDisplayFullWithdrawAddress] = useState(false);
     const [isWithdrawAmountInSOL, setIsWithdrawAmountInSOL] = useState(false);
     const [isDepositAmountInSOL, setIsDepositAmountInSOL] = useState(false);
     const userMenuRef = useRef(null);
