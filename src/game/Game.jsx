@@ -6,7 +6,6 @@ import Canvas from './canvas.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
-import '../styles/ui.css';
 
 /**
  * Version v11 - Full Agar.io Clone Logic Integrated
@@ -466,37 +465,51 @@ export default function Game() {
                 position: 'absolute', 
                 top: '30px', 
                 left: '30px', 
-                zIndex: 100,
-                width: '285px'
+                zIndex: 100
             }}>
-                <div className="glass-panel" style={{ padding: '20px', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                        <div>
-                            <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '1.5px', opacity: 0.65, fontWeight: 800, color: '#14F195' }}>In-Game Stake</div>
-                            <div style={{ fontSize: '2rem', fontWeight: '900', color: '#fff', lineHeight: 1, marginTop: '8px' }}>${(currentBalance ?? 0).toFixed(2)}</div>
+                <div style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    backdropFilter: 'blur(20px)',
+                    padding: '15px 25px',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '12px'
+                }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#34C759' }}>In-Game Stake</h3>
+                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
+                            ${(currentBalance ?? 0).toFixed(2)}
                         </div>
-                        <div style={{ minWidth: '40px', minHeight: '40px', borderRadius: '16px', background: 'rgba(0,122,255,0.12)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                            <span style={{ color: '#007AFF', fontWeight: 800, fontSize: '1rem' }}>₿</span>
-                        </div>
+                        
+                        {potentialBonus > 0 && (
+                            <div style={{ fontSize: '0.85rem', color: '#FFD700', fontWeight: '800', marginTop: '2px', letterSpacing: '1px' }}>
+                                + ${potentialBonus.toFixed(2)} RANK BONUS
+                            </div>
+                        )}
                     </div>
-
-                    {potentialBonus > 0 && (
-                        <div style={{ marginTop: '14px', fontSize: '0.8rem', color: '#FFD700', fontWeight: '800', letterSpacing: '0.8px' }}>
-                            + ${potentialBonus.toFixed(2)} rank bonus
-                        </div>
-                    )}
 
                     <button 
                         onClick={() => localTimer <= 0 && socketRef.current?.emit('cashOut')}
                         disabled={localTimer > 0}
-                        className="btn-primary"
                         style={{
                             width: '100%',
-                            marginTop: '18px',
-                            opacity: localTimer > 0 ? 0.7 : 1,
+                            background: localTimer > 0 ? '#444' : '#34C759',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 0',
+                            borderRadius: '12px',
+                            fontWeight: '800',
+                            fontSize: '0.8rem',
+                            letterSpacing: '1px',
                             cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
-                            background: localTimer > 0 ? 'rgba(52,199,89,0.3)' : 'linear-gradient(180deg, #14F195 0%, #0FC37D 100%)',
-                            boxShadow: localTimer > 0 ? 'none' : '0 10px 30px rgba(20,241,149,0.25)'
+                            transition: '0.2s all ease',
+                            boxShadow: localTimer > 0 ? 'none' : '0 4px 15px rgba(52, 199, 89, 0.4)',
+                            opacity: localTimer > 0 ? 0.7 : 1
                         }}
                     >
                         {localTimer > 0 ? `WAIT ${localTimer}s` : 'CASH OUT'}
@@ -504,17 +517,18 @@ export default function Game() {
                 </div>
 
                 {/* Reward Info Panel */}
-                <div className="glass-panel" style={{
+                <div style={{
                     marginTop: '20px',
-                    padding: '18px',
+                    padding: '15px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '15px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
                     textAlign: 'left',
                     fontSize: '0.75rem',
                     lineHeight: '1.6',
                     width: '100%',
                     boxSizing: 'border-box',
-                    opacity: rewardsUnlocked ? 1 : 0.7,
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'rgba(255,255,255,0.04)'
+                    opacity: rewardsUnlocked ? 1 : 0.5
                 }}>
                     <div style={{ color: '#34C759', fontWeight: '800', marginBottom: rewardsUnlocked ? '8px' : '2px', letterSpacing: '1px' }}>
                         ARENA REWARDS
@@ -551,29 +565,34 @@ export default function Game() {
                 position: 'absolute', 
                 top: '30px', 
                 right: '30px', 
-                textAlign: 'right',
-                zIndex: 100
+                textAlign: 'right' 
             }}>
-                <div className="logo" style={{ justifyContent: 'flex-end', fontSize: '1rem', marginBottom: '6px' }}>
-                    AGAR<span className="logo-accent">STAKE</span>
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', marginTop: '8px' }}>Alpha Demo v0.1</div>
-                <div style={{ color: 'rgba(255,255,255,0.22)', fontSize: '0.65rem', marginTop: '6px', fontWeight: '700', letterSpacing: '0.5px' }}>
+                <h2 style={{ 
+                    margin: 0, 
+                    color: 'white', 
+                    fontWeight: '900', 
+                    letterSpacing: '-1px',
+                    fontStyle: 'italic'
+                }} className="game-title">
+                    AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                </h2>
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
+                <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>
                     {formatResetTimer()}
                 </div>
             </div>
 
             {/* Mock Leaderboard */}
-            <div className="glass-panel" style={{
+            <div style={{
                 position: 'absolute',
                 top: '120px',
                 right: '30px',
-                width: '220px',
+                width: '180px',
+                background: 'rgba(255, 255, 255, 0.02)',
                 padding: '20px',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: 'white',
-                boxShadow: '0 24px 80px rgba(0,0,0,0.35)'
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                color: 'white'
             }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '0.7rem', opacity: 0.4, letterSpacing: '1px' }}>LEADERBOARD</h4>
                 <div style={{ fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
