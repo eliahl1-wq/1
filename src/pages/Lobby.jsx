@@ -36,6 +36,18 @@ export default function Lobby() {
     const [solPrice, setSolPrice] = useState(150); // Placeholder, ideally fetched from an API
     const qrRef = useRef(null); // Ref for the QR code canvas
 
+    const SolanaLogo = ({ size = 14 }) => (
+        <svg width={size} height={size} viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle' }}>
+            <path d="M384 397.7c0 2.6-1.1 5.1-3 7.1L306.9 480c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1c0-2.6 1.1-5.1 3-7.1L77.1 395c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.2 3.2 7.2 7.1zM0 114.3c0-2.6 1.1-5.1 3-7.1L77.1 32c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.1 3.2 7.1 7.1c0 2.6-1.1 5.1-3 7.1l-74.1 74.9c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1zM384 256c0 2.6-1.1 5.1-3 7.1l-74.1 74.9c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1c0-2.6 1.1-5.1 3-7.1l74.1-74.9c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.2 3.2 7.2 7.1z" fill="url(#solana_grad_lobby)"/>
+            <defs>
+                <linearGradient id="solana_grad_lobby" x1="0" y1="256" x2="384" y2="256" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#9945FF"/>
+                    <stop offset="1" stopColor="#14F195"/>
+                </linearGradient>
+            </defs>
+        </svg>
+    );
+
     const depositAddress = user?.depositAddress;
 
     // Memoize bakgrundsblobs så de inte skapas på nytt vid varje re-render (fixar "snabba blobs")
@@ -108,7 +120,7 @@ export default function Lobby() {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
             const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
             qrRef.current.innerHTML = '';
-            const qr = createQR(solanaPayUrl, 180, 'white', 'black');
+            const qr = createQR(solanaPayUrl, 200, 'white', 'black'); // Larger QR code
             qr.append(qrRef.current);
         }
     }, [depositAddress, depositMethod]);
@@ -403,7 +415,7 @@ export default function Lobby() {
                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '1.5rem', marginBottom: '45px', fontWeight: '500', letterSpacing: '-0.8px' }}>Stake your claim and dominate the arena.</p>
 
                 <div style={{ 
-                    background: 'rgba(255, 255, 255, 0.04)', 
+                    background: '#0f1118', // Axiom background color
                     padding: '50px 60px', 
                     borderRadius: '48px', 
                     border: '1px solid rgba(255, 255, 255, 0.07)', 
@@ -425,24 +437,20 @@ export default function Lobby() {
                         textIndent: '22px'
                     }}>ARENA</h2>
                     
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px', marginTop: '20px' }}>
-                        <WalletMultiButton />
-                    </div>
-
-                    {connected && (
+                    {connected ? ( // Only show deposit options if wallet is connected
                         <div style={{ 
                             marginTop: '20px', 
                             marginBottom: '30px', 
                             padding: '25px', 
-                            background: 'rgba(255, 255, 255, 0.04)', 
-                            borderRadius: '28px', 
-                            border: '1px solid rgba(255, 255, 255, 0.05)' 
+                            background: '#161922', // Darker background for inner card
+                            borderRadius: '32px',
+                            border: '1px solid rgba(255, 255, 255, 0.03)'
                         }}>
                             <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '20px', width: 'fit-content', margin: '0 auto 20px auto' }}>
                                 <button 
                                     onClick={() => { setDepositMethod('wallet'); setDepositStatusMessage(''); }}
                                     style={{
-                                        padding: '4px 14px', border: 'none', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '800', cursor: 'pointer',
+                                        padding: '10px 24px', border: 'none', borderRadius: '100px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
                                         background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',
                                         color: depositMethod === 'wallet' ? 'white' : 'rgba(255,255,255,0.4)',
                                         transition: '0.2s'
@@ -453,7 +461,7 @@ export default function Lobby() {
                                 <button 
                                     onClick={() => { setDepositMethod('manual'); setDepositStatusMessage(''); }}
                                     style={{
-                                        padding: '4px 14px', border: 'none', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '800', cursor: 'pointer',
+                                        padding: '10px 24px', border: 'none', borderRadius: '100px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
                                         background: depositMethod === 'manual' ? 'rgba(255,255,255,0.1)' : 'transparent',
                                         color: depositMethod === 'manual' ? 'white' : 'rgba(255,255,255,0.4)',
                                         transition: '0.2s'
@@ -469,11 +477,11 @@ export default function Lobby() {
                                     position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', 
                                     color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', fontWeight: '800', pointerEvents: 'none', zIndex: 1 
                                 }}>
-                                    {isDepositAmountInSOL ? 'SOL' : '$'}
+                                    {isDepositAmountInSOL ? <SolanaLogo size={16} /> : '$'} {/* Use SolanaLogo component */}
                                 </div>
                                 <input
                                     type="number"
-                                    placeholder="0.00"
+                                    placeholder="0.00" // Placeholder for amount
                                     value={depositAmount}
                                     onChange={(e) => setDepositAmount(e.target.value)}
                                     style={{
@@ -491,8 +499,8 @@ export default function Lobby() {
                                 <button
                                     onClick={() => setIsDepositAmountInSOL(!isDepositAmountInSOL)}
                                     style={{ 
-                                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                                        background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', 
+                                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', // Position toggle button
+                                        background: '#23262f', border: '1px solid rgba(255,255,255,0.1)', color: 'white', 
                                         padding: '6px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800', cursor: 'pointer' 
                                     }}
                                 >
@@ -508,14 +516,14 @@ export default function Lobby() {
                                 )}
 
                                         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', marginTop: '15px' }}>
-                                            <WalletMultiButton />
+                                            <WalletMultiButton /> {/* Only one WalletMultiButton here */}
                                         </div>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
                                 <div 
                                     ref={qrRef} 
-                                    style={{ borderRadius: '16px', overflow: 'hidden', background: 'white', padding: '12px', display: 'flex', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }} 
+                                    style={{ borderRadius: '16px', overflow: 'hidden', background: 'white', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}
                                 />
                                 <div style={{ width: '100%' }}>
                                     <div style={{ fontSize: '9px', opacity: 0.4, textAlign: 'left', marginBottom: '4px', textTransform: 'uppercase' }}>Recipient Address</div>
@@ -542,7 +550,7 @@ export default function Lobby() {
                             <button
                                 onClick={handleDeposit}
                                 className="btn-hover"
-                                style={{
+                                style={{ // Deposit button styling
                                     width: '100%', padding: '16px', fontSize: '1rem', borderRadius: '16px', border: 'none',
                                     background: '#34C759', color: 'white', fontWeight: '700', cursor: 'pointer',
                                     boxShadow: '0 8px 20px rgba(52, 199, 89, 0.2)'
@@ -562,6 +570,10 @@ export default function Lobby() {
                                 {depositStatusMessage}
                             </p>
                         )}
+                        </div>
+                    ) : ( // If not connected, show WalletMultiButton
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px', marginTop: '20px' }}>
+                            <WalletMultiButton />
                         </div>
                     )}
                     

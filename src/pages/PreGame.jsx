@@ -12,6 +12,19 @@ export default function PreGame() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
     const [showUserMenu, setShowUserMenu] = useState(false);
+
+    const SolanaLogo = ({ size = 14 }) => (
+        <svg width={size} height={size} viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle' }}>
+            <path d="M384 397.7c0 2.6-1.1 5.1-3 7.1L306.9 480c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1c0-2.6 1.1-5.1 3-7.1L77.1 395c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.2 3.2 7.2 7.1zM0 114.3c0-2.6 1.1-5.1 3-7.1L77.1 32c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.1 3.2 7.1 7.1c0 2.6-1.1 5.1-3 7.1l-74.1 74.9c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1zM384 256c0 2.6-1.1 5.1-3 7.1l-74.1 74.9c-2.6 2.6-6 4-9.6 4H7.1c-3.9 0-7.1-3.2-7.1-7.1c0-2.6 1.1-5.1 3-7.1l74.1-74.9c2.6-2.6 6-4 9.6-4h290.1c3.9 0 7.2 3.2 7.2 7.1z" fill="url(#solana_grad_pre)"/>
+            <defs>
+                <linearGradient id="solana_grad_pre" x1="0" y1="256" x2="384" y2="256" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#9945FF"/>
+                    <stop offset="1" stopColor="#14F195"/>
+                </linearGradient>
+            </defs>
+        </svg>
+    );
+
     const [solPrice, setSolPrice] = useState(150); // Placeholder, ideally fetched from an API
 
     const [isWalletOpen, setIsWalletOpen] = useState(false);
@@ -37,7 +50,6 @@ export default function PreGame() {
     const [isDraggingPanel, setIsDraggingPanel] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet');
-    const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || '');
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
@@ -48,7 +60,7 @@ export default function PreGame() {
     // Solana Address Validation Regex
     const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-    const [showHowItWorks, setShowHowItWorks] = useState(false); // Moved here
+    const [nickname, setNickname] = useState(localStorage.getItem('match_nickname') || user?.username || ''); // Moved here
 
     const formatBalance = (val) => {
         const v = Number(val || 0);
@@ -59,6 +71,10 @@ export default function PreGame() {
         if (v > 0) return Number(v.toFixed(4)).toString();
         return '0';
     };
+
+    const [showHowItWorks, setShowHowItWorks] = useState(false); // Moved here
+
+
     
     // Helper for shortening Solana addresses
     const shortenAddress = (address, chars = 6) => {
@@ -178,9 +194,8 @@ export default function PreGame() {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
             const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
             try {
-                qrRef.current.innerHTML = '';
-                // Skapar QR-koden med Solana-logga (createQR hanterar detta automatiskt), större storlek och vit bakgrund
-                const qr = createQR(solanaPayUrl, 180, 'white', 'black'); 
+                qrRef.current.innerHTML = ''; // Clear previous QR code
+                const qr = createQR(solanaPayUrl, 200, 'white', 'black'); // Larger QR code, white background
                 qr.append(qrRef.current);
             } catch (err) { console.error(err); }
         }
@@ -503,9 +518,12 @@ export default function PreGame() {
                             onClick={() => setIsWalletOpen(!isWalletOpen)}
                             style={walletPillButtonStyle}
                         >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '10px', opacity: 0.8}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg> {/* Wallet Icon */}
-                            <span className="mono" style={{fontWeight: '800', fontSize: '17px', color: '#fff'}}>
-                                {isDepositAmountInSOL ? `${(user?.balance / solPrice)?.toFixed(4)} SOL` : `$${formatBalance(user?.balance)}`}
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '8px', opacity: 0.8}}><path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 00-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg> {/* Wallet Icon */}
+                            <span className="mono" style={{fontWeight: '800', fontSize: '1.1rem', color: 'white'}}>
+                                {isDepositAmountInSOL ? `${(user?.balance / solPrice)?.toFixed(4)}` : `$${formatBalance(user?.balance)}`}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', opacity: 0.6, marginLeft: '4px' }}>
+                                {isDepositAmountInSOL ? 'SOL' : 'USD'}
                             </span>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{marginLeft: '10px', opacity: 0.6}}><path d="M6 9l6 6 6-6"/></svg>
                         </button>
@@ -514,32 +532,45 @@ export default function PreGame() {
                             <div ref={walletDropdownRef} className="glass" style={walletDropdownCardStyle}>
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                                     <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
-                                            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                                            style={{ 
+                                                background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', 
+                                                fontSize: '10px', fontWeight: '700', cursor: 'pointer',
+                                                padding: '4px 8px', borderRadius: '8px',
+                                                transition: 'all 0.2s ease',
+                                                ':hover': { background: 'rgba(255,255,255,0.05)' }
+                                            }}>
                                         Transaction History
                                     </button>
                                 </div>
                                 
-                                <div className="mono" style={{ fontSize: '36px', fontWeight: '800', marginBottom: '8px', color: 'white' }}>
-                                    {isDepositAmountInSOL ? `${(user?.balance / solPrice)?.toFixed(4)} SOL` : `$${formatBalance(user?.balance)}`}
+                                <div className="mono" style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '4px', color: 'white', lineHeight: '1' }}>
+                                    {isDepositAmountInSOL ? `${(user?.balance / solPrice)?.toFixed(4)}` : `$${formatBalance(user?.balance)}`}
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'rgba(255,255,255,0.2)' }}>
-                                        {isDepositAmountInSOL ? `~${formatBalance(user?.balance)} USD` : `~${(user?.balance / solPrice)?.toFixed(4)} SOL`}
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        {isDepositAmountInSOL ? `~ $${formatBalance(user?.balance)}` : <>~ {(user?.balance / solPrice)?.toFixed(4)} <SolanaLogo size={12} /></>} {/* Show converted value */}
                                     </span>
                                     <button
                                         onClick={() => setIsDepositAmountInSOL(!isDepositAmountInSOL)}
-                                        style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', padding: '4px 8px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800', cursor: 'pointer' }}
+                                        style={{ 
+                                            background: '#1c1e26', // Dark background for pill toggle
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            color: 'white', 
+                                            padding: '4px 10px',
+                                            borderRadius: '100px', // Pill shape
+                                            fontSize: '0.65rem',
+                                            fontWeight: '700',
+                                            cursor: 'pointer' 
+                                        }}
                                     >
                                         {isDepositAmountInSOL ? 'Show USD' : 'Show SOL'}
                                     </button>
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: '700', color: 'rgba(255,255,255,0.2)' }}>USD</span>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '12px' }}>
-                                    <button onClick={() => { 
+                                <div style={{ display: 'flex', gap: '10px' }}> {/* Buttons side-by-side */}
+                                    <button 
+                                        className="btn-hover"
+                                        onClick={() => { 
                                         setIsWalletOpen(false); 
                                         setIsWithdrawExpanded(false);
                                         setIsWalletExpanded(true); 
@@ -635,7 +666,7 @@ export default function PreGame() {
                                 <WalletMultiButton />
                             </div>
                             <div style={walletInputArea}>
-                                <div style={walletInputPrefix}>{isDepositAmountInSOL ? <SolanaTextIcon /> : '$'}</div>
+                                <div style={walletInputPrefix}>{isDepositAmountInSOL ? <SolanaLogo size={16} /> : '$'}</div> {/* Currency prefix */}
                                 <input type="number" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} style={walletInput} />
                                 <button
                                     onClick={() => setIsDepositAmountInSOL(!isDepositAmountInSOL)}
@@ -658,7 +689,7 @@ export default function PreGame() {
                         </>
                     ) : ( // Deposit Address (QR) tab
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px' }}>
-                            <div ref={qrRef} style={{ background: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}></div>
+                            <div ref={qrRef} style={{ background: 'white', padding: '12px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}></div> {/* Larger padding, rounded corners, shadow */}
                             <div style={{ textAlign: 'center', width: '100%' }}>
                                 <div className="mono" style={{ fontSize: '10px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
                                     {depositAddress || 'Generating...'}
@@ -681,7 +712,7 @@ export default function PreGame() {
                             {depositStatusMessage}
                         </div>
                     )}
-                    <div style={walletPanelFooter}>Solana Mainnet · Secure Processing</div>
+                    <div style={walletPanelFooter}>Custodial Wallet · Secure Processing</div>
                 </div>
             )}
 
@@ -692,55 +723,63 @@ export default function PreGame() {
                         <div style={walletPanelTitle}>Withdraw</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div style={{...inputLabelStyle, marginBottom: '4px'}}>Destination Address</div>
+                        <div style={{...inputLabelStyle, marginBottom: '2px'}}>Destination Address</div>
                         <div style={{ position: 'relative', width: '100%' }}>
                             <input 
                                 type="text" 
                                 placeholder="Paste Solana Address" 
                                 value={displayFullWithdrawAddress ? withdrawAddress : shortenAddress(withdrawAddress, 6)}
+                                readOnly
                                 onFocus={() => setDisplayFullWithdrawAddress(true)}
                                 onBlur={() => setDisplayFullWithdrawAddress(false)}
-                                onChange={(e) => setWithdrawAddress(e.target.value)}
-                                style={{...walletInput, padding: '12px 40px 12px 12px'}} // Adjusted padding for icon
+                                style={{...walletInput, padding: '14px 60px 14px 14px', opacity: 0.8}}
                             />
-                            <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                {isValidWithdrawAddress ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34C759" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.93"></path><path d="M22 4L12 14.01l-3-3"></path></svg>
-                                ) : (
-                                    withdrawAddress && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                                )}
-                                <SolanaTextIcon />
+                            <div style={{ 
+                                position: 'absolute', 
+                                right: '12px', 
+                                top: '50%', 
+                                transform: 'translateY(-50%)', 
+                                background: 'rgba(255,255,255,0.08)', 
+                                padding: '4px 8px', 
+                                borderRadius: '6px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px',
+                                fontSize: '10px',
+                                fontWeight: '800'
+                            }}>
+                                <SolanaLogo size={12} /> SOL
                             </div>
                         </div>
-                        <div style={{...inputLabelStyle, marginBottom: '4px'}}>Amount ({isWithdrawAmountInSOL ? 'SOL' : 'USD'})</div>
+                        <div style={{...inputLabelStyle, marginBottom: '2px'}}>Amount (USD)</div>
                         <div style={walletInputArea}>
-                            <div style={walletInputPrefix}>{isWithdrawAmountInSOL ? <SolanaTextIcon /> : '$'}</div>
+                            <div style={walletInputPrefix}>$</div>
                             <input 
                                 type="number" 
                             placeholder="Paste Solana Address" 
                                 value={withdrawAmount} 
                                 onChange={(e) => setWithdrawAmount(e.target.value)} 
-                                style={walletInput} 
+                                style={{...walletInput, paddingRight: '85px'}} 
                             />
-                            <button style={walletMaxBtn} onClick={() => setWithdrawAmount(user?.balance?.toFixed(2))}>MAX</button>
-                            <button
-                                onClick={() => setIsWithdrawAmountInSOL(!isWithdrawAmountInSOL)}
-                                style={{ ...walletMaxBtn, right: '60px', width: 'auto', padding: '6px 8px', fontSize: '0.65rem' }}
-                            >
-                                {isWithdrawAmountInSOL ? 'USD' : 'SOL'}
-                            </button>
+                            <div style={{ position: 'absolute', right: '8px', display: 'flex', gap: '4px' }}>
+                                <button
+                                    onClick={() => setIsWithdrawAmountInSOL(!isWithdrawAmountInSOL)}
+                                    style={{ background: '#23262f', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '6px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800' }}
+                                >
+                                    SOL
+                                </button>
+                                <button 
+                                    style={{ background: '#23262f', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '6px 10px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '800' }}
+                                    onClick={() => setWithdrawAmount(user?.balance?.toFixed(2))}
+                                >
+                                    MAX
+                                </button>
+                            </div>
                         </div>
-                        {isWithdrawAmountInSOL && withdrawAmount && (
-                            <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '-8px', textAlign: 'right' }}>
-                                ~${(parseFloat(withdrawAmount) * solPrice).toFixed(2)}
-                            </div>
-                        )}
-                        {!isWithdrawAmountInSOL && withdrawAmount && (
-                            <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '-8px', textAlign: 'right' }}>
-                                ~{(parseFloat(withdrawAmount) / solPrice).toFixed(4)} SOL
-                            </div>
-                        )}
-                        <button style={{...walletConfirmBtn, background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)'}} onClick={handleWithdraw}>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '-4px', textAlign: 'left', fontWeight: '600' }}>
+                            ~ {(parseFloat(withdrawAmount || 0) / solPrice).toFixed(4)} SOL
+                        </div>
+                        <button className="btn-hover" style={{...walletConfirmBtn, background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', marginTop: '10px'}} onClick={handleWithdraw}>
                             Withdraw
                         </button>
                     </div>
@@ -749,13 +788,13 @@ export default function PreGame() {
                             {depositStatusMessage}
                         </div>
                     )}
-                    <div style={walletPanelFooter}>Custodial Wallet · Secure Transfer</div>
+                    <div style={{...walletPanelFooter, marginTop: '12px'}}>Custodial Wallet · Secure Transfer</div>
                 </div>
             )}
 
             {/* Standalone Deposit Modal */}
 
-            <div className="glass" style={centerCardStyle}>
+            <div className="glass" style={{...centerCardStyle, background: '#0f1118'}}>
                 <label style={inputLabelStyle}>Nickname</label>
                 <input 
                     type="text" 
@@ -841,13 +880,13 @@ const backgroundStyle = { position: 'fixed', inset: 0, zIndex: -1, background: '
 const topBarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', zIndex: 1000, background: 'rgba(10, 10, 14, 0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' };
 const logoStyle = { margin: 0, fontWeight: '900', fontStyle: 'italic', letterSpacing: '-1px', fontSize: '1.15rem' };
 
-const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', padding: '6px 12px', borderRadius: '100px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' };
+const walletPillButtonStyle = { display: 'flex', alignItems: 'center', background: '#1c1e26', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '6px 12px', borderRadius: '100px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' };
 const standaloneDepositButtonStyle = { background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', border: 'none', color: 'white', padding: '9px 22px', borderRadius: '100px', fontSize: '13.5px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(69, 127, 255, 0.25)' };
 const depositWithdrawBtnStyle = walletPillButtonStyle;
 
-const walletDropdownCardStyle = { position: 'absolute', top: '44px', left: '50%', transform: 'translateX(-50%)', width: '320px', padding: '20px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', zIndex: 1100, animation: 'slideDown 0.2s ease-out' };
-const dropdownPrimaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer', minWidth: '120px' };
-const dropdownSecondaryBtn = { flex: 1, padding: '12px', borderRadius: '100px', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer', minWidth: '120px' };
+const walletDropdownCardStyle = { position: 'absolute', top: '44px', left: '50%', transform: 'translateX(-50%)', width: '320px', padding: '16px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', zIndex: 1100, animation: 'slideDown 0.2s ease-out', background: '#0f1118' };
+const dropdownPrimaryBtn = { flex: 1, padding: '10px', borderRadius: '100px', border: 'none', background: 'linear-gradient(180deg, #4D8CFF 0%, #1B62FF 100%)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
+const dropdownSecondaryBtn = { flex: 1, padding: '10px', borderRadius: '100px', border: 'none', background: '#1c1e26', border: '1px solid rgba(255,255,255,0.08)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' };
 
 const modalOverlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const depositModalCardStyle = { width: '400px', padding: '40px', borderRadius: '28px', position: 'relative' };
@@ -860,9 +899,9 @@ const modalFooterTextStyle = { textAlign: 'center', marginTop: '24px', fontSize:
 
 const avatarPillStyle = { width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid rgba(255, 255, 255, 0.15)', padding: '2px', cursor: 'pointer' };
 const avatarCircleStyle = { width: '100%', height: '100%', background: '#007AFF', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '0.65rem' };
-const walletExpandPanelStyle = { position: 'absolute', top: '54px', left: '50%', transform: 'translateX(-50%)', width: '340px', maxWidth: '92vw', padding: '20px', borderRadius: '20px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100 };
+const walletExpandPanelStyle = { position: 'absolute', top: '54px', left: '50%', transform: 'translateX(-50%)', width: '340px', maxWidth: '92vw', padding: '20px', borderRadius: '20px', boxShadow: '0 25px 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 1100, background: '#0f1118' };
 const walletCloseX = { position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'white', opacity: 0.35, padding: '4px', cursor: 'pointer' };
-const walletPanelHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' };
+const walletPanelHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' };
 const walletPanelTitle = { fontSize: '0.8rem', letterSpacing: '0.24em', textTransform: 'uppercase', opacity: 0.65, fontWeight: '800' };
 const walletPanelSubtitle = { marginTop: '4px', fontSize: '1rem', fontWeight: '800', color: 'white', opacity: 0.9 };
 const walletStatusBadge = { padding: '7px 14px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.08em' };
@@ -870,7 +909,7 @@ const walletStatusConnected = { background: 'rgba(52, 199, 89, 0.16)', color: '#
 const walletStatusDisconnected = { background: 'rgba(255, 59, 48, 0.14)', color: '#FF3B30' };
 const walletOptionRow = { display: 'flex', justifyContent: 'center' };
 const walletPanelBalance = { fontSize: '1.25rem', fontWeight: '800' };
-const walletTabContainer = { display: 'flex', gap: '6px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '14px' };
+const walletTabContainer = { display: 'flex', gap: '6px', background: '#1c1e26', padding: '4px', borderRadius: '14px' };
 const walletTabBtn = { flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.75)', fontSize: '0.82rem', fontWeight: '800', borderRadius: '12px', cursor: 'pointer' };
 const walletTabActive = { background: 'rgba(255,255,255,0.06)', color: 'white' };
 const walletInputArea = { position: 'relative', display: 'flex', alignItems: 'center', width: '100%' };
