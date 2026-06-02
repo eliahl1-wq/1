@@ -4,7 +4,6 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
 import { useNavigate } from 'react-router-dom';
-import { createQR } from '@solana/pay';
 
 export default function Lobby() {
     const { user, logout, token, login, refreshUser } = useAuth();
@@ -32,7 +31,7 @@ export default function Lobby() {
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet'); // 'wallet' | 'manual'
-    const qrRef = useRef(null);
+    const qrRef = useRef(null); // Ref for the QR code canvas
 
     const depositAddress = user?.depositAddress;
 
@@ -105,11 +104,9 @@ export default function Lobby() {
     useEffect(() => {
         if (qrRef.current && depositAddress && depositMethod === 'manual') {
             const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
-            // Clear previous QR code if any
-            const canvas = qrRef.current;
-            const context = canvas.getContext('2d');
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            createQR(qrRef.current, solanaPayUrl, 100); // 100px size
+            qrRef.current.innerHTML = '';
+            const qr = createQR(solanaPayUrl, 120, 'white', 'black');
+            qr.append(qrRef.current);
         }
     }, [depositAddress, depositMethod]);
 
@@ -481,14 +478,12 @@ export default function Lobby() {
                                         outline: 'none'
                                     }}
                                 />
-                                        </div>
-                                    </>
+                            </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
-                                            <canvas
-                                                ref={qrRef}
-                                    alt="Deposit QR"
-                                    style={{ borderRadius: '8px', border: '3px solid white', width: '100px', height: '100px' }}
+                                <div 
+                                    ref={qrRef} 
+                                    style={{ borderRadius: '12px', overflow: 'hidden', background: 'white', padding: '8px', display: 'flex' }} 
                                 />
                                 <div style={{ width: '100%' }}>
                                     <div style={{ fontSize: '9px', opacity: 0.4, textAlign: 'left', marginBottom: '4px', textTransform: 'uppercase' }}>Recipient Address</div>

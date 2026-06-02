@@ -16,7 +16,6 @@ export default function PreGame() {
     const [depositStatusMessage, setDepositStatusMessage] = useState('');
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
-    const walletDropdownRef = useRef(null); // Keep for the dropdown menu
     const qrRef = useRef(null); // Ref for the QR code canvas
 
     const walletExpandRef = useRef(null);
@@ -27,13 +26,11 @@ export default function PreGame() {
     const [walletModalActive, setWalletModalActive] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet');
     
-    const qrRef = useRef(null);
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [amount, setAmount] = useState(''); 
     const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0 });
-    const { createQR } = require('@solana/pay'); // Import createQR here
     
     const depositAddress = user?.depositAddress;
 
@@ -133,11 +130,11 @@ export default function PreGame() {
     }, [isWalletExpanded]);
 
     useEffect(() => {
-        if (qrRef.current && depositAddress && depositMethod === 'manual') {
+        if (qrRef.current && depositAddress && depositMethod !== 'wallet') {
             const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
-            qrRef.current.innerHTML = '';
             try {
-                const qr = createQR(solanaPayUrl, 140, 'transparent', 'white');
+                qrRef.current.innerHTML = '';
+                const qr = createQR(solanaPayUrl, 140, 'white', 'black');
                 qr.append(qrRef.current);
             } catch (err) { console.error(err); }
         }
@@ -519,10 +516,9 @@ export default function PreGame() {
                         </>
                     ) : ( // Deposit Address (QR) tab
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px', marginTop: '10px' }}>
-                            <canvas
+                            <div 
                                 ref={qrRef}
-                                alt="Deposit QR"
-                                style={{ borderRadius: '8px', border: '4px solid white', width: '120px', height: '120px' }}
+                                style={{ borderRadius: '12px', overflow: 'hidden', background: 'white', padding: '10px', display: 'flex' }}
                             />
                             <div style={{ textAlign: 'center', width: '100%' }}>
                                 <div className="mono" style={{ fontSize: '10px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
