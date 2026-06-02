@@ -36,6 +36,7 @@ export default function PreGame() {
     const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
     const [displayFullWithdrawAddress, setDisplayFullWithdrawAddress] = useState(false);
     const [isDepositAmountInSOL, setIsDepositAmountInSOL] = useState(false);
+    const [isAddressFocused, setIsAddressFocused] = useState(false);
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
     const qrRef = useRef(null); // Ref for the QR code canvas
@@ -530,8 +531,8 @@ export default function PreGame() {
                             onClick={() => setIsWalletOpen(!isWalletOpen)}
                             style={walletPillButtonStyle}
                         >
-                            <span className="mono" style={{fontWeight: '800', fontSize: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '4px'}}>
-                                {isDepositAmountInSOL && <SolanaLogo size={16} />}
+                            <span className="mono" style={{fontWeight: '800', fontSize: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                {isDepositAmountInSOL && <SolanaLogo size={14} />}
                                 {isDepositAmountInSOL 
                                     ? (user?.balance / solPrice)?.toFixed(4) 
                                     : `$${formatBalance(user?.balance)}`}
@@ -541,33 +542,32 @@ export default function PreGame() {
 
                         {isWalletOpen && (
                             <div ref={walletDropdownRef} className="glass" style={walletDropdownCardStyle}>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                                     <button onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
                                             style={{ 
-                                                background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', 
-                                                fontSize: '10px', fontWeight: '700', cursor: 'pointer',
-                                                padding: '4px 8px', borderRadius: '8px',
-                                                transition: 'all 0.2s ease',
-                                                ':hover': { background: 'rgba(255,255,255,0.05)' }
+                                                background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', 
+                                                fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                                                padding: '6px 10px', borderRadius: '8px',
+                                                transition: 'all 0.2s ease'
                                             }}>
                                         Transaction History
                                     </button>
-                                </div>
-                                
-                                <div className="mono" style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '4px', color: 'white', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {isDepositAmountInSOL ? <SolanaLogo size={24} /> : '$'}
-                                    {isDepositAmountInSOL ? (user?.balance / solPrice)?.toFixed(4) : formatBalance(user?.balance)}
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        {isDepositAmountInSOL ? `~ $${formatBalance(user?.balance)}` : <>~ {(user?.balance / solPrice)?.toFixed(4)} <SolanaLogo size={14} /></>}
-                                    </span>
                                     <CustomDropdown
                                         options={[{label:'USD', value:'USD'}, {label:'SOL', value:'SOL'}]}
                                         value={isDepositAmountInSOL ? 'SOL' : 'USD'}
                                         onChange={(v) => setIsDepositAmountInSOL(v === 'SOL')}
-                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800}}>$</div>}
+                                        renderValue={(v) => v === 'SOL' ? <TokenBadge label={'SOL'} /> : <div style={{fontWeight:800,fontSize:'0.75rem'}}>$USD</div>}
                                     />
+                                </div>
+                                
+                                <div className="mono" style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '6px', color: 'white', lineHeight: '1', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isDepositAmountInSOL ? <SolanaLogo size={24} /> : '$'}
+                                    {isDepositAmountInSOL ? (user?.balance / solPrice)?.toFixed(4) : formatBalance(user?.balance)}
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px', marginBottom: '20px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255,255,255,0.35)' }}>
+                                        {isDepositAmountInSOL ? `~ $${formatBalance(user?.balance)}` : <>~ {(user?.balance / solPrice)?.toFixed(4)}</>}
+                                    </span>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '10px' }}> {/* Buttons side-by-side */}

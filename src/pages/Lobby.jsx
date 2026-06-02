@@ -465,7 +465,7 @@ export default function Lobby() {
                         }}>
                             <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '20px', width: 'fit-content', margin: '0 auto 20px auto' }}>
                                 <button 
-                                    onClick={() => { setDepositMethod('wallet'); setDepositStatusMessage(''); }}
+                                    onClick={() => { if (qrRef.current) qrRef.current.innerHTML = ''; setDepositMethod('wallet'); setDepositStatusMessage(''); }}
                                     style={{
                                         padding: '10px 24px', border: 'none', borderRadius: '100px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer',
                                         background: depositMethod === 'wallet' ? 'rgba(255,255,255,0.1)' : 'transparent',

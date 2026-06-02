@@ -42,10 +42,10 @@ export default function CustomDropdown({ options = [], value, onChange, renderVa
     };
 
     return (
-        <div className={`dropdown ${open ? 'open' : ''}`} ref={ref}>
-            <div className="dropdown-trigger" role="button" tabIndex={0} onClick={() => setOpen(s => !s)} onKeyDown={(e) => { if (e.key === 'Enter') setOpen(s => !s); }}>
-                <div style={{display:'flex',alignItems:'center',gap:8}}>{renderValue ? renderValue(value) : value}</div>
-                <svg style={{transform: open ? 'rotate(180deg)' : 'rotate(0deg)',transition:'transform .18s'}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
+        <div className={`dropdown ${open ? 'open' : ''}`} ref={ref} style={{position:'relative',zIndex:10001}}>
+            <div className="dropdown-trigger" role="button" tabIndex={0} onClick={() => setOpen(s => !s)} onKeyDown={(e) => { if (e.key === 'Enter') setOpen(s => !s); }} style={{position:'relative',zIndex:10001}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>{renderValue ? renderValue(value) : value}</div>
+                <svg style={{transform: open ? 'rotate(180deg)' : 'rotate(0deg)',transition:'transform .18s',flexShrink:0}} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
             </div>
 
             <div className="dropdown-panel" role="menu" ref={listRef} onKeyDown={handleKeyDown}>
