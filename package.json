@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@solana/pay": "^0.2.5",
+    "@solana/pay": "^0.2.6",
     "@solana/wallet-adapter-react": "latest",
     "@solana/wallet-adapter-react-ui": "latest",
     "@solana/wallet-adapter-walletconnect": "^0.1.21",

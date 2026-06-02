@@ -132,11 +132,12 @@ export default function PreGame() {
     }, [isWalletExpanded]);
 
     useEffect(() => {
-        if (qrRef.current && depositAddress && depositMethod !== 'wallet') {
+        if (qrRef.current && depositAddress && depositMethod === 'manual') {
             const solanaPayUrl = `solana:${depositAddress}?amount=0&label=AgarArena&message=Deposit`;
             try {
                 qrRef.current.innerHTML = '';
-                const qr = createQR(solanaPayUrl, 140, 'white', 'black');
+                // Skapar QR-koden med Solana-logga (createQR hanterar detta automatiskt)
+                const qr = createQR(solanaPayUrl, 160, 'white', 'black');
                 qr.append(qrRef.current);
             } catch (err) { console.error(err); }
         }
@@ -517,11 +518,8 @@ export default function PreGame() {
                             <button style={walletConfirmBtn} onClick={handleDeposit}>Deposit SOL</button>
                         </>
                     ) : ( // Deposit Address (QR) tab
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px', marginTop: '10px' }}>
-                            <div 
-                                ref={qrRef}
-                                style={{ borderRadius: '12px', overflow: 'hidden', background: 'white', padding: '10px', display: 'flex' }}
-                            />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '20px' }}>
+                            <div ref={qrRef} style={{ background: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}></div>
                             <div style={{ textAlign: 'center', width: '100%' }}>
                                 <div className="mono" style={{ fontSize: '10px', color: '#14F195', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
                                     {depositAddress || 'Generating...'}

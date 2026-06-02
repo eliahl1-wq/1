@@ -4,6 +4,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
 import { useNavigate } from 'react-router-dom';
+import { createQR } from '@solana/pay';
 
 export default function Lobby() {
     const { user, logout, token, login, refreshUser } = useAuth();
@@ -374,7 +375,7 @@ export default function Lobby() {
             </div>
 
             {/* Center Content */}
-            <div style={{ zIndex: 5, fontFamily: 'system-ui', textAlign: 'center' }}>
+            <div style={{ zIndex: 5, fontFamily: 'system-ui', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <h1 style={{ 
                     color: 'white',
                     fontSize: '5.5rem',
@@ -395,6 +396,7 @@ export default function Lobby() {
                     border: '1px solid rgba(255, 255, 255, 0.07)', 
                     textAlign: 'center', 
                     width: '480px', 
+                    margin: '0 auto',
                     backdropFilter: 'blur(80px)',
                     boxShadow: '0 40px 120px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255,255,255,0.05)',
                     position: 'relative'
@@ -423,7 +425,7 @@ export default function Lobby() {
                             borderRadius: '28px', 
                             border: '1px solid rgba(255, 255, 255, 0.05)' 
                         }}>
-                            <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '14px', marginBottom: '20px', width: 'fit-content', margin: '0 auto 20px auto' }}>
                                 <button 
                                     onClick={() => { setDepositMethod('wallet'); setDepositStatusMessage(''); }}
                                     style={{
@@ -449,7 +451,7 @@ export default function Lobby() {
                             </div>
 
                         {depositMethod === 'wallet' ? (
-                            <div style={{ position: 'relative', width: '100%', marginBottom: '15px' }}>
+                                    <>
                                 <span style={{ 
                                     position: 'absolute', 
                                     left: '18px', 
@@ -478,7 +480,10 @@ export default function Lobby() {
                                         outline: 'none'
                                     }}
                                 />
-                            </div>
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', marginTop: '15px' }}>
+                                            <WalletMultiButton />
+                                        </div>
+                                    </>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
                                 <div 
