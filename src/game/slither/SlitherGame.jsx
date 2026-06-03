@@ -238,23 +238,3 @@ export default function SlitherGame() {
         </div>
     );
 }
-
-    return (
-        <div style={{ position: 'fixed', top: '20px', left: '20px', zIndex: 100 }}>
-            <button 
-                onClick={() => navigate('/gamemodes')}
-                style={{
-                    background: 'rgba(0,0,0,0.5)',
-                    color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    backdropFilter: 'blur(10px)'
-                }}
-            >
-                ← Leave Arena
-            </button>
-        </div>
-    );
-}

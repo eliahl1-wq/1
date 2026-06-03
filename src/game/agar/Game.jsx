@@ -339,7 +339,7 @@ export default function Game() {
                         <div className="overlay-badge success">Transaction Confirmed</div>
                         <h2 className="overlay-heading">Profit Secured</h2>
                         <div className="overlay-amount success">
-                            <span className="unit">$</span>{displayCashedAmount.toFixed(2)}
+                            <span className="unit">$</span>{displayCashedAmount.toFixed(4)}
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">Capital has been successfully reconciled to your account balance.</p>
@@ -478,15 +478,16 @@ export default function Game() {
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'white',
                     boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)',
+                    boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '12px'
                 }}>
                     <div style={{ textAlign: 'center' }}>
-                        <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--accent)' }}>In-Game Stake</h3>
+                        <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Active Stake</h3>
                         <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                            ${(currentBalance ?? 0).toFixed(2)}
+                            ${(currentBalance ?? 0).toFixed(4)}
                         </div>
                         
                         {potentialBonus > 0 && (
@@ -601,9 +602,9 @@ export default function Game() {
                 gap: '2px'
             }}>
                 <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                    <div style={{ width: 7, height: 7, background: '#007AFF', borderRadius: '50%', boxShadow: '0 0 10px #007AFF' }} />
                     <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                        AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
                     </span>
                 </div>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
@@ -626,18 +627,18 @@ export default function Game() {
                 color: 'white',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
             }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 800, letterSpacing: '1px' }}>LEADERBOARD</h4>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>Leaderboard</h4>
                 <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {leaderboard.map((p, i) => (
                         <div key={p.id} style={{ 
                             display: 'flex', 
                             justifyContent: 'space-between', 
                             opacity: p.id === myIdRef.current ? 1 : 0.6,
-                            color: p.id === myIdRef.current ? 'var(--accent)' : 'var(--text-bright)',
+                            color: p.id === myIdRef.current ? '#007AFF' : 'var(--text-bright)',
                             fontWeight: p.id === myIdRef.current ? '700' : '400'
                         }}>
                             <span>{i + 1}. {p.name || 'An unnamed cell'}</span>
-                            <span className="mono">${(p.balance ?? 0).toFixed(2)}</span>
+                            <span className="mono">${(p.balance ?? 0).toFixed(4)}</span>
                         </div>
                     ))}
                 </div>
