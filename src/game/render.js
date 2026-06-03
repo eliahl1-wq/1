@@ -161,37 +161,59 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         // Visa Cashout-timer för mig själv
         if (cell.isMe && global.cashOutTimer > 0) {
             graph.shadowBlur = 0;
-            const timerFontSize = 15;
-            graph.font = '900 ' + timerFontSize + 'px sans-serif';
-            const timerText = `EXITING: ${global.cashOutTimer}s`;
-            
-            const textWidth = graph.measureText(timerText).width;
-            const pillW = textWidth + 24;
-            const pillH = timerFontSize + 12;
-            const pillX = cell.x - pillW / 2;
-            const pillY = cell.y - cell.radius - 55;
 
-            // Rita Pill-rutan (Svart tema)
-            graph.fillStyle = '#000000';
+            const timerFontSize = 13;
+            const secondaryFontSize = 11;
+            const timerText = `${global.cashOutTimer}s`;
+            const labelText = 'CASHING OUT';
+
+            graph.font = `700 ${secondaryFontSize}px 'Geist', sans-serif`;
+            const labelWidth = graph.measureText(labelText).width;
+            graph.font = `900 ${timerFontSize}px ui-monospace, monospace`;
+            const timerWidth = graph.measureText(timerText).width;
+
+            const pillW = Math.max(labelWidth, timerWidth) + 32;
+            const pillH = timerFontSize + secondaryFontSize + 22;
+            const pillX = cell.x - pillW / 2;
+            const pillY = cell.y - cell.radius - pillH - 18;
+            const radius = pillH / 2;
+
+            // Backdrop blur simäulation (mörk bakgrund)
+            graph.fillStyle = 'rgba(8, 9, 13, 0.88)';
             graph.beginPath();
-            graph.roundRect(pillX, pillY, pillW, pillH, pillH / 2);
+            graph.roundRect(pillX, pillY, pillW, pillH, radius);
             graph.fill();
-            graph.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+
+            // Blå ram
+            graph.strokeStyle = 'rgba(77, 140, 255, 0.55)';
+            graph.lineWidth = 1.5;
             graph.stroke();
 
-            // Rita en liten pil nedåt mot bloben
+            // Liten pil nedåt
+            graph.fillStyle = 'rgba(8, 9, 13, 0.88)';
+            const arrowW = 10;
+            const arrowH = 7;
             graph.beginPath();
-            graph.moveTo(cell.x - 7, pillY + pillH);
-            graph.lineTo(cell.x + 7, pillY + pillH);
-            graph.lineTo(cell.x, pillY + pillH + 8);
+            graph.moveTo(cell.x - arrowW / 2, pillY + pillH);
+            graph.lineTo(cell.x + arrowW / 2, pillY + pillH);
+            graph.lineTo(cell.x, pillY + pillH + arrowH);
             graph.closePath();
             graph.fill();
-            
-            // Rita texten inuti pillen (Guld text)
-            graph.fillStyle = '#FFD700';
+            graph.strokeStyle = 'rgba(77, 140, 255, 0.4)';
+            graph.lineWidth = 1;
+            graph.stroke();
+
+            // Label text (liten grå text)
+            graph.font = `700 ${secondaryFontSize}px 'Geist', sans-serif`;
+            graph.fillStyle = 'rgba(255,255,255,0.4)';
             graph.textAlign = 'center';
             graph.textBaseline = 'middle';
-            graph.fillText(timerText, cell.x, pillY + pillH / 2 + 1);
+            graph.fillText(labelText, cell.x, pillY + pillH * 0.32);
+
+            // Countdown (stor vit text)
+            graph.font = `900 ${timerFontSize}px ui-monospace, monospace`;
+            graph.fillStyle = '#ffffff';
+            graph.fillText(timerText, cell.x, pillY + pillH * 0.72);
         }
     }
 };
