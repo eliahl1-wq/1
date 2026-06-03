@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-
+import { SolLogo } from '../../components/SolLogo'; // Assuming SolLogo is a common component
 // Vi importerar klasserna men hanterar initieringen manuellt i useEffect
 import './snake.js';
 import './food.js';
@@ -11,7 +11,7 @@ export default function SlitherGame() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, refreshUser } = useAuth();
-    const gameInstance = useRef(null);
+    const canvasRef = useRef(null); // React manages the canvas
     
     // State för UI (samma som i Game.jsx)
     const [currentBalance, setCurrentBalance] = useState(0);
@@ -24,63 +24,80 @@ export default function SlitherGame() {
 
     useEffect(() => {
         document.body.style.backgroundColor = '#000';
-        document.title = "AgarStake | Slither Arena";
+        document.title = "AgarStake | Slither Arena"; // Set document title
         
-        // Global callback för när man dör i spelet
-        window.onSnakeDie = (score) => {
-            setIsDead(true);
-            // Nollställ timer så cashout-knappen inte ligger kvar ovanpå dödsskärmen
-            setLocalTimer(0);
-            setTimeout(() => navigate('/pre-game'), 4000);
+        // Ensure game is only initialized once
+        if (!canvasRef.current || window.gameInstance) return;
+
+        // Initialize game engine
+        window.gameInstance = new window.game(canvasRef.current);
+        
+        // Set player nickname
+        const matchNickname = location.state?.nickname || user?.username || 'Guest';
+        if (window.mySnake && window.mySnake[0]) {
+            window.mySnake[0].name = matchNickname;
+        }
+
+        // Global callback for when the player dies
+        window.onSnakeDie = (finalScore) => {
+            setIsDead(true); // Trigger death overlay
+            setLocalTimer(0); // Clear cashout timer
+            // Simulate backend transaction for death (optional, for consistency with Agar)
+            // For now, just redirect after animation
+            setTimeout(() => navigate('/pre-game'), 4000); // Redirect after 4 seconds
         };
 
-        // Initiera spelet
-        if (window.game) {
-            gameInstance.current = new window.game();
+        // Global callback for cashout (if implemented in game.js)
+        window.onCashOut = (finalScore) => {
+            handleCashOut(finalScore); // Trigger cashout animation
+        };
+
+        // UI update loop
+        const uiUpdateInterval = setInterval(() => {
+            if (window.mySnake && window.mySnake[0]) {
+                const score = window.mySnake[0].score || 0;
+                // Convert Slither score to dollar value (example ratio)
+                // Assuming 1000 score points = $1.00 profit above initial $1.00
+                const convertedBalance = 1.00 + (Math.max(0, score - 1000) / 1000); 
+                setCurrentBalance(convertedBalance);
+
+                // Update leaderboard from game state
+                const currentSnakes = [...(window.mySnake || [])]
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 10) // Top 10 players
+                    .map(s => ({
+                        id: s.name, // Use name as ID for simplicity
+                        name: s.name,
+                        balance: 1.00 + (Math.max(0, s.score - 1000) / 1000)
+                    }));
+                setLeaderboard(currentSnakes);
+            }
+            setCurrentTime(Date.now()); // For potential timer displays
+        }, 100); // Update UI 10 times per second
+
+        // Cleanup function
+        return () => {
+            clearInterval(uiUpdateInterval); // Stop UI update loop
+            window.die = true; // Signal game engine to stop its loop
+            window.onSnakeDie = null; // Clear global callback
+            window.onCashOut = null; // Clear global callback
+            if (window.gameInstance) {
+                window.gameInstance.destroy(); // Clean up game resources
+                window.gameInstance = null;
+            }
+            // Remove canvas if game engine created it (shouldn't happen with refactored game.js)
             // Sätt spelarens namn direkt
             const matchNickname = location.state?.nickname || user?.username || 'Guest';
             if (window.mySnake && window.mySnake[0]) {
                 window.mySnake[0].name = matchNickname;
             }
         }
-
-        // Uppdateringsloop för UI (60fps för att läsa värden från spelmotorn)
-        const uiInterval = setInterval(() => {
-            if (window.mySnake && window.mySnake[0]) {
-                // Konvertera Slither-score till dollar ($1 start + ökning)
-                // AgarStake ratio: Varje 200 poäng är ca $1.00 vinst utöver start
-                const score = window.mySnake[0].score || 0;
-                const convertedBalance = 1.00 + (Math.max(0, score - 200) / 200);
-                setCurrentBalance(convertedBalance);
-
-                // Uppdatera leaderboarden från spelmotorn
-                const snakes = [...(window.mySnake || [])]
-                    .sort((a, b) => b.score - a.score)
-                    .slice(0, 10)
-                    .map(s => ({
-                        id: s.name,
-                        name: s.name,
-                        balance: 1.00 + (Math.max(0, s.score - 200) / 200)
-                    }));
-                setLeaderboard(snakes);
-            }
-            setCurrentTime(Date.now());
-        }, 100);
-
-        return () => {
-            clearInterval(uiInterval);
-            window.die = true; 
-            window.onSnakeDie = null;
-            const canvas = document.querySelector('canvas');
-            if (canvas && canvas.parentNode === document.body) {
-                document.body.removeChild(canvas);
-            }
         };
     }, [user, navigate, location.state]);
 
-    const handleCashOut = () => {
-        // Simulera cashout (precis som i Agar)
-        const finalAmount = currentBalance;
+    // Cashout handler (can be called from game.js or UI button)
+    const handleCashOut = (gameScore = currentBalance) => {
+        const finalAmount = gameScore; // Use gameScore if provided, otherwise current UI balance
         setCashedAmount(finalAmount);
         window.die = true;
 
@@ -100,6 +117,11 @@ export default function SlitherGame() {
 
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, overflow: 'hidden', fontFamily: 'system-ui' }}>
+            <canvas
+                ref={canvasRef}
+                style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
+            />
+
             {/* Overlay: Vinst */}
             {cashedAmount !== null && (
                 <div className="modern-overlay-backdrop">
@@ -164,9 +186,9 @@ export default function SlitherGame() {
             {/* UI: Logo */}
             <div style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
                 <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: 7, height: 7, background: '#007AFF', borderRadius: '50%', boxShadow: '0 0 10px #007AFF' }} />
+                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
                     <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-                        AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                     </span>
                 </div>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Slither Mode v0.1</div>
@@ -184,7 +206,7 @@ export default function SlitherGame() {
                     {leaderboard.map((p, i) => (
                         <div key={i} style={{ 
                             display: 'flex', justifyContent: 'space-between', 
-                            color: p.name === (location.state?.nickname || user?.username) ? '#007AFF' : 'var(--text-bright)',
+                            color: p.name === (location.state?.nickname || user?.username) ? 'var(--accent)' : 'var(--text-bright)',
                             fontWeight: p.name === (location.state?.nickname || user?.username) ? '700' : '400'
                         }}>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {p.name}</span>
@@ -235,7 +257,6 @@ export default function SlitherGame() {
                     from { opacity: 0; transform: translateY(40px) scale(0.96); }
                     to { opacity: 1; transform: translateY(0) scale(1); }
                 }
-                canvas { position: absolute; top: 0; left: 0; z-index: 1; }
             `}</style>
         </div>
     );

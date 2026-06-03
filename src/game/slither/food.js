@@ -15,8 +15,11 @@ globalThis.food = class food {
 
     draw() {
         if (this.game.isPoint(this.x, this.y)) {
+            // Ensure XX and YY are numbers, default to 0 if undefined
+            const currentXX = globalThis.XX || 0;
+            const currentYY = globalThis.YY || 0;
             this.game.context.beginPath();
-            this.game.context.arc(this.x - this.size / 4 - XX, this.y - this.size / 4 - YY, this.size / 2, 0, Math.PI * 2, false);
+            this.game.context.arc(this.x - this.size / 4 - currentXX, this.y - this.size / 4 - currentYY, this.size / 2, 0, Math.PI * 2, false);
             this.game.context.fillStyle = this.color;
             this.game.context.fill();
             this.game.context.closePath()

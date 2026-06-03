@@ -109,7 +109,7 @@ globalThis.snake = class snake {
                     // Fallback om bilder saknas: Rita cirklar
                     ctx.beginPath();
                     ctx.arc(drawX, drawY, this.size / 2, 0, Math.PI * 2);
-                    ctx.fillStyle = isPlayer ? '#007AFF' : '#444';
+                    ctx.fillStyle = isPlayer ? 'var(--accent)' : '#444'; // Use var(--accent) for player
                     ctx.fill();
                 }
             }
@@ -129,7 +129,7 @@ globalThis.snake = class snake {
             // Fallback för huvudet
             ctx.beginPath();
             ctx.arc(hX, hY, this.size / 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = isPlayer ? '#00A2FF' : '#666';
+                    ctx.fillStyle = isPlayer ? 'var(--accent)' : '#666'; // Use var(--accent) for player
             ctx.fill();
         }
     }

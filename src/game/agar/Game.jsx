@@ -478,7 +478,6 @@ export default function Game() {
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'white',
                     boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)',
-                    boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -602,9 +601,9 @@ export default function Game() {
                 gap: '2px'
             }}>
                 <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: 7, height: 7, background: '#007AFF', borderRadius: '50%', boxShadow: '0 0 10px #007AFF' }} />
+                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
                     <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-                        AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                     </span>
                 </div>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
@@ -634,7 +633,7 @@ export default function Game() {
                             display: 'flex', 
                             justifyContent: 'space-between', 
                             opacity: p.id === myIdRef.current ? 1 : 0.6,
-                            color: p.id === myIdRef.current ? '#007AFF' : 'var(--text-bright)',
+                            color: p.id === myIdRef.current ? 'var(--accent)' : 'var(--text-bright)',
                             fontWeight: p.id === myIdRef.current ? '700' : '400'
                         }}>
                             <span>{i + 1}. {p.name || 'An unnamed cell'}</span>

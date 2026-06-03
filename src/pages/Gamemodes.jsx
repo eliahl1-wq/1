@@ -15,9 +15,9 @@ export default function Gamemodes() {
             <nav className="topbar">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                     <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
-                        <div style={{ width: 7, height: 7, background: '#007AFF', borderRadius: '50%', boxShadow: '0 0 10px #007AFF' }} />
+                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
                         <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-                            AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                            AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                         </span>
                     </div>
                     <button 
@@ -42,7 +42,7 @@ export default function Gamemodes() {
                         style={{ 
                             background: 'none', border: 'none', padding: '0 0 12px 0', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', transition: '0.2s',
                             color: activeTab === 'agar' ? '#fff' : 'var(--text-3)',
-                            borderBottom: activeTab === 'agar' ? '2px solid #007AFF' : '2px solid transparent'
+                            borderBottom: activeTab === 'agar' ? '2px solid var(--accent)' : '2px solid transparent'
                         }}
                     >
                         AGAR
@@ -52,7 +52,7 @@ export default function Gamemodes() {
                         style={{ 
                             background: 'none', border: 'none', padding: '0 0 12px 0', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', transition: '0.2s',
                             color: activeTab === 'slither' ? '#fff' : 'var(--text-3)',
-                            borderBottom: activeTab === 'slither' ? '2px solid #007AFF' : '2px solid transparent'
+                            borderBottom: activeTab === 'slither' ? '2px solid var(--accent)' : '2px solid transparent'
                         }}
                     >
                         SLITHER
@@ -120,7 +120,7 @@ export default function Gamemodes() {
                     box-shadow: var(--shadow-lg);
                 }
                 .mode-option.active {
-                    border-color: rgba(0, 122, 255, 0.3);
+                    border-color: rgba(124, 58, 255, 0.3);
                     background: linear-gradient(135deg, #0f1118 0%, #161922 100%);
                 }
                 .mode-option.disabled { opacity: 0.6; }

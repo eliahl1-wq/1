@@ -84,16 +84,14 @@ const names = ["Ahmed Steinke",
 
 globalThis.game = class game {
     constructor() {
-        this.canvas = null;
-        this.context = null;
-        this.init();
+        // Constructor now accepts a canvas element
+        this.canvas = arguments[0];
+        this.context = this.canvas.getContext("2d");
+        this.init(this.canvas);
     }
 
-    init() {
-        this.canvas = document.createElement("canvas");
-        this.context = this.canvas.getContext("2d");
-        document.body.appendChild(this.canvas);
-
+    init(canvasElement) {
+        // Use the provided canvas element
         this.render();
 
         // Skapa bottar (redan inbyggt)
@@ -242,6 +240,11 @@ globalThis.game = class game {
                             if (window.onSnakeDie) window.onSnakeDie(mySnake[i].score);
                             die = true;
                         }
+                    } else if (i === 0 && mySnake[0].speed === 2 && mySnake[0].score > minScore * 2) { // Player cashout
+                        // Simulate cashout if player is boosting and has enough score
+                        // This is a placeholder, actual cashout should be triggered by UI
+                        // if (window.onCashOut) window.onCashOut(mySnake[0].score);
+                        // die = true;
                     }
                 }
     }
@@ -250,16 +253,16 @@ globalThis.game = class game {
         if (this.canvas.width != document.documentElement.clientWidth || this.canvas.height != document.documentElement.clientHeight) {
             this.canvas.width = document.documentElement.clientWidth;
             this.canvas.height = document.documentElement.clientHeight;
-            game_W = this.canvas.width;
-            game_H = this.canvas.height;
+            globalThis.game_W = this.canvas.width;
+            globalThis.game_H = this.canvas.height;
             SPEED = this.getSize() / 7;
             SPEED = 1;
             MaxSpeed = this.getSize() / 7;
             if (mySnake.length == 0)
                 return;
             if (mySnake[0].v != null) {
-                mySnake[0].v[0].x = XX + game_W / 2;
-                mySnake[0].v[0].y = YY + game_H / 2;
+                mySnake[0].v[0].x = globalThis.XX + globalThis.game_W / 2;
+                mySnake[0].v[0].y = globalThis.YY + globalThis.game_H / 2;
             }
         }
     }
@@ -275,28 +278,32 @@ globalThis.game = class game {
     clearScreen() {
         // Mörk bakgrund som i Agario
         this.context.fillStyle = '#0a0a0c';
-        this.context.fillRect(0, 0, game_W, game_H);
+        this.context.fillRect(0, 0, globalThis.game_W, globalThis.game_H);
 
         // Rita rutnät (Grid)
         const step = 45;
         this.context.beginPath();
         this.context.strokeStyle = '#1d1d1f'; // Subtila linjer
         this.context.lineWidth = 1;
+        
+        // Ensure XX and YY are numbers, default to 0 if undefined
+        const currentXX = globalThis.XX || 0;
+        const currentYY = globalThis.YY || 0;
 
         // Offset baserat på kamerans position (XX, YY)
-        for (let x = -XX % step; x < game_W; x += step) {
+        for (let x = -currentXX % step; x < globalThis.game_W; x += step) {
             this.context.moveTo(x, 0);
-            this.context.lineTo(x, game_H);
+            this.context.lineTo(x, globalThis.game_H);
         }
-        for (let y = -YY % step; y < game_H; y += step) {
+        for (let y = -currentYY % step; y < globalThis.game_H; y += step) {
             this.context.moveTo(0, y);
-            this.context.lineTo(game_W, y);
+            this.context.lineTo(globalThis.game_W, y);
         }
         this.context.stroke();
     }
 
     getSize() {
-        var area = game_W * game_H;
+        var area = globalThis.game_W * globalThis.game_H;
         return Math.sqrt(area / 300);
     }
 
@@ -313,16 +320,26 @@ globalThis.game = class game {
     }
 
     isPoint(x, y) {
-        if (x - XX < -3 * this.getSize())
+        const currentXX = globalThis.XX || 0;
+        const currentYY = globalThis.YY || 0;
+        const currentGameW = globalThis.game_W || 0;
+        const currentGameH = globalThis.game_H || 0;
+
+        if (x - currentXX < -3 * this.getSize())
             return false;
-        if (y - YY < -3 * this.getSize())
+        if (y - currentYY < -3 * this.getSize())
             return false;
-        if (x - XX > game_W + 3 * this.getSize())
+        if (x - currentXX > currentGameW + 3 * this.getSize())
             return false;
-        if (y - YY > game_H + 3 * this.getSize())
+        if (y - currentYY > currentGameH + 3 * this.getSize())
             return false;
         return true;
     }
 }
 // Exponera klassen globalt så SlitherGame.jsx kan hitta den
 window.game = game;
+
+// Add a destroy method for cleanup
+game.prototype.destroy = function() {
+    // Any specific cleanup for the game instance
+};
