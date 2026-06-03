@@ -1,4 +1,4 @@
-game_W = 0, game_H = 0;
+game_W = 0, game_H = 0, Nball = 200;
 
 var bg_im = new Image();
 bg_im.src = "images/Map2.png";
