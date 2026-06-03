@@ -1,4 +1,4 @@
-Nball = 13;
+const Nball = 13;
 class snake {
     constructor(name, game, score, x, y) {
         this.name = name;
