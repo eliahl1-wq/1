@@ -3,7 +3,7 @@ globalThis.game_H = 0;
 globalThis.Nball = 200;
 
 var bg_im = new Image();
-bg_im.src = "images/Map2.png";
+bg_im.src = "/images/Map2.png";
 globalThis.SPEED = 1;
 globalThis.MaxSpeed = 0;
 globalThis.chX = 1;
@@ -202,7 +202,7 @@ globalThis.game = class game {
     changeFood() {
         for (let i = 0; i < FOOD.length; i++)
             if (Math.sqrt((mySnake[0].v[0].x - FOOD[i].x) * (mySnake[0].v[0].x - FOOD[i].x) + (mySnake[0].v[0].y - FOOD[i].y) * (mySnake[0].v[0].y - FOOD[i].y)) > sizeMap) {
-                FOOD[i] = new food(this, this.getSize() / (10 + Math.random() * 10), (Math.random() - Math.random()) * sizeMap + mySnake[0].v[0].x, (Math.random() - Math.random()) * sizeMap + mySnake[0].v[0].y);
+                FOOD[i] = new window.food(this, this.getSize() / (10 + Math.random() * 10), (Math.random() - Math.random()) * sizeMap + mySnake[0].v[0].x, (Math.random() - Math.random()) * sizeMap + mySnake[0].v[0].y);
                 // console.log(FOOD[i]);
             }
     }
@@ -314,7 +314,9 @@ globalThis.game = class game {
 
     clearScreen() {
         this.context.clearRect(0, 0, game_W, game_H);
-        this.context.drawImage(bg_im, Xfocus, Yfocus, 1.5 * game_W, 1.5 * game_H, 0, 0, game_W, game_H);
+        if (bg_im.complete && bg_im.naturalWidth !== 0) {
+            this.context.drawImage(bg_im, Xfocus, Yfocus, 1.5 * game_W, 1.5 * game_H, 0, 0, game_W, game_H);
+        }
     }
 
     getSize() {

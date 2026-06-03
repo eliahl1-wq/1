@@ -21,9 +21,9 @@ globalThis.snake = class snake {
         for (let i = 0; i < 50; i++)
             this.v[i] = { x: this.x, y: this.y };
         this.sn_im = new Image();
-        this.sn_im.src = "images/head.png";
+        this.sn_im.src = "/images/head.png";
         this.bd_im = new Image();
-        this.bd_im.src = "images/body/" + Math.floor(Math.random() * 999999) % Nball + ".png";
+        this.bd_im.src = "/images/body/" + Math.floor(Math.random() * 999999) % Nball + ".png";
     }
 
     update() {
@@ -92,14 +92,16 @@ globalThis.snake = class snake {
         this.update();
 
         for (let i = this.v.length - 1; i >= 1; i--)
-            if (this.game.isPoint(this.v[i].x, this.v[i].y))
+            if (this.game.isPoint(this.v[i].x, this.v[i].y) && this.bd_im.complete && this.bd_im.naturalWidth !== 0)
                 this.game.context.drawImage(this.bd_im, this.v[i].x - XX - (this.size) / 2, this.v[i].y - YY - (this.size) / 2, this.size, this.size);
 
-        this.game.context.save();
-        this.game.context.translate(this.v[0].x - XX, this.v[0].y - YY);
-        this.game.context.rotate(this.angle - Math.PI / 2);
-        this.game.context.drawImage(this.sn_im, -this.size / 2, -this.size / 2, this.size, this.size);
-        this.game.context.restore();
+        if (this.sn_im.complete && this.sn_im.naturalWidth !== 0) {
+            this.game.context.save();
+            this.game.context.translate(this.v[0].x - XX, this.v[0].y - YY);
+            this.game.context.rotate(this.angle - Math.PI / 2);
+            this.game.context.drawImage(this.sn_im, -this.size / 2, -this.size / 2, this.size, this.size);
+            this.game.context.restore();
+        }
     }
 
     getAngle(a, b) {
