@@ -6,7 +6,8 @@ import Lobby from './pages/Lobby';
 import PreGame from './pages/PreGame';
 import Transactions from './pages/Transactions';
 import Profile from './pages/Profile';
-import Game from './game/Game'; // Importera ditt nya spel
+import Game from './game/agar/Game'; // Uppdaterad sökväg
+import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
 import Gamemodes from './pages/Gamemodes';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
@@ -74,6 +75,7 @@ function App() {
                 <Route path="/lobby" element={<PrivateRoute><Lobby /></PrivateRoute>} />
                 <Route path="/pre-game" element={<PreGame />} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
+                <Route path="/slither-game" element={<ArenaRoute><SlitherGame /></ArenaRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path="/gamemodes" element={<Gamemodes />} />

@@ -87,9 +87,13 @@ export default function Gamemodes() {
                         <p style={{ color: 'var(--text-3)', fontSize: '1.1rem', lineHeight: '1.6' }}>
                             We are bringing high-stakes snake combat to AgarStake. Compete with other players in a growing arena where every move counts.
                         </p>
-                        <div style={{ marginTop: '32px', display: 'inline-block', padding: '8px 16px', background: 'rgba(0, 122, 255, 0.1)', color: '#007AFF', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em' }}>
-                            UNDER DEVELOPMENT
-                        </div>
+                        <button 
+                            className="btn btn-primary" 
+                            style={{ marginTop: '32px', padding: '12px 32px' }} 
+                            onClick={() => navigate('/slither-game')}
+                        >
+                            PLAY SLITHER
+                        </button>
                     </div>
                 )}
             </div>

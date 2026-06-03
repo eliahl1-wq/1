@@ -743,7 +743,7 @@ export default function PreGame() {
             )}
 
             {/* ── Center Card ── */}
-            <div className="game-card" style={{ maxWidth: '420px', padding: '32px' }}>
+            <div className="game-card" style={{ maxWidth: '480px', padding: '40px' }}>
                 {/* Mode info */}
                 <div 
                     onClick={() => navigate('/gamemodes')}
