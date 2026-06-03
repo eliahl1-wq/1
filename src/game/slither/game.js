@@ -1,23 +1,28 @@
-game_W = 0, game_H = 0, Nball = 200;
+globalThis.game_W = 0;
+globalThis.game_H = 0;
+globalThis.Nball = 200;
 
 var bg_im = new Image();
 bg_im.src = "images/Map2.png";
-SPEED = 1;
-MaxSpeed = 0;
-chX = chY = 1;
-mySnake = [];
-FOOD = [];
-NFood = 2000;
-Nsnake = 20;
-sizeMap = 2000;
-index = 0;
-minScore = 200;
-die = false;
+globalThis.SPEED = 1;
+globalThis.MaxSpeed = 0;
+globalThis.chX = 1;
+globalThis.chY = 1;
+globalThis.mySnake = [];
+globalThis.FOOD = [];
+globalThis.NFood = 2000;
+globalThis.Nsnake = 20;
+globalThis.sizeMap = 2000;
+globalThis.index = 0;
+globalThis.minScore = 200;
+globalThis.die = false;
 
-Xfocus = Yfocus = 0;
-XX = 0, YY = 0;
+globalThis.Xfocus = 0;
+globalThis.Yfocus = 0;
+globalThis.XX = 0;
+globalThis.YY = 0;
 
-names = ["Ahmed Steinke",
+const names = ["Ahmed Steinke",
     "Aubrey Brass",
     "Johanne Boothe",
     "Sunni Markland",
