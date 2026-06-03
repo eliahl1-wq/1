@@ -81,19 +81,31 @@ export default function Gamemodes() {
                         </div>
                     </div>
                 ) : (
-                    <div style={{ textAlign: 'left', padding: '60px 0', maxWidth: '600px' }}>
-                        <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>🐍</div>
-                        <h2 style={{ color: '#fff', fontSize: '2rem', marginBottom: '12px', fontWeight: 800 }}>Slither Mode</h2>
-                        <p style={{ color: 'var(--text-3)', fontSize: '1.1rem', lineHeight: '1.6' }}>
-                            We are bringing high-stakes snake combat to AgarStake. Compete with other players in a growing arena where every move counts.
-                        </p>
-                        <button 
-                            className="btn btn-primary" 
-                            style={{ marginTop: '32px', padding: '12px 32px' }} 
-                            onClick={() => navigate('/slither-game')}
-                        >
-                            PLAY SLITHER
-                        </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+                        <div className="mode-option active">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
+                                <div>
+                                    <div style={{ fontWeight: 800, color: '#fff', fontSize: '1.25rem' }}>Slither Normal</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginTop: '6px' }}>Classic high-stakes snake arena.</div>
+                                </div>
+                                <button 
+                                    className="btn btn-primary" 
+                                    style={{ padding: '10px 24px', fontSize: '0.8rem' }} 
+                                    onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
+                                >
+                                    SELECT
+                                </button>
+                            </div>
+                        </div>
+                        <div className="mode-option disabled">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
+                                <div>
+                                    <div style={{ fontWeight: 800, color: 'var(--text-3)', fontSize: '1.25rem' }}>Speed Snake</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginTop: '6px' }}>Faster growth, higher risk.</div>
+                                </div>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px' }}>COMING SOON</span>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

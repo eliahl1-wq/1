@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
@@ -27,6 +27,7 @@ const CUR_OPTIONS = [
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
 
@@ -53,6 +54,7 @@ export default function PreGame() {
     const [nickname, setNickname]               = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
+    const [selectedMode] = useState(location.state?.selectedMode || 'agar');
 
     // Panel drag
     const [panelPos, setPanelPos]       = useState({ x: null, y: 60 });
@@ -279,7 +281,8 @@ export default function PreGame() {
         setIsMatchmaking(true);
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
-        setTimeout(() => navigate('/game', { state: { nickname } }), 1200);
+        const targetPath = selectedMode === 'slither' ? '/slither-game' : '/game';
+        setTimeout(() => navigate(targetPath, { state: { nickname } }), 1200);
     };
 
     const handleDeposit = async () => {
@@ -757,7 +760,9 @@ export default function PreGame() {
                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                 >
                     <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Mode</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)' }}>Agar Normal</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#007AFF' }}>
+                        {selectedMode === 'slither' ? 'Slither Normal' : 'Agar Normal'}
+                    </span>
                 </div>
 
                 {/* Nickname field */}

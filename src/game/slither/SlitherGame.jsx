@@ -29,6 +29,8 @@ export default function SlitherGame() {
         // Global callback för när man dör i spelet
         window.onSnakeDie = (score) => {
             setIsDead(true);
+            // Nollställ timer så cashout-knappen inte ligger kvar ovanpå dödsskärmen
+            setLocalTimer(0);
             setTimeout(() => navigate('/pre-game'), 4000);
         };
 

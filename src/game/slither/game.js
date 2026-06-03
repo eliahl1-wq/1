@@ -156,10 +156,9 @@ globalThis.game = class game {
     }
 
     loop() {
-        if (die)
-            return;
         this.update();
         this.draw();
+        if (die) return; // Stoppa loopen EFTER att sista rutan ritats
         setTimeout(() => this.loop(), 30);
     }
 
