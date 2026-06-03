@@ -157,11 +157,22 @@ export default function Lobby() {
 
             {/* ── Top Bar ── */}
             <nav className="topbar">
-                <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
-                    <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
-                    </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                    <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
+                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                        <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
+                            AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                        </span>
+                    </div>
+
+                    <button 
+                        onClick={() => navigate('/gamemodes')}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'color 0.2s' }}
+                        onMouseEnter={e => e.target.style.color = '#fff'}
+                        onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
+                    >
+                        Gamemodes
+                    </button>
                 </div>
 
                 {user && (

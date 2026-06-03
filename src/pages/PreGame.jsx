@@ -381,11 +381,22 @@ export default function PreGame() {
             {/* ── Top Bar ── */}
             <nav className="topbar">
                 {/* Logo */}
-                <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
-                    <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
-                    </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                    <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
+                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                        <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
+                            AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                        </span>
+                    </div>
+
+                    <button 
+                        onClick={() => navigate('/gamemodes')}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'color 0.2s' }}
+                        onMouseEnter={e => e.target.style.color = '#fff'}
+                        onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
+                    >
+                        Gamemodes
+                    </button>
                 </div>
 
                 {/* Nav right */}
@@ -732,7 +743,13 @@ export default function PreGame() {
             )}
 
             {/* ── Center Card ── */}
-            <div className="game-card">
+            <div className="game-card" style={{ maxWidth: '420px', padding: '32px' }}>
+                {/* Mode info */}
+                <div style={{ marginBottom: '18px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Mode</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)' }}>Agar Normal</span>
+                </div>
+
                 {/* Nickname field */}
                 <div style={{ marginBottom: '14px' }}>
                     <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
