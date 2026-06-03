@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { SolLogo } from '../../components/SolLogo'; // Assuming SolLogo is a common component
@@ -22,35 +22,57 @@ export default function SlitherGame() {
     const [localTimer, setLocalTimer] = useState(0);
     const [currentTime, setCurrentTime] = useState(Date.now());
 
+    // Cashout handler (can be called from game.js or UI button)
+    const handleCashOut = useCallback((gameScore = currentBalance) => {
+        const finalAmount = gameScore; // Use gameScore if provided, otherwise current UI balance
+        setCashedAmount(finalAmount);
+        window.die = true;
+
+        const startTime = performance.now();
+        const duration = 1200;
+        const animate = (time) => {
+            const elapsed = time - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 4);
+            setDisplayCashedAmount(eased * finalAmount);
+            if (progress < 1) requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+
+        setTimeout(() => navigate('/pre-game'), 4500);
+    }, [currentBalance, navigate]);
+
     useEffect(() => {
         document.body.style.backgroundColor = '#000';
         document.title = "AgarStake | Slither Arena"; // Set document title
         
-        // Ensure game is only initialized once
-        if (!canvasRef.current || window.gameInstance) return;
-
-        // Initialize game engine
-        window.gameInstance = new window.game(canvasRef.current);
-        
-        // Set player nickname
-        const matchNickname = location.state?.nickname || user?.username || 'Guest';
-        if (window.mySnake && window.mySnake[0]) {
-            window.mySnake[0].name = matchNickname;
+        // Ensure canvasRef is available
+        if (!canvasRef.current) {
+            return () => {}; // Return a no-op cleanup function if canvas is not yet mounted
         }
 
-        // Global callback for when the player dies
-        window.onSnakeDie = (finalScore) => {
-            setIsDead(true); // Trigger death overlay
-            setLocalTimer(0); // Clear cashout timer
-            // Simulate backend transaction for death (optional, for consistency with Agar)
-            // For now, just redirect after animation
-            setTimeout(() => navigate('/pre-game'), 4000); // Redirect after 4 seconds
-        };
+        // Only initialize game engine if it hasn't been already
+        if (!window.gameInstance) {
+            window.gameInstance = new window.game(canvasRef.current);
+            
+            // Set player nickname
+            const matchNickname = location.state?.nickname || user?.username || 'Guest';
+            if (window.mySnake && window.mySnake[0]) {
+                window.mySnake[0].name = matchNickname;
+            }
 
-        // Global callback for cashout (if implemented in game.js)
-        window.onCashOut = (finalScore) => {
-            handleCashOut(finalScore); // Trigger cashout animation
-        };
+            // Global callback for when the player dies
+            window.onSnakeDie = (finalScore) => {
+                setIsDead(true); // Trigger death overlay
+                setLocalTimer(0); // Clear cashout timer
+                setTimeout(() => navigate('/pre-game'), 4000); // Redirect after 4 seconds
+            };
+
+            // Global callback for cashout (if implemented in game.js)
+            window.onCashOut = (finalScore) => {
+                handleCashOut(finalScore); // Trigger cashout animation
+            };
+        }
 
         // UI update loop
         const uiUpdateInterval = setInterval(() => {
@@ -85,35 +107,8 @@ export default function SlitherGame() {
                 window.gameInstance.destroy(); // Clean up game resources
                 window.gameInstance = null;
             }
-            // Remove canvas if game engine created it (shouldn't happen with refactored game.js)
-            // Sätt spelarens namn direkt
-            const matchNickname = location.state?.nickname || user?.username || 'Guest';
-            if (window.mySnake && window.mySnake[0]) {
-                window.mySnake[0].name = matchNickname;
-            }
-        }
         };
-    }, [user, navigate, location.state]);
-
-    // Cashout handler (can be called from game.js or UI button)
-    const handleCashOut = (gameScore = currentBalance) => {
-        const finalAmount = gameScore; // Use gameScore if provided, otherwise current UI balance
-        setCashedAmount(finalAmount);
-        window.die = true;
-
-        const startTime = performance.now();
-        const duration = 1200;
-        const animate = (time) => {
-            const elapsed = time - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 4);
-            setDisplayCashedAmount(eased * finalAmount);
-            if (progress < 1) requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
-
-        setTimeout(() => navigate('/pre-game'), 4500);
-    };
+    }, [user, navigate, location.state, handleCashOut]);
 
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, overflow: 'hidden', fontFamily: 'system-ui' }}>
@@ -160,7 +155,7 @@ export default function SlitherGame() {
                 <div style={{
                     background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(20px)',
                     padding: '15px 25px', borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white', boxShadow: '0 15px 35px rgba(0,0,0,0.4)',
+                    color: 'white', boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)', // Reverted to purple glow
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
                 }}>
                     <div style={{ textAlign: 'center' }}>

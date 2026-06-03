@@ -760,7 +760,7 @@ export default function PreGame() {
                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                 >
                     <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Mode</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#007AFF' }}> {/* Changed to blue */}
                         {selectedMode === 'slither' ? 'Slither Normal' : 'Agar Normal'}
                     </span>
                 </div>
