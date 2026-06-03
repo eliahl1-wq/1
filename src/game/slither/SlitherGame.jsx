@@ -99,7 +99,7 @@ export default function SlitherGame() {
                     .map(s => ({
                         id: s.name, // Use name as ID for simplicity
                         name: s.name,
-                        balance: 1.00 + (Math.max(0, s.score - 1000) / 1000)
+                        balance: 1.00 + (s.score * 0.01)
                     }));
                 setLeaderboard(currentSnakes);
             }

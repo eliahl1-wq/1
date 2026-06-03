@@ -738,10 +738,8 @@ export default function PreGame() {
                             </div>
                             <div className="amount-hint">
                                 {isCurSOL
-                                            ? `≈ $${(parseFloat(amount) * solPrice).toFixed(2)}`
-                                            : `≈ ${(parseFloat(amount) / solPrice).toFixed(2)} SOL`}
-                                        ? `≈ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
-                                        : `≈ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(2)} SOL`}
+                                    ? `≈ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
+                                    : `≈ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(2)} SOL`}
                             </div>
                         </div>
 
