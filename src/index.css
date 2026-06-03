@@ -26,9 +26,9 @@
   --text-bright: #ffffff;
 
   /* Brand accent — brighter purple matching deposit button */
-  --accent: #7C3AFF;
+  --accent: #785eff;
   --accent-dim: rgba(124, 58, 255, 0.12);
-  --accent-border: rgba(252, 252, 252, 0.61);
+  --accent-border: rgba(104, 30, 223, 0.678);
 
   /* Solana green — profit/success */
   --green: #14F195;
