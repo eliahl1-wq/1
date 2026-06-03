@@ -1,4 +1,4 @@
-const Nball = 13;
+const Nball_Assets = 13;
 globalThis.snake = class snake {
     constructor(name, game, score, x, y) {
         this.name = name;
@@ -20,16 +20,19 @@ globalThis.snake = class snake {
         this.v = [];
         for (let i = 0; i < 50; i++)
             this.v[i] = { x: this.x, y: this.y };
+
         this.sn_im = new Image();
         this.sn_im.src = "/images/head.png";
         this.bd_im = new Image();
-        this.bd_im.src = "/images/body/" + Math.floor(Math.random() * 999999) % Nball + ".png";
+        this.bd_im.src = "/images/body/" + Math.floor(Math.random() * 999999) % Nball_Assets + ".png";
     }
 
     update() {
         this.time--;
         this.angle = this.getAngle(this.dx, this.dy);
-        if (this.name !== "HaiZuka" && window.mySnake && this !== window.mySnake[0]) {
+        
+        // Endast AI-ormar uppdaterar sin riktning och poäng automatiskt här
+        if (window.mySnake && this !== window.mySnake[0]) {
             if (this.time > 90)
                 this.speed = 2;
             else
@@ -64,13 +67,14 @@ globalThis.snake = class snake {
             this.score += this.score / 666;
         }
 
-        this.v[0].x += this.dx * this.speed;
-        this.v[0].y += this.dy * this.speed;
+        // Endast AI-ormar flyttar huvudet här (Spelaren flyttas i game.js)
+        if (this !== window.mySnake?.[0]) {
+            this.v[0].x += this.dx * this.speed;
+            this.v[0].y += this.dy * this.speed;
+        }
 
         for (let i = 1; i < this.v.length; i++) {
             if (this.range(this.v[i], this.v[i - 1]) > this.size / 5) {
-                this.v[i].x = (this.v[i].x + this.v[i - 1].x) / 2;
-                this.v[i].y = (this.v[i].y + this.v[i - 1].y) / 2;
                 this.v[i].x = (this.v[i].x + this.v[i - 1].x) / 2;
                 this.v[i].y = (this.v[i].y + this.v[i - 1].y) / 2;
             }
@@ -90,17 +94,43 @@ globalThis.snake = class snake {
 
     draw() {
         this.update();
+        const ctx = this.game.context;
+        const isPlayer = window.mySnake && this === window.mySnake[0];
 
-        for (let i = this.v.length - 1; i >= 1; i--)
-            if (this.game.isPoint(this.v[i].x, this.v[i].y) && this.bd_im.complete && this.bd_im.naturalWidth !== 0)
-                this.game.context.drawImage(this.bd_im, this.v[i].x - XX - (this.size) / 2, this.v[i].y - YY - (this.size) / 2, this.size, this.size);
+        // Rita kroppen
+        for (let i = this.v.length - 1; i >= 1; i--) {
+            if (this.game.isPoint(this.v[i].x, this.v[i].y)) {
+                const drawX = this.v[i].x - XX;
+                const drawY = this.v[i].y - YY;
+
+                if (this.bd_im.complete && this.bd_im.naturalWidth !== 0) {
+                    ctx.drawImage(this.bd_im, drawX - this.size / 2, drawY - this.size / 2, this.size, this.size);
+                } else {
+                    // Fallback om bilder saknas: Rita cirklar
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, this.size / 2, 0, Math.PI * 2);
+                    ctx.fillStyle = isPlayer ? '#007AFF' : '#444';
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Rita huvudet
+        const hX = this.v[0].x - XX;
+        const hY = this.v[0].y - YY;
 
         if (this.sn_im.complete && this.sn_im.naturalWidth !== 0) {
-            this.game.context.save();
-            this.game.context.translate(this.v[0].x - XX, this.v[0].y - YY);
-            this.game.context.rotate(this.angle - Math.PI / 2);
-            this.game.context.drawImage(this.sn_im, -this.size / 2, -this.size / 2, this.size, this.size);
-            this.game.context.restore();
+            ctx.save();
+            ctx.translate(hX, hY);
+            ctx.rotate(this.angle - Math.PI / 2);
+            ctx.drawImage(this.sn_im, -this.size / 2, -this.size / 2, this.size, this.size);
+            ctx.restore();
+        } else {
+            // Fallback för huvudet
+            ctx.beginPath();
+            ctx.arc(hX, hY, this.size / 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = isPlayer ? '#00A2FF' : '#666';
+            ctx.fill();
         }
     }
 

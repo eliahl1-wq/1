@@ -2,12 +2,10 @@ globalThis.game_W = 0;
 globalThis.game_H = 0;
 globalThis.Nball = 200;
 
-var bg_im = new Image();
-bg_im.src = "/images/Map2.png";
 globalThis.SPEED = 1;
 globalThis.MaxSpeed = 0;
-globalThis.chX = 1;
-globalThis.chY = 1;
+globalThis.chX = 0;
+globalThis.chY = 0;
 globalThis.mySnake = [];
 globalThis.FOOD = [];
 globalThis.NFood = 2000;
@@ -98,12 +96,13 @@ globalThis.game = class game {
 
         this.render();
 
-        for (let i = 0; i < Nsnake; i++)
-            mySnake[i] = new window.snake(names[Math.floor(Math.random() * 99999) % names.length], this, Math.floor(2 * minScore + Math.random() * 2 * minScore), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
-        
+        // Skapa bottar (redan inbyggt)
+        for (let i = 1; i < Nsnake; i++)
+            mySnake[i] = new window.snake(names[Math.floor(Math.random() * 99999) % names.length], this, Math.floor(minScore + Math.random() * minScore), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
+
         // Spelarens orm (namnet sätts av React i SlitherGame.jsx)
         mySnake[0] = new window.snake("Player", this, minScore, game_W / 2, game_H / 2);
-        
+
         for (let i = 0; i < NFood; i++) {
             FOOD[i] = new window.food(this, this.getSize() / (7 + Math.random() * 10), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
         }
@@ -192,14 +191,6 @@ globalThis.game = class game {
 
         Xfocus += 1.5 * chX * mySnake[0].speed;
         Yfocus += 1.5 * chY * mySnake[0].speed;
-        if (Xfocus < 0)
-            Xfocus = bg_im.width / 2 + 22;
-        if (Xfocus > bg_im.width / 2 + 22)
-            Xfocus = 0;
-        if (Yfocus < 0)
-            Yfocus = bg_im.height / 2 + 60;
-        if (Yfocus > bg_im.height / 2 + 60)
-            Yfocus = 0;
     }
 
     changeFood() {
@@ -283,10 +274,26 @@ globalThis.game = class game {
     }
 
     clearScreen() {
-        this.context.clearRect(0, 0, game_W, game_H);
-        if (bg_im.complete && bg_im.naturalWidth !== 0) {
-            this.context.drawImage(bg_im, Xfocus, Yfocus, 1.5 * game_W, 1.5 * game_H, 0, 0, game_W, game_H);
+        // Mörk bakgrund som i Agario
+        this.context.fillStyle = '#0a0a0c';
+        this.context.fillRect(0, 0, game_W, game_H);
+
+        // Rita rutnät (Grid)
+        const step = 45;
+        this.context.beginPath();
+        this.context.strokeStyle = '#1d1d1f'; // Subtila linjer
+        this.context.lineWidth = 1;
+
+        // Offset baserat på kamerans position (XX, YY)
+        for (let x = -XX % step; x < game_W; x += step) {
+            this.context.moveTo(x, 0);
+            this.context.lineTo(x, game_H);
         }
+        for (let y = -YY % step; y < game_H; y += step) {
+            this.context.moveTo(0, y);
+            this.context.lineTo(game_W, y);
+        }
+        this.context.stroke();
     }
 
     getSize() {
