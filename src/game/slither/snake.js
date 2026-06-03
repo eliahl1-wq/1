@@ -1,5 +1,5 @@
 const Nball = 13;
-class snake {
+globalThis.snake = class snake {
     constructor(name, game, score, x, y) {
         this.name = name;
         this.game = game;

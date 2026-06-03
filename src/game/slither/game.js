@@ -84,7 +84,7 @@ const names = ["Ahmed Steinke",
     "NamZ Bede"
 ];
 
-class game {
+globalThis.game = class game {
     constructor() {
         this.canvas = null;
         this.context = null;

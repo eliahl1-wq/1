@@ -1,5 +1,5 @@
 const ArrColor = ["#FF0000", "#FFFF00", "#00FF00", "#FF00FF", "#FFFFFF", "#00FFFF", "#7FFF00", "#FFCC00"];
-class food {
+globalThis.food = class food {
     constructor(game, size, x, y) {
         this.game = game;
         this.size = size;
