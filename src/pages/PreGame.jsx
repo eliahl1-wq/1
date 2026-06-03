@@ -358,9 +358,9 @@ export default function PreGame() {
             <nav className="topbar">
                 {/* Logo */}
                 <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: 7, height: 7, background: '#007AFF', borderRadius: '50%', boxShadow: '0 0 10px #007AFF' }} />
+                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
                     <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-                        AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                     </span>
                 </div>
 
@@ -375,7 +375,7 @@ export default function PreGame() {
                                         id="balance-pill"
                                         className="balance-pill mono"
                                         onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
-                                        style={isWalletOpen ? { borderColor: '#007AFF', boxShadow: '0 0 10px rgba(0, 122, 255, 0.15)' } : {}}
+                                        style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(153, 69, 255, 0.15)' } : {}}
                                     >
                                         <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             {isCurSOL ? <SolLogo size={12} /> : 'USD'}
@@ -475,7 +475,7 @@ export default function PreGame() {
                                     ref={userPillRef}
                                     className={`user-pill${showUserMenu ? ' active' : ''}`}
                                     onClick={() => setShowUserMenu(v => !v)}
-                                    style={showUserMenu ? { borderColor: '#007AFF', boxShadow: '0 0 10px rgba(0, 122, 255, 0.15)' } : {}}
+                                    style={showUserMenu ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(153, 69, 255, 0.15)' } : {}}
                                 >
                                     <div className="avatar">
                                         {user?.username?.charAt(0).toUpperCase()}

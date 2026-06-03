@@ -474,7 +474,7 @@ export default function Game() {
                     borderRadius: '20px',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)',
+                    boxShadow: '0 0 20px rgba(153, 69, 255, 0.2)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -574,7 +574,7 @@ export default function Game() {
                     letterSpacing: '-1px',
                     fontStyle: 'italic'
                 }} className="game-title">
-                    AGAR<span style={{ color: '#007AFF' }}>STAKE</span>
+                    AGAR<span style={{ color: '#9945FF' }}>STAKE</span>
                 </h2>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
                 <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>

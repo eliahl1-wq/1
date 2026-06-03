@@ -520,9 +520,9 @@
 }
 
 .play-btn-rejoin {
-  background: linear-gradient(135deg, #005DCB, #007AFF);
+  background: linear-gradient(135deg, #7C3AED, #9945FF);
   color: white;
-  box-shadow: 0 4px 16px rgba(0,122,255,0.2);
+  box-shadow: 0 4px 16px rgba(153, 69, 255, 0.25);
 }
 
 .play-btn-disabled {
