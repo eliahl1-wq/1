@@ -367,12 +367,15 @@ export default function Game() {
             <style>{`
                 .modern-overlay-backdrop {
                     position: fixed;
-                    inset: 0;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
                     z-index: 99999;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    justifyContent: center;
+                    justify-content: center;
                     background: rgba(5, 5, 7, 0.98);
                     backdrop-filter: blur(20px);
                     animation: overlayIn 0.3s ease-out forwards;
@@ -474,14 +477,14 @@ export default function Game() {
                     borderRadius: '20px',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    boxShadow: '0 0 20px rgba(153, 69, 255, 0.2)',
+                    boxShadow: '0 0 20px rgba(109, 40, 255, 0.2)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '12px'
                 }}>
                     <div style={{ textAlign: 'center' }}>
-                        <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#34C759' }}>In-Game Stake</h3>
+                        <h3 style={{ margin: 0, opacity: 0.6, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--accent)' }}>In-Game Stake</h3>
                         <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
                             ${(currentBalance ?? 0).toFixed(2)}
                         </div>
@@ -498,7 +501,7 @@ export default function Game() {
                         disabled={localTimer > 0}
                         style={{
                             width: '100%',
-                            background: localTimer > 0 ? '#444' : '#34C759',
+                            background: localTimer > 0 ? '#444' : 'var(--accent)',
                             color: 'white',
                             border: 'none',
                             padding: '10px 0',
@@ -508,7 +511,7 @@ export default function Game() {
                             letterSpacing: '1px',
                             cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
                             transition: '0.2s all ease',
-                            boxShadow: localTimer > 0 ? 'none' : '0 4px 15px rgba(52, 199, 89, 0.4)',
+                            boxShadow: localTimer > 0 ? 'none' : '0 4px 15px rgba(109, 40, 255, 0.4)',
                             opacity: localTimer > 0 ? 0.7 : 1
                         }}
                     >
@@ -530,11 +533,11 @@ export default function Game() {
                     boxSizing: 'border-box',
                     opacity: rewardsUnlocked ? 1 : 0.5
                 }}>
-                    <div style={{ color: '#34C759', fontWeight: '800', marginBottom: rewardsUnlocked ? '8px' : '2px', letterSpacing: '1px' }}>
+                    <div style={{ color: 'var(--accent)', fontWeight: '800', marginBottom: rewardsUnlocked ? '8px' : '2px', letterSpacing: '1px' }}>
                         ARENA REWARDS
                     </div>
                     {!rewardsUnlocked && (
-                        <div style={{ fontSize: '0.65rem', color: '#FF3B30', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', opacity: 0.8 }}>
+                        <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', opacity: 0.8 }}>
                             {formatUnlockTimer()}
                         </div>
                     )}
@@ -564,18 +567,18 @@ export default function Game() {
             <div style={{ 
                 position: 'absolute', 
                 top: '30px', 
-                right: '30px', 
-                textAlign: 'right' 
+                right: '30px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '2px'
             }}>
-                <h2 style={{ 
-                    margin: 0, 
-                    color: 'white', 
-                    fontWeight: '900', 
-                    letterSpacing: '-1px',
-                    fontStyle: 'italic'
-                }} className="game-title">
-                    AGAR<span style={{ color: '#9945FF' }}>STAKE</span>
-                </h2>
+                <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                    <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
+                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                    </span>
+                </div>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
                 <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>
                     {formatResetTimer()}
@@ -588,18 +591,26 @@ export default function Game() {
                 top: '120px',
                 right: '30px',
                 width: '180px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                padding: '20px',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                color: 'white'
+                background: 'rgba(16, 17, 24, 0.85)',
+                backdropFilter: 'blur(20px)',
+                padding: '16px',
+                borderRadius: '16px',
+                border: '1px solid var(--border)',
+                color: 'white',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
             }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.7rem', opacity: 0.4, letterSpacing: '1px' }}>LEADERBOARD</h4>
-                <div style={{ fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 800, letterSpacing: '1px' }}>LEADERBOARD</h4>
+                <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {leaderboard.map((p, i) => (
-                        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', opacity: p.id === myIdRef.current ? 1 : 0.5 }}>
-                            <span style={{ fontWeight: p.id === myIdRef.current ? '700' : '400' }}>{i + 1}. {p.name || 'An unnamed cell'}</span>
-                            <span>${(p.balance ?? 0).toFixed(2)}</span>
+                        <div key={p.id} style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            opacity: p.id === myIdRef.current ? 1 : 0.6,
+                            color: p.id === myIdRef.current ? 'var(--accent)' : 'var(--text-bright)',
+                            fontWeight: p.id === myIdRef.current ? '700' : '400'
+                        }}>
+                            <span>{i + 1}. {p.name || 'An unnamed cell'}</span>
+                            <span className="mono">${(p.balance ?? 0).toFixed(2)}</span>
                         </div>
                     ))}
                 </div>

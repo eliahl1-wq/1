@@ -16,7 +16,7 @@
   /* Borders — razor thin */
   --border: rgba(255, 255, 255, 0.055);
   --border-2: rgba(255, 255, 255, 0.08);
-  --border-accent: rgba(153, 69, 255, 0.2);
+  --border-accent: rgba(109, 40, 255, 0.2);
 
   /* Typography */
   --text: rgba(255, 255, 255, 0.5);
@@ -26,9 +26,9 @@
   --text-bright: #ffffff;
 
   /* Brand accent — Solana purple */
-  --accent: #9945FF;
-  --accent-dim: rgba(153, 69, 255, 0.12);
-  --accent-border: rgba(153, 69, 255, 0.25);
+  --accent: #6D28FF;
+  --accent-dim: rgba(109, 40, 255, 0.12);
+  --accent-border: rgba(109, 40, 255, 0.25);
 
   /* Solana green — profit/success */
   --green: #14F195;

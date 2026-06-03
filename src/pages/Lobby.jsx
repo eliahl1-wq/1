@@ -9,9 +9,9 @@ import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 
-const SolLogo = ({ size = 13 }) => (
+const SolLogo = ({ size = 13, style }) => (
     <img src="/solana-sol-logo.png" alt="SOL"
-        style={{ height: '1.1em', width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, marginBottom: '0.15em' }} />
+        style={{ height: size, width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, ...style }} />
 );
 
 const CUR_OPTIONS = [
@@ -171,16 +171,17 @@ export default function Lobby() {
                                 ref={userPillRef}
                                 className={`user-pill${showUserMenu ? ' active' : ''}`}
                                 onClick={() => setShowUserMenu(v => !v)}
-                                style={showUserMenu ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px var(--accent-border)' } : {}}
                             >
+                                <div className="avatar">
                                     {user.username?.charAt(0).toUpperCase()}
                                 </div>
+                            </div>
                                 <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-h)' }}>
                                     {user.username}
                                 </span>
                                 <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     {isCurSOL
-                                        ? <>{<SolLogo />} {(user.balance / solPrice).toFixed(4)}</>
+                                        ? <><SolLogo size={12} /> {(user.balance / solPrice).toFixed(4)}</>
                                         : `$${(user.balance || 0).toFixed(2)}`}
                                 </span>
                                 <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"

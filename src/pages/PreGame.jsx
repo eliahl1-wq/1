@@ -10,11 +10,11 @@ import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 
 /* ── Solana logo icon ── */
-const SolLogo = ({ size = 13 }) => (
+const SolLogo = ({ size = 13, style }) => (
     <img
         src="/solana-sol-logo.png"
         alt="SOL"
-        style={{ height: '1.1em', width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, marginBottom: '0.15em' }}
+        style={{ height: size, width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, ...style }}
     />
 );
 
@@ -375,11 +375,13 @@ export default function PreGame() {
                                         id="balance-pill"
                                         className="balance-pill mono"
                                         onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
-                                        style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(153, 69, 255, 0.15)' } : {}}
+                                        style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(109, 40, 255, 0.15)' } : {}}
                                     >
-                                        <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            {isCurSOL ? <SolLogo size={12} /> : 'USD'}
-                                        </span>
+                                        {isCurSOL ? (
+                                            <SolLogo size={12} />
+                                        ) : (
+                                            <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
+                                        )}
                                         <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
                                             {isCurSOL
                                                 ? (user.balance / solPrice).toFixed(4)
@@ -475,7 +477,6 @@ export default function PreGame() {
                                     ref={userPillRef}
                                     className={`user-pill${showUserMenu ? ' active' : ''}`}
                                     onClick={() => setShowUserMenu(v => !v)}
-                                    style={showUserMenu ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(153, 69, 255, 0.15)' } : {}}
                                 >
                                     <div className="avatar">
                                         {user?.username?.charAt(0).toUpperCase()}
@@ -796,10 +797,51 @@ export default function PreGame() {
                     </span>
                 </div>
                 <div className="stat-row">
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top payout</span>
-                    <span className="mono text-green" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                        ${(liveStats.biggestPayout || 0).toFixed(2)}
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                        DeFiGod
                     </span>
+                </div>
+            </div>
+
+            {/* ── Global Leaderboard Card ── */}
+            <div style={{
+                position: 'fixed',
+                bottom: '20px',
+                left: '20px',
+                width: '185px',
+                background: 'rgba(8,9,13,0.9)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-lg)',
+                padding: '10px 12px',
+                backdropFilter: 'blur(20px)',
+                zIndex: 10
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.62rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>ALL-TIME LEADERS</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.68rem' }}>
+                    <div>
+                        <div style={{ opacity: 0.4, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Top Earnings</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-bright)' }}>1. DeFiGod</span>
+                            <span className="mono text-green">$1,420.00</span>
+                        </div>
+                    </div>
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '4px' }}>
+                        <div style={{ opacity: 0.4, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Top Cashout</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-bright)' }}>1. Whalesome</span>
+                            <span className="mono text-green">$450.00</span>
+                        </div>
+                    </div>
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '4px' }}>
+                        <div style={{ opacity: 0.4, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Highest Balance</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-bright)' }}>1. PhantomWhale</span>
+                            <span className="mono text-green">$2,500.00</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
