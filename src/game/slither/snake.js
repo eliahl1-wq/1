@@ -100,8 +100,11 @@ globalThis.snake = class snake {
         // Rita kroppen
         for (let i = this.v.length - 1; i >= 1; i--) {
             if (this.game.isPoint(this.v[i].x, this.v[i].y)) {
-                const drawX = this.v[i].x - XX;
-                const drawY = this.v[i].y - YY;
+                // Ensure XX and YY are accessed from global scope correctly
+                const currentXX = globalThis.XX || 0;
+                const currentYY = globalThis.YY || 0;
+                const drawX = this.v[i].x - currentXX;
+                const drawY = this.v[i].y - currentYY;
 
                 if (this.bd_im.complete && this.bd_im.naturalWidth !== 0) {
                     ctx.drawImage(this.bd_im, drawX - this.size / 2, drawY - this.size / 2, this.size, this.size);
@@ -116,8 +119,10 @@ globalThis.snake = class snake {
         }
 
         // Rita huvudet
-        const hX = this.v[0].x - XX;
-        const hY = this.v[0].y - YY;
+        const currentXX = globalThis.XX || 0;
+        const currentYY = globalThis.YY || 0;
+        const hX = this.v[0].x - currentXX;
+        const hY = this.v[0].y - currentYY;
 
         if (this.sn_im.complete && this.sn_im.naturalWidth !== 0) {
             ctx.save();

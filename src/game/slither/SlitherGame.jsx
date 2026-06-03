@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { SolLogo } from '../../components/SolLogo'; // Assuming SolLogo is a common component
 // Vi importerar klasserna men hanterar initieringen manuellt i useEffect
 import './snake.js';
 import './food.js';

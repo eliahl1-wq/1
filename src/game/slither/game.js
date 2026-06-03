@@ -92,6 +92,9 @@ globalThis.game = class game {
 
     init(canvasElement) {
         // Use the provided canvas element
+        globalThis.die = false; // Reset die state to prevent freezing on re-entry
+        globalThis.XX = 0;
+        globalThis.YY = 0;
         this.render();
 
         // Skapa bottar (redan inbyggt)
