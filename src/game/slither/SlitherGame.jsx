@@ -24,8 +24,8 @@ export default function SlitherGame() {
     const [currentTime, setCurrentTime] = useState(Date.now());
 
     // Cashout handler (can be called from game.js or UI button)
-    const handleCashOut = useCallback((gameScore = currentBalance) => {
-        const finalAmount = gameScore; // Use gameScore if provided, otherwise current UI balance
+    const handleCashOut = useCallback((gameScore) => {
+        const finalAmount = typeof gameScore === 'number' ? gameScore : currentBalance;
         setCashedAmount(finalAmount);
         window.die = true;
 
@@ -89,7 +89,7 @@ export default function SlitherGame() {
                 const score = window.mySnake[0].score || 0;
                 // Ekonomi: Varje food är $0.01. Start är $1.00. 
                 // Varje poäng (food) ger $0.01.
-                const convertedBalance = 1.00 + (score * 0.01); 
+                const convertedBalance = 1.00 + (score * 0.01);
                 setCurrentBalance(convertedBalance);
 
                 // Update leaderboard from game state
@@ -137,7 +137,7 @@ export default function SlitherGame() {
                         <div className="overlay-badge success">Transaction Confirmed</div>
                         <h2 className="overlay-heading">Profit Secured</h2>
                         <div className="overlay-amount success">
-                            <span className="unit">$</span>{displayCashedAmount.toFixed(4)}
+                            <span className="unit">$</span>{displayCashedAmount.toFixed(2)}
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">Capital has been successfully reconciled to your account balance.</p>
@@ -174,7 +174,7 @@ export default function SlitherGame() {
                     <div style={{ textAlign: 'center' }}>
                         <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Active Stake</h3>
                         <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                            ${(currentBalance ?? 0).toFixed(4)}
+                            ${(currentBalance ?? 0).toFixed(2)}
                         </div>
                     </div>
                     <button
@@ -192,7 +192,7 @@ export default function SlitherGame() {
             </div>
 
             {/* UI: Logo */}
-            <div style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+            <div style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', zIndex: 100 }}>
                 <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
                     <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
@@ -207,7 +207,8 @@ export default function SlitherGame() {
                 position: 'absolute', top: '120px', right: '30px', width: '180px',
                 background: 'rgba(16, 17, 24, 0.85)', backdropFilter: 'blur(20px)',
                 padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)',
-                color: 'white', boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
+                color: 'white', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                zIndex: 100
             }}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>Leaderboard</h4>
                 <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -218,7 +219,7 @@ export default function SlitherGame() {
                             fontWeight: p.name === (location.state?.nickname || user?.username) ? '700' : '400'
                         }}>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {p.name}</span>
-                            <span className="mono">${(p.balance ?? 0).toFixed(4)}</span>
+                            <span className="mono">${(p.balance ?? 0).toFixed(2)}</span>
                         </div>
                     ))}
                 </div>

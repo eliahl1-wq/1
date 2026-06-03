@@ -116,15 +116,15 @@ globalThis.game = class game {
         document.addEventListener("touchmove", evt => {
             var y = evt.touches[0].pageY;
             var x = evt.touches[0].pageX;
-            chX = (x - game_W / 2) / 15;
-            chY = (y - game_H / 2) / 15;
+            chX = (x - game_W / 2) / 45;
+            chY = (y - game_H / 2) / 45;
         })
 
         document.addEventListener("touchstart", evt => {
             var y = evt.touches[0].pageY;
             var x = evt.touches[0].pageX;
-            chX = (x - game_W / 2) / 15;
-            chY = (y - game_H / 2) / 15;
+            chX = (x - game_W / 2) / 45;
+            chY = (y - game_H / 2) / 45;
             mySnake[0].speed = 2;
         })
 
@@ -143,8 +143,8 @@ globalThis.game = class game {
         document.addEventListener("mousemove", evt => {
             var x = evt.offsetX == undefined ? evt.layerX : evt.offsetX;
             var y = evt.offsetY == undefined ? evt.layerY : evt.offsetY;
-            chX = (x - game_W / 2) / 15;
-            chY = (y - game_H / 2) / 15;
+            chX = (x - game_W / 2) / 45;
+            chY = (y - game_H / 2) / 45;
         })
 
         document.addEventListener("mouseup", evt => {
@@ -251,9 +251,8 @@ globalThis.game = class game {
             this.canvas.height = document.documentElement.clientHeight;
             globalThis.game_W = this.canvas.width;
             globalThis.game_H = this.canvas.height;
-            SPEED = this.getSize() / 7;
-            SPEED = 1;
-            MaxSpeed = this.getSize() / 7;
+            globalThis.SPEED = 0.6;
+            globalThis.MaxSpeed = this.getSize() / 18;
             if (mySnake.length == 0)
                 return;
             if (mySnake[0].v != null) {

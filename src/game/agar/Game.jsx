@@ -339,7 +339,7 @@ export default function Game() {
                         <div className="overlay-badge success">Transaction Confirmed</div>
                         <h2 className="overlay-heading">Profit Secured</h2>
                         <div className="overlay-amount success">
-                            <span className="unit">$</span>{displayCashedAmount.toFixed(4)}
+                            <span className="unit">$</span>{displayCashedAmount.toFixed(2)}
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">Capital has been successfully reconciled to your account balance.</p>
@@ -486,7 +486,7 @@ export default function Game() {
                     <div style={{ textAlign: 'center' }}>
                         <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Active Stake</h3>
                         <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                            ${(currentBalance ?? 0).toFixed(4)}
+                            ${(currentBalance ?? 0).toFixed(2)}
                         </div>
                         
                         {potentialBonus > 0 && (
@@ -637,7 +637,7 @@ export default function Game() {
                             fontWeight: p.id === myIdRef.current ? '700' : '400'
                         }}>
                             <span>{i + 1}. {p.name || 'An unnamed cell'}</span>
-                            <span className="mono">${(p.balance ?? 0).toFixed(4)}</span>
+                            <span className="mono">${(p.balance ?? 0).toFixed(2)}</span>
                         </div>
                     ))}
                 </div>

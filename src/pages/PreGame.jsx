@@ -432,7 +432,7 @@ export default function PreGame() {
                                         )}
                                         <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
                                             {isCurSOL
-                                                ? (user.balance / solPrice).toFixed(4)
+                                                ? (user.balance / solPrice).toFixed(2)
                                                 : `$${fmt(user.balance)}`}
                                         </span>
                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
@@ -478,14 +478,14 @@ export default function PreGame() {
                                                 )}
                                                 <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
                                                 {isCurSOL
-                                                    ? (user.balance / solPrice).toFixed(4)
+                                                    ? (user.balance / solPrice).toFixed(2)
                                                     : fmt(user.balance)}
                                                 </span>
                                             </div>
                                             <div className="wallet-card-sub">
                                                 {isCurSOL
                                                     ? `≈ $${fmt(user.balance)} USD`
-                                                    : `≈ ${(user.balance / solPrice).toFixed(4)} SOL`}
+                                                    : `≈ ${(user.balance / solPrice).toFixed(2)} SOL`}
                                             </div>
 
                                             {/* Action buttons */}
@@ -738,8 +738,10 @@ export default function PreGame() {
                             </div>
                             <div className="amount-hint">
                                 {isCurSOL
-                                    ? `≈ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
-                                    : `≈ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(4)} SOL`}
+                                            ? `≈ $${(parseFloat(amount) * solPrice).toFixed(2)}`
+                                            : `≈ ${(parseFloat(amount) / solPrice).toFixed(2)} SOL`}
+                                        ? `≈ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
+                                        : `≈ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(2)} SOL`}
                             </div>
                         </div>
 
