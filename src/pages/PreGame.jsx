@@ -745,7 +745,17 @@ export default function PreGame() {
             {/* ── Center Card ── */}
             <div className="game-card" style={{ maxWidth: '420px', padding: '32px' }}>
                 {/* Mode info */}
-                <div style={{ marginBottom: '18px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div 
+                    onClick={() => navigate('/gamemodes')}
+                    style={{ 
+                        marginBottom: '18px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', 
+                        borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', 
+                        justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                >
                     <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Mode</span>
                     <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)' }}>Agar Normal</span>
                 </div>
