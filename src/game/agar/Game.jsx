@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 import global from './global.js';
 import Canvas from './canvas.js';
