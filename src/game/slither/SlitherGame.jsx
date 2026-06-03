@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { io } from 'socket.io-client';
 // Vi importerar klasserna men hanterar initieringen manuellt i useEffect
 import './snake.js';
 import './food.js';
@@ -11,6 +12,7 @@ export default function SlitherGame() {
     const location = useLocation();
     const { user, refreshUser } = useAuth();
     const canvasRef = useRef(null); // React manages the canvas
+    const socketRef = useRef(null);
     
     // State för UI (samma som i Game.jsx)
     const [currentBalance, setCurrentBalance] = useState(0);
@@ -38,7 +40,7 @@ export default function SlitherGame() {
         };
         requestAnimationFrame(animate);
 
-        setTimeout(() => navigate('/pre-game'), 4500);
+        setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4500);
     }, [currentBalance, navigate]);
 
     useEffect(() => {
@@ -49,6 +51,14 @@ export default function SlitherGame() {
         if (!canvasRef.current) {
             return () => {}; // Return a no-op cleanup function if canvas is not yet mounted
         }
+
+        // Online Server Connection
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+        const socket = io(apiUrl, {
+            auth: { token: localStorage.getItem('token') },
+            transports: ['websocket']
+        });
+        socketRef.current = socket;
 
         // Only initialize game engine if it hasn't been already
         if (!window.gameInstance) {
@@ -64,7 +74,7 @@ export default function SlitherGame() {
             window.onSnakeDie = (finalScore) => {
                 setIsDead(true); // Trigger death overlay
                 setLocalTimer(0); // Clear cashout timer
-                setTimeout(() => navigate('/pre-game'), 4000); // Redirect after 4 seconds
+                setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4000); // Redirect after 4 seconds
             };
 
             // Global callback for cashout (if implemented in game.js)
@@ -77,9 +87,9 @@ export default function SlitherGame() {
         const uiUpdateInterval = setInterval(() => {
             if (window.mySnake && window.mySnake[0]) {
                 const score = window.mySnake[0].score || 0;
-                // Convert Slither score to dollar value (example ratio)
-                // Assuming 1000 score points = $1.00 profit above initial $1.00
-                const convertedBalance = 1.00 + (Math.max(0, score - 1000) / 1000); 
+                // Ekonomi: Varje food är $0.01. Start är $1.00. 
+                // Varje poäng (food) ger $0.01.
+                const convertedBalance = 1.00 + (score * 0.01); 
                 setCurrentBalance(convertedBalance);
 
                 // Update leaderboard from game state
@@ -105,6 +115,10 @@ export default function SlitherGame() {
             if (window.gameInstance) {
                 window.gameInstance.destroy(); // Clean up game resources
                 window.gameInstance = null;
+            }
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
             }
         };
     }, [user, navigate, location.state, handleCashOut]);

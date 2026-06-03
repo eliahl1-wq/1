@@ -97,15 +97,13 @@ globalThis.game = class game {
         globalThis.YY = 0;
         this.render();
 
-        // Skapa bottar (redan inbyggt)
-        for (let i = 1; i < Nsnake; i++)
-            mySnake[i] = new window.snake(names[Math.floor(Math.random() * 99999) % names.length], this, Math.floor(minScore + Math.random() * minScore), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
-
         // Spelarens orm (namnet sätts av React i SlitherGame.jsx)
         mySnake[0] = new window.snake("Player", this, minScore, game_W / 2, game_H / 2);
 
-        for (let i = 0; i < NFood; i++) {
-            FOOD[i] = new window.food(this, this.getSize() / (7 + Math.random() * 10), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
+        // Spawn initial food (Värt $7.00 = 700 units)
+        // Spawnas dubbelt så mycket som Agar för att täcka ytan
+        for (let i = 0; i < 700; i++) {
+            FOOD[i] = new window.food(this, this.getSize() / 8, (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
         }
 
         this.loop();
@@ -165,8 +163,7 @@ globalThis.game = class game {
 
     update() {
         this.render();
-        this.unFood();
-        this.changeFood();
+        this.unFood(); // Hanterar att äta food
         this.changeSnake();
         this.updateChXY();
         this.checkDie();
@@ -194,11 +191,7 @@ globalThis.game = class game {
     }
 
     changeFood() {
-        for (let i = 0; i < FOOD.length; i++)
-            if (Math.sqrt((mySnake[0].v[0].x - FOOD[i].x) * (mySnake[0].v[0].x - FOOD[i].x) + (mySnake[0].v[0].y - FOOD[i].y) * (mySnake[0].v[0].y - FOOD[i].y)) > sizeMap) {
-                FOOD[i] = new window.food(this, this.getSize() / (10 + Math.random() * 10), (Math.random() - Math.random()) * sizeMap + mySnake[0].v[0].x, (Math.random() - Math.random()) * sizeMap + mySnake[0].v[0].y);
-                // console.log(FOOD[i]);
-            }
+        // Random food spawn borttagen - styrs nu av join-logik och döda spelare
     }
 
     changeSnake() {
@@ -216,7 +209,7 @@ globalThis.game = class game {
             for (let j = 0; j < FOOD.length; j++) {
                 if ((mySnake[i].v[0].x - FOOD[j].x) * (mySnake[i].v[0].x - FOOD[j].x) + (mySnake[i].v[0].y - FOOD[j].y) * (mySnake[i].v[0].y - FOOD[j].y) < 1.5 * mySnake[i].size * mySnake[i].size) {
                     mySnake[i].score += Math.floor(FOOD[j].value);
-                    FOOD[j] = new window.food(this, this.getSize() / (5 + Math.random() * 10), (Math.random() - Math.random()) * 5000 + XX, (Math.random() - Math.random()) * 5000 + YY);
+                    FOOD.splice(j, 1); // Ta bort food istället för att spawna ny slumpmässig
                 }
             }
     }

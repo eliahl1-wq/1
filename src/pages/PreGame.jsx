@@ -277,13 +277,21 @@ export default function PreGame() {
     // ── Handlers ───────────────────────────────────────
     const handleStartMatch = () => {
         if (!isAuthenticated) { navigate('/login'); return; }
+        
+        // Om man försöker joina slither men redan är i ett agar game (eller vice versa)
+        if (isAlreadyInGame && !canRejoinThisMode) return;
+
         if (!canJoin && !isAlreadyInGame) { navigate('/lobby'); return; }
         setIsMatchmaking(true);
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
         const targetPath = selectedMode === 'slither' ? '/slither-game' : '/game';
-        setTimeout(() => navigate(targetPath, { state: { nickname } }), 1200);
+        setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode } }), 1200);
     };
+
+    // Enkel kontroll om vi kan rejoina (Placeholder tills API returnerar mode)
+    // Om vi antar att "isAlreadyInGame" alltid är Agar just nu om man byter till Slither
+    const canRejoinThisMode = isAlreadyInGame && selectedMode === 'agar';
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return; }
@@ -365,14 +373,16 @@ export default function PreGame() {
 
     // ── Play button variant ─────────────────────────────
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
-        : isAlreadyInGame ? 'play-btn play-btn-rejoin'
+        : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
+        : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
         : canJoin ? 'play-btn play-btn-ready'
         : 'play-btn play-btn-disabled';
 
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> Joining…</>
         : !isAuthenticated ? 'Play Now'
-        : isAlreadyInGame  ? 'Rejoin Arena'
+        : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
+        : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
         : canJoin          ? 'Enter Arena'
         : 'Deposit to Play';
 
@@ -760,7 +770,7 @@ export default function PreGame() {
                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                 >
                     <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Mode</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#007AFF' }}> {/* Changed to blue */}
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)' }}>
                         {selectedMode === 'slither' ? 'Slither Normal' : 'Agar Normal'}
                     </span>
                 </div>

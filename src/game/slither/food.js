@@ -3,7 +3,7 @@ globalThis.food = class food {
     constructor(game, size, x, y) {
         this.game = game;
         this.size = size;
-        this.value = this.size;
+        this.value = 1; // Varje food-bit ger 1 poäng ($0.01)
         this.x = x;
         this.y = y;
         this.init();
