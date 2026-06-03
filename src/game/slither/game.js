@@ -99,10 +99,10 @@ class game {
         this.render();
 
         for (let i = 0; i < Nsnake; i++)
-            mySnake[i] = new snake(names[Math.floor(Math.random() * 99999) % names.length], this, Math.floor(2 * minScore + Math.random() * 2 * minScore), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
-        mySnake[0] = new snake("HaiZuka", this, minScore, game_W / 2, game_H / 2);
+            mySnake[i] = new window.snake(names[Math.floor(Math.random() * 99999) % names.length], this, Math.floor(2 * minScore + Math.random() * 2 * minScore), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
+        mySnake[0] = new window.snake("HaiZuka", this, minScore, game_W / 2, game_H / 2);
         for (let i = 0; i < NFood; i++) {
-            FOOD[i] = new food(this, this.getSize() / (7 + Math.random() * 10), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
+            FOOD[i] = new window.food(this, this.getSize() / (7 + Math.random() * 10), (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
         }
 
         this.loop();
@@ -222,7 +222,7 @@ class game {
             for (let j = 0; j < FOOD.length; j++) {
                 if ((mySnake[i].v[0].x - FOOD[j].x) * (mySnake[i].v[0].x - FOOD[j].x) + (mySnake[i].v[0].y - FOOD[j].y) * (mySnake[i].v[0].y - FOOD[j].y) < 1.5 * mySnake[i].size * mySnake[i].size) {
                     mySnake[i].score += Math.floor(FOOD[j].value);
-                    FOOD[j] = new food(this, this.getSize() / (5 + Math.random() * 10), (Math.random() - Math.random()) * 5000 + XX, (Math.random() - Math.random()) * 5000 + YY);
+                    FOOD[j] = new window.food(this, this.getSize() / (5 + Math.random() * 10), (Math.random() - Math.random()) * 5000 + XX, (Math.random() - Math.random()) * 5000 + YY);
                 }
             }
     }
@@ -237,13 +237,13 @@ class game {
                             kt = false;
                     if (!kt) {
                         for (let k = 0; k < mySnake[i].v.length; k += 5) {
-                            FOOD[index] = new food(this, this.getSize() / (2 + Math.random() * 2), mySnake[i].v[k].x + Math.random() * mySnake[i].size / 2, mySnake[i].v[k].y + Math.random() * mySnake[i].size / 2);
+                            FOOD[index] = new window.food(this, this.getSize() / (2 + Math.random() * 2), mySnake[i].v[k].x + Math.random() * mySnake[i].size / 2, mySnake[i].v[k].y + Math.random() * mySnake[i].size / 2);
                             FOOD[index++].value = 0.4 * mySnake[i].score / (mySnake[i].v.length / 5);
                             if (index >= FOOD.length)
                                 index = 0;
                         }
                         if (i != 0)
-                            mySnake[i] = new snake(names[Math.floor(Math.random() * 99999) % names.length], this, Math.max(Math.floor((mySnake[0].score > 10 * minScore) ? mySnake[0].score / 10 : minScore), mySnake[i].score / 10), this.randomXY(XX), this.randomXY(YY));
+                            mySnake[i] = new window.snake(names[Math.floor(Math.random() * 99999) % names.length], this, Math.max(Math.floor((mySnake[0].score > 10 * minScore) ? mySnake[0].score / 10 : minScore), mySnake[i].score / 10), this.randomXY(XX), this.randomXY(YY));
                         else {
                             window.alert("Your Score: " + Math.floor(mySnake[i].score));
                             die = true;
