@@ -391,11 +391,11 @@ export default function PreGame() {
 
                     <button 
                         onClick={() => navigate('/gamemodes')}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'color 0.2s' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', transition: 'color 0.2s' }}
                         onMouseEnter={e => e.target.style.color = '#fff'}
                         onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
                     >
-                        Gamemodes
+                        GAME MODE
                     </button>
                 </div>
 
