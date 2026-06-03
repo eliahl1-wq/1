@@ -7,6 +7,7 @@ import PreGame from './pages/PreGame';
 import Transactions from './pages/Transactions';
 import Profile from './pages/Profile';
 import Game from './game/Game'; // Importera ditt nya spel
+import Gamemodes from './pages/Gamemodes';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -75,6 +76,7 @@ function App() {
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                <Route path="/gamemodes" element={<Gamemodes />} />
                 {/* Pregame lobbyn är nu startsidan */}
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>
