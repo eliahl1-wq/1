@@ -477,7 +477,7 @@ export default function Game() {
                     borderRadius: '20px',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     color: 'white',
-                    boxShadow: '0 0 20px rgba(109, 40, 255, 0.2)',
+                    boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -496,14 +496,41 @@ export default function Game() {
                         )}
                     </div>
 
-                    <button 
+                    {/* Exit timer badge */}
+                    {localTimer > 0 && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            padding: '5px 12px',
+                            background: 'rgba(255,255,255,0.04)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '100px',
+                            fontSize: '0.68rem',
+                            fontWeight: '700',
+                            color: 'rgba(255,255,255,0.5)',
+                            letterSpacing: '0.5px',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                        }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                            <span>Cash out available in <span style={{ color: '#fff', fontFamily: 'monospace' }}>{localTimer}s</span></span>
+                        </div>
+                    )}
+                    <button
                         onClick={() => localTimer <= 0 && socketRef.current?.emit('cashOut')}
                         disabled={localTimer > 0}
                         style={{
                             width: '100%',
-                            background: localTimer > 0 ? '#444' : 'var(--accent)',
-                            color: 'white',
-                            border: 'none',
+                            background: localTimer > 0
+                                ? 'rgba(255,255,255,0.04)'
+                                : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
+                            color: localTimer > 0 ? 'rgba(255,255,255,0.2)' : '#001a0d',
+                            border: localTimer > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                             padding: '10px 0',
                             borderRadius: '12px',
                             fontWeight: '800',
@@ -511,11 +538,11 @@ export default function Game() {
                             letterSpacing: '1px',
                             cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
                             transition: '0.2s all ease',
-                            boxShadow: localTimer > 0 ? 'none' : '0 4px 15px rgba(109, 40, 255, 0.4)',
-                            opacity: localTimer > 0 ? 0.7 : 1
+                            boxShadow: localTimer > 0 ? 'none' : '0 4px 20px rgba(20, 241, 149, 0.2)',
+                            opacity: localTimer > 0 ? 0.6 : 1
                         }}
                     >
-                        {localTimer > 0 ? `WAIT ${localTimer}s` : 'CASH OUT'}
+                        CASH OUT
                     </button>
                 </div>
 

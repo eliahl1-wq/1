@@ -21,9 +21,9 @@
   border-color: rgba(255,255,255,0.12) !important;
 }
 .wallet-adapter-button-trigger {
-  background: linear-gradient(135deg, #6D28FF, #4D8CFF) !important;
+  background: linear-gradient(135deg, #7C3AFF, #4D8CFF) !important;
   border: none !important;
-  box-shadow: 0 4px 16px rgba(109, 40, 255, 0.25) !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25) !important;
   color: white !important;
 }
 .wallet-adapter-button-trigger:hover {
@@ -172,10 +172,10 @@
 }
 .user-pill:hover .avatar {
   transform: scale(1.05);
-  box-shadow: 0 0 12px rgba(109, 40, 255, 0.4);
+  box-shadow: 0 0 12px rgba(124, 58, 255, 0.4);
 }
 .user-pill.active .avatar {
-  box-shadow: 0 0 12px rgba(109, 40, 255, 0.6);
+  box-shadow: 0 0 12px rgba(124, 58, 255, 0.6);
 }
 
 .avatar {
@@ -223,20 +223,20 @@
   padding: 0 14px;
   height: 32px;
   border-radius: var(--r-full);
-  background: linear-gradient(135deg, #6D28FF, #4D8CFF);
+  background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
   border: none;
   color: white;
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 4px 14px rgba(109, 40, 255, 0.25);
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.25);
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
 .nav-deposit-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(109, 40, 255, 0.35);
+  box-shadow: 0 6px 18px rgba(124, 58, 255, 0.35);
   filter: brightness(1.06);
 }
 .nav-deposit-btn:active { transform: scale(0.97); }
@@ -505,19 +505,19 @@
 }
 
 .play-btn-login {
-  background: linear-gradient(135deg, #6D28FF, #4D8CFF);
+  background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
   color: white;
-  box-shadow: 0 4px 16px rgba(109,40,255,0.25);
+  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25);
 }
 .play-btn-login:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(109,40,255,0.35);
+  box-shadow: 0 6px 20px rgba(124, 58, 255, 0.35);
 }
 
 .play-btn-rejoin {
-  background: linear-gradient(135deg, #531BFA, #6D28FF);
+  background: linear-gradient(135deg, #6228F5, #7C3AFF);
   color: white;
-  box-shadow: 0 4px 16px rgba(109, 40, 255, 0.25);
+  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25);
 }
 
 .play-btn-disabled {

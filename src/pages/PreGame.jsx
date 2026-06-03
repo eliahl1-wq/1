@@ -46,8 +46,10 @@ export default function PreGame() {
     const [statusMsg, setStatusMsg]             = useState('');
     const [isMatchmaking, setIsMatchmaking]     = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [liveStats, setLiveStats]             = useState({ playersOnline: 0, biggestPayout: 0 });
+    const [liveStats, setLiveStats]             = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
     const [showHowItWorks, setShowHowItWorks]   = useState(false);
+    const [leaderboardTab, setLeaderboardTab]   = useState('alltime');
+    const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
     const [nickname, setNickname]               = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
@@ -186,6 +188,28 @@ export default function PreGame() {
         };
         fetchStats();
         const id = setInterval(fetchStats, 5000);
+        return () => { alive = false; clearInterval(id); };
+    }, []);
+
+    // Leaderboard poll
+    useEffect(() => {
+        let alive = true;
+        const fetchLeaderboard = async () => {
+            try {
+                const r = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/leaderboard?t=${Date.now()}`, {
+                    headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
+                });
+                if (r.ok && alive) {
+                    const d = await r.json();
+                    setLeaderboardData({
+                        alltime: d.alltime || [],
+                        week: d.week || []
+                    });
+                }
+            } catch {}
+        };
+        fetchLeaderboard();
+        const id = setInterval(fetchLeaderboard, 15000);
         return () => { alive = false; clearInterval(id); };
     }, []);
 
@@ -375,7 +399,7 @@ export default function PreGame() {
                                         id="balance-pill"
                                         className="balance-pill mono"
                                         onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
-                                        style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(109, 40, 255, 0.15)' } : {}}
+                                        style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(124, 58, 255, 0.15)' } : {}}
                                     >
                                         {isCurSOL ? (
                                             <SolLogo size={12} />
@@ -799,17 +823,17 @@ export default function PreGame() {
                 <div className="stat-row">
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                        DeFiGod
+                        {liveStats.topPlayer ?? '—'}
                     </span>
                 </div>
             </div>
 
-            {/* ── Global Leaderboard Card ── */}
+            {/* ── Leaderboard Card ── */}
             <div style={{
                 position: 'fixed',
                 bottom: '20px',
                 left: '20px',
-                width: '185px',
+                width: '200px',
                 background: 'rgba(8,9,13,0.9)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--r-lg)',
@@ -817,31 +841,52 @@ export default function PreGame() {
                 backdropFilter: 'blur(20px)',
                 zIndex: 10
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.62rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>ALL-TIME LEADERS</span>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.62rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Leaderboard</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.68rem' }}>
-                    <div>
-                        <div style={{ opacity: 0.4, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Top Earnings</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-bright)' }}>1. DeFiGod</span>
-                            <span className="mono text-green">$1,420.00</span>
-                        </div>
-                    </div>
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '4px' }}>
-                        <div style={{ opacity: 0.4, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Top Cashout</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-bright)' }}>1. Whalesome</span>
-                            <span className="mono text-green">$450.00</span>
-                        </div>
-                    </div>
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '4px' }}>
-                        <div style={{ opacity: 0.4, fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Highest Balance</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-bright)' }}>1. PhantomWhale</span>
-                            <span className="mono text-green">$2,500.00</span>
-                        </div>
-                    </div>
+
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border)', marginBottom: '8px' }}>
+                    {[{ id: 'alltime', label: 'All Time' }, { id: 'week', label: 'This Week' }].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setLeaderboardTab(tab.id)}
+                            style={{
+                                flex: 1,
+                                padding: '4px 0',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '0.6rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                fontFamily: 'var(--sans)',
+                                background: leaderboardTab === tab.id ? 'rgba(255,255,255,0.08)' : 'transparent',
+                                color: leaderboardTab === tab.id ? '#fff' : 'var(--text-2)'
+                            }}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-3)', textAlign: 'center', padding: '6px 0' }}>No data yet</div>
+                    ) : (
+                        (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).slice(0, 5).map((entry, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
+                                <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 400 }}>
+                                    {i + 1}. {entry.username}
+                                </span>
+                                <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--green)' }}>
+                                    ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                </span>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 

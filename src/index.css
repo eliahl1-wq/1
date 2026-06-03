@@ -16,7 +16,7 @@
   /* Borders — razor thin */
   --border: rgba(255, 255, 255, 0.055);
   --border-2: rgba(255, 255, 255, 0.08);
-  --border-accent: rgba(109, 40, 255, 0.2);
+  --border-accent: rgba(124, 58, 255, 0.2);
 
   /* Typography */
   --text: rgba(255, 255, 255, 0.5);
@@ -25,10 +25,10 @@
   --text-h: rgba(255, 255, 255, 0.92);
   --text-bright: #ffffff;
 
-  /* Brand accent — Solana purple */
-  --accent: #6D28FF;
-  --accent-dim: rgba(109, 40, 255, 0.12);
-  --accent-border: rgba(109, 40, 255, 0.25);
+  /* Brand accent — brighter purple matching deposit button */
+  --accent: #7C3AFF;
+  --accent-dim: rgba(124, 58, 255, 0.12);
+  --accent-border: rgba(124, 58, 255, 0.25);
 
   /* Solana green — profit/success */
   --green: #14F195;
@@ -321,15 +321,15 @@ input[type=number] {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #6D28FF 0%, #4D8CFF 100%);
+  background: linear-gradient(135deg, #7C3AFF 0%, #4D8CFF 100%);
   color: white;
   padding: 10px 20px;
-  box-shadow: 0 4px 16px rgba(109, 40, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(109, 40, 255, 0.4);
+  box-shadow: 0 6px 20px rgba(124, 58, 255, 0.4);
   filter: brightness(1.05);
 }
 
