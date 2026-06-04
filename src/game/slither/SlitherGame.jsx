@@ -10,9 +10,10 @@ import './game.js';
 export default function SlitherGame() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, token: authToken } = useAuth(); // Rename token to authToken
     const canvasRef = useRef(null); // React manages the canvas
     const socketRef = useRef(null);
+    const [isConnected, setIsConnected] = useState(false);
     
     // State för UI (samma som i Game.jsx)
     const [currentBalance, setCurrentBalance] = useState(0);
@@ -59,24 +60,39 @@ export default function SlitherGame() {
             return () => {}; // Return a no-op cleanup function if canvas is not yet mounted
         }
 
+        if (socketRef.current) return; // Förhindra dubbla anslutningar
+        
+        // Ensure authToken is a string before proceeding with socket connection
+        if (typeof authToken !== 'string' || authToken.length === 0) {
+            console.log('useEffect: Auth token is not a valid string, skipping socket creation.');
+            return;
+        }
         // Online Server Connection
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+        console.log('useEffect: Attempting to create new socket with valid auth data...');
+        
         const socket = io(apiUrl, {
-            auth: { token: localStorage.getItem('token') },
+            auth: { token: authToken }, // Use authToken here
             transports: ['websocket']
         });
         socketRef.current = socket;
+
+        socket.on('connect', () => {
+            console.log('Connected to socket server');
+            setIsConnected(true);
+            const matchNickname = location.state?.nickname || user?.username || 'Guest';
+            console.log('Emitting joinGame...');
+            socket.emit('joinGame', { username: matchNickname, token: authToken, mode: 'slither' }); // Use authToken here
+        });
+
+        socket.on('welcome', (settings) => {
+            console.log('Welcome to Arena');
+        });
 
         // Only initialize game engine if it hasn't been already
         if (!window.gameInstance) {
             window.gameInstance = new window.game(canvasRef.current);
             
-            // Set player nickname
-            const matchNickname = location.state?.nickname || user?.username || 'Guest';
-            if (window.mySnake && window.mySnake[0]) {
-                window.mySnake[0].name = matchNickname;
-            }
-
             // Global callback for when the player dies
             window.onSnakeDie = (finalScore) => {
                 setIsDead(true); // Trigger death overlay
@@ -124,14 +140,24 @@ export default function SlitherGame() {
                 window.gameInstance = null;
             }
             if (socketRef.current) {
+                socketRef.current.off();
                 socketRef.current.disconnect();
                 socketRef.current = null;
             }
         };
-    }, [user, navigate, location.state]); // Ta bort handleCashOut som dependency
+    }, [authToken, user?.username, navigate, location.state]); // Use authToken in dependency array
 
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, overflow: 'hidden', fontFamily: 'system-ui' }}>
+            {!isConnected && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <h2 style={{ marginBottom: '10px' }}>Connecting to Slither Arena...</h2>
+                        <p style={{ opacity: 0.5 }}>Verifying session...</p>
+                    </div>
+                </div>
+            )}
+
             <canvas
                 ref={canvasRef}
                 style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1 }}

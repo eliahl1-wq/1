@@ -191,7 +191,7 @@ export default function PreGame() {
             } catch {}
         };
         fetchStats();
-        const id = setInterval(fetchStats, 20000); // Minska polling till var 20:e sekund
+        const id = setInterval(fetchStats, 30000); 
         return () => { alive = false; clearInterval(id); };
     }, []);
 
@@ -213,7 +213,7 @@ export default function PreGame() {
             } catch {}
         };
         fetchLeaderboard();
-        const id = setInterval(fetchLeaderboard, 60000); // Minska polling till var 60:e sekund
+        const id = setInterval(fetchLeaderboard, 90000);
         return () => { alive = false; clearInterval(id); };
     }, []);
 

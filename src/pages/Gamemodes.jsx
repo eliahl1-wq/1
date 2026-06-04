@@ -14,15 +14,20 @@ export default function Gamemodes() {
             {/* ── Top Bar ── */}
             <nav className="topbar">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                    <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
+                    <div
+                        className="logo"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                        onClick={() => navigate('/pre-game')}
+                    >
                         <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
-                        <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
+                        <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff', fontFamily: 'var(--sans)' }}>
                             AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                         </span>
                     </div>
-                    <button 
-                        className="nav-link active"
-                        style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
+
+                    <button
+                        className="gm-nav-link gm-nav-link--active"
+                        onClick={() => navigate('/gamemodes')}
                     >
                         Gamemodes
                     </button>
@@ -30,102 +35,225 @@ export default function Gamemodes() {
             </nav>
 
             {/* ── Content ── */}
-            <div style={{ zIndex: 1, width: '100%', maxWidth: '1200px', padding: '100px 40px 40px', animation: 'fadeUp 0.3s ease-out', boxSizing: 'border-box' }}>
-                <h1 style={{ textAlign: 'left', marginBottom: '32px', fontSize: '2.8rem', fontWeight: 900, letterSpacing: '-2px', color: 'var(--text-h)' }}>
-                    Select Gamemode
-                </h1>
+            <div style={{ zIndex: 1, width: '100%', maxWidth: '1100px', padding: '100px 32px 60px', boxSizing: 'border-box' }}>
 
-                {/* Underlined Tabs */}
-                <div style={{ display: 'flex', gap: '32px', marginBottom: '40px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <button 
+                {/* Header */}
+                <div style={{ marginBottom: '36px' }}>
+                    <h1 className="gm-heading">Select Gamemode</h1>
+                    <p className="gm-sub">Choose your arena and start competing for real rewards.</p>
+                </div>
+
+                {/* Tabs */}
+                <div className="gm-tabs">
+                    <button
+                        className={`gm-tab${activeTab === 'agar' ? ' gm-tab--active' : ''}`}
                         onClick={() => setActiveTab('agar')}
-                        style={{ 
-                            background: 'none', border: 'none', padding: '0 0 12px 0', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', transition: '0.2s',
-                            color: activeTab === 'agar' ? '#fff' : 'var(--text-3)',
-                            borderBottom: activeTab === 'agar' ? '2px solid var(--accent)' : '2px solid transparent'
-                        }}
                     >
-                        AGAR
+                        Agar
                     </button>
-                    <button 
+                    <button
+                        className={`gm-tab${activeTab === 'slither' ? ' gm-tab--active' : ''}`}
                         onClick={() => setActiveTab('slither')}
-                        style={{ 
-                            background: 'none', border: 'none', padding: '0 0 12px 0', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', transition: '0.2s',
-                            color: activeTab === 'slither' ? '#fff' : 'var(--text-3)',
-                            borderBottom: activeTab === 'slither' ? '2px solid var(--accent)' : '2px solid transparent'
-                        }}
                     >
-                        SLITHER
+                        Slither
                     </button>
                 </div>
 
-                {activeTab === 'agar' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
-                        <div className="mode-option active">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
-                                <div>
-                                    <div style={{ fontWeight: 800, color: '#fff', fontSize: '1.25rem' }}>Normal Arena</div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginTop: '6px' }}>The classic high-stakes experience.</div>
-                                </div>
-                                <button className="btn btn-primary" style={{ padding: '10px 24px', fontSize: '0.8rem' }} onClick={() => navigate('/pre-game')}>PLAY</button>
-                            </div>
-                        </div>
-                        <div className="mode-option disabled">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
-                                <div>
-                                    <div style={{ fontWeight: 800, color: 'var(--text-3)', fontSize: '1.25rem' }}>Speed Arena</div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginTop: '6px' }}>Faster movement, higher risk.</div>
-                                </div>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px' }}>COMING SOON</span>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
-                        <div className="mode-option active">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
-                                <div>
-                                    <div style={{ fontWeight: 800, color: '#fff', fontSize: '1.25rem' }}>Slither Normal</div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginTop: '6px' }}>Classic high-stakes snake arena.</div>
-                                </div>
-                                <button 
-                                    className="btn btn-primary" 
-                                    style={{ padding: '10px 24px', fontSize: '0.8rem' }} 
-                                    onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
-                                >
-                                    SELECT
-                                </button>
-                            </div>
-                        </div>
-                        <div className="mode-option disabled">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '100%' }}>
-                                <div>
-                                    <div style={{ fontWeight: 800, color: 'var(--text-3)', fontSize: '1.25rem' }}>Speed Snake</div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-3)', marginTop: '6px' }}>Faster growth, higher risk.</div>
-                                </div>
-                                <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px' }}>COMING SOON</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Mode cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                    {activeTab === 'agar' ? (
+                        <>
+                            <ModeCard
+                                title="Normal Arena"
+                                desc="The classic high-stakes Agar experience. Grow, absorb, dominate."
+                                badge={null}
+                                onPlay={() => navigate('/pre-game')}
+                            />
+                            <ModeCard
+                                title="Speed Arena"
+                                desc="Faster movement, higher risk, greater rewards."
+                                badge="COMING SOON"
+                                onPlay={null}
+                            />
+                        </>
+                    ) : (
+                        <>
+                            <ModeCard
+                                title="Slither Normal"
+                                desc="Classic high-stakes snake arena. Outmaneuver enemies, grow longer."
+                                badge={null}
+                                onPlay={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
+                            />
+                            <ModeCard
+                                title="Speed Snake"
+                                desc="Faster growth, higher risk, bigger payouts."
+                                badge="COMING SOON"
+                                onPlay={null}
+                            />
+                        </>
+                    )}
+                </div>
             </div>
 
             <style>{`
-                .mode-option {
-                    padding: 32px;
-                    border-radius: 16px;
-                    background: #0f1118;
+                /* ── Nav link ── */
+                .gm-nav-link {
+                    background: none;
+                    border: none;
+                    font-family: var(--sans);
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    color: var(--text-2);
+                    cursor: pointer;
+                    padding: 0;
+                    transition: color 0.15s;
+                    letter-spacing: -0.01em;
+                }
+                .gm-nav-link:hover { color: #fff; }
+                .gm-nav-link--active { color: #fff; }
+
+                /* ── Page heading ── */
+                .gm-heading {
+                    margin: 0 0 6px 0;
+                    font-family: var(--sans);
+                    font-size: clamp(2rem, 5vw, 3rem);
+                    font-weight: 900;
+                    letter-spacing: -2px;
+                    color: var(--text-h);
+                    line-height: 1.05;
+                }
+                .gm-sub {
+                    margin: 0;
+                    font-family: var(--sans);
+                    font-size: 0.85rem;
+                    color: var(--text-3);
+                    font-weight: 500;
+                }
+
+                /* ── Tab bar (underline style) ── */
+                .gm-tabs {
+                    display: flex;
+                    gap: 0;
+                    margin-bottom: 28px;
+                    border-bottom: 1px solid rgba(255,255,255,0.06);
+                }
+                .gm-tab {
+                    background: none;
+                    border: none;
+                    border-bottom: 2px solid transparent;
+                    margin-bottom: -1px;
+                    padding: 0 4px 14px 4px;
+                    margin-right: 28px;
+                    font-family: var(--sans);
+                    font-size: 0.85rem;
+                    font-weight: 700;
+                    letter-spacing: 0.02em;
+                    text-transform: uppercase;
+                    color: var(--text-3);
+                    cursor: pointer;
+                    transition: color 0.15s, border-color 0.15s;
+                }
+                .gm-tab:hover { color: var(--text); }
+                .gm-tab--active {
+                    color: #fff;
+                    border-bottom-color: var(--accent);
+                }
+
+                /* ── Mode cards ── */
+                .gm-card {
+                    background: var(--bg-1);
                     border: 1px solid var(--border);
-                    transition: 0.2s;
+                    border-radius: var(--r-2xl);
+                    padding: 28px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 20px;
+                    transition: border-color 0.2s, box-shadow 0.2s;
                     box-shadow: var(--shadow-lg);
                 }
-                .mode-option.active {
-                    border-color: rgba(124, 58, 255, 0.3);
-                    background: linear-gradient(135deg, #0f1118 0%, #161922 100%);
+                .gm-card--active {
+                    border-color: rgba(124,58,255,0.25);
+                    background: linear-gradient(135deg, #0d0e16 0%, #13151f 100%);
                 }
-                .mode-option.disabled { opacity: 0.6; }
-                .nav-link:hover { color: #fff !important; }
+                .gm-card--active:hover {
+                    border-color: rgba(124,58,255,0.45);
+                    box-shadow: var(--shadow-xl), 0 0 0 1px rgba(124,58,255,0.1);
+                }
+                .gm-card--disabled {
+                    opacity: 0.5;
+                    background: var(--bg-1);
+                }
+                .gm-card-title {
+                    font-family: var(--sans);
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                    color: #fff;
+                    letter-spacing: -0.02em;
+                    margin-bottom: 6px;
+                }
+                .gm-card--disabled .gm-card-title { color: var(--text-3); }
+                .gm-card-desc {
+                    font-family: var(--sans);
+                    font-size: 0.8rem;
+                    color: var(--text-3);
+                    line-height: 1.5;
+                    max-width: 280px;
+                }
+                .gm-badge {
+                    font-family: var(--sans);
+                    font-size: 0.6rem;
+                    font-weight: 800;
+                    letter-spacing: 0.07em;
+                    text-transform: uppercase;
+                    color: var(--text-3);
+                    background: rgba(255,255,255,0.04);
+                    border: 1px solid var(--border);
+                    padding: 6px 12px;
+                    border-radius: var(--r-full);
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                }
+                .gm-play-btn {
+                    font-family: var(--sans);
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                    padding: 10px 22px;
+                    border: none;
+                    border-radius: var(--r-lg);
+                    background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
+                    color: #fff;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                    box-shadow: 0 4px 14px rgba(124,58,255,0.25);
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                }
+                .gm-play-btn:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 6px 20px rgba(124,58,255,0.35);
+                    filter: brightness(1.06);
+                }
+                .gm-play-btn:active { transform: scale(0.97); }
             `}</style>
+        </div>
+    );
+}
+
+function ModeCard({ title, desc, badge, onPlay }) {
+    const isDisabled = !onPlay;
+    return (
+        <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
+            <div>
+                <div className="gm-card-title">{title}</div>
+                <div className="gm-card-desc">{desc}</div>
+            </div>
+            {isDisabled
+                ? <span className="gm-badge">{badge}</span>
+                : <button className="gm-play-btn" onClick={onPlay}>Play</button>
+            }
         </div>
     );
 }

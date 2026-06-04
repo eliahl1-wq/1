@@ -88,21 +88,20 @@ export default function Lobby() {
         }
     }, [token, refreshUser]);
 
-    // QR code
+    // QR code – show when disconnected (always) or connected + manual tab
     useEffect(() => {
-        if (qrRef.current && depositAddress && depositMethod === 'manual') {
+        const shouldShow = !connected || depositMethod === 'manual';
+        if (qrRef.current && depositAddress && shouldShow) {
             qrRef.current.innerHTML = '';
             try {
                 const qr = createQR(`solana:${depositAddress}?amount=0&label=AgarStake&message=Deposit`, 190, 'white', 'black');
                 qr.append(qrRef.current);
             } catch {}
+        } else if (qrRef.current && !shouldShow) {
+            qrRef.current.innerHTML = '';
         }
-    }, [depositAddress, depositMethod]);
-
-    useEffect(() => {
-        if (depositMethod !== 'manual' && qrRef.current) qrRef.current.innerHTML = '';
         return () => { if (qrRef.current) qrRef.current.innerHTML = ''; };
-    }, [depositMethod]);
+    }, [depositAddress, depositMethod, connected]);
 
     // Redirect if sufficient balance
     useEffect(() => {
@@ -357,8 +356,36 @@ export default function Lobby() {
                             )}
                         </>
                     ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
-                            <WalletMultiButton />
+                        /* No wallet connected – show QR + address + connect button */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+                            {/* QR code */}
+                            <div ref={qrRef} className="qr-container" />
+
+                            {/* Deposit address */}
+                            <div style={{ width: '100%' }}>
+                                <div className="label" style={{ marginBottom: '4px' }}>Deposit Address</div>
+                                <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
+                                    {depositAddress || 'Generating…'}
+                                </div>
+                                <button
+                                    onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
+                                    style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: 700, borderRadius: 'var(--r-md)', cursor: 'pointer', letterSpacing: '0.04em' }}
+                                >
+                                    COPY ADDRESS
+                                </button>
+                            </div>
+
+                            {/* Divider */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                                <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-3)', fontWeight: 600 }}>OR CONNECT WALLET</span>
+                                <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+                            </div>
+
+                            {/* Connect wallet button */}
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <WalletMultiButton />
+                            </div>
                         </div>
                     )}
 
