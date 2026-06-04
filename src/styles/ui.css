@@ -290,7 +290,7 @@
 .pre-game-grid {
   width: min(100%, 1220px);
   display: grid;
-  grid-template-columns: minmax(320px, 520px) minmax(320px, 420px) minmax(220px, 300px);
+  grid-template-columns: minmax(220px, 300px) minmax(320px, 420px) minmax(220px, 300px);
   gap: 20px;
   align-items: start;
   justify-items: center;
@@ -329,7 +329,7 @@
   color: #fff;
 }
 .mode-card-action {
-  width: min(100%, 180px);
+  width: 100%;
   padding: 12px 0;
   border: none;
   border-radius: 999px;
