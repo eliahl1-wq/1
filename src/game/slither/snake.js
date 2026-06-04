@@ -67,20 +67,18 @@ globalThis.snake = class snake {
             this.score += this.score / 666;
         }
 
-        // Endast AI-ormar flyttar huvudet här (Spelaren flyttas i game.js)
-        if (this !== window.mySnake?.[0]) {
-            this.v[0].x += this.dx * this.speed;
-            this.v[0].y += this.dy * this.speed;
-        }
+        // Alla ormar (inklusive spelaren) uppdaterar sin huvudposition här
+        // Vi använder globalThis.SPEED för att kontrollera den allmänna hastigheten mjukt
+        this.v[0].x += this.dx * this.speed * (globalThis.SPEED || 1);
+        this.v[0].y += this.dy * this.speed * (globalThis.SPEED || 1);
 
         for (let i = 1; i < this.v.length; i++) {
-            if (this.range(this.v[i], this.v[i - 1]) > this.size / 5) {
-                this.v[i].x = (this.v[i].x + this.v[i - 1].x) / 2;
-                this.v[i].y = (this.v[i].y + this.v[i - 1].y) / 2;
+            if (this.range(this.v[i], this.v[i - 1]) > this.size / 10) { // Mindre tröskel för smidigare kropp
+                this.v[i].x += (this.v[i - 1].x - this.v[i].x) * 0.5; // Mjuk interpolering
+                this.v[i].y += (this.v[i - 1].y - this.v[i].y) * 0.5; // Mjuk interpolering
             }
         }
-        if (this.score < 200)
-            return;
+
         if (this.speed == 2)
             this.score -= this.score / 2000;;
         let csUp = Math.pow((this.score) / 1000, 1 / 5);
@@ -105,7 +103,6 @@ globalThis.snake = class snake {
     }
 
     draw() {
-        this.update();
         const ctx = this.game.context;
         const isPlayer = window.mySnake && this === window.mySnake[0];
 

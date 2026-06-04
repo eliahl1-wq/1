@@ -43,6 +43,13 @@ export default function SlitherGame() {
         setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4500);
     }, [currentBalance, navigate]);
 
+    // Använd en ref för att lagra senaste versionen av handleCashOut 
+    // utan att trigga omstart av useEffect
+    const cashOutRef = useRef(handleCashOut);
+    useEffect(() => {
+        cashOutRef.current = handleCashOut;
+    }, [handleCashOut]);
+
     useEffect(() => {
         document.body.style.backgroundColor = '#000';
         document.title = "AgarStake | Slither Arena"; // Set document title
@@ -79,7 +86,7 @@ export default function SlitherGame() {
 
             // Global callback for cashout (if implemented in game.js)
             window.onCashOut = (finalScore) => {
-                handleCashOut(finalScore); // Trigger cashout animation
+                cashOutRef.current(finalScore); // Trigger cashout animation
             };
         }
 
@@ -121,7 +128,7 @@ export default function SlitherGame() {
                 socketRef.current = null;
             }
         };
-    }, [user, navigate, location.state, handleCashOut]);
+    }, [user, navigate, location.state]); // Ta bort handleCashOut som dependency
 
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, overflow: 'hidden', fontFamily: 'system-ui' }}>

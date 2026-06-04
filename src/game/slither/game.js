@@ -83,23 +83,35 @@ const names = ["Ahmed Steinke",
 ];
 
 globalThis.game = class game {
-    constructor() {
-        // Constructor now accepts a canvas element
-        this.canvas = arguments[0];
-        this.context = this.canvas.getContext("2d");
-        this.init(this.canvas);
+    constructor(canvasElement) {
+        this.canvas = canvasElement;
+        this.context = canvasElement.getContext("2d");
+        
+        // Bind event handlers to instance so they can be removed safely
+        this.handleResize = this.render.bind(this);
+        this.handleTouchMove = this.onTouchMove.bind(this);
+        this.handleTouchStart = this.onTouchStart.bind(this);
+        this.handleTouchEnd = this.onTouchEnd.bind(this);
+        this.handleMouseDown = this.onMouseDown.bind(this);
+        this.handleMouseMove = this.onMouseMove.bind(this);
+        this.handleMouseUp = this.onMouseUp.bind(this);
+        
+        this.init(canvasElement);
     }
 
     init(canvasElement) {
-        // Use the provided canvas element
         globalThis.die = false; // Reset die state to prevent freezing on re-entry
+        globalThis.mySnake = [];
+        globalThis.FOOD = [];
         globalThis.XX = 0;
         globalThis.YY = 0;
-        this.render();
+        globalThis.chX = 0;
+        globalThis.chY = 0;
 
-        // Sätt initiala hastighetsparametrar här, inte i render()
-        globalThis.SPEED = 0.1; // Basfart
-        globalThis.MaxSpeed = this.getSize() / 40; // Max svänghastighet
+        globalThis.game_W = canvasElement.width = document.documentElement.clientWidth;
+        globalThis.game_H = canvasElement.height = document.documentElement.clientHeight;
+        globalThis.SPEED = 0.5; // Balanserad basfart för att kontrollera snabbheten
+        globalThis.MaxSpeed = (this.getSize() || 100) / 25; // Stabilare svänghastighet
 
         // Spelarens orm (namnet sätts av React i SlitherGame.jsx)
         mySnake[0] = new window.snake("Player", this, minScore, 0, 0); // Starta vid 0,0, kameran kommer att centrera
@@ -107,52 +119,61 @@ globalThis.game = class game {
             FOOD[i] = new window.food(this, this.getSize() / 8, (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
         }
 
+        window.addEventListener('resize', this.handleResize);
+        this.addEventListeners();
         this.loop();
-
-        this.listenMouse();
-        this.listenTouch();
     }
 
-    listenTouch() {
-        document.addEventListener("touchmove", evt => {
-            var y = evt.touches[0].pageY;
-            var x = evt.touches[0].pageX;
-            chX = (x - game_W / 2) / 100; // Ökat delaren för att minska känsligheten
-            chY = (y - game_H / 2) / 100; // Ökat delaren för att minska känsligheten
-        })
-
-        document.addEventListener("touchstart", evt => {
-            var y = evt.touches[0].pageY;
-            var x = evt.touches[0].pageX;
-            chX = (x - game_W / 2) / 100; // Ökat delaren för att minska känsligheten
-            chY = (y - game_H / 2) / 100; // Ökat delaren för att minska känsligheten
-            mySnake[0].speed = 2;
-        })
-
-        document.addEventListener("touchend", evt => {
-            mySnake[0].speed = 1;
-        })
+    addEventListeners() {
+        document.addEventListener("touchmove", this.handleTouchMove);
+        document.addEventListener("touchstart", this.handleTouchStart);
+        document.addEventListener("touchend", this.handleTouchEnd);
+        document.addEventListener("mousedown", this.handleMouseDown);
+        document.addEventListener("mousemove", this.handleMouseMove);
+        document.addEventListener("mouseup", this.handleMouseUp);
     }
 
-    listenMouse() {
-        document.addEventListener("mousedown", evt => {
-            var x = evt.offsetX == undefined ? evt.layerX : evt.offsetX;
-            var y = evt.offsetY == undefined ? evt.layerY : evt.offsetY;
-            mySnake[0].speed = 2;
-        })
+    removeEventListeners() {
+        document.removeEventListener("touchmove", this.handleTouchMove);
+        document.removeEventListener("touchstart", this.handleTouchStart);
+        document.removeEventListener("touchend", this.handleTouchEnd);
+        document.removeEventListener("mousedown", this.handleMouseDown);
+        document.removeEventListener("mousemove", this.handleMouseMove);
+        document.removeEventListener("mouseup", this.handleMouseUp);
+    }
 
-        document.addEventListener("mousemove", evt => {
-            var x = evt.offsetX == undefined ? evt.layerX : evt.offsetX;
-            var y = evt.offsetY == undefined ? evt.layerY : evt.offsetY;
-            chX = (x - game_W / 2) / 100; // Ökat delaren för att minska känsligheten
-            chY = (y - game_H / 2) / 100; // Ökat delaren för att minska känsligheten
-        })
+    onTouchMove(evt) {
+        var y = evt.touches[0].pageY;
+        var x = evt.touches[0].pageX;
+        chX = (x - game_W / 2) / 100;
+        chY = (y - game_H / 2) / 100;
+    }
 
-        document.addEventListener("mouseup", evt => {
-            var x = evt.offsetX == undefined ? evt.layerX : evt.offsetX;
-            var y = evt.offsetY == undefined ? evt.layerY : evt.offsetY;
-            mySnake[0].speed = 1;
-        })
+    onTouchStart(evt) {
+        var y = evt.touches[0].pageY;
+        var x = evt.touches[0].pageX;
+        chX = (x - game_W / 2) / 100;
+        chY = (y - game_H / 2) / 100;
+        if (mySnake[0]) mySnake[0].speed = 2;
+    }
+
+    onTouchEnd() {
+        if (mySnake[0]) mySnake[0].speed = 1;
+    }
+
+    onMouseDown() {
+        if (mySnake[0]) mySnake[0].speed = 2;
+    }
+
+    onMouseMove(evt) {
+        var x = evt.offsetX == undefined ? evt.layerX : evt.offsetX;
+        var y = evt.offsetY == undefined ? evt.layerY : evt.offsetY;
+        chX = (x - game_W / 2) / 50;
+        chY = (y - game_H / 2) / 50;
+    }
+
+    onMouseUp() {
+        if (mySnake[0]) mySnake[0].speed = 1;
     }
 
     loop() {
@@ -163,9 +184,15 @@ globalThis.game = class game {
     }
 
     update() {
-        this.render();
+        // Removed this.render() from here. It should only be called on resize.
         this.unFood(); // Hanterar att äta food
         
+        if (!mySnake || !mySnake[0]) return;
+
+        // Koppla mus-input till spelarormen
+        mySnake[0].dx = globalThis.chX;
+        mySnake[0].dy = globalThis.chY;
+
         // Uppdatera spelarormens egen rörelse
         mySnake[0].update(); // Denna kommer nu att uppdatera mySnake[0].v[0].x och y
 
@@ -190,8 +217,6 @@ globalThis.game = class game {
             chX *= scale;
             chY *= scale;
         }
-        Xfocus += 1.5 * chX * mySnake[0].speed;
-        Yfocus += 1.5 * chY * mySnake[0].speed;
     }
 
     changeFood() {
@@ -219,6 +244,33 @@ globalThis.game = class game {
     }
 
     checkDie() {
+        // Spelarens kollision med egen kropp
+        if (mySnake.length > 0 && mySnake[0].v.length > 5) { // Se till att ormen har tillräckligt många segment
+            const head = mySnake[0].v[0];
+            for (let k = 5; k < mySnake[0].v.length; k++) { // Börja kolla från några segment bakåt
+                if (this.range(head.x, head.y, mySnake[0].v[k].x, mySnake[0].v[k].y) < mySnake[0].size) {
+                    if (window.onSnakeDie) window.onSnakeDie(mySnake[0].score);
+                    die = true;
+                    return; // Spelaren dog, ingen mer kollision behöver kollas
+                }
+            }
+        }
+
+        // Spelarens kollision med väggar
+        // Antar att sizeMap definierar världens gränser från centrum (t.ex. -sizeMap/2 till +sizeMap/2)
+        if (mySnake.length > 0) {
+            const head = mySnake[0].v[0];
+            const halfSizeMap = globalThis.sizeMap / 2;
+            // Lägg till en liten buffert för att förhindra omedelbar död vid kanten
+            const collisionBuffer = mySnake[0].size / 2; 
+            if (head.x < -halfSizeMap + collisionBuffer || head.x > halfSizeMap - collisionBuffer || 
+                head.y < -halfSizeMap + collisionBuffer || head.y > halfSizeMap - collisionBuffer) {
+                if (window.onSnakeDie) window.onSnakeDie(mySnake[0].score);
+                die = true;
+                return; // Spelaren dog, ingen mer kollision behöver kollas
+            }
+        }
+
         for (let i = 0; i < mySnake.length; i++)
             for (let j = 0; j < mySnake.length; j++)
                 if (i != j) {
@@ -255,15 +307,14 @@ globalThis.game = class game {
             this.canvas.height = document.documentElement.clientHeight;
             globalThis.game_W = this.canvas.width;
             globalThis.game_H = this.canvas.height;
-            if (mySnake.length == 0)
-                return;
             // Återberäkna MaxSpeed baserat på ny canvasstorlek
-            globalThis.MaxSpeed = this.getSize() / 40;
+            globalThis.MaxSpeed = (this.getSize() || 100) / 25; // Uppdatera MaxSpeed vid resize
         }
     }
 
     draw() {
         this.clearScreen();
+        // Rita food först, sedan ormar, så ormarna är ovanpå food
         for (let i = 0; i < FOOD.length; i++)
             FOOD[i].draw();
         for (let i = 0; i < mySnake.length; i++)
@@ -336,5 +387,13 @@ window.game = game;
 
 // Add a destroy method for cleanup
 game.prototype.destroy = function() {
-    // Any specific cleanup for the game instance
+    // Ensure event listeners are removed only if they were added and are defined
+    if (this.handleResize) window.removeEventListener('resize', this.handleResize); // This is bound in constructor
+    if (this.handleTouchMove) document.removeEventListener("touchmove", this.handleTouchMove); // These are bound in constructor
+    if (this.handleTouchStart) document.removeEventListener("touchstart", this.handleTouchStart);
+    if (this.handleTouchEnd) document.removeEventListener("touchend", this.handleTouchEnd);
+    if (this.handleMouseDown) document.removeEventListener("mousedown", this.handleMouseDown);
+    if (this.handleMouseMove) document.removeEventListener("mousemove", this.handleMouseMove);
+    if (this.handleMouseUp) document.removeEventListener("mouseup", this.handleMouseUp);
+    globalThis.die = true;
 };

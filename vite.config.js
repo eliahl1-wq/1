@@ -1,23 +1,22 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-
+  define: {
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
-      buffer: 'buffer',
-      process: 'process/browser',
-      stream: 'stream-browserify',
-      events: 'events',
+      // Polyfill for 'buffer' module, often needed by crypto/wallet libraries
+      // This points 'buffer' imports to a browser-compatible version.
+      buffer: 'buffer/',
     },
   },
-
-  define: {
-    global: 'window',
-  },
-
-  optimizeDeps: {
-    include: ['buffer', 'process', 'stream-browserify', 'events'],
-  },
-})
+  // Optional: If the 'buffer' warning persists or causes runtime errors,
+  // you might need to explicitly tell Vite to optimize it.
+  // optimizeDeps: {
+  //   include: ['buffer'],
+  // },
+});

@@ -54,6 +54,8 @@ export default function PreGame() {
     const [nickname, setNickname]               = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     const [selectedMode] = useState(location.state?.selectedMode || 'agar');
 
     // Panel drag
@@ -182,14 +184,14 @@ export default function PreGame() {
         let alive = true;
         const fetchStats = async () => {
             try {
-                const r = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stats?t=${Date.now()}`, {
+                const r = await fetch(`${API_URL}/api/stats?t=${Date.now()}`, {
                     headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                 });
                 if (r.ok && alive) setLiveStats(await r.json());
             } catch {}
         };
         fetchStats();
-        const id = setInterval(fetchStats, 5000);
+        const id = setInterval(fetchStats, 20000); // Minska polling till var 20:e sekund
         return () => { alive = false; clearInterval(id); };
     }, []);
 
@@ -198,7 +200,7 @@ export default function PreGame() {
         let alive = true;
         const fetchLeaderboard = async () => {
             try {
-                const r = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/leaderboard?t=${Date.now()}`, {
+                const r = await fetch(`${API_URL}/api/leaderboard?t=${Date.now()}`, {
                     headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                 });
                 if (r.ok && alive) {
@@ -211,14 +213,14 @@ export default function PreGame() {
             } catch {}
         };
         fetchLeaderboard();
-        const id = setInterval(fetchLeaderboard, 15000);
+        const id = setInterval(fetchLeaderboard, 60000); // Minska polling till var 60:e sekund
         return () => { alive = false; clearInterval(id); };
     }, []);
 
     // Balance poll
     useEffect(() => {
         refreshUser();
-        const id = setInterval(refreshUser, 5000);
+        const id = setInterval(refreshUser, 20000); // Minska polling till var 20:e sekund
         return () => clearInterval(id);
     }, [refreshUser]);
 
@@ -227,7 +229,7 @@ export default function PreGame() {
         if (!token) return;
         (async () => {
             try {
-                const r = await fetch(`${import.meta.env.VITE_API_URL}/api/game-status`, {
+                const r = await fetch(`${API_URL}/api/game-status`, {
                     headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
                 });
                 if (r.ok) {
@@ -316,7 +318,7 @@ export default function PreGame() {
             const conf = await connection.confirmTransaction(sig, 'confirmed');
             if (conf.value.err) throw new Error('Transaction failed on-chain.');
             setStatusMsg('Verifying with backend…');
-            const vr = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
+            const vr = await fetch(`${API_URL}/api/deposit-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' },
                 body: JSON.stringify({ signature: sig, amountUSD: usdAmt, solAmount: solAmt, walletAddress: publicKey.toString() })
@@ -327,7 +329,7 @@ export default function PreGame() {
                 throw new Error(err || 'Backend verification failed.');
             }
             if (token) {
-                const mr = await fetch(`${import.meta.env.VITE_API_URL}/api/me`, { headers: { Authorization: `Bearer ${token}` } });
+                const mr = await fetch(`${API_URL}/api/me`, { headers: { Authorization: `Bearer ${token}` } });
                 if (mr.ok) login(await mr.json(), token);
             }
             setStatusMsg(`✅ ${solAmt.toFixed(4)} SOL deposited!`);
@@ -348,7 +350,7 @@ export default function PreGame() {
         setStatusMsg('⏳ Processing withdrawal…');
         try {
             const usdAmt = isCurSOL ? parsed * solPrice : parsed;
-            const r = await fetch(`${import.meta.env.VITE_API_URL}/api/withdraw`, {
+            const r = await fetch(`${API_URL}/api/withdraw`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ amountUSD: usdAmt, destinationAddress: withdrawAddress })
