@@ -907,7 +907,7 @@ export default function PreGame() {
             </div>
 
             {/* Live stats bottom-left (moved out of grid) */}
-            <div className="stats-card live-stats-bottom" style={{ position: 'fixed', left: 16, bottom: 78, zIndex: 1050 }}>
+            <div className="stats-card live-stats-bottom" style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 1050 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <span className="label">Live</span>
                     <div className="live-dot" />

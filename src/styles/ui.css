@@ -290,7 +290,7 @@
 .pre-game-grid {
   width: min(100%, 1220px);
   display: grid;
-  grid-template-columns: minmax(200px, 260px) minmax(320px, 420px) minmax(260px, 360px);
+  grid-template-columns: minmax(320px, 520px) minmax(320px, 420px) minmax(220px, 300px);
   gap: 20px;
   align-items: start;
   justify-items: center;
@@ -301,13 +301,15 @@
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--r-2xl);
-  padding: 22px 20px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   gap: 12px;
   min-height: 140px;
+  width: 100%;
+  max-width: 520px;
   text-align: center;
 }
 .mode-card-label {
