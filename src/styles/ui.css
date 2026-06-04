@@ -290,9 +290,10 @@
 .pre-game-grid {
   width: min(100%, 1220px);
   display: grid;
-  grid-template-columns: minmax(240px, 280px) minmax(420px, 1fr) minmax(240px, 260px);
+  grid-template-columns: minmax(200px, 260px) minmax(320px, 420px) minmax(260px, 360px);
   gap: 20px;
   align-items: start;
+  justify-items: center;
   margin-top: 18px;
 }
 
@@ -305,8 +306,8 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 14px;
-  min-height: 220px;
+  gap: 12px;
+  min-height: 140px;
   text-align: center;
 }
 .mode-card-label {
@@ -319,9 +320,9 @@
 }
 .mode-card-title {
   font-family: var(--sans);
-  font-size: clamp(1.6rem, 3.2vw, 2.6rem);
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
   font-weight: 900;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   text-transform: uppercase;
   color: #fff;
 }
@@ -576,8 +577,9 @@
   animation: fadeUp 0.3s ease-out;
 }
 .game-card.main-card {
-  width: 420px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 420px;
+  justify-self: center;
 }
 
 /* ─── Nickname input ─── */
@@ -683,6 +685,20 @@
 .side-stats-card {
   min-height: 220px;
 }
+
+/* Live stats fixed bottom-left styling */
+.live-stats-bottom {
+  width: 220px;
+  background: #050506; /* darker, near-black */
+  border: 1px solid rgba(255,255,255,0.04);
+  color: var(--text);
+  padding: 16px;
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-xl);
+}
+
+.live-stats-bottom .label { color: var(--text-2); font-weight: 800; text-transform: uppercase; font-size: 0.62rem; }
+
 
 @media (max-width: 1120px) {
   .pre-game-grid {

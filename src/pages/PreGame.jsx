@@ -870,25 +870,6 @@ export default function PreGame() {
                 </div>
 
                 <div className="right-panel-stack">
-                    <div className="stats-card side-stats-card">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                            <span className="label">Live</span>
-                            <div className="live-dot" />
-                        </div>
-                        <div className="stat-row" style={{ marginBottom: '6px' }}>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
-                            <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                                {liveStats.playersOnline ?? 0}
-                            </span>
-                        </div>
-                        <div className="stat-row" style={{ marginBottom: '18px' }}>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                                {liveStats.topPlayer ?? '—'}
-                            </span>
-                        </div>
-                    </div>
-
                     <div className="leaderboard-card">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                             <span className="label">Leaderboard</span>
@@ -922,6 +903,26 @@ export default function PreGame() {
                             )}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Live stats bottom-left (moved out of grid) */}
+            <div className="stats-card live-stats-bottom" style={{ position: 'fixed', left: 16, bottom: 78, zIndex: 1050 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span className="label">Live</span>
+                    <div className="live-dot" />
+                </div>
+                <div className="stat-row" style={{ marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                        {liveStats.playersOnline ?? 0}
+                    </span>
+                </div>
+                <div className="stat-row" style={{ marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                        {liveStats.topPlayer ?? '—'}
+                    </span>
                 </div>
             </div>
 
