@@ -701,7 +701,7 @@ export default function PreGame() {
                                     type="text"
                                     placeholder="Paste Solana address"
                                     value={displayFullAddress ? withdrawAddress : shortAddr(withdrawAddress)}
-                                    readOnly
+                                    onChange={e => setWithdrawAddress(e.target.value)}
                                     onFocus={() => setDisplayFullAddress(true)}
                                     onBlur={() => setDisplayFullAddress(false)}
                                     className="amount-input"
