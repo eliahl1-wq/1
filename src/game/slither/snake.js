@@ -85,11 +85,23 @@ globalThis.snake = class snake {
             this.score -= this.score / 2000;;
         let csUp = Math.pow((this.score) / 1000, 1 / 5);
         this.size = this.game.getSize() / 2 * csUp;
-        let N = 3 * Math.floor(50 * Math.pow((this.score) / 1000, 1 / 1));
-        if (N > this.v.length) {
-            this.v[this.v.length] = { x: this.v[this.v.length - 1].x, y: this.v[this.v.length - 1].y };
-        } else
-            this.v = this.v.slice(0, N);
+        
+        // Uppdatera ormens längd (antal segment)
+        const baseSegments = 50; // Minsta antal segment
+        const segmentsPerScoreUnit = 0.1; // Hur många segment per poäng
+        let targetN = Math.round(baseSegments + (this.score * segmentsPerScoreUnit));
+
+        // Kläm fast längden inom rimliga gränser
+        if (targetN < baseSegments) targetN = baseSegments;
+        if (targetN > 500) targetN = 500; // Förhindra extremt långa ormar
+
+        // Justera längden gradvis
+        while (this.v.length < targetN) {
+            this.v.push({ x: this.v[this.v.length - 1].x, y: this.v[this.v.length - 1].y });
+        }
+        while (this.v.length > targetN) {
+            this.v.pop();
+        }
     }
 
     draw() {

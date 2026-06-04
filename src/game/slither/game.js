@@ -97,11 +97,12 @@ globalThis.game = class game {
         globalThis.YY = 0;
         this.render();
 
-        // Spelarens orm (namnet sätts av React i SlitherGame.jsx)
-        mySnake[0] = new window.snake("Player", this, minScore, game_W / 2, game_H / 2);
+        // Sätt initiala hastighetsparametrar här, inte i render()
+        globalThis.SPEED = 0.1; // Basfart
+        globalThis.MaxSpeed = this.getSize() / 40; // Max svänghastighet
 
-        // Spawn initial food (Värt $14.00 = 1400 units, dubbelt så mycket som Agar)
-        // Spawnas dubbelt så mycket som Agar för att täcka ytan
+        // Spelarens orm (namnet sätts av React i SlitherGame.jsx)
+        mySnake[0] = new window.snake("Player", this, minScore, 0, 0); // Starta vid 0,0, kameran kommer att centrera
         for (let i = 0; i < 1400; i++) {
             FOOD[i] = new window.food(this, this.getSize() / 8, (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
         }
@@ -164,28 +165,31 @@ globalThis.game = class game {
     update() {
         this.render();
         this.unFood(); // Hanterar att äta food
+        
+        // Uppdatera spelarormens egen rörelse
+        mySnake[0].update(); // Denna kommer nu att uppdatera mySnake[0].v[0].x och y
+
+        // Uppdatera kameran (XX, YY) för att följa spelarormen mjukt
+        const targetXX = mySnake[0].v[0].x - globalThis.game_W / 2;
+        const targetYY = mySnake[0].v[0].y - globalThis.game_H / 2;
+
+        // Mjuk interpolering för kameran
+        globalThis.XX += (targetXX - globalThis.XX) * 0.1; // Justera 0.1 för önskad mjukhet
+        globalThis.YY += (targetYY - globalThis.YY) * 0.1; // Justera 0.1 för önskad mjukhet
+
         this.changeSnake();
         this.updateChXY();
         this.checkDie();
-
-        mySnake[0].dx = chX;
-        mySnake[0].dy = chY;
-        XX += chX * mySnake[0].speed;
-        YY += chY * mySnake[0].speed;
-        mySnake[0].v[0].x = XX + game_W / 2;
-        mySnake[0].v[0].y = YY + game_H / 2;
     }
 
     updateChXY() {
-        while (Math.abs(chY) * Math.abs(chY) + Math.abs(chX) * Math.abs(chX) > MaxSpeed * MaxSpeed && chY * chX != 0) {
-            chX /= 1.1;
-            chY /= 1.1;
+        // Normalisera chX och chY för att ligga inom MaxSpeed-gränserna
+        const currentMagnitude = Math.sqrt(chX * chX + chY * chY);
+        if (currentMagnitude > globalThis.MaxSpeed) {
+            const scale = globalThis.MaxSpeed / currentMagnitude;
+            chX *= scale;
+            chY *= scale;
         }
-        while (Math.abs(chY) * Math.abs(chY) + Math.abs(chX) * Math.abs(chX) < MaxSpeed * MaxSpeed && chY * chX != 0) {
-            chX *= 1.1;
-            chY *= 1.1;
-        }
-
         Xfocus += 1.5 * chX * mySnake[0].speed;
         Yfocus += 1.5 * chY * mySnake[0].speed;
     }
@@ -251,14 +255,10 @@ globalThis.game = class game {
             this.canvas.height = document.documentElement.clientHeight;
             globalThis.game_W = this.canvas.width;
             globalThis.game_H = this.canvas.height;
-            globalThis.SPEED = 0.1; // Sänkt basfarten
-            globalThis.MaxSpeed = this.getSize() / 40; // Sänkt maxhastigheten
             if (mySnake.length == 0)
                 return;
-            if (mySnake[0].v != null) {
-                mySnake[0].v[0].x = globalThis.XX + globalThis.game_W / 2;
-                mySnake[0].v[0].y = globalThis.YY + globalThis.game_H / 2;
-            }
+            // Återberäkna MaxSpeed baserat på ny canvasstorlek
+            globalThis.MaxSpeed = this.getSize() / 40;
         }
     }
 
