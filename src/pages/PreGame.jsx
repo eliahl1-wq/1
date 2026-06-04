@@ -869,105 +869,59 @@ export default function PreGame() {
                     </div>
                 </div>
 
-                <div className="stats-card side-stats-card">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <span className="label">Live</span>
-                        <div className="live-dot" />
-                    </div>
-                    <div className="stat-row" style={{ marginBottom: '6px' }}>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
-                        <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                            {liveStats.playersOnline ?? 0}
-                        </span>
-                    </div>
-                    <div className="stat-row" style={{ marginBottom: '18px' }}>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                            {liveStats.topPlayer ?? '—'}
-                        </span>
+                <div className="right-panel-stack">
+                    <div className="stats-card side-stats-card">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <span className="label">Live</span>
+                            <div className="live-dot" />
+                        </div>
+                        <div className="stat-row" style={{ marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
+                            <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                                {liveStats.playersOnline ?? 0}
+                            </span>
+                        </div>
+                        <div className="stat-row" style={{ marginBottom: '18px' }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                                {liveStats.topPlayer ?? '—'}
+                            </span>
+                        </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Leaderboard</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '8px', marginBottom: '12px', border: '1px solid var(--border)' }}>
-                        {[{ id: 'alltime', label: 'All Time' }, { id: 'week', label: 'This Week' }].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setLeaderboardTab(tab.id)}
-                                className={leaderboardTab === tab.id ? 'leaderboard-tab leaderboard-tab--active' : 'leaderboard-tab'}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-3)', textAlign: 'center', padding: '8px 0' }}>No data yet</div>
-                        ) : (
-                            (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).slice(0, 5).map((entry, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
-                                    <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
-                                        {i + 1}. {entry.username}
-                                    </span>
-                                    <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)' }}>
-                                        ${Number(entry.amount || entry.balance || 0).toFixed(2)}
-                                    </span>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            </div>
+                    <div className="leaderboard-card">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <span className="label">Leaderboard</span>
+                        </div>
+                        <div className="tab-bar" style={{ marginBottom: '12px' }}>
+                            {[{ id: 'alltime', label: 'All Time' }, { id: 'week', label: 'This Week' }].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setLeaderboardTab(tab.id)}
+                                    className={leaderboardTab === tab.id ? 'tab-btn active' : 'tab-btn'}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
 
-            {/* ── Footer ── */}
-            <div className="footer-links">
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.62rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Leaderboard</span>
-                </div>
-
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border)', marginBottom: '8px' }}>
-                    {[{ id: 'alltime', label: 'All Time' }, { id: 'week', label: 'This Week' }].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setLeaderboardTab(tab.id)}
-                            style={{
-                                flex: 1,
-                                padding: '4px 0',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '0.6rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                fontFamily: 'var(--sans)',
-                                background: leaderboardTab === tab.id ? 'rgba(255,255,255,0.08)' : 'transparent',
-                                color: leaderboardTab === tab.id ? '#fff' : 'var(--text-2)'
-                            }}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Rows */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
-                        <div style={{ fontSize: '0.62rem', color: 'var(--text-3)', textAlign: 'center', padding: '6px 0' }}>No data yet</div>
-                    ) : (
-                        (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).slice(0, 5).map((entry, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
-                                <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 400 }}>
-                                    {i + 1}. {entry.username}
-                                </span>
-                                <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--green)' }}>
-                                    ${Number(entry.amount || entry.balance || 0).toFixed(2)}
-                                </span>
-                            </div>
-                        ))
-                    )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>No data yet</div>
+                            ) : (
+                                (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).slice(0, 5).map((entry, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+                                        <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
+                                            {i + 1}. {entry.username}
+                                        </span>
+                                        <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)' }}>
+                                            ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -11,10 +11,15 @@ export default function Gamemodes() {
     );
 
     useEffect(() => {
+        // Apply incoming navigation state once, then clear it so it doesn't
+        // force the tab back on subsequent interactions.
         if (location.state?.selectedMode && location.state.selectedMode !== activeTab) {
             setActiveTab(location.state.selectedMode);
+            // clear the state so user can change tabs freely
+            navigate(location.pathname, { replace: true, state: {} });
         }
-    }, [location.state?.selectedMode, activeTab]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.state?.selectedMode]);
 
     const handleTabChange = (mode) => {
         setActiveTab(mode);

@@ -14,7 +14,13 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
-import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-wallets';
+import {
+  WalletConnectWalletAdapter,
+  PhantomWalletAdapter,
+  GlowWalletAdapter,
+  SlopeWalletAdapter,
+  SolflareWalletAdapter,
+} from '@solana/wallet-adapter-wallets';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 function PrivateRoute({ children }) {
@@ -46,7 +52,12 @@ function App() {
 
   const wallets = useMemo(
     () => [
-      // Genom att lägga till denna manuellt dyker WalletConnect upp igen
+      // include common adapters so injected wallets (Phantom/Brave) appear
+      new PhantomWalletAdapter(),
+      new GlowWalletAdapter(),
+      new SlopeWalletAdapter(),
+      new SolflareWalletAdapter({ network: WalletAdapterNetwork.Mainnet }),
+      // Keep WalletConnect as well
       new WalletConnectWalletAdapter({ 
         network: WalletAdapterNetwork.Mainnet, 
         options: { 
