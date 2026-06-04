@@ -29,7 +29,7 @@ export default function Gamemodes() {
                         className="gm-nav-link gm-nav-link--active"
                         onClick={() => navigate('/gamemodes')}
                     >
-                        Gamemodes
+                        Gamemode
                     </button>
                 </div>
             </nav>
@@ -252,7 +252,7 @@ function ModeCard({ title, desc, badge, onPlay }) {
             </div>
             {isDisabled
                 ? <span className="gm-badge">{badge}</span>
-                : <button className="gm-play-btn" onClick={onPlay}>Play</button>
+                : <button className="gm-play-btn" onClick={onPlay}>Select</button>
             }
         </div>
     );

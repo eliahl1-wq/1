@@ -65,6 +65,14 @@ export default function PreGame() {
         localStorage.setItem('selected_gamemode', selectedMode);
     }, [selectedMode]);
 
+    useEffect(() => {
+        if (currentGameMode) {
+            localStorage.setItem('current_game_mode', currentGameMode);
+        } else {
+            localStorage.removeItem('current_game_mode');
+        }
+    }, [currentGameMode]);
+
     // Panel drag
     const [panelPos, setPanelPos]       = useState({ x: null, y: 60 });
     const [isDragging, setIsDragging]   = useState(false);
@@ -242,11 +250,18 @@ export default function PreGame() {
                 if (r.ok) {
                     const d = await r.json();
                     setIsAlreadyInGame(d.inGame);
-                    setCurrentGameMode(d.mode); // Antar att servern returnerar vilket mode man är i
+                    if (d.inGame) {
+                        const storedMode = localStorage.getItem('current_game_mode') || selectedMode;
+                        setCurrentGameMode(storedMode);
+                        localStorage.setItem('current_game_mode', storedMode);
+                    } else {
+                        setCurrentGameMode(null);
+                        localStorage.removeItem('current_game_mode');
+                    }
                 }
             } catch {}
         })();
-    }, [token]);
+    }, [token, selectedMode]);
 
     // ── Drag panel ─────────────────────────────────────
     useEffect(() => {
@@ -287,21 +302,20 @@ export default function PreGame() {
     // ── Handlers ───────────────────────────────────────
     const handleStartMatch = () => {
         if (!isAuthenticated) { navigate('/login'); return; }
-        
-        // Om man försöker joina slither men redan är i ett agar game (eller vice versa)
+
         if (isAlreadyInGame && !canRejoinThisMode) return;
 
         if (!canJoin && !isAlreadyInGame) { navigate('/lobby'); return; }
         setIsMatchmaking(true);
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
+        setCurrentGameMode(selectedMode);
+        localStorage.setItem('current_game_mode', selectedMode);
         const targetPath = selectedMode === 'slither' ? '/slither-game' : '/game';
         setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode } }), 1200);
     };
 
-    // Enkel kontroll om vi kan rejoina (Placeholder tills API returnerar mode)
-    // Om vi antar att "isAlreadyInGame" alltid är Agar just nu om man byter till Slither
-    const canRejoinThisMode = isAlreadyInGame && selectedMode === currentGameMode;
+    const canRejoinThisMode = isAlreadyInGame && currentGameMode && selectedMode === currentGameMode;
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return; }
@@ -393,7 +407,7 @@ export default function PreGame() {
         : !isAuthenticated ? 'Play Now'
         : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
         : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
-        : canJoin          ? 'Enter Arena'
+        : canJoin          ? 'Play'
         : 'Deposit to Play';
 
     // ── Render ─────────────────────────────────────────
@@ -412,13 +426,8 @@ export default function PreGame() {
                         </span>
                     </div>
 
-                    <button 
-                        onClick={() => navigate('/gamemodes')}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', transition: 'color 0.2s', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--sans)' }}
-                        onMouseEnter={e => e.target.style.color = '#fff'}
-                        onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
-                    >
-                        GAME MODE
+                    <button className="gm-nav-link" onClick={() => navigate('/gamemodes')}>
+                        Gamemode
                     </button>
                 </div>
 
@@ -768,38 +777,9 @@ export default function PreGame() {
             {/* ── Center Card ── */}
             <div className="game-card" style={{ maxWidth: '480px', padding: '40px', textAlign: 'center' }}>
                 {/* Mode Header */}
-                <div style={{ marginBottom: '24px' }}>
-                    <h1 style={{ 
-                        fontSize: '2.5rem', 
-                        fontWeight: 900, 
-                        color: '#fff', 
-                        margin: 0, 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '-1px',
-                        fontFamily: 'var(--sans)'
-                    }}>
-                        {selectedMode}<span style={{ color: 'var(--accent)' }}>STAKE</span>
-                    </h1>
-                    
-                    <button
-                        onClick={() => navigate('/gamemodes')}
-                        style={{
-                            marginTop: '12px',
-                            background: 'linear-gradient(135deg, #7C3AFF 0%, #A47BFF 100%)',
-                            border: 'none',
-                            color: '#fff',
-                            padding: '6px 20px',
-                            borderRadius: '100px',
-                            fontSize: '0.75rem',
-                            fontWeight: 800,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.1em',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 15px rgba(124, 58, 255, 0.3)'
-                        }}
-                    >
-                        Normal
-                    </button>
+                <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="mode-title">{selectedMode === 'slither' ? 'Slither' : 'Agar'}</div>
+                    <button type="button" className="mode-variant-btn" disabled>Normal</button>
                 </div>
 
                 {/* Nickname field */}

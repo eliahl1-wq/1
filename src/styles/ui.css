@@ -241,6 +241,52 @@
 }
 .nav-deposit-btn:active { transform: scale(0.97); }
 
+.gm-nav-link {
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: -0.01em;
+  transition: color 0.15s ease;
+}
+.gm-nav-link:hover {
+  color: #fff;
+}
+.gm-nav-link--active {
+  color: #fff;
+}
+
+.mode-title {
+  font-family: var(--sans);
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+.mode-variant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: default;
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.25);
+}
+.mode-variant-btn:disabled {
+  opacity: 0.95;
+}
+
 /* ─── Dropdown wallet card ─── */
 .wallet-card {
   position: absolute;

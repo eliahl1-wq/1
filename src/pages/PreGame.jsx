@@ -56,7 +56,24 @@ export default function PreGame() {
     );
     
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-    const [selectedMode] = useState(location.state?.selectedMode || 'agar');
+    const [selectedMode, setSelectedMode] = useState(
+        () => localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
+    );
+    const [currentGameMode, setCurrentGameMode] = useState(
+        () => localStorage.getItem('current_game_mode') || null
+    );
+
+    useEffect(() => {
+        localStorage.setItem('selected_gamemode', selectedMode);
+    }, [selectedMode]);
+
+    useEffect(() => {
+        if (currentGameMode) {
+            localStorage.setItem('current_game_mode', currentGameMode);
+        } else {
+            localStorage.removeItem('current_game_mode');
+        }
+    }, [currentGameMode]);
 
     // Panel drag
     const [panelPos, setPanelPos]       = useState({ x: null, y: 60 });
@@ -235,10 +252,19 @@ export default function PreGame() {
                 if (r.ok) {
                     const d = await r.json();
                     setIsAlreadyInGame(d.inGame);
+
+                    if (d.inGame) {
+                        const storedMode = localStorage.getItem('current_game_mode') || selectedMode;
+                        setCurrentGameMode(storedMode);
+                        localStorage.setItem('current_game_mode', storedMode);
+                    } else {
+                        setCurrentGameMode(null);
+                        localStorage.removeItem('current_game_mode');
+                    }
                 }
             } catch {}
         })();
-    }, [token]);
+    }, [token, selectedMode]);
 
     // ── Drag panel ─────────────────────────────────────
     useEffect(() => {
@@ -279,21 +305,20 @@ export default function PreGame() {
     // ── Handlers ───────────────────────────────────────
     const handleStartMatch = () => {
         if (!isAuthenticated) { navigate('/login'); return; }
-        
-        // Om man försöker joina slither men redan är i ett agar game (eller vice versa)
+
         if (isAlreadyInGame && !canRejoinThisMode) return;
 
         if (!canJoin && !isAlreadyInGame) { navigate('/lobby'); return; }
         setIsMatchmaking(true);
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
+        setCurrentGameMode(selectedMode);
+        localStorage.setItem('current_game_mode', selectedMode);
         const targetPath = selectedMode === 'slither' ? '/slither-game' : '/game';
         setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode } }), 1200);
     };
 
-    // Enkel kontroll om vi kan rejoina (Placeholder tills API returnerar mode)
-    // Om vi antar att "isAlreadyInGame" alltid är Agar just nu om man byter till Slither
-    const canRejoinThisMode = isAlreadyInGame && selectedMode === 'agar';
+    const canRejoinThisMode = isAlreadyInGame && currentGameMode && selectedMode === currentGameMode;
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return; }
@@ -385,7 +410,7 @@ export default function PreGame() {
         : !isAuthenticated ? 'Play Now'
         : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
         : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
-        : canJoin          ? 'Enter Arena'
+        : canJoin          ? 'Play'
         : 'Deposit to Play';
 
     // ── Render ─────────────────────────────────────────
@@ -404,13 +429,8 @@ export default function PreGame() {
                         </span>
                     </div>
 
-                    <button 
-                        onClick={() => navigate('/gamemodes')}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '1rem', fontWeight: 800, cursor: 'pointer', transition: 'color 0.2s' }}
-                        onMouseEnter={e => e.target.style.color = '#fff'}
-                        onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
-                    >
-                        GAME MODE
+                    <button className="gm-nav-link" onClick={() => navigate('/gamemodes')}>
+                        Gamemode
                     </button>
                 </div>
 
@@ -760,21 +780,9 @@ export default function PreGame() {
             {/* ── Center Card ── */}
             <div className="game-card" style={{ maxWidth: '480px', padding: '40px' }}>
                 {/* Mode info */}
-                <div 
-                    onClick={() => navigate('/gamemodes')}
-                    style={{ 
-                        marginBottom: '18px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', 
-                        borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', 
-                        justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                >
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Current Mode</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)' }}>
-                        {selectedMode === 'slither' ? 'Slither Normal' : 'Agar Normal'}
-                    </span>
+                <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="mode-title">{selectedMode === 'slither' ? 'Slither' : 'Agar'}</div>
+                    <button type="button" className="mode-variant-btn" disabled>Normal</button>
                 </div>
 
                 {/* Nickname field */}
