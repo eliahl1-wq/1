@@ -116,15 +116,15 @@ globalThis.game = class game {
         document.addEventListener("touchmove", evt => {
             var y = evt.touches[0].pageY;
             var x = evt.touches[0].pageX;
-            chX = (x - game_W / 2) / 65;
-            chY = (y - game_H / 2) / 65;
+            chX = (x - game_W / 2) / 100; // Ökat delaren för att minska känsligheten
+            chY = (y - game_H / 2) / 100; // Ökat delaren för att minska känsligheten
         })
 
         document.addEventListener("touchstart", evt => {
             var y = evt.touches[0].pageY;
             var x = evt.touches[0].pageX;
-            chX = (x - game_W / 2) / 65;
-            chY = (y - game_H / 2) / 65;
+            chX = (x - game_W / 2) / 100; // Ökat delaren för att minska känsligheten
+            chY = (y - game_H / 2) / 100; // Ökat delaren för att minska känsligheten
             mySnake[0].speed = 2;
         })
 
@@ -143,8 +143,8 @@ globalThis.game = class game {
         document.addEventListener("mousemove", evt => {
             var x = evt.offsetX == undefined ? evt.layerX : evt.offsetX;
             var y = evt.offsetY == undefined ? evt.layerY : evt.offsetY;
-            chX = (x - game_W / 2) / 65;
-            chY = (y - game_H / 2) / 65;
+            chX = (x - game_W / 2) / 100; // Ökat delaren för att minska känsligheten
+            chY = (y - game_H / 2) / 100; // Ökat delaren för att minska känsligheten
         })
 
         document.addEventListener("mouseup", evt => {
@@ -251,8 +251,8 @@ globalThis.game = class game {
             this.canvas.height = document.documentElement.clientHeight;
             globalThis.game_W = this.canvas.width;
             globalThis.game_H = this.canvas.height;
-            globalThis.SPEED = 0.4;
-            globalThis.MaxSpeed = this.getSize() / 24;
+            globalThis.SPEED = 0.1; // Sänkt basfarten
+            globalThis.MaxSpeed = this.getSize() / 40; // Sänkt maxhastigheten
             if (mySnake.length == 0)
                 return;
             if (mySnake[0].v != null) {
