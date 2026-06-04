@@ -246,8 +246,8 @@
   border: none;
   color: var(--text-2);
   font-family: var(--sans);
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 1.05rem;
+  font-weight: 800;
   cursor: pointer;
   padding: 0;
   letter-spacing: -0.01em;
@@ -285,6 +285,80 @@
 }
 .mode-variant-btn:disabled {
   opacity: 0.95;
+}
+
+.pre-game-grid {
+  width: min(100%, 1220px);
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) minmax(420px, 1fr) minmax(240px, 260px);
+  gap: 20px;
+  align-items: start;
+  margin-top: 18px;
+}
+
+.mode-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2xl);
+  padding: 32px 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  min-height: 320px;
+  text-align: center;
+}
+.mode-card-label {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.mode-card-title {
+  font-family: var(--sans);
+  font-size: clamp(2.25rem, 4vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.mode-card-action {
+  width: min(100%, 180px);
+  padding: 12px 0;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.mode-card-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(124, 58, 255, 0.22);
+}
+
+.leaderboard-tab {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--sans);
+  color: var(--text-2);
+  background: transparent;
+}
+.leaderboard-tab--active {
+  color: #fff;
+  background: rgba(255,255,255,0.08);
 }
 
 /* ─── Dropdown wallet card ─── */
@@ -501,6 +575,10 @@
   z-index: 10;
   animation: fadeUp 0.3s ease-out;
 }
+.game-card.main-card {
+  width: 100%;
+  max-width: none;
+}
 
 /* ─── Nickname input ─── */
 .nickname-input {
@@ -575,16 +653,30 @@
 
 /* ─── Live stats card ─── */
 .stats-card {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 176px;
-  background: rgba(8,9,13,0.9);
+  position: static;
+  width: 100%;
+  background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 10px 12px;
-  backdrop-filter: blur(20px);
-  z-index: 10;
+  border-radius: var(--r-2xl);
+  padding: 22px;
+  box-shadow: var(--shadow-xl);
+  backdrop-filter: none;
+  z-index: auto;
+}
+
+.side-stats-card {
+  min-height: 360px;
+}
+
+@media (max-width: 1120px) {
+  .pre-game-grid {
+    grid-template-columns: 1fr;
+  }
+  .mode-card,
+  .game-card.main-card,
+  .stats-card {
+    width: 100%;
+  }
 }
 
 /* ─── Footer links ─── */

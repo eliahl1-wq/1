@@ -1,11 +1,25 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import '../styles/ui.css';
 
 export default function Gamemodes() {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState('agar');
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState(
+        () => location.state?.selectedMode || localStorage.getItem('selected_gamemode') || 'agar'
+    );
+
+    useEffect(() => {
+        if (location.state?.selectedMode && location.state.selectedMode !== activeTab) {
+            setActiveTab(location.state.selectedMode);
+        }
+    }, [location.state?.selectedMode, activeTab]);
+
+    const handleTabChange = (mode) => {
+        setActiveTab(mode);
+        localStorage.setItem('selected_gamemode', mode);
+    };
 
     return (
         <div style={{ width: '100vw', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflowX: 'hidden' }}>
@@ -13,14 +27,14 @@ export default function Gamemodes() {
 
             {/* ── Top Bar ── */}
             <nav className="topbar">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
                     <div
                         className="logo"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
                         onClick={() => navigate('/pre-game')}
                     >
-                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
-                        <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff', fontFamily: 'var(--sans)' }}>
+                        <div style={{ width: 8, height: 8, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                        <span style={{ fontSize: '1.45rem', fontWeight: 900, letterSpacing: '-1.5px', color: '#fff', fontFamily: 'var(--sans)' }}>
                             AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                         </span>
                     </div>
@@ -47,13 +61,13 @@ export default function Gamemodes() {
                 <div className="gm-tabs">
                     <button
                         className={`gm-tab${activeTab === 'agar' ? ' gm-tab--active' : ''}`}
-                        onClick={() => setActiveTab('agar')}
+                        onClick={() => handleTabChange('agar')}
                     >
                         Agar
                     </button>
                     <button
                         className={`gm-tab${activeTab === 'slither' ? ' gm-tab--active' : ''}`}
-                        onClick={() => setActiveTab('slither')}
+                        onClick={() => handleTabChange('slither')}
                     >
                         Slither
                     </button>
@@ -64,10 +78,10 @@ export default function Gamemodes() {
                     {activeTab === 'agar' ? (
                         <>
                             <ModeCard
-                                title="Normal Arena"
+                                title="Agar Normal"
                                 desc="The classic high-stakes Agar experience. Grow, absorb, dominate."
                                 badge={null}
-                                onPlay={() => navigate('/pre-game')}
+                                onPlay={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                             />
                             <ModeCard
                                 title="Speed Arena"
@@ -101,8 +115,8 @@ export default function Gamemodes() {
                     background: none;
                     border: none;
                     font-family: var(--sans);
-                    font-size: 0.85rem;
-                    font-weight: 600;
+                    font-size: 1.05rem;
+                    font-weight: 800;
                     color: var(--text-2);
                     cursor: pointer;
                     padding: 0;

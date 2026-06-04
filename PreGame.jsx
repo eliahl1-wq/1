@@ -66,6 +66,12 @@ export default function PreGame() {
     }, [selectedMode]);
 
     useEffect(() => {
+        if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
+            setSelectedMode(location.state.selectedMode);
+        }
+    }, [location.state?.selectedMode, selectedMode]);
+
+    useEffect(() => {
         if (currentGameMode) {
             localStorage.setItem('current_game_mode', currentGameMode);
         } else {
@@ -418,10 +424,10 @@ export default function PreGame() {
             {/* ── Top Bar ── */}
             <nav className="topbar">
                 {/* Logo */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                    <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
-                        <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
-                        <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                    <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
+                        <div style={{ width: 8, height: 8, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
+                        <span style={{ fontSize: '1.45rem', fontWeight: 900, letterSpacing: '-1.5px', color: '#fff', fontFamily: 'var(--sans)' }}>
                             AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                         </span>
                     </div>
@@ -774,168 +780,144 @@ export default function PreGame() {
                 </div>
             )}
 
-            {/* ── Center Card ── */}
-            <div className="game-card" style={{ maxWidth: '480px', padding: '40px', textAlign: 'center' }}>
-                {/* Mode Header */}
-                <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div className="mode-title">{selectedMode === 'slither' ? 'Slither' : 'Agar'}</div>
-                    <button type="button" className="mode-variant-btn" disabled>Normal</button>
-                </div>
-
-                {/* Nickname field */}
-                <div style={{ marginBottom: '14px' }}>
-                    <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
-                        Nickname
-                    </label>
-                    <input
-                        type="text"
-                        value={nickname}
-                        onChange={e => setNickname(e.target.value)}
-                        maxLength={15}
-                        placeholder="Enter name…"
-                        className="nickname-input"
-                    />
-                </div>
-
-                {/* Divider */}
-                <div className="divider" style={{ marginBottom: '14px' }} />
-
-                {/* Entry fee row */}
-                <div className="entry-row" style={{ marginBottom: '12px' }}>
-                    <span className="label">Entry Fee</span>
-                    <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                        $10.00
-                    </span>
-                </div>
-
-                {/* Play button */}
-                <button
-                    className={playBtnClass}
-                    onClick={handleStartMatch}
-                    disabled={isMatchmaking}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                >
-                    {playBtnLabel}
-                </button>
-
-                {/* How it works */}
-                <div style={{ marginTop: '14px' }}>
-                    <div
-                        className="hiw-toggle"
-                        onClick={() => setShowHowItWorks(v => !v)}
+            {/* ── Main layout ── */}
+            <div className="pre-game-grid">
+                <div className="mode-card">
+                    <span className="mode-card-label">Gamemode</span>
+                    <div className="mode-card-title">{selectedMode === 'slither' ? 'SLITHER' : 'AGAR'}</div>
+                    <button
+                        type="button"
+                        className="mode-card-action"
+                        onClick={() => navigate('/gamemodes', { state: { selectedMode } })}
                     >
-                        <span>How it works</span>
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-                            style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
-                            <path d="M6 9l6 6 6-6" />
-                        </svg>
+                        Normal
+                    </button>
+                </div>
+
+                <div className="game-card main-card">
+                    {/* Nickname field */}
+                    <div style={{ marginBottom: '18px' }}>
+                        <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                            Nickname
+                        </label>
+                        <input
+                            type="text"
+                            value={nickname}
+                            onChange={e => setNickname(e.target.value)}
+                            maxLength={15}
+                            placeholder="Enter name…"
+                            className="nickname-input"
+                        />
                     </div>
-                    {showHowItWorks && (
-                        <div className="hiw-content">
-                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                <span>Entry fee</span>
-                                <span className="mono">$10.00</span>
-                            </div>
-                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                <span>Starting balance</span>
-                                <span className="mono">$1.00</span>
-                            </div>
-                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
-                                Eat food & other players. Cash out anytime.
-                            </div>
-                            <div className="divider" style={{ margin: '6px 0' }} />
-                            <div className="stat-row" style={{ marginBottom: '2px' }}>
-                                <span>1st place bonus</span>
-                                <span className="mono text-green">$20.00</span>
-                            </div>
-                            <div className="stat-row">
-                                <span>2nd–3rd place</span>
-                                <span className="mono text-green">$10.00</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
 
-            {/* ── Live Stats Card ── */}
-            <div className="stats-card">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span className="label">Live</span>
-                    <div className="live-dot" />
-                </div>
-                <div className="stat-row" style={{ marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                        {liveStats.playersOnline ?? 0}
-                    </span>
-                </div>
-                <div className="stat-row">
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                        {liveStats.topPlayer ?? '—'}
-                    </span>
-                </div>
-            </div>
+                    {/* Divider */}
+                    <div className="divider" style={{ marginBottom: '14px' }} />
 
-            {/* ── Leaderboard Card ── */}
-            <div style={{
-                position: 'fixed',
-                bottom: '20px',
-                left: '20px',
-                width: '200px',
-                background: 'rgba(8,9,13,0.9)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--r-lg)',
-                padding: '10px 12px',
-                backdropFilter: 'blur(20px)',
-                zIndex: 10
-            }}>
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.62rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Leaderboard</span>
-                </div>
+                    {/* Entry fee row */}
+                    <div className="entry-row" style={{ marginBottom: '18px' }}>
+                        <span className="label">Entry Fee</span>
+                        <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
+                            $10.00
+                        </span>
+                    </div>
 
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border)', marginBottom: '8px' }}>
-                    {[{ id: 'alltime', label: 'All Time' }, { id: 'week', label: 'This Week' }].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setLeaderboardTab(tab.id)}
-                            style={{
-                                flex: 1,
-                                padding: '4px 0',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '0.65rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                fontFamily: 'var(--sans)',
-                                background: leaderboardTab === tab.id ? 'rgba(255,255,255,0.08)' : 'transparent',
-                                color: leaderboardTab === tab.id ? '#fff' : 'var(--text-2)'
-                            }}
+                    {/* Play button */}
+                    <button
+                        className={playBtnClass}
+                        onClick={handleStartMatch}
+                        disabled={isMatchmaking}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                        {playBtnLabel}
+                    </button>
+
+                    {/* How it works */}
+                    <div style={{ marginTop: '16px' }}>
+                        <div
+                            className="hiw-toggle"
+                            onClick={() => setShowHowItWorks(v => !v)}
                         >
-                            {tab.label}
-                        </button>
-                    ))}
+                            <span>How it works</span>
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                                style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
+                        </div>
+                        {showHowItWorks && (
+                            <div className="hiw-content">
+                                <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                    <span>Entry fee</span>
+                                    <span className="mono">$10.00</span>
+                                </div>
+                                <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                    <span>Starting balance</span>
+                                    <span className="mono">$1.00</span>
+                                </div>
+                                <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
+                                    Eat food & other players. Cash out anytime.
+                                </div>
+                                <div className="divider" style={{ margin: '6px 0' }} />
+                                <div className="stat-row" style={{ marginBottom: '2px' }}>
+                                    <span>1st place bonus</span>
+                                    <span className="mono text-green">$20.00</span>
+                                </div>
+                                <div className="stat-row">
+                                    <span>2nd–3rd place</span>
+                                    <span className="mono text-green">$10.00</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Rows */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
-                        <div style={{ fontSize: '0.62rem', color: 'var(--text-3)', textAlign: 'center', padding: '6px 0' }}>No data yet</div>
-                    ) : (
-                        (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).slice(0, 5).map((entry, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
-                                <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 400 }}>
-                                    {i + 1}. {entry.username}
-                                </span>
-                                <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--green)' }}>
-                                    ${Number(entry.amount || entry.balance || 0).toFixed(2)}
-                                </span>
-                            </div>
-                        ))
-                    )}
+                <div className="stats-card side-stats-card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <span className="label">Live</span>
+                        <div className="live-dot" />
+                    </div>
+                    <div className="stat-row" style={{ marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
+                        <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                            {liveStats.playersOnline ?? 0}
+                        </span>
+                    </div>
+                    <div className="stat-row" style={{ marginBottom: '18px' }}>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                            {liveStats.topPlayer ?? '—'}
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Leaderboard</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '8px', marginBottom: '12px', border: '1px solid var(--border)' }}>
+                        {[{ id: 'alltime', label: 'All Time' }, { id: 'week', label: 'This Week' }].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setLeaderboardTab(tab.id)}
+                                className={leaderboardTab === tab.id ? 'leaderboard-tab leaderboard-tab--active' : 'leaderboard-tab'}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-3)', textAlign: 'center', padding: '8px 0' }}>No data yet</div>
+                        ) : (
+                            (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).slice(0, 5).map((entry, i) => (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
+                                    <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
+                                        {i + 1}. {entry.username}
+                                    </span>
+                                    <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)' }}>
+                                        ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
 
