@@ -427,11 +427,11 @@ export default function PreGame() {
             {/* ── Top Bar ── */}
             <nav className="topbar">
                 {/* Logo */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                    <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
-                        <div style={{ width: 8, height: 8, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
-                        <span style={{ fontSize: '1.45rem', fontWeight: 900, letterSpacing: '-1.5px', color: '#fff', fontFamily: 'var(--sans)' }}>
-                            AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
+                <div className="topbar-left">
+                    <div className="logo" onClick={() => navigate('/pre-game')}>
+                        <div className="logo-dot" />
+                        <span>
+                            AGAR<span className="logo-accent">STAKE</span>
                         </span>
                     </div>
 

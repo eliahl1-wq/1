@@ -139,14 +139,19 @@
   border-bottom: 1px solid var(--border);
   z-index: 1000;
 }
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
 
 /* ─── Logo ─── */
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-weight: 900;
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   letter-spacing: -1px;
   color: var(--text-h);
   text-decoration: none;
@@ -154,11 +159,11 @@
 }
 .logo-accent { color: var(--accent); }
 .logo-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   background: var(--accent);
   border-radius: 50%;
-  box-shadow: 0 0 8px var(--accent);
+  box-shadow: 0 0 10px var(--accent);
 }
 
 /* ─── User pill in topbar ─── */
@@ -290,11 +295,12 @@
 .pre-game-grid {
   width: min(100%, 1220px);
   display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(320px, 420px) minmax(220px, 300px);
+  grid-template-columns: 250px minmax(320px, 420px) 250px;
   gap: 20px;
   align-items: start;
+  justify-content: center;
   justify-items: center;
-  margin-top: 18px;
+  margin: 18px auto 0;
 }
 
 .mode-card {
@@ -309,7 +315,7 @@
   gap: 12px;
   min-height: 140px;
   width: 100%;
-  max-width: 520px;
+  max-width: 250px;
   text-align: center;
 }
 .mode-card-label {
@@ -686,6 +692,7 @@
 
 .side-stats-card {
   min-height: 220px;
+  max-width: 250px;
 }
 
 /* Live stats fixed bottom-left styling */
