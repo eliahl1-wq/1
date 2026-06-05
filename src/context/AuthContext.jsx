@@ -38,8 +38,15 @@ export const AuthProvider = ({ children }) => {
                     const contentType = res.headers.get("content-type");
                     if (res.ok && contentType && contentType.includes("application/json")) {
                         const userData = await res.json();
-                        setUser(userData);
-                        console.log('AuthContext: Användardata från /api/me:', userData);
+                        const formattedUser = {
+                            ...userData,
+                            balance: userData.balanceSol, // Fallback for components looking for .balance
+                            balanceSol: userData.balanceSol,
+                            balanceUsd: userData.balanceUsd,
+                            solPrice: userData.solPrice
+                        };
+                        setUser(formattedUser);
+                        console.log('AuthContext: Användardata från /api/me:', formattedUser);
                     } else {
                         console.log('AuthContext: /api/me misslyckades, tar bort token.');
                         if (res.status === 401 || res.status === 403) {
@@ -79,9 +86,16 @@ export const AuthProvider = ({ children }) => {
             const contentType = res.headers.get("content-type");
             if (res.ok && contentType && contentType.includes("application/json")) {
                 const userData = await res.json();
-                console.log(`[AuthContext] Refresh lyckades. Ny balans: ${userData.balance}. URL: ${url}`);
-                setUser(userData);
-                return userData;
+                const formattedUser = {
+                    ...userData,
+                    balance: userData.balanceSol,
+                    balanceSol: userData.balanceSol,
+                    balanceUsd: userData.balanceUsd,
+                    solPrice: userData.solPrice
+                };
+                console.log(`[AuthContext] Refresh lyckades. Ny balans: ${userData.balanceSol} SOL ($${userData.balanceUsd?.toFixed(2)} USD). URL: ${url}`);
+                setUser(formattedUser);
+                return formattedUser;
             }
         } catch (err) {
             console.error("AuthContext: Kunde inte uppdatera användardata:", err);
@@ -90,9 +104,20 @@ export const AuthProvider = ({ children }) => {
 
     const login = (userData, newToken) => {
         localStorage.setItem('token', newToken);
-        setUser(userData);
+        
+        // Safely handle both nested response objects and direct user structures
+        const base = userData.user || userData;
+        const formattedUser = {
+            ...base,
+            balance: base.balanceSol || base.balance,
+            balanceSol: base.balanceSol,
+            balanceUsd: base.balanceUsd,
+            solPrice: base.solPrice
+        };
+
+        setUser(formattedUser);
         setToken(newToken);
-        console.log('AuthContext: Användare inloggad, token sparad, user-state uppdaterad:', userData);
+        console.log('AuthContext: Användare inloggad, token sparad, user-state uppdaterad:', formattedUser);
     };
 
     const logout = () => {
