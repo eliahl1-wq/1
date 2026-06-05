@@ -317,8 +317,18 @@ export default function PreGame() {
         localStorage.setItem('match_nickname', nickname);
         setCurrentGameMode(selectedMode);
         localStorage.setItem('current_game_mode', selectedMode);
-        const targetPath = selectedMode === 'slither' ? '/slither-game' : '/game';
-        setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode } }), 1200);
+        (async () => {
+            try {
+                // Ensure entry fee paid on-chain before navigating
+                if (!isAlreadyInGame) {
+                    setStatusMsg('⏳ Processing entry payment...');
+                    const ok = await handleEntryPayment();
+                    if (!ok) { setIsMatchmaking(false); return; }
+                }
+                const targetPath = selectedMode === 'slither' ? '/slither-game' : '/game';
+                setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode } }), 300);
+            } catch (e) { setIsMatchmaking(false); setStatusMsg('❌ Could not join.'); }
+        })();
     };
 
     const canRejoinThisMode = isAlreadyInGame && currentGameMode && selectedMode === currentGameMode;
@@ -367,6 +377,49 @@ export default function PreGame() {
             if (m.includes('User rejected'))      setStatusMsg('❌ Cancelled in wallet.');
             else if (m.toLowerCase().includes('insufficient')) setStatusMsg('❌ Insufficient funds.');
             else setStatusMsg('❌ Deposit failed. Try again.');
+        }
+    };
+
+    // Entry payment flow: send $10 worth of SOL to house and verify with backend
+    const handleEntryPayment = async () => {
+        try {
+            if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return false; }
+            // Get entry info from backend
+            const r = await fetch(`${API_URL}/api/entry-info`, { headers: { Authorization: `Bearer ${token}` } });
+            if (!r.ok) { setStatusMsg('❌ Unable to get entry info'); return false; }
+            const info = await r.json();
+            const solAmt = info.solAmount;
+            const lamports = Math.round(solAmt * LAMPORTS_PER_SOL);
+
+            const tx = new Transaction().add(
+                SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: new PublicKey(info.houseAddress), lamports })
+            );
+            const { blockhash } = await connection.getLatestBlockhash();
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = publicKey;
+            const sig = await sendTransaction(tx, connection);
+            setStatusMsg('Confirming entry payment on-chain...');
+            const conf = await connection.confirmTransaction(sig, 'confirmed');
+            if (conf.value.err) throw new Error('Transaction failed on-chain.');
+
+            // Verify with backend
+            const vr = await fetch(`${API_URL}/api/entry-pay`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ signature: sig, solAmount: solAmt })
+            });
+            if (!vr.ok) {
+                const err = await vr.json().catch(() => ({}));
+                setStatusMsg(`❌ Entry verification failed: ${err.message || 'Unknown'}`);
+                return false;
+            }
+            setStatusMsg('✅ Entry payment received! Joining...');
+            return true;
+        } catch (err) {
+            const m = err.message || '';
+            if (m.includes('User rejected')) setStatusMsg('❌ Cancelled in wallet.');
+            else setStatusMsg('❌ Entry payment failed.');
+            return false;
         }
     };
 
