@@ -961,6 +961,12 @@ export default function PreGame() {
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
                             {liveStats.topPlayer ?? '—'}
+                            {liveStats.topPlayer ? (
+                                <>
+                                    {liveStats.topPlayer}{' '}
+                                    <span style={{ color: '#14f195', marginLeft: '4px' }}>${fmt(liveStats.biggestPayout * solPrice)}</span>
+                                </>
+                            ) : '—'}
                         </span>
                     </div>
 
@@ -1013,18 +1019,20 @@ export default function PreGame() {
                 transform: 'translateX(-50%)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '10px',
                 backgroundColor: 'rgba(10, 10, 12, 0.75)',
                 backdropFilter: 'blur(8px)',
-                padding: '8px 16px',
+                padding: '8px 18px',
                 borderRadius: '24px',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
                 fontSize: '0.85rem',
                 color: '#94a3b8',
                 fontFamily: 'monospace',
                 letterSpacing: '0.5px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+                zIndex: 1000
             }}>
+                {/* Glowing Live Indicator Dot */}
                 <span style={{
                     width: '8px',
                     height: '8px',
@@ -1033,7 +1041,25 @@ export default function PreGame() {
                     boxShadow: '0 0 10px #4ade80',
                     display: 'inline-block'
                 }}></span>
-                SOL PRICE: <span style={{ color: '#10b981', fontWeight: 'bold' }}>${solPrice ? solPrice.toFixed(2) : '57.00'} USD</span>
+
+                {/* Custom Solana Logo Image from public folder */}
+                <img 
+                    src="/solana-sol-logo.png" 
+                    alt="SOL" 
+                    style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        objectFit: 'contain' 
+                    }} 
+                />
+
+                {/* Text with dynamic price tracking and customized hex color */}
+                <span>
+                    SOL PRICE:{' '}
+                    <span style={{ color: '#14f195', fontWeight: 'bold' }}>
+                        ${user?.solPrice ? user.solPrice.toFixed(2) : '57.00'} USD
+                    </span>
+                </span>
             </div>
         </div>
     );
