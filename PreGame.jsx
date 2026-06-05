@@ -32,7 +32,11 @@ export default function PreGame() {
     const { connection } = useConnection();
 
     // ── State ──────────────────────────────────────────
-    const [solPrice] = useState(150);
+    const [solPrice, setSolPrice] = useState(57);
+    useEffect(() => {
+        if (user?.solPrice) setSolPrice(user.solPrice);
+    }, [user?.solPrice]);
+
     const [showUserMenu, setShowUserMenu]       = useState(false);
     const [isWalletOpen, setIsWalletOpen]       = useState(false);
     const [isWalletExpanded, setIsWalletExpanded]   = useState(false);
@@ -96,7 +100,7 @@ export default function PreGame() {
     const depositAddress    = user?.depositAddress;
     const SOL_ADDR_REGEX    = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const ENTRY_FEE         = 10.00;
-    const canJoin           = (user?.balance || 0) >= ENTRY_FEE;
+    const canJoin           = (user?.balance || 0) >= (ENTRY_FEE / solPrice);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -306,6 +310,27 @@ export default function PreGame() {
     }, []);
 
     // ── Handlers ───────────────────────────────────────
+    const handleCurrencyToggle = useCallback((newVal) => {
+        const becomingSOL = newVal === 'SOL';
+        if (becomingSOL === isCurSOL) return;
+
+        // Convert Deposit Amount
+        setAmount(prev => {
+            const num = parseFloat(prev);
+            if (!prev || isNaN(num)) return prev;
+            return becomingSOL ? (num / solPrice).toFixed(4) : (num * solPrice).toFixed(2);
+        });
+
+        // Convert Withdraw Amount
+        setWithdrawAmount(prev => {
+            const num = parseFloat(prev);
+            if (!prev || isNaN(num)) return prev;
+            return becomingSOL ? (num / solPrice).toFixed(4) : (num * solPrice).toFixed(2);
+        });
+
+        setIsCurSOL(becomingSOL);
+    }, [isCurSOL, solPrice]);
+
     const handleStartMatch = () => {
         if (!isAuthenticated) { navigate('/login'); return; }
 
@@ -509,9 +534,7 @@ export default function PreGame() {
                                             <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
                                         )}
                                         <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                                            {isCurSOL
-                                                ? (user.balance / solPrice).toFixed(2)
-                                                : `$${fmt(user.balance)}`}
+                                            {isCurSOL ? fmt(user.balance) : `$${fmt(user.balance * solPrice)}`}
                                         </span>
                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
                                             <path d="M6 9l6 6 6-6" />
@@ -533,7 +556,7 @@ export default function PreGame() {
                                                 <CustomDropdown
                                                     options={CUR_OPTIONS}
                                                     value={isCurSOL ? 'SOL' : 'USD'}
-                                                    onChange={v => setIsCurSOL(v === 'SOL')}
+                                                    onChange={handleCurrencyToggle}
                                                     renderValue={v => (
                                                         <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                             {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
@@ -556,14 +579,14 @@ export default function PreGame() {
                                                 )}
                                                 <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
                                                 {isCurSOL
-                                                    ? (user.balance / solPrice).toFixed(2)
-                                                    : fmt(user.balance)}
+                                                    ? fmt(user.balance)
+                                                    : fmt(user.balance * solPrice)}
                                                 </span>
                                             </div>
                                             <div className="wallet-card-sub">
                                                 {isCurSOL
-                                                    ? `≈ $${fmt(user.balance)} USD`
-                                                    : `≈ ${(user.balance / solPrice).toFixed(2)} SOL`}
+                                                    ? `≈ $${fmt(user.balance * solPrice)} USD`
+                                                    : `≈ ${fmt(user.balance)} SOL`}
                                             </div>
 
                                             {/* Action buttons */}
@@ -665,7 +688,7 @@ export default function PreGame() {
                                     <CustomDropdown
                                         options={CUR_OPTIONS}
                                         value={isCurSOL ? 'SOL' : 'USD'}
-                                        onChange={v => setIsCurSOL(v === 'SOL')}
+                                        onChange={handleCurrencyToggle}
                                         renderValue={v => (
                                             <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
@@ -782,7 +805,7 @@ export default function PreGame() {
                                 <CustomDropdown
                                     options={CUR_OPTIONS}
                                     value={isCurSOL ? 'SOL' : 'USD'}
-                                    onChange={v => setIsCurSOL(v === 'SOL')}
+                                    onChange={handleCurrencyToggle}
                                     renderValue={v => (
                                         <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
@@ -809,7 +832,7 @@ export default function PreGame() {
                                 />
                                 <button
                                     style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
-                                    onClick={() => setWithdrawAmount(user?.balance?.toFixed(2))}
+                                    onClick={() => setWithdrawAmount(isCurSOL ? user?.balance?.toFixed(4) : (user?.balance * solPrice).toFixed(2))}
                                 >
                                     MAX
                                 </button>
@@ -980,6 +1003,37 @@ export default function PreGame() {
                 <span>Provably Fair</span>
                 <span>Support</span>
                 <span style={{ opacity: 0.5 }}>EU-West · Online</span>
+            </div>
+
+            {/* ── Live Solana Price Tracker ── */}
+            <div style={{
+                position: 'absolute',
+                bottom: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: 'rgba(10, 10, 12, 0.75)',
+                backdropFilter: 'blur(8px)',
+                padding: '8px 16px',
+                borderRadius: '24px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                fontSize: '0.85rem',
+                color: '#94a3b8',
+                fontFamily: 'monospace',
+                letterSpacing: '0.5px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+            }}>
+                <span style={{
+                    width: '8px',
+                    height: '8px',
+                    backgroundColor: '#4ade80',
+                    borderRadius: '50%',
+                    boxShadow: '0 0 10px #4ade80',
+                    display: 'inline-block'
+                }}></span>
+                SOL PRICE: <span style={{ color: '#10b981', fontWeight: 'bold' }}>${solPrice ? solPrice.toFixed(2) : '57.00'} USD</span>
             </div>
         </div>
     );
