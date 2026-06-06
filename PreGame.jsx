@@ -213,7 +213,7 @@ export default function PreGame() {
                     headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                 });
                 if (r.ok && alive) setLiveStats(await r.json());
-            } catch {}
+            } catch (err) { console.warn("API swallow (stats):", err); }
         };
         fetchStats();
         const id = setInterval(fetchStats, 30000); 
@@ -235,7 +235,7 @@ export default function PreGame() {
                         week: d.week || []
                     });
                 }
-            } catch {}
+            } catch (err) { console.warn("API swallow (leaderboard):", err); }
         };
         fetchLeaderboard();
         const id = setInterval(fetchLeaderboard, 90000);
@@ -244,8 +244,13 @@ export default function PreGame() {
 
     // Balance poll
     useEffect(() => {
-        refreshUser();
-        const id = setInterval(refreshUser, 20000); // Minska polling till var 20:e sekund
+        const pollUser = async () => {
+            try {
+                await refreshUser();
+            } catch (err) { console.warn("API swallow (refreshUser):", err); }
+        };
+        pollUser();
+        const id = setInterval(pollUser, 20000); 
         return () => clearInterval(id);
     }, [refreshUser]);
 
@@ -269,7 +274,7 @@ export default function PreGame() {
                         localStorage.removeItem('current_game_mode');
                     }
                 }
-            } catch {}
+            } catch (err) { console.warn("API swallow (game-status):", err); }
         })();
     }, [token, selectedMode]);
 
@@ -534,7 +539,7 @@ export default function PreGame() {
                                             <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
                                         )}
                                         <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                                            {isCurSOL ? fmt(user.balance) : `$${fmt(user.balance * solPrice)}`}
+                                            {isCurSOL ? fmt(user.balance) : `$${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2)}`}
                                         </span>
                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
                                             <path d="M6 9l6 6 6-6" />
@@ -580,12 +585,12 @@ export default function PreGame() {
                                                 <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
                                                 {isCurSOL
                                                     ? fmt(user.balance)
-                                                    : fmt(user.balance * solPrice)}
+                                                    : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2))}
                                                 </span>
                                             </div>
                                             <div className="wallet-card-sub">
                                                 {isCurSOL
-                                                    ? `≈ $${fmt(user.balance * solPrice)} USD`
+                                                    ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2)} USD`
                                                     : `≈ ${fmt(user.balance)} SOL`}
                                             </div>
 
@@ -832,7 +837,7 @@ export default function PreGame() {
                                 />
                                 <button
                                     style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
-                                    onClick={() => setWithdrawAmount(isCurSOL ? user?.balance?.toFixed(4) : (user?.balance * solPrice).toFixed(2))}
+                                    onClick={() => setWithdrawAmount(isCurSOL ? user?.balance?.toFixed(4) : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2)))}
                                 >
                                     MAX
                                 </button>
@@ -1012,51 +1017,12 @@ export default function PreGame() {
             </div>
 
             {/* ── Live Solana Price Tracker ── */}
-            <div style={{
-                position: 'fixed',
-                bottom: '20px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                backgroundColor: 'rgba(10, 10, 12, 0.85)',
-                backdropFilter: 'blur(10px)',
-                padding: '10px 20px',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                fontSize: '0.85rem',
-                color: '#94a3b8',
-                fontFamily: 'monospace',
-                letterSpacing: '0.5px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.6)',
-                zIndex: 99999
-            }}>
-                {/* Glowing Indicator using neon green color */}
-                <span style={{
-                    width: '8px',
-                    height: '8px',
-                    backgroundColor: '#14f195',
-                    borderRadius: '50%',
-                    boxShadow: '0 0 10px #14f195',
-                    display: 'inline-block'
-                }}></span>
-
-                {/* Local Solana PNG Logo */}
-                <img 
-                    src="/solana-sol-logo.png" 
-                    alt="SOL" 
-                    style={{ width: '16px', height: '16px', objectFit: 'contain' }} 
-                />
-
-                {/* Dynamic Text Counter */}
-                <span>
-                    SOL PRICE:{' '}
-                    <span style={{ color: '#14f195', fontWeight: 'bold' }}>
-                        ${solPrice ? solPrice.toFixed(2) : '64.00'} USD
-                    </span>
-                </span>
-            </div>
+            {typeof solPrice === 'number' || solPrice ? (
+                <div style={{ position: 'fixed', bottom: '20px', left: '20px', background: 'rgba(10, 10, 12, 0.85)', border: '1px solid #14f195', padding: '10px 15px', borderRadius: '8px', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 15px rgba(20, 241, 149, 0.2)' }}>
+                    <span style={{ color: '#14f195', fontWeight: 'bold' }}>SOL Live:</span>
+                    <span style={{ color: '#ffffff', fontFamily: 'monospace' }}>${Number(solPrice || 57).toFixed(2)} USD</span>
+                </div>
+            ) : null}
         </div>
     );
 }
