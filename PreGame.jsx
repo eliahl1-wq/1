@@ -336,6 +336,10 @@ export default function PreGame() {
         setIsCurSOL(becomingSOL);
     }, [isCurSOL, solPrice]);
 
+    const displayBalance = !isCurSOL
+        ? `$${Number(user?.balanceUsd || 0).toFixed(2)}`
+        : `${Number(user?.balanceSol || 0).toFixed(4)} SOL`;
+
     const handleStartMatch = () => {
         if (!isAuthenticated) { navigate('/login'); return; }
 
