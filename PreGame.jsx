@@ -529,9 +529,7 @@ export default function PreGame() {
                                         <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
                                     )}
                                     <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                                        {isCurSOL 
-                                            ? `${(user?.balanceSol || 0).toFixed(4)} SOL` 
-                                            : `$${(user?.balanceUsd || (user?.balanceSol * solPrice) || 0).toFixed(2)}`}
+                                        {displayBalance}
                                     </span>
                                     <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
                                         <path d="M6 9l6 6 6-6" />
@@ -821,7 +819,7 @@ export default function PreGame() {
                                 />
                                 <button
                                     style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
-                                    onClick={() => setWithdrawAmount(isCurSOL ? (user?.balanceSol || 0).toFixed(4) : (user?.balanceUsd || (user?.balanceSol * solPrice) || 0).toFixed(2))}
+                                    onClick={() => setWithdrawAmount(isCurSOL ? Number(user?.balanceSol || 0).toFixed(4) : Number(user?.balanceUsd || 0).toFixed(2))}
                                 >
                                     MAX
                                 </button>
@@ -994,26 +992,41 @@ export default function PreGame() {
                 <span style={{ opacity: 0.5 }}>EU-West · Online</span>
             </div>
 
-            {/* ── Live Solana Price Tracker ── */}
-            <div style={{ 
+            {/* ── Live Arena Status & SOL Tracker (CSS Bypass) ── */}
+            <div className="stats-card live-stats-bottom" style={{ 
                 position: 'fixed', 
-                bottom: '24px', 
-                left: '24px', 
+                left: '20px', 
+                bottom: '20px', 
+                zIndex: 2147483647, // Högsta möjliga z-index för att ligga över bakgrunds-canvasen
                 background: '#0a0a0c', 
                 border: '1px solid #14f195', 
-                padding: '10px 16px', 
-                borderRadius: '8px', 
-                zIndex: 99999, 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                boxShadow: '0 0 20px rgba(20, 241, 149, 0.2)' 
+                padding: '12px 16px', 
+                borderRadius: '8px',
+                boxShadow: '0 0 20px rgba(20, 241, 149, 0.15)',
+                minWidth: '180px'
             }}>
-                <SolLogo size={14} />
-                <span style={{ color: '#14f195', fontWeight: '800', fontSize: '0.75rem', letterSpacing: '0.05em' }}>SOL LIVE:</span>
-                <span style={{ color: '#ffffff', fontFamily: 'monospace', fontWeight: '700', fontSize: '0.8rem' }}>
-                    ${Number(user?.solPrice || solPrice || 57).toFixed(2)} USD
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span className="label" style={{ color: 'var(--text-3)', fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 700 }}>Live Stats</span>
+                    <div className="live-dot" style={{ width: '6px', height: '6px', background: '#14f195', borderRadius: '50%', boxShadow: '0 0 8px #14f195' }} />
+                </div>
+                <div className="stat-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.72rem' }}>
+                    <span style={{ color: 'var(--text-2)' }}>Players:</span>
+                    <span className="mono" style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.playersOnline ?? 0}</span>
+                </div>
+                <div className="stat-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.72rem' }}>
+                    <span style={{ color: 'var(--text-2)' }}>Top:</span>
+                    <span style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.topPlayer ?? '—'}</span>
+                </div>
+                {/* SOL PRICE TRACKER */}
+                <div className="stat-row" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <SolLogo size={12} />
+                        <span style={{ fontSize: '0.65rem', color: '#14f195', fontWeight: 800 }}>SOL LIVE:</span>
+                    </div>
+                    <span className="mono" style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: 700 }}>
+                        ${Number(user?.solPrice || 57).toFixed(2)}
+                    </span>
+                </div>
             </div>
         </div>
     );
