@@ -1013,51 +1013,47 @@ export default function PreGame() {
 
             {/* ── Live Solana Price Tracker ── */}
             <div style={{
-                position: 'absolute',
+                position: 'fixed',
                 bottom: '20px',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                backgroundColor: 'rgba(10, 10, 12, 0.75)',
-                backdropFilter: 'blur(8px)',
-                padding: '8px 18px',
+                backgroundColor: 'rgba(10, 10, 12, 0.85)',
+                backdropFilter: 'blur(10px)',
+                padding: '10px 20px',
                 borderRadius: '24px',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
                 fontSize: '0.85rem',
                 color: '#94a3b8',
                 fontFamily: 'monospace',
                 letterSpacing: '0.5px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-                zIndex: 1000
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.6)',
+                zIndex: 99999
             }}>
-                {/* Glowing Live Indicator Dot */}
+                {/* Glowing Indicator using neon green color */}
                 <span style={{
                     width: '8px',
                     height: '8px',
-                    backgroundColor: '#4ade80',
+                    backgroundColor: '#14f195',
                     borderRadius: '50%',
-                    boxShadow: '0 0 10px #4ade80',
+                    boxShadow: '0 0 10px #14f195',
                     display: 'inline-block'
                 }}></span>
 
-                {/* Custom Solana Logo Image from public folder */}
+                {/* Local Solana PNG Logo */}
                 <img 
                     src="/solana-sol-logo.png" 
                     alt="SOL" 
-                    style={{ 
-                        width: '16px', 
-                        height: '16px', 
-                        objectFit: 'contain' 
-                    }} 
+                    style={{ width: '16px', height: '16px', objectFit: 'contain' }} 
                 />
 
-                {/* Text with dynamic price tracking and customized hex color */}
+                {/* Dynamic Text Counter */}
                 <span>
                     SOL PRICE:{' '}
                     <span style={{ color: '#14f195', fontWeight: 'bold' }}>
-                        ${user?.solPrice ? user.solPrice.toFixed(2) : '57.00'} USD
+                        ${solPrice ? solPrice.toFixed(2) : '64.00'} USD
                     </span>
                 </span>
             </div>
