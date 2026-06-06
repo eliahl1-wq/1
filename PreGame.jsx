@@ -995,9 +995,25 @@ export default function PreGame() {
             </div>
 
             {/* ── Live Solana Price Tracker ── */}
-            <div style={{ position: 'fixed', bottom: '20px', left: '20px', background: 'rgba(10, 10, 12, 0.85)', border: '1px solid #14f195', padding: '10px 15px', borderRadius: '8px', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 15px rgba(20, 241, 149, 0.2)' }}>
-                <span style={{ color: '#14f195', fontWeight: 'bold' }}>SOL Live:</span>
-                <span style={{ color: '#ffffff', fontFamily: 'monospace' }}>${Number(solPrice || 57).toFixed(2)} USD</span>
+            <div style={{ 
+                position: 'fixed', 
+                bottom: '24px', 
+                left: '24px', 
+                background: '#0a0a0c', 
+                border: '1px solid #14f195', 
+                padding: '10px 16px', 
+                borderRadius: '8px', 
+                zIndex: 99999, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                boxShadow: '0 0 20px rgba(20, 241, 149, 0.2)' 
+            }}>
+                <SolLogo size={14} />
+                <span style={{ color: '#14f195', fontWeight: '800', fontSize: '0.75rem', letterSpacing: '0.05em' }}>SOL LIVE:</span>
+                <span style={{ color: '#ffffff', fontFamily: 'monospace', fontWeight: '700', fontSize: '0.8rem' }}>
+                    ${Number(user?.solPrice || solPrice || 57).toFixed(2)} USD
+                </span>
             </div>
         </div>
     );
