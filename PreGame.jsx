@@ -100,7 +100,7 @@ export default function PreGame() {
     const depositAddress    = user?.depositAddress;
     const SOL_ADDR_REGEX    = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const ENTRY_FEE         = 10.00;
-    const canJoin           = (user?.balance || 0) >= (ENTRY_FEE / solPrice);
+    const canJoin           = (user?.balanceSol || 0) >= (ENTRY_FEE / solPrice);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -349,7 +349,6 @@ export default function PreGame() {
         localStorage.setItem('current_game_mode', selectedMode);
         (async () => {
             try {
-                // Ensure entry fee paid on-chain before navigating
                 if (!isAlreadyInGame) {
                     setStatusMsg('⏳ Processing entry payment...');
                     const ok = await handleEntryPayment();
@@ -410,11 +409,9 @@ export default function PreGame() {
         }
     };
 
-    // Entry payment flow: send $10 worth of SOL to house and verify with backend
     const handleEntryPayment = async () => {
         try {
             if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return false; }
-            // Get entry info from backend
             const r = await fetch(`${API_URL}/api/entry-info`, { headers: { Authorization: `Bearer ${token}` } });
             if (!r.ok) { setStatusMsg('❌ Unable to get entry info'); return false; }
             const info = await r.json();
@@ -432,7 +429,6 @@ export default function PreGame() {
             const conf = await connection.confirmTransaction(sig, 'confirmed');
             if (conf.value.err) throw new Error('Transaction failed on-chain.');
 
-            // Verify with backend
             const vr = await fetch(`${API_URL}/api/entry-pay`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -474,7 +470,6 @@ export default function PreGame() {
         } catch (e) { setStatusMsg(`❌ ${e.message}`); }
     };
 
-    // ── Panel position ─────────────────────────────────
     const panelStyle = {
         position: 'absolute',
         left:      panelPos.x !== null ? panelPos.x : '50%',
@@ -484,7 +479,6 @@ export default function PreGame() {
         transition: isDragging ? 'none' : undefined,
     };
 
-    // ── Play button variant ─────────────────────────────
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
         : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
         : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
@@ -499,14 +493,12 @@ export default function PreGame() {
         : canJoin          ? 'Play'
         : 'Deposit to Play';
 
-    // ── Render ─────────────────────────────────────────
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
             <Background />
 
             {/* ── Top Bar ── */}
             <nav className="topbar">
-                {/* Logo */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
                     <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('/pre-game')}>
                         <div style={{ width: 8, height: 8, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
@@ -520,109 +512,105 @@ export default function PreGame() {
                     </button>
                 </div>
 
-                {/* Nav right */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {isAuthenticated ? (
                         <>
-                            {/* Balance pill */}
-                            {(user?.balance || 0) > 0 && (
-                                <div style={{ position: 'relative' }}>
-                                    <button
-                                        id="balance-pill"
-                                        className="balance-pill mono"
-                                        onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
-                                        style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(124, 58, 255, 0.15)' } : {}}
-                                    >
-                                        {isCurSOL ? (
-                                            <SolLogo size={12} />
-                                        ) : (
-                                            <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
-                                        )}
-                                        <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                                            {isCurSOL ? fmt(user.balance) : `$${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2)}`}
-                                        </span>
-                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
-                                            <path d="M6 9l6 6 6-6" />
-                                        </svg>
-                                    </button>
-
-                                    {isWalletOpen && (
-                                        <div ref={walletDropRef} className="wallet-card">
-                                            {/* Header row */}
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                                <button
-                                                    onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
-                                                    style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer', padding: '2px 0', letterSpacing: '0.04em', textTransform: 'uppercase', transition: 'color 0.1s' }}
-                                                    onMouseEnter={e => e.target.style.color = 'var(--text-h)'}
-                                                    onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
-                                                >
-                                                    History
-                                                </button>
-                                                <CustomDropdown
-                                                    options={CUR_OPTIONS}
-                                                    value={isCurSOL ? 'SOL' : 'USD'}
-                                                    onChange={handleCurrencyToggle}
-                                                    renderValue={v => (
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
-                                                        </span>
-                                                    )}
-                                                    renderOption={opt => (
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
-                                                        </span>
-                                                    )}
-                                                />
-                                            </div>
-
-                                            {/* Balance */}
-                                            <div className="wallet-card-balance" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                {isCurSOL ? (
-                                                    <SolLogo size={28} />
-                                                ) : (
-                                                    <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>$</span>
-                                                )}
-                                                <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
-                                                {isCurSOL
-                                                    ? fmt(user.balance)
-                                                    : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2))}
-                                                </span>
-                                            </div>
-                                            <div className="wallet-card-sub">
-                                                {isCurSOL
-                                                    ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2)} USD`
-                                                    : `≈ ${fmt(user.balance)} SOL`}
-                                            </div>
-
-                                            {/* Action buttons */}
-                                            <div className="wallet-card-actions">
-                                                <button
-                                                    className="btn btn-primary"
-                                                    onClick={() => { setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('wallet'); }}
-                                                >
-                                                    Deposit
-                                                </button>
-                                                <button
-                                                    className="btn btn-ghost"
-                                                    onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(false); setIsWithdrawExpanded(true); }}
-                                                >
-                                                    Withdraw
-                                                </button>
-                                            </div>
-                                        </div>
+                            {/* Balance pill - FIXAD: Kontrollerar nu bara inloggningsstatus istället för gamla .balance */}
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    id="balance-pill"
+                                    className="balance-pill mono"
+                                    onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
+                                    style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(124, 58, 255, 0.15)' } : {}}
+                                >
+                                    {isCurSOL ? (
+                                        <SolLogo size={12} />
+                                    ) : (
+                                        <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
                                     )}
-                                </div>
-                            )}
+                                    <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                                        {isCurSOL ? fmt(user?.balanceSol) : `$${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)}`}
+                                    </span>
+                                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
+                                        <path d="M6 9l6 6 6-6" />
+                                    </svg>
+                                </button>
+
+                                {isWalletOpen && (
+                                    <div ref={walletDropRef} className="wallet-card">
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                            <button
+                                                onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
+                                                style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer', padding: '2px 0', letterSpacing: '0.04em', textTransform: 'uppercase', transition: 'color 0.1s' }}
+                                                onMouseEnter={e => e.target.style.color = 'var(--text-h)'}
+                                                onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
+                                            >
+                                                History
+                                            </button>
+                                            <CustomDropdown
+                                                options={CUR_OPTIONS}
+                                                value={isCurSOL ? 'SOL' : 'USD'}
+                                                onChange={handleCurrencyToggle}
+                                                renderValue={v => (
+                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
+                                                    </span>
+                                                )}
+                                                renderOption={opt => (
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
+                                                    </span>
+                                                )}
+                                            />
+                                        </div>
+
+                                        <div className="wallet-card-balance" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {isCurSOL ? (
+                                                <SolLogo size={28} />
+                                            ) : (
+                                                <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>$</span>
+                                            )}
+                                            <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
+                                                {/* FIXAD: Ändrad från .balance till .balanceSol */}
+                                                {isCurSOL
+                                                    ? fmt(user?.balanceSol)
+                                                    : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2))}
+                                            </span>
+                                        </div>
+                                        <div className="wallet-card-sub">
+                                            {/* FIXAD: Ändrad från .balance till .balanceSol */}
+                                            {isCurSOL
+                                                ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)} USD`
+                                                : `≈ ${fmt(user?.balanceSol)} SOL`}
+                                        </div>
+
+                                        <div className="wallet-card-actions">
+                                            <button
+                                                className="btn btn-primary"
+                                                onClick={() => { setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('wallet'); }}
+                                            >
+                                                Deposit
+                                            </button>
+                                            <button
+                                                className="btn btn-ghost"
+                                                onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(false); setIsWithdrawExpanded(true); }}
+                                            >
+                                                Withdraw
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Deposit button */}
                             <button
                                 className="nav-deposit-btn"
                                 onClick={() => {
-                                    if ((user?.balance || 0) === 0) navigate('/lobby');
+                                    if ((user?.balanceSol || 0) === 0) navigate('/lobby');
                                     else { setIsWalletOpen(false); setIsWalletExpanded(true); }
                                 }}
                             >
-                                {(user?.balance || 0) === 0 ? '+ Add funds' : 'Deposit'}
+                                {(user?.balanceSol || 0) === 0 ? '+ Add funds' : 'Deposit'}
                             </button>
 
                             {/* User avatar pill */}
@@ -669,7 +657,6 @@ export default function PreGame() {
                         <button className="float-panel-close" onClick={() => { setIsWalletExpanded(false); setStatusMsg(''); }}>✕</button>
                     </div>
 
-                    {/* Tab bar */}
                     <div className="tab-bar">
                         <button className={`tab-btn${depositMethod === 'wallet' ? ' active' : ''}`} onClick={() => setDepositMethod('wallet')}>
                             Wallet
@@ -681,12 +668,10 @@ export default function PreGame() {
 
                     {depositMethod === 'wallet' ? (
                         <>
-                            {/* Wallet connect */}
                             <div style={{ display: 'flex', justifyContent: 'center' }}>
                                 <WalletMultiButton />
                             </div>
 
-                            {/* Amount row */}
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                                     <span className="label">Amount</span>
@@ -732,7 +717,6 @@ export default function PreGame() {
                             </button>
                         </>
                     ) : (
-                        /* QR / Address tab */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
                             <div ref={qrRef} className="qr-container" />
                             <div style={{ width: '100%' }}>
@@ -771,7 +755,6 @@ export default function PreGame() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {/* Address */}
                         <div>
                             <div className="label" style={{ marginBottom: '5px' }}>Destination Address</div>
                             <div style={{ position: 'relative' }}>
@@ -803,7 +786,6 @@ export default function PreGame() {
                             )}
                         </div>
 
-                        {/* Amount */}
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
                                 <span className="label">Amount</span>
@@ -837,7 +819,7 @@ export default function PreGame() {
                                 />
                                 <button
                                     style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
-                                    onClick={() => setWithdrawAmount(isCurSOL ? user?.balance?.toFixed(4) : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balance * solPrice || 0).toFixed(2)))}
+                                    onClick={() => setWithdrawAmount(isCurSOL ? user?.balanceSol?.toFixed(4) : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)))}
                                 >
                                     MAX
                                 </button>
@@ -876,7 +858,6 @@ export default function PreGame() {
                 </div>
 
                 <div className="game-card main-card">
-                    {/* Nickname field */}
                     <div style={{ marginBottom: '18px' }}>
                         <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
                             Nickname
@@ -891,10 +872,8 @@ export default function PreGame() {
                         />
                     </div>
 
-                    {/* Divider */}
                     <div className="divider" style={{ marginBottom: '14px' }} />
 
-                    {/* Entry fee row */}
                     <div className="entry-row" style={{ marginBottom: '18px' }}>
                         <span className="label">Entry Fee</span>
                         <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
@@ -902,7 +881,6 @@ export default function PreGame() {
                         </span>
                     </div>
 
-                    {/* Play button */}
                     <button
                         className={playBtnClass}
                         onClick={handleStartMatch}
@@ -912,7 +890,6 @@ export default function PreGame() {
                         {playBtnLabel}
                     </button>
 
-                    {/* How it works */}
                     <div style={{ marginTop: '16px' }}>
                         <div
                             className="hiw-toggle"
@@ -965,7 +942,6 @@ export default function PreGame() {
                     <div className="stat-row" style={{ marginBottom: '18px' }}>
                         <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                            {liveStats.topPlayer ?? '—'}
                             {liveStats.topPlayer ? (
                                 <>
                                     {liveStats.topPlayer}{' '}
@@ -1017,12 +993,10 @@ export default function PreGame() {
             </div>
 
             {/* ── Live Solana Price Tracker ── */}
-            {typeof solPrice === 'number' || solPrice ? (
-                <div style={{ position: 'fixed', bottom: '20px', left: '20px', background: 'rgba(10, 10, 12, 0.85)', border: '1px solid #14f195', padding: '10px 15px', borderRadius: '8px', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 15px rgba(20, 241, 149, 0.2)' }}>
-                    <span style={{ color: '#14f195', fontWeight: 'bold' }}>SOL Live:</span>
-                    <span style={{ color: '#ffffff', fontFamily: 'monospace' }}>${Number(solPrice || 57).toFixed(2)} USD</span>
-                </div>
-            ) : null}
+            <div style={{ position: 'fixed', bottom: '20px', left: '20px', background: 'rgba(10, 10, 12, 0.85)', border: '1px solid #14f195', padding: '10px 15px', borderRadius: '8px', zIndex: 9999, display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 15px rgba(20, 241, 149, 0.2)' }}>
+                <span style={{ color: '#14f195', fontWeight: 'bold' }}>SOL Live:</span>
+                <span style={{ color: '#ffffff', fontFamily: 'monospace' }}>${Number(solPrice || 57).toFixed(2)} USD</span>
+            </div>
         </div>
     );
 }
