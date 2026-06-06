@@ -529,7 +529,9 @@ export default function PreGame() {
                                         <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
                                     )}
                                     <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                                        {isCurSOL ? fmt(user?.balanceSol) : `$${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)}`}
+                                        {isCurSOL 
+                                            ? `${(user?.balanceSol || 0).toFixed(4)} SOL` 
+                                            : `$${(user?.balanceUsd || (user?.balanceSol * solPrice) || 0).toFixed(2)}`}
                                     </span>
                                     <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
                                         <path d="M6 9l6 6 6-6" />
@@ -819,7 +821,7 @@ export default function PreGame() {
                                 />
                                 <button
                                     style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
-                                    onClick={() => setWithdrawAmount(isCurSOL ? user?.balanceSol?.toFixed(4) : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)))}
+                                    onClick={() => setWithdrawAmount(isCurSOL ? (user?.balanceSol || 0).toFixed(4) : (user?.balanceUsd || (user?.balanceSol * solPrice) || 0).toFixed(2))}
                                 >
                                     MAX
                                 </button>
@@ -945,7 +947,7 @@ export default function PreGame() {
                             {liveStats.topPlayer ? (
                                 <>
                                     {liveStats.topPlayer}{' '}
-                                    <span style={{ color: '#14f195', marginLeft: '4px' }}>${fmt(liveStats.biggestPayout * solPrice)}</span>
+                                    <span style={{ color: '#14f195', marginLeft: '4px' }}>${(liveStats.biggestPayout || 0).toFixed(2)}</span>
                                 </>
                             ) : '—'}
                         </span>
