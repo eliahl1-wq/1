@@ -575,13 +575,13 @@ export default function PreGame() {
                                                 {/* FIXAD: Ändrad från .balance till .balanceSol */}
                                                 {isCurSOL
                                                     ? fmt(user?.balanceSol)
-                                                    : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2))}
+                                                    : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2))}
                                             </span>
                                         </div>
                                         <div className="wallet-card-sub">
                                             {/* FIXAD: Ändrad från .balance till .balanceSol */}
                                             {isCurSOL
-                                                ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)} USD`
+                                                ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2)} USD`
                                                 : `≈ ${fmt(user?.balanceSol)} SOL`}
                                         </div>
 
