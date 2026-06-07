@@ -1002,6 +1002,8 @@ export default function PreGame() {
                 left: '20px', 
                 bottom: '20px', 
                 zIndex: 2147483647, // Högsta möjliga z-index för att ligga över bakgrunds-canvasen
+                zIndex: '2147483647',
+                isolation: 'isolate',
                 background: '#0a0a0c', 
                 border: '1px solid #14f195', 
                 padding: '12px 16px', 
