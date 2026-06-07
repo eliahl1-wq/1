@@ -25,6 +25,7 @@ export default function Game() {
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null });
     const myIdRef = useRef(null);
+    const timerIntervalRef = useRef(null);
     const animationFrameId = useRef(null);
     
     const WORLD_SIZE = 18000; // Synka med serverns nya storlek
@@ -106,22 +107,35 @@ export default function Game() {
         });
 
         const startCashoutCountdown = (seconds) => {
-            global.cashOutTimer = seconds;
-            setLocalTimer(seconds);
-            const timerInterval = setInterval(() => {
-                global.cashOutTimer--;
-                setLocalTimer(prev => prev - 1);
-                if (global.cashOutTimer <= 0) {
-                    clearInterval(timerInterval);
-                }
-                if (!socketRef.current?.connected) clearInterval(timerInterval);
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            
+            let timeLeft = seconds;
+            global.cashOutTimer = timeLeft;
+            setLocalTimer(timeLeft);
+
+            const intervalId = setInterval(() => {
+                setLocalTimer(prev => {
+                    const next = Math.max(0, prev - 1);
+                    global.cashOutTimer = next;
+                    if (next <= 0 || !socketRef.current?.connected) {
+                        clearInterval(intervalId);
+                        timerIntervalRef.current = null;
+                    }
+                    return next;
+                });
             }, 1000);
+            timerIntervalRef.current = intervalId;
         };
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
             gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardInfo };
+            // 1. Fix Balance Sync: Extract specific player and convert SOL balance to live USD
             const me = userData.find(p => p.id === myIdRef.current);
-            setCurrentBalance(me?.balance ?? 0); // Use nullish coalescing to default to 0 if me or me.balance is undefined
+            if (me && rewardInfo?.solPrice) {
+                setCurrentBalance(me.balance * rewardInfo.solPrice);
+            } else {
+                setCurrentBalance(0);
+            }
         });
 
         socket.on('leaderboard', (data) => {
@@ -129,7 +143,10 @@ export default function Game() {
         });
 
         socket.on('cashOutSuccess', ({ amount }) => {
-            setCashedAmount(amount);
+            // Sync success display with USD value using live price
+            const solPrice = gameData.current.rewardInfo?.solPrice || 57;
+            const usdAmount = amount * solPrice;
+            setCashedAmount(usdAmount);
             
             // Professional count-up animation for money being "added" to balance
             const startTime = performance.now();
@@ -138,7 +155,7 @@ export default function Game() {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
                 const eased = 1 - Math.pow(1 - progress, 4); // Ease-out Quart
-                setDisplayCashedAmount(eased * amount);
+                setDisplayCashedAmount(eased * usdAmount);
                 if (progress < 1) requestAnimationFrame(animate);
             };
             requestAnimationFrame(animate);
@@ -200,6 +217,7 @@ export default function Game() {
             cancelAnimationFrame(animationFrameId.current);
             console.log('Cleaning up socket connection on component unmount or auth change...');
             window.removeEventListener('keydown', handleKeyDown);
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             if (socketRef.current) {
                 socketRef.current.off(); // Ta bort alla lyssnare
                 socketRef.current.disconnect(); // Koppla bort socketen
