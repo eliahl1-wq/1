@@ -516,7 +516,7 @@ export default function PreGame() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {isAuthenticated ? (
                         <>
-                            {/* Balance pill - FIXAD: Kontrollerar nu bara inloggningsstatus istället för gamla .balance */}
+                            {/* Balance pill */}
                             <div style={{ position: 'relative' }}>
                                 <button
                                     id="balance-pill"
@@ -572,14 +572,12 @@ export default function PreGame() {
                                                 <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>$</span>
                                             )}
                                             <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
-                                                {/* FIXAD: Ändrad från .balance till .balanceSol */}
                                                 {isCurSOL
                                                     ? fmt(user?.balanceSol)
                                                     : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2))}
                                             </span>
                                         </div>
                                         <div className="wallet-card-sub">
-                                            {/* FIXAD: Ändrad från .balance till .balanceSol */}
                                             {isCurSOL
                                                 ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2)} USD`
                                                 : `≈ ${fmt(user?.balanceSol)} SOL`}
