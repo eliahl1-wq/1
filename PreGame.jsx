@@ -32,7 +32,7 @@ export default function PreGame() {
     const { connection } = useConnection();
 
     // ── State ──────────────────────────────────────────
-    const activeSolPrice = Number(user?.solPrice || 57);
+    const activeSolPrice = Number(liveStats?.solPrice || user?.solPrice || 64);
 
     const [showUserMenu, setShowUserMenu]       = useState(false);
     const [isWalletOpen, setIsWalletOpen]       = useState(false);
