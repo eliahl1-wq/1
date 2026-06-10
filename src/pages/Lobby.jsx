@@ -26,15 +26,30 @@ export default function Lobby() {
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
 
-    const [depositAmount, setDepositAmount]   = useState('');
-    const [statusMsg, setStatusMsg]           = useState('');
-    const [arenaError, setArenaError]         = useState('');
+    const [depositAmount, setDepositAmount] = useState('');
+    const [statusMsg, setStatusMsg] = useState('');
+    const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [depositMethod, setDepositMethod]   = useState('wallet');
-    const [isCurSOL, setIsCurSOL]             = useState(false);
+    const [depositMethod, setDepositMethod] = useState('wallet');
+    const [isCurSOL, setIsCurSOL] = useState(false);
+    const [onChainBalance, setOnChainBalance] = useState(null);
     const solPrice = user?.solPrice || 64;
 
-    const qrRef       = useRef(null);
+    // Hämta blockkedje-saldo för att undvika databasfel
+    useEffect(() => {
+        if (!connection || !user?.depositAddress) return;
+        const fetchBal = async () => {
+            try {
+                const b = await connection.getBalance(new PublicKey(user.depositAddress));
+                setOnChainBalance(b / LAMPORTS_PER_SOL);
+            } catch (e) { }
+        };
+        fetchBal();
+        const id = setInterval(fetchBal, 10000);
+        return () => clearInterval(id);
+    }, [connection, user?.depositAddress]);
+
+    const qrRef = useRef(null);
     const userMenuRef = useRef(null);
     const userPillRef = useRef(null);
 
@@ -42,7 +57,7 @@ export default function Lobby() {
 
     const statusClass = statusMsg.startsWith('✅') || statusMsg.includes('copied')
         ? 'success' : (statusMsg.includes('failed') || statusMsg.includes('Error') || statusMsg.startsWith('❌'))
-        ? 'error' : 'info';
+            ? 'error' : 'info';
 
     // Pre-fill deposit amount from redirect
     useEffect(() => {
@@ -53,7 +68,7 @@ export default function Lobby() {
                 localStorage.removeItem('pending_deposit');
                 setStatusMsg('Amount prefilled — complete deposit below.');
             }
-        } catch {}
+        } catch { }
     }, [connected]);
 
     // Click outside user menu
@@ -80,7 +95,7 @@ export default function Lobby() {
                         headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
                     });
                     if (r.ok) { const d = await r.json(); setIsAlreadyInGame(d.inGame); }
-                } catch {}
+                } catch { }
             };
             check();
             const id = setInterval(refreshUser, 5000);
@@ -96,7 +111,7 @@ export default function Lobby() {
             try {
                 const qr = createQR(`solana:${depositAddress}?amount=0&label=AgarStake&message=Deposit`, 190, 'white', 'black');
                 qr.append(qrRef.current);
-            } catch {}
+            } catch { }
         } else if (qrRef.current && !shouldShow) {
             qrRef.current.innerHTML = '';
         }
@@ -150,6 +165,8 @@ export default function Lobby() {
         }
     };
 
+    const currentBalanceSol = onChainBalance !== null ? onChainBalance : (user?.balance || 0);
+
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <Background />
@@ -181,18 +198,18 @@ export default function Lobby() {
                                     {user.username?.charAt(0).toUpperCase()}
                                 </div>
                             </div>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-h)' }}>
-                                    {user.username}
-                                </span>
-                                <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    {isCurSOL
-                                        ? <><SolLogo size={12} /> {(user.balance / solPrice).toFixed(4)}</>
-                                        : `$${(user.balance || 0).toFixed(2)}`}
-                                </span>
-                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-                                    style={{ opacity: 0.35, transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                                    <path d="M6 9l6 6 6-6" />
-                                </svg>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-h)' }}>
+                                {user.username}
+                            </span>
+                            <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {isCurSOL
+                                    ? <><SolLogo size={12} /> {currentBalanceSol.toFixed(4)}</>
+                                    : `$${(currentBalanceSol * solPrice).toFixed(2)}`}
+                            </span>
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                                style={{ opacity: 0.35, transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
 
                             {showUserMenu && (
                                 <div ref={userMenuRef} className="user-menu">

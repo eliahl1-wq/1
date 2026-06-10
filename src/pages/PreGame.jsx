@@ -45,6 +45,22 @@ export default function PreGame() {
     const [isCurSOL, setIsCurSOL] = useState(false);
     const [statusMsg, setStatusMsg] = useState('');
     const [isMatchmaking, setIsMatchmaking] = useState(false);
+    const [onChainBalance, setOnChainBalance] = useState(null);
+
+    // Hämtar faktiskt saldo direkt från Solana-nätverket för att fixa "2109 dollar"-felet
+    useEffect(() => {
+        if (!connection || !user?.depositAddress) return;
+        const fetchRealTimeBalance = async () => {
+            try {
+                const bal = await connection.getBalance(new PublicKey(user.depositAddress));
+                setOnChainBalance(bal / LAMPORTS_PER_SOL);
+            } catch (e) { console.warn("Kunde inte hämta live-saldo:", e); }
+        };
+        fetchRealTimeBalance();
+        const id = setInterval(fetchRealTimeBalance, 10000); // Uppdatera var 10:e sekund
+        return () => clearInterval(id);
+    }, [connection, user?.depositAddress]);
+
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
@@ -98,9 +114,11 @@ export default function PreGame() {
     const depositAddress = user?.depositAddress;
     const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const ENTRY_FEE = 10.00;
-    // user.balance is raw SOL; use balanceUsd (computed by server) for USD comparisons
-    const balanceSol = user?.balanceSol ?? user?.balance ?? 0;
-    const balanceUsd = user?.balanceUsd ?? (balanceSol * solPrice) ?? 0;
+
+    // Prioritera on-chain balance (0.22 SOL) framför databasens felaktiga värden (32 SOL)
+    const balanceSol = onChainBalance !== null ? onChainBalance : (user?.balanceSol ?? user?.balance ?? 0);
+    const balanceUsd = balanceSol * solPrice;
+
     const canJoin = balanceUsd >= ENTRY_FEE;
 
     // ── Format helpers ─────────────────────────────────
@@ -934,17 +952,18 @@ export default function PreGame() {
                 </div>
             </div>
 
-            {/* SOL Price pill — standalone, next to the LIVE box */}
-            <div style={{
-                position: 'fixed', left: 16, bottom: 16,
-                marginLeft: 'calc(140px + 10px)',   /* offset past the LIVE card */
-                display: 'flex', alignItems: 'center', gap: '6px',
-                background: 'var(--bg-1)', border: '1px solid var(--border)',
-                borderRadius: '20px', padding: '5px 10px 5px 7px',
-                boxShadow: 'var(--shadow-xl)', zIndex: 1050,
+            {/* SOL Price Tracker — Flyttad till höger och stylad som LIVE-rutan */}
+            <div className="stats-card" style={{
+                position: 'fixed', left: '215px', bottom: '16px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: '#0a0a0c', border: '1px solid #14f195',
+                padding: '10px 14px', borderRadius: '8px',
+                boxShadow: '0 0 20px rgba(20, 241, 149, 0.15)',
+                zIndex: 1050, minWidth: 'auto'
             }}>
                 <SolLogo size={14} />
-                <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
+                <span style={{ fontSize: '0.65rem', color: '#14f195', fontWeight: 800, letterSpacing: '0.05em' }}>SOL PRICE:</span>
+                <span className="mono" style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 700 }}>
                     ${solPrice.toFixed(2)}
                 </span>
             </div>
