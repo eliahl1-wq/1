@@ -7,6 +7,8 @@ import { normalizeBREntryFee, formatUsd } from '../constants/economy';
 import '../styles/ui.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
+const MIN_PLAYERS = 5;
+const MAX_PLAYERS = 10;
 
 export default function BRLobby() {
     const navigate = useNavigate();
@@ -15,18 +17,27 @@ export default function BRLobby() {
     const freePlay = !!user?.freePlay;
     const socketRef = useRef(null);
     const joinedRef = useRef(false);
+    const matchStartedRef = useRef(false);
+    const graceRef = useRef(null);
 
     const variant = location.state?.variant || localStorage.getItem('selected_gamemode')?.replace('br-', '') || 'agar';
     const entryFeeUsd = normalizeBREntryFee(
         location.state?.entryFeeUsd ?? localStorage.getItem('selected_entry_fee')
     );
+    const brMode = variant === 'slither' ? 'br-slither' : 'br-agar';
 
     const [queueStatus, setQueueStatus] = useState(null);
     const [countdown, setCountdown] = useState(null);
     const [error, setError] = useState('');
     const [joining, setJoining] = useState(false);
+    const [tick, setTick] = useState(0);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
+
+    useEffect(() => {
+        const id = setInterval(() => setTick(t => t + 1), 1000);
+        return () => clearInterval(id);
+    }, []);
 
     useEffect(() => {
         document.title = 'AgarStake | Battle Royale Queue';
@@ -35,7 +46,7 @@ export default function BRLobby() {
             return;
         }
 
-        localStorage.setItem('selected_gamemode', variant === 'slither' ? 'br-slither' : 'br-agar');
+        localStorage.setItem('selected_gamemode', brMode);
         localStorage.setItem('selected_entry_fee', String(entryFeeUsd));
 
         const socket = io(API_URL, {
@@ -56,9 +67,15 @@ export default function BRLobby() {
             setQueueStatus(status);
             setError('');
             setJoining(false);
+            if (status.graceRemainingMs != null && status.graceRemainingMs > 0) {
+                graceRef.current = { at: Date.now(), ms: status.graceRemainingMs };
+            } else if (!status.searching) {
+                graceRef.current = null;
+            }
         });
 
         socket.on('brMatchCountdown', ({ seconds, prizePool, playerCount, variant: v }) => {
+            matchStartedRef.current = true;
             const mode = v === 'slither' ? 'br-slither' : 'br-agar';
             localStorage.setItem('selected_gamemode', mode);
             localStorage.setItem('current_game_mode', mode);
@@ -77,17 +94,31 @@ export default function BRLobby() {
         });
 
         return () => {
-            socket.emit('brLeaveQueue');
+            if (!matchStartedRef.current) {
+                socket.emit('brLeaveQueue');
+            }
             socket.off();
             socket.disconnect();
             joinedRef.current = false;
         };
-    }, [token, variant, entryFeeUsd, navigate, matchNickname]);
+    }, [token, variant, entryFeeUsd, navigate, matchNickname, brMode]);
 
     const leaveQueue = () => {
-        socketRef.current?.emit('brLeaveQueue');
-        navigate('/pre-game', { state: { selectedMode: variant === 'slither' ? 'br-slither' : 'br-agar' } });
+        if (!matchStartedRef.current) {
+            socketRef.current?.emit('brLeaveQueue');
+        }
+        navigate('/pre-game', { state: { selectedMode: brMode } });
     };
+
+    const playersInQueue = queueStatus?.playersInQueue ?? 0;
+    const minPlayers = queueStatus?.minPlayers ?? MIN_PLAYERS;
+    const maxPlayers = queueStatus?.maxPlayers ?? MAX_PLAYERS;
+    const needMore = Math.max(0, minPlayers - playersInQueue);
+    const fillPct = Math.min(100, (playersInQueue / minPlayers) * 100);
+
+    const graceSecondsLeft = graceRef.current
+        ? Math.max(0, Math.ceil((graceRef.current.ms - (Date.now() - graceRef.current.at)) / 1000))
+        : null;
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
@@ -113,53 +144,106 @@ export default function BRLobby() {
                     <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '2px', color: 'var(--accent)', marginBottom: '12px' }}>
                         BATTLE ROYALE — {variant.toUpperCase()} · {freePlay ? 'FREE (Test)' : formatUsd(entryFeeUsd)}
                     </div>
-                    <h1 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 900, color: '#fff' }}>
-                        {countdown ? 'Match Found' : 'Finding Match'}
-                    </h1>
-                    <p style={{ margin: '0 0 24px', color: 'var(--text-3)', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                        {freePlay ? 'Test mode — no real SOL charged · ' : ''}4–16 players · shrinking zone · no cash-out · winner takes the pool
-                    </p>
-
-                    {freePlay && (
-                        <div style={{
-                            marginBottom: '16px', padding: '10px 14px',
-                            background: 'rgba(255, 180, 0, 0.1)', border: '1px solid rgba(255, 180, 0, 0.3)',
-                            borderRadius: '12px', color: '#FFD080', fontSize: '0.78rem', fontWeight: 600,
-                        }}>
-                            TEST MODE — Free play, no real SOL used
-                        </div>
-                    )}
-
-                    {error && (
-                        <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(255,59,48,0.1)', borderRadius: '12px', color: '#FF3B30', fontSize: '0.85rem' }}>
-                            {error}
-                        </div>
-                    )}
 
                     {countdown ? (
-                        <div>
+                        <>
+                            <h1 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 900, color: '#fff' }}>
+                                Match Starting
+                            </h1>
+                            <p style={{ margin: '0 0 24px', color: 'var(--text-3)', fontSize: '0.85rem' }}>
+                                Get ready — zone closes in, no cash-out
+                            </p>
                             <div style={{ fontSize: '3rem', fontWeight: 900, color: '#14F195', fontFamily: 'ui-monospace, monospace' }}>
                                 {countdown.seconds}s
                             </div>
                             <p style={{ color: 'var(--text-2)', marginTop: '8px' }}>
                                 {countdown.playerCount} players · ${countdown.prizePool?.toFixed(2)} prize pool
                             </p>
-                        </div>
-                    ) : queueStatus ? (
-                        <div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff' }}>
-                                {queueStatus.playersInQueue}<span style={{ opacity: 0.3, fontSize: '1.2rem' }}> / {queueStatus.maxPlayers}</span>
-                            </div>
-                            <p style={{ color: 'var(--text-3)', marginTop: '8px' }}>
-                                {queueStatus.devFreePlay || freePlay
-                                    ? 'Starting soon (test mode)'
-                                    : `Need ${Math.max(0, queueStatus.minPlayers - queueStatus.playersInQueue)} more to start`}
-                                {queueStatus.waitMs > 0 && !queueStatus.devFreePlay && !freePlay && ` · max wait ${Math.ceil(queueStatus.waitMs / 1000)}s`}
+                        </>
+                    ) : (
+                        <>
+                            <h1 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 900, color: '#fff' }}>
+                                Searching for Players
+                            </h1>
+                            <p style={{ margin: '0 0 24px', color: 'var(--text-3)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                                {freePlay ? 'Test mode — no real SOL charged · ' : ''}
+                                Need at least {minPlayers} players · up to {maxPlayers} per match
                             </p>
+
+                            {freePlay && (
+                                <div style={{
+                                    marginBottom: '16px', padding: '10px 14px',
+                                    background: 'rgba(255, 180, 0, 0.1)', border: '1px solid rgba(255, 180, 0, 0.3)',
+                                    borderRadius: '12px', color: '#FFD080', fontSize: '0.78rem', fontWeight: 600,
+                                }}>
+                                    TEST MODE — Free play, no real SOL used
+                                </div>
+                            )}
+
+                            {(joining || !queueStatus) && (
+                                <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                                    {[0, 1, 2].map(i => (
+                                        <div
+                                            key={i}
+                                            style={{
+                                                width: 8, height: 8, borderRadius: '50%',
+                                                background: 'var(--accent)',
+                                                opacity: 0.3 + ((tick + i) % 3) * 0.35,
+                                                animation: 'none',
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {queueStatus && (
+                                <>
+                                    <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#fff' }}>
+                                        {playersInQueue}
+                                        <span style={{ opacity: 0.3, fontSize: '1.2rem' }}> / {maxPlayers}</span>
+                                    </div>
+
+                                    <div style={{
+                                        margin: '16px 0 12px',
+                                        height: 6,
+                                        borderRadius: 999,
+                                        background: 'rgba(255,255,255,0.06)',
+                                        overflow: 'hidden',
+                                    }}>
+                                        <div style={{
+                                            height: '100%',
+                                            width: `${fillPct}%`,
+                                            background: playersInQueue >= minPlayers
+                                                ? 'linear-gradient(90deg, #0DBF76, #14F195)'
+                                                : 'var(--accent)',
+                                            borderRadius: 999,
+                                            transition: 'width 0.4s ease',
+                                        }} />
+                                    </div>
+
+                                    {graceSecondsLeft != null && graceSecondsLeft > 0 ? (
+                                        <p style={{ color: '#14F195', marginTop: '8px', fontWeight: 700, fontSize: '0.9rem' }}>
+                                            Match starting in {graceSecondsLeft}s — waiting for more players (max {maxPlayers})
+                                        </p>
+                                    ) : needMore > 0 ? (
+                                        <p style={{ color: 'var(--text-3)', marginTop: '8px' }}>
+                                            Waiting for {needMore} more player{needMore !== 1 ? 's' : ''} to start
+                                        </p>
+                                    ) : (
+                                        <p style={{ color: 'var(--text-2)', marginTop: '8px' }}>
+                                            Minimum reached — filling lobby…
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </>
+                    )}
+
+                    {error && (
+                        <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,59,48,0.1)', borderRadius: '12px', color: '#FF3B30', fontSize: '0.85rem' }}>
+                            {error}
                         </div>
-                    ) : joining ? (
-                        <p style={{ color: 'var(--text-3)' }}>Joining queue…</p>
-                    ) : null}
+                    )}
 
                     <button
                         onClick={leaveQueue}
@@ -175,7 +259,7 @@ export default function BRLobby() {
                             cursor: 'pointer',
                         }}
                     >
-                        Back to Lobby
+                        {countdown ? 'Leave Match' : 'Cancel Search'}
                     </button>
                 </div>
             </div>

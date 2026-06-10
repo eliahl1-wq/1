@@ -8,7 +8,7 @@ import { io } from 'socket.io-client';
 
 import { SlitherRenderer } from './SlitherRenderer.js';
 
-import { normalizeEntryFee, formatUsd } from '../../constants/economy';
+import { normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -60,7 +60,11 @@ export default function SlitherGame() {
     const [localTimer, setLocalTimer] = useState(0);
 
     const [resetCountdown, setResetCountdown] = useState(null);
-    const [isBattleRoyale, setIsBattleRoyale] = useState(false);
+    const initialBR = () => {
+        const mode = localStorage.getItem('current_game_mode') || '';
+        return mode.startsWith('br-') || !!location.state?.battleRoyale;
+    };
+    const [isBattleRoyale, setIsBattleRoyale] = useState(initialBR);
     const [brPrizePool, setBrPrizePool] = useState(0);
     const [brAliveCount, setBrAliveCount] = useState(0);
     const [brVictoryAmount, setBrVictoryAmount] = useState(null);
@@ -68,7 +72,11 @@ export default function SlitherGame() {
     const [brPlayerCount, setBrPlayerCount] = useState(0);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
-    const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
+    const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
+    const isBRMode = gameModeStored.startsWith('br-') || !!location.state?.battleRoyale;
+    const entryFeeUsd = isBRMode
+        ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
+        : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
 
 
@@ -174,7 +182,8 @@ export default function SlitherGame() {
 
 
         const gameMode = localStorage.getItem('current_game_mode') || 'slither';
-        const isBR = gameMode === 'br-slither' || location.state?.battleRoyale;
+        const isBR = gameMode.startsWith('br-') || !!location.state?.battleRoyale;
+        if (isBR) setIsBattleRoyale(true);
 
         const socket = io(API_URL, {
 
@@ -226,7 +235,7 @@ export default function SlitherGame() {
             myIdRef.current = playerSettings.id;
             if (!gameSizes?.battleRoyale) setCurrentBalance(playerSettings.balance ?? 1.0);
             setGameReady(true);
-            if (gameSizes?.cashOutRemaining > 0) {
+            if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
                 startCashoutCountdown(gameSizes.cashOutRemaining);
             }
         });
@@ -351,6 +360,10 @@ export default function SlitherGame() {
                 alert(msg);
 
                 navigate('/pre-game', { state: { selectedMode: 'slither' } });
+
+            } else if (typeof msg === 'string' && /battle royale/i.test(msg)) {
+
+                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'br-slither' } });
 
             } else if (typeof msg === 'string') {
 
@@ -601,9 +614,15 @@ export default function SlitherGame() {
 
                     <div style={{ textAlign: 'center' }}>
 
-                        <h2 style={{ marginBottom: '10px' }}>Connecting to Arena...</h2>
+                        <h2 style={{ marginBottom: '10px' }}>
+                            {isBattleRoyale ? 'Joining Battle Royale…' : 'Connecting to Arena…'}
+                        </h2>
 
-                        <p style={{ opacity: 0.5 }}>Make sure you have at least {formatUsd(entryFeeUsd)} balance.</p>
+                        <p style={{ opacity: 0.5 }}>
+                            {isBattleRoyale
+                                ? 'Syncing match — no cash-out in this mode'
+                                : `Make sure you have at least ${formatUsd(entryFeeUsd)} balance.`}
+                        </p>
 
                     </div>
 
@@ -657,7 +676,7 @@ export default function SlitherGame() {
                         )}
                         {isBattleRoyale && brPlayerCount > 0 && (
                             <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: '6px', fontWeight: 600 }}>
-                                {brPlayerCount} × $5 entry (5% house fee deducted)
+                                {brPlayerCount} players · winner takes pool
                             </div>
                         )}
                     </div>

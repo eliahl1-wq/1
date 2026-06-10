@@ -113,7 +113,7 @@ export default function Gamemodes() {
                             />
                             <ModeCard
                                 title="Agar Battle Royale"
-                                desc="4–16 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
+                                desc="5–10 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brAgar}
                                 badge="NEW"
                                 badgeAccent
@@ -134,7 +134,7 @@ export default function Gamemodes() {
                             />
                             <ModeCard
                                 title="Slither Battle Royale"
-                                desc="4–16 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
+                                desc="5–10 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brSlither}
                                 badge="NEW"
                                 badgeAccent

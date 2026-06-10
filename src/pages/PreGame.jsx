@@ -522,9 +522,7 @@ export default function PreGame() {
                 : canJoin ? 'play-btn play-btn-ready'
                     : 'play-btn play-btn-disabled';
 
-    const modeDisplayName = isBattleRoyaleMode
-        ? `BR ${brVariant === 'slither' ? 'Slither' : 'Agar'}`
-        : (selectedMode === 'slither' ? 'Slither' : 'Agar');
+    const modeBaseName = (isBattleRoyaleMode ? brVariant : selectedMode) === 'slither' ? 'Slither' : 'Agar';
 
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding match…' : 'Joining…'}</>
@@ -915,7 +913,12 @@ export default function PreGame() {
             <div className="pre-game-grid">
                 <div className="mode-card">
                     <span className="mode-card-label">Gamemode</span>
-                    <div className="mode-card-title">{modeDisplayName.toUpperCase()}</div>
+                    <div className={isBattleRoyaleMode ? 'mode-card-title mode-card-title--stacked' : 'mode-card-title'}>
+                        {modeBaseName.toUpperCase()}
+                    </div>
+                    {isBattleRoyaleMode && (
+                        <div className="mode-card-subtitle">Battle Royale</div>
+                    )}
                     <button
                         type="button"
                         className="mode-card-action"

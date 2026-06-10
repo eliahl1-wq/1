@@ -6,7 +6,7 @@ import Canvas from './canvas.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
-import { DEFAULT_ENTRY_FEE, normalizeEntryFee, formatUsd, tierEconomy } from '../../constants/economy';
+import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd, tierEconomy } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 
 /**
@@ -40,7 +40,11 @@ export default function Game() {
     const [displayCashedAmount, setDisplayCashedAmount] = useState(0);
     const [isDead, setIsDead] = useState(false);
     const [localTimer, setLocalTimer] = useState(0);
-    const [isBattleRoyale, setIsBattleRoyale] = useState(false);
+    const initialBR = () => {
+        const mode = localStorage.getItem('current_game_mode') || '';
+        return mode.startsWith('br-') || !!location.state?.battleRoyale;
+    };
+    const [isBattleRoyale, setIsBattleRoyale] = useState(initialBR);
     const [brZone, setBrZone] = useState(null);
     const [brPrizePool, setBrPrizePool] = useState(0);
     const [brAliveCount, setBrAliveCount] = useState(0);
@@ -50,9 +54,10 @@ export default function Game() {
 
     useEffect(() => {
         const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
-        document.title = "AgarStake | In Game";
+        document.title = isBattleRoyale ? 'AgarStake | Battle Royale' : 'AgarStake | In Game';
+        global.battleRoyale = isBattleRoyale;
         return () => clearInterval(itv);
-    }, []);
+    }, [isBattleRoyale]);
 
     useEffect(() => {
         if (!token) {
@@ -75,8 +80,14 @@ export default function Game() {
         const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
         const matchNickname = location.state?.nickname || user?.username || 'Guest';
         const gameMode = localStorage.getItem('current_game_mode') || 'agar';
-        const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
-        const isBR = gameMode === 'br-agar' || location.state?.battleRoyale;
+        const isBR = gameMode.startsWith('br-') || !!location.state?.battleRoyale;
+        if (isBR) {
+            setIsBattleRoyale(true);
+            global.battleRoyale = true;
+        }
+        const entryFeeUsd = isBR
+            ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
+            : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
         const socket = io(apiUrl, {
             auth: { token },
@@ -127,7 +138,7 @@ export default function Game() {
             setCurrentBalance(playerSettings.balance ?? 1.0);
             
             // Återuppta cashout-timer om man refreashar mitt i
-            if (gameSizes.cashOutRemaining > 0) {
+            if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
                 startCashoutCountdown(gameSizes.cashOutRemaining);
             }
         });
@@ -261,6 +272,8 @@ export default function Game() {
             if (typeof msg === 'string' && msg.includes('balance')) {
                 alert(msg);
                 navigate('/pre-game');
+            } else if (typeof msg === 'string' && /battle royale/i.test(msg)) {
+                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'br-agar' } });
             } else if (typeof msg === 'string' && msg.includes('Account')) {
                 alert(msg);
             }
@@ -560,8 +573,14 @@ export default function Game() {
             {!isConnected && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
                     <div style={{ textAlign: 'center' }}>
-                        <h2 style={{ marginBottom: '10px' }}>Connecting to Arena...</h2>
-                        <p style={{ opacity: 0.5 }}>Make sure you have at least {formatUsd(entryFeeUsd)} balance.</p>
+                        <h2 style={{ marginBottom: '10px' }}>
+                            {isBattleRoyale ? 'Joining Battle Royale…' : 'Connecting to Arena…'}
+                        </h2>
+                        <p style={{ opacity: 0.5 }}>
+                            {isBattleRoyale
+                                ? 'Syncing match — no cash-out in this mode'
+                                : `Make sure you have at least ${formatUsd(entryFeeUsd)} balance.`}
+                        </p>
                     </div>
                 </div>
             )}
@@ -600,7 +619,7 @@ export default function Game() {
                         )}
                         {isBattleRoyale && brPlayerCount > 0 && (
                             <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: '6px', fontWeight: 600 }}>
-                                {brPlayerCount} × $5 entry (5% house fee deducted)
+                                {brPlayerCount} players · winner takes pool
                             </div>
                         )}
                         
@@ -738,10 +757,14 @@ export default function Game() {
                         AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
                     </span>
                 </div>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Alpha Demo v0.1</div>
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
+                    {isBattleRoyale ? 'Battle Royale' : 'Alpha Demo v0.1'}
+                </div>
+                {!isBattleRoyale && (
                 <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>
                     {formatResetTimer()}
                 </div>
+                )}
             </div>
 
             {/* Mock Leaderboard */}
