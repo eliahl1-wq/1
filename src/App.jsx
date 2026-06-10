@@ -51,11 +51,18 @@ function PrivateRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
+function isBattleRoyaleSession() {
+  if (typeof window === 'undefined') return false;
+  const mode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || '';
+  return mode.startsWith('br-');
+}
+
 function ArenaRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
+  if (isBattleRoyaleSession()) return children;
   if (user && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
   return children;
 }

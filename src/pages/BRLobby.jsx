@@ -18,7 +18,6 @@ export default function BRLobby() {
     const socketRef = useRef(null);
     const joinedRef = useRef(false);
     const matchStartedRef = useRef(false);
-    const graceRef = useRef(null);
 
     const variant = location.state?.variant || localStorage.getItem('selected_gamemode')?.replace('br-', '') || 'agar';
     const entryFeeUsd = normalizeBREntryFee(
@@ -67,11 +66,6 @@ export default function BRLobby() {
             setQueueStatus(status);
             setError('');
             setJoining(false);
-            if (status.graceRemainingMs != null && status.graceRemainingMs > 0) {
-                graceRef.current = { at: Date.now(), ms: status.graceRemainingMs };
-            } else if (!status.searching) {
-                graceRef.current = null;
-            }
         });
 
         socket.on('brMatchCountdown', ({ seconds, prizePool, playerCount, variant: v }) => {
@@ -83,6 +77,7 @@ export default function BRLobby() {
         });
 
         socket.on('brMatchStart', ({ variant: v }) => {
+            matchStartedRef.current = true;
             const path = v === 'slither' ? '/slither-game' : '/game';
             navigate(path, { state: { nickname: matchNickname, battleRoyale: true } });
         });
@@ -116,9 +111,11 @@ export default function BRLobby() {
     const needMore = Math.max(0, minPlayers - playersInQueue);
     const fillPct = Math.min(100, (playersInQueue / minPlayers) * 100);
 
-    const graceSecondsLeft = graceRef.current
-        ? Math.max(0, Math.ceil((graceRef.current.ms - (Date.now() - graceRef.current.at)) / 1000))
-        : null;
+    const graceSecondsLeft = queueStatus?.graceEndsAt
+        ? Math.max(0, Math.ceil((queueStatus.graceEndsAt - Date.now()) / 1000))
+        : queueStatus?.graceRemainingMs != null
+            ? Math.max(0, Math.ceil(queueStatus.graceRemainingMs / 1000))
+            : null;
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>

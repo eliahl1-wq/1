@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
+import AppTopbar from '../components/AppTopbar';
 import '../styles/ui.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -56,24 +57,7 @@ export default function Gamemodes() {
         <div style={{ width: '100vw', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflowX: 'hidden' }}>
             <Background />
 
-            {/* ── Top Bar ── */}
-            <nav className="topbar">
-                <div className="topbar-left">
-                    <div className="logo" onClick={() => navigate('/pre-game')}>
-                        <div className="logo-dot" />
-                        <span>
-                            AGAR<span className="logo-accent">STAKE</span>
-                        </span>
-                    </div>
-
-                    <button
-                        className="gm-nav-link gm-nav-link--active"
-                        onClick={() => navigate('/gamemodes')}
-                    >
-                        Gamemode
-                    </button>
-                </div>
-            </nav>
+            <AppTopbar />
 
             {/* ── Content ── */}
             <div style={{ zIndex: 1, width: '100%', maxWidth: '1100px', padding: '100px 32px 60px', boxSizing: 'border-box' }}>

@@ -8,6 +8,7 @@ import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
+import AppTopbar from '../components/AppTopbar';
 import { MIN_ENTRY_FEE } from '../constants/economy';
 
 const SolLogo = ({ size = 13, style }) => (
@@ -164,21 +165,7 @@ export default function Lobby() {
         <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <Background />
 
-            {/* ── Top Bar ── */}
-            <nav className="topbar">
-                <div className="topbar-left">
-                    <div className="logo" onClick={() => navigate('/pre-game')}>
-                        <div className="logo-dot" />
-                        <span>
-                            AGAR<span className="logo-accent">STAKE</span>
-                        </span>
-                    </div>
-
-                    <button className="gm-nav-link" onClick={() => navigate('/gamemodes')}>
-                        Gamemode
-                    </button>
-                </div>
-
+            <AppTopbar>
                 {user && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ position: 'relative' }}>
@@ -233,7 +220,7 @@ export default function Lobby() {
                         </div>
                     </div>
                 )}
-            </nav>
+            </AppTopbar>
 
             {/* ── Center Content ── */}
             <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '0 16px', marginTop: '52px', width: '100%', maxWidth: '440px' }}>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
+import AppTopbar from '../components/AppTopbar';
 import '../styles/ui.css';
 
 export default function Profile() {
@@ -125,6 +126,7 @@ export default function Profile() {
     return (
         <div style={{ width: '100vw', minHeight: '100vh', overflowY: 'auto', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px 60px', boxSizing: 'border-box' }}>
             <Background />
+            <AppTopbar />
 
             <div style={{ width: '100%', maxWidth: '780px', position: 'relative', zIndex: 1 }}>
 

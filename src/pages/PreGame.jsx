@@ -8,6 +8,7 @@ import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
+import AppTopbar from '../components/AppTopbar';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, tierEconomy, formatUsd } from '../constants/economy';
 
 /* ── Solana logo icon ── */
@@ -539,22 +540,7 @@ export default function PreGame() {
         <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
             <Background />
 
-            {/* ── Top Bar ── */}
-            <nav className="topbar">
-                {/* Logo */}
-                <div className="topbar-left">
-                    <div className="logo" onClick={() => navigate('/pre-game')}>
-                        <div className="logo-dot" />
-                        <span>
-                            AGAR<span className="logo-accent">STAKE</span>
-                        </span>
-                    </div>
-
-                    <button className="gm-nav-link" onClick={() => navigate('/gamemodes')}>
-                        Gamemode
-                    </button>
-                </div>
-
+            <AppTopbar>
                 {/* Nav right */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {isAuthenticated ? (
@@ -693,7 +679,7 @@ export default function PreGame() {
                         </button>
                     )}
                 </div>
-            </nav>
+            </AppTopbar>
 
             {/* ── Deposit Float Panel ── */}
             {isWalletExpanded && (
