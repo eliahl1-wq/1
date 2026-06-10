@@ -32,30 +32,30 @@ export default function PreGame() {
     const { connection } = useConnection();
 
     // ── State ──────────────────────────────────────────
-    const [showUserMenu, setShowUserMenu]       = useState(false);
-    const [isWalletOpen, setIsWalletOpen]       = useState(false);
-    const [isWalletExpanded, setIsWalletExpanded]   = useState(false);
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const [isWalletOpen, setIsWalletOpen] = useState(false);
+    const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
-    const [depositMethod, setDepositMethod]     = useState('wallet');
-    const [amount, setAmount]                   = useState('');
-    const [withdrawAmount, setWithdrawAmount]   = useState('');
+    const [depositMethod, setDepositMethod] = useState('wallet');
+    const [amount, setAmount] = useState('');
+    const [withdrawAmount, setWithdrawAmount] = useState('');
     const [withdrawAddress, setWithdrawAddress] = useState('');
     const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
-    const [isCurSOL, setIsCurSOL]               = useState(false);
-    const [statusMsg, setStatusMsg]             = useState('');
-    const [isMatchmaking, setIsMatchmaking]     = useState(false);
+    const [isCurSOL, setIsCurSOL] = useState(false);
+    const [statusMsg, setStatusMsg] = useState('');
+    const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [currentGameMode, setCurrentGameMode] = useState(null);
-    const [liveStats, setLiveStats]             = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
+    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
     const solPrice = Number(liveStats?.solPrice || user?.solPrice || 64);
-    const [showHowItWorks, setShowHowItWorks]   = useState(false);
-    const [leaderboardTab, setLeaderboardTab]   = useState('alltime');
+    const [showHowItWorks, setShowHowItWorks] = useState(false);
+    const [leaderboardTab, setLeaderboardTab] = useState('alltime');
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
-    const [nickname, setNickname]               = useState(
+    const [nickname, setNickname] = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
-    
+
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     const [selectedMode, setSelectedMode] = useState(
         () => localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
@@ -80,32 +80,32 @@ export default function PreGame() {
     }, [currentGameMode]);
 
     // Panel drag
-    const [panelPos, setPanelPos]       = useState({ x: null, y: 60 });
-    const [isDragging, setIsDragging]   = useState(false);
+    const [panelPos, setPanelPos] = useState({ x: null, y: 60 });
+    const [isDragging, setIsDragging] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
 
     // Refs
-    const userMenuRef       = useRef(null);
-    const userPillRef       = useRef(null);
-    const walletDropRef     = useRef(null);
-    const walletExpandRef   = useRef(null);
+    const userMenuRef = useRef(null);
+    const userPillRef = useRef(null);
+    const walletDropRef = useRef(null);
+    const walletExpandRef = useRef(null);
     const withdrawExpandRef = useRef(null);
-    const qrRef             = useRef(null);
+    const qrRef = useRef(null);
 
-    const depositAddress    = user?.depositAddress;
-    const SOL_ADDR_REGEX    = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-    const ENTRY_FEE         = 10.00;
-    const canJoin           = (user?.balanceSol || 0) >= (ENTRY_FEE / solPrice);
+    const depositAddress = user?.depositAddress;
+    const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    const ENTRY_FEE = 10.00;
+    const canJoin = (user?.balanceSol || 0) >= (ENTRY_FEE / solPrice);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
         const n = Number(v || 0);
         if (!isFinite(n)) return '0';
         if (n >= 10000) return Math.round(n).toString();
-        if (n >= 1000)  return n.toFixed(1);
-        if (n >= 1)     return n.toFixed(2);
-        if (n > 0)      return n.toFixed(4);
+        if (n >= 1000) return n.toFixed(1);
+        if (n >= 1) return n.toFixed(2);
+        if (n > 0) return n.toFixed(4);
         return '0';
     };
 
@@ -145,7 +145,7 @@ export default function PreGame() {
                     190, 'white', 'black'
                 );
                 qr.append(qrRef.current);
-            } catch (e) {}
+            } catch (e) { }
         }
     }, [depositAddress, depositMethod]);
 
@@ -212,7 +212,7 @@ export default function PreGame() {
             } catch (err) { console.warn("API swallow (stats):", err); }
         };
         fetchStats();
-        const id = setInterval(fetchStats, 30000); 
+        const id = setInterval(fetchStats, 30000);
         return () => { alive = false; clearInterval(id); };
     }, []);
 
@@ -246,7 +246,7 @@ export default function PreGame() {
             } catch (err) { console.warn("API swallow (refreshUser):", err); }
         };
         pollUser();
-        const id = setInterval(pollUser, 20000); 
+        const id = setInterval(pollUser, 20000);
         return () => clearInterval(id);
     }, [refreshUser]);
 
@@ -368,9 +368,6 @@ export default function PreGame() {
         const parsed = parseFloat(amount);
         if (isNaN(parsed) || parsed <= 0) { setStatusMsg('❌ Enter a valid amount.'); return; }
         setStatusMsg('Waiting for wallet approval…');
-
-        const solAmt = isCurSOL ? parsed : parsed / activeSolPrice;
-        const usdAmt = isCurSOL ? parsed * activeSolPrice : parsed;
         const solAmt = isCurSOL ? parsed : parsed / solPrice;
         const usdAmt = isCurSOL ? parsed * solPrice : parsed;
 
@@ -405,7 +402,7 @@ export default function PreGame() {
             setAmount('');
         } catch (err) {
             const m = err.message || '';
-            if (m.includes('User rejected'))      setStatusMsg('❌ Cancelled in wallet.');
+            if (m.includes('User rejected')) setStatusMsg('❌ Cancelled in wallet.');
             else if (m.toLowerCase().includes('insufficient')) setStatusMsg('❌ Insufficient funds.');
             else setStatusMsg('❌ Deposit failed. Try again.');
         }
@@ -474,26 +471,26 @@ export default function PreGame() {
 
     const panelStyle = {
         position: 'absolute',
-        left:      panelPos.x !== null ? panelPos.x : '50%',
-        top:       panelPos.y,
+        left: panelPos.x !== null ? panelPos.x : '50%',
+        top: panelPos.y,
         transform: panelPos.x !== null ? 'none' : 'translateX(-50%)',
-        cursor:    isDragging ? 'grabbing' : 'default',
+        cursor: isDragging ? 'grabbing' : 'default',
         transition: isDragging ? 'none' : undefined,
     };
 
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
         : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
-        : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
-        : canJoin ? 'play-btn play-btn-ready'
-        : 'play-btn play-btn-disabled';
+            : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
+                : canJoin ? 'play-btn play-btn-ready'
+                    : 'play-btn play-btn-disabled';
 
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> Joining…</>
         : !isAuthenticated ? 'Play Now'
-        : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
-        : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
-        : canJoin          ? 'Play'
-        : 'Deposit to Play';
+            : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
+                : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
+                    : canJoin ? 'Play'
+                        : 'Deposit to Play';
 
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
@@ -575,13 +572,11 @@ export default function PreGame() {
                                             <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
                                                 {isCurSOL
                                                     ? fmt(user?.balanceSol)
-                                                    : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2))}
                                                     : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2))}
                                             </span>
                                         </div>
                                         <div className="wallet-card-sub">
                                             {isCurSOL
-                                                ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2)} USD`
                                                 ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)} USD`
                                                 : `≈ ${fmt(user?.balanceSol)} SOL`}
                                         </div>
@@ -708,8 +703,6 @@ export default function PreGame() {
                                 {amount && (
                                     <div className="amount-hint">
                                         {isCurSOL
-                                            ? `≈ $${(parseFloat(amount) * activeSolPrice).toFixed(2)}`
-                                            : `≈ ${(parseFloat(amount) / activeSolPrice).toFixed(4)} SOL`}
                                             ? `≈ $${(parseFloat(amount) * solPrice).toFixed(2)}`
                                             : `≈ ${(parseFloat(amount) / solPrice).toFixed(4)} SOL`}
                                     </div>
@@ -997,15 +990,15 @@ export default function PreGame() {
             </div>
 
             {/* ── Live Arena Status & SOL Tracker (CSS Bypass) ── */}
-            <div className="stats-card live-stats-bottom" style={{ 
-                position: 'fixed', 
-                left: '20px', 
-                bottom: '20px', 
+            <div className="stats-card live-stats-bottom" style={{
+                position: 'fixed',
+                left: '20px',
+                bottom: '20px',
                 zIndex: 2147483647,
                 isolation: 'isolate',
-                background: '#0a0a0c', 
-                border: '1px solid #14f195', 
-                padding: '12px 16px', 
+                background: '#0a0a0c',
+                border: '1px solid #14f195',
+                padding: '12px 16px',
                 borderRadius: '8px',
                 boxShadow: '0 0 20px rgba(20, 241, 149, 0.15)',
                 minWidth: '180px'
@@ -1023,13 +1016,6 @@ export default function PreGame() {
                     <span style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.topPlayer ?? '—'}</span>
                 </div>
                 {/* SOL PRICE TRACKER */}
-                <div className="stat-row" style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <SolLogo size={12} />
-                        <span style={{ fontSize: '0.65rem', color: '#14f195', fontWeight: 800 }}>SOL LIVE:</span>
-                    </div>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: 700 }}>
-                        ${activeSolPrice.toFixed(2)}
                 <div className="stat-row">
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>SOL Price</span>
                     <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--green)', fontWeight: 700 }}>

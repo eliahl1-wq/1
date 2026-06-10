@@ -762,7 +762,7 @@ export default function PreGame() {
                                 />
                                 <button
                                     style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
-                                    onClick={() => setWithdrawAmount(user?.balance?.toFixed(2))}
+                                    onClick={() => setWithdrawAmount(isCurSOL ? balanceSol.toFixed(4) : balanceUsd.toFixed(2))}
                                 >
                                     MAX
                                 </button>
