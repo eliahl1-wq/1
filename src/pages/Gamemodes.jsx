@@ -86,12 +86,12 @@ export default function Gamemodes() {
                             />
                             <ModeCard
                                 title="Agar Battle Royale"
-                                desc="4–16 players, shrinking zone, last one standing wins the pool. $5 entry, no cash-out."
+                                desc="4–16 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
                                 badge="NEW"
                                 badgeAccent
                                 onPlay={() => {
                                     localStorage.setItem('selected_gamemode', 'br-agar');
-                                    navigate('/br-lobby', { state: { variant: 'agar' } });
+                                    navigate('/pre-game', { state: { selectedMode: 'br-agar' } });
                                 }}
                             />
                         </>
@@ -105,12 +105,12 @@ export default function Gamemodes() {
                             />
                             <ModeCard
                                 title="Slither Battle Royale"
-                                desc="4–16 snakes, deadly zone closes in, winner takes all. $5 entry, no cash-out."
+                                desc="4–16 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
                                 badge="NEW"
                                 badgeAccent
                                 onPlay={() => {
                                     localStorage.setItem('selected_gamemode', 'br-slither');
-                                    navigate('/br-lobby', { state: { variant: 'slither' } });
+                                    navigate('/pre-game', { state: { selectedMode: 'br-slither' } });
                                 }}
                             />
                         </>

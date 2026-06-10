@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import Background from '../components/Background';
+import { normalizeBREntryFee, formatUsd } from '../constants/economy';
 import '../styles/ui.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -12,12 +13,17 @@ export default function BRLobby() {
     const location = useLocation();
     const { user, token } = useAuth();
     const socketRef = useRef(null);
+    const joinedRef = useRef(false);
+
     const variant = location.state?.variant || localStorage.getItem('selected_gamemode')?.replace('br-', '') || 'agar';
+    const entryFeeUsd = normalizeBREntryFee(
+        location.state?.entryFeeUsd ?? localStorage.getItem('selected_entry_fee')
+    );
 
     const [queueStatus, setQueueStatus] = useState(null);
     const [countdown, setCountdown] = useState(null);
     const [error, setError] = useState('');
-    const [joined, setJoined] = useState(false);
+    const [joining, setJoining] = useState(false);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
 
@@ -28,6 +34,9 @@ export default function BRLobby() {
             return;
         }
 
+        localStorage.setItem('selected_gamemode', variant === 'slither' ? 'br-slither' : 'br-agar');
+        localStorage.setItem('selected_entry_fee', String(entryFeeUsd));
+
         const socket = io(API_URL, {
             auth: { token },
             transports: ['websocket', 'polling'],
@@ -36,13 +45,16 @@ export default function BRLobby() {
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            socket.emit('brJoinQueue', { variant, token, username: matchNickname });
-            setJoined(true);
+            if (joinedRef.current) return;
+            joinedRef.current = true;
+            setJoining(true);
+            socket.emit('brJoinQueue', { variant, token, username: matchNickname, entryFeeUsd });
         });
 
         socket.on('brQueueStatus', (status) => {
             setQueueStatus(status);
             setError('');
+            setJoining(false);
         });
 
         socket.on('brMatchCountdown', ({ seconds, prizePool, playerCount, variant: v }) => {
@@ -59,19 +71,21 @@ export default function BRLobby() {
 
         socket.on('error', (msg) => {
             setError(typeof msg === 'string' ? msg : 'Queue error');
-            setJoined(false);
+            setJoining(false);
+            joinedRef.current = false;
         });
 
         return () => {
             socket.emit('brLeaveQueue');
             socket.off();
             socket.disconnect();
+            joinedRef.current = false;
         };
-    }, [token, variant, navigate, matchNickname]);
+    }, [token, variant, entryFeeUsd, navigate, matchNickname]);
 
     const leaveQueue = () => {
         socketRef.current?.emit('brLeaveQueue');
-        navigate('/gamemodes', { state: { selectedMode: variant } });
+        navigate('/pre-game', { state: { selectedMode: variant === 'slither' ? 'br-slither' : 'br-agar' } });
     };
 
     return (
@@ -96,13 +110,13 @@ export default function BRLobby() {
                     textAlign: 'center',
                 }}>
                     <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '2px', color: 'var(--accent)', marginBottom: '12px' }}>
-                        BATTLE ROYALE — {variant.toUpperCase()}
+                        BATTLE ROYALE — {variant.toUpperCase()} · {formatUsd(entryFeeUsd)}
                     </div>
                     <h1 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 900, color: '#fff' }}>
                         {countdown ? 'Match Found' : 'Finding Match'}
                     </h1>
                     <p style={{ margin: '0 0 24px', color: 'var(--text-3)', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                        $5 entry · 4–16 players · shrinking zone · no cash-out · winner takes the pool
+                        4–16 players · shrinking zone · no cash-out · winner takes the pool
                     </p>
 
                     {error && (
@@ -130,7 +144,7 @@ export default function BRLobby() {
                                 {queueStatus.waitMs > 0 && ` · max wait ${Math.ceil(queueStatus.waitMs / 1000)}s`}
                             </p>
                         </div>
-                    ) : joined ? (
+                    ) : joining ? (
                         <p style={{ color: 'var(--text-3)' }}>Joining queue…</p>
                     ) : null}
 
@@ -148,7 +162,7 @@ export default function BRLobby() {
                             cursor: 'pointer',
                         }}
                     >
-                        Leave Queue
+                        Back to Lobby
                     </button>
                 </div>
             </div>

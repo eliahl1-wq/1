@@ -8,7 +8,7 @@ import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
-import { ENTRY_TIERS, DEFAULT_ENTRY_FEE, tierEconomy, formatUsd } from '../constants/economy';
+import { ENTRY_TIERS, BR_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, tierEconomy, formatUsd } from '../constants/economy';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -50,7 +50,7 @@ export default function PreGame() {
         () => !!localStorage.getItem('current_game_mode')
     );
     const [activeGameBalance, setActiveGameBalance] = useState(null);
-    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
+    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null, playersByEntryFee: {}, brPlayersByFee: {} });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
@@ -113,6 +113,22 @@ export default function PreGame() {
 
     const entryFeeForSession = isAlreadyInGame && activeEntryFee != null ? activeEntryFee : selectedEntryFee;
     const economy = tierEconomy(entryFeeForSession);
+    const isBattleRoyaleMode = selectedMode.startsWith('br-');
+    const brVariant = isBattleRoyaleMode ? selectedMode.replace(/^br-/, '') : null;
+    const tierOptions = isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS;
+
+    useEffect(() => {
+        if (isBattleRoyaleMode && !BR_ENTRY_TIERS.includes(selectedEntryFee)) {
+            setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
+        }
+    }, [selectedMode, isBattleRoyaleMode, selectedEntryFee]);
+
+    const playingCountForTier = (tier) => {
+        if (isBattleRoyaleMode && brVariant) {
+            return liveStats.brPlayersByFee?.[brVariant]?.[tier] ?? 0;
+        }
+        return liveStats.playersByEntryFee?.[tier] ?? 0;
+    };
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
@@ -235,7 +251,7 @@ export default function PreGame() {
             } catch { }
         };
         fetchStats();
-        const id = setInterval(fetchStats, 15000);
+        const id = setInterval(fetchStats, 5000);
         return () => { alive = false; clearInterval(id); };
     }, []);
 
@@ -378,20 +394,39 @@ export default function PreGame() {
         localStorage.setItem('selected_gamemode', activeMode);
 
         const isBR = activeMode.startsWith('br-');
-        const targetPath = (activeMode === 'slither' || activeMode === 'br-slither') ? '/slither-game' : '/game';
+        if (isBR) {
+            const variant = activeMode.replace(/^br-/, '');
+            if (isAlreadyInGame && canRejoinThisMode) {
+                const path = variant === 'slither' ? '/slither-game' : '/game';
+                setTimeout(() => navigate(path, {
+                    state: { nickname, battleRoyale: true },
+                }), 400);
+                return;
+            }
+            setTimeout(() => navigate('/br-lobby', {
+                state: {
+                    nickname,
+                    variant,
+                    entryFeeUsd: entryFeeForSession,
+                },
+            }), 800);
+            return;
+        }
+
+        const targetPath = (activeMode === 'slither') ? '/slither-game' : '/game';
         const baseMode = activeMode.replace(/^br-/, '');
         setTimeout(() => navigate(targetPath, {
             state: {
                 nickname,
                 selectedMode: baseMode,
-                ...(isBR ? { battleRoyale: true } : {}),
             },
         }), 1200);
     };
 
     const normalizeMode = (mode) => (mode || '').replace(/^br-/, '');
     const canRejoinThisMode = isAlreadyInGame && currentGameMode
-        && normalizeMode(selectedMode) === normalizeMode(currentGameMode);
+        && normalizeMode(selectedMode) === normalizeMode(currentGameMode)
+        && (activeEntryFee == null || activeEntryFee === entryFeeForSession);
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return; }
@@ -478,14 +513,18 @@ export default function PreGame() {
                 : canJoin ? 'play-btn play-btn-ready'
                     : 'play-btn play-btn-disabled';
 
+    const modeDisplayName = isBattleRoyaleMode
+        ? `BR ${brVariant === 'slither' ? 'Slither' : 'Agar'}`
+        : (selectedMode === 'slither' ? 'Slither' : 'Agar');
+
     const playBtnLabel = isMatchmaking
-        ? <><span className="spinner" /> Joining…</>
+        ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding match…' : 'Joining…'}</>
         : !isAuthenticated ? 'Play Now'
             : (isAlreadyInGame && canRejoinThisMode)
-                ? `Rejoin ${currentGameMode === 'slither' ? 'Slither' : 'Agar'} Arena`
+                ? `Rejoin ${currentGameMode?.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}`
                 : (isAlreadyInGame && !canRejoinThisMode)
-                    ? `In ${currentGameMode === 'slither' ? 'Slither' : 'Agar'} — switch mode`
-                    : canJoin ? 'Play'
+                    ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')} — switch mode`
+                    : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
                         : 'Deposit to Play';
 
     // ── Render ─────────────────────────────────────────
@@ -867,21 +906,24 @@ export default function PreGame() {
             <div className="pre-game-grid">
                 <div className="mode-card">
                     <span className="mode-card-label">Gamemode</span>
-                    <div className="mode-card-title">{selectedMode === 'slither' ? 'SLITHER' : 'AGAR'}</div>
+                    <div className="mode-card-title">{modeDisplayName.toUpperCase()}</div>
                     <button
                         type="button"
                         className="mode-card-action"
-                        onClick={() => navigate('/gamemodes', { state: { selectedMode } })}
+                        onClick={() => navigate('/gamemodes', { state: { selectedMode: isBattleRoyaleMode ? brVariant : selectedMode } })}
                     >
-                        Normal
+                        Change
                     </button>
 
                     <div style={{ marginTop: '14px', width: '100%' }}>
-                        <span className="label" style={{ display: 'block', marginBottom: '8px' }}>Entry stake</span>
+                        <span className="label" style={{ display: 'block', marginBottom: '8px' }}>
+                            {isBattleRoyaleMode ? 'Entry fee' : 'Entry stake'}
+                        </span>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {ENTRY_TIERS.map(tier => {
+                            {tierOptions.map(tier => {
                                 const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
                                 const active = entryFeeForSession === tier;
+                                const playing = playingCountForTier(tier);
                                 return (
                                     <button
                                         key={tier}
@@ -902,10 +944,20 @@ export default function PreGame() {
                                             textAlign: 'left',
                                         }}
                                     >
-                                        {freePlay ? 'FREE (Test)' : formatUsd(tier)}
-                                        {!freePlay && (
+                                        <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                            <span>{freePlay ? 'FREE (Test)' : formatUsd(tier)}</span>
+                                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#14F195' }}>
+                                                {playing} playing
+                                            </span>
+                                        </span>
+                                        {!freePlay && !isBattleRoyaleMode && (
                                             <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)', marginTop: '2px' }}>
                                                 Start {formatUsd(tierEconomy(tier).startBalance)}
+                                            </span>
+                                        )}
+                                        {!freePlay && isBattleRoyaleMode && (
+                                            <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)', marginTop: '2px' }}>
+                                                Winner takes pool · no cash-out
                                             </span>
                                         )}
                                     </button>
@@ -951,9 +1003,9 @@ export default function PreGame() {
 
                     {isAlreadyInGame && currentGameMode && (
                         <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
-                            Active session: {currentGameMode === 'slither' ? 'Slither' : 'Agar'}
-                            {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} stake`}
-                            {activeGameBalance != null && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
+                            Active session: {currentGameMode.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}
+                            {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} entry`}
+                            {activeGameBalance != null && !currentGameMode.startsWith('br-') && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
                         </div>
                     )}
 
@@ -1062,8 +1114,7 @@ export default function PreGame() {
 
             {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}
             <div style={{
-                position: 'fixed', left: 16, bottom: 16,
-                marginLeft: 'calc(140px + 235px)', /* Flyttad ännu längre till höger */
+                position: 'fixed', right: 16, bottom: 16,
                 display: 'flex', alignItems: 'center', gap: '6px',
                 background: '#000', border: '1px solid var(--border)',
                 borderRadius: '20px', padding: '5px 12px',
