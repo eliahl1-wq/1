@@ -11,9 +11,17 @@ export default function Profile() {
     const [activeTab, setActiveTab]     = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs]       = useState([]);
+    const [usernameInput, setUsernameInput] = useState(user?.username || '');
     const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
+    const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+    const [usernameMsg, setUsernameMsg] = useState('');
     const [isUpdating, setIsUpdating]   = useState(false);
     const [updateMsg, setUpdateMsg]     = useState('');
+
+    useEffect(() => {
+        setUsernameInput(user?.username || '');
+        setWalletInput(user?.walletAddress || '');
+    }, [user?.username, user?.walletAddress]);
 
     useEffect(() => {
         document.title = 'AgarStake | Profile';
@@ -64,6 +72,34 @@ export default function Profile() {
 
     const chartColor = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
 
+    const handleUpdateUsername = async () => {
+        const trimmed = usernameInput.trim();
+        if (!trimmed || trimmed === user?.username) return;
+        setIsUpdatingUsername(true);
+        setUsernameMsg('');
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ username: trimmed }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.user) {
+                login(data.user, token);
+                const prevNick = localStorage.getItem('match_nickname');
+                if (!prevNick || prevNick === user?.username) {
+                    localStorage.setItem('match_nickname', data.user.username);
+                }
+                setUsernameMsg('success');
+            } else {
+                setUsernameMsg(data.message || 'error');
+            }
+        } catch {
+            setUsernameMsg('error');
+        }
+        setIsUpdatingUsername(false);
+    };
+
     const handleUpdateWallet = async () => {
         if (!walletInput || walletInput === user?.walletAddress) return;
         setIsUpdating(true);
@@ -74,12 +110,12 @@ export default function Profile() {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ walletAddress: walletInput })
             });
-            const data = res.ok ? await res.json() : null;
-            if (res.ok && data) {
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.user) {
                 login(data.user, token);
                 setUpdateMsg('success');
             } else {
-                setUpdateMsg('error');
+                setUpdateMsg(data.message || 'error');
             }
         } catch { setUpdateMsg('error'); }
         setIsUpdating(false);
@@ -306,12 +342,43 @@ export default function Profile() {
                             /* ══ Settings view ══ */
                             <div style={{ maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
 
-                                {/* Username (read-only) */}
+                                {/* Username */}
                                 <div>
                                     <label className="label" style={{ display: 'block', marginBottom: '6px' }}>Username</label>
-                                    <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '10px 14px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-h)' }}>
-                                        {user?.username}
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input
+                                            value={usernameInput}
+                                            onChange={e => {
+                                                setUsernameInput(e.target.value);
+                                                setUsernameMsg('');
+                                            }}
+                                            placeholder="Choose a username"
+                                            className="input"
+                                            maxLength={20}
+                                            autoComplete="username"
+                                            style={{ flex: 1, fontSize: '0.9rem', fontWeight: 600, boxSizing: 'border-box' }}
+                                        />
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={handleUpdateUsername}
+                                            disabled={isUpdatingUsername || !usernameInput.trim() || usernameInput.trim() === user?.username}
+                                            style={{ padding: '0 18px', fontSize: '0.75rem', flexShrink: 0, borderRadius: 'var(--r-md)' }}
+                                        >
+                                            {isUpdatingUsername ? <span className="spinner" /> : 'Save'}
+                                        </button>
                                     </div>
+                                    {usernameMsg && (
+                                        <div className={`status-msg ${usernameMsg === 'success' ? 'success' : 'error'}`} style={{ marginTop: '8px' }}>
+                                            {usernameMsg === 'success'
+                                                ? '✅ Username updated.'
+                                                : usernameMsg === 'error'
+                                                    ? '❌ Failed to update username.'
+                                                    : `❌ ${usernameMsg}`}
+                                        </div>
+                                    )}
+                                    <p style={{ margin: '8px 0 0', fontSize: '0.67rem', color: 'var(--text-3)', lineHeight: 1.5 }}>
+                                        3–20 characters · letters, numbers, and underscores only
+                                    </p>
                                 </div>
 
                                 {/* Email (read-only) */}
@@ -348,18 +415,14 @@ export default function Profile() {
                                         <div className={`status-msg ${updateMsg === 'success' ? 'success' : 'error'}`} style={{ marginTop: '8px' }}>
                                             {updateMsg === 'success'
                                                 ? '✅ Wallet linked! Manual deposits will be tracked.'
-                                                : '❌ Failed to link. Check address format.'}
+                                                : updateMsg === 'error'
+                                                    ? '❌ Failed to link. Check address format.'
+                                                    : `❌ ${updateMsg}`}
                                         </div>
                                     )}
                                     <p style={{ margin: '8px 0 0', fontSize: '0.67rem', color: 'var(--text-3)', lineHeight: 1.5 }}>
                                         Link the wallet you intend to deposit from. This helps us auto-identify your manual deposits.
                                     </p>
-                                </div>
-
-                                <div className="divider" />
-
-                                <div style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 500 }}>
-                                    More profile customization coming soon.
                                 </div>
                             </div>
                         )}
