@@ -940,7 +940,7 @@ export default function PreGame() {
             {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}
             <div style={{
                 position: 'fixed', left: 16, bottom: 16,
-                marginLeft: 'calc(140px + 115px)', /* Flyttad ännu längre till höger */
+                marginLeft: 'calc(140px + 145px)', /* Flyttad ännu längre till höger */
                 display: 'flex', alignItems: 'center', gap: '6px',
                 background: '#000', border: '1px solid var(--border)',
                 borderRadius: '20px', padding: '5px 12px',

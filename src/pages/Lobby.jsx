@@ -150,7 +150,6 @@ export default function Lobby() {
         }
     };
 
-    const currentBalanceSol = onChainBalance !== null ? onChainBalance : (user?.balance || 0);
     const currentBalanceSol = user?.balanceSol ?? 0; // Use balance from AuthContext
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
