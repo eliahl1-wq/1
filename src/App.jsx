@@ -13,41 +13,32 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { BraveWalletAdapter } from '@solana/wallet-adapter-brave';
 import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 function buildWalletAdapters() {
-  const walletConnect = new WalletConnectWalletAdapter({
-    network: WalletAdapterNetwork.Mainnet,
-    options: {
-      projectId: '8b2f78d206bbaec981376e03d9d15376',
-      metadata: {
-        name: 'AgarStake',
-        description: 'Stake SOL and dominate the arena in this high-stakes agar clone.',
-        url: 'https://www.agararena.space',
-        icons: ['https://www.agararena.space/vite.svg'],
+  const adapters = [
+    new WalletConnectWalletAdapter({
+      network: WalletAdapterNetwork.Mainnet,
+      options: {
+        projectId: '8b2f78d206bbaec981376e03d9d15376',
+        metadata: {
+          name: 'AgarStake',
+          description: 'Stake SOL and dominate the arena in this high-stakes agar clone.',
+          url: 'https://www.agararena.space',
+          icons: ['https://www.agararena.space/vite.svg'],
+        },
       },
-    },
-  });
+    }),
+    // Auto-detects Brave browser wallet via window.braveSolana
+    new BraveWalletAdapter(),
+  ];
 
-  const adapters = [walletConnect];
-
-  if (typeof window !== 'undefined') {
-    const hasPhantomExtension = !!window.phantom?.solana?.isPhantom;
-    const hasBraveWallet = !!window.braveSolana?.isBraveWallet;
-
-    // Phantom adapter: real extension, or Brave's built-in wallet (Phantom-compatible API)
-    if (hasPhantomExtension || hasBraveWallet) {
-      adapters.push(new PhantomWalletAdapter());
-    }
-
-    if (window.solflare?.isSolflare) {
-      adapters.push(new SolflareWalletAdapter({ network: WalletAdapterNetwork.Mainnet }));
-    }
-  } else {
+  // Phantom extension only — not injected when only Brave wallet is present
+  if (typeof window !== 'undefined' && window.phantom?.solana?.isPhantom) {
     adapters.push(new PhantomWalletAdapter());
-    adapters.push(new SolflareWalletAdapter({ network: WalletAdapterNetwork.Mainnet }));
   }
 
   return adapters;
