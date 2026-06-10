@@ -43,7 +43,6 @@ export default function PreGame() {
     const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
     const [isCurSOL, setIsCurSOL] = useState(false);
-    const [statusMsg, setStatusMsg] = useState('');
     const [isMatchmaking, setIsMatchmaking] = useState(false);
 
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
@@ -51,6 +50,7 @@ export default function PreGame() {
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
+    const [statusMsg, setStatusMsg] = useState(''); // Moved here to avoid conflicts
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
     const [nickname, setNickname] = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
@@ -100,8 +100,8 @@ export default function PreGame() {
     const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const ENTRY_FEE = 10.00;
 
-    // Lita nu på user.balanceSol eftersom servern synkar den automatiskt mot kedjan i /api/me
-    const balanceSol = user?.balanceSol ?? 0;
+    // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
+    const balanceSol = user?.balanceSol || 0;
     const balanceUsd = balanceSol * solPrice;
 
     const canJoin = balanceUsd >= ENTRY_FEE;
@@ -940,7 +940,7 @@ export default function PreGame() {
             {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}
             <div style={{
                 position: 'fixed', left: 16, bottom: 16,
-                marginLeft: 'calc(140px + 145px)', /* Flyttad ännu längre till höger */
+                marginLeft: 'calc(140px + 175px)', /* Flyttad ännu längre till höger */
                 display: 'flex', alignItems: 'center', gap: '6px',
                 background: '#000', border: '1px solid var(--border)',
                 borderRadius: '20px', padding: '5px 12px',

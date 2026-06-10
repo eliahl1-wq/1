@@ -32,7 +32,6 @@ export default function Lobby() {
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet');
     const [isCurSOL, setIsCurSOL] = useState(false);
-    const solPrice = user?.solPrice || 64;
 
     const qrRef = useRef(null);
     const userMenuRef = useRef(null);
@@ -150,7 +149,7 @@ export default function Lobby() {
         }
     };
 
-    const currentBalanceSol = user?.balanceSol ?? 0; // Use balance from AuthContext
+    const currentBalanceSol = user?.balanceSol || 0; // Use balance from AuthContext
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <Background />
