@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import Game from './game/agar/Game'; // Uppdaterad sökväg
 import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
 import Gamemodes from './pages/Gamemodes';
+import BRLobby from './pages/BRLobby';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -17,6 +18,7 @@ import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { BraveWalletAdapter } from '@solana/wallet-adapter-brave';
 import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect';
 import '@solana/wallet-adapter-react-ui/styles.css';
+import { MIN_ENTRY_FEE } from './constants/economy';
 
 function buildWalletAdapters() {
   const adapters = [
@@ -54,7 +56,7 @@ function ArenaRoute({ children }) {
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
-  if (user && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < 10) return <Navigate to="/lobby" />;
+  if (user && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
   return children;
 }
 
@@ -63,7 +65,7 @@ function PublicRoute({ children }) {
   if (loading) return null;
   if (isAuthenticated) {
     const balanceUsd = user?.balanceUsd || (user?.balanceSol * (user?.solPrice || 57)) || 0;
-    if (user?.freePlay || balanceUsd >= 10) return <Navigate to="/pre-game" />;
+    if (user?.freePlay || balanceUsd >= MIN_ENTRY_FEE) return <Navigate to="/pre-game" />;
     return <Navigate to="/lobby" />;
   }
   return children;
@@ -92,6 +94,7 @@ function App() {
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path="/gamemodes" element={<Gamemodes />} />
+                <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 {/* Pregame lobbyn är nu startsidan */}
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>

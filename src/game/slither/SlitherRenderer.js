@@ -38,15 +38,15 @@ export class SlitherRenderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.state = { snakes: [], food: [], you: null, worldHalf: 1000 };
+        this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null };
         this.camera = { x: 0, y: 0 };
+        this.zoom = 3.4;
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
         this.running = false;
         this._raf = null;
         this._frame = 0;
-        this._hexPattern = null;
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
@@ -81,36 +81,6 @@ export class SlitherRenderer {
         this.canvas.height = window.innerHeight;
         this.W = this.canvas.width;
         this.H = this.canvas.height;
-        this._hexPattern = null;
-    }
-
-    _getHexPattern() {
-        if (this._hexPattern) return this._hexPattern;
-        const tile = document.createElement('canvas');
-        tile.width = 56;
-        tile.height = 48;
-        const tctx = tile.getContext('2d');
-        tctx.strokeStyle = 'rgba(255,255,255,0.035)';
-        tctx.lineWidth = 1;
-        const r = 14;
-        for (let row = 0; row < 3; row++) {
-            for (let col = 0; col < 3; col++) {
-                const cx = col * r * 1.75 + (row % 2 ? r * 0.875 : 0) + r;
-                const cy = row * r * 1.5 + r;
-                tctx.beginPath();
-                for (let i = 0; i < 6; i++) {
-                    const a = (Math.PI / 3) * i + Math.PI / 6;
-                    const x = cx + Math.cos(a) * r;
-                    const y = cy + Math.sin(a) * r;
-                    if (i === 0) tctx.moveTo(x, y);
-                    else tctx.lineTo(x, y);
-                }
-                tctx.closePath();
-                tctx.stroke();
-            }
-        }
-        this._hexPattern = this.ctx.createPattern(tile, 'repeat');
-        return this._hexPattern;
     }
 
     _setInputFromScreen(sx, sy) {
@@ -138,10 +108,11 @@ export class SlitherRenderer {
 
     updateState(tick) {
         this.state = {
-            snakes: tick.snakes || [],
-            food: tick.food || [],
-            you: tick.you,
-            worldHalf: tick.worldHalf || 1000,
+            snakes: tick.snakes ?? this.state.snakes,
+            food: tick.food ?? this.state.food,
+            you: tick.you ?? this.state.you,
+            worldHalf: tick.worldHalf ?? this.state.worldHalf,
+            zone: tick.zone !== undefined ? tick.zone : this.state.zone,
         };
     }
 
@@ -158,31 +129,57 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen) {
-        ctx.fillStyle = '#160924';
+        ctx.fillStyle = '#0a0a0c';
         ctx.fillRect(0, 0, W, H);
 
-        ctx.save();
-        ctx.translate(W / 2 - cx, H / 2 - cy);
-        ctx.fillStyle = this._getHexPattern();
-        ctx.fillRect(-worldHalf - 200, -worldHalf - 200, worldHalf * 2 + 400, worldHalf * 2 + 400);
-        ctx.restore();
+        const gridStep = H / 18;
+        const offsetX = ((W / 2 - cx * this.zoom) % gridStep + gridStep) % gridStep;
+        const offsetY = ((H / 2 - cy * this.zoom) % gridStep + gridStep) % gridStep;
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.08;
+        ctx.beginPath();
+        for (let x = offsetX; x < W; x += gridStep) {
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, H);
+        }
+        for (let y = offsetY; y < H; y += gridStep) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(W, y);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
 
         const limit = worldHalf;
         const tl = toScreen(-limit, -limit);
-        const size = limit * 2;
+        const br = toScreen(limit, limit);
+        ctx.strokeStyle = 'rgba(124, 58, 255, 0.35)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    }
 
-        const edgeGrad = ctx.createLinearGradient(tl.x, tl.y, tl.x + size, tl.y);
-        edgeGrad.addColorStop(0, 'rgba(255, 40, 40, 0.55)');
-        edgeGrad.addColorStop(0.04, 'rgba(255, 40, 40, 0.08)');
-        edgeGrad.addColorStop(0.96, 'rgba(255, 40, 40, 0.08)');
-        edgeGrad.addColorStop(1, 'rgba(255, 40, 40, 0.55)');
-        ctx.strokeStyle = edgeGrad;
-        ctx.lineWidth = 14;
-        ctx.strokeRect(tl.x, tl.y, size, size);
+    _drawZone(ctx, toScreen, W, H) {
+        const zone = this.state.zone;
+        if (!zone || zone.radius == null) return;
 
-        ctx.strokeStyle = 'rgba(255, 80, 80, 0.35)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(tl.x, tl.y, size, size);
+        const { x: zx, y: zy } = toScreen(zone.cx, zone.cy);
+        const screenRadius = zone.radius * this.zoom;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 59, 48, 0.12)';
+        ctx.beginPath();
+        ctx.rect(0, 0, W, H);
+        ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2, true);
+        ctx.fill('evenodd');
+
+        ctx.strokeStyle = 'rgba(255, 107, 107, 0.85)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([12, 8]);
+        ctx.beginPath();
+        ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
     }
 
     _drawFood(ctx, food, toScreen, W, H) {
@@ -309,9 +306,14 @@ export class SlitherRenderer {
 
         const cx = this.camera.x;
         const cy = this.camera.y;
-        const toScreen = (wx, wy) => ({ x: wx - cx + W / 2, y: wy - cy + H / 2 });
+        const zoom = this.zoom;
+        const toScreen = (wx, wy) => ({
+            x: (wx - cx) * zoom + W / 2,
+            y: (wy - cy) * zoom + H / 2,
+        });
 
         this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen);
+        this._drawZone(ctx, toScreen, W, H);
         this._drawFood(ctx, food, toScreen, W, H);
 
         const sorted = [...snakes].sort((a, b) => {

@@ -23,10 +23,11 @@ export default function Profile() {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const data = await res.json();
-                setGameLogs(data.filter(tx =>
-                    (tx.type === 'withdraw' && tx.meta?.reason === 'Arena Cashout') ||
-                    (tx.type === 'game'     && tx.meta?.reason === 'Arena Death')
-                ));
+                setGameLogs(data.filter(tx => {
+                    const reason = tx.meta?.reason || '';
+                    return (tx.type === 'withdraw' && reason.includes('Arena Cashout'))
+                        || (tx.type === 'game' && reason === 'Arena Death');
+                }));
             } catch {}
         };
         fetchLogs();
@@ -35,10 +36,11 @@ export default function Profile() {
 
     // ── Chart data ────────────────────────────────────
     const processedLogs = [...gameLogs].reverse().map(log => {
-        const isCashout = log.type === 'withdraw' && log.meta?.reason === 'Arena Cashout';
+        const isCashout = log.type === 'withdraw' && (log.meta?.reason || '').includes('Arena Cashout');
         const amount    = Number(log.amount) || 0;
-        const netProfit = isCashout ? amount - 10 : amount;
-        return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount };
+        const entryCost = Number(log.meta?.entryFeeUsd) || 10;
+        const netProfit = amount - entryCost;
+        return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount, isCashout };
     });
 
     const totalPnL = processedLogs.reduce((acc, l) => acc + l.netProfit, 0);

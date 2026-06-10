@@ -6,6 +6,8 @@ import Canvas from './canvas.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
+import { DEFAULT_ENTRY_FEE, normalizeEntryFee, formatUsd, tierEconomy } from '../../constants/economy';
+import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 
 /**
  * Version v11 - Full Agar.io Clone Logic Integrated
@@ -38,6 +40,13 @@ export default function Game() {
     const [displayCashedAmount, setDisplayCashedAmount] = useState(0);
     const [isDead, setIsDead] = useState(false);
     const [localTimer, setLocalTimer] = useState(0);
+    const [isBattleRoyale, setIsBattleRoyale] = useState(false);
+    const [brZone, setBrZone] = useState(null);
+    const [brPrizePool, setBrPrizePool] = useState(0);
+    const [brAliveCount, setBrAliveCount] = useState(0);
+    const [brVictoryAmount, setBrVictoryAmount] = useState(null);
+    const [brShowIntro, setBrShowIntro] = useState(false);
+    const [brPlayerCount, setBrPlayerCount] = useState(0);
 
     useEffect(() => {
         const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -66,6 +75,8 @@ export default function Game() {
         const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
         const matchNickname = location.state?.nickname || user?.username || 'Guest';
         const gameMode = localStorage.getItem('current_game_mode') || 'agar';
+        const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
+        const isBR = gameMode === 'br-agar' || location.state?.battleRoyale;
 
         const socket = io(apiUrl, {
             auth: { token },
@@ -82,8 +93,11 @@ export default function Game() {
             console.log('Connected to socket server');
             setIsConnected(true);
             if (!hasJoinedGameRef.current) {
-                console.log('Emitting joinGame...');
-                socket.emit('joinGame', { username: matchNickname, token, mode: gameMode });
+                if (isBR) {
+                    socket.emit('brRejoinMatch', { token });
+                } else {
+                    socket.emit('joinGame', { username: matchNickname, token, mode: gameMode, entryFeeUsd });
+                }
                 hasJoinedGameRef.current = true;
             }
         });
@@ -96,6 +110,15 @@ export default function Game() {
             const isRejoin = gameSizes?.rejoin === true;
             console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
             localStorage.setItem('current_game_mode', gameSizes?.mode || 'agar');
+            if (gameSizes?.entryFeeUsd) {
+                localStorage.setItem('selected_entry_fee', String(gameSizes.entryFeeUsd));
+            }
+            setIsBattleRoyale(!!gameSizes?.battleRoyale);
+            global.battleRoyale = !!gameSizes?.battleRoyale;
+            if (gameSizes?.prizePool) setBrPrizePool(gameSizes.prizePool);
+            if (gameSizes?.playerCount) setBrPlayerCount(gameSizes.playerCount);
+            if (gameSizes?.zone) setBrZone(gameSizes.zone);
+            if (gameSizes?.battleRoyale && gameSizes?.prizePool) setBrShowIntro(true);
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
             global.game.width = gameSizes.width;
@@ -138,17 +161,40 @@ export default function Game() {
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
             gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardInfo };
-            // Server balance is already USD ($1.00 start stake)
-            const me = userData.find(p => p.id === myIdRef.current);
-            if (me) {
-                setCurrentBalance(me.balance ?? 0);
+            if (rewardInfo?.battleRoyale) {
+                setIsBattleRoyale(true);
+                global.battleRoyale = true;
+                if (rewardInfo.zone) setBrZone(rewardInfo.zone);
+                if (rewardInfo.prizePool != null) setBrPrizePool(rewardInfo.prizePool);
+                if (rewardInfo.aliveCount != null) setBrAliveCount(rewardInfo.aliveCount);
             }
+            if (!rewardInfo?.battleRoyale) {
+                const me = userData.find(p => p.id === myIdRef.current);
+                if (me) setCurrentBalance(me.balance ?? 0);
+            }
+        });
+
+        socket.on('brMatchStart', ({ prizePool, playerCount }) => {
+            if (prizePool != null) setBrPrizePool(prizePool);
+            if (playerCount != null) setBrPlayerCount(playerCount);
+            setBrShowIntro(true);
+        });
+        socket.on('brZoneUpdate', (zone) => setBrZone(zone));
+        socket.on('brVictory', ({ amount }) => {
+            setBrVictoryAmount(amount);
+            localStorage.removeItem('current_game_mode');
+            setTimeout(() => navigate('/gamemodes', { state: { selectedMode: 'agar' } }), 5000);
+        });
+        socket.on('brEliminated', ({ placement, playersRemaining }) => {
+            setBrAliveCount(playersRemaining);
         });
 
         socket.on('leaderboard', (data) => {
             setLeaderboard((data.leaderboard || []).map(p => ({
                 ...p,
                 balance: parseFloat(p.balance) || 0,
+                kills: p.kills || 0,
+                mass: p.mass || 0,
             })));
         });
 
@@ -178,10 +224,13 @@ export default function Game() {
         const handleDeath = () => {
             setIsDead(true);
             global.cashOutTimer = 0;
+            const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
-            // Visa döds-skärmen i 4 sekunder innan vi skickar tillbaka till pre-game
             setTimeout(() => {
-                navigate('/pre-game'); 
+                navigate(
+                    wasBR ? '/gamemodes' : '/pre-game',
+                    wasBR ? { state: { selectedMode: 'agar' } } : undefined,
+                );
             }, 4000);
         };
 
@@ -243,6 +292,7 @@ export default function Game() {
                 socketRef.current = null;
             }
             global.cashOutTimer = 0;
+            global.battleRoyale = false;
             hasJoinedGameRef.current = false;
         };
     }, [token, navigate, location.state?.nickname]);
@@ -269,6 +319,18 @@ export default function Game() {
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
                 renderUtils.drawGrid(global, player, screen, graph);
+
+                if (brZone && player.x != null) {
+                    const zx = brZone.cx - player.x + screen.width / 2;
+                    const zy = brZone.cy - player.y + screen.height / 2;
+                    graph.beginPath();
+                    graph.arc(zx, zy, brZone.radius, 0, Math.PI * 2);
+                    graph.strokeStyle = 'rgba(255, 80, 80, 0.55)';
+                    graph.lineWidth = 4;
+                    graph.stroke();
+                    graph.fillStyle = 'rgba(255, 40, 40, 0.06)';
+                    graph.fill();
+                }
                 
                 food.forEach(f => {
                     const pos = { x: f.x - player.x + screen.width/2, y: f.y - player.y + screen.height/2 };
@@ -306,7 +368,7 @@ export default function Game() {
         };
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);
-    }, [isConnected, isDead]); 
+    }, [isConnected, isDead, brZone]); 
 
     const handleMouseMove = (e) => {
         const canvas = canvasRef.current;
@@ -318,11 +380,16 @@ export default function Game() {
         });
     };
 
+    const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
+    const sessionEconomy = tierEconomy(entryFeeUsd);
+
     // Beräkna potentiell bonus baserat på leaderboard-position
     const rewardInfo = gameData.current.rewardInfo;
     const myRank = leaderboard.findIndex(p => p.id === myIdRef.current) + 1;
     const rewardsUnlocked = rewardInfo?.unlocked;
-    const potentialBonus = rewardsUnlocked ? (myRank === 1 ? 20 : (myRank > 1 && myRank <= 3 ? 10 : 0)) : 0;
+    const potentialBonus = rewardsUnlocked
+        ? (myRank === 1 ? sessionEconomy.rankBonus1st : (myRank > 1 && myRank <= 3 ? sessionEconomy.rankBonus2nd3rd : 0))
+        : 0;
 
     const formatUnlockTimer = () => {
         if (!rewardInfo) return "LOCKED";
@@ -494,7 +561,7 @@ export default function Game() {
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
                     <div style={{ textAlign: 'center' }}>
                         <h2 style={{ marginBottom: '10px' }}>Connecting to Arena...</h2>
-                        <p style={{ opacity: 0.5 }}>Make sure you have at least $10 balance.</p>
+                        <p style={{ opacity: 0.5 }}>Make sure you have at least {formatUsd(entryFeeUsd)} balance.</p>
                     </div>
                 </div>
             )}
@@ -520,12 +587,24 @@ export default function Game() {
                     gap: '12px'
                 }}>
                     <div style={{ textAlign: 'center' }}>
-                        <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>Active Stake</h3>
+                        <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
+                            {isBattleRoyale ? 'Prize Pool' : 'Active Stake'}
+                        </h3>
                         <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                            ${(currentBalance ?? 0).toFixed(2)}
+                            {isBattleRoyale ? `$${brPrizePool.toFixed(2)}` : `$${(currentBalance ?? 0).toFixed(2)}`}
                         </div>
+                        {isBattleRoyale && (
+                            <div style={{ fontSize: '0.75rem', color: '#FF6B6B', fontWeight: 700, marginTop: '4px' }}>
+                                {brAliveCount} ALIVE · WINNER TAKES ${brPrizePool.toFixed(2)}
+                            </div>
+                        )}
+                        {isBattleRoyale && brPlayerCount > 0 && (
+                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: '6px', fontWeight: 600 }}>
+                                {brPlayerCount} × $5 entry (5% house fee deducted)
+                            </div>
+                        )}
                         
-                        {potentialBonus > 0 && (
+                        {!isBattleRoyale && potentialBonus > 0 && (
                             <div style={{ fontSize: '0.85rem', color: '#FFD700', fontWeight: '800', marginTop: '2px', letterSpacing: '1px' }}>
                                 + ${potentialBonus.toFixed(2)} RANK BONUS
                             </div>
@@ -533,7 +612,7 @@ export default function Game() {
                     </div>
 
                     {/* Exit timer badge */}
-                    {localTimer > 0 && (
+                    {!isBattleRoyale && localTimer > 0 && (
                         <div style={{
                             display: 'flex',
                             flexDirection: 'column',
@@ -560,6 +639,7 @@ export default function Game() {
                             </div>
                         </div>
                     )}
+                    {!isBattleRoyale && (
                     <button
                         onClick={() => localTimer <= 0 && socketRef.current?.emit('cashOut')}
                         disabled={localTimer > 0}
@@ -583,9 +663,10 @@ export default function Game() {
                     >
                         CASH OUT
                     </button>
+                    )}
                 </div>
 
-                {/* Reward Info Panel */}
+                {!isBattleRoyale && (
                 <div style={{
                     marginTop: '20px',
                     padding: '15px',
@@ -609,14 +690,26 @@ export default function Game() {
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Rank 1 Bonus</span>
-                        <span style={{ color: '#fff' }}>$20.00</span>
+                        <span style={{ color: '#fff' }}>{formatUsd(sessionEconomy.rankBonus1st)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Rank 2-3 Bonus</span>
-                        <span style={{ color: '#fff' }}>$10.00</span>
+                        <span style={{ color: '#fff' }}>{formatUsd(sessionEconomy.rankBonus2nd3rd)}</span>
                     </div>
                 </div>
+                )}
             </div>
+
+            {brVictoryAmount != null && (
+                <BRVictoryOverlay show amount={brVictoryAmount} />
+            )}
+
+            <BRIntroOverlay
+                show={brShowIntro && isBattleRoyale && brVictoryAmount == null}
+                prizePool={brPrizePool}
+                playerCount={brPlayerCount}
+                onComplete={() => setBrShowIntro(false)}
+            />
 
             {/* Controls Info */}
             <div style={{ 
@@ -665,7 +758,9 @@ export default function Game() {
                 color: 'white',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
             }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>Leaderboard</h4>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>
+                    {isBattleRoyale ? 'Eliminations' : 'Leaderboard'}
+                </h4>
                 <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {leaderboard.map((p, i) => (
                         <div key={p.id} style={{ 
@@ -676,7 +771,9 @@ export default function Game() {
                             fontWeight: p.id === myIdRef.current ? '700' : '400'
                         }}>
                             <span>{i + 1}. {p.name || 'An unnamed cell'}</span>
-                            <span className="mono">${Number(p.balance ?? 0).toFixed(2)}</span>
+                            <span className="mono">
+                                {isBattleRoyale ? `${p.kills ?? 0} kills` : `$${Number(p.balance ?? 0).toFixed(2)}`}
+                            </span>
                         </div>
                     ))}
                 </div>

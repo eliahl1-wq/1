@@ -225,7 +225,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
             const pulse = 0.6 + Math.sin(Date.now() * 0.012) * 0.4;
             graph.shadowBlur = 30 * pulse;
             graph.shadowColor = '#14F195';
-        } else if (cell.balance > 50) {
+        } else if (!global.battleRoyale && cell.balance > 50) {
             graph.shadowBlur = 40; // Starkare glöd
             graph.shadowColor = '#FFD700'; // Guld-färg
         } else {
@@ -260,7 +260,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.strokeText(cell.name, cell.x, nameY);
         graph.fillText(cell.name, cell.x, nameY);
 
-        if (cell.radius >= 22) {
+        if (!global.battleRoyale && cell.radius >= 22) {
             drawBalanceBadge(graph, cell, nameY, fontSize);
         }
 

@@ -8,6 +8,7 @@ import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
+import { ENTRY_TIERS, DEFAULT_ENTRY_FEE, tierEconomy, formatUsd } from '../constants/economy';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -63,6 +64,10 @@ export default function PreGame() {
     const [selectedMode, setSelectedMode] = useState(
         () => localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
     );
+    const [selectedEntryFee, setSelectedEntryFee] = useState(
+        () => Number(localStorage.getItem('selected_entry_fee')) || DEFAULT_ENTRY_FEE
+    );
+    const [activeEntryFee, setActiveEntryFee] = useState(null);
     const [currentGameMode, setCurrentGameMode] = useState(
         () => localStorage.getItem('current_game_mode') || null
     );
@@ -70,6 +75,10 @@ export default function PreGame() {
     useEffect(() => {
         localStorage.setItem('selected_gamemode', selectedMode);
     }, [selectedMode]);
+
+    useEffect(() => {
+        localStorage.setItem('selected_entry_fee', String(selectedEntryFee));
+    }, [selectedEntryFee]);
 
     useEffect(() => {
         if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
@@ -101,14 +110,16 @@ export default function PreGame() {
 
     const depositAddress = user?.depositAddress;
     const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-    const ENTRY_FEE = 10.00;
+
+    const entryFeeForSession = isAlreadyInGame && activeEntryFee != null ? activeEntryFee : selectedEntryFee;
+    const economy = tierEconomy(entryFeeForSession);
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
     const balanceUsd = balanceSol * solPrice;
     const freePlay = !!user?.freePlay;
 
-    const canJoin = freePlay || balanceUsd >= ENTRY_FEE;
+    const canJoin = freePlay || balanceUsd >= entryFeeForSession;
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -284,12 +295,18 @@ export default function PreGame() {
                     setCurrentGameMode(d.mode);
                     setSelectedMode(d.mode);
                     setActiveGameBalance(d.balance ?? null);
+                    if (d.entryFeeUsd) {
+                        setActiveEntryFee(d.entryFeeUsd);
+                        setSelectedEntryFee(d.entryFeeUsd);
+                    }
                     localStorage.setItem('current_game_mode', d.mode);
                     localStorage.setItem('selected_gamemode', d.mode);
+                    if (d.entryFeeUsd) localStorage.setItem('selected_entry_fee', String(d.entryFeeUsd));
                 } else if (r.ok) {
                     // Only clear when server confirms we're not in a game
                     setCurrentGameMode(null);
                     setActiveGameBalance(null);
+                    setActiveEntryFee(null);
                     localStorage.removeItem('current_game_mode');
                 }
             } catch { /* ignore */ }
@@ -353,17 +370,28 @@ export default function PreGame() {
         setIsMatchmaking(true);
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
+        localStorage.setItem('selected_entry_fee', String(entryFeeForSession));
 
         const activeMode = (isAlreadyInGame && currentGameMode) ? currentGameMode : selectedMode;
         setCurrentGameMode(activeMode);
         localStorage.setItem('current_game_mode', activeMode);
         localStorage.setItem('selected_gamemode', activeMode);
 
-        const targetPath = activeMode === 'slither' ? '/slither-game' : '/game';
-        setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode: activeMode } }), 1200);
+        const isBR = activeMode.startsWith('br-');
+        const targetPath = (activeMode === 'slither' || activeMode === 'br-slither') ? '/slither-game' : '/game';
+        const baseMode = activeMode.replace(/^br-/, '');
+        setTimeout(() => navigate(targetPath, {
+            state: {
+                nickname,
+                selectedMode: baseMode,
+                ...(isBR ? { battleRoyale: true } : {}),
+            },
+        }), 1200);
     };
 
-    const canRejoinThisMode = isAlreadyInGame && currentGameMode && selectedMode === currentGameMode;
+    const normalizeMode = (mode) => (mode || '').replace(/^br-/, '');
+    const canRejoinThisMode = isAlreadyInGame && currentGameMode
+        && normalizeMode(selectedMode) === normalizeMode(currentGameMode);
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return; }
@@ -847,6 +875,44 @@ export default function PreGame() {
                     >
                         Normal
                     </button>
+
+                    <div style={{ marginTop: '14px', width: '100%' }}>
+                        <span className="label" style={{ display: 'block', marginBottom: '8px' }}>Entry stake</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {ENTRY_TIERS.map(tier => {
+                                const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
+                                const active = entryFeeForSession === tier;
+                                return (
+                                    <button
+                                        key={tier}
+                                        type="button"
+                                        disabled={locked || isMatchmaking}
+                                        onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '9px 12px',
+                                            borderRadius: 'var(--r-md)',
+                                            border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                                            background: active ? 'rgba(124, 58, 255, 0.12)' : 'rgba(255,255,255,0.02)',
+                                            color: locked ? 'var(--text-3)' : 'var(--text-h)',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 700,
+                                            cursor: locked || isAlreadyInGame ? 'default' : 'pointer',
+                                            opacity: locked ? 0.45 : 1,
+                                            textAlign: 'left',
+                                        }}
+                                    >
+                                        {freePlay ? 'FREE (Test)' : formatUsd(tier)}
+                                        {!freePlay && (
+                                            <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)', marginTop: '2px' }}>
+                                                Start {formatUsd(tierEconomy(tier).startBalance)}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="game-card main-card">
@@ -870,7 +936,7 @@ export default function PreGame() {
                     <div className="entry-row" style={{ marginBottom: '18px' }}>
                         <span className="label">Entry Fee</span>
                         <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                            {freePlay ? 'FREE (Test)' : '$10.00'}
+                            {freePlay ? 'FREE (Test)' : formatUsd(entryFeeForSession)}
                         </span>
                     </div>
 
@@ -886,7 +952,8 @@ export default function PreGame() {
                     {isAlreadyInGame && currentGameMode && (
                         <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
                             Active session: {currentGameMode === 'slither' ? 'Slither' : 'Agar'}
-                            {activeGameBalance != null && ` · $${Number(activeGameBalance).toFixed(2)} stake`}
+                            {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} stake`}
+                            {activeGameBalance != null && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
                         </div>
                     )}
 
@@ -905,11 +972,11 @@ export default function PreGame() {
                             <div className="hiw-content">
                                 <div className="stat-row" style={{ marginBottom: '3px' }}>
                                     <span>Entry fee</span>
-                                    <span className="mono">$10.00</span>
+                                    <span className="mono">{formatUsd(entryFeeForSession)}</span>
                                 </div>
                                 <div className="stat-row" style={{ marginBottom: '3px' }}>
                                     <span>Starting balance</span>
-                                    <span className="mono">$1.00</span>
+                                    <span className="mono">{formatUsd(economy.startBalance)}</span>
                                 </div>
                                 <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
                                     Eat food & other players. Cash out anytime.
@@ -917,11 +984,11 @@ export default function PreGame() {
                                 <div className="divider" style={{ margin: '6px 0' }} />
                                 <div className="stat-row" style={{ marginBottom: '2px' }}>
                                     <span>1st place bonus</span>
-                                    <span className="mono text-green">$20.00</span>
+                                    <span className="mono text-green">{formatUsd(economy.rankBonus1st)}</span>
                                 </div>
                                 <div className="stat-row">
                                     <span>2nd–3rd place</span>
-                                    <span className="mono text-green">$10.00</span>
+                                    <span className="mono text-green">{formatUsd(economy.rankBonus2nd3rd)}</span>
                                 </div>
                             </div>
                         )}

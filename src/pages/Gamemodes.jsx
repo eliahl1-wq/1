@@ -80,30 +80,38 @@ export default function Gamemodes() {
                         <>
                             <ModeCard
                                 title="Agar Normal"
-                                desc="The classic high-stakes Agar experience. Grow, absorb, dominate."
+                                desc="The classic high-stakes Agar experience. Grow, absorb, dominate. Choose $5, $10, or $20 entry in the lobby."
                                 badge={null}
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                             />
                             <ModeCard
-                                title="Speed Arena"
-                                desc="Faster movement, higher risk, greater rewards."
-                                badge="COMING SOON"
-                                onPlay={null}
+                                title="Agar Battle Royale"
+                                desc="4–16 players, shrinking zone, last one standing wins the pool. $5 entry, no cash-out."
+                                badge="NEW"
+                                badgeAccent
+                                onPlay={() => {
+                                    localStorage.setItem('selected_gamemode', 'br-agar');
+                                    navigate('/br-lobby', { state: { variant: 'agar' } });
+                                }}
                             />
                         </>
                     ) : (
                         <>
                             <ModeCard
                                 title="Slither Normal"
-                                desc="Classic high-stakes snake arena. Outmaneuver enemies, grow longer."
+                                desc="Classic high-stakes snake arena. Outmaneuver enemies, grow longer. $5 / $10 / $20 entry."
                                 badge={null}
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                             />
                             <ModeCard
-                                title="Speed Snake"
-                                desc="Faster growth, higher risk, bigger payouts."
-                                badge="COMING SOON"
-                                onPlay={null}
+                                title="Slither Battle Royale"
+                                desc="4–16 snakes, deadly zone closes in, winner takes all. $5 entry, no cash-out."
+                                badge="NEW"
+                                badgeAccent
+                                onPlay={() => {
+                                    localStorage.setItem('selected_gamemode', 'br-slither');
+                                    navigate('/br-lobby', { state: { variant: 'slither' } });
+                                }}
                             />
                         </>
                     )}
@@ -257,7 +265,7 @@ export default function Gamemodes() {
     );
 }
 
-function ModeCard({ title, desc, badge, onPlay }) {
+function ModeCard({ title, desc, badge, badgeAccent, onPlay }) {
     const isDisabled = !onPlay;
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
@@ -267,7 +275,12 @@ function ModeCard({ title, desc, badge, onPlay }) {
             </div>
             {isDisabled
                 ? <span className="gm-badge">{badge}</span>
-                : <button className="gm-play-btn" onClick={onPlay}>Select</button>
+                : badge
+                    ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                        <span className="gm-badge" style={badgeAccent ? { color: '#14F195', borderColor: 'rgba(20,241,149,0.3)', background: 'rgba(20,241,149,0.08)' } : undefined}>{badge}</span>
+                        <button className="gm-play-btn" onClick={onPlay}>Select</button>
+                      </div>
+                    : <button className="gm-play-btn" onClick={onPlay}>Select</button>
             }
         </div>
     );

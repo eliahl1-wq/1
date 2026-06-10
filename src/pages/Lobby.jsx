@@ -8,6 +8,7 @@ import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
+import { MIN_ENTRY_FEE } from '../constants/economy';
 
 const SolLogo = ({ size = 13, style }) => (
     <img src="/solana-sol-logo.png" alt="SOL"
@@ -112,7 +113,7 @@ export default function Lobby() {
     // Leave lobby once the user can enter the arena (funded or free-play)
     useEffect(() => {
         const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
-        if (user?.freePlay || balanceUsd >= 10) {
+        if (user?.freePlay || balanceUsd >= MIN_ENTRY_FEE) {
             navigate('/pre-game');
         }
     }, [user?.freePlay, user?.balanceUsd, user?.balanceSol, user?.solPrice, navigate, solPrice]);
@@ -243,7 +244,7 @@ export default function Lobby() {
                         Fund Your Arena
                     </h1>
                     <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 500 }}>
-                        Deposit $10 minimum to enter the arena.
+                        Deposit ${MIN_ENTRY_FEE} minimum to enter the arena.
                     </p>
                 </div>
 
@@ -406,8 +407,8 @@ export default function Lobby() {
                     style={{ width: '100%', padding: '14px', fontSize: '0.9rem', borderRadius: 'var(--r-lg)', letterSpacing: '0.01em' }}
                     onClick={() => {
                         if (!connected) { setArenaError('Connect your wallet first.'); return; }
-                        if (!isAlreadyInGame && (user?.balance ?? 0) < 10) {
-                            setArenaError('Deposit at least $10 to enter.'); return;
+                        if (!isAlreadyInGame && (user?.balance ?? 0) < MIN_ENTRY_FEE) {
+                            setArenaError(`Deposit at least $${MIN_ENTRY_FEE} to enter.`); return;
                         }
                         setArenaError('');
                         navigate('/pre-game');
