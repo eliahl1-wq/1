@@ -118,6 +118,7 @@ export default function Game() {
             cashoutActiveRef.current = true;
 
             let timeLeft = seconds;
+            global.cashOutTotal = seconds;
             global.cashOutTimer = timeLeft;
             setLocalTimer(timeLeft);
 
@@ -535,25 +536,28 @@ export default function Game() {
                     {localTimer > 0 && (
                         <div style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            flexDirection: 'column',
                             gap: '6px',
-                            padding: '5px 12px',
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: '100px',
-                            fontSize: '0.68rem',
-                            fontWeight: '700',
-                            color: 'rgba(255,255,255,0.5)',
-                            letterSpacing: '0.5px',
+                            padding: '10px 12px',
+                            background: 'rgba(6, 10, 8, 0.85)',
+                            border: '1px solid rgba(20, 241, 149, 0.25)',
+                            borderRadius: '14px',
                             width: '100%',
-                            boxSizing: 'border-box'
+                            boxSizing: 'border-box',
                         }}>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 6v6l4 2"/>
-                            </svg>
-                            <span>Cash out available in <span style={{ color: '#fff', fontFamily: 'monospace' }}>{localTimer}s</span></span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '1.2px' }}>SECURING</span>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#14F195', fontFamily: 'ui-monospace, monospace' }}>{localTimer}s</span>
+                            </div>
+                            <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                                <div style={{
+                                    height: '100%',
+                                    width: `${(localTimer / (global.cashOutTotal || 20)) * 100}%`,
+                                    background: 'linear-gradient(90deg, #0DBF76, #14F195)',
+                                    borderRadius: 2,
+                                    transition: 'width 1s linear',
+                                }} />
+                            </div>
                         </div>
                     )}
                     <button

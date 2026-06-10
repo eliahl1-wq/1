@@ -140,7 +140,7 @@ export class SlitherRenderer {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -20 || fy < -20 || fx > W + 20 || fy > H + 20) continue;
             ctx.beginPath();
-            ctx.arc(fx, fy, 4, 0, Math.PI * 2);
+            ctx.arc(fx, fy, f.radius || 7, 0, Math.PI * 2);
             ctx.fillStyle = `hsl(${f.hue || 120}, 80%, 60%)`;
             ctx.fill();
         }
@@ -156,7 +156,7 @@ export class SlitherRenderer {
         if (segs.length === 0) return;
 
         const cents = Math.max(0, (snake.balance - 1) * 100);
-        const radius = 8 * (1 + Math.pow(cents / 200, 0.35));
+        const radius = 10 * (1 + Math.pow(cents / 200, 0.35));
         const color = snake.isYou ? '#7C3AFF' : (snake.color || '#666');
 
         for (let i = segs.length - 1; i >= 1; i--) {

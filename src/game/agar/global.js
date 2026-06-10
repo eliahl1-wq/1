@@ -30,5 +30,6 @@ export default {
     toggleMassState: 0,
     backgroundColor: '#0a0a0c', // Mörk bakgrund
     lineColor: '#ffffff',       // Vitt rutnät
-    cashOutTimer: 0,            // Nedräkning för uttag
+    cashOutTimer: 0,
+    cashOutTotal: 20,
 };

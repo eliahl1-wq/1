@@ -98,10 +98,13 @@ export default function SlitherGame() {
             }
         });
 
-        socket.on('welcome', (playerSettings) => {
+        socket.on('welcome', (playerSettings, gameSizes) => {
             localStorage.setItem('current_game_mode', 'slither');
             setCurrentBalance(playerSettings.balance ?? 1.0);
             setGameReady(true);
+            if (gameSizes?.cashOutRemaining > 0) {
+                startCashoutCountdown(gameSizes.cashOutRemaining);
+            }
         });
 
         socket.on('slitherTick', (tick) => {
