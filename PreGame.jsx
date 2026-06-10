@@ -32,8 +32,6 @@ export default function PreGame() {
     const { connection } = useConnection();
 
     // ── State ──────────────────────────────────────────
-    const activeSolPrice = Number(liveStats?.solPrice || user?.solPrice || 64);
-
     const [showUserMenu, setShowUserMenu]       = useState(false);
     const [isWalletOpen, setIsWalletOpen]       = useState(false);
     const [isWalletExpanded, setIsWalletExpanded]   = useState(false);
@@ -50,6 +48,7 @@ export default function PreGame() {
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [currentGameMode, setCurrentGameMode] = useState(null);
     const [liveStats, setLiveStats]             = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
+    const solPrice = Number(liveStats?.solPrice || user?.solPrice || 64);
     const [showHowItWorks, setShowHowItWorks]   = useState(false);
     const [leaderboardTab, setLeaderboardTab]   = useState('alltime');
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
@@ -97,7 +96,7 @@ export default function PreGame() {
     const depositAddress    = user?.depositAddress;
     const SOL_ADDR_REGEX    = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const ENTRY_FEE         = 10.00;
-    const canJoin           = (user?.balanceSol || 0) >= (ENTRY_FEE / activeSolPrice);
+    const canJoin           = (user?.balanceSol || 0) >= (ENTRY_FEE / solPrice);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -320,18 +319,18 @@ export default function PreGame() {
         setAmount(prev => {
             const num = parseFloat(prev);
             if (!prev || isNaN(num)) return prev;
-            return becomingSOL ? (num / activeSolPrice).toFixed(4) : (num * activeSolPrice).toFixed(2);
+            return becomingSOL ? (num / solPrice).toFixed(4) : (num * solPrice).toFixed(2);
         });
 
         // Convert Withdraw Amount
         setWithdrawAmount(prev => {
             const num = parseFloat(prev);
             if (!prev || isNaN(num)) return prev;
-            return becomingSOL ? (num / activeSolPrice).toFixed(4) : (num * activeSolPrice).toFixed(2);
+            return becomingSOL ? (num / solPrice).toFixed(4) : (num * solPrice).toFixed(2);
         });
 
         setIsCurSOL(becomingSOL);
-    }, [isCurSOL, activeSolPrice]);
+    }, [isCurSOL, solPrice]);
 
     const displayBalance = !isCurSOL
         ? `$${Number(user?.balanceUsd || 0).toFixed(2)}`
@@ -372,6 +371,8 @@ export default function PreGame() {
 
         const solAmt = isCurSOL ? parsed : parsed / activeSolPrice;
         const usdAmt = isCurSOL ? parsed * activeSolPrice : parsed;
+        const solAmt = isCurSOL ? parsed : parsed / solPrice;
+        const usdAmt = isCurSOL ? parsed * solPrice : parsed;
 
         try {
             const lamports = Math.round(solAmt * LAMPORTS_PER_SOL);
@@ -457,7 +458,7 @@ export default function PreGame() {
         if (isNaN(parsed) || parsed < 1) { setStatusMsg('❌ Minimum withdrawal is $1.00'); return; }
         setStatusMsg('⏳ Processing withdrawal…');
         try {
-            const usdAmt = isCurSOL ? parsed * activeSolPrice : parsed;
+            const usdAmt = isCurSOL ? parsed * solPrice : parsed;
             const r = await fetch(`${API_URL}/api/withdraw`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -575,11 +576,13 @@ export default function PreGame() {
                                                 {isCurSOL
                                                     ? fmt(user?.balanceSol)
                                                     : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2))}
+                                                    : (user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2))}
                                             </span>
                                         </div>
                                         <div className="wallet-card-sub">
                                             {isCurSOL
                                                 ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * activeSolPrice || 0).toFixed(2)} USD`
+                                                ? `≈ $${user?.balanceUsd ? user.balanceUsd.toFixed(2) : (user?.balanceSol * solPrice || 0).toFixed(2)} USD`
                                                 : `≈ ${fmt(user?.balanceSol)} SOL`}
                                         </div>
 
@@ -707,6 +710,8 @@ export default function PreGame() {
                                         {isCurSOL
                                             ? `≈ $${(parseFloat(amount) * activeSolPrice).toFixed(2)}`
                                             : `≈ ${(parseFloat(amount) / activeSolPrice).toFixed(4)} SOL`}
+                                            ? `≈ $${(parseFloat(amount) * solPrice).toFixed(2)}`
+                                            : `≈ ${(parseFloat(amount) / solPrice).toFixed(4)} SOL`}
                                     </div>
                                 )}
                             </div>
@@ -825,8 +830,8 @@ export default function PreGame() {
                             </div>
                             <div className="amount-hint">
                                 {isCurSOL
-                                    ? `≈ $${(parseFloat(withdrawAmount || 0) * activeSolPrice).toFixed(2)}`
-                                    : `≈ ${(parseFloat(withdrawAmount || 0) / activeSolPrice).toFixed(2)} SOL`}
+                                    ? `≈ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
+                                    : `≈ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(2)} SOL`}
                             </div>
                         </div>
 
@@ -1025,6 +1030,10 @@ export default function PreGame() {
                     </div>
                     <span className="mono" style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: 700 }}>
                         ${activeSolPrice.toFixed(2)}
+                <div className="stat-row">
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>SOL Price</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--green)', fontWeight: 700 }}>
+                        ${solPrice.toFixed(2)}
                     </span>
                 </div>
             </div>

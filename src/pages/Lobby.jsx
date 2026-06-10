@@ -32,7 +32,7 @@ export default function Lobby() {
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [depositMethod, setDepositMethod]   = useState('wallet');
     const [isCurSOL, setIsCurSOL]             = useState(false);
-    const [solPrice] = useState(150);
+    const solPrice = user?.solPrice || 64;
 
     const qrRef       = useRef(null);
     const userMenuRef = useRef(null);

@@ -249,20 +249,22 @@
 .gm-nav-link {
   background: none;
   border: none;
-  color: var(--text-2);
+  color: #fff;
   font-family: var(--sans);
   font-size: 1.05rem;
   font-weight: 800;
   cursor: pointer;
   padding: 0;
   letter-spacing: -0.01em;
-  transition: color 0.15s ease;
+  transition: all 0.2s ease;
 }
 .gm-nav-link:hover {
-  color: #fff;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(124, 58, 255, 0.7);
 }
 .gm-nav-link--active {
-  color: #fff;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(124, 58, 255, 0.7);
 }
 
 .mode-title {

@@ -32,29 +32,29 @@ export default function PreGame() {
     const { connection } = useConnection();
 
     // ── State ──────────────────────────────────────────
-    const [solPrice] = useState(150);
-    const [showUserMenu, setShowUserMenu]       = useState(false);
-    const [isWalletOpen, setIsWalletOpen]       = useState(false);
-    const [isWalletExpanded, setIsWalletExpanded]   = useState(false);
+    const solPrice = liveStats?.solPrice || user?.solPrice || 64;
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const [isWalletOpen, setIsWalletOpen] = useState(false);
+    const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
-    const [depositMethod, setDepositMethod]     = useState('wallet');
-    const [amount, setAmount]                   = useState('');
-    const [withdrawAmount, setWithdrawAmount]   = useState('');
+    const [depositMethod, setDepositMethod] = useState('wallet');
+    const [amount, setAmount] = useState('');
+    const [withdrawAmount, setWithdrawAmount] = useState('');
     const [withdrawAddress, setWithdrawAddress] = useState('');
     const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
-    const [isCurSOL, setIsCurSOL]               = useState(false);
-    const [statusMsg, setStatusMsg]             = useState('');
-    const [isMatchmaking, setIsMatchmaking]     = useState(false);
+    const [isCurSOL, setIsCurSOL] = useState(false);
+    const [statusMsg, setStatusMsg] = useState('');
+    const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [liveStats, setLiveStats]             = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
-    const [showHowItWorks, setShowHowItWorks]   = useState(false);
-    const [leaderboardTab, setLeaderboardTab]   = useState('alltime');
+    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
+    const [showHowItWorks, setShowHowItWorks] = useState(false);
+    const [leaderboardTab, setLeaderboardTab] = useState('alltime');
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
-    const [nickname, setNickname]               = useState(
+    const [nickname, setNickname] = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
-    
+
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     const [selectedMode, setSelectedMode] = useState(
         () => localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
@@ -82,32 +82,32 @@ export default function PreGame() {
     }, [currentGameMode]);
 
     // Panel drag
-    const [panelPos, setPanelPos]       = useState({ x: null, y: 60 });
-    const [isDragging, setIsDragging]   = useState(false);
+    const [panelPos, setPanelPos] = useState({ x: null, y: 60 });
+    const [isDragging, setIsDragging] = useState(false);
     const [walletModalActive, setWalletModalActive] = useState(false);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
 
     // Refs
-    const userMenuRef       = useRef(null);
-    const userPillRef       = useRef(null);
-    const walletDropRef     = useRef(null);
-    const walletExpandRef   = useRef(null);
+    const userMenuRef = useRef(null);
+    const userPillRef = useRef(null);
+    const walletDropRef = useRef(null);
+    const walletExpandRef = useRef(null);
     const withdrawExpandRef = useRef(null);
-    const qrRef             = useRef(null);
+    const qrRef = useRef(null);
 
-    const depositAddress    = user?.depositAddress;
-    const SOL_ADDR_REGEX    = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-    const ENTRY_FEE         = 10.00;
-    const canJoin           = (user?.balance || 0) >= ENTRY_FEE;
+    const depositAddress = user?.depositAddress;
+    const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    const ENTRY_FEE = 10.00;
+    const canJoin = (user?.balance || 0) >= ENTRY_FEE;
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
         const n = Number(v || 0);
         if (!isFinite(n)) return '0';
         if (n >= 10000) return Math.round(n).toString();
-        if (n >= 1000)  return n.toFixed(1);
-        if (n >= 1)     return n.toFixed(2);
-        if (n > 0)      return n.toFixed(4);
+        if (n >= 1000) return n.toFixed(1);
+        if (n >= 1) return n.toFixed(2);
+        if (n > 0) return n.toFixed(4);
         return '0';
     };
 
@@ -147,7 +147,7 @@ export default function PreGame() {
                     190, 'white', 'black'
                 );
                 qr.append(qrRef.current);
-            } catch (e) {}
+            } catch (e) { }
         }
     }, [depositAddress, depositMethod]);
 
@@ -211,10 +211,10 @@ export default function PreGame() {
                     headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                 });
                 if (r.ok && alive) setLiveStats(await r.json());
-            } catch {}
+            } catch { }
         };
         fetchStats();
-        const id = setInterval(fetchStats, 30000); 
+        const id = setInterval(fetchStats, 30000);
         return () => { alive = false; clearInterval(id); };
     }, []);
 
@@ -233,7 +233,7 @@ export default function PreGame() {
                         week: d.week || []
                     });
                 }
-            } catch {}
+            } catch { }
         };
         fetchLeaderboard();
         const id = setInterval(fetchLeaderboard, 90000);
@@ -268,7 +268,7 @@ export default function PreGame() {
                         localStorage.removeItem('current_game_mode');
                     }
                 }
-            } catch {}
+            } catch { }
         })();
     }, [token, selectedMode]);
 
@@ -367,7 +367,7 @@ export default function PreGame() {
             setAmount('');
         } catch (err) {
             const m = err.message || '';
-            if (m.includes('User rejected'))      setStatusMsg('❌ Cancelled in wallet.');
+            if (m.includes('User rejected')) setStatusMsg('❌ Cancelled in wallet.');
             else if (m.toLowerCase().includes('insufficient')) setStatusMsg('❌ Insufficient funds.');
             else setStatusMsg('❌ Deposit failed. Try again.');
         }
@@ -397,27 +397,27 @@ export default function PreGame() {
     // ── Panel position ─────────────────────────────────
     const panelStyle = {
         position: 'absolute',
-        left:      panelPos.x !== null ? panelPos.x : '50%',
-        top:       panelPos.y,
+        left: panelPos.x !== null ? panelPos.x : '50%',
+        top: panelPos.y,
         transform: panelPos.x !== null ? 'none' : 'translateX(-50%)',
-        cursor:    isDragging ? 'grabbing' : 'default',
+        cursor: isDragging ? 'grabbing' : 'default',
         transition: isDragging ? 'none' : undefined,
     };
 
     // ── Play button variant ─────────────────────────────
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
         : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
-        : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
-        : canJoin ? 'play-btn play-btn-ready'
-        : 'play-btn play-btn-disabled';
+            : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
+                : canJoin ? 'play-btn play-btn-ready'
+                    : 'play-btn play-btn-disabled';
 
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> Joining…</>
         : !isAuthenticated ? 'Play Now'
-        : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
-        : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
-        : canJoin          ? 'Play'
-        : 'Deposit to Play';
+            : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
+                : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
+                    : canJoin ? 'Play'
+                        : 'Deposit to Play';
 
     // ── Render ─────────────────────────────────────────
     return (
@@ -505,9 +505,9 @@ export default function PreGame() {
                                                     <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>$</span>
                                                 )}
                                                 <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
-                                                {isCurSOL
-                                                    ? (user.balance / solPrice).toFixed(2)
-                                                    : fmt(user.balance)}
+                                                    {isCurSOL
+                                                        ? (user.balance / solPrice).toFixed(2)
+                                                        : fmt(user.balance)}
                                                 </span>
                                             </div>
                                             <div className="wallet-card-sub">
@@ -922,6 +922,12 @@ export default function PreGame() {
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
                         {liveStats.topPlayer ?? '—'}
+                    </span>
+                </div>
+                <div className="stat-row">
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>SOL Price</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--green)', fontWeight: 700 }}>
+                        ${solPrice.toFixed(2)}
                     </span>
                 </div>
             </div>
