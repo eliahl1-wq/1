@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import WalletConnectPanel from '../components/WalletConnectPanel';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { useNavigate } from 'react-router-dom';
@@ -94,20 +94,19 @@ export default function Lobby() {
         }
     }, [token, refreshUser]);
 
-    // QR code – show when disconnected (always) or connected + manual tab
+    // QR code — manual deposit tab only
     useEffect(() => {
-        const shouldShow = !connected || depositMethod === 'manual';
-        if (qrRef.current && depositAddress && shouldShow) {
+        if (qrRef.current && depositAddress && depositMethod === 'manual') {
             qrRef.current.innerHTML = '';
             try {
                 const qr = createQR(`solana:${depositAddress}?amount=0&label=AgarStake&message=Deposit`, 190, 'white', 'black');
                 qr.append(qrRef.current);
             } catch { }
-        } else if (qrRef.current && !shouldShow) {
+        } else if (qrRef.current) {
             qrRef.current.innerHTML = '';
         }
         return () => { if (qrRef.current) qrRef.current.innerHTML = ''; };
-    }, [depositAddress, depositMethod, connected]);
+    }, [depositAddress, depositMethod]);
 
     // Redirect if sufficient balance or free-play test mode
     useEffect(() => {
@@ -264,109 +263,92 @@ export default function Lobby() {
                         </div>
                     </div>
 
-                    {connected ? (
-                        <>
-                            {/* Tab bar */}
-                            <div className="tab-bar" style={{ marginBottom: '16px' }}>
-                                <button
-                                    className={`tab-btn${depositMethod === 'wallet' ? ' active' : ''}`}
-                                    onClick={() => { if (qrRef.current) qrRef.current.innerHTML = ''; setDepositMethod('wallet'); setStatusMsg(''); }}
-                                >
-                                    Wallet Connect
-                                </button>
-                                <button
-                                    className={`tab-btn${depositMethod === 'manual' ? ' active' : ''}`}
-                                    onClick={() => { setDepositMethod('manual'); setStatusMsg(''); }}
-                                >
-                                    QR Deposit
-                                </button>
+                    <div className="tab-bar" style={{ marginBottom: '16px' }}>
+                        <button
+                            className={`tab-btn${depositMethod === 'wallet' ? ' active' : ''}`}
+                            onClick={() => { if (qrRef.current) qrRef.current.innerHTML = ''; setDepositMethod('wallet'); setStatusMsg(''); }}
+                        >
+                            Wallet
+                        </button>
+                        <button
+                            className={`tab-btn${depositMethod === 'manual' ? ' active' : ''}`}
+                            onClick={() => { setDepositMethod('manual'); setStatusMsg(''); }}
+                        >
+                            QR / Address
+                        </button>
+                    </div>
+
+                    {depositMethod === 'wallet' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <WalletConnectPanel onStatusChange={setStatusMsg} />
+
+                            <div>
+                                <div className="wallet-connect-header" style={{ marginBottom: '10px' }}>
+                                    <span className="wallet-connect-step">2</span>
+                                    <div>
+                                        <div className="wallet-connect-title">Enter amount</div>
+                                        <div className="wallet-connect-sub">
+                                            {connected ? 'Minimum $10 to enter the arena' : 'Connect a wallet first'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                    <span className="label">Amount</span>
+                                    <CustomDropdown
+                                        options={CUR_OPTIONS}
+                                        value={isCurSOL ? 'SOL' : 'USD'}
+                                        onChange={v => setIsCurSOL(v === 'SOL')}
+                                        renderValue={v => (
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
+                                            </span>
+                                        )}
+                                        renderOption={opt => (
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
+                                            </span>
+                                        )}
+                                    />
+                                </div>
+                                <div className="amount-field" style={{ opacity: connected ? 1 : 0.55 }}>
+                                    <span className="amount-prefix">
+                                        {isCurSOL ? <SolLogo size={13} /> : <span>$</span>}
+                                    </span>
+                                    <input
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={depositAmount}
+                                        onChange={e => setDepositAmount(e.target.value)}
+                                        className="amount-input"
+                                        disabled={!connected}
+                                    />
+                                </div>
+                                {depositAmount && (
+                                    <div className="amount-hint">
+                                        {isCurSOL
+                                            ? `≈ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}`
+                                            : `≈ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
+                                    </div>
+                                )}
                             </div>
 
-                            {depositMethod === 'wallet' ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    {/* Amount */}
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                                            <span className="label">Amount</span>
-                                            <CustomDropdown
-                                                options={CUR_OPTIONS}
-                                                value={isCurSOL ? 'SOL' : 'USD'}
-                                                onChange={v => setIsCurSOL(v === 'SOL')}
-                                                renderValue={v => (
-                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
-                                                    </span>
-                                                )}
-                                                renderOption={opt => (
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
-                                                    </span>
-                                                )}
-                                            />
-                                        </div>
-                                        <div className="amount-field">
-                                            <span className="amount-prefix">
-                                                {isCurSOL ? <SolLogo size={13} /> : <span>$</span>}
-                                            </span>
-                                            <input
-                                                type="number"
-                                                placeholder="0.00"
-                                                value={depositAmount}
-                                                onChange={e => setDepositAmount(e.target.value)}
-                                                className="amount-input"
-                                            />
-                                        </div>
-                                        {depositAmount && (
-                                            <div className="amount-hint">
-                                                {isCurSOL
-                                                    ? `≈ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}`
-                                                    : `≈ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Wallet button */}
-                                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                        <WalletMultiButton />
-                                    </div>
-
-                                    {/* Deposit action */}
-                                    <button
-                                        className="btn btn-green"
-                                        style={{ width: '100%', padding: '12px', fontSize: '0.82rem', borderRadius: 'var(--r-lg)' }}
-                                        onClick={handleDeposit}
-                                    >
-                                        Deposit via Wallet
-                                    </button>
-                                </div>
-                            ) : (
-                                /* QR tab */
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-                                    <div ref={qrRef} className="qr-container" />
-                                    <div style={{ width: '100%' }}>
-                                        <div className="label" style={{ marginBottom: '4px' }}>Recipient Address</div>
-                                        <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
-                                            {depositAddress || 'Generating…'}
-                                        </div>
-                                        <button
-                                            onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
-                                            style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: 700, borderRadius: 'var(--r-md)', cursor: 'pointer', letterSpacing: '0.04em' }}
-                                        >
-                                            COPY ADDRESS
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
+                            <button
+                                className="btn btn-green"
+                                style={{ width: '100%', padding: '12px', fontSize: '0.82rem', borderRadius: 'var(--r-lg)', opacity: connected ? 1 : 0.5 }}
+                                onClick={handleDeposit}
+                                disabled={!connected}
+                            >
+                                {connected ? 'Deposit via Wallet' : 'Connect wallet to deposit'}
+                            </button>
+                        </div>
                     ) : (
-                        /* No wallet connected – show QR + address + connect button */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
-                            {/* QR code */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+                            <div className="wallet-none-detected" style={{ width: '100%', marginBottom: '4px' }}>
+                                Send SOL to your personal deposit address below. Balance updates automatically.
+                            </div>
                             <div ref={qrRef} className="qr-container" />
-
-                            {/* Deposit address */}
                             <div style={{ width: '100%' }}>
-                                <div className="label" style={{ marginBottom: '4px' }}>Deposit Address</div>
+                                <div className="label" style={{ marginBottom: '4px' }}>Your Deposit Address</div>
                                 <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
                                     {depositAddress || 'Generating…'}
                                 </div>
@@ -376,18 +358,6 @@ export default function Lobby() {
                                 >
                                     COPY ADDRESS
                                 </button>
-                            </div>
-
-                            {/* Divider */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-                                <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
-                                <span style={{ fontSize: '0.65rem', color: 'var(--text-3)', fontWeight: 600 }}>OR CONNECT WALLET</span>
-                                <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
-                            </div>
-
-                            {/* Connect wallet button */}
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                <WalletMultiButton />
                             </div>
                         </div>
                     )}
@@ -404,9 +374,10 @@ export default function Lobby() {
                     className="btn btn-primary"
                     style={{ width: '100%', padding: '14px', fontSize: '0.9rem', borderRadius: 'var(--r-lg)', letterSpacing: '0.01em' }}
                     onClick={() => {
-                        if (!connected) { setArenaError('Connect your wallet first.'); return; }
-                        if (!isAlreadyInGame && (user?.balance ?? 0) < 10) {
-                            setArenaError('Deposit at least $10 to enter.'); return;
+                        const balanceUsd = (user?.balanceSol || 0) * (user?.solPrice || solPrice);
+                        if (!isAlreadyInGame && balanceUsd < 10) {
+                            setArenaError('Deposit at least $10 to enter.');
+                            return;
                         }
                         setArenaError('');
                         navigate('/pre-game');

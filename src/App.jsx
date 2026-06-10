@@ -12,10 +12,11 @@ import Gamemodes from './pages/Gamemodes';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { clusterApiUrl } from '@solana/web3.js';
-import { WalletConnectWalletAdapter, PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
-import '@solana/wallet-adapter-react-ui/styles.css';
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+} from '@solana/wallet-adapter-wallets';
+import { BraveWalletAdapter } from '@solana/wallet-adapter-brave';
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -49,30 +50,16 @@ function App() {
 
   const wallets = useMemo(
     () => [
-      // include common adapters so injected wallets (Phantom/Brave) appear
+      new BraveWalletAdapter(),
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter({ network: WalletAdapterNetwork.Mainnet }),
-      // Keep WalletConnect as well
-      new WalletConnectWalletAdapter({ 
-        network: WalletAdapterNetwork.Mainnet, 
-        options: { 
-          projectId: '8b2f78d206bbaec981376e03d9d15376',
-          metadata: {
-            name: 'AgarStake',
-            description: 'Stake SOL and dominate the arena in this high-stakes agar clone.',
-            url: 'https://www.agararena.space',
-            icons: ['https://www.agararena.space/vite.svg']
-          }
-        } 
-      }),
     ],
     []
   );
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
+      <WalletProvider wallets={wallets} autoConnect={false}>
           <Router>
             <AuthProvider>
               <Routes>
@@ -90,7 +77,6 @@ function App() {
               </Routes>
             </AuthProvider>
           </Router>
-        </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );
