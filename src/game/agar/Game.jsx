@@ -27,6 +27,7 @@ export default function Game() {
     const myIdRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const animationFrameId = useRef(null);
+    const cashoutActiveRef = useRef(false);
     
     const WORLD_SIZE = 18000; // Synka med serverns nya storlek
 
@@ -109,7 +110,8 @@ export default function Game() {
 
         const startCashoutCountdown = (seconds) => {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-            
+            cashoutActiveRef.current = true;
+
             let timeLeft = seconds;
             global.cashOutTimer = timeLeft;
             setLocalTimer(timeLeft);
@@ -145,6 +147,7 @@ export default function Game() {
         });
 
         socket.on('cashOutSuccess', ({ amount }) => {
+            cashoutActiveRef.current = false;
             const usdAmount = amount;
             setCashedAmount(usdAmount);
             
@@ -194,7 +197,10 @@ export default function Game() {
         });
 
         socket.on('error', (msg) => {
-            console.error('Server error:', msg); // Logga server-side fel
+            console.error('Server error:', msg);
+            if (cashoutActiveRef.current) {
+                cashoutActiveRef.current = false;
+            }
             if (msg.includes('balance')) {
                 alert(msg);
                 navigate('/pre-game');
@@ -215,17 +221,23 @@ export default function Game() {
 
         return () => {
             cancelAnimationFrame(animationFrameId.current);
-            console.log('Cleaning up socket connection on component unmount or auth change...');
             window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('resize', handleResize);
+
+            if (cashoutActiveRef.current) {
+                // Keep socket alive during 20s cashout so cashOutSuccess can arrive
+                return;
+            }
+
+            console.log('Cleaning up socket connection on component unmount or auth change...');
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             if (socketRef.current) {
-                socketRef.current.off(); // Ta bort alla lyssnare
-                socketRef.current.disconnect(); // Koppla bort socketen
-                socketRef.current = null; // Nollställ ref
+                socketRef.current.off();
+                socketRef.current.disconnect();
+                socketRef.current = null;
             }
-            global.cashOutTimer = 0; // FIX: Nollställ global timer när man lämnar spelet (unmount/back button)
-            hasJoinedGameRef.current = false; // Återställ flaggan
-            window.removeEventListener('resize', handleResize);
+            global.cashOutTimer = 0;
+            hasJoinedGameRef.current = false;
         };
     }, [token, user?.username]); // Körs när vi har inloggningsdata
 

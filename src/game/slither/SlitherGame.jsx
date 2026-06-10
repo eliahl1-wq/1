@@ -16,6 +16,7 @@ export default function SlitherGame() {
     const inputIntervalRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const hasJoinedRef = useRef(false);
+    const cashoutActiveRef = useRef(false);
 
     const [isConnected, setIsConnected] = useState(false);
     const [gameReady, setGameReady] = useState(false);
@@ -31,6 +32,7 @@ export default function SlitherGame() {
 
     const startCashoutCountdown = useCallback((seconds) => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        cashoutActiveRef.current = true;
         let timeLeft = seconds;
         setLocalTimer(timeLeft);
         const intervalId = setInterval(() => {
@@ -93,6 +95,7 @@ export default function SlitherGame() {
         });
 
         socket.on('cashOutSuccess', ({ amount }) => {
+            cashoutActiveRef.current = false;
             setCashedAmount(amount);
             const startTime = performance.now();
             const duration = 1200;
@@ -149,6 +152,8 @@ export default function SlitherGame() {
         }, 50);
 
         return () => {
+            if (cashoutActiveRef.current) return;
+
             if (inputIntervalRef.current) clearInterval(inputIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             renderer.destroy();
