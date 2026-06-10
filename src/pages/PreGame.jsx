@@ -952,18 +952,17 @@ export default function PreGame() {
                 </div>
             </div>
 
-            {/* SOL Price Tracker — Flyttad till höger och stylad som LIVE-rutan */}
-            <div className="stats-card" style={{
-                position: 'fixed', left: '215px', bottom: '16px',
-                display: 'flex', alignItems: 'center', gap: '8px',
-                background: '#0a0a0c', border: '1px solid #14f195',
-                padding: '10px 14px', borderRadius: '8px',
-                boxShadow: '0 0 20px rgba(20, 241, 149, 0.15)',
-                zIndex: 1050, minWidth: 'auto'
+            {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}
+            <div style={{
+                position: 'fixed', left: 16, bottom: 16,
+                marginLeft: 'calc(140px + 35px)', /* Flyttad mer höger */
+                display: 'flex', alignItems: 'center', gap: '6px',
+                background: '#000', border: '1px solid var(--border)',
+                borderRadius: '20px', padding: '5px 12px',
+                boxShadow: 'var(--shadow-xl)', zIndex: 1050,
             }}>
                 <SolLogo size={14} />
-                <span style={{ fontSize: '0.65rem', color: '#14f195', fontWeight: 800, letterSpacing: '0.05em' }}>SOL PRICE:</span>
-                <span className="mono" style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 700 }}>
+                <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
                     ${solPrice.toFixed(2)}
                 </span>
             </div>
