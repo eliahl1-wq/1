@@ -50,7 +50,14 @@ export default function PreGame() {
         () => !!localStorage.getItem('current_game_mode')
     );
     const [activeGameBalance, setActiveGameBalance] = useState(null);
-    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null, playersByEntryFee: {}, brPlayersByFee: {} });
+    const [liveStats, setLiveStats] = useState({
+        playersOnline: 0,
+        biggestPayout: 0,
+        topPlayer: null,
+        playersByEntryFee: {},
+        playersByModeAndFee: { agar: {}, slither: {} },
+        brPlayersByFee: {},
+    });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
@@ -123,11 +130,13 @@ export default function PreGame() {
         }
     }, [selectedMode, isBattleRoyaleMode, selectedEntryFee]);
 
+    const normalModeKey = selectedMode.replace(/^br-/, '');
+
     const playingCountForTier = (tier) => {
         if (isBattleRoyaleMode && brVariant) {
             return liveStats.brPlayersByFee?.[brVariant]?.[tier] ?? 0;
         }
-        return liveStats.playersByEntryFee?.[tier] ?? 0;
+        return liveStats.playersByModeAndFee?.[normalModeKey]?.[tier] ?? 0;
     };
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
@@ -946,7 +955,7 @@ export default function PreGame() {
                                     >
                                         <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                                             <span>{freePlay ? 'FREE (Test)' : formatUsd(tier)}</span>
-                                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#14F195' }}>
+                                            <span style={{ fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)' }}>
                                                 {playing} playing
                                             </span>
                                         </span>
@@ -955,9 +964,9 @@ export default function PreGame() {
                                                 Start {formatUsd(tierEconomy(tier).startBalance)}
                                             </span>
                                         )}
-                                        {!freePlay && isBattleRoyaleMode && (
+                                        {isBattleRoyaleMode && (
                                             <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)', marginTop: '2px' }}>
-                                                Winner takes pool · no cash-out
+                                                {freePlay ? 'Free test entry · ' : ''}Winner takes pool · no cash-out
                                             </span>
                                         )}
                                     </button>

@@ -12,6 +12,7 @@ export default function BRLobby() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, token } = useAuth();
+    const freePlay = !!user?.freePlay;
     const socketRef = useRef(null);
     const joinedRef = useRef(false);
 
@@ -110,14 +111,24 @@ export default function BRLobby() {
                     textAlign: 'center',
                 }}>
                     <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '2px', color: 'var(--accent)', marginBottom: '12px' }}>
-                        BATTLE ROYALE — {variant.toUpperCase()} · {formatUsd(entryFeeUsd)}
+                        BATTLE ROYALE — {variant.toUpperCase()} · {freePlay ? 'FREE (Test)' : formatUsd(entryFeeUsd)}
                     </div>
                     <h1 style={{ margin: '0 0 8px', fontSize: '1.8rem', fontWeight: 900, color: '#fff' }}>
                         {countdown ? 'Match Found' : 'Finding Match'}
                     </h1>
                     <p style={{ margin: '0 0 24px', color: 'var(--text-3)', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                        4–16 players · shrinking zone · no cash-out · winner takes the pool
+                        {freePlay ? 'Test mode — no real SOL charged · ' : ''}4–16 players · shrinking zone · no cash-out · winner takes the pool
                     </p>
+
+                    {freePlay && (
+                        <div style={{
+                            marginBottom: '16px', padding: '10px 14px',
+                            background: 'rgba(255, 180, 0, 0.1)', border: '1px solid rgba(255, 180, 0, 0.3)',
+                            borderRadius: '12px', color: '#FFD080', fontSize: '0.78rem', fontWeight: 600,
+                        }}>
+                            TEST MODE — Free play, no real SOL used
+                        </div>
+                    )}
 
                     {error && (
                         <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(255,59,48,0.1)', borderRadius: '12px', color: '#FF3B30', fontSize: '0.85rem' }}>
@@ -140,8 +151,10 @@ export default function BRLobby() {
                                 {queueStatus.playersInQueue}<span style={{ opacity: 0.3, fontSize: '1.2rem' }}> / {queueStatus.maxPlayers}</span>
                             </div>
                             <p style={{ color: 'var(--text-3)', marginTop: '8px' }}>
-                                Need {Math.max(0, queueStatus.minPlayers - queueStatus.playersInQueue)} more to start
-                                {queueStatus.waitMs > 0 && ` · max wait ${Math.ceil(queueStatus.waitMs / 1000)}s`}
+                                {queueStatus.devFreePlay || freePlay
+                                    ? 'Starting soon (test mode)'
+                                    : `Need ${Math.max(0, queueStatus.minPlayers - queueStatus.playersInQueue)} more to start`}
+                                {queueStatus.waitMs > 0 && !queueStatus.devFreePlay && !freePlay && ` · max wait ${Math.ceil(queueStatus.waitMs / 1000)}s`}
                             </p>
                         </div>
                     ) : joining ? (

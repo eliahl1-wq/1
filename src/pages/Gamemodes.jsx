@@ -3,12 +3,38 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import '../styles/ui.css';
 
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
+
 export default function Gamemodes() {
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState(
         () => location.state?.selectedMode || localStorage.getItem('selected_gamemode') || 'agar'
     );
+    const [playersByGamemode, setPlayersByGamemode] = useState({
+        agar: 0,
+        slither: 0,
+        brAgar: 0,
+        brSlither: 0,
+    });
+
+    useEffect(() => {
+        let alive = true;
+        const fetchStats = async () => {
+            try {
+                const r = await fetch(`${API_URL}/api/stats?t=${Date.now()}`, {
+                    headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' },
+                });
+                if (r.ok && alive) {
+                    const d = await r.json();
+                    setPlayersByGamemode(d.playersByGamemode || {});
+                }
+            } catch { /* ignore */ }
+        };
+        fetchStats();
+        const id = setInterval(fetchStats, 5000);
+        return () => { alive = false; clearInterval(id); };
+    }, []);
 
     useEffect(() => {
         // Apply incoming navigation state once, then clear it so it doesn't
@@ -81,12 +107,14 @@ export default function Gamemodes() {
                             <ModeCard
                                 title="Agar Normal"
                                 desc="The classic high-stakes Agar experience. Grow, absorb, dominate. Choose $5, $10, or $20 entry in the lobby."
+                                playing={playersByGamemode.agar}
                                 badge={null}
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                             />
                             <ModeCard
                                 title="Agar Battle Royale"
                                 desc="4–16 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
+                                playing={playersByGamemode.brAgar}
                                 badge="NEW"
                                 badgeAccent
                                 onPlay={() => {
@@ -100,12 +128,14 @@ export default function Gamemodes() {
                             <ModeCard
                                 title="Slither Normal"
                                 desc="Classic high-stakes snake arena. Outmaneuver enemies, grow longer. $5 / $10 / $20 entry."
+                                playing={playersByGamemode.slither}
                                 badge={null}
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                             />
                             <ModeCard
                                 title="Slither Battle Royale"
                                 desc="4–16 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
+                                playing={playersByGamemode.brSlither}
                                 badge="NEW"
                                 badgeAccent
                                 onPlay={() => {
@@ -223,6 +253,13 @@ export default function Gamemodes() {
                     line-height: 1.5;
                     max-width: 280px;
                 }
+                .gm-card-playing {
+                    font-family: var(--sans);
+                    font-size: 0.72rem;
+                    font-weight: 500;
+                    color: var(--text-3);
+                    margin-top: 8px;
+                }
                 .gm-badge {
                     font-family: var(--sans);
                     font-size: 0.6rem;
@@ -265,13 +302,16 @@ export default function Gamemodes() {
     );
 }
 
-function ModeCard({ title, desc, badge, badgeAccent, onPlay }) {
+function ModeCard({ title, desc, playing, badge, badgeAccent, onPlay }) {
     const isDisabled = !onPlay;
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
             <div>
                 <div className="gm-card-title">{title}</div>
                 <div className="gm-card-desc">{desc}</div>
+                {playing != null && (
+                    <div className="gm-card-playing">{playing} playing</div>
+                )}
             </div>
             {isDisabled
                 ? <span className="gm-badge">{badge}</span>
