@@ -32,7 +32,6 @@ export default function PreGame() {
     const { connection } = useConnection();
 
     // ── State ──────────────────────────────────────────
-    const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
@@ -48,6 +47,7 @@ export default function PreGame() {
     const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
+    const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
