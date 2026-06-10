@@ -74,17 +74,23 @@ export default function Lobby() {
         if (token) {
             refreshUser();
             document.title = 'AgarStake | Lobby';
+            let alive = true;
             const check = async () => {
                 try {
-                    const r = await fetch(`${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')}/api/game-status`, {
-                        headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
+                    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
+                    const r = await fetch(`${apiUrl}/api/game-status?t=${Date.now()}`, {
+                        headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                     });
-                    if (r.ok) { const d = await r.json(); setIsAlreadyInGame(d.inGame); }
+                    if (r.ok && alive) {
+                        const d = await r.json();
+                        setIsAlreadyInGame(!!d.inGame);
+                    }
                 } catch { }
             };
             check();
-            const id = setInterval(refreshUser, 5000);
-            return () => clearInterval(id);
+            const statusId = setInterval(check, 10000);
+            const balanceId = setInterval(refreshUser, 5000);
+            return () => { alive = false; clearInterval(statusId); clearInterval(balanceId); };
         }
     }, [token, refreshUser]);
 

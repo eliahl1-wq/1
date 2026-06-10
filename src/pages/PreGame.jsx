@@ -46,6 +46,7 @@ export default function PreGame() {
     const [isMatchmaking, setIsMatchmaking] = useState(false);
 
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
+    const [activeGameBalance, setActiveGameBalance] = useState(null);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -220,7 +221,7 @@ export default function PreGame() {
             } catch { }
         };
         fetchStats();
-        const id = setInterval(fetchStats, 30000);
+        const id = setInterval(fetchStats, 15000);
         return () => { alive = false; clearInterval(id); };
     }, []);
 
@@ -253,30 +254,54 @@ export default function PreGame() {
         return () => clearInterval(id);
     }, [refreshUser]);
 
-    // Game status check
+    // Game status — poll so rejoin button stays accurate
     useEffect(() => {
-        if (!token) return;
-        (async () => {
-            try {
-                const r = await fetch(`${API_URL}/api/game-status`, {
-                    headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
-                });
-                if (r.ok) {
-                    const d = await r.json();
-                    setIsAlreadyInGame(d.inGame);
+        if (!token) {
+            setIsAlreadyInGame(false);
+            setCurrentGameMode(null);
+            return;
+        }
 
-                    if (d.inGame) {
-                        const storedMode = localStorage.getItem('current_game_mode') || selectedMode;
-                        setCurrentGameMode(storedMode);
-                        localStorage.setItem('current_game_mode', storedMode);
-                    } else {
-                        setCurrentGameMode(null);
-                        localStorage.removeItem('current_game_mode');
-                    }
+        let alive = true;
+        const checkGameStatus = async () => {
+            try {
+                const r = await fetch(`${API_URL}/api/game-status?t=${Date.now()}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'bypass-tunnel-reminders': 'true',
+                        'Cache-Control': 'no-cache',
+                    },
+                });
+                if (!r.ok || !alive) return;
+                const d = await r.json();
+
+                setIsAlreadyInGame(!!d.inGame);
+
+                if (d.inGame && d.mode) {
+                    setCurrentGameMode(d.mode);
+                    setSelectedMode(d.mode);
+                    setActiveGameBalance(d.balance ?? null);
+                    localStorage.setItem('current_game_mode', d.mode);
+                    localStorage.setItem('selected_gamemode', d.mode);
+                } else {
+                    setCurrentGameMode(null);
+                    setActiveGameBalance(null);
+                    localStorage.removeItem('current_game_mode');
                 }
-            } catch { }
-        })();
-    }, [token, selectedMode]);
+            } catch { /* ignore */ }
+        };
+
+        checkGameStatus();
+        const id = setInterval(checkGameStatus, 10000);
+        const onFocus = () => checkGameStatus();
+        window.addEventListener('focus', onFocus);
+
+        return () => {
+            alive = false;
+            clearInterval(id);
+            window.removeEventListener('focus', onFocus);
+        };
+    }, [token, API_URL]);
 
     // ── Drag panel ─────────────────────────────────────
     useEffect(() => {
@@ -324,10 +349,14 @@ export default function PreGame() {
         setIsMatchmaking(true);
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
-        setCurrentGameMode(selectedMode);
-        localStorage.setItem('current_game_mode', selectedMode);
-        const targetPath = selectedMode === 'slither' ? '/slither-game' : '/game';
-        setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode } }), 1200);
+
+        const activeMode = (isAlreadyInGame && currentGameMode) ? currentGameMode : selectedMode;
+        setCurrentGameMode(activeMode);
+        localStorage.setItem('current_game_mode', activeMode);
+        localStorage.setItem('selected_gamemode', activeMode);
+
+        const targetPath = activeMode === 'slither' ? '/slither-game' : '/game';
+        setTimeout(() => navigate(targetPath, { state: { nickname, selectedMode: activeMode } }), 1200);
     };
 
     const canRejoinThisMode = isAlreadyInGame && currentGameMode && selectedMode === currentGameMode;
@@ -420,8 +449,10 @@ export default function PreGame() {
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> Joining…</>
         : !isAuthenticated ? 'Play Now'
-            : (isAlreadyInGame && canRejoinThisMode) ? 'Rejoin Arena'
-                : (isAlreadyInGame && !canRejoinThisMode) ? 'Already in Arena'
+            : (isAlreadyInGame && canRejoinThisMode)
+                ? `Rejoin ${currentGameMode === 'slither' ? 'Slither' : 'Agar'} Arena`
+                : (isAlreadyInGame && !canRejoinThisMode)
+                    ? `In ${currentGameMode === 'slither' ? 'Slither' : 'Agar'} — switch mode`
                     : canJoin ? 'Play'
                         : 'Deposit to Play';
 
@@ -831,11 +862,18 @@ export default function PreGame() {
                     <button
                         className={playBtnClass}
                         onClick={handleStartMatch}
-                        disabled={isMatchmaking}
+                        disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode)}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                     >
                         {playBtnLabel}
                     </button>
+
+                    {isAlreadyInGame && currentGameMode && (
+                        <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
+                            Active session: {currentGameMode === 'slither' ? 'Slither' : 'Agar'}
+                            {activeGameBalance != null && ` · $${Number(activeGameBalance).toFixed(2)} stake`}
+                        </div>
+                    )}
 
                     <div style={{ marginTop: '16px' }}>
                         <div

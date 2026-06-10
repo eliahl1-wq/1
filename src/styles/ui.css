@@ -655,6 +655,25 @@
   color: white;
   box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25);
 }
+.play-btn-rejoin:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 255, 0.35);
+  filter: brightness(1.04);
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #14F195;
+  box-shadow: 0 0 8px rgba(20, 241, 149, 0.6);
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
 
 .play-btn-disabled {
   background: rgba(255,255,255,0.04);

@@ -139,7 +139,10 @@ export default function Game() {
         });
 
         socket.on('leaderboard', (data) => {
-            setLeaderboard(data.leaderboard);
+            setLeaderboard((data.leaderboard || []).map(p => ({
+                ...p,
+                balance: parseFloat(p.balance) || 0,
+            })));
         });
 
         socket.on('cashOutSuccess', ({ amount }) => {
@@ -655,7 +658,7 @@ export default function Game() {
                             fontWeight: p.id === myIdRef.current ? '700' : '400'
                         }}>
                             <span>{i + 1}. {p.name || 'An unnamed cell'}</span>
-                            <span className="mono">${(p.balance ?? 0).toFixed(2)}</span>
+                            <span className="mono">${Number(p.balance ?? 0).toFixed(2)}</span>
                         </div>
                     ))}
                 </div>
