@@ -150,7 +150,7 @@ export default function Lobby() {
         }
     };
 
-    const currentBalanceSol = user?.balanceSol ?? 0; // Use balance from AuthContext
+    const currentBalanceSol = user?.balanceSol || 0;
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <Background />
