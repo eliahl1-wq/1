@@ -98,7 +98,10 @@ export default function PreGame() {
     const depositAddress = user?.depositAddress;
     const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const ENTRY_FEE = 10.00;
-    const canJoin = (user?.balance || 0) >= ENTRY_FEE;
+    // user.balance is raw SOL; use balanceUsd (computed by server) for USD comparisons
+    const balanceSol = user?.balanceSol ?? user?.balance ?? 0;
+    const balanceUsd = user?.balanceUsd ?? (balanceSol * solPrice) ?? 0;
+    const canJoin = balanceUsd >= ENTRY_FEE;
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -460,8 +463,8 @@ export default function PreGame() {
                                         )}
                                         <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
                                             {isCurSOL
-                                                ? (user.balance / solPrice).toFixed(2)
-                                                : `$${fmt(user.balance)}`}
+                                                ? `${fmt(balanceSol)} SOL`
+                                                : `$${fmt(balanceUsd)}`}
                                         </span>
                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
                                             <path d="M6 9l6 6 6-6" />
@@ -506,14 +509,14 @@ export default function PreGame() {
                                                 )}
                                                 <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
                                                     {isCurSOL
-                                                        ? (user.balance / solPrice).toFixed(2)
-                                                        : fmt(user.balance)}
+                                                        ? fmt(balanceSol)
+                                                        : fmt(balanceUsd)}
                                                 </span>
                                             </div>
                                             <div className="wallet-card-sub">
                                                 {isCurSOL
-                                                    ? `≈ $${fmt(user.balance)} USD`
-                                                    : `≈ ${(user.balance / solPrice).toFixed(2)} SOL`}
+                                                    ? `≈ $${fmt(balanceUsd)} USD`
+                                                    : `≈ ${fmt(balanceSol)} SOL`}
                                             </div>
 
                                             {/* Action buttons */}
@@ -918,18 +921,32 @@ export default function PreGame() {
                         {liveStats.playersOnline ?? 0}
                     </span>
                 </div>
-                <div className="stat-row" style={{ marginBottom: '6px' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                        {liveStats.topPlayer ?? '—'}
-                    </span>
-                </div>
                 <div className="stat-row">
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>SOL Price</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--green)', fontWeight: 700 }}>
-                        ${solPrice.toFixed(2)}
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-h)', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+                        <span>{liveStats.topPlayer ?? '—'}</span>
+                        {liveStats.topPlayer && liveStats.topBalance != null && (
+                            <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--green)', fontWeight: 600 }}>
+                                ${Number(liveStats.topBalance).toFixed(2)}
+                            </span>
+                        )}
                     </span>
                 </div>
+            </div>
+
+            {/* SOL Price pill — standalone, next to the LIVE box */}
+            <div style={{
+                position: 'fixed', left: 16, bottom: 16,
+                marginLeft: 'calc(140px + 10px)',   /* offset past the LIVE card */
+                display: 'flex', alignItems: 'center', gap: '6px',
+                background: 'var(--bg-1)', border: '1px solid var(--border)',
+                borderRadius: '20px', padding: '5px 10px 5px 7px',
+                boxShadow: 'var(--shadow-xl)', zIndex: 1050,
+            }}>
+                <SolLogo size={14} />
+                <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
+                    ${solPrice.toFixed(2)}
+                </span>
             </div>
 
             {/* ── Footer ── */}
