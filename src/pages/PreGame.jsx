@@ -49,7 +49,7 @@ export default function PreGame() {
         () => !!localStorage.getItem('current_game_mode')
     );
     const [activeGameBalance, setActiveGameBalance] = useState(null);
-    const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
+    const [liveStats, setLiveStats] = useState({ playersOnline: 0, aiPlayersOnline: 0, biggestPayout: 0, topPlayer: null });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
@@ -977,10 +977,19 @@ export default function PreGame() {
                         {liveStats.playersOnline ?? 0}
                     </span>
                 </div>
+                <div className="stat-row" style={{ marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>AI players</span>
+                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 700 }}>
+                        {liveStats.aiPlayersOnline ?? 0}
+                    </span>
+                </div>
                 <div className="stat-row">
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top player</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top in arena</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-h)', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
-                        <span>{liveStats.topPlayer ?? '—'}</span>
+                        <span>
+                            {liveStats.topPlayer ?? '—'}
+                            {liveStats.topIsBot && liveStats.topPlayer ? ' 🤖' : ''}
+                        </span>
                         {liveStats.topPlayer && liveStats.topBalance != null && (
                             <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--green)', fontWeight: 600 }}>
                                 ${Number(liveStats.topBalance).toFixed(2)}

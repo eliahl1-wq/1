@@ -149,7 +149,7 @@ export default function SlitherGame() {
         });
 
         socket.on('forcedDisconnect', () => {
-            alert('Connected from another window. Closing this session.');
+            console.warn('Session replaced by another window.');
             navigate('/pre-game', { state: { selectedMode: 'slither' } });
         });
 

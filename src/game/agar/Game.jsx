@@ -46,40 +46,42 @@ export default function Game() {
     }, []);
 
     useEffect(() => {
-        // Endast anslut om vi har en token och användarnamn, OCH ingen socket är aktiv
-        if (!token || !user?.username || socketRef.current) {
-            // Om vi har en socket men token/användarnamn blev null (t.ex. utloggning), koppla bort den
-            if (socketRef.current && (!token || !user?.username)) {
-                console.log('Auth data lost or changed, disconnecting socket.');
-                socketRef.current.disconnect(); // Disconnect existing socket
+        if (!token) {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
                 socketRef.current = null;
-                setIsConnected(false);
                 hasJoinedGameRef.current = false;
             }
-            console.log('useEffect: Skipping socket creation (token/user missing or socket exists).');
             return;
         }
 
-        console.log('useEffect: Attempting to create new socket with valid auth data...');
+        // Tear down any existing socket before creating a new one (Strict Mode / rejoin)
+        if (socketRef.current) {
+            socketRef.current.off();
+            socketRef.current.disconnect();
+            socketRef.current = null;
+            hasJoinedGameRef.current = false;
+        }
+
         const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
-        
+        const matchNickname = location.state?.nickname || user?.username || 'Guest';
+
         const socket = io(apiUrl, {
             auth: { token },
-            transports: ['websocket'], // Tvinga websocket för Render
+            transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionAttempts: 10,
             reconnectionDelay: 2000,
-            timeout: 20000 // Längre timeout för Render cold starts
+            timeout: 20000,
         });
 
-        socketRef.current = socket; // Spara instansen i ref
+        socketRef.current = socket;
 
         socket.on('connect', () => {
             console.log('Connected to socket server');
             setIsConnected(true);
             if (!hasJoinedGameRef.current) {
                 console.log('Emitting joinGame...');
-                const matchNickname = location.state?.nickname || user?.username || 'Guest';
                 socket.emit('joinGame', { username: matchNickname, token, mode: 'agar' });
                 hasJoinedGameRef.current = true;
             }
@@ -181,7 +183,7 @@ export default function Game() {
         };
 
         socket.on('forcedDisconnect', () => {
-            alert("Connected from another window. Closing this session.");
+            console.warn('Session replaced by another window.');
             navigate('/pre-game');
         });
 
@@ -229,12 +231,8 @@ export default function Game() {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('resize', handleResize);
 
-            if (cashoutActiveRef.current) {
-                // Keep socket alive during 20s cashout so cashOutSuccess can arrive
-                return;
-            }
+            if (cashoutActiveRef.current) return;
 
-            console.log('Cleaning up socket connection on component unmount or auth change...');
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             if (socketRef.current) {
                 socketRef.current.off();
@@ -244,7 +242,7 @@ export default function Game() {
             global.cashOutTimer = 0;
             hasJoinedGameRef.current = false;
         };
-    }, [token, user?.username]); // Körs när vi har inloggningsdata
+    }, [token, navigate, location.state?.nickname]);
 
     const handleResize = () => {
         const canvas = canvasRef.current;
