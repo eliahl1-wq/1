@@ -29,7 +29,7 @@ export default function Game() {
     const animationFrameId = useRef(null);
     const cashoutActiveRef = useRef(false);
     
-    const WORLD_SIZE = 18000; // Synka med serverns nya storlek
+    const WORLD_SIZE = 6000;
 
     const [isConnected, setIsConnected] = useState(false);
     const [currentBalance, setCurrentBalance] = useState(0);

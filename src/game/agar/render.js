@@ -11,10 +11,11 @@ const drawRoundObject = (position, radius, graph) => {
 }
 
 const drawFood = (position, food, graph) => {
-    graph.fillStyle = 'hsl(' + food.hue + ', 100%, 50%)';
-    graph.strokeStyle = 'hsl(' + food.hue + ', 100%, 45%)';
+    const r = food.radius || 8;
+    graph.fillStyle = 'hsl(' + food.hue + ', 100%, 55%)';
+    graph.strokeStyle = 'hsl(' + food.hue + ', 100%, 42%)';
     graph.lineWidth = 0;
-    drawRoundObject(position, food.radius, graph);
+    drawRoundObject(position, r, graph);
 };
 
 const drawVirus = (position, virus, graph) => {
