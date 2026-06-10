@@ -139,10 +139,14 @@ export class SlitherRenderer {
         for (const f of food) {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -20 || fy < -20 || fx > W + 20 || fy > H + 20) continue;
+            const r = f.radius || 7;
             ctx.beginPath();
-            ctx.arc(fx, fy, f.radius || 7, 0, Math.PI * 2);
-            ctx.fillStyle = `hsl(${f.hue || 120}, 80%, 60%)`;
+            ctx.arc(fx, fy, r, 0, Math.PI * 2);
+            ctx.fillStyle = `hsl(${f.hue || 120}, 100%, 55%)`;
             ctx.fill();
+            ctx.strokeStyle = `hsl(${f.hue || 120}, 100%, 42%)`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
         }
 
         for (const snake of snakes) {
