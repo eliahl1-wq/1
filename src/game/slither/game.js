@@ -12,7 +12,7 @@ globalThis.NFood = 2000;
 globalThis.Nsnake = 20;
 globalThis.sizeMap = 2000;
 globalThis.index = 0;
-globalThis.minScore = 200;
+globalThis.minScore = 0;
 globalThis.die = false;
 
 globalThis.Xfocus = 0;
@@ -83,8 +83,9 @@ const names = ["Ahmed Steinke",
 ];
 
 globalThis.game = class game {
-    constructor(canvasElement) {
+    constructor(canvasElement, playerName = 'Player') {
         this.canvas = canvasElement;
+        this.playerName = playerName;
         this.context = canvasElement.getContext("2d");
         
         // Bind event handlers to instance so they can be removed safely
@@ -113,8 +114,18 @@ globalThis.game = class game {
         globalThis.SPEED = 0.5; // Balanserad basfart för att kontrollera snabbheten
         globalThis.MaxSpeed = (this.getSize() || 100) / 25; // Stabilare svänghastighet
 
-        // Spelarens orm (namnet sätts av React i SlitherGame.jsx)
-        mySnake[0] = new window.snake("Player", this, minScore, 0, 0); // Starta vid 0,0, kameran kommer att centrera
+        // Spelarens orm
+        mySnake[0] = new window.snake(this.playerName, this, 0, 0, 0);
+        // AI-ormar
+        for (let i = 1; i < Nsnake; i++) {
+            mySnake[i] = new window.snake(
+                names[Math.floor(Math.random() * names.length)],
+                this,
+                minScore,
+                this.randomXY(0),
+                this.randomXY(0)
+            );
+        }
         for (let i = 0; i < 1400; i++) {
             FOOD[i] = new window.food(this, this.getSize() / 8, (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap);
         }
@@ -186,16 +197,17 @@ globalThis.game = class game {
 
     update() {
         // Removed this.render() from here. It should only be called on resize.
-        this.unFood(); // Hanterar att äta food
-        
+        this.unFood();
+        this.changeFood();
         if (!mySnake || !mySnake[0]) return;
 
         // Koppla mus-input till spelarormen
         mySnake[0].dx = globalThis.chX;
         mySnake[0].dy = globalThis.chY;
 
-        // Uppdatera spelarormens egen rörelse
-        mySnake[0].update(); // Denna kommer nu att uppdatera mySnake[0].v[0].x och y
+        mySnake[0].update();
+        for (let i = 1; i < mySnake.length; i++)
+            mySnake[i].update();
 
         // Uppdatera kameran (XX, YY) för att följa spelarormen mjukt
         const targetXX = mySnake[0].v[0].x - globalThis.game_W / 2;
@@ -221,7 +233,11 @@ globalThis.game = class game {
     }
 
     changeFood() {
-        // Random food spawn borttagen - styrs nu av join-logik och döda spelare
+        // Respawna mat när det börjar ta slut
+        const target = 1400;
+        while (FOOD.length < target) {
+            FOOD.push(new window.food(this, this.getSize() / 8, (Math.random() - Math.random()) * sizeMap, (Math.random() - Math.random()) * sizeMap));
+        }
     }
 
     changeSnake() {

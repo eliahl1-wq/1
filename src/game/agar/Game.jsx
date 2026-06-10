@@ -60,7 +60,7 @@ export default function Game() {
         }
 
         console.log('useEffect: Attempting to create new socket with valid auth data...');
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
         
         const socket = io(apiUrl, {
             auth: { token },

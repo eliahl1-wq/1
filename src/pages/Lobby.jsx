@@ -76,7 +76,7 @@ export default function Lobby() {
             document.title = 'AgarStake | Lobby';
             const check = async () => {
                 try {
-                    const r = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/game-status`, {
+                    const r = await fetch(`${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')}/api/game-status`, {
                         headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' }
                     });
                     if (r.ok) { const d = await r.json(); setIsAlreadyInGame(d.inGame); }

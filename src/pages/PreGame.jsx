@@ -56,7 +56,7 @@ export default function PreGame() {
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
         () => localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
     );

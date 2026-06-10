@@ -2,141 +2,169 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
-// Vi importerar klasserna men hanterar initieringen manuellt i useEffect
 import './snake.js';
 import './food.js';
 import './game.js';
 
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
+
 export default function SlitherGame() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, refreshUser, token: authToken } = useAuth(); // Rename token to authToken
-    const canvasRef = useRef(null); // React manages the canvas
+    const { user, token: authToken } = useAuth();
+    const canvasRef = useRef(null);
     const socketRef = useRef(null);
+    const timerIntervalRef = useRef(null);
+    const hasJoinedRef = useRef(false);
     const [isConnected, setIsConnected] = useState(false);
-    
-    // State för UI (samma som i Game.jsx)
-    const [currentBalance, setCurrentBalance] = useState(0);
+    const [gameReady, setGameReady] = useState(false);
+    const [currentBalance, setCurrentBalance] = useState(1.0);
     const [leaderboard, setLeaderboard] = useState([]);
     const [isDead, setIsDead] = useState(false);
     const [cashedAmount, setCashedAmount] = useState(null);
     const [displayCashedAmount, setDisplayCashedAmount] = useState(0);
     const [localTimer, setLocalTimer] = useState(0);
-    const [currentTime, setCurrentTime] = useState(Date.now());
+    const [resetCountdown, setResetCountdown] = useState(null);
 
-    // Cashout handler (can be called from game.js or UI button)
-    const handleCashOut = useCallback((gameScore) => {
-        const finalAmount = typeof gameScore === 'number' ? gameScore : currentBalance;
-        setCashedAmount(finalAmount);
+    const matchNickname = location.state?.nickname || user?.username || 'Guest';
+
+    const syncBalanceToServer = useCallback((balance) => {
+        socketRef.current?.emit('slitherUpdateBalance', { balance });
+    }, []);
+
+    const startCashoutCountdown = useCallback((seconds) => {
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        let timeLeft = seconds;
+        setLocalTimer(timeLeft);
+        const intervalId = setInterval(() => {
+            timeLeft = Math.max(0, timeLeft - 1);
+            setLocalTimer(timeLeft);
+            if (timeLeft <= 0) {
+                clearInterval(intervalId);
+                timerIntervalRef.current = null;
+            }
+        }, 1000);
+        timerIntervalRef.current = intervalId;
+    }, []);
+
+    const handleCashOut = useCallback(() => {
+        if (localTimer > 0 || cashedAmount !== null || isDead) return;
+        socketRef.current?.emit('cashOut');
+    }, [localTimer, cashedAmount, isDead]);
+
+    const handleDeath = useCallback(() => {
+        if (isDead || cashedAmount !== null) return;
+        setIsDead(true);
+        setLocalTimer(0);
         window.die = true;
-
-        const startTime = performance.now();
-        const duration = 1200;
-        const animate = (time) => {
-            const elapsed = time - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 4);
-            setDisplayCashedAmount(eased * finalAmount);
-            if (progress < 1) requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
-
-        setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4500);
-    }, [currentBalance, navigate]);
-
-    // Använd en ref för att lagra senaste versionen av handleCashOut 
-    // utan att trigga omstart av useEffect
-    const cashOutRef = useRef(handleCashOut);
-    useEffect(() => {
-        cashOutRef.current = handleCashOut;
-    }, [handleCashOut]);
+        socketRef.current?.emit('playerDied');
+        setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4000);
+    }, [isDead, cashedAmount, navigate]);
 
     useEffect(() => {
         document.body.style.backgroundColor = '#000';
-        document.title = "AgarStake | Slither Arena"; // Set document title
-        
-        // Ensure canvasRef is available
-        if (!canvasRef.current) {
-            return () => {}; // Return a no-op cleanup function if canvas is not yet mounted
-        }
+        document.title = 'AgarStake | Slither Arena';
 
-        if (socketRef.current) return; // Förhindra dubbla anslutningar
-        
-        // Ensure authToken is a string before proceeding with socket connection
-        if (typeof authToken !== 'string' || authToken.length === 0) {
-            console.log('useEffect: Auth token is not a valid string, skipping socket creation.');
-            return;
-        }
-        // Online Server Connection
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-        console.log('useEffect: Attempting to create new socket with valid auth data...');
-        
-        const socket = io(apiUrl, {
-            auth: { token: authToken }, // Use authToken here
-            transports: ['websocket']
+        if (!canvasRef.current || socketRef.current) return;
+        if (typeof authToken !== 'string' || authToken.length === 0) return;
+
+        const socket = io(API_URL, {
+            auth: { token: authToken },
+            transports: ['websocket'],
+            reconnection: true,
         });
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            console.log('Connected to socket server');
             setIsConnected(true);
-            const matchNickname = location.state?.nickname || user?.username || 'Guest';
-            console.log('Emitting joinGame...');
-            socket.emit('joinGame', { username: matchNickname, token: authToken, mode: 'slither' }); // Use authToken here
-        });
-
-        socket.on('welcome', (settings) => {
-            console.log('Welcome to Arena');
-        });
-
-        // Only initialize game engine if it hasn't been already
-        if (!window.gameInstance) {
-            window.gameInstance = new window.game(canvasRef.current);
-            
-            // Global callback for when the player dies
-            window.onSnakeDie = (finalScore) => {
-                setIsDead(true); // Trigger death overlay
-                setLocalTimer(0); // Clear cashout timer
-                setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4000); // Redirect after 4 seconds
-            };
-
-            // Global callback for cashout (if implemented in game.js)
-            window.onCashOut = (finalScore) => {
-                cashOutRef.current(finalScore); // Trigger cashout animation
-            };
-        }
-
-        // UI update loop
-        const uiUpdateInterval = setInterval(() => {
-            if (window.mySnake && window.mySnake[0]) {
-                const score = window.mySnake[0].score || 0;
-                // Ekonomi: Varje food är $0.01. Start är $1.00. 
-                // Varje poäng (food) ger $0.01.
-                const convertedBalance = 1.00 + (score * 0.01);
-                setCurrentBalance(convertedBalance);
-
-                // Update leaderboard from game state
-                const currentSnakes = [...(window.mySnake || [])]
-                    .sort((a, b) => b.score - a.score)
-                    .slice(0, 10) // Top 10 players
-                    .map(s => ({
-                        id: s.name, // Use name as ID for simplicity
-                        name: s.name,
-                        balance: 1.00 + (s.score * 0.01)
-                    }));
-                setLeaderboard(currentSnakes);
+            if (!hasJoinedRef.current) {
+                socket.emit('joinGame', { username: matchNickname, token: authToken, mode: 'slither' });
+                hasJoinedRef.current = true;
             }
-            setCurrentTime(Date.now()); // For potential timer displays
-        }, 100); // Update UI 10 times per second
+        });
 
-        // Cleanup function
+        socket.on('welcome', (playerSettings) => {
+            setCurrentBalance(playerSettings.balance ?? 1.0);
+            setGameReady(true);
+
+            if (!window.gameInstance) {
+                window.gameInstance = new window.game(canvasRef.current, matchNickname);
+                window.onSnakeDie = () => handleDeath();
+            }
+        });
+
+        socket.on('cashOutStarting', ({ seconds }) => {
+            window.die = true;
+            startCashoutCountdown(seconds);
+        });
+
+        socket.on('cashOutSuccess', ({ amount }) => {
+            setCashedAmount(amount);
+            const startTime = performance.now();
+            const duration = 1200;
+            const animate = (time) => {
+                const elapsed = time - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 4);
+                setDisplayCashedAmount(eased * amount);
+                if (progress < 1) requestAnimationFrame(animate);
+            };
+            requestAnimationFrame(animate);
+            setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4500);
+        });
+
+        socket.on('slitherState', ({ balance, resetTime }) => {
+            if (resetTime) {
+                const remaining = Math.max(0, Math.ceil((resetTime - Date.now()) / 1000));
+                setResetCountdown(remaining);
+            }
+        });
+
+        socket.on('leaderboard', ({ leaderboard: lb }) => {
+            setLeaderboard(lb.map((p) => ({
+                id: p.id,
+                name: p.name,
+                balance: parseFloat(p.balance) || 0,
+            })));
+        });
+
+        socket.on('forcedDisconnect', () => {
+            alert('Connected from another window. Closing this session.');
+            navigate('/pre-game', { state: { selectedMode: 'slither' } });
+        });
+
+        socket.on('error', (msg) => {
+            console.error('Server error:', msg);
+            alert(msg);
+            navigate('/pre-game', { state: { selectedMode: 'slither' } });
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Connection failed:', err.message);
+            setIsConnected(false);
+        });
+
+        socket.on('disconnect', () => {
+            setIsConnected(false);
+            hasJoinedRef.current = false;
+        });
+
+        const uiUpdateInterval = setInterval(() => {
+            if (window.mySnake?.[0]) {
+                const score = window.mySnake[0].score || 0;
+                const convertedBalance = 1.0 + score * 0.01;
+                setCurrentBalance(convertedBalance);
+                syncBalanceToServer(convertedBalance);
+            }
+        }, 500);
+
         return () => {
-            clearInterval(uiUpdateInterval); // Stop UI update loop
-            window.die = true; // Signal game engine to stop its loop
-            window.onSnakeDie = null; // Clear global callback
-            window.onCashOut = null; // Clear global callback
+            clearInterval(uiUpdateInterval);
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            window.die = true;
+            window.onSnakeDie = null;
             if (window.gameInstance) {
-                window.gameInstance.destroy(); // Clean up game resources
+                window.gameInstance.destroy();
                 window.gameInstance = null;
             }
             if (socketRef.current) {
@@ -144,16 +172,24 @@ export default function SlitherGame() {
                 socketRef.current.disconnect();
                 socketRef.current = null;
             }
+            hasJoinedRef.current = false;
         };
-    }, [authToken, user?.username, navigate, location.state]); // Use authToken in dependency array
+    }, [authToken, matchNickname, navigate, handleDeath, startCashoutCountdown, syncBalanceToServer]);
+
+    const formatResetTime = (secs) => {
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        const s = secs % 60;
+        return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    };
 
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, overflow: 'hidden', fontFamily: 'system-ui' }}>
-            {!isConnected && (
+            {(!isConnected || !gameReady) && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
                     <div style={{ textAlign: 'center' }}>
                         <h2 style={{ marginBottom: '10px' }}>Connecting to Slither Arena...</h2>
-                        <p style={{ opacity: 0.5 }}>Verifying session...</p>
+                        <p style={{ opacity: 0.5 }}>Verifying session & entry fee...</p>
                     </div>
                 </div>
             )}
@@ -163,7 +199,6 @@ export default function SlitherGame() {
                 style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
             />
 
-            {/* Overlay: Vinst */}
             {cashedAmount !== null && (
                 <div className="modern-overlay-backdrop">
                     <div className="modern-overlay-card success">
@@ -178,7 +213,6 @@ export default function SlitherGame() {
                 </div>
             )}
 
-            {/* Overlay: Död */}
             {isDead && (
                 <div className="modern-overlay-backdrop death">
                     <div className="modern-overlay-card death">
@@ -196,12 +230,11 @@ export default function SlitherGame() {
                 </div>
             )}
 
-            {/* UI: Active Stake */}
             <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 100 }}>
                 <div style={{
                     background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(20px)',
                     padding: '15px 25px', borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white', boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)', // Reverted to purple glow
+                    color: 'white', boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
                 }}>
                     <div style={{ textAlign: 'center' }}>
@@ -209,22 +242,28 @@ export default function SlitherGame() {
                         <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
                             ${(currentBalance ?? 0).toFixed(2)}
                         </div>
+                        {localTimer > 0 && (
+                            <div style={{ fontSize: '0.75rem', color: '#14F195', marginTop: '4px', fontWeight: '700' }}>
+                                CASHING OUT: {localTimer}s
+                            </div>
+                        )}
                     </div>
                     <button
                         onClick={handleCashOut}
+                        disabled={localTimer > 0 || isDead || cashedAmount !== null}
                         style={{
-                            width: '100%', background: 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
-                            color: '#001a0d', border: 'none', padding: '10px 0', borderRadius: '12px',
-                            fontWeight: '800', fontSize: '0.8rem', letterSpacing: '1px', cursor: 'pointer',
+                            width: '100%', background: localTimer > 0 ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
+                            color: localTimer > 0 ? 'rgba(255,255,255,0.4)' : '#001a0d', border: 'none', padding: '10px 0', borderRadius: '12px',
+                            fontWeight: '800', fontSize: '0.8rem', letterSpacing: '1px',
+                            cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
                             transition: '0.2s all ease', boxShadow: '0 4px 20px rgba(20, 241, 149, 0.2)'
                         }}
                     >
-                        CASH OUT
+                        {localTimer > 0 ? `SECURING... ${localTimer}s` : 'CASH OUT'}
                     </button>
                 </div>
             </div>
 
-            {/* UI: Logo */}
             <div style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', zIndex: 100 }}>
                 <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
@@ -233,9 +272,13 @@ export default function SlitherGame() {
                     </span>
                 </div>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Slither Mode v0.1</div>
+                {resetCountdown != null && resetCountdown > 0 && (
+                    <div style={{ color: 'rgba(255,180,80,0.7)', fontSize: '0.7rem', marginTop: '4px' }}>
+                        Reset: {formatResetTime(resetCountdown)}
+                    </div>
+                )}
             </div>
 
-            {/* UI: Leaderboard */}
             <div style={{
                 position: 'absolute', top: '120px', right: '30px', width: '180px',
                 background: 'rgba(16, 17, 24, 0.85)', backdropFilter: 'blur(20px)',
@@ -246,10 +289,10 @@ export default function SlitherGame() {
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>Leaderboard</h4>
                 <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {leaderboard.map((p, i) => (
-                        <div key={i} style={{ 
-                            display: 'flex', justifyContent: 'space-between', 
-                            color: p.name === (location.state?.nickname || user?.username) ? 'var(--accent)' : 'var(--text-bright)',
-                            fontWeight: p.name === (location.state?.nickname || user?.username) ? '700' : '400'
+                        <div key={p.id || i} style={{
+                            display: 'flex', justifyContent: 'space-between',
+                            color: p.name === matchNickname ? 'var(--accent)' : 'var(--text-bright)',
+                            fontWeight: p.name === matchNickname ? '700' : '400'
                         }}>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {p.name}</span>
                             <span className="mono">${(p.balance ?? 0).toFixed(2)}</span>
@@ -258,7 +301,6 @@ export default function SlitherGame() {
                 </div>
             </div>
 
-            {/* Controls Info */}
             <div style={{ position: 'absolute', bottom: '30px', left: '30px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem' }}>
                 Mouse to Move • Click to Boost
             </div>
