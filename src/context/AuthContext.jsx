@@ -40,10 +40,11 @@ export const AuthProvider = ({ children }) => {
                         const userData = await res.json();
                         const formattedUser = {
                             ...userData,
-                            balance: userData.balanceSol, // Fallback for components looking for .balance
+                            balance: userData.balanceSol,
                             balanceSol: userData.balanceSol,
                             balanceUsd: userData.balanceUsd,
-                            solPrice: userData.solPrice
+                            solPrice: userData.solPrice,
+                            freePlay: userData.freePlay,
                         };
                         setUser(formattedUser);
                         console.log('AuthContext: Användardata från /api/me:', formattedUser);
@@ -91,7 +92,8 @@ export const AuthProvider = ({ children }) => {
                     balance: userData.balanceSol,
                     balanceSol: userData.balanceSol,
                     balanceUsd: userData.balanceUsd,
-                    solPrice: userData.solPrice
+                    solPrice: userData.solPrice,
+                    freePlay: userData.freePlay,
                 };
                 console.log(`[AuthContext] Refresh lyckades. Ny balans: ${userData.balanceSol} SOL ($${userData.balanceUsd?.toFixed(2)} USD). URL: ${url}`);
                 setUser(formattedUser);
@@ -112,7 +114,8 @@ export const AuthProvider = ({ children }) => {
             balance: base.balanceSol || base.balance,
             balanceSol: base.balanceSol,
             balanceUsd: base.balanceUsd,
-            solPrice: base.solPrice
+            solPrice: base.solPrice,
+            freePlay: base.freePlay,
         };
 
         setUser(formattedUser);

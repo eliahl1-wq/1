@@ -104,8 +104,9 @@ export default function PreGame() {
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
     const balanceUsd = balanceSol * solPrice;
+    const freePlay = !!user?.freePlay;
 
-    const canJoin = balanceUsd >= ENTRY_FEE;
+    const canJoin = freePlay || balanceUsd >= ENTRY_FEE;
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -821,6 +822,15 @@ export default function PreGame() {
             )}
 
             {/* ── Main layout ── */}
+            {freePlay && (
+                <div style={{
+                    position: 'fixed', top: '72px', left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 1100, background: 'rgba(255, 180, 0, 0.12)', border: '1px solid rgba(255, 180, 0, 0.35)',
+                    color: '#FFD080', padding: '8px 18px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700,
+                }}>
+                    TEST MODE — Free play, no real SOL used
+                </div>
+            )}
             <div className="pre-game-grid">
                 <div className="mode-card">
                     <span className="mode-card-label">Gamemode</span>
@@ -855,7 +865,7 @@ export default function PreGame() {
                     <div className="entry-row" style={{ marginBottom: '18px' }}>
                         <span className="label">Entry Fee</span>
                         <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                            $10.00
+                            {freePlay ? 'FREE (Test)' : '$10.00'}
                         </span>
                     </div>
 

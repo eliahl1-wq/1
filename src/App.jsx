@@ -26,6 +26,7 @@ function ArenaRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.freePlay) return children;
   if (user && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < 10) return <Navigate to="/lobby" />;
   return children;
 }
@@ -35,7 +36,8 @@ function PublicRoute({ children }) {
   if (loading) return null;
   if (isAuthenticated) {
     const balanceUsd = user?.balanceUsd || (user?.balanceSol * (user?.solPrice || 57)) || 0;
-    return balanceUsd >= 10 ? <Navigate to="/pre-game" /> : <Navigate to="/lobby" />;
+    if (user?.freePlay || balanceUsd >= 10) return <Navigate to="/pre-game" />;
+    return <Navigate to="/lobby" />;
   }
   return children;
 }
