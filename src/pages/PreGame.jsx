@@ -45,21 +45,6 @@ export default function PreGame() {
     const [isCurSOL, setIsCurSOL] = useState(false);
     const [statusMsg, setStatusMsg] = useState('');
     const [isMatchmaking, setIsMatchmaking] = useState(false);
-    const [onChainBalance, setOnChainBalance] = useState(null);
-
-    // Hämtar faktiskt saldo direkt från Solana-nätverket för att fixa "2109 dollar"-felet
-    useEffect(() => {
-        if (!connection || !user?.depositAddress) return;
-        const fetchRealTimeBalance = async () => {
-            try {
-                const bal = await connection.getBalance(new PublicKey(user.depositAddress));
-                setOnChainBalance(bal / LAMPORTS_PER_SOL);
-            } catch (e) { console.warn("Kunde inte hämta live-saldo:", e); }
-        };
-        fetchRealTimeBalance();
-        const id = setInterval(fetchRealTimeBalance, 10000); // Uppdatera var 10:e sekund
-        return () => clearInterval(id);
-    }, [connection, user?.depositAddress]);
 
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
@@ -115,8 +100,8 @@ export default function PreGame() {
     const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
     const ENTRY_FEE = 10.00;
 
-    // Prioritera on-chain balance (0.22 SOL) framför databasens felaktiga värden (32 SOL)
-    const balanceSol = onChainBalance !== null ? onChainBalance : (user?.balanceSol ?? user?.balance ?? 0);
+    // Lita nu på user.balanceSol eftersom servern synkar den automatiskt mot kedjan i /api/me
+    const balanceSol = user?.balanceSol ?? 0;
     const balanceUsd = balanceSol * solPrice;
 
     const canJoin = balanceUsd >= ENTRY_FEE;
@@ -955,7 +940,7 @@ export default function PreGame() {
             {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}
             <div style={{
                 position: 'fixed', left: 16, bottom: 16,
-                marginLeft: 'calc(140px + 55px)', /* Flyttad ytterligare till höger */
+                marginLeft: 'calc(140px + 115px)', /* Flyttad ännu längre till höger */
                 display: 'flex', alignItems: 'center', gap: '6px',
                 background: '#000', border: '1px solid var(--border)',
                 borderRadius: '20px', padding: '5px 12px',
