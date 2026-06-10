@@ -581,8 +581,10 @@ export default function PreGame() {
                             <button
                                 className="nav-deposit-btn"
                                 onClick={() => {
-                                    if ((user?.balance || 0) === 0) navigate('/lobby');
-                                    else { setIsWalletOpen(false); setIsWalletExpanded(true); }
+                                    setIsWalletOpen(false);
+                                    setIsWithdrawExpanded(false);
+                                    setIsWalletExpanded(true);
+                                    setDepositMethod('wallet');
                                 }}
                             >
                                 {(user?.balance || 0) === 0 ? '+ Add funds' : 'Deposit'}

@@ -109,12 +109,13 @@ export default function Lobby() {
         return () => { if (qrRef.current) qrRef.current.innerHTML = ''; };
     }, [depositAddress, depositMethod, connected]);
 
-    // Redirect if sufficient balance or free-play test mode
+    // Leave lobby once the user can enter the arena (funded or free-play)
     useEffect(() => {
-        const balanceUsd = (user?.balanceSol || 0) * (user?.solPrice || solPrice);
-        if (user?.freePlay || isAlreadyInGame) navigate('/pre-game');
-        else if (balanceUsd >= 10) navigate('/pre-game');
-    }, [user, isAlreadyInGame, navigate, solPrice]);
+        const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
+        if (user?.freePlay || balanceUsd >= 10) {
+            navigate('/pre-game');
+        }
+    }, [user?.freePlay, user?.balanceUsd, user?.balanceSol, user?.solPrice, navigate, solPrice]);
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect your wallet first.'); return; }
