@@ -65,6 +65,7 @@ export default function Game() {
 
         const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
         const matchNickname = location.state?.nickname || user?.username || 'Guest';
+        const gameMode = localStorage.getItem('current_game_mode') || 'agar';
 
         const socket = io(apiUrl, {
             auth: { token },
@@ -82,7 +83,7 @@ export default function Game() {
             setIsConnected(true);
             if (!hasJoinedGameRef.current) {
                 console.log('Emitting joinGame...');
-                socket.emit('joinGame', { username: matchNickname, token, mode: 'agar' });
+                socket.emit('joinGame', { username: matchNickname, token, mode: gameMode });
                 hasJoinedGameRef.current = true;
             }
         });
@@ -91,9 +92,10 @@ export default function Game() {
             // Denna används inte längre då servern skickar 'welcome'
         });
 
-        socket.on('welcome', (playerSettings, gameSizes, extra) => {
-            console.log('Welcome to Arena');
-            localStorage.setItem('current_game_mode', extra?.mode || 'agar');
+        socket.on('welcome', (playerSettings, gameSizes) => {
+            const isRejoin = gameSizes?.rejoin === true;
+            console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
+            localStorage.setItem('current_game_mode', gameSizes?.mode || 'agar');
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
             global.game.width = gameSizes.width;
