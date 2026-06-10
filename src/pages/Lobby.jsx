@@ -32,22 +32,7 @@ export default function Lobby() {
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [depositMethod, setDepositMethod] = useState('wallet');
     const [isCurSOL, setIsCurSOL] = useState(false);
-    const [onChainBalance, setOnChainBalance] = useState(null);
     const solPrice = user?.solPrice || 64;
-
-    // Hämta blockkedje-saldo för att undvika databasfel
-    useEffect(() => {
-        if (!connection || !user?.depositAddress) return;
-        const fetchBal = async () => {
-            try {
-                const b = await connection.getBalance(new PublicKey(user.depositAddress));
-                setOnChainBalance(b / LAMPORTS_PER_SOL);
-            } catch (e) { }
-        };
-        fetchBal();
-        const id = setInterval(fetchBal, 10000);
-        return () => clearInterval(id);
-    }, [connection, user?.depositAddress]);
 
     const qrRef = useRef(null);
     const userMenuRef = useRef(null);
@@ -166,7 +151,7 @@ export default function Lobby() {
     };
 
     const currentBalanceSol = onChainBalance !== null ? onChainBalance : (user?.balance || 0);
-
+    const currentBalanceSol = user?.balanceSol ?? 0; // Use balance from AuthContext
     return (
         <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <Background />
