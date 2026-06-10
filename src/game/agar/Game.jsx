@@ -95,6 +95,7 @@ export default function Game() {
             global.game.width = gameSizes.width;
             global.game.height = gameSizes.height;
             setIsConnected(true);
+            setCurrentBalance(playerSettings.balance ?? 1.0);
             
             // Återuppta cashout-timer om man refreashar mitt i
             if (gameSizes.cashOutRemaining > 0) {
@@ -129,12 +130,10 @@ export default function Game() {
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
             gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardInfo };
-            // 1. Fix Balance Sync: Extract specific player and convert SOL balance to live USD
+            // Server balance is already USD ($1.00 start stake)
             const me = userData.find(p => p.id === myIdRef.current);
-            if (me && rewardInfo?.solPrice) {
-                setCurrentBalance(me.balance * rewardInfo.solPrice);
-            } else {
-                setCurrentBalance(0);
+            if (me) {
+                setCurrentBalance(me.balance ?? 0);
             }
         });
 
@@ -146,9 +145,7 @@ export default function Game() {
         });
 
         socket.on('cashOutSuccess', ({ amount }) => {
-            // Sync success display with USD value using live price
-            const solPrice = gameData.current.rewardInfo?.solPrice || 57;
-            const usdAmount = amount * solPrice;
+            const usdAmount = amount;
             setCashedAmount(usdAmount);
             
             // Professional count-up animation for money being "added" to balance
