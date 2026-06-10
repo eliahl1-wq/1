@@ -55,17 +55,38 @@ export default function SlitherGame() {
         document.body.style.backgroundColor = '#000';
         document.title = 'AgarStake | Slither Arena';
 
-        if (!canvasRef.current || socketRef.current) return;
+        if (!canvasRef.current) return;
         if (typeof authToken !== 'string' || authToken.length === 0) return;
+
+        // React Strict Mode runs effect twice — tear down any prior socket first
+        if (socketRef.current) {
+            socketRef.current.off();
+            socketRef.current.disconnect();
+            socketRef.current = null;
+        }
+        if (inputIntervalRef.current) {
+            clearInterval(inputIntervalRef.current);
+            inputIntervalRef.current = null;
+        }
 
         const renderer = new SlitherRenderer(canvasRef.current);
         rendererRef.current = renderer;
         renderer.start();
 
+        const emitInput = () => {
+            if (socketRef.current?.connected && rendererRef.current) {
+                socketRef.current.emit('slitherInput', rendererRef.current.getInput());
+            }
+        };
+        renderer.setInputEmitter(emitInput);
+
         const socket = io(API_URL, {
             auth: { token: authToken },
-            transports: ['websocket'],
+            transports: ['websocket', 'polling'],
             reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000,
+            timeout: 20000,
         });
         socketRef.current = socket;
 
@@ -148,15 +169,9 @@ export default function SlitherGame() {
             hasJoinedRef.current = false;
         });
 
-        inputIntervalRef.current = setInterval(() => {
-            if (socket.connected && rendererRef.current) {
-                socket.emit('slitherInput', rendererRef.current.getInput());
-            }
-        }, 50);
+        inputIntervalRef.current = setInterval(emitInput, 25);
 
         return () => {
-            if (cashoutActiveRef.current) return;
-
             if (inputIntervalRef.current) clearInterval(inputIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             renderer.destroy();

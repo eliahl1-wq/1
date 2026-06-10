@@ -17,8 +17,8 @@ export class SlitherRenderer {
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
-        this._onMouseDown = () => { this.boost = true; };
-        this._onMouseUp = () => { this.boost = false; };
+        this._onMouseDown = () => { this.boost = true; this._emitInput?.(); };
+        this._onMouseUp = () => { this.boost = false; this._emitInput?.(); };
         this._onTouchMove = (e) => {
             e.preventDefault();
             const t = e.touches[0];
@@ -28,8 +28,9 @@ export class SlitherRenderer {
             this.boost = true;
             const t = e.touches[0];
             this._setInputFromScreen(t.clientX, t.clientY);
+            this._emitInput?.();
         };
-        this._onTouchEnd = () => { this.boost = false; };
+        this._onTouchEnd = () => { this.boost = false; this._emitInput?.(); };
 
         window.addEventListener('resize', this._onResize);
         document.addEventListener('mousemove', this._onMouseMove);
@@ -53,9 +54,18 @@ export class SlitherRenderer {
         const rect = this.canvas.getBoundingClientRect();
         const x = sx - rect.left - this.W / 2;
         const y = sy - rect.top - this.H / 2;
-        const mag = Math.hypot(x, y) || 1;
+        const mag = Math.hypot(x, y);
+        if (mag < 8) {
+            // Near center — keep last direction (server continues on current angle)
+            return;
+        }
         this.inputDx = (x / mag) * 4;
         this.inputDy = (y / mag) * 4;
+        this._emitInput?.();
+    }
+
+    setInputEmitter(fn) {
+        this._emitInput = fn;
     }
 
     _handleMouse(e) {
@@ -95,8 +105,8 @@ export class SlitherRenderer {
         const me = snakes.find(s => s.isYou);
         if (me?.segments?.[0]) {
             const head = me.segments[0];
-            this.camera.x += (head.x - this.camera.x) * 0.15;
-            this.camera.y += (head.y - this.camera.y) * 0.15;
+            this.camera.x += (head.x - this.camera.x) * 0.35;
+            this.camera.y += (head.y - this.camera.y) * 0.35;
         }
 
         const cx = this.camera.x;
