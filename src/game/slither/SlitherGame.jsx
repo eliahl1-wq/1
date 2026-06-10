@@ -78,6 +78,7 @@ export default function SlitherGame() {
         });
 
         socket.on('welcome', (playerSettings) => {
+            localStorage.setItem('current_game_mode', 'slither');
             setCurrentBalance(playerSettings.balance ?? 1.0);
             setGameReady(true);
         });
@@ -96,6 +97,7 @@ export default function SlitherGame() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            localStorage.removeItem('current_game_mode');
             setCashedAmount(amount);
             const startTime = performance.now();
             const duration = 1200;
@@ -121,6 +123,7 @@ export default function SlitherGame() {
         socket.on('RIP', () => {
             setIsDead(true);
             setLocalTimer(0);
+            localStorage.removeItem('current_game_mode');
             setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4000);
         });
 
@@ -131,8 +134,8 @@ export default function SlitherGame() {
 
         socket.on('error', (msg) => {
             console.error('Server error:', msg);
+            if (cashoutActiveRef.current) cashoutActiveRef.current = false;
             alert(msg);
-            navigate('/pre-game', { state: { selectedMode: 'slither' } });
         });
 
         socket.on('connect_error', (err) => {
@@ -165,7 +168,7 @@ export default function SlitherGame() {
             }
             hasJoinedRef.current = false;
         };
-    }, [authToken, matchNickname, navigate, startCashoutCountdown]);
+    }, [authToken, navigate, startCashoutCountdown]);
 
     const formatResetTime = (secs) => {
         const h = Math.floor(secs / 3600);

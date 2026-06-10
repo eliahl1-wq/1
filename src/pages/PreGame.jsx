@@ -45,7 +45,9 @@ export default function PreGame() {
     const [isCurSOL, setIsCurSOL] = useState(false);
     const [isMatchmaking, setIsMatchmaking] = useState(false);
 
-    const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
+    const [isAlreadyInGame, setIsAlreadyInGame] = useState(
+        () => !!localStorage.getItem('current_game_mode')
+    );
     const [activeGameBalance, setActiveGameBalance] = useState(null);
     const [liveStats, setLiveStats] = useState({ playersOnline: 0, biggestPayout: 0, topPlayer: null });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
@@ -59,7 +61,7 @@ export default function PreGame() {
 
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
-        () => localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
+        () => localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
     );
     const [currentGameMode, setCurrentGameMode] = useState(
         () => localStorage.getItem('current_game_mode') || null
@@ -284,7 +286,8 @@ export default function PreGame() {
                     setActiveGameBalance(d.balance ?? null);
                     localStorage.setItem('current_game_mode', d.mode);
                     localStorage.setItem('selected_gamemode', d.mode);
-                } else {
+                } else if (r.ok) {
+                    // Only clear when server confirms we're not in a game
                     setCurrentGameMode(null);
                     setActiveGameBalance(null);
                     localStorage.removeItem('current_game_mode');

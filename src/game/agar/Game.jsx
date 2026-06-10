@@ -80,7 +80,7 @@ export default function Game() {
             if (!hasJoinedGameRef.current) {
                 console.log('Emitting joinGame...');
                 const matchNickname = location.state?.nickname || user?.username || 'Guest';
-                socket.emit('joinGame', { username: matchNickname, token });
+                socket.emit('joinGame', { username: matchNickname, token, mode: 'agar' });
                 hasJoinedGameRef.current = true;
             }
         });
@@ -91,6 +91,7 @@ export default function Game() {
 
         socket.on('welcome', (playerSettings, gameSizes, extra) => {
             console.log('Welcome to Arena');
+            localStorage.setItem('current_game_mode', extra?.mode || 'agar');
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
             global.game.width = gameSizes.width;
@@ -148,6 +149,7 @@ export default function Game() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            localStorage.removeItem('current_game_mode');
             const usdAmount = amount;
             setCashedAmount(usdAmount);
             
@@ -170,7 +172,8 @@ export default function Game() {
 
         const handleDeath = () => {
             setIsDead(true);
-            global.cashOutTimer = 0; // Nollställ timern vid död
+            global.cashOutTimer = 0;
+            localStorage.removeItem('current_game_mode');
             // Visa döds-skärmen i 4 sekunder innan vi skickar tillbaka till pre-game
             setTimeout(() => {
                 navigate('/pre-game'); 
@@ -201,9 +204,11 @@ export default function Game() {
             if (cashoutActiveRef.current) {
                 cashoutActiveRef.current = false;
             }
-            if (msg.includes('balance')) {
+            if (typeof msg === 'string' && msg.includes('balance')) {
                 alert(msg);
                 navigate('/pre-game');
+            } else if (typeof msg === 'string' && msg.includes('Account')) {
+                alert(msg);
             }
         });
 
