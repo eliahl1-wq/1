@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
-import WalletConnectPanel from '../components/WalletConnectPanel';
 import Background from '../components/Background';
 
 /* ── Solana logo icon ── */
@@ -88,6 +88,7 @@ export default function PreGame() {
     // Panel drag
     const [panelPos, setPanelPos] = useState({ x: null, y: 60 });
     const [isDragging, setIsDragging] = useState(false);
+    const [walletModalActive, setWalletModalActive] = useState(false);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
 
     // Refs
@@ -166,8 +167,30 @@ export default function PreGame() {
         }
     }, [depositMethod, isWalletExpanded]);
 
+    useEffect(() => {
+        const obs = new MutationObserver(() => {
+            setWalletModalActive(!!document.querySelector('.wallet-adapter-modal, wcm-modal'));
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+        return () => obs.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (walletModalActive && isWalletExpanded) {
+            setPanelPos(p => ({ x: 40, y: p.y ?? 60 }));
+        }
+    }, [walletModalActive, isWalletExpanded]);
+
     // Click outside
     const handleClickOutside = useCallback((e) => {
+        const walletOpen = !!document.querySelector('.wallet-adapter-modal');
+        if (walletOpen) return;
+        const path = e.composedPath?.() || [];
+        const isWalletAdapter = path.some(el =>
+            el instanceof HTMLElement &&
+            el.className?.toString?.().includes?.('wallet-adapter')
+        );
+
         if (userMenuRef.current && !userMenuRef.current.contains(e.target) &&
             userPillRef.current && !userPillRef.current.contains(e.target)) {
             setShowUserMenu(false);
@@ -176,10 +199,10 @@ export default function PreGame() {
             !e.target.closest('#balance-pill')) {
             setIsWalletOpen(false);
         }
-        if (walletExpandRef.current && !walletExpandRef.current.contains(e.target)) {
+        if (walletExpandRef.current && !walletExpandRef.current.contains(e.target) && !isWalletAdapter) {
             setIsWalletExpanded(false);
         }
-        if (withdrawExpandRef.current && !withdrawExpandRef.current.contains(e.target)) {
+        if (withdrawExpandRef.current && !withdrawExpandRef.current.contains(e.target) && !isWalletAdapter) {
             setIsWithdrawExpanded(false);
         }
     }, []);
@@ -621,18 +644,13 @@ export default function PreGame() {
 
                     {depositMethod === 'wallet' ? (
                         <>
-                            <WalletConnectPanel onStatusChange={setStatusMsg} />
+                            {/* Wallet connect */}
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                <WalletMultiButton />
+                            </div>
 
-                            <div style={{ marginTop: '4px' }}>
-                                <div className="wallet-connect-header" style={{ marginBottom: '10px' }}>
-                                    <span className="wallet-connect-step">2</span>
-                                    <div>
-                                        <div className="wallet-connect-title">Enter amount</div>
-                                        <div className="wallet-connect-sub">
-                                            {connected ? 'Send SOL from your connected wallet' : 'Connect a wallet first'}
-                                        </div>
-                                    </div>
-                                </div>
+                            {/* Amount row */}
+                            <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                                     <span className="label">Amount</span>
                                     <CustomDropdown
@@ -651,7 +669,7 @@ export default function PreGame() {
                                         )}
                                     />
                                 </div>
-                                <div className="amount-field" style={{ opacity: connected ? 1 : 0.55 }}>
+                                <div className="amount-field">
                                     <span className="amount-prefix">
                                         {isCurSOL ? <SolLogo size={13} /> : <span>$</span>}
                                     </span>
@@ -661,7 +679,6 @@ export default function PreGame() {
                                         value={amount}
                                         onChange={e => setAmount(e.target.value)}
                                         className="amount-input"
-                                        disabled={!connected}
                                     />
                                 </div>
                                 {amount && (
@@ -673,13 +690,8 @@ export default function PreGame() {
                                 )}
                             </div>
 
-                            <button
-                                className="btn btn-primary"
-                                style={{ width: '100%', padding: '11px', opacity: connected ? 1 : 0.5 }}
-                                onClick={handleDeposit}
-                                disabled={!connected}
-                            >
-                                {connected ? 'Deposit SOL' : 'Connect wallet to deposit'}
+                            <button className="btn btn-primary" style={{ width: '100%', padding: '11px' }} onClick={handleDeposit}>
+                                Deposit SOL
                             </button>
                         </>
                     ) : (

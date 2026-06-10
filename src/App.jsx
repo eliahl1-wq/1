@@ -12,11 +12,46 @@ import Gamemodes from './pages/Gamemodes';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import {
-  PhantomWalletAdapter,
-  SolflareWalletAdapter,
-} from '@solana/wallet-adapter-wallets';
-import { BraveWalletAdapter } from '@solana/wallet-adapter-brave';
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect';
+import '@solana/wallet-adapter-react-ui/styles.css';
+
+function buildWalletAdapters() {
+  const walletConnect = new WalletConnectWalletAdapter({
+    network: WalletAdapterNetwork.Mainnet,
+    options: {
+      projectId: '8b2f78d206bbaec981376e03d9d15376',
+      metadata: {
+        name: 'AgarStake',
+        description: 'Stake SOL and dominate the arena in this high-stakes agar clone.',
+        url: 'https://www.agararena.space',
+        icons: ['https://www.agararena.space/vite.svg'],
+      },
+    },
+  });
+
+  const adapters = [walletConnect];
+
+  if (typeof window !== 'undefined') {
+    const hasPhantomExtension = !!window.phantom?.solana?.isPhantom;
+    const hasBraveWallet = !!window.braveSolana?.isBraveWallet;
+
+    // Phantom adapter: real extension, or Brave's built-in wallet (Phantom-compatible API)
+    if (hasPhantomExtension || hasBraveWallet) {
+      adapters.push(new PhantomWalletAdapter());
+    }
+
+    if (window.solflare?.isSolflare) {
+      adapters.push(new SolflareWalletAdapter({ network: WalletAdapterNetwork.Mainnet }));
+    }
+  } else {
+    adapters.push(new PhantomWalletAdapter());
+    adapters.push(new SolflareWalletAdapter({ network: WalletAdapterNetwork.Mainnet }));
+  }
+
+  return adapters;
+}
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -48,18 +83,12 @@ function App() {
   const endpoint = useMemo(() => 
     "https://mainnet.helius-rpc.com/?api-key=b83e640e-2370-4f65-bc06-efe5166084a4", []);
 
-  const wallets = useMemo(
-    () => [
-      new BraveWalletAdapter(),
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter({ network: WalletAdapterNetwork.Mainnet }),
-    ],
-    []
-  );
+  const wallets = useMemo(() => buildWalletAdapters(), []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect={false}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
           <Router>
             <AuthProvider>
               <Routes>
@@ -77,6 +106,7 @@ function App() {
               </Routes>
             </AuthProvider>
           </Router>
+        </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );
