@@ -133,22 +133,6 @@ export default function Gamemodes() {
             </div>
 
             <style>{`
-                /* ── Nav link ── */
-                .gm-nav-link {
-                    background: none;
-                    border: none;
-                    font-family: var(--sans);
-                    font-size: 1.05rem;
-                    font-weight: 800;
-                    color: var(--text-2);
-                    cursor: pointer;
-                    padding: 0;
-                    transition: color 0.15s;
-                    letter-spacing: -0.01em;
-                }
-                .gm-nav-link:hover { color: #fff; }
-                .gm-nav-link--active { color: #fff; }
-
                 /* ── Page heading ── */
                 .gm-heading {
                     margin: 0 0 6px 0;

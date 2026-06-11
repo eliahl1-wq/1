@@ -185,28 +185,49 @@ export class SlitherRenderer {
         this._raf = requestAnimationFrame(loop);
     }
 
-    _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen) {
-        ctx.fillStyle = '#0a0a0c';
+    _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
+        ctx.fillStyle = '#070709';
         ctx.fillRect(0, 0, W, H);
 
-        const gridStep = H / 18;
-        const offsetX = ((W / 2 - cx * this.zoom) % gridStep + gridStep) % gridStep;
-        const offsetY = ((H / 2 - cy * this.zoom) % gridStep + gridStep) % gridStep;
+        const hexR = 42 * zoom;
+        const hexW = hexR * 2;
+        const hexH = Math.sqrt(3) * hexR;
+        const cols = Math.ceil(W / (hexW * 0.75)) + 3;
+        const rows = Math.ceil(H / hexH) + 3;
 
+        const originX = W / 2 - cx * zoom * 0.75;
+        const originY = H / 2 - cy * zoom * (Math.sqrt(3) / 2);
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.045)';
         ctx.lineWidth = 1;
-        ctx.strokeStyle = '#ffffff';
-        ctx.globalAlpha = 0.08;
-        ctx.beginPath();
-        for (let x = offsetX; x < W; x += gridStep) {
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, H);
+
+        for (let row = -1; row < rows; row++) {
+            for (let col = -1; col < cols; col++) {
+                const offsetX = (row & 1) ? hexW * 0.375 : 0;
+                const hx = originX + col * hexW * 0.75 + offsetX;
+                const hy = originY + row * hexH;
+
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (Math.PI / 3) * i - Math.PI / 6;
+                    const px = hx + hexR * Math.cos(a);
+                    const py = hy + hexR * Math.sin(a);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
         }
-        for (let y = offsetY; y < H; y += gridStep) {
-            ctx.moveTo(0, y);
-            ctx.lineTo(W, y);
-        }
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        // Soft radial vignette like slither.io but darker
+        const vig = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.15, W / 2, H / 2, Math.max(W, H) * 0.72);
+        vig.addColorStop(0, 'rgba(0,0,0,0)');
+        vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+        ctx.fillStyle = vig;
+        ctx.fillRect(0, 0, W, H);
 
         const limit = worldHalf;
         const tl = toScreen(-limit, -limit);
@@ -239,48 +260,68 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    _drawFood(ctx, food, toScreen, W, H) {
+    _drawFood(ctx, food, toScreen, W, H, zoom) {
+        const t = Date.now() * 0.003;
         for (const f of food) {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
-            if (fx < -30 || fy < -30 || fx > W + 30 || fy > H + 30) continue;
+            if (fx < -50 || fy < -50 || fx > W + 50 || fy > H + 50) continue;
 
-            const r = f.radius || 5;
+            const r = (f.radius || 5) * zoom;
+            const pulse = 1 + Math.sin(t + f.x * 0.01 + f.y * 0.01) * 0.12;
 
             if (f.golden) {
-                const pulse = 1 + Math.sin(Date.now() * 0.006) * 0.1;
+                ctx.save();
+                ctx.shadowBlur = 22 * zoom;
+                ctx.shadowColor = 'hsla(48, 100%, 55%, 0.85)';
                 ctx.beginPath();
-                ctx.arc(fx, fy, (r + 5) * pulse, 0, Math.PI * 2);
-                ctx.fillStyle = 'hsla(48, 100%, 55%, 0.35)';
+                ctx.arc(fx, fy, (r + 6 * zoom) * pulse, 0, Math.PI * 2);
+                ctx.fillStyle = 'hsla(48, 100%, 55%, 0.4)';
                 ctx.fill();
+                ctx.shadowBlur = 0;
                 ctx.strokeStyle = 'hsl(45, 100%, 50%)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 const grad = ctx.createRadialGradient(fx - r * 0.2, fy - r * 0.2, 0, fx, fy, r);
-                grad.addColorStop(0, 'hsl(52, 100%, 88%)');
-                grad.addColorStop(0.5, 'hsl(48, 100%, 62%)');
+                grad.addColorStop(0, 'hsl(52, 100%, 92%)');
+                grad.addColorStop(0.45, 'hsl(48, 100%, 65%)');
                 grad.addColorStop(1, 'hsl(40, 90%, 38%)');
                 ctx.beginPath();
                 ctx.arc(fx, fy, r, 0, Math.PI * 2);
                 ctx.fillStyle = grad;
                 ctx.fill();
+                ctx.restore();
                 continue;
             }
 
             const hue = f.hue ?? 120;
+            const glow = f.deathDrop ? 28 : 18;
+            const outerA = f.deathDrop ? 0.45 : 0.32;
+
+            ctx.save();
+            ctx.shadowBlur = glow * zoom * pulse;
+            ctx.shadowColor = `hsla(${hue}, 100%, 60%, 0.9)`;
 
             ctx.beginPath();
-            ctx.arc(fx, fy, r + 3, 0, Math.PI * 2);
-            ctx.fillStyle = `hsla(${hue}, 90%, 55%, 0.25)`;
+            ctx.arc(fx, fy, (r + 5 * zoom) * pulse, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${hue}, 95%, 58%, ${outerA})`;
             ctx.fill();
 
-            const grad = ctx.createRadialGradient(fx - r * 0.25, fy - r * 0.25, 0, fx, fy, r);
-            grad.addColorStop(0, `hsl(${hue}, 100%, 85%)`);
-            grad.addColorStop(0.55, `hsl(${hue}, 90%, 58%)`);
-            grad.addColorStop(1, `hsl(${hue}, 80%, 38%)`);
+            ctx.shadowBlur = glow * 0.55 * zoom;
+            ctx.beginPath();
+            ctx.arc(fx, fy, (r + 2.5 * zoom) * pulse, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${hue}, 100%, 70%, 0.28)`;
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+            const grad = ctx.createRadialGradient(fx - r * 0.3, fy - r * 0.3, 0, fx, fy, r * 1.1);
+            grad.addColorStop(0, `hsla(${hue}, 100%, 92%, 0.95)`);
+            grad.addColorStop(0.4, `hsla(${hue}, 95%, 62%, 0.9)`);
+            grad.addColorStop(1, `hsla(${hue}, 85%, 38%, 0.85)`);
             ctx.beginPath();
             ctx.arc(fx, fy, r, 0, Math.PI * 2);
             ctx.fillStyle = grad;
             ctx.fill();
+            ctx.restore();
         }
     }
 
@@ -338,13 +379,13 @@ export class SlitherRenderer {
         }
     }
 
-    _drawSnake(snake, toScreen) {
+    _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
         const segs = snake.segments || [];
         if (segs.length === 0) return;
 
-        const headRadius = snake.radius || 6;
-        const bodyRadius = headRadius * 0.9;
+        const headRadius = (snake.radius || 6) * zoom;
+        const bodyRadius = headRadius * 0.92;
         const angle = snake.angle || 0;
         const baseHex = snake.isYou ? '#7C58FF' : (snake.color || '#888888');
         const base = parseColor(baseHex);
@@ -602,9 +643,9 @@ export class SlitherRenderer {
             y: (wy - cy) * zoom + H / 2,
         });
 
-        this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen);
+        this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom);
         this._drawZone(ctx, toScreen, W, H);
-        this._drawFood(ctx, food, toScreen, W, H);
+        this._drawFood(ctx, food, toScreen, W, H, zoom);
 
         const sorted = [...renderSnakes].sort((a, b) => {
             const ar = a.radius || 6;
@@ -612,7 +653,7 @@ export class SlitherRenderer {
             return ar - br;
         });
         for (const snake of sorted) {
-            this._drawSnake(snake, toScreen);
+            this._drawSnake(snake, toScreen, zoom);
         }
 
         // HUD over my snake: balance badge + cashout exit timer (matches Agar)
