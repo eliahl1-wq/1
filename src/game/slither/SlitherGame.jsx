@@ -96,11 +96,14 @@ export default function SlitherGame() {
         document.title = 'AgarStake | Slither Arena';
     }, []);
 
-    const startCashoutCountdown = useCallback((seconds) => {
+    const [isSecuringCashout, setIsSecuringCashout] = useState(false);
+
+    const startCashoutCountdown = useCallback((seconds, securing = false) => {
 
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
         cashoutActiveRef.current = true;
+        setIsSecuringCashout(securing);
 
         cashOutTotalRef.current = seconds;
 
@@ -119,6 +122,7 @@ export default function SlitherGame() {
                 clearInterval(intervalId);
 
                 timerIntervalRef.current = null;
+                setIsSecuringCashout(false);
 
             }
 
@@ -160,8 +164,9 @@ export default function SlitherGame() {
             cashoutSeconds: localTimer,
             cashoutTotal: cashOutTotalRef.current || 10,
             holdProgress,
+            securingCashout: isSecuringCashout,
         });
-    }, [currentBalance, localTimer, holdProgress]);
+    }, [currentBalance, localTimer, holdProgress, isSecuringCashout]);
 
     useEffect(() => {
         if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
@@ -275,7 +280,7 @@ export default function SlitherGame() {
             }
             setGameReady(true);
             if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
-                startCashoutCountdown(gameSizes.cashOutRemaining);
+                startCashoutCountdown(gameSizes.cashOutRemaining, false);
             }
         });
 
@@ -317,7 +322,7 @@ export default function SlitherGame() {
 
         socket.on('cashOutStarting', ({ seconds }) => {
 
-            startCashoutCountdown(seconds);
+            startCashoutCountdown(seconds, true);
 
         });
 
@@ -326,6 +331,7 @@ export default function SlitherGame() {
         socket.on('cashOutSuccess', ({ amount }) => {
 
             cashoutActiveRef.current = false;
+            setIsSecuringCashout(false);
 
             localStorage.removeItem('current_game_mode');
 
@@ -373,6 +379,7 @@ export default function SlitherGame() {
         socket.on('RIP', () => {
             setIsDead(true);
             setLocalTimer(0);
+            setIsSecuringCashout(false);
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
             setTimeout(() => {

@@ -5,17 +5,19 @@ const FULL_ANGLE = Math.PI * 2;
  * Timer drains clockwise; hold-to-cashout fills counter-clockwise.
  */
 export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) {
-    const { counterClockwise = false, pulse = false } = opts;
+    const { counterClockwise = false, pulse = false, showTrack = true } = opts;
     const lineWidth = 3.5;
 
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, FULL_ANGLE);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-
     if (progress <= 0) return;
+
+    ctx.lineCap = 'round';
+    if (showTrack) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, FULL_ANGLE);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+    }
 
     const start = -Math.PI / 2;
     const end = counterClockwise

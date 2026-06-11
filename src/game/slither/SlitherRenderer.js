@@ -45,7 +45,7 @@ export class SlitherRenderer {
         this.targetSnakes = [];
         this.smooth = new Map();
         this.foodCache = new Map();
-        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, holdProgress: 0 };
+        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, holdProgress: 0, securingCashout: false };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
@@ -171,19 +171,7 @@ export class SlitherRenderer {
             const tgt = snake.segments || [];
             let s = this.smooth.get(snake.id);
 
-            // Own snake: snap to server — smoothing here causes jitter vs camera
-            if (snake.isYou) {
-                if (!s) {
-                    s = { segments: tgt.map(p => ({ x: p.x, y: p.y })), angle: snake.angle || 0 };
-                } else {
-                    s.segments = tgt.map(p => ({ x: p.x, y: p.y }));
-                    s.angle = snake.angle || 0;
-                }
-                this.smooth.set(snake.id, s);
-                continue;
-            }
-
-            const tau = 0.075;
+            const tau = snake.isYou ? 0.038 : 0.075;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
             if (!s) {
                 s = { segments: tgt.map(p => ({ x: p.x, y: p.y })), angle: snake.angle || 0 };
@@ -407,20 +395,35 @@ export class SlitherRenderer {
         });
     }
 
-    /** Drop stale food — keep on-screen pellets even if server view-culling skips them. */
-    _pruneFoodCache(cx, cy, zoom, W, H) {
-        const margin = 160;
+    /** Drop stale off-screen food; keep visible pellets through server view-culling gaps. */
+    _pruneFoodCache(cx, cy, zoom, W, H, myHead, myRadius) {
+        const margin = 320;
         const halfW = W / zoom / 2 + margin;
         const halfH = H / zoom / 2 + margin;
         for (const [id, f] of this.foodCache) {
             const miss = f._missStreak || 0;
             if (miss === 0) continue;
+
             const inView = Math.abs(f.x - cx) <= halfW && Math.abs(f.y - cy) <= halfH;
-            if (inView) {
-                if (miss >= 2) this.foodCache.delete(id);
-            } else if (miss >= 4) {
-                this.foodCache.delete(id);
+
+            // Eaten pellets: remove quickly when near our head
+            if (myHead && miss >= 2) {
+                const dx = f.x - myHead.x;
+                const dy = f.y - myHead.y;
+                const eatR = (myRadius || 6) + (f.radius || 2) + 28;
+                if (dx * dx + dy * dy <= eatR * eatR) {
+                    this.foodCache.delete(id);
+                    continue;
+                }
             }
+
+            // Never drop on-screen food for culling — camera smoothing lags server head
+            if (inView) {
+                if (miss >= 30) this.foodCache.delete(id);
+                continue;
+            }
+
+            if (miss >= 10) this.foodCache.delete(id);
         }
     }
 
@@ -535,17 +538,20 @@ export class SlitherRenderer {
         const bumpStep = Math.max(4, bodyRadius * 0.72);
         const bumps = this._densifySpine(pts, bumpStep);
 
-        // Dark under-stroke along spine for a clean outline
-        ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
-        for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
-        ctx.lineWidth = bodyRadius * 2 + 4;
-        ctx.strokeStyle = rgb(dark, 0.85);
-        ctx.stroke();
-        ctx.restore();
+        // Dark under-stroke — skip head bumps (overlapped head sprite caused a double-ring)
+        const strokeFrom = Math.min(bumps.length - 1, Math.max(2, Math.ceil(headRadius / bumpStep) + 1));
+        if (strokeFrom < bumps.length - 1) {
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
+            for (let i = bumps.length - 2; i >= strokeFrom; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
+            ctx.lineWidth = bodyRadius * 2 + 4;
+            ctx.strokeStyle = rgb(dark, 0.85);
+            ctx.stroke();
+            ctx.restore();
+        }
 
         // Overlapping body circles (slither.io look) via cached sprites —
         // two radius buckets (tail/front) instead of a gradient per circle
@@ -554,7 +560,8 @@ export class SlitherRenderer {
         const spriteTail = this._bodySprite(baseHex, rTail);
         const spriteFront = this._bodySprite(baseHex, rFront);
         const split = bumps.length * 0.45;
-        for (let i = bumps.length - 1; i >= 0; i--) {
+        const bodyFrom = Math.min(bumps.length - 1, Math.max(1, Math.ceil(headRadius / bumpStep)));
+        for (let i = bumps.length - 1; i >= bodyFrom; i--) {
             const p = bumps[i];
             if (p.x < -60 || p.y < -60 || p.x > this.W + 60 || p.y > this.H + 60) continue;
             const sprite = i > split ? spriteTail : spriteFront;
@@ -750,7 +757,7 @@ export class SlitherRenderer {
 
         this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom);
         this._drawZone(ctx, toScreen, W, H);
-        this._pruneFoodCache(cx, cy, zoom, W, H);
+        this._pruneFoodCache(cx, cy, zoom, W, H, me?.segments?.[0], me?.radius);
         this._drawFood(ctx, Array.from(this.foodCache.values()), toScreen, W, H, zoom);
 
         const sorted = [...renderSnakes].sort((a, b) => {
@@ -768,10 +775,13 @@ export class SlitherRenderer {
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
-            if (this.hud.holdProgress > 0.04 && this.hud.cashoutSeconds <= 0) {
+            if (this.hud.holdProgress > 0.04 && !this.hud.securingCashout) {
                 const ringR = headRadius + 8;
-                drawCashoutProgressRing(ctx, hx, hy, ringR, this.hud.holdProgress, { counterClockwise: true });
-            } else if (this.hud.cashoutSeconds > 0) {
+                drawCashoutProgressRing(ctx, hx, hy, ringR, this.hud.holdProgress, {
+                    counterClockwise: true,
+                    showTrack: false,
+                });
+            } else if (this.hud.securingCashout && this.hud.cashoutSeconds > 0) {
                 this._drawCashoutOverlay(ctx, hx, hy, headRadius);
             }
         }
