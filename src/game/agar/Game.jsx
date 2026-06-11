@@ -401,7 +401,7 @@ export default function Game() {
                     cam.x = player.x;
                     cam.y = player.y;
                 } else {
-                    const camA = 1 - Math.exp(-dt / 0.045);
+                    const camA = 1 - Math.exp(-dt / 0.022);
                     cam.x += (player.x - cam.x) * camA;
                     cam.y += (player.y - cam.y) * camA;
                 }

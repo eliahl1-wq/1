@@ -82,14 +82,12 @@ function drawOrganicCell(cell, borders, graph) {
     let points = [];
     let time = Date.now() * 0.002;
     let moveAngle = Math.atan2(cell.vY || 0, cell.vX || 0);
-    let speed = Math.sqrt((cell.vX || 0)**2 + (cell.vY || 0)**2);
+    let speed = Math.min(Math.sqrt((cell.vX || 0) ** 2 + (cell.vY || 0) ** 2), 6);
 
     for (let i = 0; i < pointCount; i++) {
         let theta = (i / pointCount) * FULL_ANGLE;
-        // Wobble skapar den "slimiga" effekten (vibration i kanterna)
-        let wobble = Math.sin(time + theta * 5) * (cell.radius * 0.02);
-        // Stretch deformerar cirkeln i den riktning den rör sig (vX/vY kommer från servern)
-        let stretch = Math.cos(theta - moveAngle) * (speed * 0.7);
+        let wobble = Math.sin(time + theta * 5) * (cell.radius * 0.015);
+        let stretch = Math.cos(theta - moveAngle) * (speed * 0.22);
         
         let point = circlePoint(cell, cell.radius + wobble + stretch, theta);
         points.push(regulatePoint(point, borders));
@@ -217,13 +215,13 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         // High-stakes glow effect
         if (cell.isCashingOut) {
             const pulse = 0.6 + Math.sin(Date.now() * 0.012) * 0.4;
-            graph.shadowBlur = 30 * pulse;
+            graph.shadowBlur = 18 * pulse;
             graph.shadowColor = '#14F195';
         } else if (!global.battleRoyale && cell.balance > 50) {
-            graph.shadowBlur = 40; // Starkare glöd
-            graph.shadowColor = '#FFD700'; // Guld-färg
+            graph.shadowBlur = 22;
+            graph.shadowColor = '#FFD700';
         } else {
-            graph.shadowBlur = 15;
+            graph.shadowBlur = cell.isMe ? 4 : 8;
             graph.shadowColor = cell.color;
         }
         

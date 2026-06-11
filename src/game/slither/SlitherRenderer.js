@@ -130,10 +130,12 @@ export class SlitherRenderer {
             const seen = new Set();
             for (const f of tick.food) {
                 seen.add(f.id);
-                this.foodCache.set(f.id, f);
+                this.foodCache.set(f.id, { ...f, _missStreak: 0 });
             }
-            for (const id of this.foodCache.keys()) {
-                if (!seen.has(id)) this.foodCache.delete(id);
+            for (const [id, f] of this.foodCache) {
+                if (!seen.has(id)) {
+                    this.foodCache.set(id, { ...f, _missStreak: (f._missStreak || 0) + 1 });
+                }
             }
         }
         this.state = {
@@ -390,17 +392,33 @@ export class SlitherRenderer {
         });
     }
 
+    /** Drop food missing from server ticks — grace period avoids edge flicker from view culling. */
+    _pruneFoodCache(cx, cy, zoom, W, H) {
+        const margin = 100;
+        const halfW = W / zoom / 2 + margin;
+        const halfH = H / zoom / 2 + margin;
+        for (const [id, f] of this.foodCache) {
+            const miss = f._missStreak || 0;
+            if (miss === 0) continue;
+            const inView = Math.abs(f.x - cx) <= halfW && Math.abs(f.y - cy) <= halfH;
+            if ((inView && miss >= 4) || (!inView && miss >= 2)) {
+                this.foodCache.delete(id);
+            }
+        }
+    }
+
     _drawFood(ctx, food, toScreen, W, H, zoom) {
         for (const f of food) {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -60 || fy < -60 || fx > W + 60 || fy > H + 60) continue;
 
-            // Bucket hue/radius so a handful of sprites cover all pellets
-            const rPx = Math.max(2, Math.round((f.radius || 3.5) * zoom));
+            // Stable sprite bucket — avoid radius hopping when zoom animates
+            const rWorld = f.radius || 3.5;
+            const rPx = Math.max(2, Math.floor(rWorld * zoom * 2 + 0.5) / 2);
             const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
             const sprite = this._foodSprite(hue, rPx, !!f.golden, !!f.deathDrop);
             const half = sprite.width / 2;
-            ctx.drawImage(sprite, fx - half, fy - half);
+            ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half));
         }
     }
 
@@ -694,7 +712,7 @@ export class SlitherRenderer {
     }
 
     draw() {
-        const { food, worldHalf } = this.state;
+        const { worldHalf } = this.state;
         const ctx = this.ctx;
         const W = this.W;
         const H = this.H;
@@ -742,7 +760,8 @@ export class SlitherRenderer {
 
         this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom);
         this._drawZone(ctx, toScreen, W, H);
-        this._drawFood(ctx, food, toScreen, W, H, zoom);
+        this._pruneFoodCache(cx, cy, zoom, W, H);
+        this._drawFood(ctx, Array.from(this.foodCache.values()), toScreen, W, H, zoom);
 
         const sorted = [...renderSnakes].sort((a, b) => {
             const ar = a.radius || 6;
