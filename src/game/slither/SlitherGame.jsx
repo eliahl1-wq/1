@@ -88,6 +88,15 @@ export default function SlitherGame() {
         document.title = 'AgarStake | Slither Arena';
     }, []);
 
+    // Feed balance + cash-out timer to the renderer so it can draw them over the snake
+    useEffect(() => {
+        rendererRef.current?.setHud({
+            balance: currentBalance,
+            cashoutSeconds: localTimer,
+            cashoutTotal: cashOutTotalRef.current || 20,
+        });
+    }, [currentBalance, localTimer]);
+
 
 
     const startCashoutCountdown = useCallback((seconds) => {
