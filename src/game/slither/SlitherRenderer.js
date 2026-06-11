@@ -287,28 +287,107 @@ export class SlitherRenderer {
         if (segs.length === 0) return;
 
         const headRadius = snake.radius || 6;
-        const bodyRadius = headRadius * 0.92;
+        const bodyRadius = headRadius * 0.9;
         const angle = snake.angle || 0;
-        const color = snake.isYou ? '#7C58FF' : (snake.color || '#888888');
-        const shimmer = this._frame * 0.15;
+        const baseHex = snake.isYou ? '#7C58FF' : (snake.color || '#888888');
+        const base = parseColor(baseHex);
+        const light = shadeColor(base, 70);
+        const dark = shadeColor(base, -55);
 
-        for (let i = segs.length - 1; i >= 1; i--) {
-            const { x: sx, y: sy } = toScreen(segs[i].x, segs[i].y);
-            if (sx < -80 || sy < -80 || sx > this.W + 80 || sy > this.H + 80) continue;
-            this._drawSnakeSegment(ctx, sx, sy, bodyRadius, color, false, angle, snake.boost, shimmer);
+        // Build screen-space path along the spine
+        const pts = [];
+        for (let i = 0; i < segs.length; i++) {
+            const p = toScreen(segs[i].x, segs[i].y);
+            pts.push(p);
         }
 
-        const { x: hx, y: hy } = toScreen(segs[0].x, segs[0].y);
-        this._drawSnakeSegment(ctx, hx, hy, headRadius, color, true, angle, snake.boost, shimmer);
+        // Cull if entirely off-screen
+        const onScreen = pts.some(p => p.x > -100 && p.y > -100 && p.x < this.W + 100 && p.y < this.H + 100);
+        if (!onScreen) return;
+
+        const strokePath = (width, style) => {
+            ctx.beginPath();
+            ctx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+            for (let i = pts.length - 2; i >= 0; i--) {
+                ctx.lineTo(pts[i].x, pts[i].y);
+            }
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = style;
+            ctx.stroke();
+        };
+
+        // Boost aura
+        if (snake.boost) {
+            const glow = 0.25 + Math.sin(this._frame * 0.25) * 0.12;
+            strokePath(bodyRadius * 2 + 8, rgb(light, glow));
+        }
+
+        // Dark outline
+        strokePath(bodyRadius * 2 + 3, rgb(dark, 0.9));
+        // Main body
+        strokePath(bodyRadius * 2, rgb(base));
+        // Soft inner shade for depth
+        strokePath(bodyRadius * 1.35, rgb(shadeColor(base, 22), 0.9));
+        // Glossy top highlight running along the spine
+        strokePath(bodyRadius * 0.5, rgb(light, 0.55));
+
+        // Pattern: alternating banding dots for a slithery texture
+        for (let i = 1; i < pts.length; i += 2) {
+            const p = pts[i];
+            if (p.x < -40 || p.y < -40 || p.x > this.W + 40 || p.y > this.H + 40) continue;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, bodyRadius * 0.42, 0, Math.PI * 2);
+            ctx.fillStyle = rgb(dark, 0.35);
+            ctx.fill();
+        }
+
+        // Head
+        const { x: hx, y: hy } = pts[0];
+        const hGrad = ctx.createRadialGradient(
+            hx - headRadius * 0.35, hy - headRadius * 0.35, headRadius * 0.1,
+            hx, hy, headRadius,
+        );
+        hGrad.addColorStop(0, rgb(light));
+        hGrad.addColorStop(0.5, rgb(base));
+        hGrad.addColorStop(1, rgb(dark));
+        ctx.beginPath();
+        ctx.arc(hx, hy, headRadius, 0, Math.PI * 2);
+        ctx.fillStyle = hGrad;
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, headRadius * 0.14);
+        ctx.strokeStyle = rgb(dark, 0.8);
+        ctx.stroke();
+
+        // Eyes
+        const eyeOffset = headRadius * 0.5;
+        const eyeR = Math.max(2, headRadius * 0.28);
+        const perpX = Math.sin(angle);
+        const perpY = -Math.cos(angle);
+        const fwdX = Math.cos(angle);
+        const fwdY = Math.sin(angle);
+        for (const side of [-1, 1]) {
+            const ex = hx + fwdX * eyeOffset * 0.45 + perpX * eyeOffset * side;
+            const ey = hy + fwdY * eyeOffset * 0.45 + perpY * eyeOffset * side;
+            ctx.beginPath();
+            ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ex + fwdX * eyeR * 0.4, ey + fwdY * eyeR * 0.4, eyeR * 0.55, 0, Math.PI * 2);
+            ctx.fillStyle = '#111';
+            ctx.fill();
+        }
 
         if (snake.name) {
-            ctx.fillStyle = 'rgba(255,255,255,0.9)';
-            ctx.font = `bold ${Math.max(10, headRadius * 0.95)}px Arial, sans-serif`;
+            ctx.fillStyle = 'rgba(255,255,255,0.92)';
+            ctx.font = `bold ${Math.max(11, headRadius * 0.95)}px Arial, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
             ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headRadius - 8);
-            ctx.fillText(snake.name, hx, hy - headRadius - 8);
+            ctx.strokeText(snake.name, hx, hy - headRadius - 10);
+            ctx.fillText(snake.name, hx, hy - headRadius - 10);
         }
     }
 

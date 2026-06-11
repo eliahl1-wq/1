@@ -293,6 +293,10 @@ export default function Game() {
                 socketRef.current?.emit('2'); // Split
             } else if (e.code === 'KeyW') {
                 socketRef.current?.emit('1'); // Eject
+            } else if (e.code === 'KeyQ') {
+                if (!global.battleRoyale && global.cashOutTimer <= 0) {
+                    socketRef.current?.emit('cashOut'); // Cash out
+                }
             }
         };
 
@@ -357,6 +361,11 @@ export default function Game() {
                 food.forEach(f => {
                     const pos = { x: f.x - player.x + screen.width/2, y: f.y - player.y + screen.height/2 };
                     renderUtils.drawFood(pos, f, graph);
+                });
+
+                (ejected || []).forEach(m => {
+                    const pos = { x: m.x - player.x + screen.width/2, y: m.y - player.y + screen.height/2 };
+                    renderUtils.drawFireFood(pos, m, { border: 6 }, graph);
                 });
 
                 viruses.forEach(v => {
@@ -689,7 +698,7 @@ export default function Game() {
                 color: 'rgba(255,255,255,0.3)',
                 fontSize: '0.9rem'
             }}>
-                SPACE to Split • W to Eject • Mouse to Move
+                SPACE to Split • W to Eject • Q to Cash Out • Mouse to Move
             </div>
 
             {/* Logo/Name */}

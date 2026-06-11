@@ -948,16 +948,6 @@ export default function PreGame() {
                                                 {playing} playing
                                             </span>
                                         </span>
-                                        {!freePlay && !isBattleRoyaleMode && (
-                                            <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)', marginTop: '2px' }}>
-                                                Start {formatUsd(tierEconomy(tier).startBalance)}
-                                            </span>
-                                        )}
-                                        {isBattleRoyaleMode && (
-                                            <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)', marginTop: '2px' }}>
-                                                {freePlay ? 'Free test entry · ' : ''}Winner takes pool · no cash-out
-                                            </span>
-                                        )}
                                     </button>
                                 );
                             })}

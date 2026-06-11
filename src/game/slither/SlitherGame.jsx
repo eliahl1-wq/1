@@ -126,11 +126,19 @@ export default function SlitherGame() {
 
     const handleCashOut = useCallback(() => {
 
-        if (localTimer > 0 || cashedAmount !== null || isDead) return;
+        if (isBattleRoyale || localTimer > 0 || cashedAmount !== null || isDead) return;
 
         socketRef.current?.emit('cashOut');
 
-    }, [localTimer, cashedAmount, isDead]);
+    }, [isBattleRoyale, localTimer, cashedAmount, isDead]);
+
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (e.code === 'KeyQ') handleCashOut();
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [handleCashOut]);
 
 
 
@@ -786,7 +794,7 @@ export default function SlitherGame() {
 
             <div style={{ position: 'absolute', bottom: '30px', left: '30px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', zIndex: 100 }}>
 
-                Mouse to Move • Click to Boost
+                Mouse to Move • Click to Boost • Q to Cash Out
 
             </div>
 
