@@ -657,7 +657,7 @@ export default function Game() {
                     flexDirection: 'column',
                     alignItems: 'stretch',
                     gap: '12px',
-                    minWidth: '220px',
+                    minWidth: '190px',
                 }}>
                     <div style={{ textAlign: 'center' }}>
                         <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
@@ -712,14 +712,13 @@ export default function Game() {
                         disabled={localTimer > 0 || isDead || cashedAmount !== null}
                         style={{
                             width: '100%',
-                            minWidth: '190px',
                             boxSizing: 'border-box',
                             background: localTimer > 0
                                 ? 'rgba(255,255,255,0.04)'
                                 : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
                             color: localTimer > 0 ? 'rgba(255,255,255,0.2)' : '#001a0d',
                             border: localTimer > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                            padding: '12px 20px',
+                            padding: '10px 14px',
                             borderRadius: '12px',
                             fontWeight: '800',
                             fontSize: '0.75rem',

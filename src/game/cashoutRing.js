@@ -6,7 +6,7 @@ const FULL_ANGLE = Math.PI * 2;
  */
 export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) {
     const { counterClockwise = false, pulse = false } = opts;
-    const lineWidth = 5;
+    const lineWidth = 3.5;
 
     ctx.lineCap = 'round';
     ctx.beginPath();

@@ -168,11 +168,23 @@ export class SlitherRenderer {
         const seen = new Set();
         for (const snake of this.targetSnakes) {
             seen.add(snake.id);
-            // Own snake snaps tighter — less lag when eating/moving
-            const tau = snake.isYou ? 0.014 : 0.075;
-            const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
             const tgt = snake.segments || [];
             let s = this.smooth.get(snake.id);
+
+            // Own snake: snap to server — smoothing here causes jitter vs camera
+            if (snake.isYou) {
+                if (!s) {
+                    s = { segments: tgt.map(p => ({ x: p.x, y: p.y })), angle: snake.angle || 0 };
+                } else {
+                    s.segments = tgt.map(p => ({ x: p.x, y: p.y }));
+                    s.angle = snake.angle || 0;
+                }
+                this.smooth.set(snake.id, s);
+                continue;
+            }
+
+            const tau = 0.075;
+            const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
             if (!s) {
                 s = { segments: tgt.map(p => ({ x: p.x, y: p.y })), angle: snake.angle || 0 };
                 this.smooth.set(snake.id, s);
@@ -561,16 +573,11 @@ export class SlitherRenderer {
             ctx.stroke();
         }
 
-        // Head — slightly bigger sprite + outline ring
+        // Head sprite only — no extra outline ring (looked like a second circle)
         const { x: hx, y: hy } = pts[0];
         const rHead = Math.max(2, Math.round(headRadius));
         const headSprite = this._bodySprite(baseHex, rHead);
         ctx.drawImage(headSprite, hx - headSprite.width / 2, hy - headSprite.width / 2);
-        ctx.beginPath();
-        ctx.arc(hx, hy, headRadius, 0, Math.PI * 2);
-        ctx.lineWidth = Math.max(1, headRadius * 0.14);
-        ctx.strokeStyle = rgb(dark, 0.8);
-        ctx.stroke();
 
         // Eyes
         const eyeOffset = headRadius * 0.5;
@@ -646,30 +653,9 @@ export class SlitherRenderer {
         const remaining = Math.max(0, this.hud.cashoutSeconds);
         const progress = remaining / total;
         const pulse = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;
-        const FULL = Math.PI * 2;
+        const ringR = headRadius + 8;
 
-        const ringR = headRadius + 12;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.arc(hx, hy, ringR, 0, FULL);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-        ctx.lineWidth = 5;
-        ctx.stroke();
-
-        if (progress > 0) {
-            const start = -Math.PI / 2;
-            const end = start + progress * FULL;
-            ctx.beginPath();
-            ctx.arc(hx, hy, ringR, start, end);
-            const grad = ctx.createLinearGradient(hx - ringR, hy, hx + ringR, hy);
-            grad.addColorStop(0, '#0DBF76');
-            grad.addColorStop(1, '#14F195');
-            ctx.strokeStyle = grad;
-            ctx.lineWidth = 5;
-            ctx.globalAlpha = pulse;
-            ctx.stroke();
-            ctx.globalAlpha = 1;
-        }
+        drawCashoutProgressRing(ctx, hx, hy, ringR, progress, { pulse: true });
 
         const label = 'SECURING';
         const timerText = `${remaining}s`;
@@ -743,9 +729,8 @@ export class SlitherRenderer {
                 this.camera.y = head.y;
                 this._cameraInit = true;
             } else {
-                const camA = 1 - Math.exp(-dt / 0.06);
-                this.camera.x += (head.x - this.camera.x) * camA;
-                this.camera.y += (head.y - this.camera.y) * camA;
+                this.camera.x = head.x;
+                this.camera.y = head.y;
             }
 
             // slither.io-style zoom-out as the snake grows
@@ -783,11 +768,10 @@ export class SlitherRenderer {
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
-            if (this.hud.holdProgress > 0 && this.hud.cashoutSeconds <= 0) {
-                const ringR = headRadius + 12;
+            if (this.hud.holdProgress > 0.04 && this.hud.cashoutSeconds <= 0) {
+                const ringR = headRadius + 8;
                 drawCashoutProgressRing(ctx, hx, hy, ringR, this.hud.holdProgress, { counterClockwise: true });
-            }
-            if (this.hud.cashoutSeconds > 0) {
+            } else if (this.hud.cashoutSeconds > 0) {
                 this._drawCashoutOverlay(ctx, hx, hy, headRadius);
             }
         }
