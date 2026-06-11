@@ -1,4 +1,5 @@
 import global from './global.js';
+import { drawCashoutProgressRing } from '../cashoutRing.js';
 
 const FULL_ANGLE = 2 * Math.PI;
 
@@ -11,7 +12,7 @@ const drawRoundObject = (position, radius, graph) => {
 }
 
 const drawFood = (position, food, graph) => {
-    const r = food.radius || 8;
+    const r = food.radius || 5;
     if (food.golden) {
         graph.fillStyle = 'hsl(48, 100%, 62%)';
         graph.strokeStyle = 'hsl(45, 100%, 45%)';
@@ -158,29 +159,8 @@ function drawCashoutOverlay(graph, cell) {
     const progress = remaining / total;
     const pulse = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;
 
-    // Progress ring around blob
     const ringR = cell.radius + 10;
-    graph.lineCap = 'round';
-    graph.beginPath();
-    graph.arc(cell.x, cell.y, ringR, 0, FULL_ANGLE);
-    graph.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-    graph.lineWidth = 5;
-    graph.stroke();
-
-    if (progress > 0) {
-        const start = -Math.PI / 2;
-        const end = start + progress * FULL_ANGLE;
-        graph.beginPath();
-        graph.arc(cell.x, cell.y, ringR, start, end);
-        const grad = graph.createLinearGradient(cell.x - ringR, cell.y, cell.x + ringR, cell.y);
-        grad.addColorStop(0, '#0DBF76');
-        grad.addColorStop(1, '#14F195');
-        graph.strokeStyle = grad;
-        graph.lineWidth = 5;
-        graph.globalAlpha = pulse;
-        graph.stroke();
-        graph.globalAlpha = 1;
-    }
+    drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress, { pulse: true });
 
     // Floating pill above blob
     const label = 'SECURING';
@@ -276,6 +256,12 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
 
         if (!global.battleRoyale && cell.radius >= 22) {
             drawBalanceBadge(graph, cell, nameY, fontSize);
+        }
+
+        if (cell.isMe && global.holdCashoutProgress > 0 && global.cashOutTimer <= 0 && !global.battleRoyale) {
+            graph.shadowBlur = 0;
+            const ringR = cell.radius + 10;
+            drawCashoutProgressRing(graph, cell.x, cell.y, ringR, global.holdCashoutProgress, { counterClockwise: true });
         }
 
         if (cell.isMe && global.cashOutTimer > 0) {

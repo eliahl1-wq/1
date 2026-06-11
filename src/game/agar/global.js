@@ -32,5 +32,6 @@ export default {
     lineColor: '#ffffff',       // Vitt rutnät
     cashOutTimer: 0,
     cashOutTotal: 10,
+    holdCashoutProgress: 0,
     battleRoyale: false,
 };

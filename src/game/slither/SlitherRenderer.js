@@ -2,6 +2,8 @@
  * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
+import { drawCashoutProgressRing } from '../cashoutRing.js';
+
 function parseColor(hex) {
     if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
     const h = hex.replace('#', '');
@@ -43,7 +45,7 @@ export class SlitherRenderer {
         this.targetSnakes = [];
         this.smooth = new Map();
         this.foodCache = new Map();
-        this.hud = { balance: 0, cashoutSeconds: 0, cashoutTotal: 10 };
+        this.hud = { balance: 0, cashoutSeconds: 0, cashoutTotal: 10, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
@@ -351,7 +353,7 @@ export class SlitherRenderer {
 
     /** Glowing food pellet baked into a sprite: soft halo + bright gradient core. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * 2.4);
+        const halo = Math.ceil(rPx * 2.1);
         const key = `f|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 2, (g, sz) => {
             const c = sz / 2;
@@ -394,7 +396,7 @@ export class SlitherRenderer {
             if (fx < -60 || fy < -60 || fx > W + 60 || fy > H + 60) continue;
 
             // Bucket hue/radius so a handful of sprites cover all pellets
-            const rPx = Math.max(2, Math.round((f.radius || 5) * zoom));
+            const rPx = Math.max(2, Math.round((f.radius || 3.5) * zoom));
             const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
             const sprite = this._foodSprite(hue, rPx, !!f.golden, !!f.deathDrop);
             const half = sprite.width / 2;
