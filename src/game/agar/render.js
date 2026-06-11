@@ -13,24 +13,26 @@ const drawRoundObject = (position, radius, graph) => {
 
 const drawFood = (position, food, graph) => {
     const r = food.radius || 5;
+    const sx = Math.round(position.x);
+    const sy = Math.round(position.y);
     if (food.golden) {
         graph.fillStyle = 'hsl(48, 100%, 62%)';
         graph.strokeStyle = 'hsl(45, 100%, 45%)';
         graph.lineWidth = 2;
         graph.beginPath();
-        graph.arc(position.x, position.y, r + 4, 0, FULL_ANGLE);
+        graph.arc(sx, sy, r + 4, 0, FULL_ANGLE);
         graph.fill();
         graph.stroke();
         graph.fillStyle = 'hsl(52, 100%, 78%)';
         graph.beginPath();
-        graph.arc(position.x, position.y, r * 0.55, 0, FULL_ANGLE);
+        graph.arc(sx, sy, r * 0.55, 0, FULL_ANGLE);
         graph.fill();
         return;
     }
     graph.fillStyle = 'hsl(' + food.hue + ', 100%, 55%)';
     graph.strokeStyle = 'hsl(' + food.hue + ', 100%, 42%)';
     graph.lineWidth = 0;
-    drawRoundObject(position, r, graph);
+    drawRoundObject({ x: sx, y: sy }, r, graph);
 };
 
 const drawVirus = (position, virus, graph) => {

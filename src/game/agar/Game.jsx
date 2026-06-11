@@ -10,6 +10,23 @@ import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } 
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 
+/** Keep on-screen pellets when server view-culling skips them for a tick or two. */
+function pruneAgarFoodCache(foodMap, px, py, screenW, screenH) {
+    const margin = 160;
+    const halfW = screenW / 2 + margin;
+    const halfH = screenH / 2 + margin;
+    for (const [id, f] of foodMap) {
+        const miss = f._missStreak || 0;
+        if (miss === 0) continue;
+        const inView = Math.abs(f.x - px) <= halfW && Math.abs(f.y - py) <= halfH;
+        if (inView) {
+            if (miss >= 2) foodMap.delete(id);
+        } else if (miss >= 4) {
+            foodMap.delete(id);
+        }
+    }
+}
+
 /**
  * Version v11 - Full Agar.io Clone Logic Integrated
  * Version v12 - Full Agar.io Clone Logic Integrated (Frontend)
@@ -216,10 +233,12 @@ export default function Game() {
             const seen = new Set();
             for (const f of foodList || []) {
                 seen.add(f.id);
-                foodMap.set(f.id, f);
+                foodMap.set(f.id, { ...f, _missStreak: 0 });
             }
-            for (const id of foodMap.keys()) {
-                if (!seen.has(id)) foodMap.delete(id);
+            for (const [id, f] of foodMap) {
+                if (!seen.has(id)) {
+                    foodMap.set(id, { ...f, _missStreak: (f._missStreak || 0) + 1 });
+                }
             }
             gameData.current = {
                 player: playerData,
@@ -384,7 +403,7 @@ export default function Game() {
         const graph = canvas.getContext('2d');
         
         const gameLoop = () => {
-            const { player, users, food, viruses, ejected, zoneSize } = gameData.current;
+            const { player, users, viruses, ejected, zoneSize } = gameData.current;
             const screen = { width: window.innerWidth, height: window.innerHeight };
             
             // CRASH FIX: Kontrollera att vi inte är döda och att spelardata finns
@@ -417,9 +436,10 @@ export default function Game() {
                     graph.restore();
                 }
                 
-                food.forEach(f => {
+                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width, screen.height);
+                for (const f of foodCacheRef.current.values()) {
                     renderUtils.drawFood(worldToScreen(f.x, f.y), f, graph);
-                });
+                }
 
                 (ejected || []).forEach(m => {
                     renderUtils.drawFireFood(worldToScreen(m.x, m.y), m, { border: 6 }, graph);
