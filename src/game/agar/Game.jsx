@@ -52,6 +52,9 @@ export default function Game() {
     const [brShowIntro, setBrShowIntro] = useState(false);
     const [brPlayerCount, setBrPlayerCount] = useState(0);
     const brIntroTriggeredRef = useRef(false);
+    const cameraRef = useRef({ x: 0, y: 0 });
+    const lastLoopTimeRef = useRef(0);
+    const foodCacheRef = useRef(new Map());
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
@@ -177,7 +180,23 @@ export default function Game() {
         };
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
-            gameData.current = { player: playerData, users: userData, food: foodList, ejected: massList, viruses: virusList, rewardInfo };
+            const foodMap = foodCacheRef.current;
+            const seen = new Set();
+            for (const f of foodList || []) {
+                seen.add(f.id);
+                foodMap.set(f.id, f);
+            }
+            for (const id of foodMap.keys()) {
+                if (!seen.has(id)) foodMap.delete(id);
+            }
+            gameData.current = {
+                player: playerData,
+                users: userData,
+                food: Array.from(foodMap.values()),
+                ejected: massList,
+                viruses: virusList,
+                rewardInfo,
+            };
             if (rewardInfo?.battleRoyale) {
                 setIsBattleRoyale(true);
                 global.battleRoyale = true;
@@ -244,6 +263,7 @@ export default function Game() {
         const handleDeath = () => {
             setIsDead(true);
             global.cashOutTimer = 0;
+            foodCacheRef.current.clear();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
             setTimeout(() => {
@@ -341,43 +361,66 @@ export default function Game() {
             
             // CRASH FIX: Kontrollera att vi inte är döda och att spelardata finns
             if (isConnected && !isDead && player && player.x !== undefined) {
+                const now = performance.now();
+                let dt = lastLoopTimeRef.current ? (now - lastLoopTimeRef.current) / 1000 : 1 / 60;
+                lastLoopTimeRef.current = now;
+                if (dt > 0.1) dt = 0.1;
+
+                const cam = cameraRef.current;
+                if (Math.hypot(player.x - cam.x, player.y - cam.y) > 400) {
+                    cam.x = player.x;
+                    cam.y = player.y;
+                } else {
+                    const camA = 1 - Math.exp(-dt / 0.045);
+                    cam.x += (player.x - cam.x) * camA;
+                    cam.y += (player.y - cam.y) * camA;
+                }
+
+                const worldToScreen = (wx, wy) => ({
+                    x: wx - cam.x + screen.width / 2,
+                    y: wy - cam.y + screen.height / 2,
+                });
+
                 graph.fillStyle = global.backgroundColor;
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
-                renderUtils.drawGrid(global, player, screen, graph);
+                renderUtils.drawGrid(global, { x: cam.x, y: cam.y }, screen, graph);
 
                 if (brZone && player.x != null) {
-                    const zx = brZone.cx - player.x + screen.width / 2;
-                    const zy = brZone.cy - player.y + screen.height / 2;
+                    const { x: zx, y: zy } = worldToScreen(brZone.cx, brZone.cy);
+                    graph.save();
+                    graph.fillStyle = 'rgba(255, 59, 48, 0.14)';
+                    graph.beginPath();
+                    graph.rect(0, 0, screen.width, screen.height);
+                    graph.arc(zx, zy, brZone.radius, 0, Math.PI * 2, true);
+                    graph.fill('evenodd');
+                    graph.strokeStyle = 'rgba(255, 107, 107, 0.85)';
+                    graph.lineWidth = 3;
+                    graph.setLineDash([12, 8]);
                     graph.beginPath();
                     graph.arc(zx, zy, brZone.radius, 0, Math.PI * 2);
-                    graph.strokeStyle = 'rgba(255, 80, 80, 0.55)';
-                    graph.lineWidth = 4;
                     graph.stroke();
-                    graph.fillStyle = 'rgba(255, 40, 40, 0.06)';
-                    graph.fill();
+                    graph.setLineDash([]);
+                    graph.restore();
                 }
                 
                 food.forEach(f => {
-                    const pos = { x: f.x - player.x + screen.width/2, y: f.y - player.y + screen.height/2 };
-                    renderUtils.drawFood(pos, f, graph);
+                    renderUtils.drawFood(worldToScreen(f.x, f.y), f, graph);
                 });
 
                 (ejected || []).forEach(m => {
-                    const pos = { x: m.x - player.x + screen.width/2, y: m.y - player.y + screen.height/2 };
-                    renderUtils.drawFireFood(pos, m, { border: 6 }, graph);
+                    renderUtils.drawFireFood(worldToScreen(m.x, m.y), m, { border: 6 }, graph);
                 });
 
                 viruses.forEach(v => {
-                    const pos = { x: v.x - player.x + screen.width/2, y: v.y - player.y + screen.height/2 };
-                    renderUtils.drawVirus(pos, v, graph);
+                    renderUtils.drawVirus(worldToScreen(v.x, v.y), v, graph);
                 });
 
                 let borders = {
-                    left: screen.width / 2 - player.x,
-                    right: screen.width / 2 + global.game.width - player.x,
-                    top: screen.height / 2 - player.y,
-                    bottom: screen.height / 2 + global.game.height - player.y
+                    left: screen.width / 2 - cam.x,
+                    right: screen.width / 2 + global.game.width - cam.x,
+                    top: screen.height / 2 - cam.y,
+                    bottom: screen.height / 2 + global.game.height - cam.y
                 };
 
                 // Rita celler
@@ -388,8 +431,7 @@ export default function Game() {
                     isCashingOut: u.isCashingOut,
                     color: u.color.fill || u.color, 
                     borderColor: u.color.border || '#000',
-                    x: c.x - player.x + screen.width/2, 
-                    y: c.y - player.y + screen.height/2
+                    ...worldToScreen(c.x, c.y),
                 })));
                 
                 renderUtils.drawCells(cellsToDraw, { border: 6, textBorderSize: 3, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
@@ -642,7 +684,7 @@ export default function Game() {
                             <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                                 <div style={{
                                     height: '100%',
-                                    width: `${(localTimer / (global.cashOutTotal || 20)) * 100}%`,
+                                    width: `${(localTimer / (global.cashOutTotal || 10)) * 100}%`,
                                     background: 'linear-gradient(90deg, #0DBF76, #14F195)',
                                     borderRadius: 2,
                                     transition: 'width 1s linear',
@@ -698,7 +740,9 @@ export default function Game() {
                 color: 'rgba(255,255,255,0.3)',
                 fontSize: '0.9rem'
             }}>
-                SPACE to Split • W to Eject • Q to Cash Out • Mouse to Move
+                {isBattleRoyale
+                    ? 'SPACE to Split • W to Eject • Mouse to Move'
+                    : 'SPACE to Split • W to Eject • Q to Cash Out • Mouse to Move'}
             </div>
 
             {/* Logo/Name */}

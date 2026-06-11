@@ -42,7 +42,8 @@ export class SlitherRenderer {
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
         this.smooth = new Map();
-        this.hud = { balance: 0, cashoutSeconds: 0, cashoutTotal: 20 };
+        this.foodCache = new Map();
+        this.hud = { balance: 0, cashoutSeconds: 0, cashoutTotal: 10 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
@@ -115,9 +116,20 @@ export class SlitherRenderer {
 
     updateState(tick) {
         if (tick.snakes) this.targetSnakes = tick.snakes;
+        const now = performance.now();
+        if (tick.food) {
+            const seen = new Set();
+            for (const f of tick.food) {
+                seen.add(f.id);
+                this.foodCache.set(f.id, f);
+            }
+            for (const id of this.foodCache.keys()) {
+                if (!seen.has(id)) this.foodCache.delete(id);
+            }
+        }
         this.state = {
             snakes: tick.snakes ?? this.state.snakes,
-            food: tick.food ?? this.state.food,
+            food: Array.from(this.foodCache.values()),
             you: tick.you ?? this.state.you,
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
             zone: tick.zone !== undefined ? tick.zone : this.state.zone,
@@ -288,67 +300,47 @@ export class SlitherRenderer {
     }
 
     _drawFood(ctx, food, toScreen, W, H, zoom) {
-        const t = Date.now() * 0.003;
         for (const f of food) {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -50 || fy < -50 || fx > W + 50 || fy > H + 50) continue;
 
             const r = (f.radius || 5) * zoom;
-            const pulse = 1 + Math.sin(t + f.x * 0.01 + f.y * 0.01) * 0.12;
 
             if (f.golden) {
-                ctx.save();
-                ctx.shadowBlur = 22 * zoom;
-                ctx.shadowColor = 'hsla(48, 100%, 55%, 0.85)';
                 ctx.beginPath();
-                ctx.arc(fx, fy, (r + 6 * zoom) * pulse, 0, Math.PI * 2);
-                ctx.fillStyle = 'hsla(48, 100%, 55%, 0.4)';
+                ctx.arc(fx, fy, r + 5 * zoom, 0, Math.PI * 2);
+                ctx.fillStyle = 'hsla(48, 100%, 55%, 0.35)';
                 ctx.fill();
-                ctx.shadowBlur = 0;
                 ctx.strokeStyle = 'hsl(45, 100%, 50%)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 const grad = ctx.createRadialGradient(fx - r * 0.2, fy - r * 0.2, 0, fx, fy, r);
-                grad.addColorStop(0, 'hsl(52, 100%, 92%)');
+                grad.addColorStop(0, 'hsl(52, 100%, 90%)');
                 grad.addColorStop(0.45, 'hsl(48, 100%, 65%)');
                 grad.addColorStop(1, 'hsl(40, 90%, 38%)');
                 ctx.beginPath();
                 ctx.arc(fx, fy, r, 0, Math.PI * 2);
                 ctx.fillStyle = grad;
                 ctx.fill();
-                ctx.restore();
                 continue;
             }
 
             const hue = f.hue ?? 120;
-            const glow = f.deathDrop ? 28 : 18;
-            const outerA = f.deathDrop ? 0.45 : 0.32;
-
-            ctx.save();
-            ctx.shadowBlur = glow * zoom * pulse;
-            ctx.shadowColor = `hsla(${hue}, 100%, 60%, 0.9)`;
+            const outerA = f.deathDrop ? 0.38 : 0.28;
 
             ctx.beginPath();
-            ctx.arc(fx, fy, (r + 5 * zoom) * pulse, 0, Math.PI * 2);
+            ctx.arc(fx, fy, r + 4 * zoom, 0, Math.PI * 2);
             ctx.fillStyle = `hsla(${hue}, 95%, 58%, ${outerA})`;
             ctx.fill();
 
-            ctx.shadowBlur = glow * 0.55 * zoom;
-            ctx.beginPath();
-            ctx.arc(fx, fy, (r + 2.5 * zoom) * pulse, 0, Math.PI * 2);
-            ctx.fillStyle = `hsla(${hue}, 100%, 70%, 0.28)`;
-            ctx.fill();
-
-            ctx.shadowBlur = 0;
-            const grad = ctx.createRadialGradient(fx - r * 0.3, fy - r * 0.3, 0, fx, fy, r * 1.1);
-            grad.addColorStop(0, `hsla(${hue}, 100%, 92%, 0.95)`);
-            grad.addColorStop(0.4, `hsla(${hue}, 95%, 62%, 0.9)`);
-            grad.addColorStop(1, `hsla(${hue}, 85%, 38%, 0.85)`);
+            const grad = ctx.createRadialGradient(fx - r * 0.28, fy - r * 0.28, 0, fx, fy, r);
+            grad.addColorStop(0, `hsl(${hue}, 100%, 88%)`);
+            grad.addColorStop(0.45, `hsl(${hue}, 92%, 60%)`);
+            grad.addColorStop(1, `hsl(${hue}, 82%, 38%)`);
             ctx.beginPath();
             ctx.arc(fx, fy, r, 0, Math.PI * 2);
             ctx.fillStyle = grad;
             ctx.fill();
-            ctx.restore();
         }
     }
 
@@ -569,7 +561,7 @@ export class SlitherRenderer {
     }
 
     _drawCashoutOverlay(ctx, hx, hy, headRadius) {
-        const total = this.hud.cashoutTotal || 20;
+        const total = this.hud.cashoutTotal || 10;
         const remaining = Math.max(0, this.hud.cashoutSeconds);
         const progress = remaining / total;
         const pulse = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;

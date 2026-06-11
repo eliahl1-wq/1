@@ -13,12 +13,11 @@ const drawRoundObject = (position, radius, graph) => {
 const drawFood = (position, food, graph) => {
     const r = food.radius || 8;
     if (food.golden) {
-        const pulse = 1 + Math.sin(Date.now() * 0.006) * 0.12;
         graph.fillStyle = 'hsl(48, 100%, 62%)';
         graph.strokeStyle = 'hsl(45, 100%, 45%)';
         graph.lineWidth = 2;
         graph.beginPath();
-        graph.arc(position.x, position.y, (r + 4) * pulse, 0, FULL_ANGLE);
+        graph.arc(position.x, position.y, r + 4, 0, FULL_ANGLE);
         graph.fill();
         graph.stroke();
         graph.fillStyle = 'hsl(52, 100%, 78%)';
@@ -154,7 +153,7 @@ function drawBalanceBadge(graph, cell, nameY, fontSize) {
 }
 
 function drawCashoutOverlay(graph, cell) {
-    const total = global.cashOutTotal || 20;
+    const total = global.cashOutTotal || 10;
     const remaining = Math.max(0, global.cashOutTimer);
     const progress = remaining / total;
     const pulse = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;

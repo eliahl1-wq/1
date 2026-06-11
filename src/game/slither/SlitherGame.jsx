@@ -39,7 +39,7 @@ export default function SlitherGame() {
 
     const myIdRef = useRef(null);
 
-    const cashOutTotalRef = useRef(20);
+    const cashOutTotalRef = useRef(10);
 
 
 
@@ -93,7 +93,7 @@ export default function SlitherGame() {
         rendererRef.current?.setHud({
             balance: currentBalance,
             cashoutSeconds: localTimer,
-            cashoutTotal: cashOutTotalRef.current || 20,
+            cashoutTotal: cashOutTotalRef.current || 10,
         });
     }, [currentBalance, localTimer]);
 
@@ -734,7 +734,7 @@ export default function SlitherGame() {
 
                                     height: '100%',
 
-                                    width: `${(localTimer / (cashOutTotalRef.current || 20)) * 100}%`,
+                                    width: `${(localTimer / (cashOutTotalRef.current || 10)) * 100}%`,
 
                                     background: 'linear-gradient(90deg, #0DBF76, #14F195)',
 
@@ -803,7 +803,9 @@ export default function SlitherGame() {
 
             <div style={{ position: 'absolute', bottom: '30px', left: '30px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', zIndex: 100 }}>
 
-                Mouse to Move • Click to Boost • Q to Cash Out
+                {isBattleRoyale
+                    ? 'Mouse to Move • Click to Boost'
+                    : 'Mouse to Move • Click to Boost • Q to Cash Out'}
 
             </div>
 

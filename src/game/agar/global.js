@@ -31,6 +31,6 @@ export default {
     backgroundColor: '#0a0a0c', // Mörk bakgrund
     lineColor: '#ffffff',       // Vitt rutnät
     cashOutTimer: 0,
-    cashOutTotal: 20,
+    cashOutTotal: 10,
     battleRoyale: false,
 };
