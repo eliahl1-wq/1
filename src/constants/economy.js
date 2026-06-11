@@ -21,8 +21,7 @@ export function tierEconomy(entryFeeUsd) {
     return {
         entryFee: entry,
         startBalance: 1.0 * s,
-        rankBonus1st: 20.0 * s,
-        rankBonus2nd3rd: 10.0 * s,
+        goldenBlobValue: entry * 0.10,
     };
 }
 

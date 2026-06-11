@@ -12,6 +12,21 @@ const drawRoundObject = (position, radius, graph) => {
 
 const drawFood = (position, food, graph) => {
     const r = food.radius || 8;
+    if (food.golden) {
+        const pulse = 1 + Math.sin(Date.now() * 0.006) * 0.12;
+        graph.fillStyle = 'hsl(48, 100%, 62%)';
+        graph.strokeStyle = 'hsl(45, 100%, 45%)';
+        graph.lineWidth = 2;
+        graph.beginPath();
+        graph.arc(position.x, position.y, (r + 4) * pulse, 0, FULL_ANGLE);
+        graph.fill();
+        graph.stroke();
+        graph.fillStyle = 'hsl(52, 100%, 78%)';
+        graph.beginPath();
+        graph.arc(position.x, position.y, r * 0.55, 0, FULL_ANGLE);
+        graph.fill();
+        return;
+    }
     graph.fillStyle = 'hsl(' + food.hue + ', 100%, 55%)';
     graph.strokeStyle = 'hsl(' + food.hue + ', 100%, 42%)';
     graph.lineWidth = 0;

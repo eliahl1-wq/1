@@ -73,7 +73,12 @@ export default function BRLobby() {
             const mode = v === 'slither' ? 'br-slither' : 'br-agar';
             localStorage.setItem('selected_gamemode', mode);
             localStorage.setItem('current_game_mode', mode);
-            setCountdown({ seconds, prizePool, playerCount });
+            const sec = Math.max(1, Math.ceil(Number(seconds) || 15));
+            setCountdown({
+                endsAt: Date.now() + sec * 1000,
+                prizePool,
+                playerCount,
+            });
         });
 
         socket.on('brMatchStart', ({ variant: v }) => {
@@ -117,6 +122,10 @@ export default function BRLobby() {
             ? Math.max(0, Math.ceil(queueStatus.graceRemainingMs / 1000))
             : null;
 
+    const matchCountdownSec = countdown?.endsAt
+        ? Math.max(0, Math.ceil((countdown.endsAt - Date.now()) / 1000))
+        : null;
+
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
             <Background />
@@ -151,7 +160,7 @@ export default function BRLobby() {
                                 Get ready — zone closes in, no cash-out
                             </p>
                             <div style={{ fontSize: '3rem', fontWeight: 900, color: '#14F195', fontFamily: 'ui-monospace, monospace' }}>
-                                {countdown.seconds}s
+                                {matchCountdownSec ?? '—'}s
                             </div>
                             <p style={{ color: 'var(--text-2)', marginTop: '8px' }}>
                                 {countdown.playerCount} players · ${countdown.prizePool?.toFixed(2)} prize pool

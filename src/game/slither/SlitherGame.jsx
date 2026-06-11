@@ -70,6 +70,9 @@ export default function SlitherGame() {
     const [brVictoryAmount, setBrVictoryAmount] = useState(null);
     const [brShowIntro, setBrShowIntro] = useState(false);
     const [brPlayerCount, setBrPlayerCount] = useState(0);
+    const brIntroTriggeredRef = useRef(false);
+
+    const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
@@ -231,7 +234,10 @@ export default function SlitherGame() {
             if (gameSizes?.prizePool) setBrPrizePool(gameSizes.prizePool);
             if (gameSizes?.playerCount) setBrPlayerCount(gameSizes.playerCount);
             if (gameSizes?.zone) renderer.updateState({ zone: gameSizes.zone });
-            if (gameSizes?.battleRoyale && gameSizes?.prizePool) setBrShowIntro(true);
+            if (gameSizes?.battleRoyale && gameSizes?.prizePool && !brIntroTriggeredRef.current) {
+                brIntroTriggeredRef.current = true;
+                setBrShowIntro(true);
+            }
             myIdRef.current = playerSettings.id;
             if (!gameSizes?.battleRoyale) setCurrentBalance(playerSettings.balance ?? 1.0);
             setGameReady(true);
@@ -256,7 +262,10 @@ export default function SlitherGame() {
         socket.on('brMatchStart', ({ prizePool, playerCount }) => {
             if (prizePool != null) setBrPrizePool(prizePool);
             if (playerCount != null) setBrPlayerCount(playerCount);
-            setBrShowIntro(true);
+            if (!brIntroTriggeredRef.current) {
+                brIntroTriggeredRef.current = true;
+                setBrShowIntro(true);
+            }
         });
 
         socket.on('brZoneUpdate', (zone) => {
@@ -525,7 +534,8 @@ export default function SlitherGame() {
                 show={brShowIntro && isBattleRoyale && brVictoryAmount == null}
                 prizePool={brPrizePool}
                 playerCount={brPlayerCount}
-                onComplete={() => setBrShowIntro(false)}
+                entryFeeUsd={entryFeeUsd}
+                onComplete={dismissBrIntro}
             />
 
 

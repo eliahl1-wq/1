@@ -188,6 +188,27 @@ export class SlitherRenderer {
             if (fx < -30 || fy < -30 || fx > W + 30 || fy > H + 30) continue;
 
             const r = f.radius || 5;
+
+            if (f.golden) {
+                const pulse = 1 + Math.sin(Date.now() * 0.006) * 0.1;
+                ctx.beginPath();
+                ctx.arc(fx, fy, (r + 5) * pulse, 0, Math.PI * 2);
+                ctx.fillStyle = 'hsla(48, 100%, 55%, 0.35)';
+                ctx.fill();
+                ctx.strokeStyle = 'hsl(45, 100%, 50%)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                const grad = ctx.createRadialGradient(fx - r * 0.2, fy - r * 0.2, 0, fx, fy, r);
+                grad.addColorStop(0, 'hsl(52, 100%, 88%)');
+                grad.addColorStop(0.5, 'hsl(48, 100%, 62%)');
+                grad.addColorStop(1, 'hsl(40, 90%, 38%)');
+                ctx.beginPath();
+                ctx.arc(fx, fy, r, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+                continue;
+            }
+
             const hue = f.hue ?? 120;
 
             ctx.beginPath();

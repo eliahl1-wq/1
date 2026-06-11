@@ -1032,13 +1032,9 @@ export default function PreGame() {
                                     Eat food & other players. Cash out anytime.
                                 </div>
                                 <div className="divider" style={{ margin: '6px 0' }} />
-                                <div className="stat-row" style={{ marginBottom: '2px' }}>
-                                    <span>1st place bonus</span>
-                                    <span className="mono text-green">{formatUsd(economy.rankBonus1st)}</span>
-                                </div>
                                 <div className="stat-row">
-                                    <span>2nd–3rd place</span>
-                                    <span className="mono text-green">{formatUsd(economy.rankBonus2nd3rd)}</span>
+                                    <span>Golden Blob per join</span>
+                                    <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
                                 </div>
                             </div>
                         )}

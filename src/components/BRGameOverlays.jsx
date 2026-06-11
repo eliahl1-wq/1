@@ -1,36 +1,67 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, onComplete }) {
     const [displayPool, setDisplayPool] = useState(0);
     const [phase, setPhase] = useState('pool');
+    const [snapshot, setSnapshot] = useState({ pool: 0, players: 0, fee: entryFeeUsd });
+    const animatingRef = useRef(false);
+    const onCompleteRef = useRef(onComplete);
+    const showRef = useRef(show);
+    showRef.current = show;
+    onCompleteRef.current = onComplete;
 
     useEffect(() => {
         if (!show) {
+            animatingRef.current = false;
             setDisplayPool(0);
             setPhase('pool');
             return;
         }
 
+        if (animatingRef.current) return;
+
+        const pool = Number(prizePool) || 0;
+        if (pool <= 0) return;
+
+        animatingRef.current = true;
+        setSnapshot({
+            pool,
+            players: playerCount || 0,
+            fee: entryFeeUsd,
+        });
+        setPhase('pool');
+        setDisplayPool(0);
+
         const start = performance.now();
         const duration = 1400;
         let raf;
+        let done;
 
         const tick = (t) => {
             const p = Math.min(1, (t - start) / duration);
             const eased = 1 - Math.pow(1 - p, 3);
-            setDisplayPool(eased * (prizePool || 0));
-            if (p < 1) raf = requestAnimationFrame(tick);
-            else setTimeout(() => setPhase('fight'), 400);
+            setDisplayPool(eased * pool);
+            if (p < 1) {
+                raf = requestAnimationFrame(tick);
+            } else {
+                setTimeout(() => setPhase('fight'), 400);
+            }
         };
         raf = requestAnimationFrame(tick);
 
-        const done = setTimeout(() => onComplete?.(), 3200);
+        done = setTimeout(() => {
+            animatingRef.current = false;
+            onCompleteRef.current?.();
+        }, 3200);
 
         return () => {
-            cancelAnimationFrame(raf);
-            clearTimeout(done);
+            if (!showRef.current) {
+                cancelAnimationFrame(raf);
+                clearTimeout(done);
+                animatingRef.current = false;
+            }
         };
-    }, [show, prizePool, onComplete]);
+    }, [show, prizePool, playerCount, entryFeeUsd]);
 
     if (!show) return null;
 
@@ -45,7 +76,7 @@ export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, 
                             {displayPool.toFixed(2)}
                         </div>
                         <div className="br-overlay-sub">
-                            {playerCount} players · ${entryFeeUsd} entry · winner takes all
+                            {snapshot.players} players · ${snapshot.fee} entry · winner takes all
                         </div>
                     </>
                 ) : (
@@ -92,23 +123,36 @@ export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, 
 
 export function BRVictoryOverlay({ show, amount }) {
     const [display, setDisplay] = useState(0);
+    const animatingRef = useRef(false);
 
     useEffect(() => {
         if (!show || amount == null) {
+            animatingRef.current = false;
             setDisplay(0);
             return;
         }
+
+        if (animatingRef.current) return;
+        animatingRef.current = true;
+
+        const target = Number(amount) || 0;
         const start = performance.now();
         const duration = 1800;
         let raf;
+
         const tick = (t) => {
             const p = Math.min(1, (t - start) / duration);
             const eased = 1 - Math.pow(1 - p, 4);
-            setDisplay(eased * amount);
+            setDisplay(eased * target);
             if (p < 1) raf = requestAnimationFrame(tick);
+            else animatingRef.current = false;
         };
         raf = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(raf);
+
+        return () => {
+            cancelAnimationFrame(raf);
+            animatingRef.current = false;
+        };
     }, [show, amount]);
 
     if (!show || amount == null) return null;

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 import global from './global.js';
@@ -6,7 +6,7 @@ import Canvas from './canvas.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
-import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd, tierEconomy } from '../../constants/economy';
+import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 
 /**
@@ -51,6 +51,9 @@ export default function Game() {
     const [brVictoryAmount, setBrVictoryAmount] = useState(null);
     const [brShowIntro, setBrShowIntro] = useState(false);
     const [brPlayerCount, setBrPlayerCount] = useState(0);
+    const brIntroTriggeredRef = useRef(false);
+
+    const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
     useEffect(() => {
         const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -129,7 +132,10 @@ export default function Game() {
             if (gameSizes?.prizePool) setBrPrizePool(gameSizes.prizePool);
             if (gameSizes?.playerCount) setBrPlayerCount(gameSizes.playerCount);
             if (gameSizes?.zone) setBrZone(gameSizes.zone);
-            if (gameSizes?.battleRoyale && gameSizes?.prizePool) setBrShowIntro(true);
+            if (gameSizes?.battleRoyale && gameSizes?.prizePool && !brIntroTriggeredRef.current) {
+                brIntroTriggeredRef.current = true;
+                setBrShowIntro(true);
+            }
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
             global.game.width = gameSizes.width;
@@ -188,7 +194,10 @@ export default function Game() {
         socket.on('brMatchStart', ({ prizePool, playerCount }) => {
             if (prizePool != null) setBrPrizePool(prizePool);
             if (playerCount != null) setBrPlayerCount(playerCount);
-            setBrShowIntro(true);
+            if (!brIntroTriggeredRef.current) {
+                brIntroTriggeredRef.current = true;
+                setBrShowIntro(true);
+            }
         });
         socket.on('brZoneUpdate', (zone) => setBrZone(zone));
         socket.on('brVictory', ({ amount }) => {
@@ -394,28 +403,8 @@ export default function Game() {
     };
 
     const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
-    const sessionEconomy = tierEconomy(entryFeeUsd);
 
-    // Beräkna potentiell bonus baserat på leaderboard-position
     const rewardInfo = gameData.current.rewardInfo;
-    const myRank = leaderboard.findIndex(p => p.id === myIdRef.current) + 1;
-    const rewardsUnlocked = rewardInfo?.unlocked;
-    const potentialBonus = rewardsUnlocked
-        ? (myRank === 1 ? sessionEconomy.rankBonus1st : (myRank > 1 && myRank <= 3 ? sessionEconomy.rankBonus2nd3rd : 0))
-        : 0;
-
-    const formatUnlockTimer = () => {
-        if (!rewardInfo) return "LOCKED";
-        const remaining = Math.max(0, rewardInfo.unlockTime - currentTime);
-        if (remaining > 0) {
-            const totalSeconds = Math.floor(remaining / 1000);
-            const mins = Math.floor(totalSeconds / 60);
-            const secs = totalSeconds % 60;
-            return `UNLOCKS IN ${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-        if (rewardInfo.playerCount < 4) return "NOT ENOUGH PLAYERS";
-        return "LOCKED";
-    };
 
     const formatResetTimer = () => {
         if (!rewardInfo?.resetTime) return null;
@@ -622,12 +611,6 @@ export default function Game() {
                                 {brPlayerCount} players · winner takes pool
                             </div>
                         )}
-                        
-                        {!isBattleRoyale && potentialBonus > 0 && (
-                            <div style={{ fontSize: '0.85rem', color: '#FFD700', fontWeight: '800', marginTop: '2px', letterSpacing: '1px' }}>
-                                + ${potentialBonus.toFixed(2)} RANK BONUS
-                            </div>
-                        )}
                     </div>
 
                     {/* Exit timer badge */}
@@ -684,39 +667,6 @@ export default function Game() {
                     </button>
                     )}
                 </div>
-
-                {!isBattleRoyale && (
-                <div style={{
-                    marginTop: '20px',
-                    padding: '15px',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    borderRadius: '15px',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    textAlign: 'left',
-                    fontSize: '0.75rem',
-                    lineHeight: '1.6',
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    opacity: rewardsUnlocked ? 1 : 0.5
-                }}>
-                    <div style={{ color: 'var(--accent)', fontWeight: '800', marginBottom: rewardsUnlocked ? '8px' : '2px', letterSpacing: '1px' }}>
-                        ARENA REWARDS
-                    </div>
-                    {!rewardsUnlocked && (
-                        <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', opacity: 0.8 }}>
-                            {formatUnlockTimer()}
-                        </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Rank 1 Bonus</span>
-                        <span style={{ color: '#fff' }}>{formatUsd(sessionEconomy.rankBonus1st)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Rank 2-3 Bonus</span>
-                        <span style={{ color: '#fff' }}>{formatUsd(sessionEconomy.rankBonus2nd3rd)}</span>
-                    </div>
-                </div>
-                )}
             </div>
 
             {brVictoryAmount != null && (
@@ -727,7 +677,8 @@ export default function Game() {
                 show={brShowIntro && isBattleRoyale && brVictoryAmount == null}
                 prizePool={brPrizePool}
                 playerCount={brPlayerCount}
-                onComplete={() => setBrShowIntro(false)}
+                entryFeeUsd={normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))}
+                onComplete={dismissBrIntro}
             />
 
             {/* Controls Info */}
