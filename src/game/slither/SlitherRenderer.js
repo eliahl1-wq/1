@@ -759,6 +759,10 @@ export class SlitherRenderer {
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, this.hud.balance ?? me.balance ?? 0, true);
+            if (this.hud.holdProgress > 0 && this.hud.cashoutSeconds <= 0) {
+                const ringR = headRadius + 12;
+                drawCashoutProgressRing(ctx, hx, hy, ringR, this.hud.holdProgress, { counterClockwise: true });
+            }
             if (this.hud.cashoutSeconds > 0) {
                 this._drawCashoutOverlay(ctx, hx, hy, headRadius);
             }

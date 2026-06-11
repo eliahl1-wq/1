@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export const CASHOUT_HOLD_MS = 1000;
+export const CASHOUT_HOLD_MS = 1500;
 
 /**
- * Hold Q for ~1s before triggering cashout — avoids accidental taps.
+ * Hold Q (or press-and-hold the cashout button) before starting the cashout timer.
  */
 export function useHoldKeyCashout({ canStart, onComplete }) {
     const [holdProgress, setHoldProgress] = useState(0);
@@ -15,6 +15,7 @@ export function useHoldKeyCashout({ canStart, onComplete }) {
     onCompleteRef.current = onComplete;
 
     const cancelHold = useCallback(() => {
+        if (startTimeRef.current == null) return;
         startTimeRef.current = null;
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
@@ -67,5 +68,5 @@ export function useHoldKeyCashout({ canStart, onComplete }) {
         };
     }, [startHold, cancelHold]);
 
-    return { holdProgress, isHolding: holdProgress > 0 };
+    return { holdProgress, startHold, cancelHold, isHolding: holdProgress > 0 };
 }

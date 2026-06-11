@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 import global from './global.js';
@@ -8,6 +8,7 @@ import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
 import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
+import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 
 /**
  * Version v11 - Full Agar.io Clone Logic Integrated
@@ -57,6 +58,37 @@ export default function Game() {
     const foodCacheRef = useRef(new Map());
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
+
+    const canCashOutRef = useRef(false);
+    canCashOutRef.current = !isBattleRoyale && localTimer <= 0 && cashedAmount === null && !isDead;
+
+    const handleCashOut = useCallback(() => {
+        if (!canCashOutRef.current) return;
+        socketRef.current?.emit('cashOut');
+    }, []);
+
+    const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
+        canStart: () => canCashOutRef.current,
+        onComplete: handleCashOut,
+    });
+
+    const cashoutButtonHoldProps = {
+        onMouseDown: (e) => { e.preventDefault(); startHold(); },
+        onMouseUp: cancelHold,
+        onMouseLeave: cancelHold,
+        onTouchStart: (e) => { e.preventDefault(); startHold(); },
+        onTouchEnd: cancelHold,
+        onTouchCancel: cancelHold,
+        onContextMenu: (e) => e.preventDefault(),
+    };
+
+    useLayoutEffect(() => {
+        global.holdCashoutProgress = holdProgress;
+    }, [holdProgress]);
+
+    useEffect(() => {
+        if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
+    }, [localTimer, isDead, cashedAmount, isBattleRoyale, cancelHold]);
 
     useEffect(() => {
         const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -315,10 +347,6 @@ export default function Game() {
                 socketRef.current?.emit('2'); // Split
             } else if (e.code === 'KeyW') {
                 socketRef.current?.emit('1'); // Eject
-            } else if (e.code === 'KeyQ') {
-                if (!global.battleRoyale && global.cashOutTimer <= 0) {
-                    socketRef.current?.emit('cashOut'); // Cash out
-                }
             }
         };
 
@@ -696,8 +724,8 @@ export default function Game() {
                     )}
                     {!isBattleRoyale && (
                     <button
-                        onClick={() => localTimer <= 0 && socketRef.current?.emit('cashOut')}
-                        disabled={localTimer > 0}
+                        {...cashoutButtonHoldProps}
+                        disabled={localTimer > 0 || isDead || cashedAmount !== null}
                         style={{
                             width: '100%',
                             background: localTimer > 0
@@ -744,7 +772,7 @@ export default function Game() {
             }}>
                 {isBattleRoyale
                     ? 'SPACE to Split • W to Eject • Mouse to Move'
-                    : 'SPACE to Split • W to Eject • Q to Cash Out • Mouse to Move'}
+                    : 'SPACE to Split • W to Eject • Hold Q to Cash Out • Mouse to Move'}
             </div>
 
             {/* Logo/Name */}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -10,6 +10,7 @@ import { SlitherRenderer } from './SlitherRenderer.js';
 
 import { normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
+import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 
@@ -95,17 +96,6 @@ export default function SlitherGame() {
         document.title = 'AgarStake | Slither Arena';
     }, []);
 
-    // Feed balance + cash-out timer to the renderer so it can draw them over the snake
-    useEffect(() => {
-        rendererRef.current?.setHud({
-            balance: currentBalance,
-            cashoutSeconds: localTimer,
-            cashoutTotal: cashOutTotalRef.current || 10,
-        });
-    }, [currentBalance, localTimer]);
-
-
-
     const startCashoutCountdown = useCallback((seconds) => {
 
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -140,21 +130,42 @@ export default function SlitherGame() {
 
 
 
+    const canCashOutRef = useRef(false);
+    canCashOutRef.current = !isBattleRoyale && localTimer <= 0 && cashedAmount === null && !isDead;
+
     const handleCashOut = useCallback(() => {
-
-        if (isBattleRoyale || localTimer > 0 || cashedAmount !== null || isDead) return;
-
+        if (!canCashOutRef.current) return;
         socketRef.current?.emit('cashOut');
+    }, []);
 
-    }, [isBattleRoyale, localTimer, cashedAmount, isDead]);
+    const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
+        canStart: () => canCashOutRef.current,
+        onComplete: handleCashOut,
+    });
+
+    const cashoutButtonHoldProps = {
+        onMouseDown: (e) => { e.preventDefault(); startHold(); },
+        onMouseUp: cancelHold,
+        onMouseLeave: cancelHold,
+        onTouchStart: (e) => { e.preventDefault(); startHold(); },
+        onTouchEnd: cancelHold,
+        onTouchCancel: cancelHold,
+        onContextMenu: (e) => e.preventDefault(),
+    };
+
+    // Feed balance + cash-out timer to the renderer so it can draw them over the snake
+    useLayoutEffect(() => {
+        rendererRef.current?.setHud({
+            balance: currentBalance,
+            cashoutSeconds: localTimer,
+            cashoutTotal: cashOutTotalRef.current || 10,
+            holdProgress,
+        });
+    }, [currentBalance, localTimer, holdProgress]);
 
     useEffect(() => {
-        const onKeyDown = (e) => {
-            if (e.code === 'KeyQ') handleCashOut();
-        };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-    }, [handleCashOut]);
+        if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
+    }, [localTimer, isDead, cashedAmount, isBattleRoyale, cancelHold]);
 
 
 
@@ -743,9 +754,7 @@ export default function SlitherGame() {
 
                     {!isBattleRoyale && (
                     <button
-
-                        onClick={handleCashOut}
-
+                        {...cashoutButtonHoldProps}
                         disabled={localTimer > 0 || isDead || cashedAmount !== null}
 
                         style={{
@@ -796,7 +805,7 @@ export default function SlitherGame() {
 
                 {isBattleRoyale
                     ? 'Mouse to Move • Click to Boost'
-                    : 'Mouse to Move • Click to Boost • Q to Cash Out'}
+                    : 'Mouse to Move • Click to Boost • Hold Q to Cash Out'}
 
             </div>
 
