@@ -727,7 +727,7 @@ export default function Game() {
                             opacity: localTimer > 0 ? 0.6 : 1
                         }}
                     >
-                        HOLD Q · CASH OUT
+                        Q · CASH OUT
                     </button>
                     )}
                 </div>

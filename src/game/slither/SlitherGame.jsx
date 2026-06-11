@@ -789,7 +789,7 @@ export default function SlitherGame() {
 
                     >
 
-                        HOLD Q · CASH OUT
+                        Q · CASH OUT
                     </button>
                     )}
 

@@ -363,42 +363,30 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Glowing food pellet baked into a sprite: soft halo + bright gradient core. */
+    /** Soft glow orb (slither.io style) — pure radial gradient, no hard edges. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * 2.1);
+        const halo = Math.ceil(rPx * 3.2);
         const key = `f|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 2, (g, sz) => {
             const c = sz / 2;
             if (golden) {
-                const haloGrad = g.createRadialGradient(c, c, rPx * 0.4, c, c, halo);
-                haloGrad.addColorStop(0, 'hsla(48, 100%, 60%, 0.55)');
-                haloGrad.addColorStop(1, 'hsla(48, 100%, 55%, 0)');
-                g.fillStyle = haloGrad;
+                const grad = g.createRadialGradient(c, c, 0, c, c, halo);
+                grad.addColorStop(0, 'hsla(52, 100%, 92%, 1)');
+                grad.addColorStop(0.18, 'hsla(48, 100%, 70%, 0.9)');
+                grad.addColorStop(0.45, 'hsla(48, 100%, 60%, 0.35)');
+                grad.addColorStop(1, 'hsla(48, 100%, 55%, 0)');
+                g.fillStyle = grad;
                 g.fillRect(0, 0, sz, sz);
-                const core = g.createRadialGradient(c - rPx * 0.25, c - rPx * 0.25, 0, c, c, rPx);
-                core.addColorStop(0, 'hsl(52, 100%, 90%)');
-                core.addColorStop(0.45, 'hsl(48, 100%, 65%)');
-                core.addColorStop(1, 'hsl(40, 90%, 38%)');
-                g.fillStyle = core;
-                g.beginPath();
-                g.arc(c, c, rPx, 0, Math.PI * 2);
-                g.fill();
                 return;
             }
-            const haloA = deathDrop ? 0.5 : 0.38;
-            const haloGrad = g.createRadialGradient(c, c, rPx * 0.4, c, c, halo);
-            haloGrad.addColorStop(0, `hsla(${hue}, 95%, 60%, ${haloA})`);
-            haloGrad.addColorStop(1, `hsla(${hue}, 95%, 58%, 0)`);
-            g.fillStyle = haloGrad;
+            const boost = deathDrop ? 1.15 : 1;
+            const grad = g.createRadialGradient(c, c, 0, c, c, halo);
+            grad.addColorStop(0, `hsla(${hue}, 100%, 88%, ${0.95 * boost > 1 ? 1 : 0.95 * boost})`);
+            grad.addColorStop(0.2, `hsla(${hue}, 95%, 65%, ${Math.min(1, 0.75 * boost)})`);
+            grad.addColorStop(0.5, `hsla(${hue}, 95%, 60%, ${Math.min(1, 0.28 * boost)})`);
+            grad.addColorStop(1, `hsla(${hue}, 95%, 58%, 0)`);
+            g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
-            const core = g.createRadialGradient(c - rPx * 0.28, c - rPx * 0.28, 0, c, c, rPx);
-            core.addColorStop(0, `hsl(${hue}, 100%, 88%)`);
-            core.addColorStop(0.45, `hsl(${hue}, 92%, 60%)`);
-            core.addColorStop(1, `hsl(${hue}, 82%, 38%)`);
-            g.fillStyle = core;
-            g.beginPath();
-            g.arc(c, c, rPx, 0, Math.PI * 2);
-            g.fill();
         });
     }
 
