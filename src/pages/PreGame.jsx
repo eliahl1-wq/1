@@ -132,6 +132,7 @@ export default function PreGame() {
     }, [selectedMode, isBattleRoyaleMode, selectedEntryFee]);
 
     const normalModeKey = selectedMode.replace(/^br-/, '');
+    const liveStatsMode = normalModeKey === 'slither' ? 'slither' : 'agar';
 
     const playingCountForTier = (tier) => {
         if (isBattleRoyaleMode && brVariant) {
@@ -249,12 +250,12 @@ export default function PreGame() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
 
-    // Live stats poll
+    // Live stats poll — filtered by selected gamemode (Agar/Slither incl. BR)
     useEffect(() => {
         let alive = true;
         const fetchStats = async () => {
             try {
-                const r = await fetch(`${API_URL}/api/stats?t=${Date.now()}`, {
+                const r = await fetch(`${API_URL}/api/stats?mode=${liveStatsMode}&t=${Date.now()}`, {
                     headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                 });
                 if (r.ok && alive) setLiveStats(await r.json());
@@ -263,7 +264,7 @@ export default function PreGame() {
         fetchStats();
         const id = setInterval(fetchStats, 5000);
         return () => { alive = false; clearInterval(id); };
-    }, []);
+    }, [liveStatsMode]);
 
     // Leaderboard poll
     useEffect(() => {
@@ -1071,7 +1072,12 @@ export default function PreGame() {
             {/* Live stats bottom-left (moved out of grid) */}
             <div className="stats-card live-stats-bottom" style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 1050 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <span className="label">Live</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                        <span className="label">Live</span>
+                        <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.3px' }}>
+                            {liveStatsMode === 'slither' ? 'Slither' : 'Agar'}
+                        </span>
+                    </div>
                     <div className="live-dot" />
                 </div>
                 <div className="stat-row" style={{ marginBottom: '6px' }}>
@@ -1083,10 +1089,7 @@ export default function PreGame() {
                 <div className="stat-row">
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top in arena</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-h)', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
-                        <span>
-                            {liveStats.topPlayer ?? '—'}
-                            {liveStats.topIsBot && liveStats.topPlayer ? ' 🤖' : ''}
-                        </span>
+                        <span>{liveStats.topPlayer ?? '—'}</span>
                         {liveStats.topPlayer && liveStats.topBalance != null && (
                             <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--green)', fontWeight: 600 }}>
                                 ${Number(liveStats.topBalance).toFixed(2)}

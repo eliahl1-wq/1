@@ -268,7 +268,11 @@ export default function SlitherGame() {
                 setBrShowIntro(true);
             }
             myIdRef.current = playerSettings.id;
-            if (!gameSizes?.battleRoyale) setCurrentBalance(playerSettings.balance ?? 1.0);
+            if (!gameSizes?.battleRoyale) {
+                const bal = playerSettings.balance ?? 1.0;
+                setCurrentBalance(bal);
+                rendererRef.current?.setHud({ balance: bal });
+            }
             setGameReady(true);
             if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
                 startCashoutCountdown(gameSizes.cashOutRemaining);
@@ -666,29 +670,18 @@ export default function SlitherGame() {
             <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 100 }}>
 
                 <div style={{
-
                     background: 'rgba(255, 255, 255, 0.05)',
-
                     backdropFilter: 'blur(20px)',
-
                     padding: '15px 25px',
-
                     borderRadius: '20px',
-
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-
                     color: 'white',
-
                     boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)',
-
                     display: 'flex',
-
                     flexDirection: 'column',
-
-                    alignItems: 'center',
-
+                    alignItems: 'stretch',
                     gap: '12px',
-
+                    minWidth: '220px',
                 }}>
 
                     <div style={{ textAlign: 'center' }}>
@@ -758,24 +751,17 @@ export default function SlitherGame() {
                         disabled={localTimer > 0 || isDead || cashedAmount !== null}
 
                         style={{
-
                             width: '100%',
-
+                            minWidth: '190px',
+                            boxSizing: 'border-box',
                             background: localTimer > 0 ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
-
                             color: localTimer > 0 ? 'rgba(255,255,255,0.2)' : '#001a0d',
-
                             border: localTimer > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-
-                            padding: '10px 0',
-
+                            padding: '12px 20px',
                             borderRadius: '12px',
-
                             fontWeight: '800',
-
-                            fontSize: '0.8rem',
-
-                            letterSpacing: '1px',
+                            fontSize: '0.75rem',
+                            letterSpacing: '0.6px',
 
                             cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
 

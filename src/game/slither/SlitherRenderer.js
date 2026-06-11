@@ -45,7 +45,7 @@ export class SlitherRenderer {
         this.targetSnakes = [];
         this.smooth = new Map();
         this.foodCache = new Map();
-        this.hud = { balance: 0, cashoutSeconds: 0, cashoutTotal: 10, holdProgress: 0 };
+        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
@@ -124,7 +124,13 @@ export class SlitherRenderer {
     }
 
     updateState(tick) {
-        if (tick.snakes) this.targetSnakes = tick.snakes;
+        if (tick.snakes) {
+            this.targetSnakes = tick.snakes;
+            if (tick.you) {
+                const me = tick.snakes.find(s => s.id === tick.you);
+                if (me?.balance != null) this.hud.balance = me.balance;
+            }
+        }
         const now = performance.now();
         if (tick.food) {
             const seen = new Set();
@@ -162,9 +168,8 @@ export class SlitherRenderer {
         const seen = new Set();
         for (const snake of this.targetSnakes) {
             seen.add(snake.id);
-            // Own snake snaps tighter for responsive control; others smoother
-            // (tuned for 20Hz server broadcasts interpolated to 60fps)
-            const tau = snake.isYou ? 0.045 : 0.075;
+            // Own snake snaps tighter — less lag when eating/moving
+            const tau = snake.isYou ? 0.014 : 0.075;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
             const tgt = snake.segments || [];
             let s = this.smooth.get(snake.id);
@@ -400,8 +405,7 @@ export class SlitherRenderer {
             if (miss === 0) continue;
             const inView = Math.abs(f.x - cx) <= halfW && Math.abs(f.y - cy) <= halfH;
             if (inView) {
-                // Likely eaten — only remove after ~0.6s of misses at 20Hz
-                if (miss >= 12) this.foodCache.delete(id);
+                if (miss >= 2) this.foodCache.delete(id);
             } else if (miss >= 4) {
                 this.foodCache.delete(id);
             }
@@ -409,12 +413,12 @@ export class SlitherRenderer {
     }
 
     _drawFood(ctx, food, toScreen, W, H, zoom) {
-        const SPRITE_R = 4;
+        const SPRITE_R = 2.5;
         for (const f of food) {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -80 || fy < -80 || fx > W + 80 || fy > H + 80) continue;
 
-            const screenR = Math.max(1.5, (f.radius || 3.5) * zoom);
+            const screenR = Math.max(1, (f.radius || 2) * zoom * 0.75);
             const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 15) * 15;
             const sprite = this._foodSprite(hue, SPRITE_R, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / SPRITE_R);
@@ -778,7 +782,7 @@ export class SlitherRenderer {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
-            this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, this.hud.balance ?? me.balance ?? 0, true);
+            this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
             if (this.hud.holdProgress > 0 && this.hud.cashoutSeconds <= 0) {
                 const ringR = headRadius + 12;
                 drawCashoutProgressRing(ctx, hx, hy, ringR, this.hud.holdProgress, { counterClockwise: true });
