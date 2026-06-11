@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import '../styles/ui.css';
+import { setPageSeo, SEO } from '../utils/seo';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 
@@ -52,6 +53,11 @@ export default function Gamemodes() {
         setActiveTab(mode);
         localStorage.setItem('selected_gamemode', mode);
     };
+
+    useEffect(() => {
+        const isSlither = activeTab === 'slither' || activeTab === 'br-slither';
+        setPageSeo(isSlither ? SEO.gamemodesSlither : SEO.gamemodesAgar);
+    }, [activeTab]);
 
     return (
         <div style={{ width: '100vw', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', overflowX: 'hidden' }}>

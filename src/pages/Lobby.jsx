@@ -10,6 +10,7 @@ import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import { MIN_ENTRY_FEE } from '../constants/economy';
+import { setPageSeo, SEO } from '../utils/seo';
 
 const SolLogo = ({ size = 13, style }) => (
     <img src="/solana-sol-logo.png" alt="SOL"
@@ -73,9 +74,12 @@ export default function Lobby() {
     }, [showUserMenu, handleClickOutside]);
 
     useEffect(() => {
+        setPageSeo(SEO.lobby);
+    }, []);
+
+    useEffect(() => {
         if (token) {
             refreshUser();
-            document.title = 'AgarStake | Lobby';
             let alive = true;
             const check = async () => {
                 try {

@@ -10,6 +10,7 @@ import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, tierEconomy, formatUsd } from '../constants/economy';
+import { setPageSeo, SEO } from '../utils/seo';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -168,7 +169,10 @@ export default function PreGame() {
         ? 'success' : statusMsg.startsWith('❌') ? 'error' : 'info';
 
     // ── Effects ────────────────────────────────────────
-    useEffect(() => { document.title = 'AgarStake | Arena'; }, []);
+    useEffect(() => {
+        const base = selectedMode.replace(/^br-/, '');
+        setPageSeo(base === 'slither' ? SEO.preGameSlither : SEO.preGameAgar);
+    }, [selectedMode]);
 
     useEffect(() => {
         if (publicKey && !withdrawAddress) setWithdrawAddress(publicKey.toBase58());
