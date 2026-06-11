@@ -47,8 +47,8 @@ export class SlitherRenderer {
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
-        this.zoom = 3.2;
-        this.baseZoom = 3.2;
+        this.zoom = 2.65;
+        this.baseZoom = 2.65;
         this.snakeThickness = 0.88;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
@@ -725,7 +725,7 @@ export class SlitherRenderer {
 
             // slither.io-style zoom-out as the snake grows
             const meR = me.radius || 6.2;
-            const targetZoom = Math.min(this.baseZoom, Math.max(1.6, this.baseZoom * Math.pow(6.2 / meR, 0.4)));
+            const targetZoom = Math.min(this.baseZoom, Math.max(1.35, this.baseZoom * Math.pow(6.2 / meR, 0.4)));
             const za = 1 - Math.exp(-dt / 0.6);
             this.zoom += (targetZoom - this.zoom) * za;
         }

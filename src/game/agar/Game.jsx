@@ -97,7 +97,9 @@ export default function Game() {
 
         const socket = io(apiUrl, {
             auth: { token },
-            transports: ['websocket', 'polling'],
+            transports: ['polling', 'websocket'],
+            upgrade: true,
+            rememberUpgrade: true,
             reconnection: true,
             reconnectionAttempts: 10,
             reconnectionDelay: 2000,

@@ -40,6 +40,7 @@ export default function SlitherGame() {
     const myIdRef = useRef(null);
 
     const cashOutTotalRef = useRef(10);
+    const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 10, isBR: false });
 
 
 
@@ -80,6 +81,12 @@ export default function SlitherGame() {
     const entryFeeUsd = isBRMode
         ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
         : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
+
+    joinParamsRef.current = {
+        nickname: matchNickname,
+        entryFeeUsd,
+        isBR: isBRMode,
+    };
 
 
 
@@ -206,19 +213,15 @@ export default function SlitherGame() {
         if (isBR) setIsBattleRoyale(true);
 
         const socket = io(API_URL, {
-
             auth: { token: authToken },
-
-            transports: ['websocket', 'polling'],
-
+            // Polling first — more reliable on Railway; upgrades to websocket when ready
+            transports: ['polling', 'websocket'],
+            upgrade: true,
+            rememberUpgrade: true,
             reconnection: true,
-
             reconnectionAttempts: 10,
-
             reconnectionDelay: 2000,
-
             timeout: 20000,
-
         });
 
         socketRef.current = socket;
@@ -226,18 +229,16 @@ export default function SlitherGame() {
 
 
         socket.on('connect', () => {
-
             setIsConnected(true);
-
             if (!hasJoinedRef.current) {
-                if (isBR) {
+                const { nickname, entryFeeUsd: fee, isBR: br } = joinParamsRef.current;
+                if (br) {
                     socket.emit('brRejoinMatch', { token: authToken });
                 } else {
-                    socket.emit('joinGame', { username: matchNickname, token: authToken, mode: 'slither', entryFeeUsd });
+                    socket.emit('joinGame', { username: nickname, token: authToken, mode: 'slither', entryFeeUsd: fee });
                 }
                 hasJoinedRef.current = true;
             }
-
         });
 
 
@@ -420,30 +421,20 @@ export default function SlitherGame() {
 
 
         return () => {
-
             if (inputIntervalRef.current) clearInterval(inputIntervalRef.current);
-
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-
             renderer.destroy();
-
             rendererRef.current = null;
-
-            if (socketRef.current) {
-
-                socketRef.current.off();
-
-                socketRef.current.disconnect();
-
+            const s = socketRef.current;
+            if (s) {
+                s.removeAllListeners();
+                s.disconnect();
                 socketRef.current = null;
-
             }
-
             hasJoinedRef.current = false;
-
         };
 
-    }, [authToken, navigate, startCashoutCountdown, matchNickname]);
+    }, [authToken, navigate, startCashoutCountdown]);
 
 
 
