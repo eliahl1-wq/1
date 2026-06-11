@@ -231,7 +231,7 @@ export class SlitherRenderer {
      */
     _getHexPattern(ctx) {
         if (this._hexPattern) return this._hexPattern;
-        const R = 52;
+        const R = 34;
         const S = 3; // supersample so the pattern stays crisp at zoom ~3
         const sqrt3 = Math.sqrt(3);
         const tw = 3 * R;
@@ -305,12 +305,22 @@ export class SlitherRenderer {
         ctx.fillStyle = this._vignette;
         ctx.fillRect(0, 0, W, H);
 
+        // Red death zone outside playable square (slither.io style)
         const limit = worldHalf;
         const tl = toScreen(-limit, -limit);
         const br = toScreen(limit, limit);
-        ctx.strokeStyle = 'rgba(124, 58, 255, 0.35)';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+        const playW = br.x - tl.x;
+        const playH = br.y - tl.y;
+        ctx.save();
+        ctx.fillStyle = 'rgba(110, 8, 14, 0.94)';
+        ctx.beginPath();
+        ctx.rect(0, 0, W, H);
+        ctx.rect(tl.x, tl.y, playW, playH);
+        ctx.fill('evenodd');
+        ctx.strokeStyle = 'rgba(255, 75, 75, 0.95)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(tl.x, tl.y, playW, playH);
+        ctx.restore();
     }
 
     /** Insert extra points between spine nodes so the body has slither.io-style bumps. */
@@ -338,15 +348,15 @@ export class SlitherRenderer {
         const screenRadius = zone.radius * this.zoom;
 
         ctx.save();
-        ctx.fillStyle = 'rgba(255, 59, 48, 0.12)';
+        ctx.fillStyle = 'rgba(110, 8, 14, 0.88)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2, true);
         ctx.fill('evenodd');
 
-        ctx.strokeStyle = 'rgba(255, 107, 107, 0.85)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([12, 8]);
+        ctx.strokeStyle = 'rgba(255, 85, 85, 0.95)';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([]);
         ctx.beginPath();
         ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2);
         ctx.stroke();
@@ -392,33 +402,36 @@ export class SlitherRenderer {
         });
     }
 
-    /** Drop food missing from server ticks — grace period avoids edge flicker from view culling. */
+    /** Drop stale food — keep on-screen pellets even if server view-culling skips them. */
     _pruneFoodCache(cx, cy, zoom, W, H) {
-        const margin = 100;
+        const margin = 160;
         const halfW = W / zoom / 2 + margin;
         const halfH = H / zoom / 2 + margin;
         for (const [id, f] of this.foodCache) {
             const miss = f._missStreak || 0;
             if (miss === 0) continue;
             const inView = Math.abs(f.x - cx) <= halfW && Math.abs(f.y - cy) <= halfH;
-            if ((inView && miss >= 4) || (!inView && miss >= 2)) {
+            if (inView) {
+                // Likely eaten — only remove after ~0.6s of misses at 20Hz
+                if (miss >= 12) this.foodCache.delete(id);
+            } else if (miss >= 4) {
                 this.foodCache.delete(id);
             }
         }
     }
 
     _drawFood(ctx, food, toScreen, W, H, zoom) {
+        const SPRITE_R = 4;
         for (const f of food) {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
-            if (fx < -60 || fy < -60 || fx > W + 60 || fy > H + 60) continue;
+            if (fx < -80 || fy < -80 || fx > W + 80 || fy > H + 80) continue;
 
-            // Stable sprite bucket — avoid radius hopping when zoom animates
-            const rWorld = f.radius || 3.5;
-            const rPx = Math.max(2, Math.floor(rWorld * zoom * 2 + 0.5) / 2);
-            const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
-            const sprite = this._foodSprite(hue, rPx, !!f.golden, !!f.deathDrop);
-            const half = sprite.width / 2;
-            ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half));
+            const screenR = Math.max(1.5, (f.radius || 3.5) * zoom);
+            const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 15) * 15;
+            const sprite = this._foodSprite(hue, SPRITE_R, !!f.golden, !!f.deathDrop);
+            const size = sprite.width * (screenR / SPRITE_R);
+            const half = size / 2;
+            ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
         }
     }
 

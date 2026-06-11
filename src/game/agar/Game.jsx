@@ -53,8 +53,6 @@ export default function Game() {
     const [brShowIntro, setBrShowIntro] = useState(false);
     const [brPlayerCount, setBrPlayerCount] = useState(0);
     const brIntroTriggeredRef = useRef(false);
-    const cameraRef = useRef({ x: 0, y: 0 });
-    const lastLoopTimeRef = useRef(0);
     const foodCacheRef = useRef(new Map());
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
@@ -391,30 +389,15 @@ export default function Game() {
             
             // CRASH FIX: Kontrollera att vi inte är döda och att spelardata finns
             if (isConnected && !isDead && player && player.x !== undefined) {
-                const now = performance.now();
-                let dt = lastLoopTimeRef.current ? (now - lastLoopTimeRef.current) / 1000 : 1 / 60;
-                lastLoopTimeRef.current = now;
-                if (dt > 0.1) dt = 0.1;
-
-                const cam = cameraRef.current;
-                if (Math.hypot(player.x - cam.x, player.y - cam.y) > 400) {
-                    cam.x = player.x;
-                    cam.y = player.y;
-                } else {
-                    const camA = 1 - Math.exp(-dt / 0.022);
-                    cam.x += (player.x - cam.x) * camA;
-                    cam.y += (player.y - cam.y) * camA;
-                }
-
                 const worldToScreen = (wx, wy) => ({
-                    x: wx - cam.x + screen.width / 2,
-                    y: wy - cam.y + screen.height / 2,
+                    x: wx - player.x + screen.width / 2,
+                    y: wy - player.y + screen.height / 2,
                 });
 
                 graph.fillStyle = global.backgroundColor;
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
-                renderUtils.drawGrid(global, { x: cam.x, y: cam.y }, screen, graph);
+                renderUtils.drawGrid(global, { x: player.x, y: player.y }, screen, graph);
 
                 if (brZone && player.x != null) {
                     const { x: zx, y: zy } = worldToScreen(brZone.cx, brZone.cy);
@@ -447,10 +430,10 @@ export default function Game() {
                 });
 
                 let borders = {
-                    left: screen.width / 2 - cam.x,
-                    right: screen.width / 2 + global.game.width - cam.x,
-                    top: screen.height / 2 - cam.y,
-                    bottom: screen.height / 2 + global.game.height - cam.y
+                    left: screen.width / 2 - player.x,
+                    right: screen.width / 2 + global.game.width - player.x,
+                    top: screen.height / 2 - player.y,
+                    bottom: screen.height / 2 + global.game.height - player.y
                 };
 
                 // Rita celler
@@ -744,7 +727,7 @@ export default function Game() {
                             opacity: localTimer > 0 ? 0.6 : 1
                         }}
                     >
-                        CASH OUT
+                        HOLD Q · CASH OUT
                     </button>
                     )}
                 </div>

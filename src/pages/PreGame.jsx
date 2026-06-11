@@ -1075,9 +1075,15 @@ export default function PreGame() {
                     <div className="live-dot" />
                 </div>
                 <div className="stat-row" style={{ marginBottom: '6px' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>In arena</span>
                     <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
                         {liveStats.playersOnline ?? 0}
+                    </span>
+                </div>
+                <div className="stat-row" style={{ marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Humans · AI</span>
+                    <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 600 }}>
+                        {liveStats.humansOnline ?? 0} · {liveStats.aiOnline ?? 0} 🤖
                     </span>
                 </div>
                 <div className="stat-row">
