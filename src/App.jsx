@@ -30,7 +30,7 @@ function buildWalletAdapters() {
           name: 'AgarStake',
           description: 'Stake SOL and dominate the arena in this high-stakes agar clone.',
           url: 'https://www.agararena.space',
-          icons: ['https://www.agararena.space/favicon.png'],
+          icons: ['https://www.agararena.space/vite.svg'],
         },
       },
     }),

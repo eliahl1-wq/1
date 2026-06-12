@@ -796,8 +796,8 @@ export default function SlitherGame() {
             <div style={{ position: 'absolute', bottom: '30px', left: '30px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', zIndex: 100 }}>
 
                 {isBattleRoyale
-                    ? 'Mouse to Move • Click to Boost'
-                    : 'Mouse to Move • Click to Boost • Hold Q to Cash Out'}
+                    ? 'Mouse to Move • Space to Boost'
+                    : 'Mouse to Move • Space to Boost • Hold Q to Cash Out'}
 
             </div>
 

@@ -67,8 +67,25 @@ export class SlitherRenderer {
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
-        this._onMouseDown = () => { this.boost = true; this._emitInput?.(); };
+        this._onMouseDown = (e) => {
+            if (e.button === 0) return; // left click = steer only
+            this.boost = true;
+            this._emitInput?.();
+        };
         this._onMouseUp = () => { this.boost = false; this._emitInput?.(); };
+        this._onKeyDown = (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                this.boost = true;
+                this._emitInput?.();
+            }
+        };
+        this._onKeyUp = (e) => {
+            if (e.code === 'Space') {
+                this.boost = false;
+                this._emitInput?.();
+            }
+        };
         this._onTouchMove = (e) => {
             e.preventDefault();
             const t = e.touches[0];
@@ -86,6 +103,8 @@ export class SlitherRenderer {
         document.addEventListener('mousemove', this._onMouseMove);
         document.addEventListener('mousedown', this._onMouseDown);
         document.addEventListener('mouseup', this._onMouseUp);
+        window.addEventListener('keydown', this._onKeyDown);
+        window.addEventListener('keyup', this._onKeyUp);
         document.addEventListener('touchmove', this._onTouchMove, { passive: false });
         document.addEventListener('touchstart', this._onTouchStart, { passive: false });
         document.addEventListener('touchend', this._onTouchEnd);
@@ -131,12 +150,16 @@ export class SlitherRenderer {
                 if (me?.balance != null) this.hud.balance = me.balance;
             }
         }
-        const now = performance.now();
         if (tick.food) {
             const seen = new Set();
             for (const f of tick.food) {
                 seen.add(f.id);
-                this.foodCache.set(f.id, { ...f, _missStreak: 0 });
+                const prev = this.foodCache.get(f.id);
+                this.foodCache.set(f.id, {
+                    ...(prev || {}),
+                    ...f,
+                    _missStreak: 0,
+                });
             }
             for (const [id, f] of this.foodCache) {
                 if (!seen.has(id)) {
@@ -395,9 +418,9 @@ export class SlitherRenderer {
         });
     }
 
-    /** Drop stale off-screen food; keep visible pellets through server view-culling gaps. */
+    /** Drop stale off-screen food; keep on-screen pellets through server view-culling gaps. */
     _pruneFoodCache(cx, cy, zoom, W, H, myHead, myRadius) {
-        const margin = 320;
+        const margin = 480;
         const halfW = W / zoom / 2 + margin;
         const halfH = H / zoom / 2 + margin;
         for (const [id, f] of this.foodCache) {
@@ -406,30 +429,33 @@ export class SlitherRenderer {
 
             const inView = Math.abs(f.x - cx) <= halfW && Math.abs(f.y - cy) <= halfH;
 
-            // Eaten pellets: remove quickly when near our head
-            if (myHead && miss >= 2) {
+            // Eaten pellets: remove when near our head after a few missed ticks
+            if (myHead && miss >= 3) {
                 const dx = f.x - myHead.x;
                 const dy = f.y - myHead.y;
-                const eatR = (myRadius || 6) + (f.radius || 2) + 28;
+                const eatR = (myRadius || 6) + (f.radius || 2) + 32;
                 if (dx * dx + dy * dy <= eatR * eatR) {
                     this.foodCache.delete(id);
                     continue;
                 }
             }
 
-            // Never drop on-screen food for culling — camera smoothing lags server head
+            // On-screen food: tolerate long culling gaps from server spatial filter
             if (inView) {
-                if (miss >= 30) this.foodCache.delete(id);
+                if (miss >= 150) this.foodCache.delete(id);
                 continue;
             }
 
-            if (miss >= 10) this.foodCache.delete(id);
+            if (miss >= 40) this.foodCache.delete(id);
         }
     }
 
     _drawFood(ctx, food, toScreen, W, H, zoom) {
         const SPRITE_R = 2.5;
         for (const f of food) {
+            const miss = f._missStreak || 0;
+            if (miss > 8) continue;
+
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -80 || fy < -80 || fx > W + 80 || fy > H + 80) continue;
 
@@ -438,7 +464,10 @@ export class SlitherRenderer {
             const sprite = this._foodSprite(hue, SPRITE_R, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / SPRITE_R);
             const half = size / 2;
+            const alpha = miss === 0 ? 1 : Math.max(0.35, 1 - miss * 0.08);
+            ctx.globalAlpha = alpha;
             ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+            ctx.globalAlpha = 1;
         }
     }
 
@@ -523,9 +552,6 @@ export class SlitherRenderer {
         const bodyRadius = headRadius * 0.94;
         const angle = snake.angle || 0;
         const baseHex = snake.isYou ? '#7C58FF' : (snake.color || '#888888');
-        const base = parseColor(baseHex);
-        const light = shadeColor(base, 70);
-        const dark = shadeColor(base, -55);
 
         const pts = [];
         for (let i = 0; i < segs.length; i++) {
@@ -538,49 +564,25 @@ export class SlitherRenderer {
         const bumpStep = Math.max(4, bodyRadius * 0.72);
         const bumps = this._densifySpine(pts, bumpStep);
 
-        // Dark under-stroke — skip head bumps (overlapped head sprite caused a double-ring)
-        const strokeFrom = Math.min(bumps.length - 1, Math.max(2, Math.ceil(headRadius / bumpStep) + 1));
-        if (strokeFrom < bumps.length - 1) {
-            ctx.save();
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
-            for (let i = bumps.length - 2; i >= strokeFrom; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
-            ctx.lineWidth = bodyRadius * 2 + 4;
-            ctx.strokeStyle = rgb(dark, 0.85);
-            ctx.stroke();
-            ctx.restore();
-        }
+        // Body circles only — skip near head so we don't get a double-ring halo
+        const headScreen = pts[0];
+        const skipNearHead = headRadius * 1.35;
 
-        // Overlapping body circles (slither.io look) via cached sprites —
-        // two radius buckets (tail/front) instead of a gradient per circle
         const rTail = Math.max(2, Math.round(bodyRadius * 0.9));
         const rFront = Math.max(2, Math.round(bodyRadius));
         const spriteTail = this._bodySprite(baseHex, rTail);
         const spriteFront = this._bodySprite(baseHex, rFront);
         const split = bumps.length * 0.45;
-        const bodyFrom = Math.min(bumps.length - 1, Math.max(1, Math.ceil(headRadius / bumpStep)));
-        for (let i = bumps.length - 1; i >= bodyFrom; i--) {
+        for (let i = bumps.length - 1; i >= 1; i--) {
             const p = bumps[i];
+            if (Math.hypot(p.x - headScreen.x, p.y - headScreen.y) < skipNearHead) continue;
             if (p.x < -60 || p.y < -60 || p.x > this.W + 60 || p.y > this.H + 60) continue;
             const sprite = i > split ? spriteTail : spriteFront;
             const half = sprite.width / 2;
             ctx.drawImage(sprite, p.x - half, p.y - half);
         }
 
-        if (snake.boost) {
-            const glow = 0.2 + Math.sin(this._frame * 0.25) * 0.1;
-            ctx.beginPath();
-            ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
-            for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
-            ctx.lineWidth = bodyRadius * 2 + 10;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = rgb(light, glow);
-            ctx.stroke();
-        }
-
-        // Head sprite only — no extra outline ring (looked like a second circle)
+        // Head sprite only
         const { x: hx, y: hy } = pts[0];
         const rHead = Math.max(2, Math.round(headRadius));
         const headSprite = this._bodySprite(baseHex, rHead);
@@ -775,7 +777,7 @@ export class SlitherRenderer {
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
-            if (this.hud.holdProgress > 0.04 && !this.hud.securingCashout) {
+            if (this.hud.holdProgress > 0.08 && !this.hud.securingCashout) {
                 const ringR = headRadius + 8;
                 drawCashoutProgressRing(ctx, hx, hy, ringR, this.hud.holdProgress, {
                     counterClockwise: true,
@@ -794,6 +796,8 @@ export class SlitherRenderer {
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('mousedown', this._onMouseDown);
         document.removeEventListener('mouseup', this._onMouseUp);
+        window.removeEventListener('keydown', this._onKeyDown);
+        window.removeEventListener('keyup', this._onKeyUp);
         document.removeEventListener('touchmove', this._onTouchMove);
         document.removeEventListener('touchstart', this._onTouchStart);
         document.removeEventListener('touchend', this._onTouchEnd);

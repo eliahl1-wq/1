@@ -13,7 +13,7 @@ export default function AppTopbar({ children }) {
         <nav className="topbar">
             <div className="topbar-left">
                 <div className="logo" onClick={() => navigate('/pre-game')}>
-                    <img src="/favicon.png" alt="" className="logo-icon" />
+                    <div className="logo-dot" />
                     <span>
                         AGAR<span className="logo-accent">STAKE</span>
                     </span>

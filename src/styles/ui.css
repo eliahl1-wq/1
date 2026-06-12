@@ -158,13 +158,6 @@
   user-select: none;
 }
 .logo-accent { color: var(--accent); }
-.logo-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
 .logo-dot {
   width: 8px;
   height: 8px;
