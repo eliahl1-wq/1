@@ -2,8 +2,6 @@
  * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
-import { drawCashoutProgressRing } from '../cashoutRing.js';
-
 function parseColor(hex) {
     if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
     const h = hex.replace('#', '');
@@ -67,25 +65,8 @@ export class SlitherRenderer {
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
-        this._onMouseDown = (e) => {
-            if (e.button === 0) return; // left click = steer only
-            this.boost = true;
-            this._emitInput?.();
-        };
+        this._onMouseDown = () => { this.boost = true; this._emitInput?.(); };
         this._onMouseUp = () => { this.boost = false; this._emitInput?.(); };
-        this._onKeyDown = (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                this.boost = true;
-                this._emitInput?.();
-            }
-        };
-        this._onKeyUp = (e) => {
-            if (e.code === 'Space') {
-                this.boost = false;
-                this._emitInput?.();
-            }
-        };
         this._onTouchMove = (e) => {
             e.preventDefault();
             const t = e.touches[0];
@@ -103,8 +84,6 @@ export class SlitherRenderer {
         document.addEventListener('mousemove', this._onMouseMove);
         document.addEventListener('mousedown', this._onMouseDown);
         document.addEventListener('mouseup', this._onMouseUp);
-        window.addEventListener('keydown', this._onKeyDown);
-        window.addEventListener('keyup', this._onKeyUp);
         document.addEventListener('touchmove', this._onTouchMove, { passive: false });
         document.addEventListener('touchstart', this._onTouchStart, { passive: false });
         document.addEventListener('touchend', this._onTouchEnd);
@@ -172,7 +151,7 @@ export class SlitherRenderer {
             food: Array.from(this.foodCache.values()),
             you: tick.you ?? this.state.you,
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
-            zone: tick.zone !== undefined ? tick.zone : this.state.zone,
+            zone: tick.battleRoyale ? (tick.zone !== undefined ? tick.zone : this.state.zone) : null,
         };
     }
 
@@ -321,18 +300,6 @@ export class SlitherRenderer {
         ctx.fillRect(cx - vw / 2 - 2, cy - vh / 2 - 2, vw + 4, vh + 4);
         ctx.restore();
 
-        // Cached vignette (rebuilt only on resize)
-        const vigKey = W + 'x' + H;
-        if (this._vigKey !== vigKey) {
-            const vig = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.85);
-            vig.addColorStop(0, 'rgba(0,0,0,0)');
-            vig.addColorStop(1, 'rgba(0,0,0,0.28)');
-            this._vignette = vig;
-            this._vigKey = vigKey;
-        }
-        ctx.fillStyle = this._vignette;
-        ctx.fillRect(0, 0, W, H);
-
         // Red death zone outside playable square (slither.io style)
         const limit = worldHalf;
         const tl = toScreen(-limit, -limit);
@@ -391,28 +358,27 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Soft glow orb (slither.io style) — pure radial gradient, no hard edges. */
+    /** Compact food pellet — tight glow, no huge transparent halos. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * 3.2);
-        const key = `f|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        const halo = Math.ceil(rPx * 1.45);
+        const key = `f2|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 2, (g, sz) => {
             const c = sz / 2;
             if (golden) {
                 const grad = g.createRadialGradient(c, c, 0, c, c, halo);
                 grad.addColorStop(0, 'hsla(52, 100%, 92%, 1)');
-                grad.addColorStop(0.18, 'hsla(48, 100%, 70%, 0.9)');
-                grad.addColorStop(0.45, 'hsla(48, 100%, 60%, 0.35)');
+                grad.addColorStop(0.35, 'hsla(48, 100%, 65%, 0.95)');
+                grad.addColorStop(0.7, 'hsla(48, 100%, 58%, 0.45)');
                 grad.addColorStop(1, 'hsla(48, 100%, 55%, 0)');
                 g.fillStyle = grad;
                 g.fillRect(0, 0, sz, sz);
                 return;
             }
-            const boost = deathDrop ? 1.15 : 1;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
-            grad.addColorStop(0, `hsla(${hue}, 100%, 88%, ${0.95 * boost > 1 ? 1 : 0.95 * boost})`);
-            grad.addColorStop(0.2, `hsla(${hue}, 95%, 65%, ${Math.min(1, 0.75 * boost)})`);
-            grad.addColorStop(0.5, `hsla(${hue}, 95%, 60%, ${Math.min(1, 0.28 * boost)})`);
-            grad.addColorStop(1, `hsla(${hue}, 95%, 58%, 0)`);
+            grad.addColorStop(0, `hsla(${hue}, 100%, 88%, 1)`);
+            grad.addColorStop(0.4, `hsla(${hue}, 95%, 62%, ${deathDrop ? 0.95 : 0.85})`);
+            grad.addColorStop(0.75, `hsla(${hue}, 90%, 55%, 0.25)`);
+            grad.addColorStop(1, `hsla(${hue}, 90%, 50%, 0)`);
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
         });
@@ -459,7 +425,7 @@ export class SlitherRenderer {
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -80 || fy < -80 || fx > W + 80 || fy > H + 80) continue;
 
-            const screenR = Math.max(1, (f.radius || 2) * zoom * 0.75);
+            const screenR = Math.max(1.2, (f.radius || 2) * zoom * 0.55);
             const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 15) * 15;
             const sprite = this._foodSprite(hue, SPRITE_R, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / SPRITE_R);
@@ -552,6 +518,8 @@ export class SlitherRenderer {
         const bodyRadius = headRadius * 0.94;
         const angle = snake.angle || 0;
         const baseHex = snake.isYou ? '#7C58FF' : (snake.color || '#888888');
+        const base = parseColor(baseHex);
+        const light = shadeColor(base, 55);
 
         const pts = [];
         for (let i = 0; i < segs.length; i++) {
@@ -580,6 +548,19 @@ export class SlitherRenderer {
             const sprite = i > split ? spriteTail : spriteFront;
             const half = sprite.width / 2;
             ctx.drawImage(sprite, p.x - half, p.y - half);
+        }
+
+        if (snake.boost) {
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
+            for (let i = bumps.length - 2; i >= 1; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
+            ctx.lineWidth = bodyRadius * 2 + 5;
+            ctx.strokeStyle = rgb(light, 0.22);
+            ctx.stroke();
+            ctx.restore();
         }
 
         // Head sprite only
@@ -657,60 +638,6 @@ export class SlitherRenderer {
         ctx.textAlign = 'center';
     }
 
-    _drawCashoutOverlay(ctx, hx, hy, headRadius) {
-        const total = this.hud.cashoutTotal || 10;
-        const remaining = Math.max(0, this.hud.cashoutSeconds);
-        const progress = remaining / total;
-        const pulse = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;
-        const ringR = headRadius + 8;
-
-        drawCashoutProgressRing(ctx, hx, hy, ringR, progress, { pulse: true });
-
-        const label = 'SECURING';
-        const timerText = `${remaining}s`;
-        const labelSize = 9;
-        const timerSize = 15;
-        ctx.font = `700 ${labelSize}px system-ui, sans-serif`;
-        const labelW = ctx.measureText(label).width;
-        ctx.font = `900 ${timerSize}px ui-monospace, monospace`;
-        const timerW = ctx.measureText(timerText).width;
-        const pillW = Math.max(labelW, timerW) + 28;
-        const pillH = labelSize + timerSize + 16;
-        const pillX = hx - pillW / 2;
-        const pillY = hy - headRadius - pillH - 22;
-
-        ctx.beginPath();
-        ctx.roundRect(pillX, pillY, pillW, pillH, 12);
-        ctx.fillStyle = 'rgba(6, 10, 8, 0.92)';
-        ctx.fill();
-        ctx.strokeStyle = `rgba(20, 241, 149, ${0.35 + pulse * 0.25})`;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        const barPad = 10;
-        const barY = pillY + pillH - 9;
-        const barW = pillW - barPad * 2;
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.beginPath();
-        ctx.roundRect(pillX + barPad, barY, barW, 3, 2);
-        ctx.fill();
-        if (progress > 0) {
-            ctx.fillStyle = '#14F195';
-            ctx.beginPath();
-            ctx.roundRect(pillX + barPad, barY, barW * progress, 3, 2);
-            ctx.fill();
-        }
-
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = `700 ${labelSize}px system-ui, sans-serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.fillText(label, hx, pillY + 12);
-        ctx.font = `900 ${timerSize}px ui-monospace, monospace`;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(timerText, hx, pillY + pillH * 0.52);
-    }
-
     draw() {
         const { worldHalf } = this.state;
         const ctx = this.ctx;
@@ -771,21 +698,12 @@ export class SlitherRenderer {
             this._drawSnake(snake, toScreen, zoom);
         }
 
-        // HUD over my snake: balance badge + cashout exit timer (matches Agar)
+        // Balance badge only — cashout timer lives in the React HUD (no canvas rings)
         if (me?.segments?.[0]) {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
-            if (this.hud.holdProgress > 0.08 && !this.hud.securingCashout) {
-                const ringR = headRadius + 8;
-                drawCashoutProgressRing(ctx, hx, hy, ringR, this.hud.holdProgress, {
-                    counterClockwise: true,
-                    showTrack: false,
-                });
-            } else if (this.hud.securingCashout && this.hud.cashoutSeconds > 0) {
-                this._drawCashoutOverlay(ctx, hx, hy, headRadius);
-            }
         }
     }
 
@@ -796,8 +714,6 @@ export class SlitherRenderer {
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('mousedown', this._onMouseDown);
         document.removeEventListener('mouseup', this._onMouseUp);
-        window.removeEventListener('keydown', this._onKeyDown);
-        window.removeEventListener('keyup', this._onKeyUp);
         document.removeEventListener('touchmove', this._onTouchMove);
         document.removeEventListener('touchstart', this._onTouchStart);
         document.removeEventListener('touchend', this._onTouchEnd);

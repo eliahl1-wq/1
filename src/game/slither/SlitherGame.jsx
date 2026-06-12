@@ -267,7 +267,11 @@ export default function SlitherGame() {
             setIsBattleRoyale(!!gameSizes?.battleRoyale);
             if (gameSizes?.prizePool) setBrPrizePool(gameSizes.prizePool);
             if (gameSizes?.playerCount) setBrPlayerCount(gameSizes.playerCount);
-            if (gameSizes?.zone) renderer.updateState({ zone: gameSizes.zone });
+            if (gameSizes?.battleRoyale && gameSizes?.zone) {
+                renderer.updateState({ zone: gameSizes.zone, battleRoyale: true });
+            } else {
+                renderer.updateState({ zone: null, battleRoyale: false });
+            }
             if (gameSizes?.battleRoyale && gameSizes?.prizePool && !brIntroTriggeredRef.current) {
                 brIntroTriggeredRef.current = true;
                 setBrShowIntro(true);
@@ -285,7 +289,7 @@ export default function SlitherGame() {
         });
 
         socket.on('slitherTick', (tick) => {
-            renderer.updateState(tick);
+            renderer.updateState({ ...tick, battleRoyale: !!tick.battleRoyale });
             if (!tick.battleRoyale && tick.balance != null) setCurrentBalance(tick.balance);
             if (tick.battleRoyale) {
                 setIsBattleRoyale(true);
@@ -796,8 +800,8 @@ export default function SlitherGame() {
             <div style={{ position: 'absolute', bottom: '30px', left: '30px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', zIndex: 100 }}>
 
                 {isBattleRoyale
-                    ? 'Mouse to Move • Space to Boost'
-                    : 'Mouse to Move • Space to Boost • Hold Q to Cash Out'}
+                    ? 'Mouse to Move • Click to Boost'
+                    : 'Mouse to Move • Click to Boost • Hold Q to Cash Out'}
 
             </div>
 
