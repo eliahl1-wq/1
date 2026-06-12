@@ -290,7 +290,7 @@ export class SlitherRenderer {
      * frame was a major frame-time cost.
      */
     _getHexPattern(ctx) {
-        const VER = 7;
+        const VER = 8;
         if (this._hexPattern && this._hexPatternVer === VER) return this._hexPattern;
         this._hexPattern = null;
         const R = 18;
@@ -305,10 +305,11 @@ export class SlitherRenderer {
         const g = cv.getContext('2d');
         g.scale(S, S);
 
-        g.fillStyle = '#07080a';
+        // Agar-style: near-black tiles, thin subtle gray seams
+        g.fillStyle = '#26282c';
         g.fillRect(0, 0, tw, th);
 
-        const inset = R * 0.62;
+        const inset = R * 0.94;
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
@@ -319,29 +320,15 @@ export class SlitherRenderer {
                 else g.lineTo(px, py);
             }
             g.closePath();
-            // Soft top-down sheen + faint inner edge for a cleaner embossed look
-            const grad = g.createLinearGradient(hx, hy - inset, hx, hy + inset);
-            grad.addColorStop(0, '#272b32');
-            grad.addColorStop(0.45, '#1e2228');
-            grad.addColorStop(1, '#171a1f');
+            // Flat black tile with the faintest center lift, clean like agar
+            const grad = g.createRadialGradient(hx, hy, inset * 0.2, hx, hy, inset);
+            grad.addColorStop(0, '#0d0e11');
+            grad.addColorStop(1, '#0a0b0d');
             g.fillStyle = grad;
             g.strokeStyle = grad;
             g.lineJoin = 'round';
-            g.lineWidth = R * 0.10;
+            g.lineWidth = R * 0.06;
             g.fill();
-            g.stroke();
-            // Subtle darker inner outline to give tile depth
-            g.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const a = (Math.PI / 3) * i;
-                const px = hx + inset * 0.82 * Math.cos(a);
-                const py = hy + inset * 0.82 * Math.sin(a);
-                if (i === 0) g.moveTo(px, py);
-                else g.lineTo(px, py);
-            }
-            g.closePath();
-            g.strokeStyle = 'rgba(0, 0, 0, 0.14)';
-            g.lineWidth = 1;
             g.stroke();
         };
 
@@ -384,7 +371,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#07080a';
+        ctx.fillStyle = '#0a0a0c';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getHexPattern(ctx);
@@ -618,19 +605,19 @@ export class SlitherRenderer {
             for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
         };
 
-        // Soft colored bloom around the whole body — stronger when boosting
-        {
-            const boostPulse = snake.boost ? 0.18 + 0.08 * Math.sin(this._frame * 0.35) : 0;
+        // Boost glow only — clean body otherwise, matching the agar look
+        if (snake.boost) {
+            const pulse = 0.28 + 0.10 * Math.sin(this._frame * 0.35);
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             spinePath();
-            ctx.lineWidth = bodyRadius * 2 + Math.max(14, bodyRadius * 1.1);
-            ctx.strokeStyle = rgb(light, 0.10 + boostPulse);
+            ctx.lineWidth = bodyRadius * 2 + Math.max(10, bodyRadius * 0.8);
+            ctx.strokeStyle = rgb(light, pulse * 0.5);
             ctx.stroke();
             spinePath();
-            ctx.lineWidth = bodyRadius * 2 + Math.max(7, bodyRadius * 0.55);
-            ctx.strokeStyle = rgb(light, 0.14 + boostPulse);
+            ctx.lineWidth = bodyRadius * 2 + 6;
+            ctx.strokeStyle = rgb(light, pulse);
             ctx.stroke();
             ctx.restore();
         }
