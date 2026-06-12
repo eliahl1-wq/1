@@ -290,18 +290,20 @@ export class SlitherRenderer {
      * frame was a major frame-time cost.
      */
     _getHexPattern(ctx) {
-        const VER = 6;
+        const VER = 7;
         if (this._hexPattern && this._hexPatternVer === VER) return this._hexPattern;
         this._hexPattern = null;
         const R = 18;
+        const S = 3; // supersample so tiles stay crisp at zoom ~2.65
         const sqrt3 = Math.sqrt(3);
         const tw = 3 * R;
         const th = sqrt3 * R;
 
         const cv = document.createElement('canvas');
-        cv.width = Math.round(tw);
-        cv.height = Math.round(th);
+        cv.width = Math.round(tw * S);
+        cv.height = Math.round(th * S);
         const g = cv.getContext('2d');
+        g.scale(S, S);
 
         g.fillStyle = '#0c0d10';
         g.fillRect(0, 0, tw, th);
@@ -317,15 +319,29 @@ export class SlitherRenderer {
                 else g.lineTo(px, py);
             }
             g.closePath();
-            const grad = g.createRadialGradient(hx, hy, inset * 0.1, hx, hy, inset);
-            grad.addColorStop(0, '#30353d');
-            grad.addColorStop(0.65, '#282c33');
+            // Soft top-down sheen + faint inner edge for a cleaner embossed look
+            const grad = g.createLinearGradient(hx, hy - inset, hx, hy + inset);
+            grad.addColorStop(0, '#343a43');
+            grad.addColorStop(0.45, '#2a2f36');
             grad.addColorStop(1, '#22262c');
             g.fillStyle = grad;
-            g.strokeStyle = '#181b20';
+            g.strokeStyle = grad;
             g.lineJoin = 'round';
-            g.lineWidth = 1.2;
+            g.lineWidth = R * 0.10;
             g.fill();
+            g.stroke();
+            // Subtle darker inner outline to give tile depth
+            g.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const a = (Math.PI / 3) * i;
+                const px = hx + inset * 0.82 * Math.cos(a);
+                const py = hy + inset * 0.82 * Math.sin(a);
+                if (i === 0) g.moveTo(px, py);
+                else g.lineTo(px, py);
+            }
+            g.closePath();
+            g.strokeStyle = 'rgba(0, 0, 0, 0.10)';
+            g.lineWidth = 1;
             g.stroke();
         };
 
@@ -339,6 +355,10 @@ export class SlitherRenderer {
         this._hexTile = cv;
         this._hexPattern = ctx.createPattern(cv, 'repeat');
         this._hexPatternVer = VER;
+        // Pattern pixels are world-units * S — scale back so it maps 1:1
+        if (this._hexPattern && this._hexPattern.setTransform) {
+            this._hexPattern.setTransform(new DOMMatrix([1 / S, 0, 0, 1 / S, 0, 0]));
+        }
         return this._hexPattern;
     }
 
@@ -377,7 +397,9 @@ export class SlitherRenderer {
             const vw = W / zoom;
             const vh = H / zoom;
             const margin = 240;
-            ctx.fillRect(-vw / 2 - margin, -vh / 2 - margin, vw + margin * 2, vh + margin * 2);
+            // Rect must be centered on the camera (cx, cy) in world space —
+            // centering on origin left gray areas away from the map center
+            ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
 
