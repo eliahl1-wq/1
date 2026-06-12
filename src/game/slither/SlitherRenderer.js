@@ -2,6 +2,8 @@
  * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
+import { drawCashoutProgressRing } from '../cashoutRing.js';
+
 function parseColor(hex) {
     if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
     const h = hex.replace('#', '');
@@ -24,6 +26,10 @@ function parseColor(hex) {
 
 function rgb({ r, g, b }, a = 1) {
     return `rgba(${r},${g},${b},${a})`;
+}
+
+function toHex({ r, g, b }) {
+    return `#${[r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 }
 
 function shadeColor({ r, g, b }, amount) {
@@ -49,7 +55,7 @@ export class SlitherRenderer {
         this._lastFrameTime = 0;
         this.zoom = 2.65;
         this.baseZoom = 2.65;
-        this.snakeThickness = 0.88;
+        this.snakeThickness = 1.05;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
         this._hexTile = null;
@@ -65,8 +71,16 @@ export class SlitherRenderer {
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
-        this._onMouseDown = () => { this.boost = true; this._emitInput?.(); };
-        this._onMouseUp = () => { this.boost = false; this._emitInput?.(); };
+        this._onMouseDown = (e) => {
+            if (e.target !== this.canvas) return;
+            this.boost = true;
+            this._emitInput?.();
+        };
+        this._onMouseUp = (e) => {
+            if (e.target !== this.canvas) return;
+            this.boost = false;
+            this._emitInput?.();
+        };
         this._onTouchMove = (e) => {
             e.preventDefault();
             const t = e.touches[0];
@@ -249,9 +263,9 @@ export class SlitherRenderer {
         cv.height = Math.round(th * S);
         const g = cv.getContext('2d');
         g.scale(S, S);
-        g.strokeStyle = 'rgba(255, 255, 255, 0.045)';
-        g.fillStyle = 'rgba(255, 255, 255, 0.006)';
-        g.lineWidth = 1.1;
+        g.strokeStyle = 'rgba(180, 180, 190, 0.11)';
+        g.fillStyle = 'rgba(255, 255, 255, 0.018)';
+        g.lineWidth = 1.15;
 
         const hexAt = (hx, hy) => {
             g.beginPath();
@@ -297,7 +311,7 @@ export class SlitherRenderer {
             W / 2, H / 2, Math.hypot(W, H) * 0.62,
         );
         grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.38)');
         g.fillStyle = grad;
         g.fillRect(0, 0, W, H);
         this._vignette = cv;
@@ -306,7 +320,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#060608';
+        ctx.fillStyle = '#0f1014';
         ctx.fillRect(0, 0, W, H);
 
         // Hex grid: fill the visible world rect with the cached repeating pattern
@@ -385,27 +399,29 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Compact food pellet — tight glow, no huge transparent halos. */
+    /** Glowing orb — slither.io-style bloom. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * 1.45);
-        const key = `f2|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
-        return this._getSprite(key, halo * 2 + 2, (g, sz) => {
+        const halo = Math.ceil(rPx * 2.4);
+        const key = `f4|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             if (golden) {
                 const grad = g.createRadialGradient(c, c, 0, c, c, halo);
-                grad.addColorStop(0, 'hsla(52, 100%, 92%, 1)');
-                grad.addColorStop(0.35, 'hsla(48, 100%, 65%, 0.95)');
-                grad.addColorStop(0.7, 'hsla(48, 100%, 58%, 0.45)');
-                grad.addColorStop(1, 'hsla(48, 100%, 55%, 0)');
+                grad.addColorStop(0, 'hsla(52, 100%, 96%, 1)');
+                grad.addColorStop(0.25, 'hsla(48, 100%, 72%, 0.98)');
+                grad.addColorStop(0.55, 'hsla(48, 100%, 58%, 0.55)');
+                grad.addColorStop(1, 'hsla(48, 100%, 50%, 0)');
                 g.fillStyle = grad;
                 g.fillRect(0, 0, sz, sz);
                 return;
             }
+            const sat = deathDrop ? 100 : 95;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
-            grad.addColorStop(0, `hsla(${hue}, 100%, 88%, 1)`);
-            grad.addColorStop(0.4, `hsla(${hue}, 95%, 62%, ${deathDrop ? 0.95 : 0.85})`);
-            grad.addColorStop(0.75, `hsla(${hue}, 90%, 55%, 0.25)`);
-            grad.addColorStop(1, `hsla(${hue}, 90%, 50%, 0)`);
+            grad.addColorStop(0, `hsla(${hue}, ${sat}%, 95%, 1)`);
+            grad.addColorStop(0.22, `hsla(${hue}, ${sat}%, 72%, 0.98)`);
+            grad.addColorStop(0.5, `hsla(${hue}, ${sat}%, 58%, ${deathDrop ? 0.75 : 0.65})`);
+            grad.addColorStop(0.78, `hsla(${hue}, ${sat}%, 52%, 0.22)`);
+            grad.addColorStop(1, `hsla(${hue}, ${sat}%, 48%, 0)`);
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
         });
@@ -444,16 +460,17 @@ export class SlitherRenderer {
     }
 
     _drawFood(ctx, food, toScreen, W, H, zoom) {
-        const SPRITE_R = 2.5;
+        const SPRITE_R = 5;
         for (const f of food) {
             const miss = f._missStreak || 0;
             if (miss > 8) continue;
 
             const { x: fx, y: fy } = toScreen(f.x, f.y);
-            if (fx < -80 || fy < -80 || fx > W + 80 || fy > H + 80) continue;
+            if (fx < -120 || fy < -120 || fx > W + 120 || fy > H + 120) continue;
 
-            const screenR = Math.max(1.2, (f.radius || 2) * zoom * 0.55);
-            const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 15) * 15;
+            const baseR = f.deathDrop ? (f.radius || 3) * 1.35 : (f.radius || 3);
+            const screenR = Math.max(5, baseR * zoom * 1.05);
+            const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
             const sprite = this._foodSprite(hue, SPRITE_R, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / SPRITE_R);
             const half = size / 2;
@@ -464,83 +481,56 @@ export class SlitherRenderer {
         }
     }
 
-    _drawSnakeSegment(ctx, sx, sy, radius, color, isHead, angle, boost, shimmer) {
-        const base = parseColor(color);
-        const light = shadeColor(base, 55);
-        const dark = shadeColor(base, -45);
-
-        if (boost && shimmer) {
-            ctx.beginPath();
-            ctx.arc(sx, sy, radius + 4, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255,255,255,${0.12 + Math.sin(shimmer) * 0.08})`;
-            ctx.fill();
+    /** Stripe palette per snake — solid, white stripe, or dark stripe. */
+    _snakePalette(snake) {
+        const primary = snake.isYou ? '#9945FF' : (snake.color || '#FF8C42');
+        let hash = 0;
+        const id = String(snake.id || snake.name || '');
+        for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+        const mode = Math.abs(hash) % 3;
+        if (mode === 0 || snake.isYou) {
+            return { primary, secondary: primary, striped: false };
         }
-
-        const grad = ctx.createRadialGradient(
-            sx - radius * 0.35, sy - radius * 0.35, radius * 0.1,
-            sx, sy, radius,
-        );
-        grad.addColorStop(0, rgb(light));
-        grad.addColorStop(0.45, rgb(base));
-        grad.addColorStop(1, rgb(dark));
-
-        ctx.beginPath();
-        ctx.arc(sx, sy, radius, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(sx, sy, radius, 0, Math.PI * 2);
-        ctx.strokeStyle = rgb(dark, 0.55);
-        ctx.lineWidth = Math.max(1, radius * 0.12);
-        ctx.stroke();
-
-        if (isHead) {
-            const eyeOffset = radius * 0.42;
-            const eyeR = Math.max(1.5, radius * 0.22);
-            const perpX = Math.sin(angle);
-            const perpY = -Math.cos(angle);
-            const fwdX = Math.cos(angle);
-            const fwdY = Math.sin(angle);
-
-            for (const side of [-1, 1]) {
-                const ex = sx + fwdX * eyeOffset * 0.35 + perpX * eyeOffset * side;
-                const ey = sy + fwdY * eyeOffset * 0.35 + perpY * eyeOffset * side;
-                ctx.beginPath();
-                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-                ctx.fillStyle = '#fff';
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(ex + fwdX * eyeR * 0.35, ey + fwdY * eyeR * 0.35, eyeR * 0.55, 0, Math.PI * 2);
-                ctx.fillStyle = '#111';
-                ctx.fill();
-            }
+        if (mode === 1) {
+            return { primary, secondary: '#FFFFFF', striped: true };
         }
+        const base = parseColor(primary);
+        const secondary = toHex(shadeColor(base, -55));
+        return { primary, secondary, striped: true };
     }
 
-    /** Body-circle sprite per (color, radius) — gradient baked once, blitted many times. */
-    _bodySprite(colorHex, rPx, band = false) {
-        const key = `b3|${colorHex}|${rPx}|${band ? 1 : 0}`;
-        return this._getSprite(key, (rPx + 2) * 2, (g, sz) => {
+    /** Overlapping segment circle with colored outer glow — slither.io style. */
+    _bodySprite(colorHex, rPx) {
+        const glow = Math.ceil(rPx * 0.65);
+        const total = rPx + glow;
+        const key = `b4|${colorHex}|${rPx}`;
+        return this._getSprite(key, total * 2 + 2, (g, sz) => {
             const c = sz / 2;
             const base = parseColor(colorHex);
-            const lit = band ? shadeColor(base, 38) : base;
-            // Top highlight → base → dark belly rim, like slither.io's shaded scales
-            const grad = g.createRadialGradient(c - rPx * 0.3, c - rPx * 0.42, rPx * 0.05, c, c, rPx);
-            grad.addColorStop(0, rgb(shadeColor(lit, 62)));
-            grad.addColorStop(0.35, rgb(shadeColor(lit, 18)));
-            grad.addColorStop(0.72, rgb(lit));
-            grad.addColorStop(1, rgb(shadeColor(lit, -62)));
+
+            // Soft colored aura
+            const aura = g.createRadialGradient(c, c, rPx * 0.15, c, c, total);
+            aura.addColorStop(0, rgb(base, 0.55));
+            aura.addColorStop(0.55, rgb(base, 0.18));
+            aura.addColorStop(1, rgb(base, 0));
+            g.fillStyle = aura;
+            g.beginPath();
+            g.arc(c, c, total, 0, Math.PI * 2);
+            g.fill();
+
+            // 3D segment: bright top-left highlight, darker bottom edge
+            const grad = g.createRadialGradient(
+                c - rPx * 0.28, c - rPx * 0.38, rPx * 0.04,
+                c, c, rPx,
+            );
+            grad.addColorStop(0, rgb(shadeColor(base, 72)));
+            grad.addColorStop(0.38, rgb(shadeColor(base, 28)));
+            grad.addColorStop(0.72, rgb(base));
+            grad.addColorStop(1, rgb(shadeColor(base, -58)));
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, rPx, 0, Math.PI * 2);
             g.fill();
-            // Thin dark rim for a crisp edge
-            g.beginPath();
-            g.arc(c, c, rPx - 0.5, 0, Math.PI * 2);
-            g.strokeStyle = rgb(shadeColor(base, -80), 0.45);
-            g.lineWidth = 1;
-            g.stroke();
         });
     }
 
@@ -551,10 +541,10 @@ export class SlitherRenderer {
 
         const thick = this.snakeThickness ?? 1;
         const headRadius = (snake.radius || 6) * zoom * thick;
-        const bodyRadius = headRadius * 0.94;
+        const bodyRadius = headRadius * 0.96;
         const angle = snake.angle || 0;
-        const baseHex = snake.isYou ? '#7C58FF' : (snake.color || '#888888');
-        const base = parseColor(baseHex);
+        const palette = this._snakePalette(snake);
+        const base = parseColor(palette.primary);
         const light = shadeColor(base, 55);
 
         const pts = [];
@@ -562,112 +552,92 @@ export class SlitherRenderer {
             pts.push(toScreen(segs[i].x, segs[i].y));
         }
 
-        const onScreen = pts.some(p => p.x > -100 && p.y > -100 && p.x < this.W + 100 && p.y < this.H + 100);
+        const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(4, bodyRadius * 0.62);
+        // Tight overlap — slither.io segments sit ~50% on top of each other
+        const bumpStep = Math.max(3, bodyRadius * 0.48);
         const bumps = this._densifySpine(pts, bumpStep);
 
-        // Boost glow: pulsing halo in the snake's own color, under everything
+        // Boost trail glow
         if (snake.boost) {
-            const pulse = 0.30 + 0.14 * Math.sin(this._frame * 0.35);
+            const pulse = 0.35 + 0.12 * Math.sin(this._frame * 0.35);
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
             ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
             for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
-            ctx.lineWidth = bodyRadius * 2 + Math.max(8, bodyRadius * 0.9);
+            ctx.lineWidth = bodyRadius * 2 + 10;
             ctx.strokeStyle = rgb(light, pulse);
             ctx.stroke();
             ctx.restore();
         }
 
-        // Soft dark underlay so the body pops off the dark floor
-        ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
-        for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
-        ctx.lineWidth = bodyRadius * 2 + 4;
-        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-        ctx.stroke();
-        ctx.restore();
-
-        // Body circles, tail → head, tapering over the last stretch.
-        // Every few bumps a lighter "band" circle fakes slither.io's ring stripes.
         const headScreen = pts[0];
-        const skipNearHead = headRadius * 1.2;
-        const taperCount = Math.min(bumps.length - 1, Math.max(6, Math.round(bumps.length * 0.22)));
-        const bandEvery = Math.max(3, Math.round((bodyRadius * 2.1) / bumpStep));
+        const skipNearHead = headRadius * 0.85;
+        const taperLen = Math.min(8, Math.max(4, Math.round(bumps.length * 0.08)));
 
-        for (let i = bumps.length - 1; i >= 1; i--) {
+        // Body segments tail → head
+        for (let i = bumps.length - 1; i >= 0; i--) {
             const p = bumps[i];
-            if (Math.hypot(p.x - headScreen.x, p.y - headScreen.y) < skipNearHead) continue;
-            if (p.x < -60 || p.y < -60 || p.x > this.W + 60 || p.y > this.H + 60) continue;
+            const isHeadBump = i === 0;
+            if (!isHeadBump && Math.hypot(p.x - headScreen.x, p.y - headScreen.y) < skipNearHead) continue;
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const fromTail = bumps.length - 1 - i;
             let rf = 1;
-            if (fromTail < taperCount) {
-                const t = fromTail / taperCount;
-                rf = 0.45 + 0.55 * t;
+            if (!isHeadBump && fromTail < taperLen) {
+                rf = 0.55 + 0.45 * (fromTail / taperLen);
+            } else if (isHeadBump) {
+                rf = 1.06;
             }
-            const r = Math.max(2, Math.round(bodyRadius * rf));
-            const band = i % bandEvery === 0;
-            const sprite = this._bodySprite(baseHex, r, band);
+
+            const r = Math.max(2.5, Math.round(bodyRadius * rf));
+            const segColor = palette.striped && i % 2 === 1 ? palette.secondary : palette.primary;
+            const sprite = this._bodySprite(segColor, r);
             const half = sprite.width / 2;
             ctx.drawImage(sprite, p.x - half, p.y - half);
         }
 
-        // Head — slightly bigger than the body, like slither.io
+        // Googly eyes on head
         const { x: hx, y: hy } = pts[0];
-        const rHead = Math.max(2, Math.round(headRadius * 1.04));
-        const headSprite = this._bodySprite(baseHex, rHead);
-        ctx.drawImage(headSprite, hx - headSprite.width / 2, hy - headSprite.width / 2);
-
-        // Big cartoonish eyes with pupils that look where the snake is heading
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headRadius * 0.52;
-        const eyeFwd = headRadius * 0.32;
-        const eyeR = Math.max(2.5, headRadius * 0.38);
-        const pupilR = eyeR * 0.52;
+        const eyeSide = headRadius * 0.46;
+        const eyeFwd = headRadius * 0.28;
+        const eyeR = Math.max(3, headRadius * 0.36);
+        const pupilR = eyeR * 0.48;
+
         for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
-            // Sclera with subtle dark outline
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
+            ctx.fillStyle = '#ffffff';
             ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-            ctx.lineWidth = Math.max(1, eyeR * 0.12);
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.lineWidth = Math.max(1, eyeR * 0.1);
             ctx.stroke();
-            // Pupil pushed toward travel direction
-            const px = ex + fwdX * (eyeR - pupilR) * 0.75;
-            const py = ey + fwdY * (eyeR - pupilR) * 0.75;
+
+            const px = ex + fwdX * eyeR * 0.55;
+            const py = ey + fwdY * eyeR * 0.55;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-            ctx.fillStyle = '#15151c';
-            ctx.fill();
-            // Tiny specular glint
-            ctx.beginPath();
-            ctx.arc(px - pupilR * 0.3, py - pupilR * 0.3, pupilR * 0.28, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.fillStyle = '#1a1a22';
             ctx.fill();
         }
 
         if (snake.name) {
-            ctx.fillStyle = 'rgba(255,255,255,0.92)';
-            ctx.font = `bold ${Math.max(11, headRadius * 0.95)}px Arial, sans-serif`;
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.font = `bold ${Math.max(12, headRadius * 0.85)}px Arial, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
             ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headRadius - 10);
-            ctx.fillText(snake.name, hx, hy - headRadius - 10);
+            ctx.strokeText(snake.name, hx, hy - headRadius - 12);
+            ctx.fillText(snake.name, hx, hy - headRadius - 12);
         }
     }
 
@@ -769,11 +739,21 @@ export class SlitherRenderer {
             this._drawSnake(snake, toScreen, zoom);
         }
 
-        // Balance badge only — cashout timer lives in the React HUD (no canvas rings)
+        // Balance badge + cashout rings on your snake head
         if (me?.segments?.[0]) {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
+            const { holdProgress, cashoutSeconds, cashoutTotal } = this.hud;
+
+            if (holdProgress > 0 && cashoutSeconds <= 0) {
+                drawCashoutProgressRing(ctx, hx, hy, headRadius + 12, holdProgress, { counterClockwise: true });
+            }
+            if (cashoutSeconds > 0) {
+                const progress = cashoutSeconds / (cashoutTotal || 10);
+                drawCashoutProgressRing(ctx, hx, hy, headRadius + 12, progress, { pulse: true });
+            }
+
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
         }
     }

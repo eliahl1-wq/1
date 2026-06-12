@@ -135,11 +135,13 @@ export default function SlitherGame() {
 
 
     const canCashOutRef = useRef(false);
-    canCashOutRef.current = !isBattleRoyale && localTimer <= 0 && cashedAmount === null && !isDead;
+    canCashOutRef.current = !isBattleRoyale && gameReady && isConnected
+        && localTimer <= 0 && cashedAmount === null && !isDead;
 
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
-        socketRef.current?.emit('cashOut');
+        if (!socketRef.current?.connected) return;
+        socketRef.current.emit('cashOut');
     }, []);
 
     const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
@@ -147,11 +149,14 @@ export default function SlitherGame() {
         onComplete: handleCashOut,
     });
 
+    const cashoutReady = !isBattleRoyale && gameReady && isConnected
+        && localTimer <= 0 && cashedAmount === null && !isDead;
+
     const cashoutButtonHoldProps = {
-        onMouseDown: (e) => { e.preventDefault(); startHold(); },
+        onMouseDown: (e) => { e.preventDefault(); if (cashoutReady) startHold(); },
         onMouseUp: cancelHold,
         onMouseLeave: cancelHold,
-        onTouchStart: (e) => { e.preventDefault(); startHold(); },
+        onTouchStart: (e) => { e.preventDefault(); if (cashoutReady) startHold(); },
         onTouchEnd: cancelHold,
         onTouchCancel: cancelHold,
         onContextMenu: (e) => e.preventDefault(),
@@ -759,33 +764,47 @@ export default function SlitherGame() {
                     {!isBattleRoyale && (
                     <button
                         {...cashoutButtonHoldProps}
-                        disabled={localTimer > 0 || isDead || cashedAmount !== null}
+                        disabled={!cashoutReady}
 
                         style={{
                             width: '100%',
                             boxSizing: 'border-box',
-                            background: localTimer > 0 ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
-                            color: localTimer > 0 ? 'rgba(255,255,255,0.2)' : '#001a0d',
-                            border: localTimer > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            background: !cashoutReady ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
+                            color: !cashoutReady ? 'rgba(255,255,255,0.2)' : '#001a0d',
+                            border: !cashoutReady ? '1px solid rgba(255,255,255,0.06)' : 'none',
                             padding: '10px 14px',
                             borderRadius: '12px',
                             fontWeight: '800',
                             fontSize: '0.75rem',
                             letterSpacing: '0.6px',
 
-                            cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
+                            cursor: !cashoutReady ? 'not-allowed' : 'pointer',
 
                             transition: '0.2s all ease',
 
-                            boxShadow: localTimer > 0 ? 'none' : '0 4px 20px rgba(20, 241, 149, 0.2)',
+                            boxShadow: !cashoutReady ? 'none' : '0 4px 20px rgba(20, 241, 149, 0.2)',
 
-                            opacity: localTimer > 0 ? 0.6 : 1,
+                            opacity: !cashoutReady ? 0.6 : 1,
 
                         }}
 
                     >
-
-                        Q · CASH OUT
+                        {holdProgress > 0 && cashoutReady && (
+                            <div style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: `${holdProgress * 100}%`,
+                                background: 'rgba(0, 26, 13, 0.35)',
+                                pointerEvents: 'none',
+                            }} />
+                        )}
+                        <span style={{ position: 'relative', zIndex: 1 }}>
+                            {holdProgress > 0 ? `HOLD… ${Math.round(holdProgress * 100)}%` : 'Q · CASH OUT'}
+                        </span>
                     </button>
                     )}
 
