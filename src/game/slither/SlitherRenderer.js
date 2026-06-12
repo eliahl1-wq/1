@@ -291,11 +291,12 @@ export class SlitherRenderer {
      */
     _getHexPattern(ctx) {
         if (this._hexPattern) return this._hexPattern;
-        const R = 16; // hex ≈ 2.3x snake width on screen, like the real game
+        const R = 16; // hex ≈ 2.5x snake width on screen, like the real game
         const S = 6; // supersample so the pattern stays crisp at zoom ~3
         const sqrt3 = Math.sqrt(3);
-        const tw = 3 * R;
-        const th = sqrt3 * R;
+        // Pointy-top hexes (vertical side edges) — period (sqrt3*R, 3R)
+        const tw = sqrt3 * R;
+        const th = 3 * R;
 
         const cv = document.createElement('canvas');
         cv.width = Math.round(tw * S);
@@ -303,39 +304,40 @@ export class SlitherRenderer {
         const g = cv.getContext('2d');
         g.scale(S, S);
 
-        // Lighter blue-gray seams show between the dark tiles
-        g.fillStyle = '#34373e';
+        // Thin light ridge that shows through the dark grooves between tiles
+        g.fillStyle = '#3a3f48';
         g.fillRect(0, 0, tw, th);
 
-        // Dark beveled tile, slightly inset, rounded corners via thick stroke
-        const inset = R * 0.90;
+        // Tile face shades darker toward the rim → dark groove around each
+        // tile with the light ridge as the shared boundary (embossed look)
+        const inset = R * 0.965;
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
-                const a = (Math.PI / 3) * i;
+                const a = (Math.PI / 3) * i + Math.PI / 6;
                 const px = hx + inset * Math.cos(a);
                 const py = hy + inset * Math.sin(a);
                 if (i === 0) g.moveTo(px, py);
                 else g.lineTo(px, py);
             }
             g.closePath();
-            // Subtle top-lit bevel: lighter at the top, darker at the bottom
-            const grad = g.createLinearGradient(hx, hy - R, hx, hy + R);
-            grad.addColorStop(0, '#24262c');
-            grad.addColorStop(0.5, '#1c1e23');
-            grad.addColorStop(1, '#16181c');
+            const grad = g.createRadialGradient(hx, hy, R * 0.2, hx, hy, R);
+            grad.addColorStop(0, '#23272f');
+            grad.addColorStop(0.78, '#1f242b');
+            grad.addColorStop(0.93, '#181b21');
+            grad.addColorStop(1, '#101318');
             g.fillStyle = grad;
-            g.strokeStyle = grad;
+            g.strokeStyle = '#101318';
             g.lineJoin = 'round';
-            g.lineWidth = R * 0.14;
+            g.lineWidth = R * 0.07;
             g.fill();
             g.stroke();
         };
 
-        // Flat-top hex lattice: period (3R, sqrt(3)R), offset column halfway
+        // Pointy-top hex lattice: offset row halfway
         for (const [hx, hy] of [
             [0, 0], [tw, 0], [0, th], [tw, th],
-            [tw / 2, th / 2], [tw / 2, -th / 2], [tw / 2, th * 1.5],
+            [tw / 2, th / 2], [-tw / 2, th / 2], [tw * 1.5, th / 2],
         ]) {
             hexAt(hx, hy);
         }
@@ -371,7 +373,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#1a1c21';
+        ctx.fillStyle = '#1e2126';
         ctx.fillRect(0, 0, W, H);
 
         // Hex grid: fill the visible world rect with the cached repeating pattern
@@ -533,23 +535,22 @@ export class SlitherRenderer {
     }
 
     /**
-     * Glossy ball segment, lit from straight above in screen space — overlapping
-     * these gives the scalloped slither.io body. No aura/glow around it.
+     * Ball segment lit from its center — when these overlap densely the
+     * bright cores merge into a glossy band along the spine and the darkened
+     * rims become the subtle ring shading between bumps, exactly like the
+     * slither.io tube.
      */
     _bodySprite(colorHex, rPx) {
-        const key = `b5|${colorHex}|${rPx}`;
+        const key = `b6|${colorHex}|${rPx}`;
         return this._getSprite(key, (rPx + 1) * 2, (g, sz) => {
             const c = sz / 2;
             const base = parseColor(colorHex);
-            const grad = g.createRadialGradient(
-                c, c - rPx * 0.45, rPx * 0.08,
-                c, c, rPx,
-            );
-            grad.addColorStop(0, rgb(shadeColor(base, 64)));
-            grad.addColorStop(0.32, rgb(shadeColor(base, 22)));
-            grad.addColorStop(0.62, rgb(base));
-            grad.addColorStop(0.88, rgb(shadeColor(base, -34)));
-            grad.addColorStop(1, rgb(shadeColor(base, -70)));
+            const grad = g.createRadialGradient(c, c, rPx * 0.05, c, c, rPx);
+            grad.addColorStop(0, rgb(shadeColor(base, 58)));
+            grad.addColorStop(0.40, rgb(shadeColor(base, 16)));
+            grad.addColorStop(0.72, rgb(base));
+            grad.addColorStop(0.92, rgb(shadeColor(base, -38)));
+            grad.addColorStop(1, rgb(shadeColor(base, -68)));
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -580,9 +581,32 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        // Segment spacing wide enough that the scalloped bumps read clearly
-        const bumpStep = Math.max(3, bodyRadius * 0.62);
+        // Ring spacing ~0.65R: the center-lit sprites merge into a smooth
+        // tube while the darkened rims show as the transverse ring shading
+        // along the body, matching the real game's scallops
+        const bumpStep = Math.max(2, bodyRadius * 0.65);
         const bumps = this._densifySpine(pts, bumpStep);
+
+        const spinePath = () => {
+            ctx.beginPath();
+            ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
+            for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
+        };
+
+        // Soft drop shadow onto the floor (two widening passes fake the blur)
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.translate(0, bodyRadius * 0.22);
+        spinePath();
+        ctx.lineWidth = bodyRadius * 2 + 12;
+        ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+        ctx.stroke();
+        spinePath();
+        ctx.lineWidth = bodyRadius * 2 + 5;
+        ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+        ctx.stroke();
+        ctx.restore();
 
         // Boost trail glow
         if (snake.boost) {
@@ -590,33 +614,23 @@ export class SlitherRenderer {
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
-            for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
+            spinePath();
             ctx.lineWidth = bodyRadius * 2 + 10;
             ctx.strokeStyle = rgb(light, pulse);
             ctx.stroke();
             ctx.restore();
         }
 
-        const headScreen = pts[0];
-        const skipNearHead = headRadius * 0.85;
-        const taperLen = Math.min(8, Math.max(4, Math.round(bumps.length * 0.08)));
+        // Constant-width tube tail → head; only the last few bumps taper
+        // into the rounded tail tip. Head is the same width as the body.
+        const taperLen = Math.min(5, Math.max(3, Math.round(bumps.length * 0.05)));
 
-        // Body segments tail → head
         for (let i = bumps.length - 1; i >= 0; i--) {
             const p = bumps[i];
-            const isHeadBump = i === 0;
-            if (!isHeadBump && Math.hypot(p.x - headScreen.x, p.y - headScreen.y) < skipNearHead) continue;
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const fromTail = bumps.length - 1 - i;
-            let rf = 1;
-            if (!isHeadBump && fromTail < taperLen) {
-                rf = 0.55 + 0.45 * (fromTail / taperLen);
-            } else if (isHeadBump) {
-                rf = 1.06;
-            }
+            const rf = fromTail < taperLen ? 0.62 + 0.38 * (fromTail / taperLen) : 1;
 
             const r = Math.max(2.5, Math.round(bodyRadius * rf));
             const sprite = this._bodySprite(colorHex, r);
@@ -624,16 +638,16 @@ export class SlitherRenderer {
             ctx.drawImage(sprite, p.x - half, p.y - half);
         }
 
-        // Small white eyes near the front of the head, like the real game
+        // Two round white eyes at the very front of the head
         const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headRadius * 0.42;
-        const eyeFwd = headRadius * 0.38;
-        const eyeR = Math.max(2.5, headRadius * 0.30);
-        const pupilR = eyeR * 0.55;
+        const eyeSide = headRadius * 0.44;
+        const eyeFwd = headRadius * 0.5;
+        const eyeR = Math.max(2.5, headRadius * 0.34);
+        const pupilR = eyeR * 0.5;
 
         for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
@@ -643,11 +657,11 @@ export class SlitherRenderer {
             ctx.fillStyle = '#ffffff';
             ctx.fill();
 
-            const px = ex + fwdX * eyeR * 0.4;
-            const py = ey + fwdY * eyeR * 0.4;
+            const px = ex + fwdX * eyeR * 0.42;
+            const py = ey + fwdY * eyeR * 0.42;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-            ctx.fillStyle = '#111114';
+            ctx.fillStyle = '#101014';
             ctx.fill();
         }
 
