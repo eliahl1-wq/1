@@ -290,15 +290,14 @@ export class SlitherRenderer {
      * frame was a major frame-time cost.
      */
     _getHexPattern(ctx) {
-        const VER = 4;
+        const VER = 5;
         if (this._hexPattern && this._hexPatternVer === VER) return this._hexPattern;
         this._hexPattern = null;
         const R = 20;
         const S = 6;
         const sqrt3 = Math.sqrt(3);
-        // Pointy-top hex lattice (vertex up/down)
-        const tw = sqrt3 * R;
-        const th = 3 * R;
+        const tw = 3 * R;
+        const th = sqrt3 * R;
 
         const cv = document.createElement('canvas');
         cv.width = Math.round(tw * S);
@@ -306,26 +305,27 @@ export class SlitherRenderer {
         const g = cv.getContext('2d');
         g.scale(S, S);
 
-        g.fillStyle = '#15171a';
+        // Dark gap between tiles
+        g.fillStyle = '#101215';
         g.fillRect(0, 0, tw, th);
 
         const inset = R * 0.66;
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
-                const a = (Math.PI / 3) * i + Math.PI / 6;
+                const a = (Math.PI / 3) * i;
                 const px = hx + inset * Math.cos(a);
                 const py = hy + inset * Math.sin(a);
                 if (i === 0) g.moveTo(px, py);
                 else g.lineTo(px, py);
             }
             g.closePath();
-            const grad = g.createRadialGradient(hx, hy, inset * 0.15, hx, hy, inset);
-            grad.addColorStop(0, '#1c1e22');
-            grad.addColorStop(0.55, '#191b1f');
-            grad.addColorStop(1, '#17191d');
+            const grad = g.createRadialGradient(hx, hy, inset * 0.12, hx, hy, inset);
+            grad.addColorStop(0, '#262a31');
+            grad.addColorStop(0.6, '#21252b');
+            grad.addColorStop(1, '#1a1d22');
             g.fillStyle = grad;
-            g.strokeStyle = '#141618';
+            g.strokeStyle = '#151820';
             g.lineJoin = 'round';
             g.lineWidth = R * 0.05;
             g.fill();
@@ -334,7 +334,7 @@ export class SlitherRenderer {
 
         for (const [hx, hy] of [
             [0, 0], [tw, 0], [0, th], [tw, th],
-            [tw / 2, th / 2], [-tw / 2, th / 2], [tw * 1.5, th / 2],
+            [tw / 2, th / 2], [tw / 2, -th / 2], [tw / 2, th * 1.5],
         ]) {
             hexAt(hx, hy);
         }
@@ -342,13 +342,8 @@ export class SlitherRenderer {
         this._hexTile = cv;
         this._hexPattern = ctx.createPattern(cv, 'repeat');
         this._hexPatternVer = VER;
-        // Scale + rotate the repeat lattice so hex edges sit on a diagonal
-        if (this._hexPattern.setTransform) {
-            const rad = Math.PI / 6;
-            const sc = 1 / S;
-            const c = Math.cos(rad) * sc;
-            const s = Math.sin(rad) * sc;
-            this._hexPattern.setTransform(new DOMMatrix([c, s, -s, c, 0, 0]));
+        if (this._hexPattern?.setTransform) {
+            this._hexPattern.setTransform(new DOMMatrix([1 / S, 0, 0, 1 / S, 0, 0]));
         }
         return this._hexPattern;
     }
@@ -375,22 +370,23 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#15171a';
+        ctx.fillStyle = '#101215';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getHexPattern(ctx);
-        ctx.save();
-        ctx.translate(W / 2, H / 2);
-        ctx.scale(zoom, zoom);
-        ctx.translate(-cx, -cy);
-        ctx.fillStyle = pattern;
-        const vw = W / zoom;
-        const vh = H / zoom;
-        const margin = 160;
-        // Center on camera (origin after translate) — using cx/cy here caused
-        // a gray box edge that followed the player
-        ctx.fillRect(-vw / 2 - margin, -vh / 2 - margin, vw + margin * 2, vh + margin * 2);
-        ctx.restore();
+        if (pattern) {
+            ctx.save();
+            ctx.translate(W / 2, H / 2);
+            ctx.scale(zoom, zoom);
+            ctx.translate(-cx, -cy);
+            ctx.rotate(Math.PI / 6);
+            ctx.fillStyle = pattern;
+            const vw = W / zoom;
+            const vh = H / zoom;
+            const pad = Math.hypot(vw, vh) * 0.65;
+            ctx.fillRect(-vw / 2 - pad, -vh / 2 - pad, vw + pad * 2, vh + pad * 2);
+            ctx.restore();
+        }
 
         // Red death zone outside playable square (slither.io style)
         const limit = worldHalf;
