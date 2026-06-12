@@ -249,9 +249,9 @@ export class SlitherRenderer {
         cv.height = Math.round(th * S);
         const g = cv.getContext('2d');
         g.scale(S, S);
-        g.strokeStyle = 'rgba(255, 255, 255, 0.085)';
-        g.fillStyle = 'rgba(255, 255, 255, 0.012)';
-        g.lineWidth = 1.2;
+        g.strokeStyle = 'rgba(255, 255, 255, 0.045)';
+        g.fillStyle = 'rgba(255, 255, 255, 0.006)';
+        g.lineWidth = 1.1;
 
         const hexAt = (hx, hy) => {
             g.beginPath();
@@ -284,8 +284,29 @@ export class SlitherRenderer {
         return this._hexPattern;
     }
 
+    /** Cached edge-darkening vignette, slither.io style. */
+    _getVignette(W, H) {
+        const key = `${W}x${H}`;
+        if (this._vignette && this._vigKey === key) return this._vignette;
+        const cv = document.createElement('canvas');
+        cv.width = W;
+        cv.height = H;
+        const g = cv.getContext('2d');
+        const grad = g.createRadialGradient(
+            W / 2, H / 2, Math.min(W, H) * 0.35,
+            W / 2, H / 2, Math.hypot(W, H) * 0.62,
+        );
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, W, H);
+        this._vignette = cv;
+        this._vigKey = key;
+        return cv;
+    }
+
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#0d0d12';
+        ctx.fillStyle = '#060608';
         ctx.fillRect(0, 0, W, H);
 
         // Hex grid: fill the visible world rect with the cached repeating pattern
@@ -307,15 +328,21 @@ export class SlitherRenderer {
         const playW = br.x - tl.x;
         const playH = br.y - tl.y;
         ctx.save();
-        ctx.fillStyle = 'rgba(110, 8, 14, 0.94)';
+        ctx.fillStyle = 'rgba(72, 4, 9, 0.96)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.rect(tl.x, tl.y, playW, playH);
         ctx.fill('evenodd');
-        ctx.strokeStyle = 'rgba(255, 75, 75, 0.95)';
-        ctx.lineWidth = 4;
+        // Soft inner glow on the border, then a crisp line
+        ctx.strokeStyle = 'rgba(255, 45, 45, 0.28)';
+        ctx.lineWidth = 14;
+        ctx.strokeRect(tl.x, tl.y, playW, playH);
+        ctx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
+        ctx.lineWidth = 3;
         ctx.strokeRect(tl.x, tl.y, playW, playH);
         ctx.restore();
+
+        ctx.drawImage(this._getVignette(W, H), 0, 0);
     }
 
     /** Insert extra points between spine nodes so the body has slither.io-style bumps. */
@@ -343,7 +370,7 @@ export class SlitherRenderer {
         const screenRadius = zone.radius * this.zoom;
 
         ctx.save();
-        ctx.fillStyle = 'rgba(110, 8, 14, 0.88)';
+        ctx.fillStyle = 'rgba(72, 4, 9, 0.9)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2, true);
@@ -492,19 +519,28 @@ export class SlitherRenderer {
     }
 
     /** Body-circle sprite per (color, radius) — gradient baked once, blitted many times. */
-    _bodySprite(colorHex, rPx) {
-        const key = `b|${colorHex}|${rPx}`;
+    _bodySprite(colorHex, rPx, band = false) {
+        const key = `b3|${colorHex}|${rPx}|${band ? 1 : 0}`;
         return this._getSprite(key, (rPx + 2) * 2, (g, sz) => {
             const c = sz / 2;
             const base = parseColor(colorHex);
-            const grad = g.createRadialGradient(c - rPx * 0.35, c - rPx * 0.35, rPx * 0.08, c, c, rPx);
-            grad.addColorStop(0, rgb(shadeColor(base, 45)));
-            grad.addColorStop(0.5, rgb(base));
-            grad.addColorStop(1, rgb(shadeColor(base, -55)));
+            const lit = band ? shadeColor(base, 38) : base;
+            // Top highlight → base → dark belly rim, like slither.io's shaded scales
+            const grad = g.createRadialGradient(c - rPx * 0.3, c - rPx * 0.42, rPx * 0.05, c, c, rPx);
+            grad.addColorStop(0, rgb(shadeColor(lit, 62)));
+            grad.addColorStop(0.35, rgb(shadeColor(lit, 18)));
+            grad.addColorStop(0.72, rgb(lit));
+            grad.addColorStop(1, rgb(shadeColor(lit, -62)));
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, rPx, 0, Math.PI * 2);
             g.fill();
+            // Thin dark rim for a crisp edge
+            g.beginPath();
+            g.arc(c, c, rPx - 0.5, 0, Math.PI * 2);
+            g.strokeStyle = rgb(shadeColor(base, -80), 0.45);
+            g.lineWidth = 1;
+            g.stroke();
         });
     }
 
@@ -529,63 +565,98 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -100 && p.y > -100 && p.x < this.W + 100 && p.y < this.H + 100);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(4, bodyRadius * 0.72);
+        const bumpStep = Math.max(4, bodyRadius * 0.62);
         const bumps = this._densifySpine(pts, bumpStep);
 
-        // Body circles only — skip near head so we don't get a double-ring halo
-        const headScreen = pts[0];
-        const skipNearHead = headRadius * 1.35;
-
-        const rTail = Math.max(2, Math.round(bodyRadius * 0.9));
-        const rFront = Math.max(2, Math.round(bodyRadius));
-        const spriteTail = this._bodySprite(baseHex, rTail);
-        const spriteFront = this._bodySprite(baseHex, rFront);
-        const split = bumps.length * 0.45;
-        for (let i = bumps.length - 1; i >= 1; i--) {
-            const p = bumps[i];
-            if (Math.hypot(p.x - headScreen.x, p.y - headScreen.y) < skipNearHead) continue;
-            if (p.x < -60 || p.y < -60 || p.x > this.W + 60 || p.y > this.H + 60) continue;
-            const sprite = i > split ? spriteTail : spriteFront;
-            const half = sprite.width / 2;
-            ctx.drawImage(sprite, p.x - half, p.y - half);
-        }
-
+        // Boost glow: pulsing halo in the snake's own color, under everything
         if (snake.boost) {
+            const pulse = 0.30 + 0.14 * Math.sin(this._frame * 0.35);
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
             ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
-            for (let i = bumps.length - 2; i >= 1; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
-            ctx.lineWidth = bodyRadius * 2 + 5;
-            ctx.strokeStyle = rgb(light, 0.22);
+            for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
+            ctx.lineWidth = bodyRadius * 2 + Math.max(8, bodyRadius * 0.9);
+            ctx.strokeStyle = rgb(light, pulse);
             ctx.stroke();
             ctx.restore();
         }
 
-        // Head sprite only
+        // Soft dark underlay so the body pops off the dark floor
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
+        for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
+        ctx.lineWidth = bodyRadius * 2 + 4;
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        ctx.stroke();
+        ctx.restore();
+
+        // Body circles, tail → head, tapering over the last stretch.
+        // Every few bumps a lighter "band" circle fakes slither.io's ring stripes.
+        const headScreen = pts[0];
+        const skipNearHead = headRadius * 1.2;
+        const taperCount = Math.min(bumps.length - 1, Math.max(6, Math.round(bumps.length * 0.22)));
+        const bandEvery = Math.max(3, Math.round((bodyRadius * 2.1) / bumpStep));
+
+        for (let i = bumps.length - 1; i >= 1; i--) {
+            const p = bumps[i];
+            if (Math.hypot(p.x - headScreen.x, p.y - headScreen.y) < skipNearHead) continue;
+            if (p.x < -60 || p.y < -60 || p.x > this.W + 60 || p.y > this.H + 60) continue;
+
+            const fromTail = bumps.length - 1 - i;
+            let rf = 1;
+            if (fromTail < taperCount) {
+                const t = fromTail / taperCount;
+                rf = 0.45 + 0.55 * t;
+            }
+            const r = Math.max(2, Math.round(bodyRadius * rf));
+            const band = i % bandEvery === 0;
+            const sprite = this._bodySprite(baseHex, r, band);
+            const half = sprite.width / 2;
+            ctx.drawImage(sprite, p.x - half, p.y - half);
+        }
+
+        // Head — slightly bigger than the body, like slither.io
         const { x: hx, y: hy } = pts[0];
-        const rHead = Math.max(2, Math.round(headRadius));
+        const rHead = Math.max(2, Math.round(headRadius * 1.04));
         const headSprite = this._bodySprite(baseHex, rHead);
         ctx.drawImage(headSprite, hx - headSprite.width / 2, hy - headSprite.width / 2);
 
-        // Eyes
-        const eyeOffset = headRadius * 0.5;
-        const eyeR = Math.max(2, headRadius * 0.28);
+        // Big cartoonish eyes with pupils that look where the snake is heading
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
+        const eyeSide = headRadius * 0.52;
+        const eyeFwd = headRadius * 0.32;
+        const eyeR = Math.max(2.5, headRadius * 0.38);
+        const pupilR = eyeR * 0.52;
         for (const side of [-1, 1]) {
-            const ex = hx + fwdX * eyeOffset * 0.45 + perpX * eyeOffset * side;
-            const ey = hy + fwdY * eyeOffset * 0.45 + perpY * eyeOffset * side;
+            const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
+            const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
+            // Sclera with subtle dark outline
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
             ctx.fillStyle = '#fff';
             ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+            ctx.lineWidth = Math.max(1, eyeR * 0.12);
+            ctx.stroke();
+            // Pupil pushed toward travel direction
+            const px = ex + fwdX * (eyeR - pupilR) * 0.75;
+            const py = ey + fwdY * (eyeR - pupilR) * 0.75;
             ctx.beginPath();
-            ctx.arc(ex + fwdX * eyeR * 0.4, ey + fwdY * eyeR * 0.4, eyeR * 0.55, 0, Math.PI * 2);
-            ctx.fillStyle = '#111';
+            ctx.arc(px, py, pupilR, 0, Math.PI * 2);
+            ctx.fillStyle = '#15151c';
+            ctx.fill();
+            // Tiny specular glint
+            ctx.beginPath();
+            ctx.arc(px - pupilR * 0.3, py - pupilR * 0.3, pupilR * 0.28, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
             ctx.fill();
         }
 
