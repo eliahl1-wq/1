@@ -32,6 +32,45 @@ function toHex({ r, g, b }) {
     return `#${[r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * Server colors come from util.randomColor() (same as agar) — any random hex,
+ * sometimes as a { fill, border } object. Keep the random hue but remap it to
+ * the vivid pastel range slither.io snakes use, so dark/muddy randoms still
+ * look like the real game.
+ */
+function normalizeSnakeColor(color) {
+    const raw = typeof color === 'object' && color !== null ? color.fill : color;
+    const { r, g, b } = parseColor(raw);
+
+    // RGB → hue
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    const d = max - min;
+    let h = 0;
+    if (d > 0.0001) {
+        if (max === rn) h = ((gn - bn) / d) % 6;
+        else if (max === gn) h = (bn - rn) / d + 2;
+        else h = (rn - gn) / d + 4;
+        h *= 60;
+        if (h < 0) h += 360;
+    }
+
+    // HSL(h, 68%, 60%) → RGB, the pastel band seen in slither.io
+    const s = 0.68, l = 0.60;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let rr = 0, gg = 0, bb = 0;
+    if (h < 60) [rr, gg, bb] = [c, x, 0];
+    else if (h < 120) [rr, gg, bb] = [x, c, 0];
+    else if (h < 180) [rr, gg, bb] = [0, c, x];
+    else if (h < 240) [rr, gg, bb] = [0, x, c];
+    else if (h < 300) [rr, gg, bb] = [x, 0, c];
+    else [rr, gg, bb] = [c, 0, x];
+    return toHex({ r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 });
+}
+
 function shadeColor({ r, g, b }, amount) {
     return {
         r: Math.max(0, Math.min(255, r + amount)),
@@ -252,8 +291,8 @@ export class SlitherRenderer {
      */
     _getHexPattern(ctx) {
         if (this._hexPattern) return this._hexPattern;
-        const R = 34;
-        const S = 3; // supersample so the pattern stays crisp at zoom ~3
+        const R = 16; // hex ≈ 2.3x snake width on screen, like the real game
+        const S = 6; // supersample so the pattern stays crisp at zoom ~3
         const sqrt3 = Math.sqrt(3);
         const tw = 3 * R;
         const th = sqrt3 * R;
@@ -263,21 +302,32 @@ export class SlitherRenderer {
         cv.height = Math.round(th * S);
         const g = cv.getContext('2d');
         g.scale(S, S);
-        // Filled gray tiles with dark seams — slither.io's hex floor
-        g.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-        g.fillStyle = 'rgba(255, 255, 255, 0.045)';
-        g.lineWidth = 2.2;
 
+        // Lighter blue-gray seams show between the dark tiles
+        g.fillStyle = '#34373e';
+        g.fillRect(0, 0, tw, th);
+
+        // Dark beveled tile, slightly inset, rounded corners via thick stroke
+        const inset = R * 0.90;
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
                 const a = (Math.PI / 3) * i;
-                const px = hx + R * Math.cos(a);
-                const py = hy + R * Math.sin(a);
+                const px = hx + inset * Math.cos(a);
+                const py = hy + inset * Math.sin(a);
                 if (i === 0) g.moveTo(px, py);
                 else g.lineTo(px, py);
             }
             g.closePath();
+            // Subtle top-lit bevel: lighter at the top, darker at the bottom
+            const grad = g.createLinearGradient(hx, hy - R, hx, hy + R);
+            grad.addColorStop(0, '#24262c');
+            grad.addColorStop(0.5, '#1c1e23');
+            grad.addColorStop(1, '#16181c');
+            g.fillStyle = grad;
+            g.strokeStyle = grad;
+            g.lineJoin = 'round';
+            g.lineWidth = R * 0.14;
             g.fill();
             g.stroke();
         };
@@ -312,7 +362,7 @@ export class SlitherRenderer {
             W / 2, H / 2, Math.hypot(W, H) * 0.62,
         );
         grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.38)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.5)');
         g.fillStyle = grad;
         g.fillRect(0, 0, W, H);
         this._vignette = cv;
@@ -321,7 +371,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#0f1014';
+        ctx.fillStyle = '#1a1c21';
         ctx.fillRect(0, 0, W, H);
 
         // Hex grid: fill the visible world rect with the cached repeating pattern
@@ -482,52 +532,24 @@ export class SlitherRenderer {
         }
     }
 
-    /** Stripe palette per snake — solid, white stripe, or dark stripe. */
-    _snakePalette(snake) {
-        const primary = snake.isYou ? '#9945FF' : (snake.color || '#FF8C42');
-        let hash = 0;
-        const id = String(snake.id || snake.name || '');
-        for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
-        const mode = Math.abs(hash) % 3;
-        if (mode === 0 || snake.isYou) {
-            return { primary, secondary: primary, striped: false };
-        }
-        if (mode === 1) {
-            return { primary, secondary: '#FFFFFF', striped: true };
-        }
-        const base = parseColor(primary);
-        const secondary = toHex(shadeColor(base, -55));
-        return { primary, secondary, striped: true };
-    }
-
-    /** Overlapping segment circle with colored outer glow — slither.io style. */
+    /**
+     * Glossy ball segment, lit from straight above in screen space — overlapping
+     * these gives the scalloped slither.io body. No aura/glow around it.
+     */
     _bodySprite(colorHex, rPx) {
-        const glow = Math.ceil(rPx * 0.65);
-        const total = rPx + glow;
-        const key = `b4|${colorHex}|${rPx}`;
-        return this._getSprite(key, total * 2 + 2, (g, sz) => {
+        const key = `b5|${colorHex}|${rPx}`;
+        return this._getSprite(key, (rPx + 1) * 2, (g, sz) => {
             const c = sz / 2;
             const base = parseColor(colorHex);
-
-            // Soft colored aura
-            const aura = g.createRadialGradient(c, c, rPx * 0.15, c, c, total);
-            aura.addColorStop(0, rgb(base, 0.55));
-            aura.addColorStop(0.55, rgb(base, 0.18));
-            aura.addColorStop(1, rgb(base, 0));
-            g.fillStyle = aura;
-            g.beginPath();
-            g.arc(c, c, total, 0, Math.PI * 2);
-            g.fill();
-
-            // 3D segment: bright top-left highlight, darker bottom edge
             const grad = g.createRadialGradient(
-                c - rPx * 0.28, c - rPx * 0.38, rPx * 0.04,
+                c, c - rPx * 0.45, rPx * 0.08,
                 c, c, rPx,
             );
-            grad.addColorStop(0, rgb(shadeColor(base, 72)));
-            grad.addColorStop(0.38, rgb(shadeColor(base, 28)));
-            grad.addColorStop(0.72, rgb(base));
-            grad.addColorStop(1, rgb(shadeColor(base, -58)));
+            grad.addColorStop(0, rgb(shadeColor(base, 64)));
+            grad.addColorStop(0.32, rgb(shadeColor(base, 22)));
+            grad.addColorStop(0.62, rgb(base));
+            grad.addColorStop(0.88, rgb(shadeColor(base, -34)));
+            grad.addColorStop(1, rgb(shadeColor(base, -70)));
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -544,8 +566,10 @@ export class SlitherRenderer {
         const headRadius = (snake.radius || 6) * zoom * thick;
         const bodyRadius = headRadius * 0.96;
         const angle = snake.angle || 0;
-        const palette = this._snakePalette(snake);
-        const base = parseColor(palette.primary);
+        // Random spawn color from the server (same util.randomColor as agar),
+        // remapped to slither.io's pastel band — your own snake included
+        const colorHex = normalizeSnakeColor(snake.color);
+        const base = parseColor(colorHex);
         const light = shadeColor(base, 55);
 
         const pts = [];
@@ -556,8 +580,8 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        // Tight overlap — slither.io segments sit ~50% on top of each other
-        const bumpStep = Math.max(3, bodyRadius * 0.48);
+        // Segment spacing wide enough that the scalloped bumps read clearly
+        const bumpStep = Math.max(3, bodyRadius * 0.62);
         const bumps = this._densifySpine(pts, bumpStep);
 
         // Boost trail glow
@@ -595,24 +619,21 @@ export class SlitherRenderer {
             }
 
             const r = Math.max(2.5, Math.round(bodyRadius * rf));
-            // Block stripes (~3 segments wide) like slither.io skins, not per-segment zebra
-            const stripeBlock = Math.floor(i / 3) % 2 === 1;
-            const segColor = palette.striped && stripeBlock ? palette.secondary : palette.primary;
-            const sprite = this._bodySprite(segColor, r);
+            const sprite = this._bodySprite(colorHex, r);
             const half = sprite.width / 2;
             ctx.drawImage(sprite, p.x - half, p.y - half);
         }
 
-        // Googly eyes on head
+        // Small white eyes near the front of the head, like the real game
         const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headRadius * 0.46;
-        const eyeFwd = headRadius * 0.28;
-        const eyeR = Math.max(3, headRadius * 0.36);
-        const pupilR = eyeR * 0.48;
+        const eyeSide = headRadius * 0.42;
+        const eyeFwd = headRadius * 0.38;
+        const eyeR = Math.max(2.5, headRadius * 0.30);
+        const pupilR = eyeR * 0.55;
 
         for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
@@ -621,15 +642,12 @@ export class SlitherRenderer {
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-            ctx.lineWidth = Math.max(1, eyeR * 0.1);
-            ctx.stroke();
 
-            const px = ex + fwdX * eyeR * 0.55;
-            const py = ey + fwdY * eyeR * 0.55;
+            const px = ex + fwdX * eyeR * 0.4;
+            const py = ey + fwdY * eyeR * 0.4;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-            ctx.fillStyle = '#1a1a22';
+            ctx.fillStyle = '#111114';
             ctx.fill();
         }
 
