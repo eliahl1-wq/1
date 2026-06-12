@@ -290,15 +290,15 @@ export class SlitherRenderer {
      * frame was a major frame-time cost.
      */
     _getHexPattern(ctx) {
-        const VER = 3;
+        const VER = 4;
         if (this._hexPattern && this._hexPatternVer === VER) return this._hexPattern;
         this._hexPattern = null;
         const R = 20;
         const S = 6;
         const sqrt3 = Math.sqrt(3);
-        // Flat-top hex lattice — rotated when drawn so edges read diagonal on screen
-        const tw = 3 * R;
-        const th = sqrt3 * R;
+        // Pointy-top hex lattice (vertex up/down)
+        const tw = sqrt3 * R;
+        const th = 3 * R;
 
         const cv = document.createElement('canvas');
         cv.width = Math.round(tw * S);
@@ -306,7 +306,6 @@ export class SlitherRenderer {
         const g = cv.getContext('2d');
         g.scale(S, S);
 
-        // Gap colour — lifted so it sits closer to the tile grey
         g.fillStyle = '#15171a';
         g.fillRect(0, 0, tw, th);
 
@@ -314,14 +313,13 @@ export class SlitherRenderer {
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
-                const a = (Math.PI / 3) * i;
+                const a = (Math.PI / 3) * i + Math.PI / 6;
                 const px = hx + inset * Math.cos(a);
                 const py = hy + inset * Math.sin(a);
                 if (i === 0) g.moveTo(px, py);
                 else g.lineTo(px, py);
             }
             g.closePath();
-            // Flat, even tile — dark grey pulled down toward the gap tone
             const grad = g.createRadialGradient(hx, hy, inset * 0.15, hx, hy, inset);
             grad.addColorStop(0, '#1c1e22');
             grad.addColorStop(0.55, '#191b1f');
@@ -336,7 +334,7 @@ export class SlitherRenderer {
 
         for (const [hx, hy] of [
             [0, 0], [tw, 0], [0, th], [tw, th],
-            [tw / 2, th / 2], [tw / 2, -th / 2], [tw / 2, th * 1.5],
+            [tw / 2, th / 2], [-tw / 2, th / 2], [tw * 1.5, th / 2],
         ]) {
             hexAt(hx, hy);
         }
@@ -344,9 +342,13 @@ export class SlitherRenderer {
         this._hexTile = cv;
         this._hexPattern = ctx.createPattern(cv, 'repeat');
         this._hexPatternVer = VER;
-        // Pattern pixels are world-units * S — scale back so it maps 1:1 to world space
+        // Scale + rotate the repeat lattice so hex edges sit on a diagonal
         if (this._hexPattern.setTransform) {
-            this._hexPattern.setTransform(new DOMMatrix([1 / S, 0, 0, 1 / S, 0, 0]));
+            const rad = Math.PI / 6;
+            const sc = 1 / S;
+            const c = Math.cos(rad) * sc;
+            const s = Math.sin(rad) * sc;
+            this._hexPattern.setTransform(new DOMMatrix([c, s, -s, c, 0, 0]));
         }
         return this._hexPattern;
     }
@@ -381,13 +383,13 @@ export class SlitherRenderer {
         ctx.translate(W / 2, H / 2);
         ctx.scale(zoom, zoom);
         ctx.translate(-cx, -cy);
-        // Rotate the grid so hex edges sit on a diagonal, like slither.io
-        ctx.rotate(-Math.PI / 6);
         ctx.fillStyle = pattern;
         const vw = W / zoom;
         const vh = H / zoom;
-        const pad = Math.hypot(vw, vh) * 0.55;
-        ctx.fillRect(cx - vw / 2 - pad, cy - vh / 2 - pad, vw + pad * 2, vh + pad * 2);
+        const margin = 160;
+        // Center on camera (origin after translate) — using cx/cy here caused
+        // a gray box edge that followed the player
+        ctx.fillRect(-vw / 2 - margin, -vh / 2 - margin, vw + margin * 2, vh + margin * 2);
         ctx.restore();
 
         // Red death zone outside playable square (slither.io style)
@@ -522,10 +524,10 @@ export class SlitherRenderer {
 
             const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
 
-            // Size variation: golden is clearly biggest, death drops medium, normal varies
+            // Server already sends golden at 2.4× radius — only a slight visual bump
             let sizeMul = 1;
             if (f.golden) {
-                sizeMul = 2.2;
+                sizeMul = 1.12;
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
             } else {
@@ -536,8 +538,8 @@ export class SlitherRenderer {
             }
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenR = Math.max(3.5, baseR * zoom * (f.golden ? 1.25 : 1.05));
-            const spriteR = f.golden ? 6 : 4;
+            const screenR = Math.max(3.5, baseR * zoom * 1.05);
+            const spriteR = 4;
             const sprite = this._foodSprite(hue, spriteR, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
