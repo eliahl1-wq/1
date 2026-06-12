@@ -543,6 +543,10 @@ export default function PreGame() {
     // ── Render ─────────────────────────────────────────
     return (
         <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+                <h1>AgarStake — {modeBaseName} with Real Money</h1>
+                <p>Play {modeBaseName}.io with real money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly.</p>
+            </div>
             <Background />
 
             <AppTopbar>

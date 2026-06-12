@@ -93,7 +93,7 @@ export default function SlitherGame() {
 
     useEffect(() => {
         document.body.style.backgroundColor = '#0a0a0c';
-        document.title = 'AgarStake | Slither Arena';
+        document.title = 'AgarStake | Slither';
     }, []);
 
     const [isSecuringCashout, setIsSecuringCashout] = useState(false);
