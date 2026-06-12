@@ -263,9 +263,10 @@ export class SlitherRenderer {
         cv.height = Math.round(th * S);
         const g = cv.getContext('2d');
         g.scale(S, S);
-        g.strokeStyle = 'rgba(180, 180, 190, 0.11)';
-        g.fillStyle = 'rgba(255, 255, 255, 0.018)';
-        g.lineWidth = 1.15;
+        // Filled gray tiles with dark seams — slither.io's hex floor
+        g.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+        g.fillStyle = 'rgba(255, 255, 255, 0.045)';
+        g.lineWidth = 2.2;
 
         const hexAt = (hx, hy) => {
             g.beginPath();
@@ -594,7 +595,9 @@ export class SlitherRenderer {
             }
 
             const r = Math.max(2.5, Math.round(bodyRadius * rf));
-            const segColor = palette.striped && i % 2 === 1 ? palette.secondary : palette.primary;
+            // Block stripes (~3 segments wide) like slither.io skins, not per-segment zebra
+            const stripeBlock = Math.floor(i / 3) % 2 === 1;
+            const segColor = palette.striped && stripeBlock ? palette.secondary : palette.primary;
             const sprite = this._bodySprite(segColor, r);
             const half = sprite.width / 2;
             ctx.drawImage(sprite, p.x - half, p.y - half);
