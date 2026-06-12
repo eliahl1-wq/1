@@ -291,10 +291,9 @@ export class SlitherRenderer {
      */
     _getHexPattern(ctx) {
         if (this._hexPattern) return this._hexPattern;
-        const R = 16; // hex ≈ 2.5x snake width on screen, like the real game
-        const S = 6; // supersample so the pattern stays crisp at zoom ~3
+        const R = 20;
+        const S = 6;
         const sqrt3 = Math.sqrt(3);
-        // Pointy-top hexes (vertical side edges) — period (sqrt3*R, 3R)
         const tw = sqrt3 * R;
         const th = 3 * R;
 
@@ -304,13 +303,12 @@ export class SlitherRenderer {
         const g = cv.getContext('2d');
         g.scale(S, S);
 
-        // Gray ridge lines between the black tiles
-        g.fillStyle = '#4a4e55';
+        // Very dark gaps between the tiles — wide spacing like the reference
+        g.fillStyle = '#040506';
         g.fillRect(0, 0, tw, th);
 
-        // Near-black tile face, fading even darker toward the rim so the
-        // gray seam reads as a raised edge around each tile
-        const inset = R * 0.95;
+        // Small dark-gray tile with rounded corners sitting inside the gap
+        const inset = R * 0.66;
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
@@ -321,14 +319,14 @@ export class SlitherRenderer {
                 else g.lineTo(px, py);
             }
             g.closePath();
-            const grad = g.createRadialGradient(hx, hy, R * 0.2, hx, hy, R);
-            grad.addColorStop(0, '#0c0e12');
-            grad.addColorStop(0.8, '#090b0e');
-            grad.addColorStop(1, '#050608');
+            const grad = g.createRadialGradient(hx, hy, inset * 0.12, hx, hy, inset);
+            grad.addColorStop(0, '#2e3239');
+            grad.addColorStop(0.65, '#272b31');
+            grad.addColorStop(1, '#1e2126');
             g.fillStyle = grad;
-            g.strokeStyle = '#050608';
+            g.strokeStyle = '#141619';
             g.lineJoin = 'round';
-            g.lineWidth = R * 0.07;
+            g.lineWidth = R * 0.06;
             g.fill();
             g.stroke();
         };
@@ -372,7 +370,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#08090b';
+        ctx.fillStyle = '#040506';
         ctx.fillRect(0, 0, W, H);
 
         // Hex grid: fill the visible world rect with the cached repeating pattern
@@ -451,29 +449,31 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Glowing orb — slither.io-style bloom. */
+    /** Soft translucent bloom orb — white hot core, color fades to transparent. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * 2.4);
-        const key = `f4|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
-        return this._getSprite(key, halo * 2 + 4, (g, sz) => {
+        const halo = Math.ceil(rPx * (golden ? 6.0 : deathDrop ? 4.2 : 3.6));
+        const key = `f6|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        return this._getSprite(key, halo * 2 + 6, (g, sz) => {
             const c = sz / 2;
-            if (golden) {
-                const grad = g.createRadialGradient(c, c, 0, c, c, halo);
-                grad.addColorStop(0, 'hsla(52, 100%, 96%, 1)');
-                grad.addColorStop(0.25, 'hsla(48, 100%, 72%, 0.98)');
-                grad.addColorStop(0.55, 'hsla(48, 100%, 58%, 0.55)');
-                grad.addColorStop(1, 'hsla(48, 100%, 50%, 0)');
-                g.fillStyle = grad;
-                g.fillRect(0, 0, sz, sz);
-                return;
-            }
-            const sat = deathDrop ? 100 : 95;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
-            grad.addColorStop(0, `hsla(${hue}, ${sat}%, 95%, 1)`);
-            grad.addColorStop(0.22, `hsla(${hue}, ${sat}%, 72%, 0.98)`);
-            grad.addColorStop(0.5, `hsla(${hue}, ${sat}%, 58%, ${deathDrop ? 0.75 : 0.65})`);
-            grad.addColorStop(0.78, `hsla(${hue}, ${sat}%, 52%, 0.22)`);
-            grad.addColorStop(1, `hsla(${hue}, ${sat}%, 48%, 0)`);
+            if (golden) {
+                grad.addColorStop(0, 'hsla(48, 100%, 98%, 0.95)');
+                grad.addColorStop(0.1, 'hsla(46, 100%, 88%, 0.82)');
+                grad.addColorStop(0.28, 'hsla(42, 100%, 68%, 0.58)');
+                grad.addColorStop(0.5, 'hsla(38, 100%, 55%, 0.32)');
+                grad.addColorStop(0.72, 'hsla(36, 100%, 50%, 0.12)');
+                grad.addColorStop(0.9, 'hsla(34, 100%, 48%, 0.04)');
+                grad.addColorStop(1, 'hsla(34, 100%, 45%, 0)');
+            } else {
+                const sat = deathDrop ? 100 : 92;
+                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 98%, 0.90)`);
+                grad.addColorStop(0.12, `hsla(${hue}, ${sat}%, 82%, 0.72)`);
+                grad.addColorStop(0.32, `hsla(${hue}, ${sat}%, 62%, 0.48)`);
+                grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, 54%, 0.24)`);
+                grad.addColorStop(0.75, `hsla(${hue}, ${sat}%, 50%, 0.10)`);
+                grad.addColorStop(0.92, `hsla(${hue}, ${sat}%, 48%, 0.03)`);
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 45%, 0)`);
+            }
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
         });
@@ -512,19 +512,33 @@ export class SlitherRenderer {
     }
 
     _drawFood(ctx, food, toScreen, W, H, zoom) {
-        const SPRITE_R = 5;
         for (const f of food) {
             const miss = f._missStreak || 0;
             if (miss > 8) continue;
 
             const { x: fx, y: fy } = toScreen(f.x, f.y);
-            if (fx < -120 || fy < -120 || fx > W + 120 || fy > H + 120) continue;
+            if (fx < -140 || fy < -140 || fx > W + 140 || fy > H + 140) continue;
 
-            const baseR = f.deathDrop ? (f.radius || 3) * 1.35 : (f.radius || 3);
-            const screenR = Math.max(5, baseR * zoom * 1.05);
             const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
-            const sprite = this._foodSprite(hue, SPRITE_R, !!f.golden, !!f.deathDrop);
-            const size = sprite.width * (screenR / SPRITE_R);
+
+            // Size variation: golden is clearly biggest, death drops medium, normal varies
+            let sizeMul = 1;
+            if (f.golden) {
+                sizeMul = 2.6;
+            } else if (f.deathDrop) {
+                sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
+            } else {
+                let h = 0;
+                const id = String(f.id ?? `${f.x},${f.y}`);
+                for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+                sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
+            }
+
+            const baseR = (f.radius || 3) * sizeMul;
+            const screenR = Math.max(3.5, baseR * zoom * (f.golden ? 1.4 : 1.05));
+            const spriteR = f.golden ? 7 : 4.5;
+            const sprite = this._foodSprite(hue, spriteR, !!f.golden, !!f.deathDrop);
+            const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
             const alpha = miss === 0 ? 1 : Math.max(0.35, 1 - miss * 0.08);
             ctx.globalAlpha = alpha;
