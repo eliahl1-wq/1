@@ -290,26 +290,23 @@ export class SlitherRenderer {
      * frame was a major frame-time cost.
      */
     _getHexPattern(ctx) {
-        const VER = 5;
+        const VER = 6;
         if (this._hexPattern && this._hexPatternVer === VER) return this._hexPattern;
         this._hexPattern = null;
-        const R = 20;
-        const S = 6;
+        const R = 18;
         const sqrt3 = Math.sqrt(3);
         const tw = 3 * R;
         const th = sqrt3 * R;
 
         const cv = document.createElement('canvas');
-        cv.width = Math.round(tw * S);
-        cv.height = Math.round(th * S);
+        cv.width = Math.round(tw);
+        cv.height = Math.round(th);
         const g = cv.getContext('2d');
-        g.scale(S, S);
 
-        // Dark gap between tiles
-        g.fillStyle = '#101215';
+        g.fillStyle = '#0c0d10';
         g.fillRect(0, 0, tw, th);
 
-        const inset = R * 0.66;
+        const inset = R * 0.62;
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
@@ -320,14 +317,14 @@ export class SlitherRenderer {
                 else g.lineTo(px, py);
             }
             g.closePath();
-            const grad = g.createRadialGradient(hx, hy, inset * 0.12, hx, hy, inset);
-            grad.addColorStop(0, '#262a31');
-            grad.addColorStop(0.6, '#21252b');
-            grad.addColorStop(1, '#1a1d22');
+            const grad = g.createRadialGradient(hx, hy, inset * 0.1, hx, hy, inset);
+            grad.addColorStop(0, '#30353d');
+            grad.addColorStop(0.65, '#282c33');
+            grad.addColorStop(1, '#22262c');
             g.fillStyle = grad;
-            g.strokeStyle = '#151820';
+            g.strokeStyle = '#181b20';
             g.lineJoin = 'round';
-            g.lineWidth = R * 0.05;
+            g.lineWidth = 1.2;
             g.fill();
             g.stroke();
         };
@@ -342,9 +339,6 @@ export class SlitherRenderer {
         this._hexTile = cv;
         this._hexPattern = ctx.createPattern(cv, 'repeat');
         this._hexPatternVer = VER;
-        if (this._hexPattern?.setTransform) {
-            this._hexPattern.setTransform(new DOMMatrix([1 / S, 0, 0, 1 / S, 0, 0]));
-        }
         return this._hexPattern;
     }
 
@@ -370,7 +364,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#101215';
+        ctx.fillStyle = '#0c0d10';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getHexPattern(ctx);
@@ -379,12 +373,11 @@ export class SlitherRenderer {
             ctx.translate(W / 2, H / 2);
             ctx.scale(zoom, zoom);
             ctx.translate(-cx, -cy);
-            ctx.rotate(Math.PI / 6);
             ctx.fillStyle = pattern;
             const vw = W / zoom;
             const vh = H / zoom;
-            const pad = Math.hypot(vw, vh) * 0.65;
-            ctx.fillRect(-vw / 2 - pad, -vh / 2 - pad, vw + pad * 2, vh + pad * 2);
+            const margin = 240;
+            ctx.fillRect(-vw / 2 - margin, -vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
 
@@ -408,8 +401,6 @@ export class SlitherRenderer {
         ctx.lineWidth = 3;
         ctx.strokeRect(tl.x, tl.y, playW, playH);
         ctx.restore();
-
-        ctx.drawImage(this._getVignette(W, H), 0, 0);
     }
 
     /** Insert extra points between spine nodes so the body has slither.io-style bumps. */
@@ -558,11 +549,10 @@ export class SlitherRenderer {
             const c = sz / 2;
             const base = parseColor(colorHex);
             const grad = g.createRadialGradient(c, c, rPx * 0.05, c, c, rPx);
-            grad.addColorStop(0, rgb(shadeColor(base, 58)));
-            grad.addColorStop(0.40, rgb(shadeColor(base, 16)));
-            grad.addColorStop(0.72, rgb(base));
-            grad.addColorStop(0.92, rgb(shadeColor(base, -38)));
-            grad.addColorStop(1, rgb(shadeColor(base, -68)));
+            grad.addColorStop(0, rgb(shadeColor(base, 32)));
+            grad.addColorStop(0.45, rgb(shadeColor(base, 10)));
+            grad.addColorStop(0.78, rgb(base));
+            grad.addColorStop(1, rgb(shadeColor(base, -40)));
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -604,21 +594,6 @@ export class SlitherRenderer {
             ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
             for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
         };
-
-        // Soft drop shadow onto the floor (two widening passes fake the blur)
-        ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.translate(0, bodyRadius * 0.22);
-        spinePath();
-        ctx.lineWidth = bodyRadius * 2 + 12;
-        ctx.strokeStyle = 'rgba(0,0,0,0.16)';
-        ctx.stroke();
-        spinePath();
-        ctx.lineWidth = bodyRadius * 2 + 5;
-        ctx.strokeStyle = 'rgba(0,0,0,0.22)';
-        ctx.stroke();
-        ctx.restore();
 
         // Boost trail glow
         if (snake.boost) {
