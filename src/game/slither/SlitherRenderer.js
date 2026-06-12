@@ -305,7 +305,7 @@ export class SlitherRenderer {
         const g = cv.getContext('2d');
         g.scale(S, S);
 
-        g.fillStyle = '#0c0d10';
+        g.fillStyle = '#07080a';
         g.fillRect(0, 0, tw, th);
 
         const inset = R * 0.62;
@@ -321,9 +321,9 @@ export class SlitherRenderer {
             g.closePath();
             // Soft top-down sheen + faint inner edge for a cleaner embossed look
             const grad = g.createLinearGradient(hx, hy - inset, hx, hy + inset);
-            grad.addColorStop(0, '#343a43');
-            grad.addColorStop(0.45, '#2a2f36');
-            grad.addColorStop(1, '#22262c');
+            grad.addColorStop(0, '#272b32');
+            grad.addColorStop(0.45, '#1e2228');
+            grad.addColorStop(1, '#171a1f');
             g.fillStyle = grad;
             g.strokeStyle = grad;
             g.lineJoin = 'round';
@@ -340,7 +340,7 @@ export class SlitherRenderer {
                 else g.lineTo(px, py);
             }
             g.closePath();
-            g.strokeStyle = 'rgba(0, 0, 0, 0.10)';
+            g.strokeStyle = 'rgba(0, 0, 0, 0.14)';
             g.lineWidth = 1;
             g.stroke();
         };
@@ -384,7 +384,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#0c0d10';
+        ctx.fillStyle = '#07080a';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getHexPattern(ctx);
@@ -465,25 +465,25 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Soft translucent orb — smooth falloff, no harsh bloom. */
+    /** Bright glowing orb — strong light bloom like the official game. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * (golden ? 3.8 : deathDrop ? 2.6 : 2.2));
-        const key = `f7|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        const halo = Math.ceil(rPx * (golden ? 4.6 : deathDrop ? 3.4 : 3.0));
+        const key = `f8|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                grad.addColorStop(0, 'hsla(46, 90%, 78%, 0.62)');
-                grad.addColorStop(0.35, 'hsla(42, 85%, 58%, 0.38)');
-                grad.addColorStop(0.62, 'hsla(38, 80%, 50%, 0.18)');
-                grad.addColorStop(0.85, 'hsla(36, 75%, 48%, 0.06)');
-                grad.addColorStop(1, 'hsla(36, 70%, 46%, 0)');
+                grad.addColorStop(0, 'hsla(48, 100%, 92%, 0.95)');
+                grad.addColorStop(0.18, 'hsla(46, 95%, 70%, 0.75)');
+                grad.addColorStop(0.42, 'hsla(42, 90%, 58%, 0.40)');
+                grad.addColorStop(0.68, 'hsla(38, 85%, 50%, 0.15)');
+                grad.addColorStop(1, 'hsla(36, 80%, 46%, 0)');
             } else {
-                const sat = deathDrop ? 88 : 82;
-                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 78%, 0.55)`);
-                grad.addColorStop(0.3, `hsla(${hue}, ${sat}%, 58%, 0.35)`);
-                grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, 50%, 0.18)`);
-                grad.addColorStop(0.78, `hsla(${hue}, ${sat}%, 48%, 0.07)`);
+                const sat = deathDrop ? 95 : 88;
+                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 88%, 0.92)`);
+                grad.addColorStop(0.2, `hsla(${hue}, ${sat}%, 68%, 0.65)`);
+                grad.addColorStop(0.45, `hsla(${hue}, ${sat}%, 55%, 0.32)`);
+                grad.addColorStop(0.7, `hsla(${hue}, ${sat}%, 50%, 0.12)`);
                 grad.addColorStop(1, `hsla(${hue}, ${sat}%, 46%, 0)`);
             }
             g.fillStyle = grad;
@@ -566,15 +566,16 @@ export class SlitherRenderer {
      * slither.io tube.
      */
     _bodySprite(colorHex, rPx) {
-        const key = `b6|${colorHex}|${rPx}`;
+        const key = `b7|${colorHex}|${rPx}`;
         return this._getSprite(key, (rPx + 1) * 2, (g, sz) => {
             const c = sz / 2;
             const base = parseColor(colorHex);
             const grad = g.createRadialGradient(c, c, rPx * 0.05, c, c, rPx);
-            grad.addColorStop(0, rgb(shadeColor(base, 32)));
-            grad.addColorStop(0.45, rgb(shadeColor(base, 10)));
-            grad.addColorStop(0.78, rgb(base));
-            grad.addColorStop(1, rgb(shadeColor(base, -40)));
+            grad.addColorStop(0, rgb(shadeColor(base, 48)));
+            grad.addColorStop(0.38, rgb(shadeColor(base, 18)));
+            grad.addColorStop(0.7, rgb(base));
+            grad.addColorStop(0.9, rgb(shadeColor(base, -26)));
+            grad.addColorStop(1, rgb(shadeColor(base, -52)));
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -617,15 +618,19 @@ export class SlitherRenderer {
             for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
         };
 
-        // Boost trail glow
-        if (snake.boost) {
-            const pulse = 0.35 + 0.12 * Math.sin(this._frame * 0.35);
+        // Soft colored bloom around the whole body — stronger when boosting
+        {
+            const boostPulse = snake.boost ? 0.18 + 0.08 * Math.sin(this._frame * 0.35) : 0;
             ctx.save();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             spinePath();
-            ctx.lineWidth = bodyRadius * 2 + 10;
-            ctx.strokeStyle = rgb(light, pulse);
+            ctx.lineWidth = bodyRadius * 2 + Math.max(14, bodyRadius * 1.1);
+            ctx.strokeStyle = rgb(light, 0.10 + boostPulse);
+            ctx.stroke();
+            spinePath();
+            ctx.lineWidth = bodyRadius * 2 + Math.max(7, bodyRadius * 0.55);
+            ctx.strokeStyle = rgb(light, 0.14 + boostPulse);
             ctx.stroke();
             ctx.restore();
         }
@@ -655,16 +660,32 @@ export class SlitherRenderer {
         for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
+            // Sclera with soft shading and thin dark rim
+            const eyeGrad = ctx.createRadialGradient(
+                ex - eyeR * 0.2, ey - eyeR * 0.25, eyeR * 0.1,
+                ex, ey, eyeR,
+            );
+            eyeGrad.addColorStop(0, '#ffffff');
+            eyeGrad.addColorStop(0.75, '#f2f4f6');
+            eyeGrad.addColorStop(1, '#d8dce1');
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = eyeGrad;
             ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+            ctx.lineWidth = Math.max(0.8, eyeR * 0.09);
+            ctx.stroke();
 
+            // Pupil looking in travel direction, with tiny specular glint
             const px = ex + fwdX * eyeR * 0.42;
             const py = ey + fwdY * eyeR * 0.42;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
             ctx.fillStyle = '#101014';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(px - pupilR * 0.32, py - pupilR * 0.32, pupilR * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
             ctx.fill();
         }
 
