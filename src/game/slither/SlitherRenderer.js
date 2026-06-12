@@ -304,13 +304,13 @@ export class SlitherRenderer {
         const g = cv.getContext('2d');
         g.scale(S, S);
 
-        // Thin light ridge that shows through the dark grooves between tiles
-        g.fillStyle = '#3a3f48';
+        // Gray ridge lines between the black tiles
+        g.fillStyle = '#4a4e55';
         g.fillRect(0, 0, tw, th);
 
-        // Tile face shades darker toward the rim → dark groove around each
-        // tile with the light ridge as the shared boundary (embossed look)
-        const inset = R * 0.965;
+        // Near-black tile face, fading even darker toward the rim so the
+        // gray seam reads as a raised edge around each tile
+        const inset = R * 0.95;
         const hexAt = (hx, hy) => {
             g.beginPath();
             for (let i = 0; i < 6; i++) {
@@ -322,12 +322,11 @@ export class SlitherRenderer {
             }
             g.closePath();
             const grad = g.createRadialGradient(hx, hy, R * 0.2, hx, hy, R);
-            grad.addColorStop(0, '#23272f');
-            grad.addColorStop(0.78, '#1f242b');
-            grad.addColorStop(0.93, '#181b21');
-            grad.addColorStop(1, '#101318');
+            grad.addColorStop(0, '#0c0e12');
+            grad.addColorStop(0.8, '#090b0e');
+            grad.addColorStop(1, '#050608');
             g.fillStyle = grad;
-            g.strokeStyle = '#101318';
+            g.strokeStyle = '#050608';
             g.lineJoin = 'round';
             g.lineWidth = R * 0.07;
             g.fill();
@@ -373,7 +372,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#1e2126';
+        ctx.fillStyle = '#08090b';
         ctx.fillRect(0, 0, W, H);
 
         // Hex grid: fill the visible world rect with the cached repeating pattern
@@ -621,20 +620,14 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // Constant-width tube tail → head; only the last few bumps taper
-        // into the rounded tail tip. Head is the same width as the body.
-        const taperLen = Math.min(5, Math.max(3, Math.round(bumps.length * 0.05)));
-
+        // Constant-width tube tail → head, rounded tail tip — same silhouette
+        // as the round-capped boost glow stroke so they always line up
+        const r = Math.max(2.5, Math.round(bodyRadius));
+        const sprite = this._bodySprite(colorHex, r);
+        const half = sprite.width / 2;
         for (let i = bumps.length - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-
-            const fromTail = bumps.length - 1 - i;
-            const rf = fromTail < taperLen ? 0.62 + 0.38 * (fromTail / taperLen) : 1;
-
-            const r = Math.max(2.5, Math.round(bodyRadius * rf));
-            const sprite = this._bodySprite(colorHex, r);
-            const half = sprite.width / 2;
             ctx.drawImage(sprite, p.x - half, p.y - half);
         }
 
