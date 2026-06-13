@@ -501,33 +501,31 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — semi-gloss volume, soft shadow fade at rim. */
+    /** Paint one snake segment — matte body, even color, light edge depth. */
     _paintSnakeSegment(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const bright = shadeColor(col, 40);
-        const light = shadeColor(col, 16);
-        const dark = shadeColor(col, -44);
-        const deep = shadeColor(col, -68);
+        const light = shadeColor(col, 8);
+        const dark = shadeColor(col, -20);
+        const edge = shadeColor(col, -32);
 
-        const lx = c - rPx * 0.2;
-        const ly = c - rPx * 0.24;
-        const body = g.createRadialGradient(lx, ly, rPx * 0.04, c, c, rPx);
-        body.addColorStop(0, rgb(light, 1));
-        body.addColorStop(0.28, cs);
-        body.addColorStop(0.62, cs);
-        body.addColorStop(0.82, rgb(dark, 0.88));
-        body.addColorStop(0.93, rgb(deep, 0.5));
-        body.addColorStop(1, rgb(deep, 0));
+        const lx = c - rPx * 0.12;
+        const ly = c - rPx * 0.14;
+        const body = g.createRadialGradient(lx, ly, rPx * 0.1, c, c, rPx);
+        body.addColorStop(0, toHex(light));
+        body.addColorStop(0.45, cs);
+        body.addColorStop(0.8, cs);
+        body.addColorStop(0.93, toHex(dark));
+        body.addColorStop(1, toHex(edge));
         g.fillStyle = body;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hx = c - rPx * 0.19;
-        const hy = c - rPx * 0.25;
-        const gloss = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.5);
-        gloss.addColorStop(0, 'rgba(255,255,255,0.28)');
-        gloss.addColorStop(0.32, rgb(bright, 0.16));
+        const hx = c - rPx * 0.14;
+        const hy = c - rPx * 0.17;
+        const gloss = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.38);
+        gloss.addColorStop(0, 'rgba(255,255,255,0.1)');
+        gloss.addColorStop(0.5, rgb(shadeColor(col, 12), 0.04));
         gloss.addColorStop(1, 'rgba(255,255,255,0)');
         g.fillStyle = gloss;
         g.beginPath();
@@ -544,7 +542,7 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v4|${key}`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v6|${key}`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs);
         });
 
