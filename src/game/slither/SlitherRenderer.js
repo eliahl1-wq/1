@@ -57,8 +57,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 74%, 58%) → RGB — vivid beaded look like slither.io
-    const s = 0.74, l = 0.58;
+    // HSL(h, 68%, 60%) → RGB, the pastel band seen in slither.io
+    const s = 0.68, l = 0.60;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -407,25 +407,27 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Bright glowing orb — strong light bloom like the official game. */
+    /** Soft glowing orb — compact bloom, tighter falloff, more transparent. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * (golden ? 4.6 : deathDrop ? 3.4 : 3.0));
-        const key = `f8|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        const halo = Math.ceil(rPx * (golden ? 2.2 : deathDrop ? 1.95 : 1.7));
+        const key = `f9|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                grad.addColorStop(0, 'hsla(48, 100%, 92%, 0.95)');
-                grad.addColorStop(0.18, 'hsla(46, 95%, 70%, 0.75)');
-                grad.addColorStop(0.42, 'hsla(42, 90%, 58%, 0.40)');
-                grad.addColorStop(0.68, 'hsla(38, 85%, 50%, 0.15)');
+                grad.addColorStop(0, 'hsla(48, 100%, 86%, 0.70)');
+                grad.addColorStop(0.20, 'hsla(46, 95%, 66%, 0.50)');
+                grad.addColorStop(0.42, 'hsla(42, 90%, 56%, 0.26)');
+                grad.addColorStop(0.62, 'hsla(38, 85%, 50%, 0.09)');
+                grad.addColorStop(0.78, 'hsla(36, 80%, 46%, 0.02)');
                 grad.addColorStop(1, 'hsla(36, 80%, 46%, 0)');
             } else {
                 const sat = deathDrop ? 95 : 88;
-                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 88%, 0.92)`);
-                grad.addColorStop(0.2, `hsla(${hue}, ${sat}%, 68%, 0.65)`);
-                grad.addColorStop(0.45, `hsla(${hue}, ${sat}%, 55%, 0.32)`);
-                grad.addColorStop(0.7, `hsla(${hue}, ${sat}%, 50%, 0.12)`);
+                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 82%, 0.62)`);
+                grad.addColorStop(0.22, `hsla(${hue}, ${sat}%, 64%, 0.44)`);
+                grad.addColorStop(0.46, `hsla(${hue}, ${sat}%, 54%, 0.20)`);
+                grad.addColorStop(0.64, `hsla(${hue}, ${sat}%, 50%, 0.06)`);
+                grad.addColorStop(0.78, `hsla(${hue}, ${sat}%, 46%, 0.015)`);
                 grad.addColorStop(1, `hsla(${hue}, ${sat}%, 46%, 0)`);
             }
             g.fillStyle = grad;
@@ -489,7 +491,7 @@ export class SlitherRenderer {
             }
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenR = Math.max(3.5, baseR * zoom * 1.05);
+            const screenR = Math.max(3.5, baseR * zoom);
             const spriteR = 4;
             const sprite = this._foodSprite(hue, spriteR, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / spriteR);
@@ -501,26 +503,24 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — slither.io beaded sphere: bright top highlight, dark warm rim. */
+    /** Paint one snake segment — warm sphere highlight matching slither.io bead look. */
     _paintSnakeSegment(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const hi = shadeColor(col, 62);
-        const mid = shadeColor(col, 8);
-        const lo = shadeColor(col, -32);
+        const hi = shadeColor(col, 52);
+        const lo = shadeColor(col, -30);
         const rim = {
-            r: Math.max(0, col.r * 0.42),
-            g: Math.max(0, col.g * 0.38),
-            b: Math.max(0, col.b * 0.32),
+            r: Math.max(0, col.r * 0.45),
+            g: Math.max(0, col.g * 0.40),
+            b: Math.max(0, col.b * 0.35),
         };
 
-        const lx = c - rPx * 0.18;
-        const ly = c - rPx * 0.34;
-        const body = g.createRadialGradient(lx, ly, 0, c, c + rPx * 0.06, rPx);
-        body.addColorStop(0, toHex(hi));
-        body.addColorStop(0.28, cs);
-        body.addColorStop(0.55, toHex(mid));
-        body.addColorStop(0.82, toHex(lo));
-        body.addColorStop(1, toHex(rim));
+        const lx = c - rPx * 0.22;
+        const ly = c - rPx * 0.30;
+        const body = g.createRadialGradient(lx, ly, 0, c, c + rPx * 0.05, rPx);
+        body.addColorStop(0,    toHex(hi));
+        body.addColorStop(0.30, cs);
+        body.addColorStop(0.68, toHex(lo));
+        body.addColorStop(1,    toHex(rim));
         g.fillStyle = body;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -536,7 +536,7 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v8|${key}`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v9|${key}`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs);
         });
 
@@ -589,7 +589,7 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.46);
+        const bumpStep = Math.max(2, bodyRadius * 0.50);
         const bumps = this._densifySpine(pts, bumpStep);
         if (bumps.length < 1) return;
 
@@ -620,16 +620,16 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // Head eyes — large white circles with black pupils (slither.io style)
+        // Head eyes (no segment shadow)
         const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headRadius * 0.30;
-        const eyeFwd = headRadius * 0.12;
-        const eyeR = Math.max(2.8, headRadius * 0.40);
-        const pupilR = eyeR * 0.46;
+        const eyeSide = headRadius * 0.44;
+        const eyeFwd = headRadius * 0.5;
+        const eyeR = Math.max(2.5, headRadius * 0.34);
+        const pupilR = eyeR * 0.5;
 
         ctx.save();
         ctx.shadowBlur = 0;
@@ -640,12 +640,15 @@ export class SlitherRenderer {
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+            ctx.lineWidth = Math.max(0.8, eyeR * 0.09);
+            ctx.stroke();
 
-            const px = ex - perpX * side * eyeR * 0.22 - fwdX * eyeR * 0.14;
-            const py = ey - perpY * side * eyeR * 0.22 - fwdY * eyeR * 0.14;
+            const px = ex + fwdX * eyeR * 0.42;
+            const py = ey + fwdY * eyeR * 0.42;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = '#101014';
             ctx.fill();
         }
         ctx.restore();
