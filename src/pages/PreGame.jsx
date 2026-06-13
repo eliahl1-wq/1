@@ -1066,7 +1066,7 @@ export default function PreGame() {
                                         <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
                                             {i + 1}. {entry.username}
                                         </span>
-                                        <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)' }}>
+                                        <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
                                             ${Number(entry.amount || entry.balance || 0).toFixed(2)}
                                         </span>
                                     </div>
@@ -1096,10 +1096,10 @@ export default function PreGame() {
                 </div>
                 <div className="stat-row">
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top in arena</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-h)', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-h)', fontWeight: 700, display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: '6px' }}>
                         <span>{liveStats.topPlayer ?? '—'}</span>
                         {liveStats.topPlayer && liveStats.topBalance != null && (
-                            <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--green)', fontWeight: 600 }}>
+                            <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-bright)', fontWeight: 600 }}>
                                 ${Number(liveStats.topBalance).toFixed(2)}
                             </span>
                         )}

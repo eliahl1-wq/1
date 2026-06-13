@@ -491,7 +491,7 @@ export class SlitherRenderer {
             }
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenR = Math.max(3.5, baseR * zoom);
+            const screenR = Math.max(4.5, baseR * zoom * 1.4);
             const spriteR = 4;
             const sprite = this._foodSprite(hue, spriteR, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / spriteR);
