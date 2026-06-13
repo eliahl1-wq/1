@@ -26,10 +26,7 @@ export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) 
 
     ctx.beginPath();
     ctx.arc(x, y, radius, start, end, counterClockwise);
-    const grad = ctx.createLinearGradient(x - radius, y, x + radius, y);
-    grad.addColorStop(0, '#0DBF76');
-    grad.addColorStop(1, '#14F195');
-    ctx.strokeStyle = grad;
+    ctx.strokeStyle = '#14F195';
     ctx.lineWidth = lineWidth;
     if (pulse) {
         ctx.globalAlpha = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;

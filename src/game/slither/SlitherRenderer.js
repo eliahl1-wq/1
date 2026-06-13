@@ -57,8 +57,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 68%, 60%) → RGB, the pastel band seen in slither.io
-    const s = 0.68, l = 0.60;
+    // HSL(h, 68%, 66%) → RGB — slightly lighter slither.io pastels
+    const s = 0.68, l = 0.66;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -110,6 +110,8 @@ export class SlitherRenderer {
         this.running = false;
         this._raf = null;
         this._frame = 0;
+        this._renderSnakeBuf = [];
+        this._sortedRenderSnakes = [];
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
@@ -273,6 +275,12 @@ export class SlitherRenderer {
         this._raf = requestAnimationFrame(loop);
     }
 
+    pause() {
+        this.running = false;
+        if (this._raf) cancelAnimationFrame(this._raf);
+        this._raf = null;
+    }
+
     /** Get (or build once) a cached sprite canvas. */
     _getSprite(key, size, painter) {
         let s = this._sprites.get(key);
@@ -326,7 +334,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#161616';
+        ctx.fillStyle = '#1a1a1e';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getBgPattern(ctx);
@@ -384,6 +392,15 @@ export class SlitherRenderer {
         return out;
     }
 
+    /** Keep long snakes performant — evenly subsample excess bump points. */
+    _capBumps(bumps, max = 150) {
+        if (bumps.length <= max) return bumps;
+        const out = new Array(max);
+        const step = (bumps.length - 1) / (max - 1);
+        for (let i = 0; i < max; i++) out[i] = bumps[Math.round(i * step)];
+        return out;
+    }
+
     _drawZone(ctx, toScreen, W, H) {
         const zone = this.state.zone;
         if (!zone || zone.radius == null) return;
@@ -415,19 +432,19 @@ export class SlitherRenderer {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                grad.addColorStop(0, 'hsla(48, 100%, 86%, 0.70)');
-                grad.addColorStop(0.20, 'hsla(46, 95%, 66%, 0.50)');
-                grad.addColorStop(0.42, 'hsla(42, 90%, 56%, 0.26)');
-                grad.addColorStop(0.62, 'hsla(38, 85%, 50%, 0.09)');
-                grad.addColorStop(0.78, 'hsla(36, 80%, 46%, 0.02)');
+                grad.addColorStop(0, 'hsla(48, 100%, 88%, 0.68)');
+                grad.addColorStop(0.20, 'hsla(46, 95%, 70%, 0.48)');
+                grad.addColorStop(0.42, 'hsla(42, 90%, 60%, 0.24)');
+                grad.addColorStop(0.62, 'hsla(38, 85%, 52%, 0.08)');
+                grad.addColorStop(0.78, 'hsla(36, 80%, 48%, 0.02)');
                 grad.addColorStop(1, 'hsla(36, 80%, 46%, 0)');
             } else {
                 const sat = deathDrop ? 95 : 88;
-                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 82%, 0.62)`);
-                grad.addColorStop(0.22, `hsla(${hue}, ${sat}%, 64%, 0.44)`);
-                grad.addColorStop(0.46, `hsla(${hue}, ${sat}%, 54%, 0.20)`);
-                grad.addColorStop(0.64, `hsla(${hue}, ${sat}%, 50%, 0.06)`);
-                grad.addColorStop(0.78, `hsla(${hue}, ${sat}%, 46%, 0.015)`);
+                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 86%, 0.60)`);
+                grad.addColorStop(0.22, `hsla(${hue}, ${sat}%, 68%, 0.42)`);
+                grad.addColorStop(0.46, `hsla(${hue}, ${sat}%, 58%, 0.18)`);
+                grad.addColorStop(0.64, `hsla(${hue}, ${sat}%, 52%, 0.05)`);
+                grad.addColorStop(0.78, `hsla(${hue}, ${sat}%, 48%, 0.012)`);
                 grad.addColorStop(1, `hsla(${hue}, ${sat}%, 46%, 0)`);
             }
             g.fillStyle = grad;
@@ -467,8 +484,8 @@ export class SlitherRenderer {
         }
     }
 
-    _drawFood(ctx, food, toScreen, W, H, zoom) {
-        for (const f of food) {
+    _drawFood(ctx, foodCache, toScreen, W, H, zoom) {
+        for (const f of foodCache.values()) {
             const miss = f._missStreak || 0;
             if (miss > 8) continue;
 
@@ -491,7 +508,7 @@ export class SlitherRenderer {
             }
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenR = Math.max(4.5, baseR * zoom * 1.4);
+            const screenR = Math.max(4.5, baseR * zoom * 1.52);
             const spriteR = 4;
             const sprite = this._foodSprite(hue, spriteR, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / spriteR);
@@ -506,7 +523,7 @@ export class SlitherRenderer {
     /** Paint one snake segment — warm sphere highlight matching slither.io bead look. */
     _paintSnakeSegment(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const hi = shadeColor(col, 52);
+        const hi = shadeColor(col, 58);
         const lo = shadeColor(col, -30);
         const rim = {
             r: Math.max(0, col.r * 0.45),
@@ -589,8 +606,8 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.50);
-        const bumps = this._densifySpine(pts, bumpStep);
+        const bumpStep = Math.max(2, bodyRadius * 0.56);
+        const bumps = this._capBumps(this._densifySpine(pts, bumpStep));
         if (bumps.length < 1) return;
 
         const r = Math.max(2.5, Math.round(bodyRadius));
@@ -716,10 +733,12 @@ export class SlitherRenderer {
         this._updateSmoothing(dt);
 
         // Build render snakes from latest metadata + smoothed segments/angle
-        const renderSnakes = this.targetSnakes.map(snake => {
+        const renderSnakes = this._renderSnakeBuf;
+        renderSnakes.length = 0;
+        for (const snake of this.targetSnakes) {
             const s = this.smooth.get(snake.id);
-            return s ? { ...snake, segments: s.segments, angle: s.angle } : snake;
-        });
+            renderSnakes.push(s ? { ...snake, segments: s.segments, angle: s.angle } : snake);
+        }
 
         const me = renderSnakes.find(s => s.isYou);
         if (me?.segments?.[0]) {
@@ -750,14 +769,15 @@ export class SlitherRenderer {
 
         this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom);
         this._drawZone(ctx, toScreen, W, H);
-        this._pruneFoodCache(cx, cy, zoom, W, H, me?.segments?.[0], me?.radius);
-        this._drawFood(ctx, Array.from(this.foodCache.values()), toScreen, W, H, zoom);
+        if (this._frame % 12 === 0) {
+            this._pruneFoodCache(cx, cy, zoom, W, H, me?.segments?.[0], me?.radius);
+        }
+        this._drawFood(ctx, this.foodCache, toScreen, W, H, zoom);
 
-        const sorted = [...renderSnakes].sort((a, b) => {
-            const ar = a.radius || 6;
-            const br = b.radius || 6;
-            return ar - br;
-        });
+        const sorted = this._sortedRenderSnakes;
+        sorted.length = 0;
+        for (let i = 0; i < renderSnakes.length; i++) sorted.push(renderSnakes[i]);
+        sorted.sort((a, b) => (a.radius || 6) - (b.radius || 6));
         for (const snake of sorted) {
             this._drawSnake(snake, toScreen, zoom);
         }
@@ -782,8 +802,7 @@ export class SlitherRenderer {
     }
 
     destroy() {
-        this.running = false;
-        if (this._raf) cancelAnimationFrame(this._raf);
+        this.pause();
         window.removeEventListener('resize', this._onResize);
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('mousedown', this._onMouseDown);

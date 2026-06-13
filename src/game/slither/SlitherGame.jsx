@@ -144,9 +144,14 @@ export default function SlitherGame() {
         socketRef.current.emit('cashOut');
     }, []);
 
+    const handleHoldProgress = useCallback((progress) => {
+        rendererRef.current?.setHud({ holdProgress: progress });
+    }, []);
+
     const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
         onComplete: handleCashOut,
+        onProgress: handleHoldProgress,
     });
 
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
@@ -162,16 +167,15 @@ export default function SlitherGame() {
         onContextMenu: (e) => e.preventDefault(),
     };
 
-    // Feed balance + cash-out timer to the renderer so it can draw them over the snake
+    // Feed balance + cash-out timer to the renderer (hold progress goes via onProgress callback)
     useLayoutEffect(() => {
         rendererRef.current?.setHud({
             balance: currentBalance,
             cashoutSeconds: localTimer,
             cashoutTotal: cashOutTotalRef.current || 10,
-            holdProgress,
             securingCashout: isSecuringCashout,
         });
-    }, [currentBalance, localTimer, holdProgress, isSecuringCashout]);
+    }, [currentBalance, localTimer, isSecuringCashout]);
 
     useEffect(() => {
         if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
@@ -341,6 +345,7 @@ export default function SlitherGame() {
 
             cashoutActiveRef.current = false;
             setIsSecuringCashout(false);
+            rendererRef.current?.pause();
 
             localStorage.removeItem('current_game_mode');
 
@@ -389,6 +394,7 @@ export default function SlitherGame() {
             setIsDead(true);
             setLocalTimer(0);
             setIsSecuringCashout(false);
+            rendererRef.current?.pause();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
             setTimeout(() => {
@@ -587,13 +593,13 @@ export default function SlitherGame() {
 
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
 
-                    background: rgba(5, 5, 7, 0.98); backdrop-filter: blur(20px);
+                    background: rgba(5, 5, 7, 0.96);
 
                     animation: overlayIn 0.3s ease-out forwards; width: 100vw; height: 100vh;
 
                 }
 
-                .modern-overlay-backdrop.death { background: rgba(12, 3, 3, 0.98); }
+                .modern-overlay-backdrop.death { background: rgba(12, 3, 3, 0.96); }
 
                 .modern-overlay-card {
 
