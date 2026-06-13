@@ -3,6 +3,7 @@
  */
 
 import { drawCashoutProgressRing } from '../cashoutRing.js';
+import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
     if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
@@ -99,10 +100,9 @@ export class SlitherRenderer {
         this._sprites = new Map();
         /** o.pr_imgs — normal + boost overlay canvases per (cs, radius) */
         this._prImgs = new Map();
-        this._hexTile = null;
-        this._hexPattern = null;
-        this._vignette = null;
-        this._vigKey = '';
+        this._bgTileImage = null;
+        this._bgPattern = null;
+        this._loadBgTile();
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
@@ -289,97 +289,29 @@ export class SlitherRenderer {
         return cv;
     }
 
-    /**
-     * Seamless hex-grid tile (slither.io style), supersampled 3x and reused
-     * as a repeating canvas pattern — drawing hundreds of hex paths per
-     * frame was a major frame-time cost.
-     */
-    _getHexPattern(ctx) {
-        const VER = 8;
-        if (this._hexPattern && this._hexPatternVer === VER) return this._hexPattern;
-        this._hexPattern = null;
-        const R = 18;
-        const S = 3; // supersample so tiles stay crisp at zoom ~2.65
-        const sqrt3 = Math.sqrt(3);
-        const tw = 3 * R;
-        const th = sqrt3 * R;
-
-        const cv = document.createElement('canvas');
-        cv.width = Math.round(tw * S);
-        cv.height = Math.round(th * S);
-        const g = cv.getContext('2d');
-        g.scale(S, S);
-
-        // Agar-style: near-black tiles, thin subtle gray seams
-        g.fillStyle = '#26282c';
-        g.fillRect(0, 0, tw, th);
-
-        const inset = R * 0.94;
-        const hexAt = (hx, hy) => {
-            g.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const a = (Math.PI / 3) * i;
-                const px = hx + inset * Math.cos(a);
-                const py = hy + inset * Math.sin(a);
-                if (i === 0) g.moveTo(px, py);
-                else g.lineTo(px, py);
-            }
-            g.closePath();
-            // Flat black tile with the faintest center lift, clean like agar
-            const grad = g.createRadialGradient(hx, hy, inset * 0.2, hx, hy, inset);
-            grad.addColorStop(0, '#0d0e11');
-            grad.addColorStop(1, '#0a0b0d');
-            g.fillStyle = grad;
-            g.strokeStyle = grad;
-            g.lineJoin = 'round';
-            g.lineWidth = R * 0.06;
-            g.fill();
-            g.stroke();
+    _loadBgTile() {
+        const img = new Image();
+        img.onload = () => {
+            this._bgTileImage = img;
+            this._bgPattern = null;
         };
-
-        for (const [hx, hy] of [
-            [0, 0], [tw, 0], [0, th], [tw, th],
-            [tw / 2, th / 2], [tw / 2, -th / 2], [tw / 2, th * 1.5],
-        ]) {
-            hexAt(hx, hy);
-        }
-
-        this._hexTile = cv;
-        this._hexPattern = ctx.createPattern(cv, 'repeat');
-        this._hexPatternVer = VER;
-        // Pattern pixels are world-units * S — scale back so it maps 1:1
-        if (this._hexPattern && this._hexPattern.setTransform) {
-            this._hexPattern.setTransform(new DOMMatrix([1 / S, 0, 0, 1 / S, 0, 0]));
-        }
-        return this._hexPattern;
+        img.src = bgTileUrl;
     }
 
-    /** Cached edge-darkening vignette, slither.io style. */
-    _getVignette(W, H) {
-        const key = `${W}x${H}`;
-        if (this._vignette && this._vigKey === key) return this._vignette;
-        const cv = document.createElement('canvas');
-        cv.width = W;
-        cv.height = H;
-        const g = cv.getContext('2d');
-        const grad = g.createRadialGradient(
-            W / 2, H / 2, Math.min(W, H) * 0.35,
-            W / 2, H / 2, Math.hypot(W, H) * 0.62,
-        );
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.5)');
-        g.fillStyle = grad;
-        g.fillRect(0, 0, W, H);
-        this._vignette = cv;
-        this._vigKey = key;
-        return cv;
+    /** Repeating slither.io hex tile — 599×519 asset, 1 px ≈ 1 world unit. */
+    _getBgPattern(ctx) {
+        const img = this._bgTileImage;
+        if (!img?.complete || !img.naturalWidth) return null;
+        if (this._bgPattern) return this._bgPattern;
+        this._bgPattern = ctx.createPattern(img, 'repeat');
+        return this._bgPattern;
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#0a0a0c';
+        ctx.fillStyle = '#161616';
         ctx.fillRect(0, 0, W, H);
 
-        const pattern = this._getHexPattern(ctx);
+        const pattern = this._getBgPattern(ctx);
         if (pattern) {
             ctx.save();
             ctx.translate(W / 2, H / 2);
@@ -579,16 +511,27 @@ export class SlitherRenderer {
             g.fill();
         });
 
-        const currentLineWidth = rPx * 2;
-        const boostLineWidth = currentLineWidth * 1.5;
-        const pad = Math.ceil(boostLineWidth / 2) + 2;
-        const boost = this._getSprite(`pr_boost|${rPx}`, rPx * 2 + pad * 2, (g, sz) => {
+        const col = parseColor(cs);
+        const bright = shadeColor(col, 48);
+        const pad = Math.ceil(rPx * 0.55) + 3;
+        const boost = this._getSprite(`pr_boost|${key}`, rPx * 2 + pad * 2, (g, sz) => {
             const c = sz / 2;
-            g.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            g.lineWidth = boostLineWidth;
+            const glowR = rPx + pad - 2;
+            const aura = g.createRadialGradient(c, c, rPx * 0.88, c, c, glowR);
+            aura.addColorStop(0, 'rgba(255,255,255,0)');
+            aura.addColorStop(0.45, rgb(col, 0.1));
+            aura.addColorStop(0.78, rgb(bright, 0.38));
+            aura.addColorStop(1, rgb(col, 0.04));
+            g.fillStyle = aura;
+            g.beginPath();
+            g.arc(c, c, glowR, 0, Math.PI * 2);
+            g.fill();
+
+            g.strokeStyle = rgb(bright, 0.28);
+            g.lineWidth = Math.max(1.5, rPx * 0.2);
             g.lineCap = 'round';
             g.beginPath();
-            g.arc(c, c, rPx, 0, Math.PI * 2);
+            g.arc(c, c, rPx + 0.5, 0, Math.PI * 2);
             g.stroke();
         });
 
@@ -634,10 +577,11 @@ export class SlitherRenderer {
             ctx.drawImage(normal, p.x - halfN, p.y - halfN);
         }
 
-        // Pass 2: pre-rendered boost overlay — lighter composite, no shadowBlur
+        // Pass 2: color-tinted boost aura — lighter composite, no shadowBlur
         if (boosting) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.72;
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
             for (let i = bumps.length - 1; i >= 0; i--) {
