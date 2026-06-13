@@ -501,27 +501,35 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — subtle 3D, soft rim; cached, not called from the main loop. */
+    /** Paint one snake segment — semi-gloss volume, soft shadow fade at rim. */
     _paintSnakeSegment(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const dark = shadeColor(col, -34);
+        const bright = shadeColor(col, 40);
+        const light = shadeColor(col, 16);
+        const dark = shadeColor(col, -44);
+        const deep = shadeColor(col, -68);
 
-        const body = g.createRadialGradient(c, c, rPx * 0.12, c, c, rPx);
-        body.addColorStop(0, cs);
-        body.addColorStop(0.84, cs);
-        body.addColorStop(1, toHex(dark));
+        const lx = c - rPx * 0.2;
+        const ly = c - rPx * 0.24;
+        const body = g.createRadialGradient(lx, ly, rPx * 0.04, c, c, rPx);
+        body.addColorStop(0, rgb(light, 1));
+        body.addColorStop(0.28, cs);
+        body.addColorStop(0.62, cs);
+        body.addColorStop(0.82, rgb(dark, 0.88));
+        body.addColorStop(0.93, rgb(deep, 0.5));
+        body.addColorStop(1, rgb(deep, 0));
         g.fillStyle = body;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hx = c - rPx * 0.22;
-        const hy = c - rPx * 0.28;
-        const hi = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.62);
-        hi.addColorStop(0, 'rgba(255,255,255,0.22)');
-        hi.addColorStop(0.45, 'rgba(255,255,255,0.05)');
-        hi.addColorStop(1, 'rgba(255,255,255,0)');
-        g.fillStyle = hi;
+        const hx = c - rPx * 0.19;
+        const hy = c - rPx * 0.25;
+        const gloss = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.5);
+        gloss.addColorStop(0, 'rgba(255,255,255,0.28)');
+        gloss.addColorStop(0.32, rgb(bright, 0.16));
+        gloss.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gloss;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
@@ -536,7 +544,7 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v3|${key}`, rPx * 2 + 2, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v4|${key}`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs);
         });
 
