@@ -393,7 +393,7 @@ export class SlitherRenderer {
     }
 
     /** Keep long snakes performant — evenly subsample excess bump points. */
-    _capBumps(bumps, max = 150) {
+    _capBumps(bumps, max = 165) {
         if (bumps.length <= max) return bumps;
         const out = new Array(max);
         const step = (bumps.length - 1) / (max - 1);
@@ -520,39 +520,61 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — matte skin, soft edges, subtle dorsal gloss streak. */
+    /** Paint one snake segment — soft skin sheen, dorsal gloss, visible bead creases. */
     _paintSnakeSegment(g, c, rPx, cs, phase = 0) {
         const col = parseColor(cs);
-        const shift = phase === 1 ? -6 : 0;
+        const shift = phase === 1 ? -11 : 0;
         const base = shadeColor(col, shift);
-        const top = shadeColor(base, 14);
-        const lower = shadeColor(base, -10);
-        const bottom = shadeColor(base, -15);
-        const edge = shadeColor(base, -19);
+        const top = shadeColor(base, 22);
+        const lower = shadeColor(base, -13);
+        const bottom = shadeColor(base, -20);
+        const edge = shadeColor(base, -27);
 
-        const lx = c - rPx * 0.04;
-        const ly = c - rPx * 0.20;
-        const body = g.createRadialGradient(lx, ly, rPx * 0.10, c, c + rPx * 0.10, rPx);
+        const lx = c - rPx * 0.05;
+        const ly = c - rPx * 0.24;
+        const body = g.createRadialGradient(lx, ly, rPx * 0.06, c, c + rPx * 0.11, rPx);
         body.addColorStop(0,    toHex(top));
-        body.addColorStop(0.38, toHex(base));
-        body.addColorStop(0.68, toHex(lower));
-        body.addColorStop(0.88, toHex(bottom));
+        body.addColorStop(0.32, toHex(base));
+        body.addColorStop(0.62, toHex(lower));
+        body.addColorStop(0.82, toHex(bottom));
         body.addColorStop(1,    toHex(edge));
         g.fillStyle = body;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Narrow dorsal gloss — aligns segment-to-segment into a soft center streak
-        const glossHi = shadeColor(base, 18);
+        // Underside crease — darkens overlap zones so beads read as separate segments
+        const crease = shadeColor(base, -34);
+        const cy = c + rPx * 0.14;
+        const creaseGrad = g.createRadialGradient(c, cy, rPx * 0.12, c, cy, rPx * 0.88);
+        creaseGrad.addColorStop(0, rgb(crease, 0.24));
+        creaseGrad.addColorStop(0.45, rgb(crease, 0.10));
+        creaseGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = creaseGrad;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        // Dorsal gloss streak + tiny specular — cylindrical sheen without plastic look
+        const glossHi = shadeColor(base, 26);
         const gx = c;
-        const gy = c - rPx * 0.24;
-        const gloss = g.createRadialGradient(gx, gy, 0, gx, gy, rPx * 0.42);
-        gloss.addColorStop(0, rgb(glossHi, 0.26));
-        gloss.addColorStop(0.32, rgb(glossHi, 0.10));
-        gloss.addColorStop(0.62, rgb(glossHi, 0.02));
+        const gy = c - rPx * 0.26;
+        const gloss = g.createRadialGradient(gx, gy, 0, gx, gy, rPx * 0.46);
+        gloss.addColorStop(0, rgb(glossHi, 0.40));
+        gloss.addColorStop(0.28, rgb(glossHi, 0.16));
+        gloss.addColorStop(0.58, rgb(glossHi, 0.03));
         gloss.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = gloss;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        const spec = shadeColor(base, 32);
+        const specGrad = g.createRadialGradient(c - rPx * 0.07, c - rPx * 0.30, 0, c - rPx * 0.07, c - rPx * 0.30, rPx * 0.20);
+        specGrad.addColorStop(0, rgb(spec, 0.38));
+        specGrad.addColorStop(0.55, rgb(spec, 0.06));
+        specGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = specGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
@@ -567,11 +589,11 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v11|${key}|0`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v12|${key}|0`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0);
         });
 
-        const alt = this._getSprite(`pr_norm_v11|${key}|1`, rPx * 2 + 4, (g, sz) => {
+        const alt = this._getSprite(`pr_norm_v12|${key}|1`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 1);
         });
 
@@ -624,7 +646,7 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.56);
+        const bumpStep = Math.max(2, bodyRadius * 0.47);
         const bumps = this._capBumps(this._densifySpine(pts, bumpStep));
         if (bumps.length < 1) return;
 
