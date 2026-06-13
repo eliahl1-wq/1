@@ -546,44 +546,20 @@ export class SlitherRenderer {
         }
     }
 
-    /**
-     * Ball segment lit from its center — when these overlap densely the
-     * bright cores merge into a glossy band along the spine and the darkened
-     * rims become the subtle ring shading between bumps, exactly like the
-     * slither.io tube.
-     */
-    _bodySprite(colorHex, rPx) {
-        const key = `b7|${colorHex}|${rPx}`;
-        return this._getSprite(key, (rPx + 1) * 2, (g, sz) => {
-            const c = sz / 2;
-            const base = parseColor(colorHex);
-            const grad = g.createRadialGradient(c, c, rPx * 0.05, c, c, rPx);
-            grad.addColorStop(0, rgb(shadeColor(base, 48)));
-            grad.addColorStop(0.38, rgb(shadeColor(base, 18)));
-            grad.addColorStop(0.7, rgb(base));
-            grad.addColorStop(0.9, rgb(shadeColor(base, -26)));
-            grad.addColorStop(1, rgb(shadeColor(base, -52)));
-            g.fillStyle = grad;
-            g.beginPath();
-            g.arc(c, c, rPx, 0, Math.PI * 2);
-            g.fill();
-        });
-    }
-
     _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
         const segs = snake.segments || [];
         if (segs.length === 0) return;
 
+        const gsc = zoom;
         const thick = this.snakeThickness ?? 1;
-        const headRadius = (snake.radius || 6) * zoom * thick;
+        const headRadius = (snake.radius || 6) * gsc * thick;
         const bodyRadius = headRadius * 0.96;
         const angle = snake.angle || 0;
-        // Random spawn color from the server (same util.randomColor as agar),
-        // remapped to slither.io's pastel band — your own snake included
         const colorHex = normalizeSnakeColor(snake.color);
         const base = parseColor(colorHex);
         const light = shadeColor(base, 55);
+        const dark = shadeColor(base, -32);
 
         const pts = [];
         for (let i = 0; i < segs.length; i++) {
@@ -593,11 +569,9 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        // Ring spacing ~0.65R: the center-lit sprites merge into a smooth
-        // tube while the darkened rims show as the transverse ring shading
-        // along the body, matching the real game's scallops
-        const bumpStep = Math.max(2, bodyRadius * 0.65);
+        const bumpStep = Math.max(2, bodyRadius * 0.55);
         const bumps = this._densifySpine(pts, bumpStep);
+        if (bumps.length < 2) return;
 
         const spinePath = () => {
             ctx.beginPath();
@@ -605,35 +579,66 @@ export class SlitherRenderer {
             for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
         };
 
-        // Boost glow only — clean body otherwise, matching the agar look
-        if (snake.boost) {
-            const pulse = 0.28 + 0.10 * Math.sin(this._frame * 0.35);
+        const diam = bodyRadius * 2;
+        const outline = Math.max(2.5, 2.2 * gsc);
+        const boosting = !!snake.boost;
+
+        // --- Body: multi-layer strokes (black rim → shade → fill → highlight) ---
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+
+        spinePath();
+        ctx.lineWidth = diam + outline * 2.2;
+        ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+        ctx.stroke();
+
+        spinePath();
+        ctx.lineWidth = diam + outline * 0.9;
+        ctx.strokeStyle = rgb(dark);
+        ctx.stroke();
+
+        spinePath();
+        ctx.lineWidth = diam;
+        ctx.strokeStyle = rgb(base);
+        ctx.stroke();
+
+        spinePath();
+        ctx.lineWidth = diam * 0.46;
+        ctx.strokeStyle = rgb(shadeColor(base, 38));
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Boost / death-style glow: lighter composite + dynamic RGB shadow
+        if (boosting) {
+            const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.35);
             ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
+            ctx.shadowBlur = 16 * gsc * pulse;
+            ctx.shadowColor = rgb(light);
+
             spinePath();
-            ctx.lineWidth = bodyRadius * 2 + Math.max(10, bodyRadius * 0.8);
-            ctx.strokeStyle = rgb(light, pulse * 0.5);
+            ctx.lineWidth = diam + Math.max(8, 6 * gsc);
+            ctx.strokeStyle = rgb(light, 0.55 * pulse);
             ctx.stroke();
+
             spinePath();
-            ctx.lineWidth = bodyRadius * 2 + 6;
-            ctx.strokeStyle = rgb(light, pulse);
+            ctx.lineWidth = diam + Math.max(4, 3 * gsc);
+            ctx.strokeStyle = rgb(base, 0.45 * pulse);
             ctx.stroke();
+
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+            ctx.globalCompositeOperation = 'source-over';
             ctx.restore();
         }
 
-        // Constant-width tube tail → head, rounded tail tip — same silhouette
-        // as the round-capped boost glow stroke so they always line up
-        const r = Math.max(2.5, Math.round(bodyRadius));
-        const sprite = this._bodySprite(colorHex, r);
-        const half = sprite.width / 2;
-        for (let i = bumps.length - 1; i >= 0; i--) {
-            const p = bumps[i];
-            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            ctx.drawImage(sprite, p.x - half, p.y - half);
-        }
-
-        // Two round white eyes at the very front of the head
+        // Head eyes
         const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
@@ -644,37 +649,27 @@ export class SlitherRenderer {
         const eyeR = Math.max(2.5, headRadius * 0.34);
         const pupilR = eyeR * 0.5;
 
+        ctx.save();
+        ctx.shadowBlur = 0;
         for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
-            // Sclera with soft shading and thin dark rim
-            const eyeGrad = ctx.createRadialGradient(
-                ex - eyeR * 0.2, ey - eyeR * 0.25, eyeR * 0.1,
-                ex, ey, eyeR,
-            );
-            eyeGrad.addColorStop(0, '#ffffff');
-            eyeGrad.addColorStop(0.75, '#f2f4f6');
-            eyeGrad.addColorStop(1, '#d8dce1');
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-            ctx.fillStyle = eyeGrad;
+            ctx.fillStyle = '#ffffff';
             ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+            ctx.strokeStyle = 'rgba(0,0,0,0.28)';
             ctx.lineWidth = Math.max(0.8, eyeR * 0.09);
             ctx.stroke();
 
-            // Pupil looking in travel direction, with tiny specular glint
             const px = ex + fwdX * eyeR * 0.42;
             const py = ey + fwdY * eyeR * 0.42;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
             ctx.fillStyle = '#101014';
             ctx.fill();
-            ctx.beginPath();
-            ctx.arc(px - pupilR * 0.32, py - pupilR * 0.32, pupilR * 0.3, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.fill();
         }
+        ctx.restore();
 
         if (snake.name) {
             ctx.fillStyle = 'rgba(255,255,255,0.95)';
