@@ -520,25 +520,39 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — warm sphere highlight matching slither.io bead look. */
-    _paintSnakeSegment(g, c, rPx, cs) {
+    /** Paint one snake segment — matte skin, soft edges, subtle dorsal gloss streak. */
+    _paintSnakeSegment(g, c, rPx, cs, phase = 0) {
         const col = parseColor(cs);
-        const hi = shadeColor(col, 58);
-        const lo = shadeColor(col, -30);
-        const rim = {
-            r: Math.max(0, col.r * 0.45),
-            g: Math.max(0, col.g * 0.40),
-            b: Math.max(0, col.b * 0.35),
-        };
+        const shift = phase === 1 ? -6 : 0;
+        const base = shadeColor(col, shift);
+        const top = shadeColor(base, 14);
+        const lower = shadeColor(base, -10);
+        const bottom = shadeColor(base, -15);
+        const edge = shadeColor(base, -19);
 
-        const lx = c - rPx * 0.22;
-        const ly = c - rPx * 0.30;
-        const body = g.createRadialGradient(lx, ly, 0, c, c + rPx * 0.05, rPx);
-        body.addColorStop(0,    toHex(hi));
-        body.addColorStop(0.30, cs);
-        body.addColorStop(0.68, toHex(lo));
-        body.addColorStop(1,    toHex(rim));
+        const lx = c - rPx * 0.04;
+        const ly = c - rPx * 0.20;
+        const body = g.createRadialGradient(lx, ly, rPx * 0.10, c, c + rPx * 0.10, rPx);
+        body.addColorStop(0,    toHex(top));
+        body.addColorStop(0.38, toHex(base));
+        body.addColorStop(0.68, toHex(lower));
+        body.addColorStop(0.88, toHex(bottom));
+        body.addColorStop(1,    toHex(edge));
         g.fillStyle = body;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        // Narrow dorsal gloss — aligns segment-to-segment into a soft center streak
+        const glossHi = shadeColor(base, 18);
+        const gx = c;
+        const gy = c - rPx * 0.24;
+        const gloss = g.createRadialGradient(gx, gy, 0, gx, gy, rPx * 0.42);
+        gloss.addColorStop(0, rgb(glossHi, 0.26));
+        gloss.addColorStop(0.32, rgb(glossHi, 0.10));
+        gloss.addColorStop(0.62, rgb(glossHi, 0.02));
+        gloss.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gloss;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
@@ -553,8 +567,12 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v9|${key}`, rPx * 2 + 4, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, rPx, cs);
+        const normal = this._getSprite(`pr_norm_v11|${key}|0`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0);
+        });
+
+        const alt = this._getSprite(`pr_norm_v11|${key}|1`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 1);
         });
 
         const col = parseColor(cs);
@@ -580,7 +598,7 @@ export class SlitherRenderer {
             g.stroke();
         });
 
-        pair = { normal, boost };
+        pair = { normal, alt, boost };
         this._prImgs.set(key, pair);
         return pair;
     }
@@ -611,15 +629,16 @@ export class SlitherRenderer {
         if (bumps.length < 1) return;
 
         const r = Math.max(2.5, Math.round(bodyRadius));
-        const { normal, boost: boostOverlay } = this._getSnakePrImgs(cs, r);
+        const { normal, alt, boost: boostOverlay } = this._getSnakePrImgs(cs, r);
         const halfN = normal.width / 2;
         const halfB = boostOverlay.width / 2;
 
-        // Pass 1: normal body — drawImage only
+        // Pass 1: normal body — alternate light/dark segments for ribbed depth
         for (let i = bumps.length - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            ctx.drawImage(normal, p.x - halfN, p.y - halfN);
+            const seg = (i & 1) ? alt : normal;
+            ctx.drawImage(seg, p.x - halfN, p.y - halfN);
         }
 
         // Pass 2: tight boost glow — lighter composite, no shadowBlur
