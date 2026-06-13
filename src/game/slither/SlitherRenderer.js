@@ -300,11 +300,22 @@ export class SlitherRenderer {
         img.src = bgTileUrl;
     }
 
-    /** Repeating slither.io hex tile — scaled down to match in-game hex size. */
+    /**
+     * Scale slither.io bg tile so hex width ≈ 2.2× snake body (reference: body ~45% of hex).
+     * Tile asset is ~9 hex across at 599px; base snake diameter ≈ 12.4 world units.
+     */
+    _getBgTileScale(img) {
+        const snakeBodyDiam = 12.4;
+        const hexToBody = 2.2;
+        const hexesAcross = 9;
+        return (snakeBodyDiam * hexToBody * hexesAcross) / img.naturalWidth;
+    }
+
+    /** Repeating slither.io hex tile — sized to match in-game reference. */
     _getBgPattern(ctx) {
         const img = this._bgTileImage;
         if (!img?.complete || !img.naturalWidth) return null;
-        const scale = 48 / img.naturalWidth;
+        const scale = this._getBgTileScale(img);
         if (this._bgPattern && this._bgPatternScale === scale) return this._bgPattern;
         this._bgPattern = ctx.createPattern(img, 'repeat');
         this._bgPatternScale = scale;
