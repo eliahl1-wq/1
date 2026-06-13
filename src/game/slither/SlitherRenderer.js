@@ -102,6 +102,7 @@ export class SlitherRenderer {
         this._prImgs = new Map();
         this._bgTileImage = null;
         this._bgPattern = null;
+        this._bgPatternScale = 0;
         this._loadBgTile();
         this.inputDx = 0;
         this.inputDy = 0;
@@ -294,16 +295,22 @@ export class SlitherRenderer {
         img.onload = () => {
             this._bgTileImage = img;
             this._bgPattern = null;
+            this._bgPatternScale = 0;
         };
         img.src = bgTileUrl;
     }
 
-    /** Repeating slither.io hex tile — 599×519 asset, 1 px ≈ 1 world unit. */
+    /** Repeating slither.io hex tile — scaled down to match in-game hex size. */
     _getBgPattern(ctx) {
         const img = this._bgTileImage;
         if (!img?.complete || !img.naturalWidth) return null;
-        if (this._bgPattern) return this._bgPattern;
+        const scale = 48 / img.naturalWidth;
+        if (this._bgPattern && this._bgPatternScale === scale) return this._bgPattern;
         this._bgPattern = ctx.createPattern(img, 'repeat');
+        this._bgPatternScale = scale;
+        if (this._bgPattern?.setTransform) {
+            this._bgPattern.setTransform(new DOMMatrix([scale, 0, 0, scale, 0, 0]));
+        }
         return this._bgPattern;
     }
 
@@ -483,15 +490,30 @@ export class SlitherRenderer {
         }
     }
 
-    /**
-     * Slither.io 3D skin gradient — exact color stops for glossy segment look.
-     */
-    _snakeSkinGradient(ctx, cx, cy, radius, cs) {
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-        grad.addColorStop(0, '#FFFFFF');
-        grad.addColorStop(0.2, cs);
-        grad.addColorStop(0.9, '#333333');
-        return grad;
+    /** Paint one snake segment — subtle 3D, cached; not called from the main loop. */
+    _paintSnakeSegment(g, c, rPx, cs) {
+        const col = parseColor(cs);
+        const dark = shadeColor(col, -52);
+
+        const body = g.createRadialGradient(c, c, rPx * 0.08, c, c, rPx);
+        body.addColorStop(0, cs);
+        body.addColorStop(0.72, cs);
+        body.addColorStop(1, toHex(dark));
+        g.fillStyle = body;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        const hx = c - rPx * 0.24;
+        const hy = c - rPx * 0.3;
+        const hi = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.58);
+        hi.addColorStop(0, 'rgba(255,255,255,0.3)');
+        hi.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+        hi.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = hi;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
     }
 
     /**
@@ -504,34 +526,29 @@ export class SlitherRenderer {
         if (pair) return pair;
 
         const normal = this._getSprite(`pr_norm|${key}`, rPx * 2 + 2, (g, sz) => {
-            const c = sz / 2;
-            g.fillStyle = this._snakeSkinGradient(g, c, c, rPx, cs);
-            g.beginPath();
-            g.arc(c, c, rPx, 0, Math.PI * 2);
-            g.fill();
+            this._paintSnakeSegment(g, sz / 2, rPx, cs);
         });
 
         const col = parseColor(cs);
-        const bright = shadeColor(col, 48);
-        const pad = Math.ceil(rPx * 0.55) + 3;
+        const bright = shadeColor(col, 36);
+        const pad = Math.max(2, Math.ceil(rPx * 0.1));
         const boost = this._getSprite(`pr_boost|${key}`, rPx * 2 + pad * 2, (g, sz) => {
             const c = sz / 2;
-            const glowR = rPx + pad - 2;
-            const aura = g.createRadialGradient(c, c, rPx * 0.88, c, c, glowR);
+            const glowR = rPx + pad - 1;
+            const aura = g.createRadialGradient(c, c, rPx * 0.96, c, c, glowR);
             aura.addColorStop(0, 'rgba(255,255,255,0)');
-            aura.addColorStop(0.45, rgb(col, 0.1));
-            aura.addColorStop(0.78, rgb(bright, 0.38));
-            aura.addColorStop(1, rgb(col, 0.04));
+            aura.addColorStop(0.55, rgb(bright, 0.14));
+            aura.addColorStop(1, 'rgba(255,255,255,0)');
             g.fillStyle = aura;
             g.beginPath();
             g.arc(c, c, glowR, 0, Math.PI * 2);
             g.fill();
 
-            g.strokeStyle = rgb(bright, 0.28);
-            g.lineWidth = Math.max(1.5, rPx * 0.2);
+            g.strokeStyle = rgb(bright, 0.18);
+            g.lineWidth = Math.max(1, rPx * 0.1);
             g.lineCap = 'round';
             g.beginPath();
-            g.arc(c, c, rPx + 0.5, 0, Math.PI * 2);
+            g.arc(c, c, rPx + 0.3, 0, Math.PI * 2);
             g.stroke();
         });
 
@@ -577,11 +594,11 @@ export class SlitherRenderer {
             ctx.drawImage(normal, p.x - halfN, p.y - halfN);
         }
 
-        // Pass 2: color-tinted boost aura — lighter composite, no shadowBlur
+        // Pass 2: tight boost glow — lighter composite, no shadowBlur
         if (boosting) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.72;
+            ctx.globalAlpha = 0.48;
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
             for (let i = bumps.length - 1; i >= 0; i--) {
