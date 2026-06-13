@@ -501,25 +501,25 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — subtle 3D, cached; not called from the main loop. */
+    /** Paint one snake segment — subtle 3D, soft rim; cached, not called from the main loop. */
     _paintSnakeSegment(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const dark = shadeColor(col, -52);
+        const dark = shadeColor(col, -34);
 
-        const body = g.createRadialGradient(c, c, rPx * 0.08, c, c, rPx);
+        const body = g.createRadialGradient(c, c, rPx * 0.12, c, c, rPx);
         body.addColorStop(0, cs);
-        body.addColorStop(0.72, cs);
+        body.addColorStop(0.84, cs);
         body.addColorStop(1, toHex(dark));
         g.fillStyle = body;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hx = c - rPx * 0.24;
-        const hy = c - rPx * 0.3;
-        const hi = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.58);
-        hi.addColorStop(0, 'rgba(255,255,255,0.3)');
-        hi.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+        const hx = c - rPx * 0.22;
+        const hy = c - rPx * 0.28;
+        const hi = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.62);
+        hi.addColorStop(0, 'rgba(255,255,255,0.22)');
+        hi.addColorStop(0.45, 'rgba(255,255,255,0.05)');
         hi.addColorStop(1, 'rgba(255,255,255,0)');
         g.fillStyle = hi;
         g.beginPath();
@@ -536,7 +536,7 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm|${key}`, rPx * 2 + 2, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v3|${key}`, rPx * 2 + 2, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs);
         });
 
@@ -589,11 +589,11 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.52);
+        const bumpStep = Math.max(2.5, bodyRadius * 0.63);
         const bumps = this._densifySpine(pts, bumpStep);
         if (bumps.length < 1) return;
 
-        const r = Math.max(2.5, Math.round(bodyRadius));
+        const r = Math.max(2.5, Math.round(bodyRadius * 0.95));
         const { normal, boost: boostOverlay } = this._getSnakePrImgs(cs, r);
         const halfN = normal.width / 2;
         const halfB = boostOverlay.width / 2;
