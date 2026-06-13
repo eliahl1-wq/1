@@ -546,6 +546,30 @@ export class SlitherRenderer {
         }
     }
 
+    /**
+     * Snake Gradient Generator — Slither.io 3D skin without image assets.
+     * White gloss center → dynamic base color (cs) → black rim shadow.
+     */
+    _snakeSkinGradient(ctx, cx, cy, radius, cs) {
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        grad.addColorStop(0, '#FFFFFF');
+        grad.addColorStop(0.3, cs);
+        grad.addColorStop(1, '#000000');
+        return grad;
+    }
+
+    /** Baked segment circle using the skin gradient (cached, not an external image). */
+    _snakeSegmentSprite(cs, rPx) {
+        const key = `skin|${cs}|${rPx}`;
+        return this._getSprite(key, rPx * 2 + 2, (g, sz) => {
+            const c = sz / 2;
+            g.fillStyle = this._snakeSkinGradient(g, c, c, rPx, cs);
+            g.beginPath();
+            g.arc(c, c, rPx, 0, Math.PI * 2);
+            g.fill();
+        });
+    }
+
     _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
         const segs = snake.segments || [];
@@ -556,10 +580,7 @@ export class SlitherRenderer {
         const headRadius = (snake.radius || 6) * gsc * thick;
         const bodyRadius = headRadius * 0.96;
         const angle = snake.angle || 0;
-        const colorHex = normalizeSnakeColor(snake.color);
-        const base = parseColor(colorHex);
-        const light = shadeColor(base, 55);
-        const dark = shadeColor(base, -32);
+        const cs = normalizeSnakeColor(snake.color);
 
         const pts = [];
         for (let i = 0; i < segs.length; i++) {
@@ -569,76 +590,34 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.55);
+        const bumpStep = Math.max(2, bodyRadius * 0.52);
         const bumps = this._densifySpine(pts, bumpStep);
-        if (bumps.length < 2) return;
+        if (bumps.length < 1) return;
 
-        const spinePath = () => {
-            ctx.beginPath();
-            ctx.moveTo(bumps[bumps.length - 1].x, bumps[bumps.length - 1].y);
-            for (let i = bumps.length - 2; i >= 0; i--) ctx.lineTo(bumps[i].x, bumps[i].y);
-        };
-
-        const diam = bodyRadius * 2;
-        const outline = Math.max(2.5, 2.2 * gsc);
+        const r = Math.max(2.5, Math.round(bodyRadius));
         const boosting = !!snake.boost;
 
-        // --- Body: multi-layer strokes (black rim → shade → fill → highlight) ---
         ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-
-        spinePath();
-        ctx.lineWidth = diam + outline * 2.2;
-        ctx.strokeStyle = 'rgba(0,0,0,0.92)';
-        ctx.stroke();
-
-        spinePath();
-        ctx.lineWidth = diam + outline * 0.9;
-        ctx.strokeStyle = rgb(dark);
-        ctx.stroke();
-
-        spinePath();
-        ctx.lineWidth = diam;
-        ctx.strokeStyle = rgb(base);
-        ctx.stroke();
-
-        spinePath();
-        ctx.lineWidth = diam * 0.46;
-        ctx.strokeStyle = rgb(shadeColor(base, 38));
-        ctx.stroke();
-
-        ctx.restore();
-
-        // Boost / death-style glow: lighter composite + dynamic RGB shadow
         if (boosting) {
-            const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.35);
-            ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.shadowBlur = 16 * gsc * pulse;
-            ctx.shadowColor = rgb(light);
-
-            spinePath();
-            ctx.lineWidth = diam + Math.max(8, 6 * gsc);
-            ctx.strokeStyle = rgb(light, 0.55 * pulse);
-            ctx.stroke();
-
-            spinePath();
-            ctx.lineWidth = diam + Math.max(4, 3 * gsc);
-            ctx.strokeStyle = rgb(base, 0.45 * pulse);
-            ctx.stroke();
-
-            ctx.shadowBlur = 0;
-            ctx.shadowColor = 'transparent';
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.restore();
+            ctx.shadowBlur = 22 * gsc;
+            ctx.shadowColor = cs;
         }
 
-        // Head eyes
+        const sprite = this._snakeSegmentSprite(cs, r);
+        const half = sprite.width / 2;
+        for (let i = bumps.length - 1; i >= 0; i--) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+            ctx.drawImage(sprite, p.x - half, p.y - half);
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+
+        // Head eyes (no segment shadow)
         const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
