@@ -72,6 +72,18 @@ function normalizeSnakeColor(color) {
     return toHex({ r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 });
 }
 
+/** Bucket colors so sprite cache stays small across many snakes. */
+function bucketSnakeColor(color) {
+    const cs = normalizeSnakeColor(color);
+    const { r, g, b } = parseColor(cs);
+    const step = 24;
+    return toHex({
+        r: Math.min(255, Math.round(r / step) * step),
+        g: Math.min(255, Math.round(g / step) * step),
+        b: Math.min(255, Math.round(b / step) * step),
+    });
+}
+
 function shadeColor({ r, g, b }, amount) {
     return {
         r: Math.max(0, Math.min(255, r + amount)),
@@ -112,6 +124,10 @@ export class SlitherRenderer {
         this._frame = 0;
         this._renderSnakeBuf = [];
         this._sortedRenderSnakes = [];
+        this._ptsBuf = [];
+        this._denseBuf = [];
+        this._bumpsBuf = [];
+        this._foodCap = 700;
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
@@ -203,14 +219,35 @@ export class SlitherRenderer {
                     this.foodCache.set(id, { ...f, _missStreak: (f._missStreak || 0) + 1 });
                 }
             }
+            this._enforceFoodCap();
         }
         this.state = {
             snakes: tick.snakes ?? this.state.snakes,
-            food: Array.from(this.foodCache.values()),
             you: tick.you ?? this.state.you,
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
             zone: tick.battleRoyale ? (tick.zone !== undefined ? tick.zone : this.state.zone) : null,
         };
+    }
+
+    /** Prevent food cache from growing without bound (main cause of progressive lag). */
+    _enforceFoodCap() {
+        const max = this._foodCap;
+        if (this.foodCache.size <= max) return;
+
+        const cx = this.camera.x;
+        const cy = this.camera.y;
+        const victims = [];
+        for (const [id, f] of this.foodCache) {
+            const miss = f._missStreak || 0;
+            const dx = f.x - cx;
+            const dy = f.y - cy;
+            const dist = dx * dx + dy * dy;
+            victims.push({ id, score: miss * 1e6 + dist });
+        }
+        victims.sort((a, b) => b.score - a.score);
+        for (let i = 0; i < victims.length - max; i++) {
+            this.foodCache.delete(victims[i].id);
+        }
     }
 
     setHud(hud) {
@@ -281,19 +318,29 @@ export class SlitherRenderer {
         this._raf = null;
     }
 
-    /** Get (or build once) a cached sprite canvas. */
+    /** Get (or build once) a cached sprite canvas. LRU eviction avoids full-cache clear stutters. */
     _getSprite(key, size, painter) {
         let s = this._sprites.get(key);
-        if (s) return s;
-        if (this._sprites.size > 400) {
-            this._sprites.clear();
-            this._prImgs.clear();
+        if (s) {
+            s._lastUsed = this._frame;
+            return s;
+        }
+        if (this._sprites.size >= 220) {
+            const entries = [...this._sprites.entries()]
+                .sort((a, b) => (a[1]._lastUsed || 0) - (b[1]._lastUsed || 0));
+            for (let i = 0; i < 40 && i < entries.length; i++) {
+                this._sprites.delete(entries[i][0]);
+            }
+            if (this._prImgs.size > 48) {
+                this._prImgs.clear();
+            }
         }
         const cv = document.createElement('canvas');
         const sz = Math.max(2, Math.ceil(size));
         cv.width = sz;
         cv.height = sz;
         painter(cv.getContext('2d'), sz);
+        cv._lastUsed = this._frame;
         this._sprites.set(key, cv);
         return cv;
     }
@@ -376,9 +423,13 @@ export class SlitherRenderer {
     }
 
     /** Insert extra points between spine nodes so the body has slither.io-style bumps. */
-    _densifySpine(pts, stepPx) {
-        if (pts.length < 2) return pts;
-        const out = [pts[0]];
+    _densifySpine(pts, stepPx, out) {
+        out.length = 0;
+        if (pts.length < 2) {
+            if (pts.length === 1) out.push(pts[0]);
+            return out;
+        }
+        out.push(pts[0]);
         for (let i = 1; i < pts.length; i++) {
             const a = pts[i - 1];
             const b = pts[i];
@@ -393,9 +444,13 @@ export class SlitherRenderer {
     }
 
     /** Keep long snakes performant — evenly subsample excess bump points. */
-    _capBumps(bumps, max = 165) {
-        if (bumps.length <= max) return bumps;
-        const out = new Array(max);
+    _capBumps(bumps, out, max = 110) {
+        if (bumps.length <= max) {
+            out.length = bumps.length;
+            for (let i = 0; i < bumps.length; i++) out[i] = bumps[i];
+            return out;
+        }
+        out.length = max;
         const step = (bumps.length - 1) / (max - 1);
         for (let i = 0; i < max; i++) out[i] = bumps[Math.round(i * step)];
         return out;
@@ -476,18 +531,22 @@ export class SlitherRenderer {
 
             // On-screen food: tolerate long culling gaps from server spatial filter
             if (inView) {
-                if (miss >= 150) this.foodCache.delete(id);
+                if (miss >= 60) this.foodCache.delete(id);
                 continue;
             }
 
-            if (miss >= 40) this.foodCache.delete(id);
+            if (miss >= 18) this.foodCache.delete(id);
         }
+        this._enforceFoodCap();
     }
 
-    _drawFood(ctx, foodCache, toScreen, W, H, zoom) {
+    _drawFood(ctx, foodCache, toScreen, cx, cy, zoom, W, H) {
+        const wxMargin = W / zoom / 2 + 160;
+        const wyMargin = H / zoom / 2 + 160;
         for (const f of foodCache.values()) {
             const miss = f._missStreak || 0;
-            if (miss > 8) continue;
+            if (miss > 6) continue;
+            if (Math.abs(f.x - cx) > wxMargin || Math.abs(f.y - cy) > wyMargin) continue;
 
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -140 || fy < -140 || fx > W + 140 || fy > H + 140) continue;
@@ -520,61 +579,62 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — soft skin sheen, dorsal gloss, visible bead creases. */
+    /** Paint one snake bead — layered skin tones, dorsal sheen, alternating stripe phase. */
     _paintSnakeSegment(g, c, rPx, cs, phase = 0) {
         const col = parseColor(cs);
-        const shift = phase === 1 ? -11 : 0;
+        const shift = phase === 1 ? -14 : 0;
         const base = shadeColor(col, shift);
-        const top = shadeColor(base, 22);
-        const lower = shadeColor(base, -13);
-        const bottom = shadeColor(base, -20);
-        const edge = shadeColor(base, -27);
+        const top = shadeColor(base, 20);
+        const upper = shadeColor(base, 8);
+        const lower = shadeColor(base, -11);
+        const bottom = shadeColor(base, -18);
+        const edge = shadeColor(base, -24);
 
-        const lx = c - rPx * 0.05;
-        const ly = c - rPx * 0.24;
-        const body = g.createRadialGradient(lx, ly, rPx * 0.06, c, c + rPx * 0.11, rPx);
+        const lx = c - rPx * 0.04;
+        const ly = c - rPx * 0.26;
+        const body = g.createRadialGradient(lx, ly, rPx * 0.05, c, c + rPx * 0.10, rPx);
         body.addColorStop(0,    toHex(top));
-        body.addColorStop(0.32, toHex(base));
-        body.addColorStop(0.62, toHex(lower));
-        body.addColorStop(0.82, toHex(bottom));
+        body.addColorStop(0.22, toHex(upper));
+        body.addColorStop(0.46, toHex(base));
+        body.addColorStop(0.68, toHex(lower));
+        body.addColorStop(0.84, toHex(bottom));
         body.addColorStop(1,    toHex(edge));
         g.fillStyle = body;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Underside crease — darkens overlap zones so beads read as separate segments
-        const crease = shadeColor(base, -34);
-        const cy = c + rPx * 0.14;
-        const creaseGrad = g.createRadialGradient(c, cy, rPx * 0.12, c, cy, rPx * 0.88);
-        creaseGrad.addColorStop(0, rgb(crease, 0.24));
-        creaseGrad.addColorStop(0.45, rgb(crease, 0.10));
-        creaseGrad.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = creaseGrad;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-
-        // Dorsal gloss streak + tiny specular — cylindrical sheen without plastic look
-        const glossHi = shadeColor(base, 26);
+        const glossHi = shadeColor(base, 24);
         const gx = c;
-        const gy = c - rPx * 0.26;
-        const gloss = g.createRadialGradient(gx, gy, 0, gx, gy, rPx * 0.46);
-        gloss.addColorStop(0, rgb(glossHi, 0.40));
-        gloss.addColorStop(0.28, rgb(glossHi, 0.16));
-        gloss.addColorStop(0.58, rgb(glossHi, 0.03));
+        const gy = c - rPx * 0.27;
+        const gloss = g.createRadialGradient(gx, gy, 0, gx, gy, rPx * 0.38);
+        gloss.addColorStop(0, rgb(glossHi, 0.34));
+        gloss.addColorStop(0.30, rgb(glossHi, 0.14));
+        gloss.addColorStop(0.62, rgb(glossHi, 0.03));
         gloss.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = gloss;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const spec = shadeColor(base, 32);
-        const specGrad = g.createRadialGradient(c - rPx * 0.07, c - rPx * 0.30, 0, c - rPx * 0.07, c - rPx * 0.30, rPx * 0.20);
-        specGrad.addColorStop(0, rgb(spec, 0.38));
-        specGrad.addColorStop(0.55, rgb(spec, 0.06));
+        const spec = shadeColor(base, 28);
+        const specGrad = g.createRadialGradient(c - rPx * 0.06, c - rPx * 0.31, 0, c - rPx * 0.06, c - rPx * 0.31, rPx * 0.17);
+        specGrad.addColorStop(0, rgb(spec, 0.22));
+        specGrad.addColorStop(0.6, rgb(spec, 0.04));
         specGrad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = specGrad;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        // Baked overlap crease — ribbing without a second draw pass per bead
+        const crease = shadeColor(base, -36);
+        const cy = c + rPx * 0.15;
+        const creaseGrad = g.createRadialGradient(c, cy, rPx * 0.10, c, cy, rPx * 0.78);
+        creaseGrad.addColorStop(0, rgb(crease, phase === 1 ? 0.28 : 0.20));
+        creaseGrad.addColorStop(0.45, rgb(crease, 0.08));
+        creaseGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = creaseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
@@ -589,11 +649,11 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v12|${key}|0`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v14|${key}|0`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0);
         });
 
-        const alt = this._getSprite(`pr_norm_v12|${key}|1`, rPx * 2 + 4, (g, sz) => {
+        const alt = this._getSprite(`pr_norm_v14|${key}|1`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 1);
         });
 
@@ -635,19 +695,21 @@ export class SlitherRenderer {
         const headRadius = (snake.radius || 6) * gsc * thick;
         const bodyRadius = headRadius * 0.96;
         const angle = snake.angle || 0;
-        const cs = normalizeSnakeColor(snake.color);
+        const cs = bucketSnakeColor(snake.color);
         const boosting = !!snake.boost;
 
-        const pts = [];
+        const pts = this._ptsBuf;
+        pts.length = segs.length;
         for (let i = 0; i < segs.length; i++) {
-            pts.push(toScreen(segs[i].x, segs[i].y));
+            pts[i] = toScreen(segs[i].x, segs[i].y);
         }
 
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.47);
-        const bumps = this._capBumps(this._densifySpine(pts, bumpStep));
+        const bumpStep = Math.max(2, bodyRadius * 0.43);
+        const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
+        const bumps = this._capBumps(dense, this._bumpsBuf);
         if (bumps.length < 1) return;
 
         const r = Math.max(2.5, Math.round(bodyRadius));
@@ -655,12 +717,10 @@ export class SlitherRenderer {
         const halfN = normal.width / 2;
         const halfB = boostOverlay.width / 2;
 
-        // Pass 1: normal body — alternate light/dark segments for ribbed depth
         for (let i = bumps.length - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            const seg = (i & 1) ? alt : normal;
-            ctx.drawImage(seg, p.x - halfN, p.y - halfN);
+            ctx.drawImage((i & 1) ? alt : normal, p.x - halfN, p.y - halfN);
         }
 
         // Pass 2: tight boost glow — lighter composite, no shadowBlur
@@ -810,10 +870,10 @@ export class SlitherRenderer {
 
         this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom);
         this._drawZone(ctx, toScreen, W, H);
-        if (this._frame % 12 === 0) {
+        if (this._frame % 8 === 0) {
             this._pruneFoodCache(cx, cy, zoom, W, H, me?.segments?.[0], me?.radius);
         }
-        this._drawFood(ctx, this.foodCache, toScreen, W, H, zoom);
+        this._drawFood(ctx, this.foodCache, toScreen, cx, cy, zoom, W, H);
 
         const sorted = this._sortedRenderSnakes;
         sorted.length = 0;
