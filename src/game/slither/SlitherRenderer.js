@@ -57,8 +57,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 68%, 60%) → RGB, the pastel band seen in slither.io
-    const s = 0.68, l = 0.60;
+    // HSL(h, 74%, 58%) → RGB — vivid beaded look like slither.io
+    const s = 0.74, l = 0.58;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -501,22 +501,25 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — matte sphere: tinted highlight/shadow, no white gloss. */
+    /** Paint one snake segment — slither.io beaded sphere: bright top highlight, dark warm rim. */
     _paintSnakeSegment(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const hi = shadeColor(col, 11);
-        const lo = shadeColor(col, -24);
-        const rim = shadeColor(col, -36);
+        const hi = shadeColor(col, 62);
+        const mid = shadeColor(col, 8);
+        const lo = shadeColor(col, -32);
+        const rim = {
+            r: Math.max(0, col.r * 0.42),
+            g: Math.max(0, col.g * 0.38),
+            b: Math.max(0, col.b * 0.32),
+        };
 
-        const lx = c - rPx * 0.26;
-        const ly = c - rPx * 0.26;
-        const sx = c + rPx * 0.18;
-        const sy = c + rPx * 0.2;
-        const body = g.createRadialGradient(lx, ly, rPx * 0.06, sx, sy, rPx);
+        const lx = c - rPx * 0.18;
+        const ly = c - rPx * 0.34;
+        const body = g.createRadialGradient(lx, ly, 0, c, c + rPx * 0.06, rPx);
         body.addColorStop(0, toHex(hi));
-        body.addColorStop(0.42, cs);
-        body.addColorStop(0.74, cs);
-        body.addColorStop(0.9, toHex(lo));
+        body.addColorStop(0.28, cs);
+        body.addColorStop(0.55, toHex(mid));
+        body.addColorStop(0.82, toHex(lo));
         body.addColorStop(1, toHex(rim));
         g.fillStyle = body;
         g.beginPath();
@@ -533,7 +536,7 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v7|${key}`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v8|${key}`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs);
         });
 
@@ -586,11 +589,11 @@ export class SlitherRenderer {
         const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2.5, bodyRadius * 0.63);
+        const bumpStep = Math.max(2, bodyRadius * 0.46);
         const bumps = this._densifySpine(pts, bumpStep);
         if (bumps.length < 1) return;
 
-        const r = Math.max(2.5, Math.round(bodyRadius * 0.95));
+        const r = Math.max(2.5, Math.round(bodyRadius));
         const { normal, boost: boostOverlay } = this._getSnakePrImgs(cs, r);
         const halfN = normal.width / 2;
         const halfB = boostOverlay.width / 2;
@@ -617,16 +620,16 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // Head eyes (no segment shadow)
+        // Head eyes — large white circles with black pupils (slither.io style)
         const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headRadius * 0.44;
-        const eyeFwd = headRadius * 0.5;
-        const eyeR = Math.max(2.5, headRadius * 0.34);
-        const pupilR = eyeR * 0.5;
+        const eyeSide = headRadius * 0.30;
+        const eyeFwd = headRadius * 0.12;
+        const eyeR = Math.max(2.8, headRadius * 0.40);
+        const pupilR = eyeR * 0.46;
 
         ctx.save();
         ctx.shadowBlur = 0;
@@ -637,15 +640,12 @@ export class SlitherRenderer {
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.28)';
-            ctx.lineWidth = Math.max(0.8, eyeR * 0.09);
-            ctx.stroke();
 
-            const px = ex + fwdX * eyeR * 0.42;
-            const py = ey + fwdY * eyeR * 0.42;
+            const px = ex - perpX * side * eyeR * 0.22 - fwdX * eyeR * 0.14;
+            const py = ey - perpY * side * eyeR * 0.22 - fwdY * eyeR * 0.14;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-            ctx.fillStyle = '#101014';
+            ctx.fillStyle = '#000000';
             ctx.fill();
         }
         ctx.restore();
