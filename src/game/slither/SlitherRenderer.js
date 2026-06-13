@@ -501,33 +501,24 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake segment — matte body, even color, light edge depth. */
+    /** Paint one snake segment — matte sphere: tinted highlight/shadow, no white gloss. */
     _paintSnakeSegment(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const light = shadeColor(col, 8);
-        const dark = shadeColor(col, -20);
-        const edge = shadeColor(col, -32);
+        const hi = shadeColor(col, 11);
+        const lo = shadeColor(col, -24);
+        const rim = shadeColor(col, -36);
 
-        const lx = c - rPx * 0.12;
-        const ly = c - rPx * 0.14;
-        const body = g.createRadialGradient(lx, ly, rPx * 0.1, c, c, rPx);
-        body.addColorStop(0, toHex(light));
-        body.addColorStop(0.45, cs);
-        body.addColorStop(0.8, cs);
-        body.addColorStop(0.93, toHex(dark));
-        body.addColorStop(1, toHex(edge));
+        const lx = c - rPx * 0.26;
+        const ly = c - rPx * 0.26;
+        const sx = c + rPx * 0.18;
+        const sy = c + rPx * 0.2;
+        const body = g.createRadialGradient(lx, ly, rPx * 0.06, sx, sy, rPx);
+        body.addColorStop(0, toHex(hi));
+        body.addColorStop(0.42, cs);
+        body.addColorStop(0.74, cs);
+        body.addColorStop(0.9, toHex(lo));
+        body.addColorStop(1, toHex(rim));
         g.fillStyle = body;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-
-        const hx = c - rPx * 0.14;
-        const hy = c - rPx * 0.17;
-        const gloss = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.38);
-        gloss.addColorStop(0, 'rgba(255,255,255,0.1)');
-        gloss.addColorStop(0.5, rgb(shadeColor(col, 12), 0.04));
-        gloss.addColorStop(1, 'rgba(255,255,255,0)');
-        g.fillStyle = gloss;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
@@ -542,7 +533,7 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v6|${key}`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v7|${key}`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs);
         });
 
