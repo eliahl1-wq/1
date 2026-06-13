@@ -97,6 +97,8 @@ export class SlitherRenderer {
         this.snakeThickness = 1.05;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
+        /** o.pr_imgs — normal + boost overlay canvases per (cs, radius) */
+        this._prImgs = new Map();
         this._hexTile = null;
         this._hexPattern = null;
         this._vignette = null;
@@ -274,7 +276,10 @@ export class SlitherRenderer {
     _getSprite(key, size, painter) {
         let s = this._sprites.get(key);
         if (s) return s;
-        if (this._sprites.size > 400) this._sprites.clear();
+        if (this._sprites.size > 400) {
+            this._sprites.clear();
+            this._prImgs.clear();
+        }
         const cv = document.createElement('canvas');
         const sz = Math.max(2, Math.ceil(size));
         cv.width = sz;
@@ -547,27 +552,49 @@ export class SlitherRenderer {
     }
 
     /**
-     * Snake Gradient Generator — Slither.io 3D skin without image assets.
-     * White gloss center → dynamic base color (cs) → black rim shadow.
+     * Slither.io 3D skin gradient — exact color stops for glossy segment look.
      */
     _snakeSkinGradient(ctx, cx, cy, radius, cs) {
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
         grad.addColorStop(0, '#FFFFFF');
-        grad.addColorStop(0.3, cs);
-        grad.addColorStop(1, '#000000');
+        grad.addColorStop(0.2, cs);
+        grad.addColorStop(0.9, '#333333');
         return grad;
     }
 
-    /** Baked segment circle using the skin gradient (cached, not an external image). */
-    _snakeSegmentSprite(cs, rPx) {
-        const key = `skin|${cs}|${rPx}`;
-        return this._getSprite(key, rPx * 2 + 2, (g, sz) => {
+    /**
+     * Pre-render normal segment + boost overlay into o.pr_imgs cache.
+     * Main loop only blits these — no arc/stroke work per frame.
+     */
+    _getSnakePrImgs(cs, rPx) {
+        const key = `${cs}|${rPx}`;
+        let pair = this._prImgs.get(key);
+        if (pair) return pair;
+
+        const normal = this._getSprite(`pr_norm|${key}`, rPx * 2 + 2, (g, sz) => {
             const c = sz / 2;
             g.fillStyle = this._snakeSkinGradient(g, c, c, rPx, cs);
             g.beginPath();
             g.arc(c, c, rPx, 0, Math.PI * 2);
             g.fill();
         });
+
+        const currentLineWidth = rPx * 2;
+        const boostLineWidth = currentLineWidth * 1.5;
+        const pad = Math.ceil(boostLineWidth / 2) + 2;
+        const boost = this._getSprite(`pr_boost|${rPx}`, rPx * 2 + pad * 2, (g, sz) => {
+            const c = sz / 2;
+            g.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            g.lineWidth = boostLineWidth;
+            g.lineCap = 'round';
+            g.beginPath();
+            g.arc(c, c, rPx, 0, Math.PI * 2);
+            g.stroke();
+        });
+
+        pair = { normal, boost };
+        this._prImgs.set(key, pair);
+        return pair;
     }
 
     _drawSnake(snake, toScreen, zoom) {
@@ -581,6 +608,7 @@ export class SlitherRenderer {
         const bodyRadius = headRadius * 0.96;
         const angle = snake.angle || 0;
         const cs = normalizeSnakeColor(snake.color);
+        const boosting = !!snake.boost;
 
         const pts = [];
         for (let i = 0; i < segs.length; i++) {
@@ -595,27 +623,30 @@ export class SlitherRenderer {
         if (bumps.length < 1) return;
 
         const r = Math.max(2.5, Math.round(bodyRadius));
-        const boosting = !!snake.boost;
+        const { normal, boost: boostOverlay } = this._getSnakePrImgs(cs, r);
+        const halfN = normal.width / 2;
+        const halfB = boostOverlay.width / 2;
 
-        ctx.save();
-        if (boosting) {
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.shadowBlur = 22 * gsc;
-            ctx.shadowColor = cs;
-        }
-
-        const sprite = this._snakeSegmentSprite(cs, r);
-        const half = sprite.width / 2;
+        // Pass 1: normal body — drawImage only
         for (let i = bumps.length - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            ctx.drawImage(sprite, p.x - half, p.y - half);
+            ctx.drawImage(normal, p.x - halfN, p.y - halfN);
         }
 
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.restore();
+        // Pass 2: pre-rendered boost overlay — lighter composite, no shadowBlur
+        if (boosting) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+            for (let i = bumps.length - 1; i >= 0; i--) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                ctx.drawImage(boostOverlay, p.x - halfB, p.y - halfB);
+            }
+            ctx.restore();
+        }
 
         // Head eyes (no segment shadow)
         const { x: hx, y: hy } = pts[0];
