@@ -542,7 +542,7 @@ export default function PreGame() {
 
     // ── Render ─────────────────────────────────────────
     return (
-        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingBottom: '60px', position: 'relative', overflow: 'hidden' }}>
             <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
                 <h1>AgarStake — {modeBaseName} with Real Money</h1>
                 <p>Play {modeBaseName}.io with real money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly.</p>
@@ -1079,31 +1079,35 @@ export default function PreGame() {
 
             {/* Live stats bottom-left (moved out of grid) */}
             <div className="stats-card live-stats-bottom" style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 1050 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                        <span className="label">Live</span>
-                        <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.3px' }}>
-                            {liveStatsMode === 'slither' ? 'Slither' : 'Agar'}
-                        </span>
+                        <span className="label" style={{ color: 'var(--text)', fontSize: '0.7rem' }}>LIVE</span>
                     </div>
                     <div className="live-dot" />
                 </div>
-                <div className="stat-row" style={{ marginBottom: '6px' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Players online</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-h)', fontWeight: 700 }}>
-                        {liveStats.playersOnline ?? 0}
-                    </span>
+                
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-2)', marginBottom: '14px' }}>
+                    Players online: <span className="mono" style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.playersOnline ?? 0}</span>
                 </div>
-                <div className="stat-row">
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-2)' }}>Top in arena</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-h)', fontWeight: 700, display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: '6px' }}>
-                        <span>{liveStats.topPlayer ?? '—'}</span>
-                        {liveStats.topPlayer && liveStats.topBalance != null && (
-                            <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-bright)', fontWeight: 600 }}>
-                                ${Number(liveStats.topBalance).toFixed(2)}
-                            </span>
-                        )}
-                    </span>
+
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-2)', marginBottom: '8px' }}>
+                    Top Players:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {leaderboardData.alltime.length === 0 ? (
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>No data yet</div>
+                    ) : (
+                        leaderboardData.alltime.slice(0, 3).map((entry, i) => (
+                            <div key={i} style={{ fontSize: '0.7rem', color: 'var(--text-bright)' }}>
+                                <span style={{ fontWeight: 600, color: i === 0 ? '#FFD700' : 'var(--text-h)' }}>
+                                    {i + 1}. {entry.username}
+                                </span>
+                                <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginLeft: '4px' }}>
+                                    - ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                </span>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
