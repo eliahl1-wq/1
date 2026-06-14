@@ -201,7 +201,7 @@ export default function Gamemodes() {
                 }
                 .gm-card--active {
                     border-color: rgba(124,58,255,0.25);
-                    background: linear-gradient(135deg, #0d0e16 0%, #13151f 100%);
+                    background: linear-gradient(135deg, #121319 0%, #171820 100%);
                 }
                 .gm-card--active:hover {
                     border-color: rgba(124,58,255,0.45);

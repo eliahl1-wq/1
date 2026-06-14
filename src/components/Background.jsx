@@ -12,7 +12,7 @@ const Background = () => {
         <div style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: '#08090D',
+            backgroundColor: 'var(--bg)',
             zIndex: -2,
             overflow: 'hidden',
         }}>
@@ -53,7 +53,7 @@ const Background = () => {
             <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'radial-gradient(ellipse at center, transparent 40%, rgba(8,9,13,0.6) 100%)',
+                background: 'radial-gradient(ellipse at center, transparent 40%, rgba(12,13,18,0.6) 100%)',
                 pointerEvents: 'none',
             }} />
         </div>

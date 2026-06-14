@@ -7,15 +7,15 @@
 
 :root {
   /* Core palette — deep black with slight blue tint */
-  --bg: #08090D;
-  --bg-1: #0D0E14;
-  --bg-2: #111219;
-  --bg-3: #161720;
-  --bg-elevated: rgba(16, 17, 24, 0.95);
+  --bg: #0C0D12;
+  --bg-1: #121319;
+  --bg-2: #171820;
+  --bg-3: #1C1D27;
+  --bg-elevated: rgba(28, 29, 37, 0.95);
 
   /* Borders — razor thin */
-  --border: rgba(255, 255, 255, 0.055);
-  --border-2: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.065);
+  --border-2: rgba(255, 255, 255, 0.09);
   --border-accent: rgba(124, 58, 255, 0.2);
 
   /* Typography */
@@ -107,7 +107,7 @@ h2 {
 
 /* ─── Glass surface ─── */
 .glass {
-  background: rgba(13, 14, 20, 0.7);
+  background: rgba(18, 19, 25, 0.7);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border);
