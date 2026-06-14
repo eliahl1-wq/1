@@ -33,7 +33,7 @@ export default function Lobby() {
     const [statusMsg, setStatusMsg] = useState('');
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [depositMethod, setDepositMethod] = useState('wallet');
+    const [depositMethod, setDepositMethod] = useState('manual');
     const [isCurSOL, setIsCurSOL] = useState(false);
     const solPrice = user?.solPrice || 64;
 

@@ -39,7 +39,7 @@ export default function PreGame() {
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
-    const [depositMethod, setDepositMethod] = useState('wallet');
+    const [depositMethod, setDepositMethod] = useState('manual');
     const [amount, setAmount] = useState('');
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [withdrawAddress, setWithdrawAddress] = useState('');
@@ -631,7 +631,7 @@ export default function PreGame() {
                                             <div className="wallet-card-actions">
                                                 <button
                                                     className="btn btn-primary"
-                                                    onClick={() => { setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('wallet'); }}
+                                                    onClick={() => { setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('manual'); }}
                                                 >
                                                     Deposit
                                                 </button>
@@ -654,7 +654,7 @@ export default function PreGame() {
                                     setIsWalletOpen(false);
                                     setIsWithdrawExpanded(false);
                                     setIsWalletExpanded(true);
-                                    setDepositMethod('wallet');
+                                    setDepositMethod('manual');
                                 }}
                             >
                                 {(user?.balance || 0) === 0 ? '+ Add funds' : 'Deposit'}

@@ -829,8 +829,10 @@ export class SlitherRenderer {
         const overlapMul = 0.45;
         const boostSpaceMul = 0.60;
         const bumpStep = Math.max(2, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
+        const isYou = !!snake.isYou;
+        const maxBumps = isYou ? (boosting ? 150 : 120) : (boosting ? 70 : 50);
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
-        const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 150 : 120);
+        const bumps = this._capBumps(dense, this._bumpsBuf, maxBumps);
         if (bumps.length < 1) {
             ctx.restore();
             return;
@@ -851,15 +853,15 @@ export class SlitherRenderer {
             trail = [];
             this._boostTrailPool.set(snake.id, trail);
         }
-        if (boosting) {
+        if (isYou && boosting) {
             trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
             if (trail.length > 6) trail.length = 6;
         } else if (trail.length > 0) {
             trail.length = 0;
         }
 
-        // Motion blur trailing afterimages during boost
-        if (boosting && trail.length > 1) {
+        // Motion blur trailing afterimages during boost (local snake only)
+        if (isYou && boosting && trail.length > 1) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             for (let t = 1; t < trail.length; t++) {
@@ -880,20 +882,22 @@ export class SlitherRenderer {
             this._drawSegmentSprite(ctx, sprite, p.x, p.y, 1.0, 1.0);
         }
 
-        // Subtle ambient glow
-        ctx.globalAlpha = 1;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = boosting ? 0.15 * pulse : 0.08;
-        for (let i = bumpCount - 1; i >= 0; i--) {
-            const p = bumps[i];
-            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            this._drawSegmentSprite(ctx, glow, p.x, p.y, 1.0, 1);
+        // Subtle ambient glow (skip heavy pass on distant/other snakes)
+        if (isYou || bumpCount <= 45) {
+            ctx.globalAlpha = 1;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = boosting ? 0.15 * pulse : 0.08;
+            for (let i = bumpCount - 1; i >= 0; i--) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                this._drawSegmentSprite(ctx, glow, p.x, p.y, 1.0, 1);
+            }
+            ctx.restore();
         }
-        ctx.restore();
 
-        // Boost overlay
-        if (boosting) {
+        // Boost overlay (local snake only)
+        if (isYou && boosting) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             for (let i = bumpCount - 1; i >= 0; i--) {
