@@ -130,6 +130,7 @@ export class SlitherRenderer {
         this._renderPool = new Map();
         this._smoothSegPool = [];
         this._pointPool = [];
+        this._bumpPool = [];
         this._boostTrailPool = new Map();
         this._bgCanvas = null;
         this._bgCacheKey = '';
@@ -287,7 +288,7 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = snake.isYou ? 0.032 : 0.062;
+            const tau = snake.isYou ? 0.038 : 0.075;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
             const stride = len > 72 ? Math.ceil(len / 72) : 1;
 
@@ -459,14 +460,26 @@ export class SlitherRenderer {
         ctx.drawImage(this._bgCanvas, 0, 0);
     }
 
+    _bumpPoint(i, x, y) {
+        let p = this._bumpPool[i];
+        if (!p) {
+            p = { x: 0, y: 0 };
+            this._bumpPool[i] = p;
+        }
+        p.x = x;
+        p.y = y;
+        return p;
+    }
+
     /** Insert extra points between spine nodes so the body has slither.io-style bumps. */
     _densifySpine(pts, stepPx, out) {
         out.length = 0;
         if (pts.length < 2) {
-            if (pts.length === 1) out.push(pts[0]);
+            if (pts.length === 1) out.push(this._bumpPoint(0, pts[0].x, pts[0].y));
             return out;
         }
-        out.push(pts[0]);
+        out.push(this._bumpPoint(0, pts[0].x, pts[0].y));
+        let bi = 1;
         for (let i = 1; i < pts.length; i++) {
             const a = pts[i - 1];
             const b = pts[i];
@@ -474,7 +487,7 @@ export class SlitherRenderer {
             const steps = Math.max(1, Math.ceil(d / stepPx));
             for (let s = 1; s <= steps; s++) {
                 const t = s / steps;
-                out.push(this._poolPoint(out.length, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t));
+                out.push(this._bumpPoint(bi++, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t));
             }
         }
         return out;
@@ -667,35 +680,6 @@ export class SlitherRenderer {
         g.fill();
     }
 
-    /** Tangent angle at bump index (radians, toward head). */
-    _bumpTangent(bumps, i) {
-        if (bumps.length < 2) return 0;
-        if (i <= 0) {
-            const a = bumps[0];
-            const b = bumps[1];
-            return Math.atan2(a.y - b.y, a.x - b.x);
-        }
-        if (i >= bumps.length - 1) {
-            const a = bumps[i];
-            const b = bumps[i - 1];
-            return Math.atan2(b.y - a.y, b.x - a.x);
-        }
-        const prev = bumps[i - 1];
-        const next = bumps[i + 1];
-        return Math.atan2(prev.y - next.y, prev.x - next.x);
-    }
-
-    _drawSegmentSprite(ctx, sprite, x, y, scale, alpha, angle, stretchX, stretchY) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.scale(stretchX * scale, stretchY * scale);
-        ctx.globalAlpha *= alpha;
-        const half = sprite.width / 2;
-        ctx.drawImage(sprite, -half, -half);
-        ctx.restore();
-    }
-
     /**
      * Pre-render normal segment + glow + boost overlay into o.pr_imgs cache.
      * Main loop only blits these — no arc/stroke work per frame.
@@ -769,8 +753,15 @@ export class SlitherRenderer {
 
     _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+
         const segs = snake.segments || [];
-        if (segs.length === 0) return;
+        if (segs.length === 0) {
+            ctx.restore();
+            return;
+        }
 
         const gsc = zoom;
         const thick = this.snakeThickness ?? 1;
@@ -779,7 +770,7 @@ export class SlitherRenderer {
         const angle = snake.angle || 0;
         const cs = bucketSnakeColor(snake.color);
         const boosting = !!snake.boost;
-        const pulse = 0.82 + 0.18 * Math.sin(this._frame * 0.16);
+        const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.16);
 
         const pts = this._ptsBuf;
         let pi = 0;
@@ -803,38 +794,36 @@ export class SlitherRenderer {
                 break;
             }
         }
-        if (!onScreen) return;
+        if (!onScreen) {
+            ctx.restore();
+            return;
+        }
 
-        const overlapMul = 0.38;
-        const boostSpaceMul = 0.54;
-        const bumpStep = Math.max(2, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
+        const bumpStep = Math.max(2, bodyRadius * (boosting ? 0.52 : 0.44));
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
-        const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 72 : 65);
-        if (bumps.length < 1) return;
+        const bumps = this._capBumps(dense, this._bumpsBuf);
+        if (bumps.length < 1) {
+            ctx.restore();
+            return;
+        }
 
         const r = Math.max(2.5, Math.round(bodyRadius / 2) * 2);
         const { normal, alt, boostBody, glow, boost: boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
+        const halfN = normal.width / 2;
         const halfG = glow.width / 2;
         const halfB = boostOverlay.width / 2;
         const halfT = trailGlow.width / 2;
-
         const bumpCount = bumps.length;
-        const headBump = bumps[0];
-        let moveSpeed = 0;
-        if (bumps.length >= 2) {
-            moveSpeed = Math.hypot(headBump.x - bumps[1].x, headBump.y - bumps[1].y);
-        }
-        const subtleStretch = 1 + Math.min(0.035, moveSpeed * 0.004);
-        const subtleSquash = 1 / subtleStretch;
 
         let trail = this._boostTrailPool.get(snake.id);
         if (!trail) {
             trail = [];
             this._boostTrailPool.set(snake.id, trail);
         }
+        const headBump = bumps[0];
         if (boosting) {
             trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
-            if (trail.length > 6) trail.length = 6;
+            if (trail.length > 5) trail.length = 5;
         } else if (trail.length > 0) {
             trail.length = 0;
         }
@@ -843,98 +832,52 @@ export class SlitherRenderer {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             for (let t = 1; t < trail.length; t++) {
-                const fade = (1 - t / trail.length) * 0.22 * pulse;
-                ctx.globalAlpha = fade;
                 const tr = trail[t];
+                ctx.globalAlpha = (1 - t / trail.length) * 0.16 * pulse;
                 ctx.drawImage(trailGlow, tr.x - halfT, tr.y - halfT);
             }
             ctx.restore();
         }
 
-        if (boosting) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.14 * pulse;
-            const tailStart = Math.floor(bumpCount * 0.35);
-            for (let i = bumpCount - 1; i >= tailStart; i--) {
-                const p = bumps[i];
-                if (p.x < -100 || p.y < -100 || p.x > this.W + 100 || p.y > this.H + 100) continue;
-                ctx.drawImage(trailGlow, p.x - halfT, p.y - halfT);
-            }
-            ctx.restore();
-        }
-
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
-            const along = i / Math.max(1, bumpCount - 1);
-            const headProx = 1 - along;
-            const scaleMul = (0.76 + headProx * 0.34) * 1.06;
-            const alphaMul = 0.58 + headProx * 0.42;
-            const tang = this._bumpTangent(bumps, i);
-
-            let stretchX = subtleStretch;
-            let stretchY = subtleSquash;
-            if (boosting) {
-                stretchX = 1.06 + headProx * 0.10;
-                stretchY = 0.90 - headProx * 0.04;
-            }
-
-            const isHead = i === 0;
-            const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
-            this._drawSegmentSprite(ctx, sprite, p.x, p.y, scaleMul, alphaMul, tang, stretchX, stretchY);
+            const headProx = 1 - i / Math.max(1, bumpCount - 1);
+            const size = normal.width * (0.88 + headProx * 0.14);
+            const half = size / 2;
+            const sprite = (boosting && i === 0) ? boostBody : ((i & 1) ? alt : normal);
+            ctx.globalAlpha = 0.82 + headProx * 0.18;
+            ctx.drawImage(sprite, p.x - half, p.y - half, size, size);
         }
 
+        ctx.globalAlpha = 1;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = boosting ? 0.38 * pulse : 0.22;
+        ctx.globalAlpha = boosting ? 0.28 * pulse : 0.16;
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            const along = i / Math.max(1, bumpCount - 1);
-            const headProx = 1 - along;
-            const scaleMul = (0.80 + headProx * 0.28) * 1.08;
-            const alphaMul = 0.35 + headProx * 0.45;
-            const tang = this._bumpTangent(bumps, i);
-            this._drawSegmentSprite(ctx, glow, p.x, p.y, scaleMul, alphaMul, tang, 1, 1);
+            const headProx = 1 - i / Math.max(1, bumpCount - 1);
+            const size = glow.width * (0.90 + headProx * 0.12);
+            const half = size / 2;
+            ctx.drawImage(glow, p.x - half, p.y - half, size, size);
         }
         ctx.restore();
 
         if (boosting) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.52 * pulse;
             for (let i = bumpCount - 1; i >= 0; i--) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-                const along = i / Math.max(1, bumpCount - 1);
-                const headProx = 1 - along;
-                const scaleMul = 0.88 + headProx * 0.22;
-                const tang = this._bumpTangent(bumps, i);
-                const stretchX = 1.08 + headProx * 0.08;
-                ctx.globalAlpha = (0.38 + headProx * 0.28) * pulse;
-                this._drawSegmentSprite(ctx, boostOverlay, p.x, p.y, scaleMul, 1, tang, stretchX, 0.92);
+                const headProx = 1 - i / Math.max(1, bumpCount - 1);
+                ctx.globalAlpha = (0.22 + headProx * 0.22) * pulse;
+                const size = boostOverlay.width * (0.92 + headProx * 0.10);
+                const half = size / 2;
+                ctx.drawImage(boostOverlay, p.x - half, p.y - half, size, size);
             }
             ctx.restore();
-
-            if (trail.length > 1) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter';
-                for (let t = 1; t < Math.min(4, trail.length); t++) {
-                    const tr = trail[t];
-                    const fade = (1 - t / 4) * 0.18;
-                    const ghostScale = 1.12 - t * 0.06;
-                    ctx.save();
-                    ctx.globalAlpha = fade;
-                    ctx.translate(tr.x, tr.y);
-                    ctx.rotate(tr.a);
-                    ctx.scale(ghostScale, ghostScale * 0.88);
-                    ctx.drawImage(boostBody, -normal.width / 2, -normal.height / 2);
-                    ctx.restore();
-                }
-                ctx.restore();
-            }
         }
 
         const { x: hx, y: hy } = pts[0];
@@ -942,32 +885,31 @@ export class SlitherRenderer {
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const headScale = boosting ? 1.10 : 1.04;
-        const headEyeRadius = headRadius * headScale;
-        const eyeSide = headEyeRadius * 0.44;
-        const eyeFwd = headEyeRadius * 0.5;
-        const eyeR = Math.max(2.5, headEyeRadius * 0.34);
+        const eyeSide = headRadius * 0.44;
+        const eyeFwd = headRadius * 0.5;
+        const eyeR = Math.max(2.5, headRadius * 0.34);
         const pupilR = eyeR * 0.5;
 
         if (boosting) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.35 * pulse;
-            ctx.translate(hx + fwdX * headRadius * 0.08, hy + fwdY * headRadius * 0.08);
-            ctx.rotate(angle);
-            ctx.scale(1.14, 0.94);
-            ctx.drawImage(boostOverlay, -halfB, -halfB);
+            ctx.globalAlpha = 0.28 * pulse;
+            ctx.drawImage(
+                boostOverlay,
+                hx + fwdX * headRadius * 0.06 - halfB,
+                hy + fwdY * headRadius * 0.06 - halfB,
+            );
             ctx.restore();
         }
 
-        ctx.save();
-        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
         for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-            ctx.fillStyle = boosting ? '#ffffff' : 'rgba(255,255,255,0.96)';
+            ctx.fillStyle = '#ffffff';
             ctx.fill();
             ctx.strokeStyle = 'rgba(0,0,0,0.28)';
             ctx.lineWidth = Math.max(0.8, eyeR * 0.09);
@@ -980,17 +922,18 @@ export class SlitherRenderer {
             ctx.fillStyle = '#101014';
             ctx.fill();
         }
-        ctx.restore();
 
         if (snake.name) {
             ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
+            ctx.font = `bold ${Math.max(12, headRadius * 0.85)}px Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'rgba(0,0,0,0.55)';
             ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
-            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
+            ctx.strokeText(snake.name, hx, hy - headRadius - 12);
+            ctx.fillText(snake.name, hx, hy - headRadius - 12);
         }
+
+        ctx.restore();
     }
 
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
@@ -1041,6 +984,10 @@ export class SlitherRenderer {
         let dt = this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 1 / 60;
         this._lastFrameTime = now;
         if (dt > 0.1) dt = 0.1; // clamp after tab-switch / hitch
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
 
         this._updateSmoothing(dt);
 
