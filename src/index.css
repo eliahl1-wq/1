@@ -339,7 +339,7 @@ input[type=number] {
   background: linear-gradient(135deg, #7C3AFF 0%, #4D8CFF 100%);
   color: white;
   padding: 10px 20px;
-  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.3);
+  box-shadow: none;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -352,7 +352,7 @@ input[type=number] {
   background: linear-gradient(135deg, #0DBF76 0%, #14F195 100%);
   color: #001a0d;
   padding: 10px 20px;
-  box-shadow: 0 4px 16px rgba(20, 241, 149, 0.2);
+  box-shadow: none;
 }
 
 .btn-green:hover:not(:disabled) {

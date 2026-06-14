@@ -261,7 +261,7 @@ export default function Gamemodes() {
                     color: #fff;
                     cursor: pointer;
                     transition: all 0.15s ease;
-                    box-shadow: 0 4px 14px rgba(124,58,255,0.25);
+                    box-shadow: none;
                     white-space: nowrap;
                     flex-shrink: 0;
                 }

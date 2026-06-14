@@ -23,7 +23,7 @@
 .wallet-adapter-button-trigger {
   background: linear-gradient(135deg, #7C3AFF, #4D8CFF) !important;
   border: none !important;
-  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25) !important;
+  box-shadow: none !important;
   color: white !important;
   font-family: var(--display) !important;
   font-weight: 700 !important;
@@ -31,6 +31,7 @@
 .wallet-adapter-button-trigger:hover {
   filter: brightness(1.08) !important;
   transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(124, 58, 255, 0.35) !important;
 }
 .wallet-adapter-modal-wrapper {
   background: var(--bg-2) !important;
@@ -248,7 +249,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.25);
+  box-shadow: none;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
@@ -270,10 +271,11 @@
   padding: 7px 14px;
   border-radius: var(--r-sm);
   letter-spacing: 0.01em;
-  transition: color 0.2s ease, opacity 0.2s ease;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 .gm-nav-link:not(.gm-nav-link--active):hover {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--accent);
+  background-color: rgba(124, 58, 255, 0.16);
 }
 .gm-nav-link--active {
   color: #ffffff;
@@ -281,7 +283,8 @@
   background: transparent;
 }
 .gm-nav-link--active:hover {
-  color: #ffffff;
+  color: var(--accent);
+  background-color: rgba(124, 58, 255, 0.16);
 }
 
 .mode-title {
@@ -305,7 +308,7 @@
   font-size: 0.85rem;
   font-weight: 700;
   cursor: default;
-  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.25);
+  box-shadow: none;
 }
 .mode-variant-btn:disabled {
   opacity: 0.95;
@@ -665,7 +668,7 @@
 .play-btn-ready {
   background: linear-gradient(135deg, #0DBF76 0%, #14F195 100%);
   color: #001a0d;
-  box-shadow: 0 4px 20px rgba(20, 241, 149, 0.2);
+  box-shadow: none;
 }
 .play-btn-ready:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -676,7 +679,7 @@
 .play-btn-login {
   background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
   color: white;
-  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25);
+  box-shadow: none;
 }
 .play-btn-login:hover {
   transform: translateY(-1px);
@@ -686,7 +689,7 @@
 .play-btn-rejoin {
   background: linear-gradient(135deg, #6228F5, #7C3AFF);
   color: white;
-  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25);
+  box-shadow: none;
 }
 .play-btn-rejoin:hover:not(:disabled) {
   transform: translateY(-1px);
