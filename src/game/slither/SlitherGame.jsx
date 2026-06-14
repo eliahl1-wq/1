@@ -41,6 +41,7 @@ export default function SlitherGame() {
     const myIdRef = useRef(null);
 
     const cashOutTotalRef = useRef(10);
+    const cashOutEndAtRef = useRef(0);
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 10, isBR: false });
 
 
@@ -108,10 +109,18 @@ export default function SlitherGame() {
         setIsSecuringCashout(securing);
 
         cashOutTotalRef.current = seconds;
+        const endAt = Date.now() + seconds * 1000;
+        cashOutEndAtRef.current = endAt;
 
         let timeLeft = seconds;
 
         setLocalTimer(timeLeft);
+
+        rendererRef.current?.setHud({
+            cashoutEndAt: endAt,
+            cashoutTotal: seconds,
+            cashoutSeconds: timeLeft,
+        });
 
         const intervalId = setInterval(() => {
 
@@ -125,6 +134,8 @@ export default function SlitherGame() {
 
                 timerIntervalRef.current = null;
                 setIsSecuringCashout(false);
+                cashOutEndAtRef.current = 0;
+                rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
 
             }
 
@@ -169,6 +180,7 @@ export default function SlitherGame() {
             balance: currentBalance,
             cashoutSeconds: localTimer,
             cashoutTotal: cashOutTotalRef.current || 10,
+            cashoutEndAt: cashOutEndAtRef.current,
             securingCashout: isSecuringCashout,
         });
     }, [currentBalance, localTimer, isSecuringCashout]);
@@ -345,6 +357,8 @@ export default function SlitherGame() {
 
             cashoutActiveRef.current = false;
             setIsSecuringCashout(false);
+            cashOutEndAtRef.current = 0;
+            rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             rendererRef.current?.pause();
 
             localStorage.removeItem('current_game_mode');
@@ -397,6 +411,8 @@ export default function SlitherGame() {
             setIsDead(true);
             setLocalTimer(0);
             setIsSecuringCashout(false);
+            cashOutEndAtRef.current = 0;
+            rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             rendererRef.current?.pause();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');

@@ -1,11 +1,18 @@
 const FULL_ANGLE = Math.PI * 2;
 
+/** Smooth frame-based progress from a wall-clock end timestamp. */
+export function getCashoutRingProgress(endAtMs, totalSeconds) {
+    if (!endAtMs || !totalSeconds) return 0;
+    const remainingSec = Math.max(0, endAtMs - Date.now()) / 1000;
+    return remainingSec / totalSeconds;
+}
+
 /**
  * Green progress ring — same style as the cashout countdown timer.
  * Timer drains clockwise; hold-to-cashout fills counter-clockwise.
  */
 export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) {
-    const { counterClockwise = false, pulse = false, showTrack = true } = opts;
+    const { counterClockwise = false, showTrack = true } = opts;
     const lineWidth = 3.5;
 
     if (progress <= 0) return;
@@ -28,9 +35,5 @@ export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) 
     ctx.arc(x, y, radius, start, end, counterClockwise);
     ctx.strokeStyle = '#14F195';
     ctx.lineWidth = lineWidth;
-    if (pulse) {
-        ctx.globalAlpha = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;
-    }
     ctx.stroke();
-    ctx.globalAlpha = 1;
 }

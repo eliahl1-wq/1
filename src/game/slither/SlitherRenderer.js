@@ -2,7 +2,7 @@
  * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
-import { drawCashoutProgressRing } from '../cashoutRing.js';
+import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -101,7 +101,7 @@ export class SlitherRenderer {
         this.targetSnakes = [];
         this.smooth = new Map();
         this._foodDrawList = [];
-        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, holdProgress: 0, securingCashout: false };
+        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0, securingCashout: false };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
@@ -1086,14 +1086,15 @@ export class SlitherRenderer {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
-            const { holdProgress, cashoutSeconds, cashoutTotal } = this.hud;
+            const { holdProgress, cashoutEndAt, cashoutTotal } = this.hud;
+            const ringR = headRadius + 10;
 
-            if (holdProgress > 0 && cashoutSeconds <= 0) {
-                drawCashoutProgressRing(ctx, hx, hy, headRadius + 12, holdProgress, { counterClockwise: true });
+            if (holdProgress > 0 && (!cashoutEndAt || cashoutEndAt <= Date.now())) {
+                drawCashoutProgressRing(ctx, hx, hy, ringR, holdProgress, { counterClockwise: true });
             }
-            if (cashoutSeconds > 0) {
-                const progress = cashoutSeconds / (cashoutTotal || 10);
-                drawCashoutProgressRing(ctx, hx, hy, headRadius + 12, progress, { pulse: true });
+            if (cashoutEndAt && cashoutEndAt > Date.now()) {
+                const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
+                drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
             }
 
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);

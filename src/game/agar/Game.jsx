@@ -205,6 +205,7 @@ export default function Game() {
 
             let timeLeft = seconds;
             global.cashOutTotal = seconds;
+            global.cashOutEndAt = Date.now() + seconds * 1000;
             global.cashOutTimer = timeLeft;
             setLocalTimer(timeLeft);
 
@@ -212,7 +213,8 @@ export default function Game() {
                 setLocalTimer(prev => {
                     const next = Math.max(0, prev - 1);
                     global.cashOutTimer = next;
-                    if (next <= 0 || !socketRef.current?.connected) {
+                    if (next <= 0) {
+                        global.cashOutEndAt = 0;
                         clearInterval(intervalId);
                         timerIntervalRef.current = null;
                     }
@@ -308,6 +310,7 @@ export default function Game() {
         const handleDeath = () => {
             setIsDead(true);
             global.cashOutTimer = 0;
+            global.cashOutEndAt = 0;
             foodCacheRef.current.clear();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
@@ -379,6 +382,7 @@ export default function Game() {
                 socketRef.current = null;
             }
             global.cashOutTimer = 0;
+            global.cashOutEndAt = 0;
             global.battleRoyale = false;
             hasJoinedGameRef.current = false;
         };

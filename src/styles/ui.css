@@ -269,7 +269,7 @@
 }
 .gm-nav-link--active:hover {
   color: var(--accent);
-  background: transparent;
+  background-color: rgba(124, 58, 255, 0.16);
 }
 
 .mode-title {

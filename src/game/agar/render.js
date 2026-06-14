@@ -1,5 +1,5 @@
 import global from './global.js';
-import { drawCashoutProgressRing } from '../cashoutRing.js';
+import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
 
 const FULL_ANGLE = 2 * Math.PI;
 
@@ -157,12 +157,15 @@ function drawBalanceBadge(graph, cell, nameY, fontSize) {
 
 function drawCashoutOverlay(graph, cell) {
     const total = global.cashOutTotal || 10;
-    const remaining = Math.max(0, global.cashOutTimer);
-    const progress = remaining / total;
-    const pulse = 0.7 + Math.sin(Date.now() * 0.009) * 0.3;
+    const progress = global.cashOutEndAt
+        ? getCashoutRingProgress(global.cashOutEndAt, total)
+        : Math.max(0, global.cashOutTimer) / total;
+    const remaining = global.cashOutEndAt
+        ? Math.ceil(Math.max(0, global.cashOutEndAt - Date.now()) / 1000)
+        : Math.max(0, global.cashOutTimer);
 
     const ringR = cell.radius + 10;
-    drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress, { pulse: true });
+    drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress);
 
     // Floating pill above blob
     const label = 'SECURING';
@@ -180,7 +183,7 @@ function drawCashoutOverlay(graph, cell) {
 
     drawGlassPill(graph, pillX, pillY, pillW, pillH, 12, {
         fill: 'rgba(6, 10, 8, 0.92)',
-        stroke: `rgba(20, 241, 149, ${0.35 + pulse * 0.25})`,
+        stroke: 'rgba(20, 241, 149, 0.45)',
         lineWidth: 1.5,
     });
 
