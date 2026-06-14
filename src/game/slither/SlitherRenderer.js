@@ -107,7 +107,7 @@ export class SlitherRenderer {
         this._lastFrameTime = 0;
         this.zoom = 2.65;
         this.baseZoom = 2.65;
-        this.snakeThickness = 1.05;
+        this.snakeThickness = 0.9;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
         /** o.pr_imgs — normal + boost overlay canvases per (cs, radius) */
@@ -646,11 +646,11 @@ export class SlitherRenderer {
         g.fill();
 
         // 2. Specular Highlight (Top band)
-        const hiCol = shadeColor(col, Math.round(100 * k));
+        const hiCol = shadeColor(col, Math.round(75 * k));
         const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
         hiGrad.addColorStop(0.02, 'rgba(255,255,255,0)');
-        hiGrad.addColorStop(0.08, rgb(hiCol, 0.7 * k)); // The bright band
-        hiGrad.addColorStop(0.18, rgb(hiCol, 0.1 * k));
+        hiGrad.addColorStop(0.08, rgb(hiCol, 0.35 * k)); // The bright band (more matte now)
+        hiGrad.addColorStop(0.18, rgb(hiCol, 0.05 * k));
         hiGrad.addColorStop(0.25, 'rgba(255,255,255,0)');
         
         g.fillStyle = hiGrad;
@@ -791,8 +791,8 @@ export class SlitherRenderer {
         }
 
         // Segment overlapping. Very tight when normal for continuous look.
-        const overlapMul = 0.22;
-        const boostSpaceMul = 0.35;
+        const overlapMul = 0.28;
+        const boostSpaceMul = 0.42;
         const bumpStep = Math.max(2, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
         const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 150 : 120);
