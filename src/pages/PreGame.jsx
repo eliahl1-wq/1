@@ -56,6 +56,7 @@ export default function PreGame() {
         playersOnline: 0,
         biggestPayout: 0,
         topPlayer: null,
+        topPlayers: [],
         playersByEntryFee: {},
         playersByModeAndFee: { agar: {}, slither: {} },
         brPlayersByFee: {},
@@ -1090,20 +1091,28 @@ export default function PreGame() {
                     Players online: <span className="mono" style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.playersOnline ?? 0}</span>
                 </div>
 
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-2)', marginBottom: '8px' }}>
-                    Top Players:
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {leaderboardData.alltime.length === 0 ? (
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>No data yet</div>
+                <div style={{ 
+                    background: 'rgba(0,0,0,0.2)', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: 'var(--r-md)', 
+                    padding: '10px',
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '8px' 
+                }}>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '2px' }}>
+                        Top in Arena
+                    </div>
+                    {(!liveStats.topPlayers || liveStats.topPlayers.length === 0) ? (
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>Arena is empty</div>
                     ) : (
-                        leaderboardData.alltime.slice(0, 3).map((entry, i) => (
-                            <div key={i} style={{ fontSize: '0.7rem', color: 'var(--text-bright)' }}>
+                        liveStats.topPlayers.map((entry, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
                                 <span style={{ fontWeight: 600, color: i === 0 ? '#FFD700' : 'var(--text-h)' }}>
                                     {i + 1}. {entry.username}
                                 </span>
-                                <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginLeft: '4px' }}>
-                                    - ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                <span className="mono" style={{ fontSize: '0.7rem', color: '#fff', fontWeight: 600 }}>
+                                    ${Number(entry.balance || 0).toFixed(2)}
                                 </span>
                             </div>
                         ))
