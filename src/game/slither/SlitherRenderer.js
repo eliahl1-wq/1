@@ -130,6 +130,7 @@ export class SlitherRenderer {
         this._renderPool = new Map();
         this._smoothSegPool = [];
         this._pointPool = [];
+        this._boostTrailPool = new Map();
         this._bgCanvas = null;
         this._bgCacheKey = '';
 
@@ -286,7 +287,7 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = snake.isYou ? 0.038 : 0.075;
+            const tau = snake.isYou ? 0.032 : 0.062;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
             const stride = len > 72 ? Math.ceil(len / 72) : 1;
 
@@ -319,6 +320,9 @@ export class SlitherRenderer {
         }
         for (const id of this._renderPool.keys()) {
             if (!seen.has(id)) this._renderPool.delete(id);
+        }
+        for (const id of this._boostTrailPool.keys()) {
+            if (!seen.has(id)) this._boostTrailPool.delete(id);
         }
     }
 
@@ -571,60 +575,75 @@ export class SlitherRenderer {
         }
     }
 
-    /** Paint one snake bead — layered skin tones, dorsal sheen, alternating stripe phase. */
-    _paintSnakeSegment(g, c, rPx, cs, phase = 0) {
+    /** Glossy gel-like segment — radial body, top-left specular, bottom-right depth. */
+    _paintSnakeSegment(g, c, rPx, cs, phase = 0, contrast = 1) {
         const col = parseColor(cs);
-        const shift = phase === 1 ? -14 : 0;
+        const k = contrast;
+        const shift = phase === 1 ? -12 : 0;
         const base = shadeColor(col, shift);
-        const top = shadeColor(base, 20);
-        const upper = shadeColor(base, 8);
-        const lower = shadeColor(base, -11);
-        const bottom = shadeColor(base, -18);
-        const edge = shadeColor(base, -24);
+        const top = shadeColor(base, Math.round(26 * k));
+        const upper = shadeColor(base, Math.round(10 * k));
+        const lower = shadeColor(base, Math.round(-14 * k));
+        const bottom = shadeColor(base, Math.round(-22 * k));
+        const edge = shadeColor(base, Math.round(-30 * k));
 
-        const lx = c - rPx * 0.04;
-        const ly = c - rPx * 0.26;
-        const body = g.createRadialGradient(lx, ly, rPx * 0.05, c, c + rPx * 0.10, rPx);
-        body.addColorStop(0,    toHex(top));
-        body.addColorStop(0.22, toHex(upper));
-        body.addColorStop(0.46, toHex(base));
-        body.addColorStop(0.68, toHex(lower));
+        const lx = c - rPx * 0.22;
+        const ly = c - rPx * 0.28;
+        const body = g.createRadialGradient(lx, ly, rPx * 0.02, c + rPx * 0.12, c + rPx * 0.14, rPx * 1.02);
+        body.addColorStop(0, toHex(top));
+        body.addColorStop(0.18, toHex(upper));
+        body.addColorStop(0.42, toHex(base));
+        body.addColorStop(0.66, toHex(lower));
         body.addColorStop(0.84, toHex(bottom));
-        body.addColorStop(1,    toHex(edge));
+        body.addColorStop(1, toHex(edge));
         g.fillStyle = body;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const glossHi = shadeColor(base, 24);
-        const gx = c;
-        const gy = c - rPx * 0.27;
-        const gloss = g.createRadialGradient(gx, gy, 0, gx, gy, rPx * 0.38);
-        gloss.addColorStop(0, rgb(glossHi, 0.34));
-        gloss.addColorStop(0.30, rgb(glossHi, 0.14));
-        gloss.addColorStop(0.62, rgb(glossHi, 0.03));
+        const glossHi = shadeColor(base, Math.round(32 * k));
+        const gx = c - rPx * 0.08;
+        const gy = c - rPx * 0.32;
+        const gloss = g.createRadialGradient(gx, gy, 0, gx, gy, rPx * 0.42);
+        gloss.addColorStop(0, rgb(glossHi, 0.42 * k));
+        gloss.addColorStop(0.28, rgb(glossHi, 0.18 * k));
+        gloss.addColorStop(0.58, rgb(glossHi, 0.04 * k));
         gloss.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = gloss;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const spec = shadeColor(base, 28);
-        const specGrad = g.createRadialGradient(c - rPx * 0.06, c - rPx * 0.31, 0, c - rPx * 0.06, c - rPx * 0.31, rPx * 0.17);
-        specGrad.addColorStop(0, rgb(spec, 0.22));
-        specGrad.addColorStop(0.6, rgb(spec, 0.04));
+        const spec = shadeColor(base, Math.round(38 * k));
+        const specGrad = g.createRadialGradient(
+            c - rPx * 0.18, c - rPx * 0.34, 0,
+            c - rPx * 0.18, c - rPx * 0.34, rPx * 0.22,
+        );
+        specGrad.addColorStop(0, rgb(spec, 0.38 * k));
+        specGrad.addColorStop(0.45, rgb(spec, 0.10 * k));
         specGrad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = specGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Baked overlap crease — ribbing without a second draw pass per bead
-        const crease = shadeColor(base, -36);
-        const cy = c + rPx * 0.15;
-        const creaseGrad = g.createRadialGradient(c, cy, rPx * 0.10, c, cy, rPx * 0.78);
-        creaseGrad.addColorStop(0, rgb(crease, phase === 1 ? 0.28 : 0.20));
-        creaseGrad.addColorStop(0.45, rgb(crease, 0.08));
+        const shadow = shadeColor(base, Math.round(-42 * k));
+        const sx = c + rPx * 0.16;
+        const sy = c + rPx * 0.20;
+        const shadowGrad = g.createRadialGradient(sx, sy, rPx * 0.08, sx, sy, rPx * 0.72);
+        shadowGrad.addColorStop(0, rgb(shadow, 0.32 * k));
+        shadowGrad.addColorStop(0.50, rgb(shadow, 0.10 * k));
+        shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = shadowGrad;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        const crease = shadeColor(base, Math.round(-34 * k));
+        const cy = c + rPx * 0.12;
+        const creaseGrad = g.createRadialGradient(c, cy, rPx * 0.08, c, cy, rPx * 0.76);
+        creaseGrad.addColorStop(0, rgb(crease, phase === 1 ? 0.22 : 0.14));
+        creaseGrad.addColorStop(0.42, rgb(crease, 0.05));
         creaseGrad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = creaseGrad;
         g.beginPath();
@@ -632,8 +651,53 @@ export class SlitherRenderer {
         g.fill();
     }
 
+    /** Soft outer glow for additive body pass. */
+    _paintSnakeGlow(g, c, rPx, cs) {
+        const col = parseColor(cs);
+        const bright = shadeColor(col, 28);
+        const glowR = rPx * 1.42;
+        const grad = g.createRadialGradient(c, c, rPx * 0.35, c, c, glowR);
+        grad.addColorStop(0, rgb(bright, 0.14));
+        grad.addColorStop(0.45, rgb(col, 0.07));
+        grad.addColorStop(0.72, rgb(col, 0.025));
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(c, c, glowR, 0, Math.PI * 2);
+        g.fill();
+    }
+
+    /** Tangent angle at bump index (radians, toward head). */
+    _bumpTangent(bumps, i) {
+        if (bumps.length < 2) return 0;
+        if (i <= 0) {
+            const a = bumps[0];
+            const b = bumps[1];
+            return Math.atan2(a.y - b.y, a.x - b.x);
+        }
+        if (i >= bumps.length - 1) {
+            const a = bumps[i];
+            const b = bumps[i - 1];
+            return Math.atan2(b.y - a.y, b.x - a.x);
+        }
+        const prev = bumps[i - 1];
+        const next = bumps[i + 1];
+        return Math.atan2(prev.y - next.y, prev.x - next.x);
+    }
+
+    _drawSegmentSprite(ctx, sprite, x, y, scale, alpha, angle, stretchX, stretchY) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.scale(stretchX * scale, stretchY * scale);
+        ctx.globalAlpha *= alpha;
+        const half = sprite.width / 2;
+        ctx.drawImage(sprite, -half, -half);
+        ctx.restore();
+    }
+
     /**
-     * Pre-render normal segment + boost overlay into o.pr_imgs cache.
+     * Pre-render normal segment + glow + boost overlay into o.pr_imgs cache.
      * Main loop only blits these — no arc/stroke work per frame.
      */
     _getSnakePrImgs(cs, rPx) {
@@ -641,38 +705,64 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v14|${key}|0`, rPx * 2 + 4, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0);
+        const normal = this._getSprite(`pr_norm_v15|${key}|0`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1);
         });
 
-        const alt = this._getSprite(`pr_norm_v14|${key}|1`, rPx * 2 + 4, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, rPx, cs, 1);
+        const alt = this._getSprite(`pr_norm_v15|${key}|1`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 1, 1);
+        });
+
+        const boostBody = this._getSprite(`pr_norm_v15|${key}|boost`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1.28);
+        });
+
+        const glowPad = Math.ceil(rPx * 0.55);
+        const glow = this._getSprite(`pr_glow_v15|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+            this._paintSnakeGlow(g, sz / 2, rPx, cs);
         });
 
         const col = parseColor(cs);
-        const bright = shadeColor(col, 36);
-        const pad = Math.max(2, Math.ceil(rPx * 0.1));
-        const boost = this._getSprite(`pr_boost|${key}`, rPx * 2 + pad * 2, (g, sz) => {
+        const bright = shadeColor(col, 42);
+        const pad = Math.max(3, Math.ceil(rPx * 0.22));
+        const boost = this._getSprite(`pr_boost_v15|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
             const c = sz / 2;
-            const glowR = rPx + pad - 1;
-            const aura = g.createRadialGradient(c, c, rPx * 0.96, c, c, glowR);
-            aura.addColorStop(0, 'rgba(255,255,255,0)');
-            aura.addColorStop(0.55, rgb(bright, 0.14));
+            const glowR = rPx * 1.55 + pad;
+            const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
+            aura.addColorStop(0, rgb(bright, 0.06));
+            aura.addColorStop(0.35, rgb(bright, 0.22));
+            aura.addColorStop(0.65, rgb(bright, 0.10));
             aura.addColorStop(1, 'rgba(255,255,255,0)');
             g.fillStyle = aura;
             g.beginPath();
             g.arc(c, c, glowR, 0, Math.PI * 2);
             g.fill();
 
-            g.strokeStyle = rgb(bright, 0.18);
-            g.lineWidth = Math.max(1, rPx * 0.1);
-            g.lineCap = 'round';
+            const rim = g.createRadialGradient(c - rPx * 0.12, c - rPx * 0.18, 0, c, c, rPx * 1.08);
+            rim.addColorStop(0, rgb(bright, 0.32));
+            rim.addColorStop(0.55, rgb(bright, 0.08));
+            rim.addColorStop(1, 'rgba(255,255,255,0)');
+            g.fillStyle = rim;
             g.beginPath();
-            g.arc(c, c, rPx + 0.3, 0, Math.PI * 2);
-            g.stroke();
+            g.arc(c, c, rPx * 1.08, 0, Math.PI * 2);
+            g.fill();
         });
 
-        pair = { normal, alt, boost };
+        const trailGlow = this._getSprite(`pr_trail_v15|${key}`, rPx * 3 + 8, (g, sz) => {
+            const c = sz / 2;
+            const glowR = rPx * 1.85;
+            const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
+            grad.addColorStop(0, rgb(bright, 0.18));
+            grad.addColorStop(0.40, rgb(col, 0.10));
+            grad.addColorStop(0.70, rgb(col, 0.03));
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = grad;
+            g.beginPath();
+            g.arc(c, c, glowR, 0, Math.PI * 2);
+            g.fill();
+        });
+
+        pair = { normal, alt, boostBody, glow, boost, trailGlow };
         this._prImgs.set(key, pair);
         return pair;
     }
@@ -689,6 +779,7 @@ export class SlitherRenderer {
         const angle = snake.angle || 0;
         const cs = bucketSnakeColor(snake.color);
         const boosting = !!snake.boost;
+        const pulse = 0.82 + 0.18 * Math.sin(this._frame * 0.16);
 
         const pts = this._ptsBuf;
         let pi = 0;
@@ -714,47 +805,160 @@ export class SlitherRenderer {
         }
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.50);
+        const overlapMul = 0.38;
+        const boostSpaceMul = 0.54;
+        const bumpStep = Math.max(2, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
-        const bumps = this._capBumps(dense, this._bumpsBuf);
+        const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 72 : 65);
         if (bumps.length < 1) return;
 
         const r = Math.max(2.5, Math.round(bodyRadius / 2) * 2);
-        const { normal, alt, boost: boostOverlay } = this._getSnakePrImgs(cs, r);
-        const halfN = normal.width / 2;
+        const { normal, alt, boostBody, glow, boost: boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
+        const halfG = glow.width / 2;
         const halfB = boostOverlay.width / 2;
+        const halfT = trailGlow.width / 2;
 
-        for (let i = bumps.length - 1; i >= 0; i--) {
-            const p = bumps[i];
-            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            ctx.drawImage((i & 1) ? alt : normal, p.x - halfN, p.y - halfN);
+        const bumpCount = bumps.length;
+        const headBump = bumps[0];
+        let moveSpeed = 0;
+        if (bumps.length >= 2) {
+            moveSpeed = Math.hypot(headBump.x - bumps[1].x, headBump.y - bumps[1].y);
+        }
+        const subtleStretch = 1 + Math.min(0.035, moveSpeed * 0.004);
+        const subtleSquash = 1 / subtleStretch;
+
+        let trail = this._boostTrailPool.get(snake.id);
+        if (!trail) {
+            trail = [];
+            this._boostTrailPool.set(snake.id, trail);
+        }
+        if (boosting) {
+            trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
+            if (trail.length > 6) trail.length = 6;
+        } else if (trail.length > 0) {
+            trail.length = 0;
         }
 
-        // Pass 2: tight boost glow — lighter composite, no shadowBlur
-        if (boosting) {
+        if (boosting && trail.length > 1) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.48;
-            ctx.shadowBlur = 0;
-            ctx.shadowColor = 'transparent';
-            for (let i = bumps.length - 1; i >= 0; i--) {
-                const p = bumps[i];
-                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-                ctx.drawImage(boostOverlay, p.x - halfB, p.y - halfB);
+            for (let t = 1; t < trail.length; t++) {
+                const fade = (1 - t / trail.length) * 0.22 * pulse;
+                ctx.globalAlpha = fade;
+                const tr = trail[t];
+                ctx.drawImage(trailGlow, tr.x - halfT, tr.y - halfT);
             }
             ctx.restore();
         }
 
-        // Head eyes (no segment shadow)
+        if (boosting) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.14 * pulse;
+            const tailStart = Math.floor(bumpCount * 0.35);
+            for (let i = bumpCount - 1; i >= tailStart; i--) {
+                const p = bumps[i];
+                if (p.x < -100 || p.y < -100 || p.x > this.W + 100 || p.y > this.H + 100) continue;
+                ctx.drawImage(trailGlow, p.x - halfT, p.y - halfT);
+            }
+            ctx.restore();
+        }
+
+        for (let i = bumpCount - 1; i >= 0; i--) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+
+            const along = i / Math.max(1, bumpCount - 1);
+            const headProx = 1 - along;
+            const scaleMul = (0.76 + headProx * 0.34) * 1.06;
+            const alphaMul = 0.58 + headProx * 0.42;
+            const tang = this._bumpTangent(bumps, i);
+
+            let stretchX = subtleStretch;
+            let stretchY = subtleSquash;
+            if (boosting) {
+                stretchX = 1.06 + headProx * 0.10;
+                stretchY = 0.90 - headProx * 0.04;
+            }
+
+            const isHead = i === 0;
+            const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
+            this._drawSegmentSprite(ctx, sprite, p.x, p.y, scaleMul, alphaMul, tang, stretchX, stretchY);
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = boosting ? 0.38 * pulse : 0.22;
+        for (let i = bumpCount - 1; i >= 0; i--) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+            const along = i / Math.max(1, bumpCount - 1);
+            const headProx = 1 - along;
+            const scaleMul = (0.80 + headProx * 0.28) * 1.08;
+            const alphaMul = 0.35 + headProx * 0.45;
+            const tang = this._bumpTangent(bumps, i);
+            this._drawSegmentSprite(ctx, glow, p.x, p.y, scaleMul, alphaMul, tang, 1, 1);
+        }
+        ctx.restore();
+
+        if (boosting) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.52 * pulse;
+            for (let i = bumpCount - 1; i >= 0; i--) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                const along = i / Math.max(1, bumpCount - 1);
+                const headProx = 1 - along;
+                const scaleMul = 0.88 + headProx * 0.22;
+                const tang = this._bumpTangent(bumps, i);
+                const stretchX = 1.08 + headProx * 0.08;
+                ctx.globalAlpha = (0.38 + headProx * 0.28) * pulse;
+                this._drawSegmentSprite(ctx, boostOverlay, p.x, p.y, scaleMul, 1, tang, stretchX, 0.92);
+            }
+            ctx.restore();
+
+            if (trail.length > 1) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                for (let t = 1; t < Math.min(4, trail.length); t++) {
+                    const tr = trail[t];
+                    const fade = (1 - t / 4) * 0.18;
+                    const ghostScale = 1.12 - t * 0.06;
+                    ctx.save();
+                    ctx.globalAlpha = fade;
+                    ctx.translate(tr.x, tr.y);
+                    ctx.rotate(tr.a);
+                    ctx.scale(ghostScale, ghostScale * 0.88);
+                    ctx.drawImage(boostBody, -normal.width / 2, -normal.height / 2);
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+        }
+
         const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headRadius * 0.44;
-        const eyeFwd = headRadius * 0.5;
-        const eyeR = Math.max(2.5, headRadius * 0.34);
+        const headScale = boosting ? 1.10 : 1.04;
+        const headEyeRadius = headRadius * headScale;
+        const eyeSide = headEyeRadius * 0.44;
+        const eyeFwd = headEyeRadius * 0.5;
+        const eyeR = Math.max(2.5, headEyeRadius * 0.34);
         const pupilR = eyeR * 0.5;
+
+        if (boosting) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.35 * pulse;
+            ctx.translate(hx + fwdX * headRadius * 0.08, hy + fwdY * headRadius * 0.08);
+            ctx.rotate(angle);
+            ctx.scale(1.14, 0.94);
+            ctx.drawImage(boostOverlay, -halfB, -halfB);
+            ctx.restore();
+        }
 
         ctx.save();
         ctx.shadowBlur = 0;
@@ -763,7 +967,7 @@ export class SlitherRenderer {
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = boosting ? '#ffffff' : 'rgba(255,255,255,0.96)';
             ctx.fill();
             ctx.strokeStyle = 'rgba(0,0,0,0.28)';
             ctx.lineWidth = Math.max(0.8, eyeR * 0.09);
@@ -780,12 +984,12 @@ export class SlitherRenderer {
 
         if (snake.name) {
             ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            ctx.font = `bold ${Math.max(12, headRadius * 0.85)}px Arial, sans-serif`;
+            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'rgba(0,0,0,0.55)';
             ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headRadius - 12);
-            ctx.fillText(snake.name, hx, hy - headRadius - 12);
+            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
+            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
         }
     }
 
@@ -930,6 +1134,7 @@ export class SlitherRenderer {
 
     destroy() {
         this.pause();
+        this._boostTrailPool.clear();
         window.removeEventListener('resize', this._onResize);
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('mousedown', this._onMouseDown);
