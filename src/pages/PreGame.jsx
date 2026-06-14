@@ -434,11 +434,12 @@ export default function PreGame() {
 
         if (!canJoin && !isAlreadyInGame) { navigate('/lobby'); return; }
 
-        trackMixpanelEvent('Game Started', {
+        trackMixpanelEvent('game_started', {
             mode: selectedMode,
-            entryFeeUsd: entryFeeForSession,
-            isBattleRoyale: isBattleRoyaleMode,
-            isRejoin: isAlreadyInGame && canRejoinThisMode,
+            entry_fee_usd: entryFeeForSession,
+            is_battle_royale: isBattleRoyaleMode,
+            is_rejoin: isAlreadyInGame && canRejoinThisMode,
+            platform: 'web',
         });
 
         setIsMatchmaking(true);
@@ -674,7 +675,7 @@ export default function PreGame() {
                                                 <button
                                                     className="btn btn-primary"
                                                     onClick={() => {
-                                                        trackMixpanelEvent('Deposit Clicked', { source: 'wallet_menu' });
+                                                        trackMixpanelEvent('deposit_clicked', { source: 'wallet_menu', platform: 'web' });
                                                         setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('manual');
                                                     }}
                                                 >
@@ -696,7 +697,7 @@ export default function PreGame() {
                             <button
                                 className="nav-deposit-btn"
                                 onClick={() => {
-                                    trackMixpanelEvent('Deposit Clicked', { source: 'nav_button' });
+                                    trackMixpanelEvent('deposit_clicked', { source: 'nav_button', platform: 'web' });
                                     setIsWalletOpen(false);
                                     setIsWithdrawExpanded(false);
                                     setIsWalletExpanded(true);

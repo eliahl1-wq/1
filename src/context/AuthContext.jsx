@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { syncMixpanelUser, resetMixpanel } from '../utils/mixpanel';
 
 const AuthContext = createContext();
 
@@ -48,6 +49,7 @@ export const AuthProvider = ({ children }) => {
                             isAdmin: userData.isAdmin,
                         };
                         setUser(formattedUser);
+                        syncMixpanelUser(formattedUser);
                         console.log('AuthContext: Användardata från /api/me:', formattedUser);
                     } else {
                         console.log('AuthContext: /api/me misslyckades, tar bort token.');
@@ -123,10 +125,12 @@ export const AuthProvider = ({ children }) => {
 
         setUser(formattedUser);
         setToken(newToken);
+        syncMixpanelUser(formattedUser);
         console.log('AuthContext: Användare inloggad, token sparad, user-state uppdaterad:', formattedUser);
     };
 
     const logout = () => {
+        resetMixpanel();
         localStorage.removeItem('token');
         setUser(null);
         setToken(null);

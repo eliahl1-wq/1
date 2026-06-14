@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Background from '../components/Background';
+import { identifyMixpanelUser, trackMixpanelEvent } from '../utils/mixpanel';
 
 export default function RegisterPage() {
     const [email, setEmail]       = useState('');
@@ -26,6 +27,10 @@ export default function RegisterPage() {
             });
             const data = await res.json();
             if (res.ok) {
+                if (data.userId) {
+                    identifyMixpanelUser(data.userId, { username: data.username });
+                    trackMixpanelEvent('sign_up_completed', { sign_up_method: 'email', platform: 'web' });
+                }
                 setIsSuccess(true);
                 setMessage('Account created! Redirecting to login…');
                 setTimeout(() => navigate('/login'), 2000);
