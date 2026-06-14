@@ -593,11 +593,10 @@ export class SlitherRenderer {
         }
     }
 
-    _drawSegmentSprite(ctx, sprite, x, y, scale, alpha, angle, stretchX, stretchY) {
+    _drawSegmentSprite(ctx, sprite, x, y, scale, alpha) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.scale(stretchX * scale, stretchY * scale);
+        ctx.scale(scale, scale);
         ctx.globalAlpha *= alpha;
         const half = sprite.width / 2;
         ctx.drawImage(sprite, -half, -half);
@@ -630,62 +629,41 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
         
-        // Base color and slight variations
-        const base = col;
-        const centerCol = shadeColor(base, Math.round(15 * k));
-        const edgeCol = shadeColor(base, Math.round(-18 * k));
-
-        // 1. Main Body Gradient
-        // Center slightly brighter, edge slightly darker. No hard transitions.
-        const body = g.createRadialGradient(c, c, 0, c, c, rPx);
-        body.addColorStop(0, toHex(centerCol));
-        body.addColorStop(0.6, toHex(base));
-        body.addColorStop(1, toHex(edgeCol));
-        g.fillStyle = body;
+        // 1. Base Radial Gradient
+        // Offset center slightly up to simulate top-down light
+        const baseGrad = g.createRadialGradient(c, c - rPx * 0.15, rPx * 0.1, c, c, rPx);
+        const centerCol = shadeColor(col, Math.round(15 * k));
+        const midCol = col;
+        const edgeCol = shadeColor(col, Math.round(-45 * k)); // Dark edge for the overlap crease
+        
+        baseGrad.addColorStop(0, toHex(centerCol));
+        baseGrad.addColorStop(0.6, toHex(midCol));
+        baseGrad.addColorStop(1, toHex(edgeCol));
+        
+        g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // 2. Top-Left Soft Highlight
-        // Subtle, not harsh cartoon highlight.
-        const hlCol = shadeColor(base, Math.round(35 * k));
-        const hx = c - rPx * 0.25;
-        const hy = c - rPx * 0.25;
-        const highlight = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.6);
-        highlight.addColorStop(0, rgb(hlCol, 0.35 * k));
-        highlight.addColorStop(0.5, rgb(hlCol, 0.1 * k));
-        highlight.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = highlight;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
+        // 2. Specular Highlight (Top band)
+        const hiCol = shadeColor(col, Math.round(100 * k));
+        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        hiGrad.addColorStop(0.02, 'rgba(255,255,255,0)');
+        hiGrad.addColorStop(0.08, rgb(hiCol, 0.7 * k)); // The bright band
+        hiGrad.addColorStop(0.18, rgb(hiCol, 0.1 * k));
+        hiGrad.addColorStop(0.25, 'rgba(255,255,255,0)');
+        
+        g.fillStyle = hiGrad;
         g.fill();
 
-        // 3. Bottom-Right Depth Shadow
-        // Subtle illusion of volume.
-        const shCol = shadeColor(base, Math.round(-35 * k));
-        const sx = c + rPx * 0.2;
-        const sy = c + rPx * 0.2;
-        const shadow = g.createRadialGradient(sx, sy, rPx * 0.2, sx, sy, rPx * 0.8);
-        shadow.addColorStop(0, 'rgba(0,0,0,0)');
-        shadow.addColorStop(0.6, rgb(shCol, 0.15 * k));
-        shadow.addColorStop(1, rgb(shCol, 0.3 * k));
-        g.fillStyle = shadow;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-
-        // 4. Overlap Ambient Shadow (Crease)
-        // Soft shadow at the front where the next segment overlaps.
-        const creaseCol = shadeColor(base, Math.round(-40 * k));
-        const cx = c;
-        const cy = c + rPx * 0.15; // Offset towards the "back" slightly
-        const crease = g.createRadialGradient(cx, cy, rPx * 0.1, cx, cy, rPx * 0.85);
-        crease.addColorStop(0, rgb(creaseCol, phase === 1 ? 0.25 : 0.15));
-        crease.addColorStop(0.4, rgb(creaseCol, 0.05));
-        crease.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = crease;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
+        // 3. Ambient Shadow (Bottom)
+        const shCol = shadeColor(col, Math.round(-70 * k));
+        const shGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        shGrad.addColorStop(0.7, 'rgba(0,0,0,0)');
+        shGrad.addColorStop(0.95, rgb(shCol, 0.6 * k));
+        shGrad.addColorStop(1.0, rgb(shCol, 0.8 * k));
+        
+        g.fillStyle = shGrad;
         g.fill();
     }
 
@@ -712,27 +690,27 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v17|${key}|0`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v18|${key}|0`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1);
         });
 
-        const alt = this._getSprite(`pr_norm_v17|${key}|1`, rPx * 2 + 4, (g, sz) => {
+        const alt = this._getSprite(`pr_norm_v18|${key}|1`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 1, 1);
         });
 
-        const boostBody = this._getSprite(`pr_norm_v17|${key}|boost`, rPx * 2 + 4, (g, sz) => {
+        const boostBody = this._getSprite(`pr_norm_v18|${key}|boost`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1.25);
         });
 
         const glowPad = Math.ceil(rPx * 0.45);
-        const glow = this._getSprite(`pr_glow_v17|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+        const glow = this._getSprite(`pr_glow_v18|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
             this._paintSnakeGlow(g, sz / 2, rPx, cs);
         });
 
         const col = parseColor(cs);
         const bright = shadeColor(col, 35);
         const pad = Math.max(3, Math.ceil(rPx * 0.2));
-        const boostOverlay = this._getSprite(`pr_boost_v17|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
+        const boostOverlay = this._getSprite(`pr_boost_v18|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
             const c = sz / 2;
             const glowR = rPx * 1.4 + pad;
             const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
@@ -746,7 +724,7 @@ export class SlitherRenderer {
             g.fill();
         });
 
-        const trailGlow = this._getSprite(`pr_trail_v17|${key}`, rPx * 3 + 8, (g, sz) => {
+        const trailGlow = this._getSprite(`pr_trail_v18|${key}`, rPx * 3 + 8, (g, sz) => {
             const c = sz / 2;
             const glowR = rPx * 1.7;
             const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
@@ -779,7 +757,7 @@ export class SlitherRenderer {
         const gsc = zoom;
         const thick = this.snakeThickness ?? 1;
         const headRadius = (snake.radius || 6) * gsc * thick;
-        const bodyRadius = headRadius * 0.96;
+        const bodyRadius = headRadius; // Head and body are exactly the same size
         const angle = snake.angle || 0;
         const cs = bucketSnakeColor(snake.color);
         const boosting = !!snake.boost;
@@ -812,12 +790,12 @@ export class SlitherRenderer {
             return;
         }
 
-        // Segment overlapping. Tighter when normal, slightly spaced when boosting.
-        const overlapMul = 0.35;
-        const boostSpaceMul = 0.48;
+        // Segment overlapping. Very tight when normal for continuous look.
+        const overlapMul = 0.22;
+        const boostSpaceMul = 0.35;
         const bumpStep = Math.max(2, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
-        const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 80 : 70);
+        const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 150 : 120);
         if (bumps.length < 1) {
             ctx.restore();
             return;
@@ -825,21 +803,11 @@ export class SlitherRenderer {
 
         const r = Math.max(2.5, Math.round(bodyRadius / 2) * 2);
         const { normal, alt, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
-        const halfN = normal.width / 2;
-        const halfG = glow.width / 2;
-        const halfB = boostOverlay.width / 2;
         const halfT = trailGlow.width / 2;
+        const halfB = boostOverlay.width / 2;
         const bumpCount = bumps.length;
 
         const headBump = bumps[0];
-        let moveSpeed = 0;
-        if (bumps.length >= 2) {
-            moveSpeed = Math.hypot(headBump.x - bumps[1].x, headBump.y - bumps[1].y);
-        }
-        
-        // Subtle stretch based on movement speed
-        const subtleStretch = 1 + Math.min(0.04, moveSpeed * 0.005);
-        const subtleSquash = 1 / subtleStretch;
 
         let trail = this._boostTrailPool.get(snake.id);
         if (!trail) {
@@ -871,30 +839,20 @@ export class SlitherRenderer {
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const along = i / Math.max(1, bumpCount - 1);
-            const headProx = 1 - along;
             
             // Taper tail naturally
             let scaleMul = 1.0;
-            if (along > 0.8) {
-                // Last 20% tapers down
-                const tailFactor = (along - 0.8) / 0.2; // 0 to 1 at the very tip
-                scaleMul = 1.0 - (tailFactor * 0.4); // Shrinks to 60% size
+            if (along > 0.75) {
+                // Last 25% tapers down
+                const tailFactor = (along - 0.75) / 0.25; // 0 to 1 at the very tip
+                scaleMul = 1.0 - (tailFactor * 0.6); // Shrinks to 40% size
             }
             
             const alphaMul = along > 0.9 ? (1 - (along - 0.9) / 0.1) * 0.8 + 0.2 : 1; // Fade very tip
-            const tang = this._bumpTangent(bumps, i);
-
-            let stretchX = subtleStretch;
-            let stretchY = subtleSquash;
-            
-            if (boosting) {
-                stretchX = 1.08 + headProx * 0.08;
-                stretchY = 0.92 - headProx * 0.04;
-            }
 
             const isHead = i === 0;
             const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
-            this._drawSegmentSprite(ctx, sprite, p.x, p.y, scaleMul, alphaMul, tang, stretchX, stretchY);
+            this._drawSegmentSprite(ctx, sprite, p.x, p.y, scaleMul, alphaMul);
         }
 
         // Subtle ambient glow
@@ -907,9 +865,8 @@ export class SlitherRenderer {
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
             const along = i / Math.max(1, bumpCount - 1);
             let scaleMul = 1.0;
-            if (along > 0.8) scaleMul = 1.0 - ((along - 0.8) / 0.2) * 0.4;
-            const tang = this._bumpTangent(bumps, i);
-            this._drawSegmentSprite(ctx, glow, p.x, p.y, scaleMul, 1, tang, 1, 1);
+            if (along > 0.75) scaleMul = 1.0 - ((along - 0.75) / 0.25) * 0.6;
+            this._drawSegmentSprite(ctx, glow, p.x, p.y, scaleMul, 1);
         }
         ctx.restore();
 
@@ -923,12 +880,10 @@ export class SlitherRenderer {
                 const along = i / Math.max(1, bumpCount - 1);
                 const headProx = 1 - along;
                 let scaleMul = 1.0;
-                if (along > 0.8) scaleMul = 1.0 - ((along - 0.8) / 0.2) * 0.4;
+                if (along > 0.75) scaleMul = 1.0 - ((along - 0.75) / 0.25) * 0.6;
                 
                 ctx.globalAlpha = (0.15 + headProx * 0.15) * pulse;
-                const tang = this._bumpTangent(bumps, i);
-                const stretchX = 1.05 + headProx * 0.05;
-                this._drawSegmentSprite(ctx, boostOverlay, p.x, p.y, scaleMul, 1, tang, stretchX, 0.95);
+                this._drawSegmentSprite(ctx, boostOverlay, p.x, p.y, scaleMul, 1);
             }
             ctx.restore();
         }
@@ -940,14 +895,13 @@ export class SlitherRenderer {
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
         
-        // Head is slightly larger
-        const headScale = boosting ? 1.08 : 1.04;
-        const headEyeRadius = headRadius * headScale;
+        // Head is exactly the same size as the body
+        const headEyeRadius = headRadius;
         
         // Eye positioning
-        const eyeSide = headEyeRadius * 0.46;
-        const eyeFwd = headEyeRadius * 0.38;
-        const eyeR = Math.max(2.5, headEyeRadius * 0.42);
+        const eyeSide = headEyeRadius * 0.35;
+        const eyeFwd = headEyeRadius * 0.35;
+        const eyeR = Math.max(2.5, headEyeRadius * 0.32);
         const pupilR = eyeR * 0.45;
 
         // Head boost glow
@@ -969,24 +923,18 @@ export class SlitherRenderer {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
             
-            // Soft gray shadow underneath
-            ctx.beginPath();
-            ctx.arc(ex + eyeR * 0.1, ey + eyeR * 0.15, eyeR * 1.05, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(20, 24, 30, 0.25)';
-            ctx.fill();
-
-            // White eye
+            // White eye (no grey shadow underneath to match image)
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
 
             // Pupil tracking movement
-            const px = ex + fwdX * eyeR * 0.45;
-            const py = ey + fwdY * eyeR * 0.45;
+            const px = ex + fwdX * eyeR * 0.4;
+            const py = ey + fwdY * eyeR * 0.4;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-            ctx.fillStyle = '#0a0a0c';
+            ctx.fillStyle = '#000000';
             ctx.fill();
         }
 
