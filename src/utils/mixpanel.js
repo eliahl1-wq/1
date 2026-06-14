@@ -1,23 +1,56 @@
 import mixpanel from 'mixpanel-browser';
 
-const TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN;
+const TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN?.trim() || '';
+const API_HOST = import.meta.env.VITE_MIXPANEL_API_HOST?.trim() || '';
+const DEBUG = import.meta.env.DEV || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('mp_debug'));
+
 let initialized = false;
 
+function logStatus(message, ...args) {
+    if (DEBUG || !TOKEN) {
+        console.log(`[Mixpanel] ${message}`, ...args);
+    }
+}
+
+export function isMixpanelConfigured() {
+    return Boolean(TOKEN);
+}
+
 export function initMixpanel() {
-    if (initialized || !TOKEN) return;
-    mixpanel.init(TOKEN, {
-        debug: import.meta.env.DEV,
+    if (initialized) return;
+    if (!TOKEN) {
+        console.warn('[Mixpanel] VITE_MIXPANEL_TOKEN saknas — events skickas inte. Sätt variabeln i Cloudflare (Production) och redeploya.');
+        return;
+    }
+
+    const config = {
+        debug: DEBUG,
         track_pageview: true,
         persistence: 'localStorage',
-        ignore_dnt: false,
-    });
+        // Many browsers block tracking when DNT is on — otherwise Live View stays empty.
+        ignore_dnt: true,
+        batch_requests: true,
+    };
+    if (API_HOST) {
+        config.api_host = API_HOST;
+    }
+
+    mixpanel.init(TOKEN, config);
     mixpanel.register({ platform: 'web' });
     initialized = true;
+
+    logStatus('init OK', API_HOST ? `(api_host: ${API_HOST})` : '(US default)');
+
+    mixpanel.track('app_opened', {
+        platform: 'web',
+        path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+    });
 }
 
 export function trackMixpanelEvent(eventName, properties = {}) {
     if (!TOKEN) return;
     if (!initialized) initMixpanel();
+    logStatus('track', eventName, properties);
     mixpanel.track(eventName, { platform: 'web', ...properties });
 }
 
@@ -28,6 +61,7 @@ export function identifyMixpanelUser(userId, traits = {}) {
     if (Object.keys(traits).length > 0) {
         mixpanel.people.set({ platform: 'web', ...traits });
     }
+    logStatus('identify', userId);
 }
 
 export function syncMixpanelUser(user) {
@@ -45,4 +79,5 @@ export function resetMixpanel() {
     if (!TOKEN) return;
     if (!initialized) initMixpanel();
     mixpanel.reset();
+    logStatus('reset');
 }
