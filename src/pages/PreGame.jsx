@@ -60,6 +60,7 @@ export default function PreGame() {
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
     const [isCurSOL, setIsCurSOL] = useState(false);
     const [isMatchmaking, setIsMatchmaking] = useState(false);
+    const [gamemodeStatsExpanded, setGamemodeStatsExpanded] = useState(false);
 
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(
         () => !!localStorage.getItem('current_game_mode')
@@ -130,6 +131,7 @@ export default function PreGame() {
     const walletDropRef = useRef(null);
     const walletExpandRef = useRef(null);
     const withdrawExpandRef = useRef(null);
+    const gamemodeStatsRef = useRef(null);
     const qrRef = useRef(null);
 
     const depositAddress = user?.depositAddress;
@@ -167,6 +169,9 @@ export default function PreGame() {
     const topGamemodeCount = gamemodeStatsList[0]?.count ?? 0;
     const secondGamemodeCount = gamemodeStatsList[1]?.count ?? 0;
     const anyGamemodeActive = gamemodeStatsList.some(m => m.count > 0);
+    const visibleGamemodeStats = gamemodeStatsExpanded
+        ? gamemodeStatsList
+        : gamemodeStatsList.slice(0, 1);
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
@@ -272,6 +277,9 @@ export default function PreGame() {
         }
         if (withdrawExpandRef.current && !withdrawExpandRef.current.contains(e.target) && !isWalletAdapter) {
             setIsWithdrawExpanded(false);
+        }
+        if (gamemodeStatsRef.current && !gamemodeStatsRef.current.contains(e.target)) {
+            setGamemodeStatsExpanded(false);
         }
     }, []);
 
@@ -952,40 +960,25 @@ export default function PreGame() {
                         <span className="label" style={{ display: 'block', marginBottom: '8px' }}>
                             {isBattleRoyaleMode ? 'Entry fee' : 'Entry stake'}
                         </span>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div className="entry-tier-row">
                             {tierOptions.map(tier => {
                                 const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
                                 const active = entryFeeForSession === tier;
-                                const playing = playingCountForTier(tier);
                                 return (
                                     <button
                                         key={tier}
                                         type="button"
+                                        className={`entry-tier-btn${active ? ' entry-tier-btn--active' : ''}${locked ? ' entry-tier-btn--locked' : ''}`}
                                         disabled={locked || isMatchmaking}
                                         onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
-                                        style={{
-                                            width: '100%',
-                                            padding: '9px 12px',
-                                            borderRadius: 'var(--r-md)',
-                                            border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-                                            background: active ? 'rgba(124, 58, 255, 0.12)' : 'rgba(255,255,255,0.02)',
-                                            color: locked ? 'var(--text-3)' : 'var(--text-h)',
-                                            fontSize: '0.78rem',
-                                            fontWeight: 700,
-                                            cursor: locked || isAlreadyInGame ? 'default' : 'pointer',
-                                            opacity: locked ? 0.45 : 1,
-                                            textAlign: 'left',
-                                        }}
                                     >
-                                        <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                                            <span>{freePlay ? 'FREE (Test)' : formatUsd(tier)}</span>
-                                            <span style={{ fontSize: '0.62rem', fontWeight: 500, color: 'var(--text-3)' }}>
-                                                {playing} playing
-                                            </span>
-                                        </span>
+                                        {freePlay ? 'FREE' : `$${tier}`}
                                     </button>
                                 );
                             })}
+                        </div>
+                        <div className="entry-tier-playing">
+                            playing {freePlay ? 'FREE' : `$${entryFeeForSession}`}: {playingCountForTier(entryFeeForSession)}
                         </div>
                     </div>
                 </div>
@@ -1058,7 +1051,7 @@ export default function PreGame() {
                                 </div>
                                 <div className="divider" style={{ margin: '6px 0' }} />
                                 <div className="stat-row">
-                                    <span>Golden Blob per join</span>
+                                    <span>Golden Blob value</span>
                                     <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
                                 </div>
                             </div>
@@ -1146,13 +1139,21 @@ export default function PreGame() {
                     </div>
                 </div>
 
-                <div className={`gamemode-stats-list${anyGamemodeActive ? '' : ' gamemode-stats-list--idle'}`}>
-                    {gamemodeStatsList.map(({ key, label, count }) => {
+                <button
+                    ref={gamemodeStatsRef}
+                    type="button"
+                    className={`gamemode-stats-list${anyGamemodeActive ? '' : ' gamemode-stats-list--idle'}${gamemodeStatsExpanded ? ' gamemode-stats-list--expanded' : ''}`}
+                    onClick={() => setGamemodeStatsExpanded(v => !v)}
+                    aria-expanded={gamemodeStatsExpanded}
+                    aria-label={gamemodeStatsExpanded ? 'Collapse gamemode list' : 'Expand gamemode list'}
+                >
+                    {visibleGamemodeStats.map(({ key, label, count }, i) => {
                         const hot = isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
+                        const isToggleRow = i === 0;
                         return (
                             <div
                                 key={key}
-                                className={`gamemode-stats-row${hot ? ' gamemode-stats-row--hot' : ''}${count > 0 ? '' : ' gamemode-stats-row--empty'}`}
+                                className={`gamemode-stats-row${hot ? ' gamemode-stats-row--hot' : ''}${count > 0 ? '' : ' gamemode-stats-row--empty'}${isToggleRow ? ' gamemode-stats-row--toggle' : ''}`}
                             >
                                 <span className="gamemode-stats-row__text mono">
                                     {label}:{' '}
@@ -1160,10 +1161,24 @@ export default function PreGame() {
                                         {count}
                                     </span>
                                 </span>
+                                {isToggleRow && (
+                                    <svg
+                                        className="gamemode-stats-list__chevron"
+                                        width="8"
+                                        height="8"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        aria-hidden="true"
+                                    >
+                                        <path d="M6 9l6 6 6-6" />
+                                    </svg>
+                                )}
                             </div>
                         );
                     })}
-                </div>
+                </button>
             </div>
 
             {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}

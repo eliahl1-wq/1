@@ -77,6 +77,8 @@ export default function SlitherGame() {
 
     const lastLeaderboardAtRef = useRef(0);
 
+    const lastBrHudAtRef = useRef(0);
+
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
@@ -312,9 +314,17 @@ export default function SlitherGame() {
                 setCurrentBalance((prev) => (prev === tick.balance ? prev : tick.balance));
             }
             if (tick.battleRoyale) {
-                setIsBattleRoyale(true);
-                if (tick.prizePool != null) setBrPrizePool(tick.prizePool);
-                if (tick.aliveCount != null) setBrAliveCount(tick.aliveCount);
+                const now = Date.now();
+                if (now - lastBrHudAtRef.current >= 300) {
+                    lastBrHudAtRef.current = now;
+                    setIsBattleRoyale(true);
+                    if (tick.prizePool != null) {
+                        setBrPrizePool((prev) => (prev === tick.prizePool ? prev : tick.prizePool));
+                    }
+                    if (tick.aliveCount != null) {
+                        setBrAliveCount((prev) => (prev === tick.aliveCount ? prev : tick.aliveCount));
+                    }
+                }
             }
             if (tick.resetTime) {
                 const secs = Math.max(0, Math.ceil((tick.resetTime - Date.now()) / 1000));

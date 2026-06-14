@@ -386,6 +386,50 @@
   box-shadow: 0 8px 22px rgba(124, 58, 255, 0.22);
 }
 
+.entry-tier-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.entry-tier-btn {
+  flex: 1;
+  padding: 7px 4px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-h);
+  font-family: var(--ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.entry-tier-btn:hover:not(:disabled) {
+  border-color: rgba(124, 58, 255, 0.45);
+  background: rgba(124, 58, 255, 0.06);
+}
+
+.entry-tier-btn--active {
+  border-color: var(--accent);
+  background: rgba(124, 58, 255, 0.12);
+}
+
+.entry-tier-btn--locked,
+.entry-tier-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.entry-tier-playing {
+  margin-top: 8px;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--text-3);
+  text-align: center;
+}
+
 .leaderboard-tab {
   flex: 1;
   padding: 8px 0;
@@ -779,10 +823,41 @@
   overflow: hidden;
   box-shadow: var(--shadow-xl);
   font-family: var(--ui);
+  cursor: pointer;
+  text-align: left;
+  appearance: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.gamemode-stats-list:hover {
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .gamemode-stats-list--idle {
   opacity: 0.65;
+}
+
+.gamemode-stats-row--toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.gamemode-stats-list__chevron {
+  flex-shrink: 0;
+  opacity: 0.4;
+  color: var(--text-2);
+  transition: transform 0.2s ease, opacity 0.15s ease;
+}
+
+.gamemode-stats-list:hover .gamemode-stats-list__chevron {
+  opacity: 0.7;
+}
+
+.gamemode-stats-list--expanded .gamemode-stats-list__chevron {
+  transform: rotate(180deg);
 }
 
 .gamemode-stats-row {
