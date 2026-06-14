@@ -59,6 +59,7 @@ function OutcomeBadge({ outcome }) {
         Win: { bg: 'rgba(34,197,94,0.12)', color: 'var(--green)' },
         Loss: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
         'Break-even': { bg: 'rgba(234,179,8,0.12)', color: 'var(--yellow)' },
+        excluded: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
     };
     const style = colors[outcome] || { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-2)' };
     return (
@@ -184,12 +185,15 @@ export default function AdminDashboard() {
     const [serverStatus, setServerStatus] = useState(null);
     const [actionMsg, setActionMsg] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
+    const [showExcluded, setShowExcluded] = useState(false);
+    const [selectedTxIds, setSelectedTxIds] = useState(new Set());
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
             ...options,
             headers: {
                 Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
                 ...(options.headers || {}),
             },
         });
@@ -208,12 +212,17 @@ export default function AdminDashboard() {
         }
     }, [fetchAdmin]);
 
-    const loadData = useCallback(async (userId = filterUserId) => {
+    const loadData = useCallback(async (userId = filterUserId, includeExcluded = showExcluded) => {
         setLoading(true);
         setError('');
         try {
-            const txQuery = userId ? `?userId=${userId}` : '';
-            const gameQuery = userId ? `?userId=${userId}` : '';
+            const txParams = new URLSearchParams();
+            if (userId) txParams.set('userId', userId);
+            if (includeExcluded) txParams.set('showExcluded', 'true');
+            const gameParams = new URLSearchParams();
+            if (userId) gameParams.set('userId', userId);
+            const txQuery = txParams.toString() ? `?${txParams}` : '';
+            const gameQuery = gameParams.toString() ? `?${gameParams}` : '';
             const [ov, au, us, wal, sw, tx, gh] = await Promise.all([
                 fetchAdmin('/api/admin/dashboard/overview'),
                 fetchAdmin('/api/admin/dashboard/active-users'),
@@ -230,12 +239,13 @@ export default function AdminDashboard() {
             setSweeps(sw.sweeps ?? []);
             setTransactions(tx.transactions ?? []);
             setGameHistory(gh.history ?? []);
+            setSelectedTxIds(new Set());
         } catch (err) {
             setError(err.message || 'Could not load dashboard');
         } finally {
             setLoading(false);
         }
-    }, [fetchAdmin, filterUserId]);
+    }, [fetchAdmin, filterUserId, showExcluded]);
 
     useEffect(() => {
         document.title = 'AgarStake | Admin';
@@ -248,12 +258,15 @@ export default function AdminDashboard() {
         return () => clearInterval(id);
     }, [fetchServerStatus]);
 
-    const runAdminAction = async (path, confirmText) => {
+    const runAdminAction = async (path, confirmText, body) => {
         if (confirmText && !window.confirm(confirmText)) return;
         setActionLoading(true);
         setActionMsg('');
         try {
-            const result = await fetchAdmin(path, { method: 'POST' });
+            const result = await fetchAdmin(path, {
+                method: 'POST',
+                body: body ? JSON.stringify(body) : undefined,
+            });
             setActionMsg(`✅ ${result.message || 'Done'}`);
             await Promise.all([loadData(), fetchServerStatus()]);
         } catch (err) {
@@ -261,6 +274,44 @@ export default function AdminDashboard() {
         } finally {
             setActionLoading(false);
         }
+    };
+
+    const toggleTxSelection = (id) => {
+        setSelectedTxIds(prev => {
+            const next = new Set(prev);
+            const key = String(id);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+
+    const toggleSelectAllTx = () => {
+        if (selectedTxIds.size === transactions.length) {
+            setSelectedTxIds(new Set());
+        } else {
+            setSelectedTxIds(new Set(transactions.map(t => String(t.id))));
+        }
+    };
+
+    const bulkExcludeTx = () => {
+        const ids = [...selectedTxIds];
+        if (!ids.length) return;
+        runAdminAction(
+            '/api/admin/transactions/exclude',
+            `Exclude ${ids.length} transaction(s) from reports?\n\nThey stay in the database but won't count toward profit/deposits/lists.`,
+            { ids },
+        );
+    };
+
+    const bulkRestoreTx = () => {
+        const ids = [...selectedTxIds];
+        if (!ids.length) return;
+        runAdminAction(
+            '/api/admin/transactions/restore',
+            `Restore ${ids.length} transaction(s) to reports?`,
+            { ids },
+        );
     };
 
     const onFilterUser = (userId) => {
@@ -366,6 +417,9 @@ export default function AdminDashboard() {
                         <StatCard label="Total Deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} txs` : ''} />
                         <StatCard label="Total Withdrawals" value={formatUsd(overview?.totalWithdrawalsUsd)} sub={overview ? `${overview.withdrawalCount} txs` : ''} />
                         <StatCard label="Net Gaming Revenue" value={formatUsd(overview?.netGamingRevenue)} sub={overview?.netGamingRevenue >= 0 ? 'Platform profit' : 'Platform loss'} />
+                        {(overview?.excludedCount ?? 0) > 0 && (
+                            <StatCard label="Excluded from reports" value={overview.excludedCount} sub="Hidden test/fake txs — not deleted" />
+                        )}
                         <StatCard label="Currently In Game" value={activeUsers?.currentlyInGame ?? '—'} sub={`${activeUsers?.activeLast24h ?? 0} active in last 24h`} />
                         <StatCard label="Main House Wallet" value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'} />
                         <StatCard label="Owner Vault" value={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'} sub="Sweep destination after reset" />
@@ -577,24 +631,118 @@ export default function AdminDashboard() {
                 )}
 
                 {tab === 'transactions' && (
-                    <Panel title="All transactions" sub="Deposits, withdrawals, and system events (last 200)">
+                    <Panel
+                        title="All transactions"
+                        sub="Exclude test/fake rows from stats without deleting them. Use bulk select for many at once."
+                    >
                         {userFilterBar}
-                        <DataTable
-                            columns={[
-                                { key: 'createdAt', label: 'Date', render: r => formatDate(r.createdAt) },
-                                { key: 'username', label: 'User', render: r => r.username },
-                                { key: 'type', label: 'Type', render: r => <TypeBadge type={r.type} /> },
-                                { key: 'amountUsd', label: 'Amount (USD)', render: r => formatUsd(r.amountUsd) },
-                                { key: 'status', label: 'Status' },
-                                { key: 'meta', label: 'Details', render: r => {
-                                    const m = r.meta || {};
-                                    return m.reason || m.event || m.signature ? truncateAddr(m.reason || m.event || m.signature) : '—';
-                                }},
-                            ]}
-                            rows={transactions}
-                            loading={loading}
-                            emptyMessage="No transactions"
-                        />
+                        <div style={{
+                            padding: '12px 16px',
+                            borderBottom: '1px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            flexWrap: 'wrap',
+                        }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-2)', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showExcluded}
+                                    onChange={e => {
+                                        setShowExcluded(e.target.checked);
+                                        loadData(filterUserId, e.target.checked);
+                                    }}
+                                />
+                                Include excluded (to restore)
+                            </label>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>
+                                {selectedTxIds.size} selected
+                            </span>
+                            <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                disabled={actionLoading || selectedTxIds.size === 0}
+                                onClick={bulkExcludeTx}
+                            >
+                                Exclude selected
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                disabled={actionLoading || selectedTxIds.size === 0}
+                                onClick={bulkRestoreTx}
+                            >
+                                Restore selected
+                            </button>
+                        </div>
+                        {loading ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>
+                                <span className="spinner" style={{ marginRight: '8px' }} />
+                                Loading…
+                            </div>
+                        ) : transactions.length === 0 ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>No transactions</div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <th style={{ padding: '12px 16px', width: 40 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={transactions.length > 0 && selectedTxIds.size === transactions.length}
+                                                    onChange={toggleSelectAllTx}
+                                                />
+                                            </th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Date</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>User</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Type</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Amount</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Status</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {transactions.map(tx => {
+                                            const id = String(tx.id);
+                                            const isExcluded = tx.excludedFromReports;
+                                            const m = tx.meta || {};
+                                            const detail = m.reason || m.event || m.signature || '—';
+                                            return (
+                                                <tr
+                                                    key={id}
+                                                    style={{
+                                                        borderBottom: '1px solid var(--border)',
+                                                        opacity: isExcluded ? 0.55 : 1,
+                                                        background: isExcluded ? 'rgba(255,255,255,0.02)' : undefined,
+                                                    }}
+                                                >
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedTxIds.has(id)}
+                                                            onChange={() => toggleTxSelection(id)}
+                                                        />
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>{formatDate(tx.createdAt)}</td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>{tx.username}</td>
+                                                    <td style={{ padding: '12px 16px' }}><TypeBadge type={tx.type} /></td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>{formatUsd(tx.amountUsd)}</td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>
+                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : tx.status}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>
+                                                        <span className="mono" style={{ fontSize: '0.72rem' }} title={detail}>{truncateAddr(detail)}</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </Panel>
                 )}
 
