@@ -87,14 +87,8 @@ export default function Game() {
         onComplete: handleCashOut,
     });
 
-    const cashoutButtonHoldProps = {
-        onMouseDown: (e) => { e.preventDefault(); startHold(); },
-        onMouseUp: cancelHold,
-        onMouseLeave: cancelHold,
-        onTouchStart: (e) => { e.preventDefault(); startHold(); },
-        onTouchEnd: cancelHold,
-        onTouchCancel: cancelHold,
-        onContextMenu: (e) => e.preventDefault(),
+    const cashoutButtonProps = {
+        onClick: (e) => { e.preventDefault(); if (canCashOutRef.current) handleCashOut(); },
     };
 
     useLayoutEffect(() => {
@@ -728,7 +722,7 @@ export default function Game() {
                     )}
                     {!isBattleRoyale && (
                     <button
-                        {...cashoutButtonHoldProps}
+                        {...cashoutButtonProps}
                         disabled={localTimer > 0 || isDead || cashedAmount !== null}
                         style={{
                             width: '100%',

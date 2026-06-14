@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export const CASHOUT_HOLD_MS = 1500;
+export const CASHOUT_HOLD_MS = 750;
 
 /**
  * Hold Q (or press-and-hold the cashout button) before starting the cashout timer.

@@ -536,18 +536,19 @@ export class SlitherRenderer {
 
     /** Soft glowing orb — compact bloom, tighter falloff, more transparent. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * (golden ? 2.2 : deathDrop ? 1.95 : 1.7));
-        const key = `f9|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        const halo = Math.ceil(rPx * (golden ? 2.6 : deathDrop ? 1.95 : 1.7));
+        const key = `f10|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                grad.addColorStop(0, 'hsla(48, 100%, 88%, 0.68)');
-                grad.addColorStop(0.20, 'hsla(46, 95%, 70%, 0.48)');
-                grad.addColorStop(0.42, 'hsla(42, 90%, 60%, 0.24)');
-                grad.addColorStop(0.62, 'hsla(38, 85%, 52%, 0.08)');
-                grad.addColorStop(0.78, 'hsla(36, 80%, 48%, 0.02)');
-                grad.addColorStop(1, 'hsla(36, 80%, 46%, 0)');
+                // High quality golden orb: bright white-yellow core, strong gold mid, soft amber outer
+                grad.addColorStop(0, 'hsla(55, 100%, 100%, 1)');
+                grad.addColorStop(0.12, 'hsla(50, 100%, 85%, 0.95)');
+                grad.addColorStop(0.30, 'hsla(45, 100%, 65%, 0.75)');
+                grad.addColorStop(0.55, 'hsla(40, 100%, 50%, 0.35)');
+                grad.addColorStop(0.80, 'hsla(35, 100%, 40%, 0.10)');
+                grad.addColorStop(1, 'hsla(30, 100%, 30%, 0)');
             } else {
                 const sat = deathDrop ? 95 : 88;
                 grad.addColorStop(0, `hsla(${hue}, ${sat}%, 86%, 0.60)`);
@@ -563,17 +564,28 @@ export class SlitherRenderer {
     }
 
     _drawFood(ctx, foodList, toScreen, W, H, zoom) {
+        const now = Date.now();
         for (let fi = 0; fi < foodList.length; fi++) {
             const f = foodList[fi];
-            const { x: fx, y: fy } = toScreen(f.x, f.y);
-            if (fx < -140 || fy < -140 || fx > W + 140 || fy > H + 140) continue;
+            let { x: fx, y: fy } = toScreen(f.x, f.y);
 
-            const hue = f.golden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
+            const isGolden = !!f.golden;
+            const hue = isGolden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
 
-            // Server already sends golden at 2.4× radius — only a slight visual bump
             let sizeMul = 1;
-            if (f.golden) {
-                sizeMul = 1.12;
+            let alpha = 1;
+
+            if (isGolden) {
+                // Slightly smaller base size, pulsating
+                const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
+                sizeMul = 0.85 + pulse;
+                
+                // Slight floating movement
+                fx += Math.sin(now * 0.003 + f.y) * 6 * zoom;
+                fy += Math.cos(now * 0.0035 + f.x) * 6 * zoom;
+                
+                // Pulsating opacity
+                alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
             } else {
@@ -583,13 +595,24 @@ export class SlitherRenderer {
                 sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
             }
 
+            if (fx < -140 || fy < -140 || fx > W + 140 || fy > H + 140) continue;
+
             const baseR = (f.radius || 3) * sizeMul;
             const screenR = Math.max(4.5, baseR * zoom * 1.65);
             const spriteR = 4;
-            const sprite = this._foodSprite(hue, spriteR, !!f.golden, !!f.deathDrop);
+            const sprite = this._foodSprite(hue, spriteR, isGolden, !!f.deathDrop);
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
-            ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+
+            if (isGolden) {
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+                ctx.restore();
+            } else {
+                ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+            }
         }
     }
 
