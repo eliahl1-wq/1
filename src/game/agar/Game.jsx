@@ -10,18 +10,19 @@ import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } 
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 
-/** Keep on-screen pellets when server view-culling skips them for a tick or two. */
+/** Drop stale cached pellets; keep on-screen blobs through short server cull gaps. */
 function pruneAgarFoodCache(foodMap, px, py, screenW, screenH) {
-    const margin = 160;
+    const margin = 240;
     const halfW = screenW / 2 + margin;
     const halfH = screenH / 2 + margin;
     for (const [id, f] of foodMap) {
         const miss = f._missStreak || 0;
         if (miss === 0) continue;
         const inView = Math.abs(f.x - px) <= halfW && Math.abs(f.y - py) <= halfH;
-        if (inView) {
-            if (miss >= 2) foodMap.delete(id);
-        } else if (miss >= 4) {
+        if (!inView) {
+            if (miss >= 8) foodMap.delete(id);
+        } else if (miss >= 24) {
+            // Eaten or despawned — remove ghost blobs after ~0.6s at 40Hz
             foodMap.delete(id);
         }
     }
@@ -393,6 +394,14 @@ export default function Game() {
         if (!canvas) return;
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('0', {
+                x: 0,
+                y: 0,
+                screenWidth: canvas.width,
+                screenHeight: canvas.height,
+            });
+        }
     };
 
     useEffect(() => {
@@ -435,7 +444,10 @@ export default function Game() {
                 }
                 
                 pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width, screen.height);
+                const halfW = screen.width / 2 + 120;
+                const halfH = screen.height / 2 + 120;
                 for (const f of foodCacheRef.current.values()) {
+                    if (Math.abs(f.x - player.x) > halfW || Math.abs(f.y - player.y) > halfH) continue;
                     renderUtils.drawFood(worldToScreen(f.x, f.y), f, graph);
                 }
 
@@ -478,9 +490,11 @@ export default function Game() {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
-        socketRef.current?.emit('0', { // Agario-protokoll '0' för move
+        socketRef.current?.emit('0', {
             x: e.clientX - rect.left - canvas.width / 2,
-            y: e.clientY - rect.top - canvas.height / 2
+            y: e.clientY - rect.top - canvas.height / 2,
+            screenWidth: canvas.width,
+            screenHeight: canvas.height,
         });
     };
 

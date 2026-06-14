@@ -34,8 +34,8 @@ export default function Profile() {
                 const data = await res.json();
                 setGameLogs(data.filter(tx => {
                     const reason = tx.meta?.reason || '';
-                    return (tx.type === 'withdraw' && reason.includes('Arena Cashout'))
-                        || (tx.type === 'game' && reason === 'Arena Death');
+                    return (tx.type === 'withdraw' && (reason.includes('Arena Cashout') || reason.includes('BR Victory')))
+                        || (tx.type === 'game' && (reason === 'Arena Death' || reason === 'BR Eliminated'));
                 }));
             } catch {}
         };
@@ -45,10 +45,10 @@ export default function Profile() {
 
     // ── Chart data ────────────────────────────────────
     const processedLogs = [...gameLogs].reverse().map(log => {
-        const isCashout = log.type === 'withdraw' && (log.meta?.reason || '').includes('Arena Cashout');
+        const isCashout = log.type === 'withdraw' && ((log.meta?.reason || '').includes('Arena Cashout') || (log.meta?.reason || '').includes('BR Victory'));
         const amount    = Number(log.amount) || 0;
         const entryCost = Number(log.meta?.entryFeeUsd) || 10;
-        const netProfit = amount - entryCost;
+        const netProfit = isCashout ? (amount - entryCost) : (0 - entryCost);
         return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount, isCashout };
     });
 

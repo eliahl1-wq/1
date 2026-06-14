@@ -10,6 +10,7 @@ import Game from './game/agar/Game'; // Uppdaterad sökväg
 import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
 import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
+import AdminDashboard from './pages/AdminDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -78,6 +79,14 @@ function PublicRoute({ children }) {
   return children;
 }
 
+function AdminRoute({ children }) {
+  const { user, isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!user?.isAdmin) return <Navigate to="/pre-game" />;
+  return children;
+}
+
 function App() {
   // TIPS: Ersätt clusterApiUrl med din personliga RPC-länk från Helius för bättre stabilitet
   const endpoint = useMemo(() => 
@@ -102,6 +111,7 @@ function App() {
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path="/gamemodes" element={<Gamemodes />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
+                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 {/* Pregame lobbyn är nu startsidan */}
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>

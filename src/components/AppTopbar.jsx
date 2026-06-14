@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function AppTopbar({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
 
     const linkClass = (path) => (
         `gm-nav-link${location.pathname === path ? ' gm-nav-link--active' : ''}`
@@ -26,6 +28,11 @@ export default function AppTopbar({ children }) {
                     <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
                         Profile
                     </button>
+                    {user?.isAdmin && (
+                        <button type="button" className={linkClass('/admin')} onClick={() => navigate('/admin')}>
+                            Admin
+                        </button>
+                    )}
                 </div>
             </div>
             {children}

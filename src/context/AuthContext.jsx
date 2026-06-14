@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }) => {
                             balanceUsd: userData.balanceUsd,
                             solPrice: userData.solPrice,
                             freePlay: userData.freePlay,
+                            isAdmin: userData.isAdmin,
                         };
                         setUser(formattedUser);
                         console.log('AuthContext: Användardata från /api/me:', formattedUser);
@@ -94,6 +95,7 @@ export const AuthProvider = ({ children }) => {
                     balanceUsd: userData.balanceUsd,
                     solPrice: userData.solPrice,
                     freePlay: userData.freePlay,
+                    isAdmin: userData.isAdmin,
                 };
                 console.log(`[AuthContext] Refresh lyckades. Ny balans: ${userData.balanceSol} SOL ($${userData.balanceUsd?.toFixed(2)} USD). URL: ${url}`);
                 setUser(formattedUser);
@@ -116,6 +118,7 @@ export const AuthProvider = ({ children }) => {
             balanceUsd: base.balanceUsd,
             solPrice: base.solPrice,
             freePlay: base.freePlay,
+            isAdmin: base.isAdmin,
         };
 
         setUser(formattedUser);

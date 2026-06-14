@@ -21,6 +21,7 @@
     "buffer": "^6.0.3",
     "bufferutil": "^4.1.0",
     "events": "^3.3.0",
+    "mixpanel-browser": "^2.80.0",
     "process": "^0.11.10",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -11,6 +11,7 @@ import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, tierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
+import { trackMixpanelEvent } from '../utils/mixpanel';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -432,6 +433,14 @@ export default function PreGame() {
         if (isAlreadyInGame && !canRejoinThisMode) return;
 
         if (!canJoin && !isAlreadyInGame) { navigate('/lobby'); return; }
+
+        trackMixpanelEvent('Game Started', {
+            mode: selectedMode,
+            entryFeeUsd: entryFeeForSession,
+            isBattleRoyale: isBattleRoyaleMode,
+            isRejoin: isAlreadyInGame && canRejoinThisMode,
+        });
+
         setIsMatchmaking(true);
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
@@ -664,7 +673,10 @@ export default function PreGame() {
                                             <div className="wallet-card-actions">
                                                 <button
                                                     className="btn btn-primary"
-                                                    onClick={() => { setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('manual'); }}
+                                                    onClick={() => {
+                                                        trackMixpanelEvent('Deposit Clicked', { source: 'wallet_menu' });
+                                                        setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true); setDepositMethod('manual');
+                                                    }}
                                                 >
                                                     Deposit
                                                 </button>
@@ -684,6 +696,7 @@ export default function PreGame() {
                             <button
                                 className="nav-deposit-btn"
                                 onClick={() => {
+                                    trackMixpanelEvent('Deposit Clicked', { source: 'nav_button' });
                                     setIsWalletOpen(false);
                                     setIsWithdrawExpanded(false);
                                     setIsWalletExpanded(true);
