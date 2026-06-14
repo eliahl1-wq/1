@@ -593,104 +593,175 @@ export class SlitherRenderer {
         }
     }
 
-    /**
-     * Glossy gel head — radial gradient (brighter center), soft top-left
-     * specular, bottom-right ambient shadow. Subtle, rubber-like, no rim.
-     */
-    _getSnakeHeadSprite(cs, rPx, boosting) {
-        const key = `head_v16|${cs}|${rPx}|${boosting ? 1 : 0}`;
-        const pad = Math.ceil(rPx * 0.35) + 2;
-        return this._getSprite(key, rPx * 2 + pad * 2, (g, sz) => {
-            const c = sz / 2;
-            const col = parseColor(cs);
-            const k = boosting ? 1.18 : 1;
-            const base = col;
-            const center = shadeColor(base, Math.round(20 * k));
-            const edge = shadeColor(base, Math.round(-22 * k));
+    _drawSegmentSprite(ctx, sprite, x, y, scale, alpha, angle, stretchX, stretchY) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.scale(stretchX * scale, stretchY * scale);
+        ctx.globalAlpha *= alpha;
+        const half = sprite.width / 2;
+        ctx.drawImage(sprite, -half, -half);
+        ctx.restore();
+    }
 
-            // Body fill — center brighter, edge slightly darker, soft transition
-            const lx = c - rPx * 0.26;
-            const ly = c - rPx * 0.30;
-            const body = g.createRadialGradient(lx, ly, rPx * 0.05, c + rPx * 0.10, c + rPx * 0.12, rPx);
-            body.addColorStop(0, toHex(center));
-            body.addColorStop(0.45, toHex(base));
-            body.addColorStop(0.80, toHex(shadeColor(base, Math.round(-10 * k))));
-            body.addColorStop(1, toHex(edge));
-            g.fillStyle = body;
-            g.beginPath();
-            g.arc(c, c, rPx, 0, Math.PI * 2);
-            g.fill();
-
-            // Soft top-left specular
-            const spec = shadeColor(base, Math.round(40 * k));
-            const sgx = c - rPx * 0.24;
-            const sgy = c - rPx * 0.30;
-            const specGrad = g.createRadialGradient(sgx, sgy, 0, sgx, sgy, rPx * 0.55);
-            specGrad.addColorStop(0, rgb(spec, 0.34 * k));
-            specGrad.addColorStop(0.5, rgb(spec, 0.10 * k));
-            specGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            g.fillStyle = specGrad;
-            g.beginPath();
-            g.arc(c, c, rPx, 0, Math.PI * 2);
-            g.fill();
-
-            // Bottom-right ambient shadow
-            const shadow = shadeColor(base, Math.round(-34 * k));
-            const shx = c + rPx * 0.22;
-            const shy = c + rPx * 0.26;
-            const shGrad = g.createRadialGradient(shx, shy, rPx * 0.1, shx, shy, rPx * 0.8);
-            shGrad.addColorStop(0, rgb(shadow, 0.28));
-            shGrad.addColorStop(0.55, rgb(shadow, 0.08));
-            shGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            g.fillStyle = shGrad;
-            g.beginPath();
-            g.arc(c, c, rPx, 0, Math.PI * 2);
-            g.fill();
-        });
+    /** Tangent angle at bump index (radians, toward head). */
+    _bumpTangent(bumps, i) {
+        if (bumps.length < 2) return 0;
+        if (i <= 0) {
+            const a = bumps[0];
+            const b = bumps[1];
+            return Math.atan2(a.y - b.y, a.x - b.x);
+        }
+        if (i >= bumps.length - 1) {
+            const a = bumps[i];
+            const b = bumps[i - 1];
+            return Math.atan2(b.y - a.y, b.x - a.x);
+        }
+        const prev = bumps[i - 1];
+        const next = bumps[i + 1];
+        return Math.atan2(prev.y - next.y, prev.x - next.x);
     }
 
     /**
-     * Stroke the spine as one continuous round-capped tube. The body up to the
-     * taper zone is a single stroke (seamless); the last few nodes shrink so
-     * the tail tapers instead of ending in a blunt cap.
+     * Glossy gel-like segment — radial body, top-left specular, bottom-right depth.
+     * Designed to overlap heavily to form a continuous rubber-like tube.
      */
-    _strokeTube(ctx, bumps, width, color, alpha, offX, offY) {
-        const n = bumps.length;
-        if (n < 1) return;
-        ctx.save();
-        ctx.translate(offX, offY);
-        ctx.globalAlpha = alpha;
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+    _paintSnakeSegment(g, c, rPx, cs, phase = 0, contrast = 1) {
+        const col = parseColor(cs);
+        const k = contrast;
+        
+        // Base color and slight variations
+        const base = col;
+        const centerCol = shadeColor(base, Math.round(15 * k));
+        const edgeCol = shadeColor(base, Math.round(-18 * k));
 
-        if (n === 1) {
-            ctx.beginPath();
-            ctx.arc(bumps[0].x, bumps[0].y, width / 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-            return;
-        }
+        // 1. Main Body Gradient
+        // Center slightly brighter, edge slightly darker. No hard transitions.
+        const body = g.createRadialGradient(c, c, 0, c, c, rPx);
+        body.addColorStop(0, toHex(centerCol));
+        body.addColorStop(0.6, toHex(base));
+        body.addColorStop(1, toHex(edgeCol));
+        g.fillStyle = body;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
 
-        const taperCount = Math.min(9, Math.max(2, Math.floor(n * 0.18)));
-        const bodyEnd = n - taperCount;
+        // 2. Top-Left Soft Highlight
+        // Subtle, not harsh cartoon highlight.
+        const hlCol = shadeColor(base, Math.round(35 * k));
+        const hx = c - rPx * 0.25;
+        const hy = c - rPx * 0.25;
+        const highlight = g.createRadialGradient(hx, hy, 0, hx, hy, rPx * 0.6);
+        highlight.addColorStop(0, rgb(hlCol, 0.35 * k));
+        highlight.addColorStop(0.5, rgb(hlCol, 0.1 * k));
+        highlight.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = highlight;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
 
-        ctx.lineWidth = width;
-        ctx.beginPath();
-        ctx.moveTo(bumps[0].x, bumps[0].y);
-        for (let i = 1; i <= bodyEnd && i < n; i++) ctx.lineTo(bumps[i].x, bumps[i].y);
-        ctx.stroke();
+        // 3. Bottom-Right Depth Shadow
+        // Subtle illusion of volume.
+        const shCol = shadeColor(base, Math.round(-35 * k));
+        const sx = c + rPx * 0.2;
+        const sy = c + rPx * 0.2;
+        const shadow = g.createRadialGradient(sx, sy, rPx * 0.2, sx, sy, rPx * 0.8);
+        shadow.addColorStop(0, 'rgba(0,0,0,0)');
+        shadow.addColorStop(0.6, rgb(shCol, 0.15 * k));
+        shadow.addColorStop(1, rgb(shCol, 0.3 * k));
+        g.fillStyle = shadow;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
 
-        for (let i = Math.max(1, bodyEnd + 1); i < n; i++) {
-            const t = (n - 1 - i) / taperCount; // 1 → 0 toward tail
-            ctx.lineWidth = width * (0.20 + 0.80 * t);
-            ctx.beginPath();
-            ctx.moveTo(bumps[i - 1].x, bumps[i - 1].y);
-            ctx.lineTo(bumps[i].x, bumps[i].y);
-            ctx.stroke();
-        }
-        ctx.restore();
+        // 4. Overlap Ambient Shadow (Crease)
+        // Soft shadow at the front where the next segment overlaps.
+        const creaseCol = shadeColor(base, Math.round(-40 * k));
+        const cx = c;
+        const cy = c + rPx * 0.15; // Offset towards the "back" slightly
+        const crease = g.createRadialGradient(cx, cy, rPx * 0.1, cx, cy, rPx * 0.85);
+        crease.addColorStop(0, rgb(creaseCol, phase === 1 ? 0.25 : 0.15));
+        crease.addColorStop(0.4, rgb(creaseCol, 0.05));
+        crease.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = crease;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+    }
+
+    /** Soft outer glow for additive body pass. Extremely subtle bloom. */
+    _paintSnakeGlow(g, c, rPx, cs) {
+        const col = parseColor(cs);
+        const bright = shadeColor(col, 20);
+        const glowR = rPx * 1.35;
+        const grad = g.createRadialGradient(c, c, rPx * 0.4, c, c, glowR);
+        grad.addColorStop(0, rgb(bright, 0.1));
+        grad.addColorStop(0.5, rgb(col, 0.04));
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(c, c, glowR, 0, Math.PI * 2);
+        g.fill();
+    }
+
+    /**
+     * Pre-render normal segment + glow + boost overlay into o.pr_imgs cache.
+     */
+    _getSnakePrImgs(cs, rPx) {
+        const key = `${cs}|${rPx}`;
+        let pair = this._prImgs.get(key);
+        if (pair) return pair;
+
+        const normal = this._getSprite(`pr_norm_v17|${key}|0`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1);
+        });
+
+        const alt = this._getSprite(`pr_norm_v17|${key}|1`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 1, 1);
+        });
+
+        const boostBody = this._getSprite(`pr_norm_v17|${key}|boost`, rPx * 2 + 4, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1.25);
+        });
+
+        const glowPad = Math.ceil(rPx * 0.45);
+        const glow = this._getSprite(`pr_glow_v17|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+            this._paintSnakeGlow(g, sz / 2, rPx, cs);
+        });
+
+        const col = parseColor(cs);
+        const bright = shadeColor(col, 35);
+        const pad = Math.max(3, Math.ceil(rPx * 0.2));
+        const boostOverlay = this._getSprite(`pr_boost_v17|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
+            const c = sz / 2;
+            const glowR = rPx * 1.4 + pad;
+            const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
+            aura.addColorStop(0, rgb(bright, 0.05));
+            aura.addColorStop(0.4, rgb(bright, 0.15));
+            aura.addColorStop(0.7, rgb(bright, 0.08));
+            aura.addColorStop(1, 'rgba(255,255,255,0)');
+            g.fillStyle = aura;
+            g.beginPath();
+            g.arc(c, c, glowR, 0, Math.PI * 2);
+            g.fill();
+        });
+
+        const trailGlow = this._getSprite(`pr_trail_v17|${key}`, rPx * 3 + 8, (g, sz) => {
+            const c = sz / 2;
+            const glowR = rPx * 1.7;
+            const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
+            grad.addColorStop(0, rgb(bright, 0.12));
+            grad.addColorStop(0.40, rgb(col, 0.06));
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = grad;
+            g.beginPath();
+            g.arc(c, c, glowR, 0, Math.PI * 2);
+            g.fill();
+        });
+
+        pair = { normal, alt, boostBody, glow, boostOverlay, trailGlow };
+        this._prImgs.set(key, pair);
+        return pair;
     }
 
     _drawSnake(snake, toScreen, zoom) {
@@ -741,113 +812,192 @@ export class SlitherRenderer {
             return;
         }
 
-        const bumpStep = Math.max(2, bodyRadius * (boosting ? 0.62 : 0.5));
+        // Segment overlapping. Tighter when normal, slightly spaced when boosting.
+        const overlapMul = 0.35;
+        const boostSpaceMul = 0.48;
+        const bumpStep = Math.max(2, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
-        const bumps = this._capBumps(dense, this._bumpsBuf, 90);
+        const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 80 : 70);
         if (bumps.length < 1) {
             ctx.restore();
             return;
         }
 
-        const fwdX = Math.cos(angle);
-        const fwdY = Math.sin(angle);
+        const r = Math.max(2.5, Math.round(bodyRadius / 2) * 2);
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
+        const halfN = normal.width / 2;
+        const halfG = glow.width / 2;
+        const halfB = boostOverlay.width / 2;
+        const halfT = trailGlow.width / 2;
+        const bumpCount = bumps.length;
 
-        // Global light direction: top-left brightest, bottom-right darkest.
-        const LX = -0.40, LY = -0.46;
+        const headBump = bumps[0];
+        let moveSpeed = 0;
+        if (bumps.length >= 2) {
+            moveSpeed = Math.hypot(headBump.x - bumps[1].x, headBump.y - bumps[1].y);
+        }
+        
+        // Subtle stretch based on movement speed
+        const subtleStretch = 1 + Math.min(0.04, moveSpeed * 0.005);
+        const subtleSquash = 1 / subtleStretch;
 
-        // Layered colour tones — moderate contrast, glossy not plastic.
-        const col = parseColor(cs);
-        const bright = boosting ? 1.18 : 1;
-        const edgeCol = toHex(shadeColor(col, Math.round(-26 * bright)));
-        const baseCol = toHex(col);
-        const upperCol = toHex(shadeColor(col, Math.round(14 * bright)));
-        const hiCol = toHex(shadeColor(col, Math.round(34 * bright)));
-        const glossCol = toHex(shadeColor(col, Math.round(58 * bright)));
-        const glowCol = toHex(shadeColor(col, 30));
-
-        const W2 = bodyRadius * 2;
-
-        // Boost afterimages — fade trailing copies of the tube backward along travel.
         let trail = this._boostTrailPool.get(snake.id);
         if (!trail) {
             trail = [];
             this._boostTrailPool.set(snake.id, trail);
         }
         if (boosting) {
-            if (trail.length === 0 || Math.hypot(bumps[0].x - trail[0].x, bumps[0].y - trail[0].y) > 1) {
-                trail.unshift({ x: bumps[0].x, y: bumps[0].y });
-                if (trail.length > 4) trail.length = 4;
-            }
-            ctx.save();
-            for (let t = trail.length - 1; t >= 1; t--) {
-                const back = bodyRadius * 0.5 * t;
-                this._strokeTube(ctx, bumps, W2 * 0.96, baseCol, 0.12 * (1 - t / 5), -fwdX * back, -fwdY * back);
-            }
-            ctx.restore();
+            trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
+            if (trail.length > 6) trail.length = 6;
         } else if (trail.length > 0) {
             trail.length = 0;
         }
 
-        // 1. Extremely subtle bloom (no neon).
+        // Motion blur trailing afterimages during boost
+        if (boosting && trail.length > 1) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let t = 1; t < trail.length; t++) {
+                const tr = trail[t];
+                ctx.globalAlpha = (1 - t / trail.length) * 0.12 * pulse;
+                ctx.drawImage(trailGlow, tr.x - halfT, tr.y - halfT);
+            }
+            ctx.restore();
+        }
+
+        // Draw body segments (tail to head)
+        for (let i = bumpCount - 1; i >= 0; i--) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+
+            const along = i / Math.max(1, bumpCount - 1);
+            const headProx = 1 - along;
+            
+            // Taper tail naturally
+            let scaleMul = 1.0;
+            if (along > 0.8) {
+                // Last 20% tapers down
+                const tailFactor = (along - 0.8) / 0.2; // 0 to 1 at the very tip
+                scaleMul = 1.0 - (tailFactor * 0.4); // Shrinks to 60% size
+            }
+            
+            const alphaMul = along > 0.9 ? (1 - (along - 0.9) / 0.1) * 0.8 + 0.2 : 1; // Fade very tip
+            const tang = this._bumpTangent(bumps, i);
+
+            let stretchX = subtleStretch;
+            let stretchY = subtleSquash;
+            
+            if (boosting) {
+                stretchX = 1.08 + headProx * 0.08;
+                stretchY = 0.92 - headProx * 0.04;
+            }
+
+            const isHead = i === 0;
+            const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
+            this._drawSegmentSprite(ctx, sprite, p.x, p.y, scaleMul, alphaMul, tang, stretchX, stretchY);
+        }
+
+        // Subtle ambient glow
+        ctx.globalAlpha = 1;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        this._strokeTube(ctx, bumps, W2 * 1.22, glowCol, boosting ? 0.09 * pulse : 0.055, 0, 0);
+        ctx.globalAlpha = boosting ? 0.15 * pulse : 0.08;
+        for (let i = bumpCount - 1; i >= 0; i--) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+            const along = i / Math.max(1, bumpCount - 1);
+            let scaleMul = 1.0;
+            if (along > 0.8) scaleMul = 1.0 - ((along - 0.8) / 0.2) * 0.4;
+            const tang = this._bumpTangent(bumps, i);
+            this._drawSegmentSprite(ctx, glow, p.x, p.y, scaleMul, 1, tang, 1, 1);
+        }
         ctx.restore();
 
-        // 2. Continuous tube — stacked offset strokes give cylindrical shading.
-        this._strokeTube(ctx, bumps, W2, edgeCol, 1, 0, 0);
-        this._strokeTube(ctx, bumps, W2 * 0.9, baseCol, 1, LX * bodyRadius * 0.12, LY * bodyRadius * 0.12);
-        this._strokeTube(ctx, bumps, W2 * 0.6, upperCol, 0.9, LX * bodyRadius * 0.32, LY * bodyRadius * 0.32);
-        this._strokeTube(ctx, bumps, W2 * 0.32, hiCol, boosting ? 0.62 : 0.48, LX * bodyRadius * 0.44, LY * bodyRadius * 0.44);
-        this._strokeTube(ctx, bumps, W2 * 0.14, glossCol, boosting ? 0.42 : 0.32, LX * bodyRadius * 0.52, LY * bodyRadius * 0.52);
+        // Boost overlay
+        if (boosting) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = bumpCount - 1; i >= 0; i--) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                const along = i / Math.max(1, bumpCount - 1);
+                const headProx = 1 - along;
+                let scaleMul = 1.0;
+                if (along > 0.8) scaleMul = 1.0 - ((along - 0.8) / 0.2) * 0.4;
+                
+                ctx.globalAlpha = (0.15 + headProx * 0.15) * pulse;
+                const tang = this._bumpTangent(bumps, i);
+                const stretchX = 1.05 + headProx * 0.05;
+                this._drawSegmentSprite(ctx, boostOverlay, p.x, p.y, scaleMul, 1, tang, stretchX, 0.95);
+            }
+            ctx.restore();
+        }
+
+        // Head and Eyes
+        const { x: hx, y: hy } = pts[0];
+        const perpX = Math.sin(angle);
+        const perpY = -Math.cos(angle);
+        const fwdX = Math.cos(angle);
+        const fwdY = Math.sin(angle);
+        
+        // Head is slightly larger
+        const headScale = boosting ? 1.08 : 1.04;
+        const headEyeRadius = headRadius * headScale;
+        
+        // Eye positioning
+        const eyeSide = headEyeRadius * 0.46;
+        const eyeFwd = headEyeRadius * 0.38;
+        const eyeR = Math.max(2.5, headEyeRadius * 0.42);
+        const pupilR = eyeR * 0.45;
+
+        // Head boost glow
+        if (boosting) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.25 * pulse;
+            ctx.translate(hx + fwdX * headRadius * 0.08, hy + fwdY * headRadius * 0.08);
+            ctx.rotate(angle);
+            ctx.scale(1.12, 0.95);
+            ctx.drawImage(boostOverlay, -halfB, -halfB);
+            ctx.restore();
+        }
 
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
-
-        // 3. Glossy head — slightly larger than the body, blends into the tube.
-        const { x: hx, y: hy } = pts[0];
-        const headSprite = this._getSnakeHeadSprite(cs, Math.max(2.5, Math.round(headRadius)), boosting);
-        const hHalf = headSprite.width / 2;
-        ctx.drawImage(headSprite, hx - hHalf, hy - hHalf);
-
-        // 4. Eyes — large white, soft grey shadow, small tracking pupils.
-        const perpX = Math.sin(angle);
-        const perpY = -Math.cos(angle);
-        const eyeSide = headRadius * 0.46;
-        const eyeFwd = headRadius * 0.40;
-        const eyeR = Math.max(2.5, headRadius * 0.40);
-        const pupilR = eyeR * 0.46;
-
+        
         for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
-
+            
+            // Soft gray shadow underneath
             ctx.beginPath();
-            ctx.arc(ex + eyeR * 0.12, ey + eyeR * 0.22, eyeR * 1.02, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(40,44,52,0.28)';
+            ctx.arc(ex + eyeR * 0.1, ey + eyeR * 0.15, eyeR * 1.05, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(20, 24, 30, 0.25)';
             ctx.fill();
 
+            // White eye
             ctx.beginPath();
             ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
 
-            const px = ex + fwdX * eyeR * 0.40;
-            const py = ey + fwdY * eyeR * 0.40;
+            // Pupil tracking movement
+            const px = ex + fwdX * eyeR * 0.45;
+            const py = ey + fwdY * eyeR * 0.45;
             ctx.beginPath();
             ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-            ctx.fillStyle = '#0c0c10';
+            ctx.fillStyle = '#0a0a0c';
             ctx.fill();
         }
 
         if (snake.name) {
             ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            ctx.font = `bold ${Math.max(12, headRadius * 0.85)}px Arial, sans-serif`;
+            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'rgba(0,0,0,0.55)';
             ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headRadius - 12);
-            ctx.fillText(snake.name, hx, hy - headRadius - 12);
+            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
+            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
         }
 
         ctx.restore();
