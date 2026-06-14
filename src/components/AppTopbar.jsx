@@ -19,12 +19,14 @@ export default function AppTopbar({ children }) {
                     </span>
                 </div>
 
-                <button type="button" className={linkClass('/gamemodes')} onClick={() => navigate('/gamemodes')}>
-                    Gamemode
-                </button>
-                <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
-                    Profile
-                </button>
+                <div className="topbar-nav">
+                    <button type="button" className={linkClass('/gamemodes')} onClick={() => navigate('/gamemodes')}>
+                        Gamemode
+                    </button>
+                    <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
+                        Profile
+                    </button>
+                </div>
             </div>
             {children}
         </nav>

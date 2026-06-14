@@ -142,7 +142,7 @@ export default function Gamemodes() {
                 /* ── Page heading ── */
                 .gm-heading {
                     margin: 0 0 6px 0;
-                    font-family: var(--sans);
+                    font-family: var(--display);
                     font-size: clamp(2rem, 5vw, 3rem);
                     font-weight: 900;
                     letter-spacing: -2px;
@@ -151,7 +151,7 @@ export default function Gamemodes() {
                 }
                 .gm-sub {
                     margin: 0;
-                    font-family: var(--sans);
+                    font-family: var(--ui);
                     font-size: 0.85rem;
                     color: var(--text-3);
                     font-weight: 500;
@@ -171,9 +171,9 @@ export default function Gamemodes() {
                     margin-bottom: -1px;
                     padding: 0 4px 14px 4px;
                     margin-right: 28px;
-                    font-family: var(--sans);
+                    font-family: var(--ui);
                     font-size: 0.85rem;
-                    font-weight: 700;
+                    font-weight: 600;
                     letter-spacing: 0.02em;
                     text-transform: uppercase;
                     color: var(--text-3);
@@ -212,7 +212,7 @@ export default function Gamemodes() {
                     background: var(--bg-1);
                 }
                 .gm-card-title {
-                    font-family: var(--sans);
+                    font-family: var(--display);
                     font-size: 1.1rem;
                     font-weight: 800;
                     color: #fff;
@@ -221,23 +221,23 @@ export default function Gamemodes() {
                 }
                 .gm-card--disabled .gm-card-title { color: var(--text-3); }
                 .gm-card-desc {
-                    font-family: var(--sans);
+                    font-family: var(--ui);
                     font-size: 0.8rem;
                     color: var(--text-3);
                     line-height: 1.5;
                     max-width: 280px;
                 }
                 .gm-card-playing {
-                    font-family: var(--sans);
+                    font-family: var(--ui);
                     font-size: 0.72rem;
                     font-weight: 500;
                     color: var(--text-3);
                     margin-top: 8px;
                 }
                 .gm-badge {
-                    font-family: var(--sans);
+                    font-family: var(--ui);
                     font-size: 0.6rem;
-                    font-weight: 800;
+                    font-weight: 600;
                     letter-spacing: 0.07em;
                     text-transform: uppercase;
                     color: var(--text-3);
@@ -249,7 +249,7 @@ export default function Gamemodes() {
                     flex-shrink: 0;
                 }
                 .gm-play-btn {
-                    font-family: var(--sans);
+                    font-family: var(--display);
                     font-size: 0.75rem;
                     font-weight: 800;
                     letter-spacing: 0.04em;

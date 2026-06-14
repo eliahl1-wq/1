@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 /* ═══════════════════════════════════════════════
    AGARSAKE — AXIOM-INSPIRED DESIGN SYSTEM
@@ -46,8 +46,10 @@
   --red-dim: rgba(255, 59, 48, 0.1);
   --yellow: #FF9F0A;
 
-  /* Typography system */
-  --sans: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+  /* Typography system — display vs interface */
+  --display: 'Geist', system-ui, -apple-system, sans-serif;
+  --ui: 'Inter', sans-serif;
+  --sans: var(--ui);
   --mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
 
   /* Shadows */
@@ -65,8 +67,8 @@
   --r-2xl: 20px;
   --r-full: 999px;
 
-  font: 14px/1.5 var(--sans);
-  letter-spacing: -0.01em;
+  font: 14px/1.5 var(--ui);
+  letter-spacing: 0;
   color-scheme: dark;
   color: var(--text);
   font-synthesis: none;
@@ -87,8 +89,13 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--sans);
+  font-family: var(--ui);
   overflow-x: hidden;
+}
+
+h1,
+h2 {
+  font-family: var(--display);
 }
 
 /* ─── Monospace util ─── */
@@ -252,8 +259,9 @@ body {
 }
 
 .label {
+  font-family: var(--ui);
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--text-3);
@@ -269,7 +277,7 @@ body {
   color: var(--text-h);
   font-size: 0.875rem;
   font-weight: 500;
-  font-family: var(--sans);
+  font-family: var(--ui);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -302,12 +310,19 @@ input[type=number] {
   gap: 6px;
   border: none;
   border-radius: var(--r-md);
-  font-family: var(--sans);
-  font-weight: 700;
+  font-family: var(--ui);
+  font-weight: 600;
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
   outline: none;
+  letter-spacing: 0;
+}
+
+.btn-primary,
+.btn-green {
+  font-family: var(--display);
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -394,8 +409,9 @@ input[type=number] {
   gap: 4px;
   padding: 2px 7px;
   border-radius: var(--r-sm);
+  font-family: var(--ui);
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 

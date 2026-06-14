@@ -4,8 +4,8 @@
 
 /* Wallet adapter override — match our design */
 .wallet-adapter-button {
-  font-family: var(--sans) !important;
-  font-weight: 700 !important;
+  font-family: var(--ui) !important;
+  font-weight: 600 !important;
   font-size: 0.75rem !important;
   padding: 0 14px !important;
   height: 32px !important;
@@ -25,6 +25,8 @@
   border: none !important;
   box-shadow: 0 4px 16px rgba(124, 58, 255, 0.25) !important;
   color: white !important;
+  font-family: var(--display) !important;
+  font-weight: 700 !important;
 }
 .wallet-adapter-button-trigger:hover {
   filter: brightness(1.08) !important;
@@ -37,7 +39,7 @@
 }
 .wallet-adapter-modal-title {
   color: var(--text-h) !important;
-  font-family: var(--sans) !important;
+  font-family: var(--display) !important;
   font-weight: 700 !important;
 }
 
@@ -57,8 +59,9 @@
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--border);
   cursor: pointer;
+  font-family: var(--ui);
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -108,10 +111,11 @@
   padding: 5px 8px;
   border-radius: 4px;
   color: var(--text);
-  font-weight: 600;
+  font-family: var(--ui);
+  font-weight: 500;
   cursor: pointer;
   font-size: 0.68rem;
-  transition: all 0.1s ease;
+  transition: color 0.15s ease, background-color 0.15s ease;
   letter-spacing: 0.01em;
 }
 .dropdown-item:hover {
@@ -142,7 +146,13 @@
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 36px;
+}
+
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
 }
 
 /* ─── Logo ─── */
@@ -150,6 +160,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  font-family: var(--display);
   font-weight: 900;
   font-size: 1.35rem;
   letter-spacing: -1px;
@@ -210,8 +221,9 @@
   border: 1px solid var(--border);
   cursor: pointer;
   transition: all 0.15s ease;
+  font-family: var(--ui);
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-h);
   white-space: nowrap;
 }
@@ -231,6 +243,7 @@
   background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
   border: none;
   color: white;
+  font-family: var(--display);
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
@@ -249,31 +262,30 @@
 .gm-nav-link {
   background: transparent;
   border: none;
-  color: #fff;
-  font-family: var(--sans);
-  font-size: 0.9rem;
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.52);
+  font-family: var(--ui);
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: var(--r-sm);
   letter-spacing: 0.01em;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: color 0.2s ease, opacity 0.2s ease;
 }
 .gm-nav-link:not(.gm-nav-link--active):hover {
-  color: var(--accent);
-  background-color: rgba(124, 58, 255, 0.16);
+  color: rgba(255, 255, 255, 0.78);
 }
 .gm-nav-link--active {
-  color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
   background: transparent;
 }
 .gm-nav-link--active:hover {
-  color: var(--accent);
-  background-color: rgba(124, 58, 255, 0.16);
+  color: #ffffff;
 }
 
 .mode-title {
-  font-family: var(--sans);
+  font-family: var(--display);
   font-size: 1.55rem;
   font-weight: 900;
   letter-spacing: -0.04em;
@@ -289,7 +301,7 @@
   border-radius: 999px;
   background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
   color: #fff;
-  font-family: var(--sans);
+  font-family: var(--display);
   font-size: 0.85rem;
   font-weight: 700;
   cursor: default;
@@ -326,15 +338,15 @@
   text-align: center;
 }
 .mode-card-label {
-  font-family: var(--sans);
+  font-family: var(--ui);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-2);
 }
 .mode-card-title {
-  font-family: var(--sans);
+  font-family: var(--display);
   font-size: clamp(1.1rem, 2vw, 1.6rem);
   font-weight: 900;
   letter-spacing: -0.03em;
@@ -346,9 +358,9 @@
   line-height: 1.1;
 }
 .mode-card-subtitle {
-  font-family: var(--sans);
+  font-family: var(--ui);
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
   color: var(--text-2);
   margin-top: -6px;
@@ -360,7 +372,7 @@
   border-radius: 999px;
   background: linear-gradient(135deg, #7C3AFF, #4D8CFF);
   color: #fff;
-  font-family: var(--sans);
+  font-family: var(--display);
   font-size: 0.85rem;
   font-weight: 800;
   cursor: pointer;
@@ -377,10 +389,10 @@
   border: none;
   border-radius: 6px;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: var(--sans);
+  transition: color 0.15s ease, background-color 0.15s ease;
+  font-family: var(--ui);
   color: var(--text-2);
   background: transparent;
 }
@@ -417,6 +429,7 @@
 }
 
 .wallet-card-sub {
+  font-family: var(--ui);
   font-size: 0.72rem;
   color: var(--text-2);
   font-weight: 500;
@@ -460,8 +473,9 @@
 }
 
 .float-panel-title {
+  font-family: var(--ui);
   font-size: 0.58rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-3);
@@ -501,11 +515,11 @@
   border: none;
   border-radius: 5px;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: var(--sans);
-  letter-spacing: -0.01em;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  font-family: var(--ui);
+  letter-spacing: 0;
 }
 .tab-btn.active {
   background: rgba(255,255,255,0.08);
@@ -532,8 +546,9 @@
   display: flex;
   align-items: center;
   color: var(--text-2);
+  font-family: var(--ui);
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   pointer-events: none;
   z-index: 1;
 }
@@ -545,13 +560,14 @@
   padding: 9px 10px 9px 28px;
   color: var(--text-h);
   font-size: 0.875rem;
-  font-weight: 600;
-  font-family: var(--mono);
+  font-weight: 500;
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
-.amount-input::placeholder { color: var(--text-3); font-family: var(--sans); font-weight: 400; }
+.amount-input::placeholder { color: var(--text-3); font-family: var(--ui); font-weight: 400; }
 .amount-input:focus {
   border-color: rgba(153,69,255,0.3);
   box-shadow: 0 0 0 3px rgba(153,69,255,0.06);
@@ -560,16 +576,16 @@
 .amount-hint {
   font-size: 0.67rem;
   color: var(--text-3);
-  font-family: var(--mono);
+  font-family: var(--ui);
   margin-top: 3px;
   text-align: right;
-  letter-spacing: -0.02em;
 }
 
 /* ─── Status message ─── */
 .status-msg {
+  font-family: var(--ui);
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
   padding: 8px;
   border-radius: var(--r-sm);
@@ -618,8 +634,8 @@
   padding: 10px 12px;
   color: var(--text-h);
   font-size: 0.875rem;
-  font-weight: 600;
-  font-family: var(--sans);
+  font-weight: 500;
+  font-family: var(--ui);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
@@ -641,7 +657,7 @@
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
-  font-family: var(--sans);
+  font-family: var(--display);
 }
 .play-btn:active:not(:disabled) { transform: scale(0.98); }
 .play-btn:disabled { cursor: not-allowed; }
@@ -710,6 +726,7 @@
   box-shadow: var(--shadow-xl);
   backdrop-filter: none;
   z-index: auto;
+  font-family: var(--ui);
 }
 
 .right-panel-stack {
@@ -726,6 +743,7 @@
   border-radius: var(--r-2xl);
   padding: 24px;
   box-shadow: var(--shadow-xl);
+  font-family: var(--ui);
 }
 
 .side-stats-card {
@@ -738,7 +756,7 @@
   width: 240px;
 }
 
-.live-stats-bottom .label { color: var(--text-2); font-weight: 800; text-transform: uppercase; font-size: 0.62rem; }
+.live-stats-bottom .label { color: var(--text-2); font-weight: 600; text-transform: uppercase; font-size: 0.62rem; }
 
 
 @media (max-width: 1120px) {
@@ -762,17 +780,18 @@
   justify-content: center;
   gap: 20px;
   padding: 10px 24px;
+  font-family: var(--ui);
   font-size: 0.6rem;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-3);
 }
 .footer-links span {
   cursor: pointer;
-  transition: color 0.15s;
+  transition: color 0.2s ease;
 }
-.footer-links span:hover { color: var(--text); }
+.footer-links span:hover { color: var(--text-2); }
 
 /* ─── QR container ─── */
 .qr-container {
@@ -802,8 +821,9 @@
 }
 .user-menu-header {
   padding: 8px 12px;
+  font-family: var(--ui);
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -817,10 +837,10 @@
   color: var(--text);
   text-align: left;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.1s ease;
-  font-family: var(--sans);
+  transition: color 0.15s ease, background-color 0.15s ease;
+  font-family: var(--ui);
   display: block;
 }
 .user-menu-item:hover {
@@ -853,16 +873,18 @@
   gap: 5px;
   cursor: pointer;
   color: var(--text-3);
+  font-family: var(--ui);
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  transition: color 0.15s;
+  transition: color 0.15s ease;
   user-select: none;
 }
 .hiw-toggle:hover { color: var(--text-2); }
 
 .hiw-content {
+  font-family: var(--ui);
   font-size: 0.67rem;
   line-height: 1.55;
   color: var(--text-2);

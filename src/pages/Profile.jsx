@@ -165,13 +165,13 @@ export default function Profile() {
                                     border: 'none',
                                     borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent)' : 'transparent'}`,
                                     color: activeTab === tab.id ? 'var(--text-h)' : 'var(--text-2)',
-                                    fontWeight: 700,
+                                    fontWeight: activeTab === tab.id ? 600 : 500,
                                     fontSize: '0.82rem',
                                     cursor: 'pointer',
-                                    transition: 'all 0.15s',
-                                    fontFamily: 'var(--sans)',
+                                    transition: 'color 0.2s ease, border-color 0.2s ease',
+                                    fontFamily: 'var(--ui)',
                                     marginBottom: '-1px',
-                                    letterSpacing: '-0.01em',
+                                    letterSpacing: '0.01em',
                                 }}
                             >
                                 {tab.label}
