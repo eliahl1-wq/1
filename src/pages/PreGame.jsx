@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -26,6 +26,19 @@ const CUR_OPTIONS = [
     { label: 'USD', value: 'USD' },
     { label: 'SOL', value: 'SOL' },
 ];
+
+const GAMEMODE_STATS = [
+    { key: 'agar', label: 'Agar' },
+    { key: 'brAgar', label: 'Agar BR' },
+    { key: 'slither', label: 'Slither' },
+    { key: 'brSlither', label: 'Slither BR' },
+];
+
+const isHotGamemode = (count, topCount, secondCount) => {
+    if (count <= 0 || count !== topCount) return false;
+    if (secondCount === 0) return count >= 2;
+    return count >= secondCount * 1.5 && (count - secondCount) >= 2;
+};
 
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
@@ -60,6 +73,7 @@ export default function PreGame() {
         playersByEntryFee: {},
         playersByModeAndFee: { agar: {}, slither: {} },
         brPlayersByFee: {},
+        playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0 },
     });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -142,6 +156,17 @@ export default function PreGame() {
         }
         return liveStats.playersByModeAndFee?.[normalModeKey]?.[tier] ?? 0;
     };
+
+    const gamemodeStatsList = useMemo(() => {
+        const counts = liveStats.playersByGamemode || {};
+        return GAMEMODE_STATS
+            .map(({ key, label }) => ({ key, label, count: counts[key] ?? 0 }))
+            .sort((a, b) => b.count - a.count);
+    }, [liveStats.playersByGamemode]);
+
+    const topGamemodeCount = gamemodeStatsList[0]?.count ?? 0;
+    const secondGamemodeCount = gamemodeStatsList[1]?.count ?? 0;
+    const anyGamemodeActive = gamemodeStatsList.some(m => m.count > 0);
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
@@ -1078,45 +1103,69 @@ export default function PreGame() {
                 </div>
             </div>
 
-            {/* Live stats bottom-left (moved out of grid) */}
-            <div className="stats-card live-stats-bottom" style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 1050 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                        <span className="label" style={{ color: 'var(--text)', fontSize: '0.7rem' }}>LIVE</span>
+            {/* Live stats + gamemode list — bottom-left row */}
+            <div className="bottom-stats-row">
+                <div className="stats-card live-stats-bottom">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <span className="label" style={{ color: 'var(--text)', fontSize: '0.7rem' }}>LIVE</span>
+                        </div>
+                        <div className="live-dot" />
                     </div>
-                    <div className="live-dot" />
-                </div>
-                
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-2)', marginBottom: '14px' }}>
-                    Players online: <span className="mono" style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.playersOnline ?? 0}</span>
+
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-2)', marginBottom: '14px' }}>
+                        Players online: <span className="mono" style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.playersOnline ?? 0}</span>
+                    </div>
+
+                    <div style={{
+                        background: 'rgba(0,0,0,0.2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r-md)',
+                        padding: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                    }}>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '2px' }}>
+                            Top in Arena
+                        </div>
+                        {(!liveStats.topPlayers || liveStats.topPlayers.length === 0) ? (
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>Arena is empty</div>
+                        ) : (
+                            liveStats.topPlayers.map((entry, i) => (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
+                                    <span style={{ fontWeight: 600, color: i === 0 ? '#FFD700' : 'var(--text-h)' }}>
+                                        {i + 1}. {entry.username}
+                                    </span>
+                                    <span className="mono" style={{ fontSize: '0.7rem', color: '#fff', fontWeight: 600 }}>
+                                        ${Number(entry.balance || 0).toFixed(2)}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
 
-                <div style={{ 
-                    background: 'rgba(0,0,0,0.2)', 
-                    border: '1px solid var(--border)', 
-                    borderRadius: 'var(--r-md)', 
-                    padding: '10px',
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '8px' 
-                }}>
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '2px' }}>
-                        Top in Arena
+                <div className={`stats-card gamemode-stats-list${anyGamemodeActive ? '' : ' gamemode-stats-list--idle'}`}>
+                    <div className="gamemode-stats-list__header">
+                        <span className="label">Gamemodes</span>
                     </div>
-                    {(!liveStats.topPlayers || liveStats.topPlayers.length === 0) ? (
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>Arena is empty</div>
-                    ) : (
-                        liveStats.topPlayers.map((entry, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
-                                <span style={{ fontWeight: 600, color: i === 0 ? '#FFD700' : 'var(--text-h)' }}>
-                                    {i + 1}. {entry.username}
-                                </span>
-                                <span className="mono" style={{ fontSize: '0.7rem', color: '#fff', fontWeight: 600 }}>
-                                    ${Number(entry.balance || 0).toFixed(2)}
-                                </span>
-                            </div>
-                        ))
-                    )}
+                    <div className="gamemode-stats-list__rows">
+                        {gamemodeStatsList.map(({ key, label, count }) => {
+                            const hot = isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
+                            return (
+                                <div
+                                    key={key}
+                                    className={`gamemode-stats-row${hot ? ' gamemode-stats-row--hot' : ''}${count > 0 ? '' : ' gamemode-stats-row--empty'}`}
+                                >
+                                    <span className="gamemode-stats-row__label">{label}</span>
+                                    <span className={`gamemode-stats-row__count mono${count > 0 ? ' gamemode-stats-row__count--active' : ''}`}>
+                                        {count} playing
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 

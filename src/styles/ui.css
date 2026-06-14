@@ -755,11 +755,99 @@
 }
 
 /* Live stats fixed bottom-left styling */
+.bottom-stats-row {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1050;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
 .live-stats-bottom {
   width: 240px;
 }
 
 .live-stats-bottom .label { color: var(--text-2); font-weight: 600; text-transform: uppercase; font-size: 0.62rem; }
+
+.gamemode-stats-list {
+  width: 200px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gamemode-stats-list--idle {
+  opacity: 0.72;
+}
+
+.gamemode-stats-list__header {
+  margin-bottom: 10px;
+}
+
+.gamemode-stats-list__header .label {
+  color: var(--text-2);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+}
+
+.gamemode-stats-list__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gamemode-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.64rem;
+  line-height: 1.2;
+}
+
+.gamemode-stats-row__label {
+  color: var(--text-2);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gamemode-stats-row--empty .gamemode-stats-row__label,
+.gamemode-stats-row--empty .gamemode-stats-row__count {
+  color: var(--text-3);
+}
+
+.gamemode-stats-row__count {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gamemode-stats-row__count--active {
+  color: var(--green);
+}
+
+.gamemode-stats-row--hot .gamemode-stats-row__label,
+.gamemode-stats-row--hot .gamemode-stats-row__count {
+  animation: gmHotPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes gmHotPulse {
+  0%, 100% {
+    color: var(--green);
+    text-shadow: 0 0 0 rgba(20, 241, 149, 0);
+  }
+  50% {
+    color: #14F195;
+    text-shadow: 0 0 8px rgba(20, 241, 149, 0.55), 0 0 14px rgba(20, 241, 149, 0.25);
+  }
+}
 
 
 @media (max-width: 1120px) {
@@ -768,7 +856,7 @@
   }
   .mode-card,
   .game-card.main-card,
-  .stats-card {
+  .pre-game-grid .stats-card {
     width: 100%;
   }
 }
