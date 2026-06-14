@@ -2,17 +2,17 @@ import React, { useMemo } from 'react';
 
 const Background = () => {
     const blobs = useMemo(() => [
-        { color: 'rgba(0, 122, 255, 0.10)', x: 15, y: 20, size: 500, dur: 55, delay: 0 },
-        { color: 'rgba(20, 241, 149, 0.06)',  x: 70, y: 65, size: 420, dur: 70, delay: -20 },
-        { color: 'rgba(0, 122, 255, 0.08)',  x: 55, y: 10, size: 380, dur: 60, delay: -10 },
-        { color: 'rgba(255, 59, 48, 0.04)',   x: 85, y: 80, size: 350, dur: 80, delay: -35 },
+        { color: 'rgba(120, 94, 255, 0.07)', x: 15, y: 20, size: 520, dur: 55, delay: 0 },
+        { color: 'rgba(20, 241, 149, 0.04)', x: 70, y: 65, size: 440, dur: 70, delay: -20 },
+        { color: 'rgba(77, 140, 255, 0.05)', x: 55, y: 10, size: 400, dur: 60, delay: -10 },
+        { color: 'rgba(120, 94, 255, 0.04)', x: 85, y: 80, size: 360, dur: 80, delay: -35 },
     ], []);
 
     return (
         <div style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: '#08090D',
+            backgroundColor: '#0E0F13',
             zIndex: -2,
             overflow: 'hidden',
         }}>
@@ -20,9 +20,9 @@ const Background = () => {
             <div style={{
                 position: 'absolute',
                 inset: 0,
-                backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)`,
+                backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)`,
                 backgroundSize: '32px 32px',
-                opacity: 0.4,
+                opacity: 0.5,
                 maskImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, transparent 75%)',
                 WebkitMaskImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, transparent 75%)',
             }} />
@@ -53,7 +53,7 @@ const Background = () => {
             <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'radial-gradient(ellipse at center, transparent 40%, rgba(8,9,13,0.6) 100%)',
+                background: 'radial-gradient(ellipse at center, transparent 40%, rgba(14,15,19,0.55) 100%)',
                 pointerEvents: 'none',
             }} />
         </div>

@@ -372,13 +372,13 @@ export class SlitherRenderer {
             s._lastUsed = this._frame;
             return s;
         }
-        if (this._sprites.size >= 220) {
+        if (this._sprites.size >= 512) {
             const entries = [...this._sprites.entries()]
                 .sort((a, b) => (a[1]._lastUsed || 0) - (b[1]._lastUsed || 0));
-            for (let i = 0; i < 40 && i < entries.length; i++) {
+            for (let i = 0; i < 96 && i < entries.length; i++) {
                 this._sprites.delete(entries[i][0]);
             }
-            if (this._prImgs.size > 48) {
+            if (this._prImgs.size > 200) {
                 this._prImgs.clear();
             }
         }
@@ -565,8 +565,17 @@ export class SlitherRenderer {
 
     _drawFood(ctx, foodList, toScreen, W, H, zoom) {
         const now = Date.now();
+        // World-space view bounds — cull far food before any trig / toScreen work so the
+        // cost stays flat even when the map fills up with death-drop food over a long match.
+        const cx = this.camera.x;
+        const cy = this.camera.y;
+        const halfW = W / 2 / zoom + 160 / zoom;
+        const halfH = H / 2 / zoom + 160 / zoom;
+
         for (let fi = 0; fi < foodList.length; fi++) {
             const f = foodList[fi];
+            if (Math.abs(f.x - cx) > halfW || Math.abs(f.y - cy) > halfH) continue;
+
             let { x: fx, y: fy } = toScreen(f.x, f.y);
 
             const isGolden = !!f.golden;
@@ -579,23 +588,26 @@ export class SlitherRenderer {
                 // Slightly smaller base size, pulsating
                 const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
                 sizeMul = 0.85 + pulse;
-                
+
                 // Slight floating movement
                 fx += Math.sin(now * 0.003 + f.y) * 6 * zoom;
                 fy += Math.cos(now * 0.0035 + f.x) * 6 * zoom;
-                
+
                 // Pulsating opacity
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
             } else {
-                let h = 0;
-                const id = String(f.id ?? `${f.x},${f.y}`);
-                for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-                sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
+                // Cache the deterministic size jitter on the food object so we don't rebuild
+                // a string + hash for every pellet on every frame.
+                if (f._sizeMul == null) {
+                    let h = 0;
+                    const id = String(f.id ?? `${f.x},${f.y}`);
+                    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+                    f._sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
+                }
+                sizeMul = f._sizeMul;
             }
-
-            if (fx < -140 || fy < -140 || fx > W + 140 || fy > H + 140) continue;
 
             const baseR = (f.radius || 3) * sizeMul;
             const screenR = Math.max(4.5, baseR * zoom * 1.65);
@@ -824,7 +836,9 @@ export class SlitherRenderer {
             return;
         }
 
-        const r = Math.max(2.5, Math.round(bodyRadius / 2) * 2);
+        // Coarse 4px radius buckets: fewer distinct sprites + stable across zoom animation,
+        // so we don't re-paint the gradient sprite set every frame as the radius drifts.
+        const r = Math.max(4, Math.round(bodyRadius / 4) * 4);
         const { normal, alt, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
         const halfT = trailGlow.width / 2;
         const halfB = boostOverlay.width / 2;
