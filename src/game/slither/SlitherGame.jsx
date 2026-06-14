@@ -288,6 +288,7 @@ export default function SlitherGame() {
                 setBrShowIntro(true);
             }
             myIdRef.current = playerSettings.id;
+            renderer.resetSession();
             if (!gameSizes?.battleRoyale) {
                 const bal = playerSettings.balance ?? 1.0;
                 setCurrentBalance(bal);
