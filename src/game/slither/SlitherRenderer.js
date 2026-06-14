@@ -634,7 +634,7 @@ export class SlitherRenderer {
         const baseGrad = g.createRadialGradient(c, c - rPx * 0.15, rPx * 0.1, c, c, rPx);
         const centerCol = shadeColor(col, Math.round(15 * k));
         const midCol = col;
-        const edgeCol = shadeColor(col, Math.round(-45 * k)); // Dark edge for the overlap crease
+        const edgeCol = shadeColor(col, Math.round(-60 * k)); // Dark edge for the overlap crease
         
         baseGrad.addColorStop(0, toHex(centerCol));
         baseGrad.addColorStop(0.6, toHex(midCol));
@@ -791,8 +791,8 @@ export class SlitherRenderer {
         }
 
         // Segment overlapping. Very tight when normal for continuous look.
-        const overlapMul = 0.28;
-        const boostSpaceMul = 0.42;
+        const overlapMul = 0.45;
+        const boostSpaceMul = 0.60;
         const bumpStep = Math.max(2, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
         const bumps = this._capBumps(dense, this._bumpsBuf, boosting ? 150 : 120);
@@ -838,21 +838,9 @@ export class SlitherRenderer {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
-            const along = i / Math.max(1, bumpCount - 1);
-            
-            // Taper tail naturally
-            let scaleMul = 1.0;
-            if (along > 0.75) {
-                // Last 25% tapers down
-                const tailFactor = (along - 0.75) / 0.25; // 0 to 1 at the very tip
-                scaleMul = 1.0 - (tailFactor * 0.6); // Shrinks to 40% size
-            }
-            
-            const alphaMul = along > 0.9 ? (1 - (along - 0.9) / 0.1) * 0.8 + 0.2 : 1; // Fade very tip
-
             const isHead = i === 0;
             const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
-            this._drawSegmentSprite(ctx, sprite, p.x, p.y, scaleMul, alphaMul);
+            this._drawSegmentSprite(ctx, sprite, p.x, p.y, 1.0, 1.0);
         }
 
         // Subtle ambient glow
@@ -863,10 +851,7 @@ export class SlitherRenderer {
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            const along = i / Math.max(1, bumpCount - 1);
-            let scaleMul = 1.0;
-            if (along > 0.75) scaleMul = 1.0 - ((along - 0.75) / 0.25) * 0.6;
-            this._drawSegmentSprite(ctx, glow, p.x, p.y, scaleMul, 1);
+            this._drawSegmentSprite(ctx, glow, p.x, p.y, 1.0, 1);
         }
         ctx.restore();
 
@@ -879,11 +864,9 @@ export class SlitherRenderer {
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
                 const headProx = 1 - along;
-                let scaleMul = 1.0;
-                if (along > 0.75) scaleMul = 1.0 - ((along - 0.75) / 0.25) * 0.6;
                 
                 ctx.globalAlpha = (0.15 + headProx * 0.15) * pulse;
-                this._drawSegmentSprite(ctx, boostOverlay, p.x, p.y, scaleMul, 1);
+                this._drawSegmentSprite(ctx, boostOverlay, p.x, p.y, 1.0, 1);
             }
             ctx.restore();
         }
