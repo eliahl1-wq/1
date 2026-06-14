@@ -2,6 +2,12 @@ import mixpanel from 'mixpanel-browser';
 
 const TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN?.trim() || '';
 const API_HOST = import.meta.env.VITE_MIXPANEL_API_HOST?.trim() || '';
+const RECORD_SESSIONS_PERCENT = (() => {
+    const raw = import.meta.env.VITE_MIXPANEL_RECORD_SESSIONS_PERCENT;
+    if (raw === undefined || raw === '') return 100;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+})();
 const DEBUG = import.meta.env.DEV || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('mp_debug'));
 
 let initialized = false;
@@ -27,9 +33,10 @@ export function initMixpanel() {
         debug: DEBUG,
         track_pageview: true,
         persistence: 'localStorage',
-        // Many browsers block tracking when DNT is on — otherwise Live View stays empty.
         ignore_dnt: true,
         batch_requests: true,
+        // Session Replay — required for Mixpanel onboarding "replays" check (0 = off by default in SDK)
+        record_sessions_percent: RECORD_SESSIONS_PERCENT,
     };
     if (API_HOST) {
         config.api_host = API_HOST;
@@ -39,7 +46,7 @@ export function initMixpanel() {
     mixpanel.register({ platform: 'web' });
     initialized = true;
 
-    logStatus('init OK', API_HOST ? `(api_host: ${API_HOST})` : '(US default)');
+    logStatus('init OK', API_HOST ? `(api_host: ${API_HOST})` : '(US default)', `replay: ${RECORD_SESSIONS_PERCENT}%`);
 
     mixpanel.track('app_opened', {
         platform: 'web',
@@ -73,6 +80,15 @@ export function syncMixpanelUser(user) {
         username: user.username,
         ...(user.isAdmin != null ? { is_admin: user.isAdmin } : {}),
     });
+}
+
+export function startSessionRecording() {
+    if (!TOKEN) return;
+    if (!initialized) initMixpanel();
+    if (typeof mixpanel.start_session_recording === 'function') {
+        mixpanel.start_session_recording();
+        logStatus('session recording started manually');
+    }
 }
 
 export function resetMixpanel() {
