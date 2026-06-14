@@ -100,7 +100,7 @@ export class SlitherRenderer {
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
         this.smooth = new Map();
-        this.foodCache = new Map();
+        this._foodDrawList = [];
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, holdProgress: 0, securingCashout: false };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
@@ -127,7 +127,11 @@ export class SlitherRenderer {
         this._ptsBuf = [];
         this._denseBuf = [];
         this._bumpsBuf = [];
-        this._foodCap = 700;
+        this._renderPool = new Map();
+        this._smoothSegPool = [];
+        this._pointPool = [];
+        this._bgCanvas = null;
+        this._bgCacheKey = '';
 
         this._onResize = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
@@ -180,7 +184,6 @@ export class SlitherRenderer {
         if (mag < 8) return;
         this.inputDx = (x / mag) * 4;
         this.inputDy = (y / mag) * 4;
-        this._emitInput?.();
     }
 
     setInputEmitter(fn) {
@@ -204,22 +207,11 @@ export class SlitherRenderer {
             }
         }
         if (tick.food) {
-            const seen = new Set();
-            for (const f of tick.food) {
-                seen.add(f.id);
-                const prev = this.foodCache.get(f.id);
-                this.foodCache.set(f.id, {
-                    ...(prev || {}),
-                    ...f,
-                    _missStreak: 0,
-                });
+            const list = this._foodDrawList;
+            list.length = tick.food.length;
+            for (let i = 0; i < tick.food.length; i++) {
+                list[i] = tick.food[i];
             }
-            for (const [id, f] of this.foodCache) {
-                if (!seen.has(id)) {
-                    this.foodCache.set(id, { ...f, _missStreak: (f._missStreak || 0) + 1 });
-                }
-            }
-            this._enforceFoodCap();
         }
         this.state = {
             snakes: tick.snakes ?? this.state.snakes,
@@ -227,27 +219,32 @@ export class SlitherRenderer {
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
             zone: tick.battleRoyale ? (tick.zone !== undefined ? tick.zone : this.state.zone) : null,
         };
+        if (tick.battleRoyale !== undefined) {
+            this.state.battleRoyale = !!tick.battleRoyale;
+        }
     }
 
-    /** Prevent food cache from growing without bound (main cause of progressive lag). */
-    _enforceFoodCap() {
-        const max = this._foodCap;
-        if (this.foodCache.size <= max) return;
+    _smoothSeg(s, i, x, y) {
+        let p = s.segments[i];
+        if (!p) {
+            p = this._smoothSegPool[i] || { x: 0, y: 0 };
+            this._smoothSegPool[i] = p;
+            s.segments[i] = p;
+        }
+        p.x = x;
+        p.y = y;
+        return p;
+    }
 
-        const cx = this.camera.x;
-        const cy = this.camera.y;
-        const victims = [];
-        for (const [id, f] of this.foodCache) {
-            const miss = f._missStreak || 0;
-            const dx = f.x - cx;
-            const dy = f.y - cy;
-            const dist = dx * dx + dy * dy;
-            victims.push({ id, score: miss * 1e6 + dist });
+    _poolPoint(i, x, y) {
+        let p = this._pointPool[i];
+        if (!p) {
+            p = { x: 0, y: 0 };
+            this._pointPool[i] = p;
         }
-        victims.sort((a, b) => b.score - a.score);
-        for (let i = 0; i < victims.length - max; i++) {
-            this.foodCache.delete(victims[i].id);
-        }
+        p.x = x;
+        p.y = y;
+        return p;
     }
 
     setHud(hud) {
@@ -260,27 +257,47 @@ export class SlitherRenderer {
      * without this makes movement look choppy and teleporty.
      */
     _updateSmoothing(dt) {
-        const SNAP_SQ = 220 * 220; // teleport/respawn → snap instead of slide
-
+        const SNAP_SQ = 220 * 220;
         const seen = new Set();
+        const cx = this.camera.x;
+        const cy = this.camera.y;
+        const viewR = 3200;
+
         for (const snake of this.targetSnakes) {
             seen.add(snake.id);
             const tgt = snake.segments || [];
+            const len = tgt.length;
+            if (len === 0) continue;
+
+            const head = tgt[0];
+            const offScreen = head && !snake.isYou && (head.x - cx) ** 2 + (head.y - cy) ** 2 > viewR * viewR;
+
             let s = this.smooth.get(snake.id);
+            if (!s) {
+                s = { segments: [], angle: snake.angle || 0 };
+                this.smooth.set(snake.id, s);
+            }
+
+            if (s.segments.length > len) s.segments.length = len;
+
+            if (offScreen) {
+                for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                s.angle = snake.angle || 0;
+                continue;
+            }
 
             const tau = snake.isYou ? 0.038 : 0.075;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
-            if (!s) {
-                s = { segments: tgt.map(p => ({ x: p.x, y: p.y })), angle: snake.angle || 0 };
-                this.smooth.set(snake.id, s);
-                continue;
-            }
-            if (s.segments.length > tgt.length) s.segments.length = tgt.length;
-            for (let i = 0; i < tgt.length; i++) {
-                if (i >= s.segments.length) {
-                    s.segments.push({ x: tgt[i].x, y: tgt[i].y });
+            const stride = len > 72 ? Math.ceil(len / 72) : 1;
+
+            for (let i = 0; i < len; i++) {
+                if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+
+                if (stride > 1 && i > 0 && i < len - 1 && i % stride !== 0) {
+                    this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     continue;
                 }
+
                 const dx = tgt[i].x - s.segments[i].x;
                 const dy = tgt[i].y - s.segments[i].y;
                 if (dx * dx + dy * dy > SNAP_SQ) {
@@ -291,12 +308,17 @@ export class SlitherRenderer {
                     s.segments[i].y += dy * a;
                 }
             }
+
             let da = (snake.angle || 0) - s.angle;
             da = Math.atan2(Math.sin(da), Math.cos(da));
             s.angle += da * a;
         }
+
         for (const id of this.smooth.keys()) {
             if (!seen.has(id)) this.smooth.delete(id);
+        }
+        for (const id of this._renderPool.keys()) {
+            if (!seen.has(id)) this._renderPool.delete(id);
         }
     }
 
@@ -381,45 +403,56 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
-        ctx.fillStyle = '#1a1a1e';
-        ctx.fillRect(0, 0, W, H);
-
-        const pattern = this._getBgPattern(ctx);
-        if (pattern) {
-            ctx.save();
-            ctx.translate(W / 2, H / 2);
-            ctx.scale(zoom, zoom);
-            ctx.translate(-cx, -cy);
-            ctx.fillStyle = pattern;
-            const vw = W / zoom;
-            const vh = H / zoom;
-            const margin = 240;
-            // Rect must be centered on the camera (cx, cy) in world space —
-            // centering on origin left gray areas away from the map center
-            ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
-            ctx.restore();
+        if (!this._bgCanvas || this._bgCanvas.width !== W || this._bgCanvas.height !== H) {
+            this._bgCanvas = this._bgCanvas || document.createElement('canvas');
+            this._bgCanvas.width = W;
+            this._bgCanvas.height = H;
+            this._bgCacheKey = '';
         }
 
-        // Red death zone outside playable square (slither.io style)
-        const limit = worldHalf;
-        const tl = toScreen(-limit, -limit);
-        const br = toScreen(limit, limit);
-        const playW = br.x - tl.x;
-        const playH = br.y - tl.y;
-        ctx.save();
-        ctx.fillStyle = 'rgba(72, 4, 9, 0.96)';
-        ctx.beginPath();
-        ctx.rect(0, 0, W, H);
-        ctx.rect(tl.x, tl.y, playW, playH);
-        ctx.fill('evenodd');
-        // Soft inner glow on the border, then a crisp line
-        ctx.strokeStyle = 'rgba(255, 45, 45, 0.28)';
-        ctx.lineWidth = 14;
-        ctx.strokeRect(tl.x, tl.y, playW, playH);
-        ctx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(tl.x, tl.y, playW, playH);
-        ctx.restore();
+        const cacheKey = `${Math.round(cx / 64)}|${Math.round(cy / 64)}|${zoom.toFixed(2)}|${worldHalf}`;
+        const bgCtx = this._bgCanvas.getContext('2d');
+        if (cacheKey !== this._bgCacheKey) {
+            this._bgCacheKey = cacheKey;
+            bgCtx.setTransform(1, 0, 0, 1, 0, 0);
+            bgCtx.fillStyle = '#1a1a1e';
+            bgCtx.fillRect(0, 0, W, H);
+
+            const pattern = this._getBgPattern(bgCtx);
+            if (pattern) {
+                bgCtx.save();
+                bgCtx.translate(W / 2, H / 2);
+                bgCtx.scale(zoom, zoom);
+                bgCtx.translate(-cx, -cy);
+                bgCtx.fillStyle = pattern;
+                const vw = W / zoom;
+                const vh = H / zoom;
+                const margin = 240;
+                bgCtx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
+                bgCtx.restore();
+            }
+
+            const limit = worldHalf;
+            const tl = toScreen(-limit, -limit);
+            const br = toScreen(limit, limit);
+            const playW = br.x - tl.x;
+            const playH = br.y - tl.y;
+            bgCtx.save();
+            bgCtx.fillStyle = 'rgba(72, 4, 9, 0.96)';
+            bgCtx.beginPath();
+            bgCtx.rect(0, 0, W, H);
+            bgCtx.rect(tl.x, tl.y, playW, playH);
+            bgCtx.fill('evenodd');
+            bgCtx.strokeStyle = 'rgba(255, 45, 45, 0.28)';
+            bgCtx.lineWidth = 14;
+            bgCtx.strokeRect(tl.x, tl.y, playW, playH);
+            bgCtx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
+            bgCtx.lineWidth = 3;
+            bgCtx.strokeRect(tl.x, tl.y, playW, playH);
+            bgCtx.restore();
+        }
+
+        ctx.drawImage(this._bgCanvas, 0, 0);
     }
 
     /** Insert extra points between spine nodes so the body has slither.io-style bumps. */
@@ -437,14 +470,14 @@ export class SlitherRenderer {
             const steps = Math.max(1, Math.ceil(d / stepPx));
             for (let s = 1; s <= steps; s++) {
                 const t = s / steps;
-                out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+                out.push(this._poolPoint(out.length, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t));
             }
         }
         return out;
     }
 
     /** Keep long snakes performant — evenly subsample excess bump points. */
-    _capBumps(bumps, out, max = 110) {
+    _capBumps(bumps, out, max = 65) {
         if (bumps.length <= max) {
             out.length = bumps.length;
             for (let i = 0; i < bumps.length; i++) out[i] = bumps[i];
@@ -507,47 +540,9 @@ export class SlitherRenderer {
         });
     }
 
-    /** Drop stale off-screen food; keep on-screen pellets through server view-culling gaps. */
-    _pruneFoodCache(cx, cy, zoom, W, H, myHead, myRadius) {
-        const margin = 480;
-        const halfW = W / zoom / 2 + margin;
-        const halfH = H / zoom / 2 + margin;
-        for (const [id, f] of this.foodCache) {
-            const miss = f._missStreak || 0;
-            if (miss === 0) continue;
-
-            const inView = Math.abs(f.x - cx) <= halfW && Math.abs(f.y - cy) <= halfH;
-
-            // Eaten pellets: remove when near our head after a few missed ticks
-            if (myHead && miss >= 3) {
-                const dx = f.x - myHead.x;
-                const dy = f.y - myHead.y;
-                const eatR = (myRadius || 6) + (f.radius || 2) + 32;
-                if (dx * dx + dy * dy <= eatR * eatR) {
-                    this.foodCache.delete(id);
-                    continue;
-                }
-            }
-
-            // On-screen food: tolerate long culling gaps from server spatial filter
-            if (inView) {
-                if (miss >= 60) this.foodCache.delete(id);
-                continue;
-            }
-
-            if (miss >= 18) this.foodCache.delete(id);
-        }
-        this._enforceFoodCap();
-    }
-
-    _drawFood(ctx, foodCache, toScreen, cx, cy, zoom, W, H) {
-        const wxMargin = W / zoom / 2 + 160;
-        const wyMargin = H / zoom / 2 + 160;
-        for (const f of foodCache.values()) {
-            const miss = f._missStreak || 0;
-            if (miss > 6) continue;
-            if (Math.abs(f.x - cx) > wxMargin || Math.abs(f.y - cy) > wyMargin) continue;
-
+    _drawFood(ctx, foodList, toScreen, W, H, zoom) {
+        for (let fi = 0; fi < foodList.length; fi++) {
+            const f = foodList[fi];
             const { x: fx, y: fy } = toScreen(f.x, f.y);
             if (fx < -140 || fy < -140 || fx > W + 140 || fy > H + 140) continue;
 
@@ -567,15 +562,12 @@ export class SlitherRenderer {
             }
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenR = Math.max(4.5, baseR * zoom * 1.52);
+            const screenR = Math.max(4.5, baseR * zoom * 1.65);
             const spriteR = 4;
             const sprite = this._foodSprite(hue, spriteR, !!f.golden, !!f.deathDrop);
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
-            const alpha = miss === 0 ? 1 : Math.max(0.35, 1 - miss * 0.08);
-            ctx.globalAlpha = alpha;
             ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
-            ctx.globalAlpha = 1;
         }
     }
 
@@ -699,20 +691,35 @@ export class SlitherRenderer {
         const boosting = !!snake.boost;
 
         const pts = this._ptsBuf;
-        pts.length = segs.length;
-        for (let i = 0; i < segs.length; i++) {
-            pts[i] = toScreen(segs[i].x, segs[i].y);
+        let pi = 0;
+        const stride = segs.length > 70 ? Math.ceil(segs.length / 55) : 1;
+        for (let i = 0; i < segs.length; i += stride) {
+            const scr = toScreen(segs[i].x, segs[i].y);
+            pts[pi++] = this._poolPoint(pi - 1, scr.x, scr.y);
         }
+        if (stride > 1) {
+            const last = segs[segs.length - 1];
+            const scr = toScreen(last.x, last.y);
+            pts[pi++] = this._poolPoint(pi - 1, scr.x, scr.y);
+        }
+        pts.length = pi;
 
-        const onScreen = pts.some(p => p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120);
+        let onScreen = false;
+        for (let i = 0; i < pi; i++) {
+            const p = pts[i];
+            if (p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120) {
+                onScreen = true;
+                break;
+            }
+        }
         if (!onScreen) return;
 
-        const bumpStep = Math.max(2, bodyRadius * 0.43);
+        const bumpStep = Math.max(2, bodyRadius * 0.50);
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
         const bumps = this._capBumps(dense, this._bumpsBuf);
         if (bumps.length < 1) return;
 
-        const r = Math.max(2.5, Math.round(bodyRadius));
+        const r = Math.max(2.5, Math.round(bodyRadius / 2) * 2);
         const { normal, alt, boost: boostOverlay } = this._getSnakePrImgs(cs, r);
         const halfN = normal.width / 2;
         const halfB = boostOverlay.width / 2;
@@ -833,12 +840,26 @@ export class SlitherRenderer {
 
         this._updateSmoothing(dt);
 
-        // Build render snakes from latest metadata + smoothed segments/angle
+        // Build render snakes without per-frame object spreads
         const renderSnakes = this._renderSnakeBuf;
         renderSnakes.length = 0;
         for (const snake of this.targetSnakes) {
+            let rs = this._renderPool.get(snake.id);
+            if (!rs) {
+                rs = {};
+                this._renderPool.set(snake.id, rs);
+            }
+            rs.id = snake.id;
+            rs.color = snake.color;
+            rs.radius = snake.radius;
+            rs.boost = snake.boost;
+            rs.isYou = snake.isYou;
+            rs.name = snake.name;
+            rs.balance = snake.balance;
             const s = this.smooth.get(snake.id);
-            renderSnakes.push(s ? { ...snake, segments: s.segments, angle: s.angle } : snake);
+            rs.segments = s ? s.segments : snake.segments;
+            rs.angle = s ? s.angle : snake.angle;
+            renderSnakes.push(rs);
         }
 
         const me = renderSnakes.find(s => s.isYou);
@@ -870,16 +891,21 @@ export class SlitherRenderer {
 
         this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom);
         this._drawZone(ctx, toScreen, W, H);
-        if (this._frame % 8 === 0) {
-            this._pruneFoodCache(cx, cy, zoom, W, H, me?.segments?.[0], me?.radius);
-        }
-        this._drawFood(ctx, this.foodCache, toScreen, cx, cy, zoom, W, H);
+        this._drawFood(ctx, this._foodDrawList, toScreen, W, H, zoom);
 
         const sorted = this._sortedRenderSnakes;
         sorted.length = 0;
         for (let i = 0; i < renderSnakes.length; i++) sorted.push(renderSnakes[i]);
         sorted.sort((a, b) => (a.radius || 6) - (b.radius || 6));
+
+        const viewPad = 900;
         for (const snake of sorted) {
+            const head = snake.segments?.[0];
+            if (head && !snake.isYou) {
+                const dx = head.x - cx;
+                const dy = head.y - cy;
+                if (dx * dx + dy * dy > viewPad * viewPad) continue;
+            }
             this._drawSnake(snake, toScreen, zoom);
         }
 
