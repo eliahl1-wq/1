@@ -761,8 +761,8 @@
   bottom: 16px;
   z-index: 1050;
   display: flex;
-  align-items: stretch;
-  gap: 10px;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .live-stats-bottom {
@@ -772,68 +772,50 @@
 .live-stats-bottom .label { color: var(--text-2); font-weight: 600; text-transform: uppercase; font-size: 0.62rem; }
 
 .gamemode-stats-list {
-  width: 200px;
-  padding: 16px 14px;
-  display: flex;
-  flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  font-family: var(--ui);
 }
 
 .gamemode-stats-list--idle {
-  opacity: 0.72;
-}
-
-.gamemode-stats-list__header {
-  margin-bottom: 10px;
-}
-
-.gamemode-stats-list__header .label {
-  color: var(--text-2);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.62rem;
-}
-
-.gamemode-stats-list__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  opacity: 0.65;
 }
 
 .gamemode-stats-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 0.64rem;
-  line-height: 1.2;
+  padding: 4px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  line-height: 1.3;
 }
 
-.gamemode-stats-row__label {
-  color: var(--text-2);
+.gamemode-stats-row:last-child {
+  border-bottom: none;
+}
+
+.gamemode-stats-row__text {
+  font-size: 0.58rem;
   font-weight: 600;
+  color: var(--text-2);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.gamemode-stats-row--empty .gamemode-stats-row__label,
-.gamemode-stats-row--empty .gamemode-stats-row__count {
+.gamemode-stats-row--empty .gamemode-stats-row__text {
   color: var(--text-3);
 }
 
 .gamemode-stats-row__count {
-  font-size: 0.6rem;
-  font-weight: 600;
   color: var(--text-3);
-  white-space: nowrap;
-  flex-shrink: 0;
+  font-weight: 700;
 }
 
 .gamemode-stats-row__count--active {
   color: var(--green);
 }
 
-.gamemode-stats-row--hot .gamemode-stats-row__label,
+.gamemode-stats-row--hot .gamemode-stats-row__text,
 .gamemode-stats-row--hot .gamemode-stats-row__count {
   animation: gmHotPulse 2.2s ease-in-out infinite;
 }

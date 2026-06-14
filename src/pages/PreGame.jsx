@@ -1146,26 +1146,23 @@ export default function PreGame() {
                     </div>
                 </div>
 
-                <div className={`stats-card gamemode-stats-list${anyGamemodeActive ? '' : ' gamemode-stats-list--idle'}`}>
-                    <div className="gamemode-stats-list__header">
-                        <span className="label">Gamemodes</span>
-                    </div>
-                    <div className="gamemode-stats-list__rows">
-                        {gamemodeStatsList.map(({ key, label, count }) => {
-                            const hot = isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
-                            return (
-                                <div
-                                    key={key}
-                                    className={`gamemode-stats-row${hot ? ' gamemode-stats-row--hot' : ''}${count > 0 ? '' : ' gamemode-stats-row--empty'}`}
-                                >
-                                    <span className="gamemode-stats-row__label">{label}</span>
-                                    <span className={`gamemode-stats-row__count mono${count > 0 ? ' gamemode-stats-row__count--active' : ''}`}>
-                                        {count} playing
+                <div className={`gamemode-stats-list${anyGamemodeActive ? '' : ' gamemode-stats-list--idle'}`}>
+                    {gamemodeStatsList.map(({ key, label, count }) => {
+                        const hot = isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
+                        return (
+                            <div
+                                key={key}
+                                className={`gamemode-stats-row${hot ? ' gamemode-stats-row--hot' : ''}${count > 0 ? '' : ' gamemode-stats-row--empty'}`}
+                            >
+                                <span className="gamemode-stats-row__text mono">
+                                    {label}:{' '}
+                                    <span className={`gamemode-stats-row__count${count > 0 ? ' gamemode-stats-row__count--active' : ''}`}>
+                                        {count}
                                     </span>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
