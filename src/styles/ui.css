@@ -1145,18 +1145,20 @@
   padding: 8px 0;
 }
 
-/* ─── Page shell utilities ─── */
+/* ─── Page shell utilities (desktop-first) ─── */
 .page-shell {
   width: 100%;
-  max-width: 100vw;
   min-height: 100dvh;
   position: relative;
   overflow-x: hidden;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .page-shell--with-topbar {
-  padding-top: 52px;
+  /* Topbar is fixed; vertical offset lives in .page-content padding */
 }
 
 .page-shell--pregame {
@@ -1176,7 +1178,9 @@
 .page-content {
   width: 100%;
   max-width: 1100px;
-  padding: 100px 32px 60px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 80px 32px 60px;
   box-sizing: border-box;
   position: relative;
   z-index: 1;
@@ -2042,5 +2046,107 @@
 @media (max-width: 640px) {
   .game-card {
     width: calc(100vw - 32px);
+  }
+}
+
+/* ─── Desktop: explicit resets so mobile rules never leak ─── */
+@media (min-width: 769px) {
+  .topbar-nav--desktop {
+    display: flex;
+  }
+
+  .topbar-menu-btn,
+  .topbar-mobile-menu {
+    display: none !important;
+  }
+
+  .panel-backdrop {
+    display: none !important;
+  }
+
+  .profile-stat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .gm-card {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .gm-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+
+  .gm-play-btn {
+    width: auto;
+  }
+
+  .tx-table-wrap {
+    display: block;
+  }
+
+  .tx-card-list {
+    display: none !important;
+  }
+
+  .admin-stat-card {
+    flex: 1 1 200px;
+    min-width: 180px;
+    padding: 20px 24px;
+  }
+
+  .bottom-stats-row {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+  }
+
+  .live-stats-bottom {
+    width: 260px;
+  }
+
+  .sol-price-pill {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    margin: 0;
+  }
+
+  .footer-links {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    flex-wrap: nowrap;
+    gap: 20px;
+    padding: 10px 24px;
+    font-size: 0.6rem;
+  }
+
+  .float-panel-header--draggable {
+    cursor: grab !important;
+  }
+
+  .logo {
+    font-size: 1.5rem;
+  }
+
+  .logo span {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+  }
+
+  .topbar-user-name,
+  .topbar-user-balance-inline {
+    display: inline;
+  }
+
+  .nav-deposit-btn--compact .nav-deposit-btn-text {
+    display: inline;
+  }
+
+  .nav-deposit-btn--compact::after {
+    content: none;
   }
 }

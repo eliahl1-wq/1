@@ -3,6 +3,7 @@
  */
 
 import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
+import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -126,11 +127,8 @@ export class SlitherRenderer {
         this._frame = 0;
         this._renderSnakeBuf = [];
         this._sortedRenderSnakes = [];
-        this._ptsBuf = [];
-        this._denseBuf = [];
         this._bumpsBuf = [];
         this._renderPool = new Map();
-        this._pointPool = [];
         this._bumpPool = [];
         this._boostTrailPool = new Map();
         this._smoothSeen = new Set();
@@ -139,6 +137,7 @@ export class SlitherRenderer {
         this._quality = 1;
 
         this._onResize = () => this.resize();
+        this._onLayoutChange = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
         this._onMouseDown = (e) => {
             if (e.target !== this.canvas) return;
@@ -174,6 +173,7 @@ export class SlitherRenderer {
         };
 
         window.addEventListener('resize', this._onResize);
+        window.addEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
         document.addEventListener('mousemove', this._onMouseMove);
         document.addEventListener('mousedown', this._onMouseDown);
         document.addEventListener('mouseup', this._onMouseUp);
@@ -185,16 +185,15 @@ export class SlitherRenderer {
     }
 
     resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.W = this.canvas.width;
-        this.H = this.canvas.height;
+        const { width, height } = getGameScreenSize();
+        this.canvas.width = width;
+        this.canvas.height = height;
+        this.W = width;
+        this.H = height;
     }
 
     _setInputFromScreen(sx, sy) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = sx - rect.left - this.W / 2;
-        const y = sy - rect.top - this.H / 2;
+        const { x, y } = mapPointerToGameSpace(sx, sy, this.canvas);
         const mag = Math.hypot(x, y);
         if (mag < 8) return;
         this.inputDx = (x / mag) * 4;
@@ -203,6 +202,11 @@ export class SlitherRenderer {
 
     setInputEmitter(fn) {
         this._emitInput = fn;
+    }
+
+    setBoost(active) {
+        this.boost = !!active;
+        this._emitInput?.();
     }
 
     _handleMouse(e) {
@@ -244,17 +248,6 @@ export class SlitherRenderer {
         if (!p) {
             p = { x: 0, y: 0 };
             s.segments[i] = p;
-        }
-        p.x = x;
-        p.y = y;
-        return p;
-    }
-
-    _poolPoint(i, x, y) {
-        let p = this._pointPool[i];
-        if (!p) {
-            p = { x: 0, y: 0 };
-            this._pointPool[i] = p;
         }
         p.x = x;
         p.y = y;
@@ -310,6 +303,7 @@ export class SlitherRenderer {
             if (s.segments.length > len) s.segments.length = len;
 
             if (snake.isYou) {
+                // Large delta = respawn/teleport → snap whole spine, otherwise interpolate below.
                 const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
                 const headDy = tgt[0].y - (s.segments[0]?.y ?? tgt[0].y);
                 if (headDx * headDx + headDy * headDy > SNAP_SQ) {
@@ -317,10 +311,6 @@ export class SlitherRenderer {
                     s.angle = snake.angle || 0;
                     continue;
                 }
-                // Snap local snake to server spine — per-segment lerp warps spacing and makes skin shimmer.
-                for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-                s.angle = snake.angle || 0;
-                continue;
             }
 
             if (offScreen) {
@@ -329,7 +319,9 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = 0.09;
+            // Smooth toward server spine. Local snake is slightly snappier for input feel.
+            // Arc-length resampling at draw time keeps spacing even regardless of lerp phase.
+            const tau = snake.isYou ? 0.05 : 0.09;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
 
             for (let i = 0; i < len; i++) {
@@ -494,39 +486,65 @@ export class SlitherRenderer {
         return p;
     }
 
-    /** Insert extra points between spine nodes so the body has slither.io-style bumps. */
-    _densifySpine(pts, stepPx, out) {
+    /**
+     * Resample a spine at fixed arc-length intervals, capped at maxPoints.
+     * One pass replaces densify+subsample: output bumps are evenly spaced and
+     * temporally stable (no index hopping), which removes body shimmer, and the
+     * cap keeps long snakes cheap. Output points are pooled via _bumpPoint.
+     */
+    _resampleSpine(spine, stepWorld, maxPoints, out) {
         out.length = 0;
-        if (pts.length < 2) {
-            if (pts.length === 1) out.push(this._bumpPoint(0, pts[0].x, pts[0].y));
+        const n = spine.length;
+        if (n === 0) return out;
+        if (n === 1) {
+            out.push(this._bumpPoint(0, spine[0].x, spine[0].y));
             return out;
         }
-        out.push(this._bumpPoint(0, pts[0].x, pts[0].y));
-        let bi = 1;
-        for (let i = 1; i < pts.length; i++) {
-            const a = pts[i - 1];
-            const b = pts[i];
-            const d = Math.hypot(b.x - a.x, b.y - a.y);
-            const steps = Math.max(1, Math.ceil(d / stepPx));
-            for (let s = 1; s <= steps; s++) {
-                const t = s / steps;
-                out.push(this._bumpPoint(bi++, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t));
-            }
-        }
-        return out;
-    }
 
-    /** Keep long snakes performant — evenly subsample excess bump points. */
-    _capBumps(bumps, out, max = 65) {
-        if (bumps.length <= max) {
-            out.length = bumps.length;
-            for (let i = 0; i < bumps.length; i++) out[i] = bumps[i];
-            return out;
+        let total = 0;
+        for (let i = 1; i < n; i++) {
+            const dx = spine[i].x - spine[i - 1].x;
+            const dy = spine[i].y - spine[i - 1].y;
+            total += Math.sqrt(dx * dx + dy * dy);
         }
-        out.length = max;
-        const step = (bumps.length - 1) / (max - 1);
-        for (let i = 0; i < max; i++) {
-            out[i] = bumps[Math.min(bumps.length - 1, Math.floor(i * step))];
+
+        let step = stepWorld;
+        const minStep = total / Math.max(1, maxPoints - 1);
+        if (step < minStep) step = minStep;
+        if (step < 0.0001) step = 0.0001;
+
+        let bi = 0;
+        out.push(this._bumpPoint(bi++, spine[0].x, spine[0].y));
+
+        let acc = 0;
+        let ax = spine[0].x;
+        let ay = spine[0].y;
+        for (let i = 1; i < n && bi < maxPoints; i++) {
+            const bx = spine[i].x;
+            const by = spine[i].y;
+            let dx = bx - ax;
+            let dy = by - ay;
+            let segLen = Math.sqrt(dx * dx + dy * dy);
+
+            while (segLen > 0 && acc + segLen >= step && bi < maxPoints) {
+                const t = (step - acc) / segLen;
+                ax += dx * t;
+                ay += dy * t;
+                out.push(this._bumpPoint(bi++, ax, ay));
+                acc = 0;
+                dx = bx - ax;
+                dy = by - ay;
+                segLen = Math.sqrt(dx * dx + dy * dy);
+            }
+            acc += segLen;
+            ax = bx;
+            ay = by;
+        }
+
+        const tail = spine[n - 1];
+        const last = out[out.length - 1];
+        if (bi < maxPoints && (last.x !== tail.x || last.y !== tail.y)) {
+            out.push(this._bumpPoint(bi, tail.x, tail.y));
         }
         return out;
     }
@@ -815,37 +833,34 @@ export class SlitherRenderer {
         const headRadius = (snake.radius || 6) * gsc * thick;
         const bodyRadius = headRadius;
         const angle = snake.angle || 0;
-        const cs = bucketSnakeColor(snake.color);
+        // Cache the (expensive) HSL color bucketing across frames per snake.
+        let cs = snake._csCache;
+        if (cs === undefined || snake._csColor !== snake.color) {
+            cs = bucketSnakeColor(snake.color);
+            snake._csCache = cs;
+            snake._csColor = snake.color;
+        }
         const boosting = !!snake.boost;
         const isYou = !!snake.isYou;
         const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.16);
 
-        // Spine in world space — bump spacing must not depend on zoom (zoom animates every frame).
-        const pts = this._ptsBuf;
-        let pi = 0;
-        const maxPts = isYou ? 55 : (this._quality < 0.72 ? 28 : 36);
-        const segStride = segs.length > maxPts ? Math.ceil(segs.length / maxPts) : 1;
-        for (let i = 0; i < segs.length; i += segStride) {
-            pts[pi++] = this._poolPoint(pi - 1, segs[i].x, segs[i].y);
-        }
-        if (segStride > 1) {
-            const last = segs[segs.length - 1];
-            pts[pi++] = this._poolPoint(pi - 1, last.x, last.y);
-        }
-        pts.length = pi;
-
+        // Cheap on-screen cull straight from the world-space spine before any resampling.
         const cx = this.camera.x;
         const cy = this.camera.y;
+        const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 160;
+        const viewR2 = viewR * viewR;
         let onScreen = false;
-        const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 140;
-        for (let i = 0; i < pi; i++) {
-            const p = pts[i];
-            const dx = p.x - cx;
-            const dy = p.y - cy;
-            if (dx * dx + dy * dy <= viewR * viewR) {
-                onScreen = true;
-                break;
-            }
+        const checkStride = Math.max(1, Math.floor(segs.length / 12));
+        for (let i = 0; i < segs.length; i += checkStride) {
+            const dx = segs[i].x - cx;
+            const dy = segs[i].y - cy;
+            if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
+        }
+        if (!onScreen) {
+            const tail = segs[segs.length - 1];
+            const dx = tail.x - cx;
+            const dy = tail.y - cy;
+            if (dx * dx + dy * dy <= viewR2) onScreen = true;
         }
         if (!onScreen) {
             ctx.restore();
@@ -855,13 +870,14 @@ export class SlitherRenderer {
         const worldRadius = snake.radius || 6;
         const overlapMul = isYou ? 0.45 : 0.58;
         const boostSpaceMul = isYou ? 0.60 : 0.72;
+        // Bump spacing in WORLD units so it stays constant while zoom animates each frame.
         const bumpStepWorld = Math.max(2.8, worldRadius * (boosting ? boostSpaceMul : overlapMul));
         const q = this._quality;
         const maxBumps = Math.round(
             (isYou ? (boosting ? 95 : 75) : (boosting ? 48 : 38)) * Math.max(0.75, this._quality),
         );
-        const dense = this._densifySpine(pts, bumpStepWorld, this._denseBuf);
-        const bumps = this._capBumps(dense, this._bumpsBuf, maxBumps);
+        // Arc-length resample → evenly spaced, temporally stable bumps (kills body shimmer).
+        const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf);
         if (bumps.length < 1) {
             ctx.restore();
             return;
@@ -1209,6 +1225,7 @@ export class SlitherRenderer {
         this.pause();
         this._boostTrailPool.clear();
         window.removeEventListener('resize', this._onResize);
+        window.removeEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('mousedown', this._onMouseDown);
         document.removeEventListener('mouseup', this._onMouseUp);

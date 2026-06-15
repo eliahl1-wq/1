@@ -43,7 +43,7 @@ export default function Transactions() {
     }, [token]);
 
     return (
-        <div className="page-shell page-shell--with-topbar page-shell--scroll">
+        <div className="page-shell page-shell--scroll">
             <Background />
 
             <div className="page-content" style={{ maxWidth: '860px' }}>

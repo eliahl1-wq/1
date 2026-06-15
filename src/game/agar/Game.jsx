@@ -9,8 +9,10 @@ import * as renderUtils from './render.js';
 import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
-import MobileLandscapeGate from '../../components/MobileLandscapeGate';
+import MobileGameSession from '../../components/MobileGameSession';
+import { AgarMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
+import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -57,6 +59,7 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users) {
 
 export default function Game() {
     const canvasRef = useRef(null);
+    const viewportRef = useRef(null);
     const { user, token } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
@@ -391,6 +394,7 @@ export default function Game() {
         };
 
         window.addEventListener('resize', handleResize);
+        window.addEventListener(GAME_LAYOUT_CHANGE, handleResize);
         window.addEventListener('keydown', handleKeyDown);
         handleResize();
 
@@ -398,6 +402,7 @@ export default function Game() {
             cancelAnimationFrame(animationFrameId.current);
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('resize', handleResize);
+            window.removeEventListener(GAME_LAYOUT_CHANGE, handleResize);
 
             if (cashoutActiveRef.current) return;
 
@@ -417,8 +422,9 @@ export default function Game() {
     const handleResize = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const { width, height } = getGameScreenSize();
+        canvas.width = width;
+        canvas.height = height;
         if (socketRef.current?.connected) {
             socketRef.current.emit('0', {
                 x: 0,
@@ -436,7 +442,7 @@ export default function Game() {
         
         const gameLoop = () => {
             const { player, users, viruses, ejected, zoneSize } = gameData.current;
-            const screen = { width: window.innerWidth, height: window.innerHeight };
+            const screen = { width: canvas.width, height: canvas.height };
             
             // CRASH FIX: Kontrollera att vi inte är döda och att spelardata finns
             if (isConnected && !isDead && player && player.x !== undefined) {
@@ -517,28 +523,24 @@ export default function Game() {
     const handleMouseMove = (e) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
+        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
         socketRef.current?.emit('0', {
-            x: e.clientX - rect.left - canvas.width / 2,
-            y: e.clientY - rect.top - canvas.height / 2,
-            screenWidth: canvas.width,
-            screenHeight: canvas.height,
+            x, y,
+            screenWidth,
+            screenHeight,
         });
     };
 
-    // Mobile: hold/drag a finger to steer. The server keeps moving the cell toward
-    // the last target, so a held finger produces smooth continuous movement.
     const handleTouch = (e) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const t = e.touches?.[0];
         if (!t) return;
-        const rect = canvas.getBoundingClientRect();
+        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(t.clientX, t.clientY, canvas);
         socketRef.current?.emit('0', {
-            x: t.clientX - rect.left - canvas.width / 2,
-            y: t.clientY - rect.top - canvas.height / 2,
-            screenWidth: canvas.width,
-            screenHeight: canvas.height,
+            x, y,
+            screenWidth,
+            screenHeight,
         });
     };
 
@@ -562,7 +564,7 @@ export default function Game() {
     };
 
     return (
-        <div className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{ 
+        <div ref={viewportRef} className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{ 
             width: '100vw', 
             height: '100vh', 
             background: '#0a0a0c', 
@@ -580,7 +582,14 @@ export default function Game() {
                 style={{ display: 'block', touchAction: 'none' }}
             />
 
-            <MobileLandscapeGate />
+            <MobileGameSession containerRef={viewportRef} />
+
+            {IS_MOBILE && isConnected && !isDead && (
+                <AgarMobileControls
+                    onSplit={() => socketRef.current?.emit('2')}
+                    onEject={() => socketRef.current?.emit('1')}
+                />
+            )}
 
             {cashedAmount !== null && (
                 <div className="modern-overlay-backdrop">
@@ -599,8 +608,8 @@ export default function Game() {
             {isDead && (
                 <div className="modern-overlay-backdrop death">
                     <div className="modern-overlay-card death">
-                        <div className="overlay-badge error">Session Terminated</div>
-                        <h2 className="overlay-heading">Eliminated</h2>
+                        <div className="overlay-badge error">{isBattleRoyale ? 'Eliminated' : 'Session Terminated'}</div>
+                        <h2 className="overlay-heading">{isBattleRoyale ? 'Out of the Zone' : 'Eliminated'}</h2>
                         <div className="overlay-icon error">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -608,7 +617,11 @@ export default function Game() {
                             </svg>
                         </div>
                         <div className="overlay-divider" />
-                        <p className="overlay-caption">Your stake has been liquidated. Redirecting to terminal...</p>
+                        <p className="overlay-caption">
+                            {isBattleRoyale
+                                ? `${brAliveCount} players remain. Prize pool: $${brPrizePool.toFixed(2)}`
+                                : 'Your stake has been liquidated. Redirecting to terminal...'}
+                        </p>
                     </div>
                 </div>
             )}
@@ -725,7 +738,7 @@ export default function Game() {
                 left: '30px', 
                 zIndex: 100
             }}>
-                <div className="game-stake-panel" style={{
+                <div className={`game-stake-panel${isBattleRoyale ? ' game-stake-panel--br' : ''}`} style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     backdropFilter: 'blur(20px)',
                     padding: '15px 25px',
@@ -739,6 +752,7 @@ export default function Game() {
                     gap: '12px',
                     minWidth: '190px',
                 }}>
+                    {(!IS_MOBILE || isBattleRoyale) && (
                     <div style={{ textAlign: 'center' }}>
                         <h3 className="game-stake-label" style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
                             {isBattleRoyale ? 'Prize Pool' : 'Active Stake'}
@@ -757,6 +771,7 @@ export default function Game() {
                             </div>
                         )}
                     </div>
+                    )}
 
                     {/* Exit timer badge */}
                     {!isBattleRoyale && localTimer > 0 && (

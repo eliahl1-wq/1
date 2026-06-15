@@ -227,7 +227,7 @@ export default function Lobby() {
             </AppTopbar>
 
             {/* ── Center Content ── */}
-            <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '24px 16px 40px', width: '100%', maxWidth: '440px', boxSizing: 'border-box' }}>
+            <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '72px 16px 40px', width: '100%', maxWidth: '440px', boxSizing: 'border-box' }}>
 
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '4px' }}>

@@ -754,7 +754,7 @@ export default function AdminDashboard() {
             <Background />
             <AppTopbar />
 
-            <div className="page-content" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            <div className="page-content" style={{ maxWidth: '1200px' }}>
                 <div className="page-header-row">
                     <div>
                         <p className="label" style={{ marginBottom: '6px' }}>Admin</p>

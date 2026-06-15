@@ -1,3 +1,14 @@
+/* Force landscape layout when the phone is held portrait (iOS / no orientation lock) */
+
+.game-viewport.game-viewport--mobile.game-viewport--portrait-lock {
+    top: 50% !important;
+    left: 50% !important;
+    width: 100vh !important;
+    height: 100vw !important;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+}
+
 /* In-game HUD + overlays — mobile (touch) layout tweaks */
 
 .game-viewport--mobile .modern-overlay-card {
@@ -42,51 +53,127 @@
 }
 
 .game-viewport--mobile .game-stake-wrap {
-    top: 10px;
-    left: 10px;
+    top: 4px;
+    left: 4px;
 }
 
 .game-viewport--mobile .game-stake-panel {
-    padding: 8px 12px;
-    border-radius: 14px;
-    gap: 7px;
+    padding: 5px 8px;
+    border-radius: 10px;
+    gap: 5px;
     min-width: 0;
-    max-width: 132px;
+    max-width: 96px;
+}
+
+.game-viewport--mobile .game-stake-panel--br {
+    max-width: 118px;
+    padding: 6px 9px;
 }
 
 .game-viewport--mobile .game-stake-label {
-    font-size: 0.5rem !important;
-    letter-spacing: 1px !important;
+    font-size: 0.46rem !important;
+    letter-spacing: 0.8px !important;
 }
 
 .game-viewport--mobile .game-stake-amount {
-    font-size: 1.35rem !important;
+    font-size: 1.05rem !important;
 }
 
 .game-viewport--mobile .game-stake-br-meta {
-    font-size: 0.58rem !important;
+    font-size: 0.5rem !important;
     margin-top: 2px !important;
+    line-height: 1.25;
 }
 
 .game-viewport--mobile .game-stake-securing {
-    padding: 6px 8px !important;
-    border-radius: 10px !important;
-    gap: 4px !important;
+    padding: 4px 6px !important;
+    border-radius: 8px !important;
+    gap: 3px !important;
 }
 
 .game-viewport--mobile .game-stake-securing-label {
-    font-size: 0.52rem !important;
+    font-size: 0.46rem !important;
 }
 
 .game-viewport--mobile .game-stake-securing-time {
-    font-size: 0.75rem !important;
+    font-size: 0.65rem !important;
 }
 
 .game-viewport--mobile .game-cashout-btn {
-    padding: 6px 8px !important;
-    font-size: 0.62rem !important;
-    border-radius: 9px !important;
-    letter-spacing: 0.4px !important;
+    padding: 5px 6px !important;
+    font-size: 0.54rem !important;
+    border-radius: 7px !important;
+    letter-spacing: 0.3px !important;
+}
+
+/* On-screen action buttons (boost / split / eject) */
+
+.game-mobile-controls {
+    position: absolute;
+    z-index: 110;
+    display: flex;
+    gap: 8px;
+    pointer-events: none;
+    touch-action: none;
+}
+
+.game-mobile-controls--slither {
+    right: 12px;
+    bottom: 14px;
+}
+
+.game-mobile-controls--agar {
+    right: 12px;
+    bottom: 14px;
+    flex-direction: row-reverse;
+}
+
+.game-mobile-btn {
+    pointer-events: auto;
+    touch-action: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(12, 13, 18, 0.72);
+    backdrop-filter: blur(12px);
+    color: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.game-mobile-btn:active,
+.game-mobile-btn.game-mobile-btn--active {
+    transform: scale(0.94);
+    background: rgba(20, 241, 149, 0.22);
+    border-color: rgba(20, 241, 149, 0.45);
+}
+
+.game-mobile-btn--accent {
+    border-color: rgba(20, 241, 149, 0.35);
+    box-shadow: 0 4px 18px rgba(20, 241, 149, 0.15);
+}
+
+.game-mobile-btn-label {
+    font-size: 1rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.game-mobile-btn-sub {
+    font-size: 0.42rem;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    opacity: 0.55;
+    margin-top: 2px;
 }
 
 .game-viewport--mobile .game-leaderboard {

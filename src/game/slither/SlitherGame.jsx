@@ -11,7 +11,8 @@ import { SlitherRenderer } from './SlitherRenderer.js';
 import { normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
-import MobileLandscapeGate from '../../components/MobileLandscapeGate';
+import MobileGameSession from '../../components/MobileGameSession';
+import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
 import '../../styles/gameInGame.css';
 
@@ -30,6 +31,8 @@ export default function SlitherGame() {
     const { user, token: authToken } = useAuth();
 
     const canvasRef = useRef(null);
+
+    const viewportRef = useRef(null);
 
     const socketRef = useRef(null);
 
@@ -85,6 +88,10 @@ export default function SlitherGame() {
     const lastBrHudAtRef = useRef(0);
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
+
+    const handleBoostChange = useCallback((active) => {
+        rendererRef.current?.setBoost(active);
+    }, []);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
@@ -533,7 +540,7 @@ export default function SlitherGame() {
 
     return (
 
-        <div className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
+        <div ref={viewportRef} className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
 
             width: '100vw',
 
@@ -555,7 +562,11 @@ export default function SlitherGame() {
 
             <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
 
-            <MobileLandscapeGate />
+            <MobileGameSession containerRef={viewportRef} />
+
+            {IS_MOBILE && gameReady && isConnected && !isDead && (
+                <SlitherMobileControls onBoostChange={handleBoostChange} />
+            )}
 
 
 
@@ -727,7 +738,7 @@ export default function SlitherGame() {
 
             <div className="game-stake-wrap" style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 100 }}>
 
-                <div className="game-stake-panel" style={{
+                <div className={`game-stake-panel${isBattleRoyale ? ' game-stake-panel--br' : ''}`} style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     backdropFilter: 'blur(20px)',
                     padding: '15px 25px',
@@ -742,6 +753,7 @@ export default function SlitherGame() {
                     minWidth: '190px',
                 }}>
 
+                    {(!IS_MOBILE || isBattleRoyale) && (
                     <div style={{ textAlign: 'center' }}>
                         <h3 className="game-stake-label" style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
                             {isBattleRoyale ? 'Prize Pool' : 'Active Stake'}
@@ -760,6 +772,7 @@ export default function SlitherGame() {
                             </div>
                         )}
                     </div>
+                    )}
 
                     {!isBattleRoyale && localTimer > 0 && (
 
