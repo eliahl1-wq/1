@@ -316,7 +316,7 @@ export class SlitherRenderer {
             if (s.segments.length > len) s.segments.length = len;
 
             if (snake.isYou) {
-                // Large delta = respawn/teleport → snap whole spine.
+                // Large delta = respawn/teleport → snap whole spine, otherwise interpolate below.
                 const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
                 const headDy = tgt[0].y - (s.segments[0]?.y ?? tgt[0].y);
                 if (headDx * headDx + headDy * headDy > SNAP_SQ) {
@@ -324,28 +324,6 @@ export class SlitherRenderer {
                     s.angle = snake.angle || 0;
                     continue;
                 }
-
-                // Rigid translation + light shape correction — avoids per-segment crawl.
-                const tau = 0.048;
-                const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
-                const tx = headDx * a;
-                const ty = headDy * a;
-                for (let i = 0; i < len; i++) {
-                    if (i >= s.segments.length) {
-                        this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-                        continue;
-                    }
-                    s.segments[i].x += tx;
-                    s.segments[i].y += ty;
-                    const cx2 = tgt[i].x - s.segments[i].x;
-                    const cy2 = tgt[i].y - s.segments[i].y;
-                    s.segments[i].x += cx2 * a * 0.25;
-                    s.segments[i].y += cy2 * a * 0.25;
-                }
-                let da = (snake.angle || 0) - s.angle;
-                da = Math.atan2(Math.sin(da), Math.cos(da));
-                s.angle += da * a;
-                continue;
             }
 
             if (offScreen) {
