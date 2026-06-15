@@ -1152,16 +1152,18 @@ export default function PreGame() {
                             {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
                                 <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>No data yet</div>
                             ) : (
-                                (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).slice(0, 5).map((entry, i) => (
-                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem' }}>
-                                        <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
-                                            {i + 1}. {entry.username}
-                                        </span>
-                                        <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
-                                            ${Number(entry.amount || entry.balance || 0).toFixed(2)}
-                                        </span>
-                                    </div>
-                                ))
+                                <div style={{ maxHeight: '124px', overflowY: 'auto', paddingRight: '4px' }}>
+                                    {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).map((entry, i) => (
+                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', marginBottom: i === (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length - 1 ? 0 : '10px' }}>
+                                            <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
+                                                {i + 1}. {entry.username}
+                                            </span>
+                                            <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
+                                                ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </div>
                         <div className="divider" style={{ margin: '12px 0 10px' }} />
