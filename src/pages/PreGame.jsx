@@ -102,6 +102,9 @@ export default function PreGame() {
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
     const [statusMsg, setStatusMsg] = useState(''); // Moved here to avoid conflicts
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
+    const [liveLeaderboardEvents, setLiveLeaderboardEvents] = useState([]);
+    const [liveTabPulse, setLiveTabPulse] = useState(false);
+    const liveTabSeenIdRef = useRef(null);
     const [nickname, setNickname] = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
@@ -373,6 +376,40 @@ export default function PreGame() {
         const id = setInterval(fetchLeaderboard, 90000);
         return () => { alive = false; clearInterval(id); };
     }, []);
+
+    // Live leaderboard events (cashouts/deaths)
+    useEffect(() => {
+        let alive = true;
+        const fetchLiveLeaderboard = async () => {
+            try {
+                const r = await fetch(`${API_URL}/api/leaderboard-live?t=${Date.now()}`, {
+                    headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
+                });
+                if (!r.ok || !alive) return;
+                const d = await r.json();
+                const events = Array.isArray(d.events) ? d.events : [];
+
+                const latestId = events[0]?.id || null;
+                if (latestId) {
+                    if (liveTabSeenIdRef.current == null) {
+                        liveTabSeenIdRef.current = latestId;
+                    } else if (latestId !== liveTabSeenIdRef.current) {
+                        if (leaderboardTab === 'alltime') {
+                            setLiveTabPulse(true);
+                            setTimeout(() => setLiveTabPulse(false), 900);
+                        }
+                        liveTabSeenIdRef.current = latestId;
+                    }
+                }
+
+                setLiveLeaderboardEvents(events);
+            } catch { }
+        };
+
+        fetchLiveLeaderboard();
+        const id = setInterval(fetchLiveLeaderboard, 3000);
+        return () => { alive = false; clearInterval(id); };
+    }, [API_URL, leaderboardTab]);
 
     // Balance poll
     useEffect(() => {
@@ -1137,11 +1174,11 @@ export default function PreGame() {
                             <span className="label">Leaderboard</span>
                         </div>
                         <div className="tab-bar" style={{ marginBottom: '12px' }}>
-                            {[{ id: 'alltime', label: 'All Time' }, { id: 'week', label: 'This Week' }].map(tab => (
+                            {[{ id: 'alltime', label: 'All Time' }, { id: 'live', label: 'LIVE' }].map(tab => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setLeaderboardTab(tab.id)}
-                                    className={leaderboardTab === tab.id ? 'tab-btn active' : 'tab-btn'}
+                                    className={leaderboardTab === tab.id ? 'tab-btn active' : `tab-btn${tab.id === 'live' && liveTabPulse ? ' tab-btn-live-pulse' : ''}`}
                                 >
                                     {tab.label}
                                 </button>
@@ -1149,20 +1186,33 @@ export default function PreGame() {
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length === 0 ? (
+                            {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
                                 <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>No data yet</div>
                             ) : (
                                 <div style={{ maxHeight: '124px', overflowY: 'auto', paddingRight: '4px' }}>
-                                    {(leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).map((entry, i) => (
-                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', marginBottom: i === (leaderboardTab === 'alltime' ? leaderboardData.alltime : leaderboardData.week).length - 1 ? 0 : '10px' }}>
-                                            <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
-                                                {i + 1}. {entry.username}
-                                            </span>
-                                            <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
-                                                ${Number(entry.amount || entry.balance || 0).toFixed(2)}
-                                            </span>
-                                        </div>
-                                    ))}
+                                    {leaderboardTab === 'alltime' ? (
+                                        leaderboardData.alltime.map((entry, i) => (
+                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', marginBottom: i === leaderboardData.alltime.length - 1 ? 0 : '10px' }}>
+                                                <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
+                                                    {i + 1}. {entry.username}
+                                                </span>
+                                                <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
+                                                    ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        liveLeaderboardEvents.map((event, i) => (
+                                            <div key={event.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '0.72rem', marginBottom: i === liveLeaderboardEvents.length - 1 ? 0 : '10px' }}>
+                                                <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>
+                                                    {event.text}
+                                                </span>
+                                                <span className="mono" style={{ fontSize: '0.7rem', color: event.type === 'cashout' ? 'var(--green)' : 'var(--yellow)', fontWeight: 700 }}>
+                                                    {event.type === 'cashout' ? 'cashout' : 'death'}
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             )}
                         </div>
