@@ -1,0 +1,131 @@
+/* In-game HUD + overlays — mobile (touch) layout tweaks */
+
+.game-viewport--mobile .modern-overlay-card {
+    padding: 28px 22px;
+    max-width: min(88vw, 380px);
+}
+
+.game-viewport--mobile .overlay-badge {
+    margin-bottom: 18px;
+    font-size: 0.58rem;
+    padding: 5px 10px;
+}
+
+.game-viewport--mobile .overlay-heading {
+    font-size: 1.35rem;
+    margin: 0 0 14px 0;
+}
+
+.game-viewport--mobile .overlay-amount {
+    font-size: 2.6rem;
+    letter-spacing: -1.5px;
+    margin-bottom: 20px;
+}
+
+.game-viewport--mobile .overlay-icon {
+    margin: 12px 0;
+}
+
+.game-viewport--mobile .overlay-icon svg {
+    width: 32px;
+    height: 32px;
+}
+
+.game-viewport--mobile .overlay-divider {
+    margin: 18px auto;
+}
+
+.game-viewport--mobile .overlay-caption {
+    font-size: 0.78rem;
+    max-width: 280px;
+    line-height: 1.45;
+}
+
+.game-viewport--mobile .game-stake-wrap {
+    top: 10px;
+    left: 10px;
+}
+
+.game-viewport--mobile .game-stake-panel {
+    padding: 8px 12px;
+    border-radius: 14px;
+    gap: 7px;
+    min-width: 0;
+    max-width: 132px;
+}
+
+.game-viewport--mobile .game-stake-label {
+    font-size: 0.5rem !important;
+    letter-spacing: 1px !important;
+}
+
+.game-viewport--mobile .game-stake-amount {
+    font-size: 1.35rem !important;
+}
+
+.game-viewport--mobile .game-stake-br-meta {
+    font-size: 0.58rem !important;
+    margin-top: 2px !important;
+}
+
+.game-viewport--mobile .game-stake-securing {
+    padding: 6px 8px !important;
+    border-radius: 10px !important;
+    gap: 4px !important;
+}
+
+.game-viewport--mobile .game-stake-securing-label {
+    font-size: 0.52rem !important;
+}
+
+.game-viewport--mobile .game-stake-securing-time {
+    font-size: 0.75rem !important;
+}
+
+.game-viewport--mobile .game-cashout-btn {
+    padding: 6px 8px !important;
+    font-size: 0.62rem !important;
+    border-radius: 9px !important;
+    letter-spacing: 0.4px !important;
+}
+
+.game-viewport--mobile .game-leaderboard {
+    top: 58px;
+    right: 10px;
+    width: 138px;
+    padding: 9px 10px;
+    border-radius: 12px;
+}
+
+.game-viewport--mobile .game-leaderboard-title {
+    margin: 0 0 7px 0 !important;
+    font-size: 0.52rem !important;
+    letter-spacing: 1px !important;
+}
+
+.game-viewport--mobile .game-leaderboard-list {
+    font-size: 0.68rem !important;
+    gap: 5px !important;
+}
+
+.game-viewport--mobile .game-leaderboard-name {
+    max-width: 72px !important;
+}
+
+.game-viewport--mobile .game-logo-wrap {
+    top: 10px;
+    right: 10px;
+}
+
+.game-viewport--mobile .game-logo-text {
+    font-size: 0.95rem !important;
+}
+
+.game-viewport--mobile .game-logo-sub {
+    font-size: 0.62rem !important;
+}
+
+.game-viewport--mobile .game-logo-reset {
+    font-size: 0.52rem !important;
+    margin-top: 2px !important;
+}

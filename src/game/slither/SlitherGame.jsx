@@ -13,6 +13,7 @@ import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlay
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileLandscapeGate from '../../components/MobileLandscapeGate';
 import { isTouchDevice } from '../../utils/mobile';
+import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 
@@ -532,7 +533,7 @@ export default function SlitherGame() {
 
     return (
 
-        <div style={{
+        <div className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
 
             width: '100vw',
 
@@ -724,9 +725,9 @@ export default function SlitherGame() {
 
             {/* Stake panel — matches Agar */}
 
-            <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 100 }}>
+            <div className="game-stake-wrap" style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 100 }}>
 
-                <div style={{
+                <div className="game-stake-panel" style={{
                     background: 'rgba(255, 255, 255, 0.05)',
                     backdropFilter: 'blur(20px)',
                     padding: '15px 25px',
@@ -742,19 +743,19 @@ export default function SlitherGame() {
                 }}>
 
                     <div style={{ textAlign: 'center' }}>
-                        <h3 style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
+                        <h3 className="game-stake-label" style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
                             {isBattleRoyale ? 'Prize Pool' : 'Active Stake'}
                         </h3>
-                        <div style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
+                        <div className="game-stake-amount" style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
                             {isBattleRoyale ? `$${brPrizePool.toFixed(2)}` : `$${(currentBalance ?? 0).toFixed(2)}`}
                         </div>
                         {isBattleRoyale && (
-                            <div style={{ fontSize: '0.75rem', color: '#FF6B6B', fontWeight: 700, marginTop: '4px' }}>
+                            <div className="game-stake-br-meta" style={{ fontSize: '0.75rem', color: '#FF6B6B', fontWeight: 700, marginTop: '4px' }}>
                                 {brAliveCount} ALIVE · WINNER TAKES ${brPrizePool.toFixed(2)}
                             </div>
                         )}
                         {isBattleRoyale && brPlayerCount > 0 && (
-                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: '6px', fontWeight: 600 }}>
+                            <div className="game-stake-br-meta" style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: '6px', fontWeight: 600 }}>
                                 {brPlayerCount} players · winner takes pool
                             </div>
                         )}
@@ -762,7 +763,7 @@ export default function SlitherGame() {
 
                     {!isBattleRoyale && localTimer > 0 && (
 
-                        <div style={{
+                        <div className="game-stake-securing" style={{
 
                             display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px 12px',
 
@@ -774,9 +775,9 @@ export default function SlitherGame() {
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '1.2px' }}>SECURING</span>
+                                <span className="game-stake-securing-label" style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '1.2px' }}>SECURING</span>
 
-                                <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#14F195', fontFamily: 'ui-monospace, monospace' }}>{localTimer}s</span>
+                                <span className="game-stake-securing-time" style={{ fontSize: '0.9rem', fontWeight: 900, color: '#14F195', fontFamily: 'ui-monospace, monospace' }}>{localTimer}s</span>
 
                             </div>
 
@@ -804,6 +805,7 @@ export default function SlitherGame() {
 
                     {!isBattleRoyale && (
                     <button
+                        className="game-cashout-btn"
                         {...cashoutButtonProps}
                         disabled={!cashoutReady}
 
@@ -851,13 +853,13 @@ export default function SlitherGame() {
 
             {/* Logo + reset — matches Agar */}
 
-            <div style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', zIndex: 100 }}>
+            <div className="game-logo-wrap" style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', zIndex: 100 }}>
 
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
 
                     <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
 
-                    <span style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
+                    <span className="game-logo-text" style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
 
                         AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
 
@@ -865,11 +867,11 @@ export default function SlitherGame() {
 
                 </div>
 
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
+                <div className="game-logo-sub" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
                     {isBattleRoyale ? 'Battle Royale' : 'Slither Mode'}
                 </div>
                 {!isBattleRoyale && (
-                <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>
+                <div className="game-logo-reset" style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>
                     {formatResetTimer()}
                 </div>
                 )}
@@ -880,7 +882,7 @@ export default function SlitherGame() {
 
             {/* Leaderboard — matches Agar */}
 
-            <div style={{
+            <div className="game-leaderboard" style={{
 
                 position: 'absolute',
 
@@ -908,11 +910,11 @@ export default function SlitherGame() {
 
             }}>
 
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>
+                <h4 className="game-leaderboard-title" style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>
                     {isBattleRoyale ? 'Eliminations' : 'Leaderboard'}
                 </h4>
 
-                <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="game-leaderboard-list" style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
                     {leaderboard.map((p, i) => (
 
@@ -930,7 +932,7 @@ export default function SlitherGame() {
 
                         }}>
 
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {p.name}</span>
+                            <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {p.name}</span>
 
                             <span style={{ fontFamily: 'ui-monospace, monospace' }}>
                                 {isBattleRoyale ? `${p.kills ?? 0} kills` : `$${(p.balance ?? 0).toFixed(2)}`}

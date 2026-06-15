@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Background from '../components/Background';
@@ -9,13 +9,47 @@ const API_BASE = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
-    { id: 'controls', label: 'Server & Controls' },
-    { id: 'wallets', label: 'Wallets' },
-    { id: 'sweeps', label: 'Sweeps' },
-    { id: 'users', label: 'Users' },
+    { id: 'live', label: 'Live' },
     { id: 'transactions', label: 'Transactions' },
-    { id: 'game', label: 'Game History' },
-    { id: 'active', label: 'Active Now' },
+    { id: 'users', label: 'Users' },
+    { id: 'finances', label: 'Finances' },
+    { id: 'server', label: 'Server' },
+];
+
+const USER_SORT_OPTIONS = [
+    { value: 'balance_desc', label: 'Highest balance' },
+    { value: 'balance_asc', label: 'Lowest balance' },
+    { value: 'deposits_desc', label: 'Most deposited' },
+    { value: 'newest', label: 'Newest first' },
+    { value: 'oldest', label: 'Oldest first' },
+    { value: 'username_asc', label: 'Username A–Z' },
+];
+
+const TX_CATEGORY_OPTIONS = [
+    { value: '', label: 'All categories' },
+    { value: 'deposit', label: 'Deposits' },
+    { value: 'withdraw', label: 'Withdrawals' },
+    { value: 'entry', label: 'Game entries' },
+    { value: 'cashout', label: 'Cashouts' },
+    { value: 'death', label: 'Deaths' },
+    { value: 'sweep', label: 'Owner sweeps' },
+];
+
+const TX_TYPE_OPTIONS = [
+    { value: '', label: 'All types' },
+    { value: 'deposit', label: 'Deposit' },
+    { value: 'withdraw', label: 'Withdraw' },
+    { value: 'game', label: 'Game' },
+];
+
+const LIVE_CATEGORY_FILTERS = [
+    { value: '', label: 'All activity' },
+    { value: 'entry', label: 'Entries' },
+    { value: 'cashout', label: 'Cashouts' },
+    { value: 'death', label: 'Deaths' },
+    { value: 'deposit', label: 'Deposits' },
+    { value: 'withdraw', label: 'Withdrawals' },
+    { value: 'sweep', label: 'Sweeps' },
 ];
 
 function formatUsd(n) {
@@ -30,6 +64,16 @@ function formatSol(n) {
 function formatDate(d) {
     if (!d) return '—';
     return new Date(d).toLocaleString();
+}
+
+function formatRelativeTime(d) {
+    if (!d) return '—';
+    const ms = Date.now() - new Date(d).getTime();
+    if (ms < 5000) return 'just now';
+    if (ms < 60000) return `${Math.floor(ms / 1000)}s ago`;
+    if (ms < 3600000) return `${Math.floor(ms / 60000)}m ago`;
+    if (ms < 86400000) return `${Math.floor(ms / 3600000)}h ago`;
+    return formatDate(d);
 }
 
 function formatCountdown(ms) {
@@ -47,6 +91,40 @@ function formatDuration(ms) {
     const m = Math.floor((ms % 3600000) / 60000);
     if (h > 0) return `${h}h ${m}m`;
     return `${m} min`;
+}
+
+function classifyTxCategory(tx) {
+    const m = tx.meta || {};
+    if (tx.type === 'deposit') return 'deposit';
+    if (m.event === 'pool_sweep' || m.event === 'br_owner_sweep') return 'sweep';
+    if (tx.type === 'game') {
+        if (m.event === 'join' || m.event === 'br_join') return 'entry';
+        if (m.reason === 'Arena Death' || m.reason === 'BR Eliminated') return 'death';
+        if (m.event === 'br_refund') return 'refund';
+        return 'game';
+    }
+    if (tx.type === 'withdraw') {
+        if (/Arena Cashout|Admin Forced|Auto Room Reset|BR Victory/i.test(m.reason || '')) return 'cashout';
+        return 'withdraw';
+    }
+    return 'other';
+}
+
+function txActivityLabelClient(tx) {
+    const m = tx.meta || {};
+    const cat = classifyTxCategory(tx);
+    switch (cat) {
+        case 'deposit': return 'Deposit';
+        case 'withdraw': return 'Withdrawal';
+        case 'entry':
+            if (m.event === 'br_join') return `BR entry · $${m.entryFeeUsd ?? '?'}`;
+            return `Arena entry · ${m.mode || 'agar'} · $${m.entryFeeUsd ?? '?'}`;
+        case 'cashout': return m.reason || 'Cashout';
+        case 'death': return m.reason || 'Eliminated';
+        case 'refund': return 'BR refund';
+        case 'sweep': return m.reason || 'Owner sweep';
+        default: return m.reason || m.event || tx.type;
+    }
 }
 
 function truncateAddr(addr) {
@@ -83,6 +161,78 @@ function TypeBadge({ type }) {
         <span style={{ fontWeight: 700, fontSize: '0.72rem', color: colors[type] || 'var(--text)' }}>
             {type}
         </span>
+    );
+}
+
+const CATEGORY_STYLES = {
+    deposit: { bg: 'rgba(34,197,94,0.12)', color: 'var(--green)' },
+    withdraw: { bg: 'rgba(59,130,246,0.12)', color: 'var(--blue)' },
+    entry: { bg: 'rgba(234,179,8,0.12)', color: 'var(--yellow)' },
+    cashout: { bg: 'rgba(34,197,94,0.18)', color: '#22c55e' },
+    death: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
+    sweep: { bg: 'rgba(168,85,247,0.12)', color: '#a855f7' },
+    refund: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
+    game: { bg: 'rgba(234,179,8,0.08)', color: 'var(--yellow)' },
+    other: { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-2)' },
+};
+
+function CategoryBadge({ category }) {
+    const style = CATEGORY_STYLES[category] || CATEGORY_STYLES.other;
+    const labels = {
+        deposit: 'Deposit',
+        withdraw: 'Withdrawal',
+        entry: 'Entry',
+        cashout: 'Cashout',
+        death: 'Death',
+        sweep: 'Sweep',
+        refund: 'Refund',
+        game: 'Game',
+        other: 'Other',
+    };
+    return (
+        <span style={{
+            display: 'inline-block',
+            padding: '3px 10px',
+            borderRadius: 'var(--r-full)',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            background: style.bg,
+            color: style.color,
+        }}>
+            {labels[category] || category}
+        </span>
+    );
+}
+
+function LiveIndicator({ active }) {
+    if (!active) return null;
+    return (
+        <span className="admin-live-dot" title="Auto-refreshing">
+            <span className="admin-live-dot-pulse" />
+            LIVE
+        </span>
+    );
+}
+
+function FilterSelect({ label, value, onChange, options, style }) {
+    return (
+        <label className="admin-filter-field" style={style}>
+            {label && <span className="admin-filter-label">{label}</span>}
+            <select className="admin-filter-select" value={value} onChange={onChange}>
+                {options.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+            </select>
+        </label>
+    );
+}
+
+function AdminFilterBar({ children, right }) {
+    return (
+        <div className="admin-filter-bar">
+            <div className="admin-filter-bar-left">{children}</div>
+            {right && <div className="admin-filter-bar-right">{right}</div>}
+        </div>
     );
 }
 
@@ -161,6 +311,155 @@ function Panel({ title, sub, children }) {
     );
 }
 
+function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, actionLoading }) {
+    const [detail, setDetail] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [subTab, setSubTab] = useState('overview');
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            setError('');
+            try {
+                const data = await fetchAdmin(`/api/admin/dashboard/users/${userId}`);
+                if (!cancelled) setDetail(data);
+            } catch (err) {
+                if (!cancelled) setError(err.message || 'Could not load user');
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [userId, fetchAdmin]);
+
+    const u = detail?.user;
+    const stats = detail?.stats;
+
+    return (
+        <div className="admin-user-modal-backdrop" onClick={onClose}>
+            <div className="admin-user-modal" onClick={e => e.stopPropagation()}>
+                <div className="admin-user-modal-header">
+                    <div>
+                        <p className="label" style={{ marginBottom: '4px' }}>Account</p>
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-h)' }}>
+                            {loading ? 'Loading…' : u?.username ?? 'Unknown'}
+                        </h2>
+                        {u?.createdAt && (
+                            <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: 'var(--text-2)' }}>
+                                Joined {formatDate(u.createdAt)}
+                                {u.excludedFromReports && <> · <OutcomeBadge outcome="excluded" /></>}
+                            </p>
+                        )}
+                    </div>
+                    <button type="button" className="btn btn-ghost" onClick={onClose} style={{ padding: '8px 14px' }}>Close</button>
+                </div>
+
+                {error && (
+                    <div style={{ padding: '16px 20px', color: '#ef4444', fontSize: '0.85rem' }}>{error}</div>
+                )}
+
+                {loading ? (
+                    <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>
+                        <span className="spinner" style={{ marginRight: '8px' }} />
+                        Loading account…
+                    </div>
+                ) : detail && (
+                    <>
+                        <div className="admin-user-modal-stats">
+                            <StatCard label="Balance" value={formatUsd(u.balanceUsd)} sub={formatSol(u.balanceSol)} />
+                            <StatCard label="Total deposited" value={formatUsd(stats.totalDepositedUsd)} sub={`${stats.depositCount} deposits`} />
+                            <StatCard label="Total withdrawn" value={formatUsd(stats.totalWithdrawnUsd)} sub={`${stats.withdrawalCount} withdrawals`} />
+                            <StatCard label="Games played" value={stats.gamesPlayed} sub={`${stats.wins}W · ${stats.losses}L · ${stats.brWins} BR wins`} />
+                        </div>
+
+                        <div style={{ padding: '0 20px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div className="admin-tabs" style={{ marginBottom: 0, flex: 1 }}>
+                                {['overview', 'transactions', 'games'].map(id => (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        className={`tab-btn${subTab === id ? ' active' : ''}`}
+                                        onClick={() => setSubTab(id)}
+                                        style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                                    >
+                                        {id === 'overview' ? 'Overview' : id === 'transactions' ? 'Transactions' : 'Game activity'}
+                                    </button>
+                                ))}
+                            </div>
+                            {u.excludedFromReports ? (
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                    disabled={actionLoading}
+                                    onClick={() => onRestore([String(u.id)])}
+                                >
+                                    Restore to reports
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                    disabled={actionLoading}
+                                    onClick={() => onExclude([String(u.id)])}
+                                >
+                                    Exclude from reports
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="admin-user-modal-body">
+                            {subTab === 'overview' && (
+                                <div style={{ display: 'grid', gap: '12px', fontSize: '0.82rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                                        <div><span style={{ color: 'var(--text-2)' }}>Deposit wallet</span><br /><span className="mono" style={{ fontSize: '0.72rem' }}>{u.depositAddress}</span></div>
+                                        <div><span style={{ color: 'var(--text-2)' }}>Withdraw address</span><br /><span className="mono" style={{ fontSize: '0.72rem' }}>{u.wallet}</span></div>
+                                        <div><span style={{ color: 'var(--text-2)' }}>Email</span><br />{u.email || '—'}</div>
+                                        <div><span style={{ color: 'var(--text-2)' }}>Playtime</span><br />{formatDuration(u.playtime ?? 0)}</div>
+                                        <div><span style={{ color: 'var(--text-2)' }}>Deaths</span><br />{stats.deaths}</div>
+                                        <div><span style={{ color: 'var(--text-2)' }}>Net result (withdraw − deposit)</span><br />{formatUsd(stats.netGameResultUsd)}</div>
+                                    </div>
+                                </div>
+                            )}
+                            {subTab === 'transactions' && (
+                                <DataTable
+                                    columns={[
+                                        { key: 'createdAt', label: 'Date', render: r => formatDate(r.createdAt) },
+                                        { key: 'category', label: 'Category', render: r => <CategoryBadge category={r.category || classifyTxCategory(r)} /> },
+                                        { key: 'label', label: 'Description', render: r => r.label || txActivityLabelClient(r) },
+                                        { key: 'amountUsd', label: 'Amount', render: r => formatUsd(r.amountUsd) },
+                                        { key: 'status', label: 'Status', render: r => r.excludedFromReports ? <OutcomeBadge outcome="excluded" /> : r.status },
+                                    ]}
+                                    rows={detail.transactions.map(t => ({ ...t, category: t.category || classifyTxCategory(t) }))}
+                                    loading={false}
+                                    emptyMessage="No transactions"
+                                />
+                            )}
+                            {subTab === 'games' && (
+                                <DataTable
+                                    columns={[
+                                        { key: 'createdAt', label: 'Date', render: r => formatDate(r.createdAt) },
+                                        { key: 'game', label: 'Game', render: r => String(r.game).charAt(0).toUpperCase() + String(r.game).slice(1) },
+                                        { key: 'entryFeeUsd', label: 'Entry', render: r => r.entryFeeUsd != null ? formatUsd(r.entryFeeUsd) : formatUsd(r.wagerUsd) },
+                                        { key: 'payoutUsd', label: 'Payout', render: r => formatUsd(r.payoutUsd) },
+                                        { key: 'outcome', label: 'Result', render: r => <OutcomeBadge outcome={r.outcome} /> },
+                                    ]}
+                                    rows={detail.gameHistory}
+                                    loading={false}
+                                    emptyMessage="No game activity yet"
+                                />
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function AdminDashboard() {
     const { token } = useAuth();
     const navigate = useNavigate();
@@ -173,8 +472,16 @@ export default function AdminDashboard() {
     const [wallets, setWallets] = useState(null);
     const [sweeps, setSweeps] = useState([]);
     const [transactions, setTransactions] = useState([]);
-    const [gameHistory, setGameHistory] = useState([]);
     const [filterUserId, setFilterUserId] = useState('');
+    const [txFilter, setTxFilter] = useState({ userId: '', category: '', type: '', search: '' });
+    const txFilterRef = useRef(txFilter);
+    txFilterRef.current = txFilter;
+    const [liveFeed, setLiveFeed] = useState([]);
+    const [livePlayers, setLivePlayers] = useState([]);
+    const [liveCategoryFilter, setLiveCategoryFilter] = useState('');
+    const [liveUpdatedAt, setLiveUpdatedAt] = useState(null);
+    const [liveRefreshing, setLiveRefreshing] = useState(false);
+    const [userSearch, setUserSearch] = useState('');
     const [serverStatus, setServerStatus] = useState(null);
     const [actionMsg, setActionMsg] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
@@ -182,6 +489,8 @@ export default function AdminDashboard() {
     const [showExcludedUsers, setShowExcludedUsers] = useState(false);
     const [selectedTxIds, setSelectedTxIds] = useState(new Set());
     const [selectedUserIds, setSelectedUserIds] = useState(new Set());
+    const [userSort, setUserSort] = useState('balance_desc');
+    const [selectedUserId, setSelectedUserId] = useState(null);
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -207,36 +516,62 @@ export default function AdminDashboard() {
         }
     }, [fetchAdmin]);
 
-    const loadData = useCallback(async (userId = filterUserId, includeExcluded = showExcluded, includeExcludedUsers = showExcludedUsers) => {
+    const fetchLiveFeed = useCallback(async (silent = true) => {
+        if (!silent) setLiveRefreshing(true);
+        try {
+            const data = await fetchAdmin('/api/admin/dashboard/live-feed?limit=80');
+            setLiveFeed(data.feed ?? []);
+            setLivePlayers(data.inGamePlayers ?? []);
+            setLiveUpdatedAt(data.serverTime ?? new Date().toISOString());
+            setActiveUsers(prev => ({
+                ...(prev || {}),
+                currentlyInGame: data.currentlyInGame ?? 0,
+                inGamePlayers: data.inGamePlayers ?? [],
+            }));
+        } catch {
+            /* keep last feed */
+        } finally {
+            if (!silent) setLiveRefreshing(false);
+        }
+    }, [fetchAdmin]);
+
+    const fetchTransactions = useCallback(async (filters = txFilter, includeExcluded = showExcluded) => {
+        const params = new URLSearchParams();
+        if (filters.userId) params.set('userId', filters.userId);
+        if (filters.category) params.set('category', filters.category);
+        if (filters.type) params.set('type', filters.type);
+        if (filters.search?.trim()) params.set('search', filters.search.trim());
+        if (includeExcluded) params.set('showExcluded', 'true');
+        const q = params.toString() ? `?${params}` : '';
+        const data = await fetchAdmin(`/api/admin/dashboard/transactions${q}`);
+        setTransactions(data.transactions ?? []);
+        return data;
+    }, [fetchAdmin, txFilter, showExcluded]);
+
+    const loadData = useCallback(async (userId = filterUserId, includeExcluded = showExcluded, includeExcludedUsers = showExcludedUsers, sort = userSort) => {
         setLoading(true);
         setError('');
         try {
-            const txParams = new URLSearchParams();
-            if (userId) txParams.set('userId', userId);
-            if (includeExcluded) txParams.set('showExcluded', 'true');
-            const gameParams = new URLSearchParams();
-            if (userId) gameParams.set('userId', userId);
             const userParams = new URLSearchParams();
             if (includeExcludedUsers) userParams.set('showExcluded', 'true');
-            const txQuery = txParams.toString() ? `?${txParams}` : '';
-            const gameQuery = gameParams.toString() ? `?${gameParams}` : '';
+            if (sort) userParams.set('sort', sort);
             const userQuery = userParams.toString() ? `?${userParams}` : '';
-            const [ov, au, us, wal, sw, tx, gh] = await Promise.all([
+            const [ov, au, us, wal, sw] = await Promise.all([
                 fetchAdmin('/api/admin/dashboard/overview'),
                 fetchAdmin('/api/admin/dashboard/active-users'),
                 fetchAdmin(`/api/admin/dashboard/users${userQuery}`),
                 fetchAdmin('/api/admin/dashboard/wallets'),
                 fetchAdmin('/api/admin/dashboard/sweeps'),
-                fetchAdmin(`/api/admin/dashboard/transactions${txQuery}`),
-                fetchAdmin(`/api/admin/dashboard/game-history${gameQuery}`),
             ]);
             setOverview(ov);
             setActiveUsers(au);
             setUsers(us.users ?? []);
             setWallets(wal);
             setSweeps(sw.sweeps ?? []);
-            setTransactions(tx.transactions ?? []);
-            setGameHistory(gh.history ?? []);
+            await Promise.all([
+                fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded),
+                fetchLiveFeed(true),
+            ]);
             setSelectedTxIds(new Set());
             setSelectedUserIds(new Set());
         } catch (err) {
@@ -244,7 +579,7 @@ export default function AdminDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [fetchAdmin, filterUserId, showExcluded, showExcludedUsers]);
+    }, [fetchAdmin, filterUserId, showExcluded, showExcludedUsers, userSort, fetchTransactions, fetchLiveFeed]);
 
     useEffect(() => {
         document.title = 'AgarStake | Admin';
@@ -256,6 +591,21 @@ export default function AdminDashboard() {
         const id = setInterval(fetchServerStatus, 1000);
         return () => clearInterval(id);
     }, [fetchServerStatus]);
+
+    useEffect(() => {
+        if (tab !== 'live' && tab !== 'overview') return undefined;
+        fetchLiveFeed(true);
+        const id = setInterval(() => fetchLiveFeed(true), 3000);
+        return () => clearInterval(id);
+    }, [tab, fetchLiveFeed]);
+
+    useEffect(() => {
+        if (tab !== 'transactions') return undefined;
+        const id = setInterval(() => {
+            fetchTransactions(txFilter, showExcluded).catch(() => {});
+        }, 5000);
+        return () => clearInterval(id);
+    }, [tab, txFilter, showExcluded, fetchTransactions]);
 
     const runAdminAction = async (path, confirmText, body) => {
         if (confirmText && !window.confirm(confirmText)) return;
@@ -341,6 +691,24 @@ export default function AdminDashboard() {
         );
     };
 
+    const excludeUsersById = (ids) => {
+        if (!ids.length) return;
+        runAdminAction(
+            '/api/admin/users/exclude',
+            `Exclude this account from reports?\n\nAll their transactions will be hidden from stats. Nothing is deleted.`,
+            { ids },
+        ).then(() => setSelectedUserId(null));
+    };
+
+    const restoreUsersById = (ids) => {
+        if (!ids.length) return;
+        runAdminAction(
+            '/api/admin/users/restore',
+            `Restore this account to reports?`,
+            { ids },
+        ).then(() => setSelectedUserId(null));
+    };
+
     const bulkRestoreUsers = () => {
         const ids = [...selectedUserIds];
         if (!ids.length) return;
@@ -351,33 +719,35 @@ export default function AdminDashboard() {
         );
     };
 
-    const onFilterUser = (userId) => {
-        setFilterUserId(userId);
-        loadData(userId);
+    const applyTxFilters = (patch) => {
+        const next = { ...txFilterRef.current, ...patch };
+        setTxFilter(next);
+        setFilterUserId(next.userId || '');
+        fetchTransactions(next, showExcluded).catch(err => setError(err.message));
     };
 
-    const userFilterBar = (
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-2)' }}>Filter by user:</span>
-            <select
-                value={filterUserId}
-                onChange={e => onFilterUser(e.target.value)}
-                style={{
-                    background: 'var(--bg-2)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-md)',
-                    color: 'var(--text-h)',
-                    padding: '6px 10px',
-                    fontSize: '0.78rem',
-                }}
-            >
-                <option value="">All users</option>
-                {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.username}</option>
-                ))}
-            </select>
-        </div>
-    );
+    const runTxSearch = () => {
+        fetchTransactions(txFilterRef.current, showExcluded).catch(err => setError(err.message));
+    };
+
+    const clearTxFilters = () => {
+        const next = { userId: '', category: '', type: '', search: '' };
+        setFilterUserId('');
+        setTxFilter(next);
+        fetchTransactions(next, showExcluded).catch(err => setError(err.message));
+    };
+
+    const filteredUsers = userSearch.trim()
+        ? users.filter(u => u.username.toLowerCase().includes(userSearch.trim().toLowerCase()))
+        : users;
+
+    const filteredLiveFeed = liveCategoryFilter
+        ? liveFeed.filter(item => item.category === liveCategoryFilter)
+        : liveFeed;
+
+    const openUserFromFeed = (userId) => {
+        if (userId) setSelectedUserId(String(userId));
+    };
 
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
@@ -392,7 +762,8 @@ export default function AdminDashboard() {
                             Dashboard
                         </h1>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <LiveIndicator active={tab === 'live' || tab === 'overview'} />
                         <button className="btn btn-ghost" onClick={() => loadData()} disabled={loading} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
                             {loading ? 'Refreshing…' : 'Refresh'}
                         </button>
@@ -445,28 +816,160 @@ export default function AdminDashboard() {
                 </div>
 
                 {tab === 'overview' && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                        <StatCard
-                            label="Arena Reset Timer"
-                            value={serverStatus?.isResetting ? 'Resetting…' : formatCountdown(serverStatus?.msUntilReset)}
-                            sub={serverStatus ? `Cycle: ${formatDuration(serverStatus.arenaDurationMs)} · ${serverStatus.isResetting ? 'In progress' : `Next reset ${formatDate(serverStatus.arenaResetAt)}`}` : ''}
-                        />
-                        <StatCard label="Total Deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} txs` : ''} />
-                        <StatCard label="Total Withdrawals" value={formatUsd(overview?.totalWithdrawalsUsd)} sub={overview ? `${overview.withdrawalCount} txs` : ''} />
-                        <StatCard label="Net Gaming Revenue" value={formatUsd(overview?.netGamingRevenue)} sub={overview?.netGamingRevenue >= 0 ? 'Platform profit' : 'Platform loss'} />
-                        {(overview?.excludedTxCount ?? 0) > 0 && (
-                            <StatCard label="Excluded txs" value={overview.excludedTxCount} sub="Hidden individually — not deleted" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                            <StatCard
+                                label="Your earnings (→ Owner Vault)"
+                                value={formatUsd(overview?.ownerEarningsUsd)}
+                                sub={overview ? `${overview.ownerEarningsSol?.toFixed(4)} SOL · ${overview.ownerSweepCount ?? 0} sweeps (arena + BR)` : 'All house wallet → owner vault transfers'}
+                            />
+                            <StatCard
+                                label="Registered accounts"
+                                value={overview?.totalAccounts ?? '—'}
+                                sub={`Total balance held: ${formatUsd(overview?.totalUserBalanceUsd)} (${overview?.totalUserBalanceSol?.toFixed(4) ?? '0'} SOL)`}
+                            />
+                            <StatCard
+                                label="Owner Vault balance"
+                                value={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'}
+                                sub={wallets?.ownerVault ? `${formatUsd(wallets.ownerVault.balanceUsd)} on-chain now` : 'Sweep destination'}
+                            />
+                            <StatCard
+                                label="Arena Reset Timer"
+                                value={serverStatus?.isResetting ? 'Resetting…' : formatCountdown(serverStatus?.msUntilReset)}
+                                sub={serverStatus ? `Cycle: ${formatDuration(serverStatus.arenaDurationMs)} · ${serverStatus.isResetting ? 'In progress' : `Next reset ${formatDate(serverStatus.arenaResetAt)}`}` : ''}
+                            />
+                            <StatCard label="Total Deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} txs` : ''} />
+                            <StatCard label="Player Withdrawals" value={formatUsd(overview?.totalWithdrawalsUsd)} sub={overview ? `${overview.withdrawalCount} txs (excludes owner sweeps)` : ''} />
+                            <StatCard label="Currently In Game" value={activeUsers?.currentlyInGame ?? '—'} sub={`${activeUsers?.activeLast24h ?? 0} active in last 24h`} />
+                            <StatCard label="Main House Wallet" value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'} />
+                            {(overview?.excludedTxCount ?? 0) > 0 && (
+                                <StatCard label="Excluded txs" value={overview.excludedTxCount} sub="Hidden individually — not deleted" />
+                            )}
+                            {(overview?.excludedUsersCount ?? 0) > 0 && (
+                                <StatCard label="Excluded accounts" value={overview.excludedUsersCount} sub="All their txs hidden from stats" />
+                            )}
+                        </div>
+                        {overview && (
+                            <Panel
+                                title="Earnings breakdown"
+                                sub="Actual platform profit = SOL transferred from house wallets to your owner vault"
+                            >
+                                <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', fontSize: '0.82rem' }}>
+                                    <div>
+                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Arena reset sweeps</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--green)' }}>{formatSol(overview.ownerEarningsArenaSol)}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>BR owner cut (2.5%)</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--green)' }}>{formatSol(overview.ownerEarningsBrSol)}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>All user balances combined</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--text-h)' }}>{formatUsd(overview.totalUserBalanceUsd)}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Total accounts</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--text-h)' }}>{overview.totalAccounts}</p>
+                                    </div>
+                                </div>
+                            </Panel>
                         )}
-                        {(overview?.excludedUsersCount ?? 0) > 0 && (
-                            <StatCard label="Excluded accounts" value={overview.excludedUsersCount} sub="All their txs hidden from stats" />
-                        )}
-                        <StatCard label="Currently In Game" value={activeUsers?.currentlyInGame ?? '—'} sub={`${activeUsers?.activeLast24h ?? 0} active in last 24h`} />
-                        <StatCard label="Main House Wallet" value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'} />
-                        <StatCard label="Owner Vault" value={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'} sub="Sweep destination after reset" />
+                        <Panel title="Recent activity" sub="Auto-updates every 3s · full feed in Live tab">
+                            <DataTable
+                                columns={[
+                                    { key: 'time', label: 'When', render: r => formatRelativeTime(r.createdAt) },
+                                    { key: 'category', label: 'Type', render: r => <CategoryBadge category={r.category} /> },
+                                    { key: 'username', label: 'User', render: r => r.username },
+                                    { key: 'label', label: 'Event', render: r => r.label },
+                                    { key: 'amountUsd', label: 'Amount', render: r => r.amountUsd > 0 ? formatUsd(r.amountUsd) : '—' },
+                                ]}
+                                rows={liveFeed.slice(0, 8)}
+                                loading={false}
+                                emptyMessage="No activity yet"
+                            />
+                            <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--border)' }}>
+                                <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: '0.78rem' }} onClick={() => setTab('live')}>
+                                    Open live feed →
+                                </button>
+                            </div>
+                        </Panel>
                     </div>
                 )}
 
-                {tab === 'controls' && (
+                {tab === 'live' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                            <StatCard
+                                label="In game right now"
+                                value={livePlayers.length}
+                                sub={liveUpdatedAt ? `Updated ${formatRelativeTime(liveUpdatedAt)} · auto every 3s` : 'Loading…'}
+                            />
+                            <StatCard
+                                label="Active last 24h"
+                                value={activeUsers?.activeLast24h ?? '—'}
+                                sub="Unique users with any activity"
+                            />
+                        </div>
+
+                        <Panel
+                            title="Players in arena"
+                            sub={livePlayers.length ? 'Currently staking in arena tiers' : 'Nobody in arena right now'}
+                        >
+                            <DataTable
+                                columns={[
+                                    { key: 'username', label: 'Player', render: r => (
+                                        <button type="button" className="admin-link-btn" onClick={() => openUserFromFeed(r.id)}>{r.username}</button>
+                                    )},
+                                    { key: 'mode', label: 'Game', render: r => r.mode?.charAt(0).toUpperCase() + r.mode?.slice(1) },
+                                    { key: 'entryFeeUsd', label: 'Entry stake', render: r => formatUsd(r.entryFeeUsd) },
+                                ]}
+                                rows={livePlayers}
+                                loading={false}
+                                emptyMessage="No players in arena"
+                            />
+                        </Panel>
+
+                        <Panel
+                            title="Live activity feed"
+                            sub="Deposits, entries, cashouts, deaths, withdrawals — newest first"
+                        >
+                            <AdminFilterBar right={
+                                <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} onClick={() => fetchLiveFeed(false)} disabled={liveRefreshing}>
+                                    {liveRefreshing ? 'Updating…' : 'Refresh now'}
+                                </button>
+                            }>
+                                <FilterSelect
+                                    label="Show"
+                                    value={liveCategoryFilter}
+                                    onChange={e => setLiveCategoryFilter(e.target.value)}
+                                    options={LIVE_CATEGORY_FILTERS}
+                                />
+                            </AdminFilterBar>
+                            <DataTable
+                                columns={[
+                                    { key: 'time', label: 'When', render: r => (
+                                        <span title={formatDate(r.createdAt)}>{formatRelativeTime(r.createdAt)}</span>
+                                    )},
+                                    { key: 'category', label: 'Type', render: r => <CategoryBadge category={r.category} /> },
+                                    { key: 'username', label: 'User', render: r => r.userId ? (
+                                        <button type="button" className="admin-link-btn" onClick={() => openUserFromFeed(r.userId)}>{r.username}</button>
+                                    ) : r.username },
+                                    { key: 'label', label: 'What happened', render: r => <span style={{ color: 'var(--text-h)' }}>{r.label}</span> },
+                                    { key: 'amountUsd', label: 'Amount', render: r => (
+                                        <span style={{ fontWeight: 600, color: r.category === 'death' ? 'var(--text-2)' : 'var(--text-h)' }}>
+                                            {r.amountUsd > 0 ? formatUsd(r.amountUsd) : '—'}
+                                        </span>
+                                    )},
+                                ]}
+                                rows={filteredLiveFeed}
+                                loading={liveFeed.length === 0 && liveRefreshing}
+                                emptyMessage="No recent activity"
+                            />
+                        </Panel>
+                    </div>
+                )}
+
+                {tab === 'server' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                             <StatCard
@@ -584,8 +1087,25 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {tab === 'wallets' && (
+                {tab === 'finances' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                            <StatCard
+                                label="Total earned (sweeps)"
+                                value={formatUsd(overview?.ownerEarningsUsd)}
+                                sub={`${overview?.ownerEarningsSol?.toFixed(4) ?? '0'} SOL → owner vault`}
+                            />
+                            <StatCard
+                                label="Owner vault (on-chain)"
+                                value={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'}
+                                sub={wallets?.ownerVault ? formatUsd(wallets.ownerVault.balanceUsd) : 'Not configured'}
+                            />
+                            <StatCard
+                                label="Main house wallet"
+                                value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'}
+                                sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'}
+                            />
+                        </div>
                         <Panel title="On-chain wallets" sub={`Live Solana balances · SOL @ $${wallets?.solPrice?.toFixed(2) ?? '—'}`}>
                             <DataTable
                                 columns={[
@@ -593,7 +1113,7 @@ export default function AdminDashboard() {
                                     { key: 'address', label: 'Address', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.address}>{truncateAddr(r.address)}</span> },
                                     { key: 'balanceSol', label: 'Balance', render: r => formatSol(r.balanceSol) },
                                     { key: 'balanceUsd', label: 'USD', render: r => formatUsd(r.balanceUsd) },
-                                    { key: 'sweptOnReset', label: 'Owner sweep', render: r => r.sweptOnReset === false ? '2.5% after match' : r.sweptOnReset ? 'On arena reset' : '—' },
+                                    { key: 'sweptOnReset', label: 'Sweep rule', render: r => r.sweptOnReset === false ? '2.5% after BR match' : r.sweptOnReset ? 'On arena reset' : '—' },
                                 ]}
                                 rows={[
                                     ...(wallets?.mainHouse ? [wallets.mainHouse] : []),
@@ -604,7 +1124,7 @@ export default function AdminDashboard() {
                                 emptyMessage="No wallets configured"
                             />
                         </Panel>
-                        <Panel title="In-memory arena pools" sub="Per entry tier — reset when arena resets">
+                        <Panel title="Arena pools (in-memory)" sub="Per stake tier — resets with arena">
                             <DataTable
                                 columns={[
                                     { key: 'entryFeeUsd', label: 'Tier', render: r => formatUsd(r.entryFeeUsd) },
@@ -618,88 +1138,56 @@ export default function AdminDashboard() {
                                 emptyMessage="No active rooms"
                             />
                         </Panel>
+                        <Panel title="Sweep history" sub="House wallets → owner vault">
+                            <DataTable
+                                columns={[
+                                    { key: 'solAmount', label: 'SOL', render: r => r.solAmount != null ? formatSol(r.solAmount) : '—' },
+                                    { key: 'usdAmount', label: 'USD', render: r => r.usdAmount != null ? formatUsd(r.usdAmount) : '—' },
+                                    { key: 'from', label: 'From', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.from}>{truncateAddr(r.from)}</span> },
+                                    { key: 'signature', label: 'Tx', render: r => r.signature ? (
+                                        <a href={`https://solscan.io/tx/${r.signature}`} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: '0.72rem', color: 'var(--accent)' }}>
+                                            {truncateAddr(r.signature)}
+                                        </a>
+                                    ) : '—' },
+                                    { key: 'createdAt', label: 'Date', render: r => formatDate(r.createdAt) },
+                                ]}
+                                rows={sweeps}
+                                loading={loading}
+                                emptyMessage="No sweeps yet"
+                            />
+                        </Panel>
                     </div>
-                )}
-
-                {tab === 'sweeps' && (
-                    <Panel
-                        title="House wallet sweeps & arena resets"
-                        sub="Main arena → owner vault on reset. BR → 2.5% owner cut swept after each match winner is paid."
-                    >
-                        <DataTable
-                            columns={[
-                                { key: 'kind', label: 'Event', render: r => <OutcomeBadge outcome={r.kind.replace('_', ' ')} /> },
-                                { key: 'solAmount', label: 'SOL swept', render: r => r.solAmount != null ? formatSol(r.solAmount) : '—' },
-                                { key: 'usdAmount', label: 'USD', render: r => r.usdAmount != null ? formatUsd(r.usdAmount) : '—' },
-                                { key: 'from', label: 'From', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.from}>{truncateAddr(r.from)}</span> },
-                                { key: 'destination', label: 'To (Owner Vault)', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.destination}>{truncateAddr(r.destination)}</span> },
-                                { key: 'signature', label: 'Tx Sig', render: r => r.signature ? (
-                                    <a href={`https://solscan.io/tx/${r.signature}`} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: '0.72rem', color: 'var(--accent)' }}>
-                                        {truncateAddr(r.signature)}
-                                    </a>
-                                ) : '—' },
-                                { key: 'createdAt', label: 'Date', render: r => formatDate(r.createdAt) },
-                            ]}
-                            rows={sweeps}
-                            loading={loading}
-                            emptyMessage="No sweeps recorded yet (happens after arena reset)"
-                        />
-                    </Panel>
                 )}
 
                 {tab === 'users' && (
                     <Panel
                         title={`${users.length} registered accounts`}
-                        sub="Exclude a whole account (e.g. your test user) to hide all their transactions from stats without deleting anything."
+                        sub="Click a row to see full account details, transactions, and game history."
                     >
-                        <div style={{
-                            padding: '12px 16px',
-                            borderBottom: '1px solid var(--border)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            flexWrap: 'wrap',
-                        }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-2)', cursor: 'pointer' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={showExcludedUsers}
-                                    onChange={e => {
-                                        setShowExcludedUsers(e.target.checked);
-                                        loadData(filterUserId, showExcluded, e.target.checked);
-                                    }}
-                                />
-                                Include excluded accounts (to restore)
+                        <AdminFilterBar right={
+                            <>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>{selectedUserIds.size} selected</span>
+                                <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={bulkExcludeUsers}>Exclude</button>
+                                <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={bulkRestoreUsers}>Restore</button>
+                            </>
+                        }>
+                            <FilterSelect label="Sort" value={userSort} onChange={e => { setUserSort(e.target.value); loadData(filterUserId, showExcluded, showExcludedUsers, e.target.value); }} options={USER_SORT_OPTIONS} />
+                            <label className="admin-filter-field">
+                                <span className="admin-filter-label">Search</span>
+                                <input className="admin-filter-input" type="text" placeholder="Username…" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
                             </label>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>
-                                {selectedUserIds.size} selected
-                            </span>
-                            <button
-                                type="button"
-                                className="btn btn-ghost"
-                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                                disabled={actionLoading || selectedUserIds.size === 0}
-                                onClick={bulkExcludeUsers}
-                            >
-                                Exclude selected
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-ghost"
-                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                                disabled={actionLoading || selectedUserIds.size === 0}
-                                onClick={bulkRestoreUsers}
-                            >
-                                Restore selected
-                            </button>
-                        </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-2)', cursor: 'pointer', alignSelf: 'flex-end', paddingBottom: '2px' }}>
+                                <input type="checkbox" checked={showExcludedUsers} onChange={e => { setShowExcludedUsers(e.target.checked); loadData(filterUserId, showExcluded, e.target.checked); }} />
+                                Show excluded
+                            </label>
+                        </AdminFilterBar>
                         {loading ? (
                             <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>
                                 <span className="spinner" style={{ marginRight: '8px' }} />
                                 Loading…
                             </div>
-                        ) : users.length === 0 ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>No users found</div>
+                        ) : filteredUsers.length === 0 ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>No users match your search</div>
                         ) : (
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
@@ -708,34 +1196,40 @@ export default function AdminDashboard() {
                                             <th style={{ padding: '12px 16px', width: 40 }}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={users.length > 0 && selectedUserIds.size === users.length}
-                                                    onChange={toggleSelectAllUsers}
+                                                    checked={filteredUsers.length > 0 && selectedUserIds.size === filteredUsers.length}
+                                                    onChange={() => {
+                                                        if (selectedUserIds.size === filteredUsers.length) setSelectedUserIds(new Set());
+                                                        else setSelectedUserIds(new Set(filteredUsers.map(u => String(u.id))));
+                                                    }}
                                                 />
                                             </th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Username</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Joined</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposit wallet</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Withdraw addr</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Balance</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Total deposited</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposits</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Status</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {users.map(u => {
+                                        {filteredUsers.map(u => {
                                             const id = String(u.id);
                                             const isExcluded = u.excludedFromReports;
                                             return (
                                                 <tr
                                                     key={id}
+                                                    className="admin-user-row"
                                                     style={{
                                                         borderBottom: '1px solid var(--border)',
                                                         opacity: isExcluded ? 0.55 : 1,
                                                         background: isExcluded ? 'rgba(148,163,184,0.06)' : 'transparent',
+                                                        cursor: 'pointer',
                                                     }}
+                                                    onClick={() => setSelectedUserId(id)}
                                                 >
-                                                    <td style={{ padding: '12px 16px' }}>
+                                                    <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
                                                         <input
                                                             type="checkbox"
                                                             checked={selectedUserIds.has(id)}
@@ -743,6 +1237,7 @@ export default function AdminDashboard() {
                                                         />
                                                     </td>
                                                     <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-h)' }}>{u.username}</td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.78rem' }}>{u.createdAt ? formatDate(u.createdAt) : '—'}</td>
                                                     <td style={{ padding: '12px 16px' }}>
                                                         <span className="mono" style={{ fontSize: '0.72rem' }} title={u.depositAddress}>{truncateAddr(u.depositAddress)}</span>
                                                     </td>
@@ -754,16 +1249,6 @@ export default function AdminDashboard() {
                                                     <td style={{ padding: '12px 16px' }}>{u.depositCount}</td>
                                                     <td style={{ padding: '12px 16px' }}>
                                                         {isExcluded ? <OutcomeBadge outcome="excluded" /> : 'Active'}
-                                                    </td>
-                                                    <td style={{ padding: '12px 16px' }}>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-ghost"
-                                                            style={{ padding: '4px 10px', fontSize: '0.72rem' }}
-                                                            onClick={() => { setFilterUserId(u.id); setTab('transactions'); loadData(u.id); }}
-                                                        >
-                                                            View txs
-                                                        </button>
                                                     </td>
                                                 </tr>
                                             );
@@ -777,109 +1262,77 @@ export default function AdminDashboard() {
 
                 {tab === 'transactions' && (
                     <Panel
-                        title="All transactions"
-                        sub="Exclude test/fake rows from stats without deleting them. Use bulk select for many at once."
+                        title={`${transactions.length} transactions`}
+                        sub="Filter by category, user, or search · auto-refreshes every 5s on this tab"
                     >
-                        {userFilterBar}
-                        <div style={{
-                            padding: '12px 16px',
-                            borderBottom: '1px solid var(--border)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            flexWrap: 'wrap',
-                        }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-2)', cursor: 'pointer' }}>
+                        <AdminFilterBar right={
+                            <>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>{selectedTxIds.size} selected</span>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-2)', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={showExcluded} onChange={e => { setShowExcluded(e.target.checked); fetchTransactions(txFilter, e.target.checked); }} />
+                                    Show excluded
+                                </label>
+                                <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedTxIds.size === 0} onClick={bulkExcludeTx}>Exclude</button>
+                                <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedTxIds.size === 0} onClick={bulkRestoreTx}>Restore</button>
+                            </>
+                        }>
+                            <FilterSelect label="Category" value={txFilter.category} onChange={e => applyTxFilters({ category: e.target.value })} options={TX_CATEGORY_OPTIONS} />
+                            <FilterSelect label="Type" value={txFilter.type} onChange={e => applyTxFilters({ type: e.target.value })} options={TX_TYPE_OPTIONS} />
+                            <FilterSelect label="User" value={txFilter.userId} onChange={e => { setFilterUserId(e.target.value); applyTxFilters({ userId: e.target.value }); }} options={[{ value: '', label: 'All users' }, ...users.map(u => ({ value: String(u.id), label: u.username }))]} />
+                            <label className="admin-filter-field">
+                                <span className="admin-filter-label">Search user</span>
                                 <input
-                                    type="checkbox"
-                                    checked={showExcluded}
-                                    onChange={e => {
-                                        setShowExcluded(e.target.checked);
-                                        loadData(filterUserId, e.target.checked);
-                                    }}
+                                    className="admin-filter-input"
+                                    type="text"
+                                    placeholder="Username…"
+                                    value={txFilter.search}
+                                    onChange={e => setTxFilter(prev => ({ ...prev, search: e.target.value }))}
+                                    onKeyDown={e => { if (e.key === 'Enter') runTxSearch(); }}
                                 />
-                                Include excluded (to restore)
                             </label>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>
-                                {selectedTxIds.size} selected
-                            </span>
-                            <button
-                                type="button"
-                                className="btn btn-ghost"
-                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                                disabled={actionLoading || selectedTxIds.size === 0}
-                                onClick={bulkExcludeTx}
-                            >
-                                Exclude selected
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-ghost"
-                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
-                                disabled={actionLoading || selectedTxIds.size === 0}
-                                onClick={bulkRestoreTx}
-                            >
-                                Restore selected
-                            </button>
-                        </div>
-                        {loading ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>
-                                <span className="spinner" style={{ marginRight: '8px' }} />
-                                Loading…
-                            </div>
-                        ) : transactions.length === 0 ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>No transactions</div>
+                            <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem', alignSelf: 'flex-end' }} onClick={runTxSearch}>Apply</button>
+                            {(txFilter.category || txFilter.type || txFilter.userId || txFilter.search) && (
+                                <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem', alignSelf: 'flex-end' }} onClick={clearTxFilters}>Clear</button>
+                            )}
+                        </AdminFilterBar>
+                        {transactions.length === 0 ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>No transactions match your filters</div>
                         ) : (
                             <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                                     <thead>
                                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
                                             <th style={{ padding: '12px 16px', width: 40 }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={transactions.length > 0 && selectedTxIds.size === transactions.length}
-                                                    onChange={toggleSelectAllTx}
-                                                />
+                                                <input type="checkbox" checked={transactions.length > 0 && selectedTxIds.size === transactions.length} onChange={toggleSelectAllTx} />
                                             </th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Date</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>When</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Category</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>User</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Type</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Description</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Amount</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Status</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Details</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {transactions.map(tx => {
                                             const id = String(tx.id);
                                             const isExcluded = tx.excludedFromReports;
-                                            const m = tx.meta || {};
-                                            const detail = m.reason || m.event || m.signature || '—';
                                             return (
-                                                <tr
-                                                    key={id}
-                                                    style={{
-                                                        borderBottom: '1px solid var(--border)',
-                                                        opacity: isExcluded ? 0.55 : 1,
-                                                        background: isExcluded ? 'rgba(255,255,255,0.02)' : undefined,
-                                                    }}
-                                                >
+                                                <tr key={id} style={{ borderBottom: '1px solid var(--border)', opacity: isExcluded ? 0.55 : 1 }}>
                                                     <td style={{ padding: '12px 16px' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedTxIds.has(id)}
-                                                            onChange={() => toggleTxSelection(id)}
-                                                        />
+                                                        <input type="checkbox" checked={selectedTxIds.has(id)} onChange={() => toggleTxSelection(id)} />
                                                     </td>
-                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>{formatDate(tx.createdAt)}</td>
-                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>{tx.username}</td>
-                                                    <td style={{ padding: '12px 16px' }}><TypeBadge type={tx.type} /></td>
-                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>{formatUsd(tx.amountUsd)}</td>
-                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }} title={formatDate(tx.createdAt)}>{formatRelativeTime(tx.createdAt)}</td>
+                                                    <td style={{ padding: '12px 16px' }}><CategoryBadge category={tx.category} /></td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        {tx.userId ? (
+                                                            <button type="button" className="admin-link-btn" onClick={() => openUserFromFeed(tx.userId)}>{tx.username}</button>
+                                                        ) : tx.username}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text-h)' }}>{tx.label}</td>
+                                                    <td style={{ padding: '12px 16px', fontWeight: 600 }}>{formatUsd(tx.amountUsd)}</td>
+                                                    <td style={{ padding: '12px 16px' }}>
                                                         {isExcluded ? <OutcomeBadge outcome="excluded" /> : tx.status}
-                                                    </td>
-                                                    <td style={{ padding: '12px 16px', color: 'var(--text)' }}>
-                                                        <span className="mono" style={{ fontSize: '0.72rem' }} title={detail}>{truncateAddr(detail)}</span>
                                                     </td>
                                                 </tr>
                                             );
@@ -890,44 +1343,18 @@ export default function AdminDashboard() {
                         )}
                     </Panel>
                 )}
-
-                {tab === 'game' && (
-                    <Panel title="In-game history" sub="Joins, deaths, cashouts, reset payouts">
-                        {userFilterBar}
-                        <DataTable
-                            columns={[
-                                { key: 'createdAt', label: 'Date', render: r => formatDate(r.createdAt) },
-                                { key: 'username', label: 'User', render: r => r.username },
-                                { key: 'eventType', label: 'Event', render: r => <OutcomeBadge outcome={r.eventType} /> },
-                                { key: 'game', label: 'Game', render: r => String(r.game).charAt(0).toUpperCase() + String(r.game).slice(1) },
-                                { key: 'entryFeeUsd', label: 'Entry', render: r => r.entryFeeUsd != null ? formatUsd(r.entryFeeUsd) : '—' },
-                                { key: 'amountUsd', label: 'Amount', render: r => formatUsd(r.amountUsd) },
-                            ]}
-                            rows={gameHistory}
-                            loading={loading}
-                            emptyMessage="No game history yet"
-                        />
-                    </Panel>
-                )}
-
-                {tab === 'active' && (
-                    <Panel
-                        title={`${activeUsers?.currentlyInGame ?? 0} players in arena now`}
-                        sub={`${activeUsers?.activeLast24h ?? 0} unique users with activity in the last 24 hours`}
-                    >
-                        <DataTable
-                            columns={[
-                                { key: 'username', label: 'Player' },
-                                { key: 'mode', label: 'Mode', render: r => r.mode?.charAt(0).toUpperCase() + r.mode?.slice(1) },
-                                { key: 'entryFeeUsd', label: 'Entry', render: r => formatUsd(r.entryFeeUsd) },
-                            ]}
-                            rows={activeUsers?.inGamePlayers ?? []}
-                            loading={loading}
-                            emptyMessage="No players currently in game"
-                        />
-                    </Panel>
-                )}
             </div>
+
+            {selectedUserId && (
+                <UserDetailModal
+                    userId={selectedUserId}
+                    fetchAdmin={fetchAdmin}
+                    onClose={() => setSelectedUserId(null)}
+                    onExclude={excludeUsersById}
+                    onRestore={restoreUsersById}
+                    actionLoading={actionLoading}
+                />
+            )}
         </div>
     );
 }
