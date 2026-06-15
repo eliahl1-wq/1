@@ -1,5 +1,6 @@
 let audioCtx = null;
 let unlocked = false;
+let noiseBuffer = null;
 
 const THROTTLE_MS = 38;
 const STREAK_WINDOW_MS = 240;
@@ -19,6 +20,15 @@ function getCtx() {
         audioCtx = new Ctx();
     }
     return audioCtx;
+}
+
+function getNoiseBuffer(ctx, durationSec = 0.03) {
+    if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer;
+    const len = Math.ceil(ctx.sampleRate * durationSec);
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return noiseBuffer;
 }
 
 /** Call once after a user gesture so browsers allow playback. */
@@ -45,65 +55,54 @@ function nextStreak(prev, prevAt) {
 }
 
 /**
- * Soft counter-style chime — subtle casino tick when blobs are eaten in quick succession.
- * Dual sine tones, low volume, gentle downward glide (no harsh arcade sweep).
+ * Barely-there UI click — filtered noise + low thump, no bright pling.
+ * Rapid eats nudge filter/volume slightly, like a soft counter ticking.
  */
-function playSoftChime({ baseFreq, streak, gain, decay }) {
+function playSoftClick({ centerFreq, q, gain, streak, duration }) {
     const ctx = getCtx();
     if (!ctx || ctx.state !== 'running') return;
 
     const t = ctx.currentTime;
-    const pitchLift = streak * 16;
-    const jitter = (Math.random() - 0.5) * 14;
-    const freq = baseFreq + pitchLift + jitter;
-    const attack = 0.004;
-    const duration = decay;
+    const dur = duration;
+    const lift = Math.min(streak, 8) * 10;
 
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, t);
-    master.gain.linearRampToValueAtTime(gain, t + attack);
-    master.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    master.gain.linearRampToValueAtTime(gain, t + 0.001);
+    master.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     master.connect(ctx.destination);
 
-    const tones = [
-        { ratio: 1, level: 1 },
-        { ratio: 2, level: 0.22 },
-        { ratio: 1.498, level: streak >= 2 ? 0.14 : 0.08 },
-    ];
+    const noise = ctx.createBufferSource();
+    noise.buffer = getNoiseBuffer(ctx, dur + 0.01);
 
-    for (const tone of tones) {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'sine';
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = centerFreq + lift;
+    bp.Q.value = q;
 
-        const f0 = freq * tone.ratio;
-        const f1 = f0 * 0.94;
-        osc.frequency.setValueAtTime(f0, t);
-        osc.frequency.exponentialRampToValueAtTime(Math.max(f1, 40), t + duration * 0.65);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 90;
 
-        g.gain.value = tone.level;
-        osc.connect(g);
-        g.connect(master);
-        osc.start(t);
-        osc.stop(t + duration + 0.03);
-    }
+    noise.connect(bp);
+    bp.connect(hp);
+    hp.connect(master);
+    noise.start(t);
+    noise.stop(t + dur + 0.005);
 
-    // Very faint high tick on rapid chains — like digits ticking up
-    if (streak >= 3) {
-        const tick = ctx.createOscillator();
-        const tickGain = ctx.createGain();
-        tick.type = 'sine';
-        const tickFreq = freq * 2.4 + streak * 8;
-        tick.frequency.setValueAtTime(tickFreq, t + 0.012);
-        tick.frequency.exponentialRampToValueAtTime(Math.max(tickFreq * 0.92, 40), t + 0.05);
-        tickGain.gain.setValueAtTime(0.0001, t + 0.012);
-        tickGain.gain.linearRampToValueAtTime(gain * 0.35, t + 0.018);
-        tickGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
-        tick.connect(tickGain);
-        tickGain.connect(master);
-        tick.start(t + 0.012);
-        tick.stop(t + 0.07);
-    }
+    const thump = ctx.createOscillator();
+    const thumpG = ctx.createGain();
+    thump.type = 'sine';
+    const thumpFreq = 88 + lift * 0.4;
+    thump.frequency.setValueAtTime(thumpFreq, t);
+    thump.frequency.exponentialRampToValueAtTime(Math.max(thumpFreq * 0.82, 40), t + dur);
+    thumpG.gain.setValueAtTime(0.0001, t);
+    thumpG.gain.linearRampToValueAtTime(gain * 0.55, t + 0.0015);
+    thumpG.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.1);
+    thump.connect(thumpG);
+    thumpG.connect(master);
+    thump.start(t);
+    thump.stop(t + dur + 0.01);
 }
 
 function playEatSound(kind) {
@@ -119,32 +118,34 @@ function playEatSound(kind) {
         const next = nextStreak(agarStreak, agarStreakAt);
         agarStreak = next.streak;
         agarStreakAt = next.at;
-        playSoftChime({
-            baseFreq: 680,
+        playSoftClick({
+            centerFreq: 210,
+            q: 1.4,
+            gain: 0.014 + Math.min(agarStreak, 6) * 0.0012,
             streak: agarStreak,
-            gain: 0.032 + Math.min(agarStreak, 6) * 0.002,
-            decay: 0.085,
+            duration: 0.018,
         });
     } else {
         lastSlitherEatAt = now;
         const next = nextStreak(slitherStreak, slitherStreakAt);
         slitherStreak = next.streak;
         slitherStreakAt = next.at;
-        playSoftChime({
-            baseFreq: 760,
+        playSoftClick({
+            centerFreq: 245,
+            q: 1.6,
+            gain: 0.013 + Math.min(slitherStreak, 6) * 0.001,
             streak: slitherStreak,
-            gain: 0.028 + Math.min(slitherStreak, 6) * 0.002,
-            decay: 0.072,
+            duration: 0.016,
         });
     }
 }
 
-/** Soft counter chime — Agar pellet pickup. */
+/** Subtle click — Agar pellet pickup. */
 export function playAgarEatSound() {
     playEatSound('agar');
 }
 
-/** Soft counter chime — Slither food pickup. */
+/** Subtle click — Slither food pickup. */
 export function playSlitherEatSound() {
     playEatSound('slither');
 }

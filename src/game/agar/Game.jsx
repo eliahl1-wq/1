@@ -52,6 +52,10 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
     const margin = 240;
     const halfW = screenW / 2 + margin;
     const halfH = screenH / 2 + margin;
+    // Keep in-view pellets much longer to avoid visible blinking from packet jitter.
+    const IN_VIEW_MISS_LIMIT = 24;
+    // Off-screen pellets can be pruned sooner to keep cache bounded.
+    const OFF_VIEW_MISS_LIMIT = 12;
     for (const [id, f] of foodMap) {
         const miss = f._missStreak || 0;
         if (miss === 0) continue;
@@ -60,9 +64,8 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
             if (foodEatenByPlayer(f, myId, users)) playAgarEatSound();
             foodMap.delete(id);
         } else if (!inView) {
-            if (miss >= 8) foodMap.delete(id);
-        } else if (miss >= 3) {
-            // Brief grace for edge culling (~75ms at 40Hz), not full second
+            if (miss >= OFF_VIEW_MISS_LIMIT) foodMap.delete(id);
+        } else if (miss >= IN_VIEW_MISS_LIMIT) {
             foodMap.delete(id);
         }
     }
