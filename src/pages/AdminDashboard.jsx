@@ -186,7 +186,9 @@ export default function AdminDashboard() {
     const [actionMsg, setActionMsg] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
     const [showExcluded, setShowExcluded] = useState(false);
+    const [showExcludedUsers, setShowExcludedUsers] = useState(false);
     const [selectedTxIds, setSelectedTxIds] = useState(new Set());
+    const [selectedUserIds, setSelectedUserIds] = useState(new Set());
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -212,7 +214,7 @@ export default function AdminDashboard() {
         }
     }, [fetchAdmin]);
 
-    const loadData = useCallback(async (userId = filterUserId, includeExcluded = showExcluded) => {
+    const loadData = useCallback(async (userId = filterUserId, includeExcluded = showExcluded, includeExcludedUsers = showExcludedUsers) => {
         setLoading(true);
         setError('');
         try {
@@ -221,12 +223,15 @@ export default function AdminDashboard() {
             if (includeExcluded) txParams.set('showExcluded', 'true');
             const gameParams = new URLSearchParams();
             if (userId) gameParams.set('userId', userId);
+            const userParams = new URLSearchParams();
+            if (includeExcludedUsers) userParams.set('showExcluded', 'true');
             const txQuery = txParams.toString() ? `?${txParams}` : '';
             const gameQuery = gameParams.toString() ? `?${gameParams}` : '';
+            const userQuery = userParams.toString() ? `?${userParams}` : '';
             const [ov, au, us, wal, sw, tx, gh] = await Promise.all([
                 fetchAdmin('/api/admin/dashboard/overview'),
                 fetchAdmin('/api/admin/dashboard/active-users'),
-                fetchAdmin('/api/admin/dashboard/users'),
+                fetchAdmin(`/api/admin/dashboard/users${userQuery}`),
                 fetchAdmin('/api/admin/dashboard/wallets'),
                 fetchAdmin('/api/admin/dashboard/sweeps'),
                 fetchAdmin(`/api/admin/dashboard/transactions${txQuery}`),
@@ -240,12 +245,13 @@ export default function AdminDashboard() {
             setTransactions(tx.transactions ?? []);
             setGameHistory(gh.history ?? []);
             setSelectedTxIds(new Set());
+            setSelectedUserIds(new Set());
         } catch (err) {
             setError(err.message || 'Could not load dashboard');
         } finally {
             setLoading(false);
         }
-    }, [fetchAdmin, filterUserId, showExcluded]);
+    }, [fetchAdmin, filterUserId, showExcluded, showExcludedUsers]);
 
     useEffect(() => {
         document.title = 'AgarStake | Admin';
@@ -310,6 +316,44 @@ export default function AdminDashboard() {
         runAdminAction(
             '/api/admin/transactions/restore',
             `Restore ${ids.length} transaction(s) to reports?`,
+            { ids },
+        );
+    };
+
+    const toggleUserSelection = (id) => {
+        setSelectedUserIds(prev => {
+            const next = new Set(prev);
+            const key = String(id);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+
+    const toggleSelectAllUsers = () => {
+        if (selectedUserIds.size === users.length) {
+            setSelectedUserIds(new Set());
+        } else {
+            setSelectedUserIds(new Set(users.map(u => String(u.id))));
+        }
+    };
+
+    const bulkExcludeUsers = () => {
+        const ids = [...selectedUserIds];
+        if (!ids.length) return;
+        runAdminAction(
+            '/api/admin/users/exclude',
+            `Exclude ${ids.length} account(s) from reports?\n\nAll their transactions will be hidden from profit/deposits/stats. Nothing is deleted.`,
+            { ids },
+        );
+    };
+
+    const bulkRestoreUsers = () => {
+        const ids = [...selectedUserIds];
+        if (!ids.length) return;
+        runAdminAction(
+            '/api/admin/users/restore',
+            `Restore ${ids.length} account(s) to reports?`,
             { ids },
         );
     };
@@ -417,8 +461,11 @@ export default function AdminDashboard() {
                         <StatCard label="Total Deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} txs` : ''} />
                         <StatCard label="Total Withdrawals" value={formatUsd(overview?.totalWithdrawalsUsd)} sub={overview ? `${overview.withdrawalCount} txs` : ''} />
                         <StatCard label="Net Gaming Revenue" value={formatUsd(overview?.netGamingRevenue)} sub={overview?.netGamingRevenue >= 0 ? 'Platform profit' : 'Platform loss'} />
-                        {(overview?.excludedCount ?? 0) > 0 && (
-                            <StatCard label="Excluded from reports" value={overview.excludedCount} sub="Hidden test/fake txs — not deleted" />
+                        {(overview?.excludedTxCount ?? 0) > 0 && (
+                            <StatCard label="Excluded txs" value={overview.excludedTxCount} sub="Hidden individually — not deleted" />
+                        )}
+                        {(overview?.excludedUsersCount ?? 0) > 0 && (
+                            <StatCard label="Excluded accounts" value={overview.excludedUsersCount} sub="All their txs hidden from stats" />
                         )}
                         <StatCard label="Currently In Game" value={activeUsers?.currentlyInGame ?? '—'} sub={`${activeUsers?.activeLast24h ?? 0} active in last 24h`} />
                         <StatCard label="Main House Wallet" value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'} />
@@ -608,25 +655,130 @@ export default function AdminDashboard() {
                 )}
 
                 {tab === 'users' && (
-                    <Panel title={`${users.length} registered accounts`} sub="Balance = on-chain deposit wallet (SOL). Click user filter in Transactions/Game tabs.">
-                        <DataTable
-                            columns={[
-                                { key: 'username', label: 'Username', render: r => <span style={{ fontWeight: 600, color: 'var(--text-h)' }}>{r.username}</span> },
-                                { key: 'depositAddress', label: 'Deposit wallet', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.depositAddress}>{truncateAddr(r.depositAddress)}</span> },
-                                { key: 'wallet', label: 'Withdraw addr', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.wallet}>{truncateAddr(r.wallet)}</span> },
-                                { key: 'balanceUsd', label: 'Balance', render: r => `${formatUsd(r.balanceUsd)} (${formatSol(r.balanceSol)})` },
-                                { key: 'totalDepositedUsd', label: 'Total deposited', render: r => formatUsd(r.totalDepositedUsd) },
-                                { key: 'depositCount', label: 'Deposits' },
-                                { key: 'id', label: 'Actions', render: r => (
-                                    <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: '0.72rem' }} onClick={() => { setFilterUserId(r.id); setTab('transactions'); loadData(r.id); }}>
-                                        View txs
-                                    </button>
-                                )},
-                            ]}
-                            rows={users}
-                            loading={loading}
-                            emptyMessage="No users found"
-                        />
+                    <Panel
+                        title={`${users.length} registered accounts`}
+                        sub="Exclude a whole account (e.g. your test user) to hide all their transactions from stats without deleting anything."
+                    >
+                        <div style={{
+                            padding: '12px 16px',
+                            borderBottom: '1px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            flexWrap: 'wrap',
+                        }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-2)', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={showExcludedUsers}
+                                    onChange={e => {
+                                        setShowExcludedUsers(e.target.checked);
+                                        loadData(filterUserId, showExcluded, e.target.checked);
+                                    }}
+                                />
+                                Include excluded accounts (to restore)
+                            </label>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>
+                                {selectedUserIds.size} selected
+                            </span>
+                            <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                disabled={actionLoading || selectedUserIds.size === 0}
+                                onClick={bulkExcludeUsers}
+                            >
+                                Exclude selected
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                disabled={actionLoading || selectedUserIds.size === 0}
+                                onClick={bulkRestoreUsers}
+                            >
+                                Restore selected
+                            </button>
+                        </div>
+                        {loading ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>
+                                <span className="spinner" style={{ marginRight: '8px' }} />
+                                Loading…
+                            </div>
+                        ) : users.length === 0 ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>No users found</div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <th style={{ padding: '12px 16px', width: 40 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={users.length > 0 && selectedUserIds.size === users.length}
+                                                    onChange={toggleSelectAllUsers}
+                                                />
+                                            </th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Username</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposit wallet</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Withdraw addr</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Balance</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Total deposited</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposits</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Status</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {users.map(u => {
+                                            const id = String(u.id);
+                                            const isExcluded = u.excludedFromReports;
+                                            return (
+                                                <tr
+                                                    key={id}
+                                                    style={{
+                                                        borderBottom: '1px solid var(--border)',
+                                                        opacity: isExcluded ? 0.55 : 1,
+                                                        background: isExcluded ? 'rgba(148,163,184,0.06)' : 'transparent',
+                                                    }}
+                                                >
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedUserIds.has(id)}
+                                                            onChange={() => toggleUserSelection(id)}
+                                                        />
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-h)' }}>{u.username}</td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <span className="mono" style={{ fontSize: '0.72rem' }} title={u.depositAddress}>{truncateAddr(u.depositAddress)}</span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <span className="mono" style={{ fontSize: '0.72rem' }} title={u.wallet}>{truncateAddr(u.wallet)}</span>
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>{formatUsd(u.balanceUsd)} ({formatSol(u.balanceSol)})</td>
+                                                    <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalDepositedUsd)}</td>
+                                                    <td style={{ padding: '12px 16px' }}>{u.depositCount}</td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : 'Active'}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-ghost"
+                                                            style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+                                                            onClick={() => { setFilterUserId(u.id); setTab('transactions'); loadData(u.id); }}
+                                                        >
+                                                            View txs
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </Panel>
                 )}
 

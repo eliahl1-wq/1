@@ -804,16 +804,126 @@
   left: 16px;
   bottom: 16px;
   z-index: 1050;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
 }
 
 .live-stats-bottom {
-  width: 240px;
+  width: 260px;
 }
 
 .live-stats-bottom .label { color: var(--text-2); font-weight: 600; text-transform: uppercase; font-size: 0.62rem; }
+
+.live-stats-mode-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-h);
+  letter-spacing: 0.04em;
+}
+
+.live-stats-playing {
+  font-size: 0.68rem;
+  color: var(--text-2);
+  margin-bottom: 10px;
+}
+
+.live-stats-playing .mono {
+  color: var(--text-h);
+  font-weight: 700;
+}
+
+.live-gamemode-picker {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.live-gamemode-row {
+  display: block;
+  width: 100%;
+  padding: 4px 10px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+
+.live-gamemode-row:last-child {
+  border-bottom: none;
+}
+
+.live-gamemode-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.live-gamemode-row--selected {
+  background: rgba(124, 58, 255, 0.1);
+}
+
+.live-gamemode-row--selected .live-gamemode-row__text {
+  color: var(--text-h);
+}
+
+.live-gamemode-row__text {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.live-gamemode-row--empty .live-gamemode-row__text {
+  color: var(--text-3);
+}
+
+.live-gamemode-row__count {
+  color: var(--text-3);
+  font-weight: 700;
+}
+
+.live-gamemode-row__count--active {
+  color: var(--green);
+}
+
+.live-gamemode-row--hot .live-gamemode-row__text,
+.live-gamemode-row--hot .live-gamemode-row__count {
+  animation: gmHotPulse 2.2s ease-in-out infinite;
+}
+
+.live-stats-panel {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.live-stats-panel__title {
+  font-size: 0.62rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.live-stats-panel__empty {
+  font-size: 0.65rem;
+  color: var(--text-3);
+}
+
+.live-stats-panel__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  gap: 8px;
+}
 
 .gamemode-stats-list {
   background: var(--bg-1);

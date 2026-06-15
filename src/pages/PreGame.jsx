@@ -35,6 +35,20 @@ const GAMEMODE_STATS = [
     { key: 'brSlither', label: 'Slither BR' },
 ];
 
+const LIVE_GAMEMODE_OPTIONS = [
+    { key: 'all', label: 'All' },
+    ...GAMEMODE_STATS,
+];
+
+const modeToLiveStatsKey = (mode) => {
+    if (mode === 'slither') return 'slither';
+    if (mode === 'br-agar' || mode === 'brAgar') return 'brAgar';
+    if (mode === 'br-slither' || mode === 'brSlither') return 'brSlither';
+    return 'agar';
+};
+
+const isBRStatsKey = (key) => key === 'brAgar' || key === 'brSlither';
+
 const isHotGamemode = (count, topCount, secondCount) => {
     if (count <= 0 || count !== topCount) return false;
     if (secondCount === 0) return count >= 2;
@@ -61,7 +75,9 @@ export default function PreGame() {
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
     const [isCurSOL, setIsCurSOL] = useState(false);
     const [isMatchmaking, setIsMatchmaking] = useState(false);
-    const [gamemodeStatsExpanded, setGamemodeStatsExpanded] = useState(false);
+    const [liveViewGamemode, setLiveViewGamemode] = useState(
+        () => modeToLiveStatsKey(localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || 'agar')
+    );
 
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(
         () => !!localStorage.getItem('current_game_mode')
@@ -69,9 +85,12 @@ export default function PreGame() {
     const [activeGameBalance, setActiveGameBalance] = useState(null);
     const [liveStats, setLiveStats] = useState({
         playersOnline: 0,
+        totalPlayersOnline: 0,
         biggestPayout: 0,
         topPlayer: null,
         topPlayers: [],
+        topPlayersByGamemode: { agar: [], slither: [] },
+        recentBRVictories: { agar: [], slither: [] },
         playersByEntryFee: {},
         playersByModeAndFee: { agar: {}, slither: {} },
         brPlayersByFee: {},
@@ -132,7 +151,6 @@ export default function PreGame() {
     const walletDropRef = useRef(null);
     const walletExpandRef = useRef(null);
     const withdrawExpandRef = useRef(null);
-    const gamemodeStatsRef = useRef(null);
     const qrRef = useRef(null);
 
     const depositAddress = user?.depositAddress;
@@ -151,7 +169,6 @@ export default function PreGame() {
     }, [selectedMode, isBattleRoyaleMode, selectedEntryFee]);
 
     const normalModeKey = selectedMode.replace(/^br-/, '');
-    const liveStatsMode = normalModeKey === 'slither' ? 'slither' : 'agar';
 
     const playingCountForTier = (tier) => {
         if (isBattleRoyaleMode && brVariant) {
@@ -159,6 +176,44 @@ export default function PreGame() {
         }
         return liveStats.playersByModeAndFee?.[normalModeKey]?.[tier] ?? 0;
     };
+
+    const liveGamemodeOptions = useMemo(() => {
+        const counts = liveStats.playersByGamemode || {};
+        const total = liveStats.totalPlayersOnline ?? liveStats.playersOnline ?? 0;
+        return LIVE_GAMEMODE_OPTIONS.map(({ key, label }) => ({
+            key,
+            label,
+            count: key === 'all' ? total : (counts[key] ?? 0),
+        }));
+    }, [liveStats.playersByGamemode, liveStats.totalPlayersOnline, liveStats.playersOnline]);
+
+    const liveViewLabel = LIVE_GAMEMODE_OPTIONS.find(o => o.key === liveViewGamemode)?.label ?? 'All';
+
+    const playingCountForLiveView = useMemo(() => {
+        if (liveViewGamemode === 'all') {
+            return liveStats.totalPlayersOnline ?? liveStats.playersOnline ?? 0;
+        }
+        return liveStats.playersByGamemode?.[liveViewGamemode] ?? 0;
+    }, [liveViewGamemode, liveStats.playersByGamemode, liveStats.totalPlayersOnline, liveStats.playersOnline]);
+
+    const liveTopPlayers = useMemo(() => {
+        const byMode = liveStats.topPlayersByGamemode || { agar: [], slither: [] };
+        if (liveViewGamemode === 'agar') return byMode.agar || [];
+        if (liveViewGamemode === 'slither') return byMode.slither || [];
+        if (liveViewGamemode === 'all') {
+            return [...(byMode.agar || []), ...(byMode.slither || [])]
+                .sort((a, b) => (b.balance || 0) - (a.balance || 0))
+                .slice(0, 3);
+        }
+        return [];
+    }, [liveViewGamemode, liveStats.topPlayersByGamemode]);
+
+    const liveBRVictories = useMemo(() => {
+        const recent = liveStats.recentBRVictories || { agar: [], slither: [] };
+        if (liveViewGamemode === 'brAgar') return recent.agar || [];
+        if (liveViewGamemode === 'brSlither') return recent.slither || [];
+        return [];
+    }, [liveViewGamemode, liveStats.recentBRVictories]);
 
     const gamemodeStatsList = useMemo(() => {
         const counts = liveStats.playersByGamemode || {};
@@ -169,10 +224,6 @@ export default function PreGame() {
 
     const topGamemodeCount = gamemodeStatsList[0]?.count ?? 0;
     const secondGamemodeCount = gamemodeStatsList[1]?.count ?? 0;
-    const anyGamemodeActive = gamemodeStatsList.some(m => m.count > 0);
-    const visibleGamemodeStats = gamemodeStatsExpanded
-        ? gamemodeStatsList
-        : gamemodeStatsList.slice(0, 1);
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
@@ -279,9 +330,6 @@ export default function PreGame() {
         if (withdrawExpandRef.current && !withdrawExpandRef.current.contains(e.target) && !isWalletAdapter) {
             setIsWithdrawExpanded(false);
         }
-        if (gamemodeStatsRef.current && !gamemodeStatsRef.current.contains(e.target)) {
-            setGamemodeStatsExpanded(false);
-        }
     }, []);
 
     useEffect(() => {
@@ -289,12 +337,12 @@ export default function PreGame() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
 
-    // Live stats poll — filtered by selected gamemode (Agar/Slither incl. BR)
+    // Live stats poll — full snapshot for gamemode picker + LIVE panel
     useEffect(() => {
         let alive = true;
         const fetchStats = async () => {
             try {
-                const r = await fetch(`${API_URL}/api/stats?mode=${liveStatsMode}&t=${Date.now()}`, {
+                const r = await fetch(`${API_URL}/api/stats?t=${Date.now()}`, {
                     headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                 });
                 if (r.ok && alive) setLiveStats(await r.json());
@@ -303,7 +351,7 @@ export default function PreGame() {
         fetchStats();
         const id = setInterval(fetchStats, 5000);
         return () => { alive = false; clearInterval(id); };
-    }, [liveStatsMode]);
+    }, [API_URL]);
 
     // Leaderboard poll
     useEffect(() => {
@@ -1110,89 +1158,84 @@ export default function PreGame() {
                 </div>
             </div>
 
-            {/* Live stats + gamemode list — bottom-left row */}
+            {/* Live stats — bottom-left */}
             <div className="bottom-stats-row">
                 <div className="stats-card live-stats-bottom">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
                             <span className="label" style={{ color: 'var(--text)', fontSize: '0.7rem' }}>LIVE</span>
+                            <span className="live-stats-mode-label">{liveViewLabel}</span>
                         </div>
                         <div className="live-dot" />
                     </div>
 
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-2)', marginBottom: '14px' }}>
-                        Players online: <span className="mono" style={{ color: 'var(--text-h)', fontWeight: 700 }}>{liveStats.playersOnline ?? 0}</span>
+                    <div className="live-stats-playing">
+                        Playing: <span className="mono">{playingCountForLiveView}</span>
                     </div>
 
-                    <div style={{
-                        background: 'rgba(0,0,0,0.2)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 'var(--r-md)',
-                        padding: '10px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
-                    }}>
-                        <div style={{ fontSize: '0.62rem', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '2px' }}>
-                            Top in Arena
+                    <div className="live-gamemode-picker">
+                        {liveGamemodeOptions.map(({ key, label, count }) => {
+                            const hot = key !== 'all' && isHotGamemode(
+                                count,
+                                topGamemodeCount,
+                                secondGamemodeCount
+                            );
+                            const selected = liveViewGamemode === key;
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    className={`live-gamemode-row${selected ? ' live-gamemode-row--selected' : ''}${hot ? ' live-gamemode-row--hot' : ''}${count > 0 ? '' : ' live-gamemode-row--empty'}`}
+                                    onClick={() => setLiveViewGamemode(key)}
+                                >
+                                    <span className="live-gamemode-row__text mono">
+                                        {label}:{' '}
+                                        <span className={`live-gamemode-row__count${count > 0 ? ' live-gamemode-row__count--active' : ''}`}>
+                                            {count}
+                                        </span>
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="live-stats-panel">
+                        <div className="live-stats-panel__title">
+                            {isBRStatsKey(liveViewGamemode) ? 'Recent Victories' : 'Top in Arena'}
                         </div>
-                        {(!liveStats.topPlayers || liveStats.topPlayers.length === 0) ? (
-                            <div style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>Arena is empty</div>
+                        {isBRStatsKey(liveViewGamemode) ? (
+                            liveBRVictories.length === 0 ? (
+                                <div className="live-stats-panel__empty">No victories yet</div>
+                            ) : (
+                                liveBRVictories.map((entry, i) => (
+                                    <div key={`${entry.username}-${entry.at}-${i}`} className="live-stats-panel__row">
+                                        <span style={{ fontWeight: 600, color: i === 0 ? '#FFD700' : 'var(--text-h)' }}>
+                                            {entry.username}
+                                        </span>
+                                        <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--green)', fontWeight: 600 }}>
+                                            won ${Number(entry.amount || 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                ))
+                            )
                         ) : (
-                            liveStats.topPlayers.map((entry, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem' }}>
-                                    <span style={{ fontWeight: 600, color: i === 0 ? '#FFD700' : 'var(--text-h)' }}>
-                                        {i + 1}. {entry.username}
-                                    </span>
-                                    <span className="mono" style={{ fontSize: '0.7rem', color: '#fff', fontWeight: 600 }}>
-                                        ${Number(entry.balance || 0).toFixed(2)}
-                                    </span>
-                                </div>
-                            ))
+                            liveTopPlayers.length === 0 ? (
+                                <div className="live-stats-panel__empty">Arena is empty</div>
+                            ) : (
+                                liveTopPlayers.map((entry, i) => (
+                                    <div key={`${entry.username}-${i}`} className="live-stats-panel__row">
+                                        <span style={{ fontWeight: 600, color: i === 0 ? '#FFD700' : 'var(--text-h)' }}>
+                                            {i + 1}. {entry.username}
+                                        </span>
+                                        <span className="mono" style={{ fontSize: '0.7rem', color: '#fff', fontWeight: 600 }}>
+                                            ${Number(entry.balance || 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                ))
+                            )
                         )}
                     </div>
                 </div>
-
-                <button
-                    ref={gamemodeStatsRef}
-                    type="button"
-                    className={`gamemode-stats-list${anyGamemodeActive ? '' : ' gamemode-stats-list--idle'}${gamemodeStatsExpanded ? ' gamemode-stats-list--expanded' : ''}`}
-                    onClick={() => setGamemodeStatsExpanded(v => !v)}
-                    aria-expanded={gamemodeStatsExpanded}
-                    aria-label={gamemodeStatsExpanded ? 'Collapse gamemode list' : 'Expand gamemode list'}
-                >
-                    {visibleGamemodeStats.map(({ key, label, count }, i) => {
-                        const hot = isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
-                        const isToggleRow = i === 0;
-                        return (
-                            <div
-                                key={key}
-                                className={`gamemode-stats-row${hot ? ' gamemode-stats-row--hot' : ''}${count > 0 ? '' : ' gamemode-stats-row--empty'}${isToggleRow ? ' gamemode-stats-row--toggle' : ''}`}
-                            >
-                                <span className="gamemode-stats-row__text mono">
-                                    {label}:{' '}
-                                    <span className={`gamemode-stats-row__count${count > 0 ? ' gamemode-stats-row__count--active' : ''}`}>
-                                        {count}
-                                    </span>
-                                </span>
-                                {isToggleRow && (
-                                    <svg
-                                        className="gamemode-stats-list__chevron"
-                                        width="8"
-                                        height="8"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="3"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M6 9l6 6 6-6" />
-                                    </svg>
-                                )}
-                            </div>
-                        );
-                    })}
-                </button>
             </div>
 
             {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}
