@@ -88,14 +88,7 @@ function TypeBadge({ type }) {
 
 function StatCard({ label, value, sub }) {
     return (
-        <div style={{
-            background: 'var(--bg-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--r-xl)',
-            padding: '20px 24px',
-            flex: '1 1 200px',
-            minWidth: '180px',
-        }}>
+        <div className="admin-stat-card">
             <p className="label" style={{ marginBottom: '8px' }}>{label}</p>
             <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-1px' }}>
                 {value}
@@ -156,9 +149,9 @@ function DataTable({ columns, rows, loading, emptyMessage }) {
 
 function Panel({ title, sub, children }) {
     return (
-        <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', overflow: 'hidden' }}>
+        <div className="admin-panel" style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', overflow: 'hidden' }}>
             {(title || sub) && (
-                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div className="admin-panel-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
                     {title && <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-h)' }}>{title}</p>}
                     {sub && <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: 'var(--text-2)' }}>{sub}</p>}
                 </div>
@@ -387,12 +380,12 @@ export default function AdminDashboard() {
     );
 
     return (
-        <div style={{ width: '100vw', minHeight: '100vh', position: 'relative', display: 'flex', flexDirection: 'column', paddingBottom: '40px' }}>
+        <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
             <AppTopbar />
 
-            <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '80px 20px 0', position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '28px', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="page-content" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                <div className="page-header-row">
                     <div>
                         <p className="label" style={{ marginBottom: '6px' }}>Admin</p>
                         <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)' }}>
@@ -437,7 +430,7 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <div className="admin-tabs">
                     {TABS.map(t => (
                         <button
                             key={t.id}

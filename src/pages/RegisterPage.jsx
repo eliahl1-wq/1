@@ -50,10 +50,10 @@ export default function RegisterPage() {
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative' }}>
+        <div className="auth-page">
             <Background />
 
-            <div style={{ width: '100%', maxWidth: '360px', position: 'relative', zIndex: 1, animation: 'fadeUp 0.3s ease-out' }}>
+            <div className="auth-card">
                 {/* Logo */}
                 <div style={{ textAlign: 'center', marginBottom: '28px' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>

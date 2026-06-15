@@ -9,9 +9,27 @@ import * as renderUtils from './render.js';
 import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
+import MobileLandscapeGate from '../../components/MobileLandscapeGate';
+import { isTouchDevice } from '../../utils/mobile';
 
-/** Drop stale cached pellets; keep on-screen blobs through short server cull gaps. */
-function pruneAgarFoodCache(foodMap, px, py, screenW, screenH) {
+const IS_MOBILE = isTouchDevice();
+
+/** True when any cell overlaps this pellet (server already removed it). */
+function foodLikelyEaten(f, users) {
+    if (!users?.length) return false;
+    const fr = f.radius || 5;
+    for (const u of users) {
+        for (const c of u.cells || []) {
+            if (Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0) + fr * 0.5) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/** Drop stale cached pellets; keep edge blobs briefly through spatial-filter gaps. */
+function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users) {
     const margin = 240;
     const halfW = screenW / 2 + margin;
     const halfH = screenH / 2 + margin;
@@ -19,10 +37,12 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH) {
         const miss = f._missStreak || 0;
         if (miss === 0) continue;
         const inView = Math.abs(f.x - px) <= halfW && Math.abs(f.y - py) <= halfH;
-        if (!inView) {
+        if (foodLikelyEaten(f, users)) {
+            foodMap.delete(id);
+        } else if (!inView) {
             if (miss >= 8) foodMap.delete(id);
-        } else if (miss >= 24) {
-            // Eaten or despawned — remove ghost blobs after ~0.6s at 40Hz
+        } else if (miss >= 3) {
+            // Brief grace for edge culling (~75ms at 40Hz), not full second
             foodMap.delete(id);
         }
     }
@@ -233,8 +253,12 @@ export default function Game() {
                 foodMap.set(f.id, { ...f, _missStreak: 0 });
             }
             for (const [id, f] of foodMap) {
-                if (!seen.has(id)) {
-                    foodMap.set(id, { ...f, _missStreak: (f._missStreak || 0) + 1 });
+                if (seen.has(id)) continue;
+                const nextMiss = (f._missStreak || 0) + 1;
+                if (foodLikelyEaten(f, userData)) {
+                    foodMap.delete(id);
+                } else {
+                    foodMap.set(id, { ...f, _missStreak: nextMiss });
                 }
             }
             gameData.current = {
@@ -443,11 +467,14 @@ export default function Game() {
                     graph.restore();
                 }
                 
-                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width, screen.height);
+                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width, screen.height, users);
                 const halfW = screen.width / 2 + 120;
                 const halfH = screen.height / 2 + 120;
+                const myCells = users.find(u => u.id === myIdRef.current)?.cells || [];
                 for (const f of foodCacheRef.current.values()) {
                     if (Math.abs(f.x - player.x) > halfW || Math.abs(f.y - player.y) > halfH) continue;
+                    const underMe = myCells.some(c => Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0));
+                    if (underMe) continue;
                     renderUtils.drawFood(worldToScreen(f.x, f.y), f, graph);
                 }
 
@@ -498,6 +525,22 @@ export default function Game() {
         });
     };
 
+    // Mobile: hold/drag a finger to steer. The server keeps moving the cell toward
+    // the last target, so a held finger produces smooth continuous movement.
+    const handleTouch = (e) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const t = e.touches?.[0];
+        if (!t) return;
+        const rect = canvas.getBoundingClientRect();
+        socketRef.current?.emit('0', {
+            x: t.clientX - rect.left - canvas.width / 2,
+            y: t.clientY - rect.top - canvas.height / 2,
+            screenWidth: canvas.width,
+            screenHeight: canvas.height,
+        });
+    };
+
     const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
     const rewardInfo = gameData.current.rewardInfo;
@@ -531,8 +574,12 @@ export default function Game() {
             <canvas
                 ref={canvasRef}
                 onMouseMove={handleMouseMove}
-                style={{ display: 'block' }}
+                onTouchStart={handleTouch}
+                onTouchMove={handleTouch}
+                style={{ display: 'block', touchAction: 'none' }}
             />
+
+            <MobileLandscapeGate />
 
             {cashedAmount !== null && (
                 <div className="modern-overlay-backdrop">
@@ -761,7 +808,7 @@ export default function Game() {
                             opacity: localTimer > 0 ? 0.6 : 1
                         }}
                     >
-                        Q · CASH OUT
+                        {IS_MOBILE ? 'CASH OUT' : 'Q · CASH OUT'}
                     </button>
                     )}
                 </div>
@@ -779,7 +826,8 @@ export default function Game() {
                 onComplete={dismissBrIntro}
             />
 
-            {/* Controls Info */}
+            {/* Controls Info — hidden on mobile (no keyboard) */}
+            {!IS_MOBILE && (
             <div style={{ 
                 position: 'absolute', 
                 bottom: '30px', 
@@ -791,6 +839,7 @@ export default function Game() {
                     ? 'SPACE to Split • W to Eject • Mouse to Move'
                     : 'SPACE to Split • W to Eject • Hold Q to Cash Out • Mouse to Move'}
             </div>
+            )}
 
             {/* Logo/Name */}
             <div style={{ 

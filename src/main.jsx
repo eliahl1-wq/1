@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import { initMixpanel } from "./utils/mixpanel.js";
 import "./index.css";
+import "./styles/ui.css";
 
 window.Buffer = Buffer;
 initMixpanel();

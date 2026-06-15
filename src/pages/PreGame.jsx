@@ -29,10 +29,10 @@ const CUR_OPTIONS = [
 ];
 
 const GAMEMODE_STATS = [
-    { key: 'agar', label: 'Agar' },
-    { key: 'brAgar', label: 'Agar BR' },
-    { key: 'slither', label: 'Slither' },
-    { key: 'brSlither', label: 'Slither BR' },
+    { key: 'agar', label: 'Agar Normal' },
+    { key: 'brAgar', label: 'Agar Battle Royale' },
+    { key: 'slither', label: 'Slither Normal' },
+    { key: 'brSlither', label: 'Slither Battle Royale' },
 ];
 
 const LIVE_GAMEMODE_OPTIONS = [
@@ -462,6 +462,7 @@ export default function PreGame() {
     }, [isDragging]);
 
     const startDrag = useCallback((e) => {
+        if (window.innerWidth <= 768) return;
         const cx = e.clientX ?? e.touches?.[0]?.clientX;
         const cy = e.clientY ?? e.touches?.[0]?.clientY;
         const panel = (walletExpandRef.current || withdrawExpandRef.current);
@@ -630,9 +631,11 @@ export default function PreGame() {
                     : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
                         : 'Deposit to Play';
 
+    const panelOpen = isWalletExpanded || isWithdrawExpanded;
+
     // ── Render ─────────────────────────────────────────
     return (
-        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingBottom: '60px', position: 'relative', overflow: 'hidden' }}>
+        <div className="page-shell page-shell--pregame">
             <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
                 <h1>AgarStake — {modeBaseName} with Real Money</h1>
                 <p>Play {modeBaseName}.io with real money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly.</p>
@@ -641,7 +644,7 @@ export default function PreGame() {
 
             <AppTopbar>
                 {/* Nav right */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="topbar-right">
                     {isAuthenticated ? (
                         <>
                             {/* Balance pill */}
@@ -741,7 +744,7 @@ export default function PreGame() {
 
                             {/* Deposit button */}
                             <button
-                                className="nav-deposit-btn"
+                                className="nav-deposit-btn nav-deposit-btn--compact"
                                 onClick={() => {
                                     trackMixpanelEvent('deposit_clicked', { source: 'nav_button', platform: 'web' });
                                     setIsWalletOpen(false);
@@ -750,7 +753,7 @@ export default function PreGame() {
                                     setDepositMethod('manual');
                                 }}
                             >
-                                {(user?.balance || 0) === 0 ? '+ Add funds' : 'Deposit'}
+                                <span className="nav-deposit-btn-text">{(user?.balance || 0) === 0 ? '+ Add funds' : 'Deposit'}</span>
                             </button>
 
                             {/* User avatar pill */}
@@ -784,11 +787,23 @@ export default function PreGame() {
                 </div>
             </AppTopbar>
 
+            {panelOpen && (
+                <div
+                    className="panel-backdrop"
+                    aria-hidden="true"
+                    onClick={() => {
+                        setIsWalletExpanded(false);
+                        setIsWithdrawExpanded(false);
+                        setStatusMsg('');
+                    }}
+                />
+            )}
+
             {/* ── Deposit Float Panel ── */}
             {isWalletExpanded && (
                 <div ref={walletExpandRef} className="float-panel" style={panelStyle}>
                     <div
-                        className="float-panel-header"
+                        className="float-panel-header float-panel-header--draggable"
                         onMouseDown={startDrag}
                         onTouchStart={startDrag}
                         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
@@ -889,7 +904,7 @@ export default function PreGame() {
             {isWithdrawExpanded && (
                 <div ref={withdrawExpandRef} className="float-panel" style={{ ...panelStyle, top: panelPos.y + 20 }}>
                     <div
-                        className="float-panel-header"
+                        className="float-panel-header float-panel-header--draggable"
                         onMouseDown={startDrag}
                         onTouchStart={startDrag}
                         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
@@ -991,11 +1006,7 @@ export default function PreGame() {
 
             {/* ── Main layout ── */}
             {freePlay && (
-                <div style={{
-                    position: 'fixed', top: '72px', left: '50%', transform: 'translateX(-50%)',
-                    zIndex: 1100, background: 'rgba(255, 180, 0, 0.12)', border: '1px solid rgba(255, 180, 0, 0.35)',
-                    color: '#FFD080', padding: '8px 18px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 700,
-                }}>
+                <div className="test-mode-banner">
                     TEST MODE — Free play, no real SOL used
                 </div>
             )}
@@ -1156,6 +1167,8 @@ export default function PreGame() {
                 </div>
             </div>
 
+            {/* Live stats + SOL price + footer */}
+            <div className="pregame-bottom-bar">
             {/* Live stats — bottom-left */}
             <div className="bottom-stats-row">
                 <div className="stats-card live-stats-bottom">
@@ -1235,14 +1248,8 @@ export default function PreGame() {
                 </div>
             </div>
 
-            {/* SOL Price pill — Återställd till enkel pill-design med svart bakgrund */}
-            <div style={{
-                position: 'fixed', right: 16, bottom: 16,
-                display: 'flex', alignItems: 'center', gap: '6px',
-                background: '#000', border: '1px solid var(--border)',
-                borderRadius: '20px', padding: '5px 12px',
-                boxShadow: 'var(--shadow-xl)', zIndex: 1050,
-            }}>
+            {/* SOL Price pill */}
+            <div className="sol-price-pill">
                 <SolLogo size={14} />
                 <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
                     ${solPrice.toFixed(2)}
@@ -1255,6 +1262,7 @@ export default function PreGame() {
                 <span>Provably Fair</span>
                 <span>Support</span>
                 <span style={{ opacity: 0.5 }}>EU-West · Online</span>
+            </div>
             </div>
         </div>
     );

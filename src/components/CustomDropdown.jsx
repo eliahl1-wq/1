@@ -18,7 +18,11 @@ export default function CustomDropdown({ options, value, onChange, renderValue, 
             if (ref.current && !ref.current.contains(e.target)) setOpen(false);
         };
         document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        document.addEventListener('touchstart', handler, { passive: true });
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            document.removeEventListener('touchstart', handler);
+        };
     }, [open]);
 
     const selected = options.find(o => o.value === value);

@@ -127,7 +127,7 @@ export default function BRLobby() {
         : null;
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+        <div className="br-lobby-shell">
             <Background />
             <nav className="topbar" style={{ width: '100%', zIndex: 2 }}>
                 <div className="topbar-left">
@@ -138,15 +138,8 @@ export default function BRLobby() {
                 </div>
             </nav>
 
-            <div style={{ zIndex: 1, marginTop: '120px', width: '100%', maxWidth: '480px', padding: '0 24px' }}>
-                <div style={{
-                    background: 'var(--bg-1)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-2xl)',
-                    padding: '32px',
-                    boxShadow: 'var(--shadow-xl)',
-                    textAlign: 'center',
-                }}>
+            <div className="br-lobby-content">
+                <div className="br-lobby-card">
                     <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '2px', color: 'var(--accent)', marginBottom: '12px' }}>
                         BATTLE ROYALE — {variant.toUpperCase()} · {freePlay ? 'FREE (Test)' : formatUsd(entryFeeUsd)}
                     </div>

@@ -119,6 +119,8 @@ export class SlitherRenderer {
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
+        this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+        this._lastTapAt = 0;
         this.running = false;
         this._raf = null;
         this._frame = 0;
@@ -148,18 +150,28 @@ export class SlitherRenderer {
             this.boost = false;
             this._emitInput?.();
         };
+        // slither.io mobile: press-and-hold steers (snake follows finger relative to
+        // the head); boost is a double-tap-and-hold or a second finger — a plain
+        // touch must NOT boost, otherwise steering bleeds mass on every turn.
         this._onTouchMove = (e) => {
             e.preventDefault();
             const t = e.touches[0];
-            this._setInputFromScreen(t.clientX, t.clientY);
+            if (t) this._setInputFromScreen(t.clientX, t.clientY);
         };
         this._onTouchStart = (e) => {
-            this.boost = true;
             const t = e.touches[0];
-            this._setInputFromScreen(t.clientX, t.clientY);
+            if (t) this._setInputFromScreen(t.clientX, t.clientY);
+            const now = Date.now();
+            if (e.touches.length >= 2 || (now - this._lastTapAt) < 300) {
+                this.boost = true;
+            }
+            this._lastTapAt = now;
             this._emitInput?.();
         };
-        this._onTouchEnd = () => { this.boost = false; this._emitInput?.(); };
+        this._onTouchEnd = (e) => {
+            if (!e?.touches || e.touches.length === 0) this.boost = false;
+            this._emitInput?.();
+        };
 
         window.addEventListener('resize', this._onResize);
         document.addEventListener('mousemove', this._onMouseMove);
@@ -1002,6 +1014,34 @@ export class SlitherRenderer {
             ctx.lineWidth = 3;
             ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
             ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
+        }
+
+        // Mobile steering arrow (slither.io "arrow mode") — points just ahead of the
+        // head toward where the finger is steering the snake.
+        if (isYou && this.isMobile) {
+            const am = Math.hypot(this.inputDx, this.inputDy);
+            const aang = am > 0.001 ? Math.atan2(this.inputDy, this.inputDx) : angle;
+            const size = Math.max(11, Math.min(22, headRadius * 0.95));
+            const gap = headRadius * 1.9 + size;
+            const ax = hx + Math.cos(aang) * gap;
+            const ay = hy + Math.sin(aang) * gap;
+
+            ctx.save();
+            ctx.translate(ax, ay);
+            ctx.rotate(aang);
+            ctx.globalAlpha = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(size, 0);
+            ctx.lineTo(-size * 0.7, size * 0.7);
+            ctx.lineTo(-size * 0.32, 0);
+            ctx.lineTo(-size * 0.7, -size * 0.7);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255,255,255,0.92)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+            ctx.stroke();
+            ctx.restore();
         }
 
         ctx.restore();

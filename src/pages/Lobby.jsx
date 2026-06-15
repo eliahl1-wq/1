@@ -166,13 +166,13 @@ export default function Lobby() {
 
     const currentBalanceSol = user?.balanceSol || 0;
     return (
-        <div style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
 
             <AppTopbar>
                 {user && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ position: 'relative' }}>
+                    <div className="topbar-right">
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div
                                 ref={userPillRef}
                                 className={`user-pill${showUserMenu ? ' active' : ''}`}
@@ -182,10 +182,10 @@ export default function Lobby() {
                                     {user.username?.charAt(0).toUpperCase()}
                                 </div>
                             </div>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-h)' }}>
+                            <span className="topbar-user-name" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-h)' }}>
                                 {user.username}
                             </span>
-                            <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span className="topbar-user-balance-inline mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {isCurSOL
                                     ? <><SolLogo size={12} /> {currentBalanceSol.toFixed(4)}</>
                                     : `$${(currentBalanceSol * solPrice).toFixed(2)}`}
@@ -227,7 +227,7 @@ export default function Lobby() {
             </AppTopbar>
 
             {/* ── Center Content ── */}
-            <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '0 16px', marginTop: '52px', width: '100%', maxWidth: '440px' }}>
+            <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '24px 16px 40px', width: '100%', maxWidth: '440px', boxSizing: 'border-box' }}>
 
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '4px' }}>

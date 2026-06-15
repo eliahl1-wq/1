@@ -124,14 +124,14 @@ export default function Profile() {
 
     // ── Render ─────────────────────────────────────────
     return (
-        <div style={{ width: '100vw', minHeight: '100vh', overflowY: 'auto', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 20px 60px', boxSizing: 'border-box' }}>
+        <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
             <AppTopbar />
 
-            <div style={{ width: '100%', maxWidth: '780px', position: 'relative', zIndex: 1 }}>
+            <div className="page-content" style={{ maxWidth: '780px' }}>
 
                 {/* ── Page header ── */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '28px' }}>
+                <div className="page-header-row">
                     <div>
                         <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
                         <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)', lineHeight: 1 }}>
@@ -151,7 +151,7 @@ export default function Profile() {
                 <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', overflow: 'hidden', boxShadow: 'var(--shadow-xl)' }}>
 
                     {/* ── Tab bar ── */}
-                    <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 4px' }}>
+                    <div className="profile-tabs">
                         {[
                             { id: 'stats',   label: 'Performance' },
                             { id: 'profile', label: 'Settings' },
@@ -159,20 +159,7 @@ export default function Profile() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                style={{
-                                    padding: '14px 20px',
-                                    background: 'none',
-                                    border: 'none',
-                                    borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent)' : 'transparent'}`,
-                                    color: activeTab === tab.id ? 'var(--text-h)' : 'var(--text-2)',
-                                    fontWeight: activeTab === tab.id ? 600 : 500,
-                                    fontSize: '0.82rem',
-                                    cursor: 'pointer',
-                                    transition: 'color 0.2s ease, border-color 0.2s ease',
-                                    fontFamily: 'var(--ui)',
-                                    marginBottom: '-1px',
-                                    letterSpacing: '0.01em',
-                                }}
+                                className={`profile-tab-btn${activeTab === tab.id ? ' profile-tab-btn--active' : ''}`}
                             >
                                 {tab.label}
                             </button>
@@ -186,7 +173,7 @@ export default function Profile() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                                 {/* Stat cards */}
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                                <div className="profile-stat-grid">
                                     {[
                                         {
                                             label: 'Total P&L',

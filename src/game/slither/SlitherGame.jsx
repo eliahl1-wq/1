@@ -11,8 +11,12 @@ import { SlitherRenderer } from './SlitherRenderer.js';
 import { normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
+import MobileLandscapeGate from '../../components/MobileLandscapeGate';
+import { isTouchDevice } from '../../utils/mobile';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
+
+const IS_MOBILE = isTouchDevice();
 
 
 
@@ -548,7 +552,9 @@ export default function SlitherGame() {
 
         }}>
 
-            <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1 }} />
+            <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
+
+            <MobileLandscapeGate />
 
 
 
@@ -819,7 +825,7 @@ export default function SlitherGame() {
                         }}
 
                     >
-                        Q · CASH OUT
+                        {IS_MOBILE ? 'CASH OUT' : 'Q · CASH OUT'}
                     </button>
                     )}
 
@@ -829,8 +835,9 @@ export default function SlitherGame() {
 
 
 
-            {/* Controls */}
+            {/* Controls — hidden on mobile (no keyboard/mouse) */}
 
+            {!IS_MOBILE && (
             <div style={{ position: 'absolute', bottom: '30px', left: '30px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', zIndex: 100 }}>
 
                 {isBattleRoyale
@@ -838,6 +845,7 @@ export default function SlitherGame() {
                     : 'Mouse to Move • Click to Boost • Hold Q to Cash Out'}
 
             </div>
+            )}
 
 
 
