@@ -305,6 +305,10 @@ export class SlitherRenderer {
                     s.angle = snake.angle || 0;
                     continue;
                 }
+                // Snap local snake to server spine — per-segment lerp warps spacing and makes skin shimmer.
+                for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                s.angle = snake.angle || 0;
+                continue;
             }
 
             if (offScreen) {
@@ -313,17 +317,11 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = snake.isYou ? 0.05 : 0.09;
+            const tau = 0.09;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
-            const stride = len > 72 ? Math.ceil(len / 72) : 1;
 
             for (let i = 0; i < len; i++) {
                 if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-
-                if (stride > 1 && i > 0 && i < len - 1 && i % stride !== 0) {
-                    this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-                    continue;
-                }
 
                 const dx = tgt[i].x - s.segments[i].x;
                 const dy = tgt[i].y - s.segments[i].y;
@@ -515,7 +513,9 @@ export class SlitherRenderer {
         }
         out.length = max;
         const step = (bumps.length - 1) / (max - 1);
-        for (let i = 0; i < max; i++) out[i] = bumps[Math.round(i * step)];
+        for (let i = 0; i < max; i++) {
+            out[i] = bumps[Math.min(bumps.length - 1, Math.floor(i * step))];
+        }
         return out;
     }
 
@@ -801,32 +801,36 @@ export class SlitherRenderer {
         const gsc = zoom;
         const thick = this.snakeThickness ?? 1;
         const headRadius = (snake.radius || 6) * gsc * thick;
-        const bodyRadius = headRadius; // Head and body are exactly the same size
+        const bodyRadius = headRadius;
         const angle = snake.angle || 0;
         const cs = bucketSnakeColor(snake.color);
         const boosting = !!snake.boost;
         const isYou = !!snake.isYou;
         const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.16);
 
+        // Spine in world space — bump spacing must not depend on zoom (zoom animates every frame).
         const pts = this._ptsBuf;
         let pi = 0;
         const maxPts = isYou ? 55 : (this._quality < 0.72 ? 28 : 36);
-        const stride = segs.length > maxPts ? Math.ceil(segs.length / maxPts) : 1;
-        for (let i = 0; i < segs.length; i += stride) {
-            const scr = toScreen(segs[i].x, segs[i].y);
-            pts[pi++] = this._poolPoint(pi - 1, scr.x, scr.y);
+        const segStride = segs.length > maxPts ? Math.ceil(segs.length / maxPts) : 1;
+        for (let i = 0; i < segs.length; i += segStride) {
+            pts[pi++] = this._poolPoint(pi - 1, segs[i].x, segs[i].y);
         }
-        if (stride > 1) {
+        if (segStride > 1) {
             const last = segs[segs.length - 1];
-            const scr = toScreen(last.x, last.y);
-            pts[pi++] = this._poolPoint(pi - 1, scr.x, scr.y);
+            pts[pi++] = this._poolPoint(pi - 1, last.x, last.y);
         }
         pts.length = pi;
 
+        const cx = this.camera.x;
+        const cy = this.camera.y;
         let onScreen = false;
+        const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 140;
         for (let i = 0; i < pi; i++) {
             const p = pts[i];
-            if (p.x > -120 && p.y > -120 && p.x < this.W + 120 && p.y < this.H + 120) {
+            const dx = p.x - cx;
+            const dy = p.y - cy;
+            if (dx * dx + dy * dy <= viewR * viewR) {
                 onScreen = true;
                 break;
             }
@@ -836,24 +840,42 @@ export class SlitherRenderer {
             return;
         }
 
+        const worldRadius = snake.radius || 6;
         const overlapMul = isYou ? 0.45 : 0.58;
         const boostSpaceMul = isYou ? 0.60 : 0.72;
-        const bumpStep = Math.max(2.5, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
+        const bumpStepWorld = Math.max(2.8, worldRadius * (boosting ? boostSpaceMul : overlapMul));
         const q = this._quality;
         const maxBumps = Math.round(
             (isYou ? (boosting ? 95 : 75) : (boosting ? 48 : 38)) * Math.max(0.75, this._quality),
         );
-        const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
+        const dense = this._densifySpine(pts, bumpStepWorld, this._denseBuf);
         const bumps = this._capBumps(dense, this._bumpsBuf, maxBumps);
         if (bumps.length < 1) {
             ctx.restore();
             return;
         }
 
-        // Coarse 4px radius buckets: fewer distinct sprites + stable across zoom animation,
-        // so we don't re-paint the gradient sprite set every frame as the radius drifts.
-        const r = Math.max(4, Math.round(bodyRadius / 4) * 4);
-        const { normal, alt, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
+        // Project bumps to screen once — stable world spacing, single projection.
+        for (let i = 0; i < bumps.length; i++) {
+            const b = bumps[i];
+            const wx = b.x;
+            const wy = b.y;
+            b.x = (wx - cx) * zoom + this.W / 2;
+            b.y = (wy - cy) * zoom + this.H / 2;
+        }
+
+        const hx = (segs[0].x - cx) * zoom + this.W / 2;
+        const hy = (segs[0].y - cy) * zoom + this.H / 2;
+
+        // Coarse radius buckets with hysteresis so sprite set doesn't swap every frame.
+        const rawR = Math.max(4, Math.round(bodyRadius / 4) * 4);
+        let r = rawR;
+        if (snake._lastSpriteR != null && Math.abs(rawR - snake._lastSpriteR) < 8) {
+            r = snake._lastSpriteR;
+        } else {
+            snake._lastSpriteR = rawR;
+        }
+        const { normal, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
         const halfT = trailGlow.width / 2;
         const halfB = boostOverlay.width / 2;
         const bumpCount = bumps.length;
@@ -890,7 +912,7 @@ export class SlitherRenderer {
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const isHead = i === 0;
-            const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
+            const sprite = (boosting && isHead) ? boostBody : normal;
             this._blitSprite(ctx, sprite, p.x, p.y);
         }
 
@@ -924,7 +946,6 @@ export class SlitherRenderer {
         }
 
         // Head and Eyes
-        const { x: hx, y: hy } = pts[0];
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
