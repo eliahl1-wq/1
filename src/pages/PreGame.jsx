@@ -1179,10 +1179,7 @@ export default function PreGame() {
                                 const hot = key !== 'all' && isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
                                 return (
                                     <span className={`live-stats-dropdown-value${hot ? ' live-stats-dropdown-value--hot' : ''}`}>
-                                        {opt?.label ?? 'All'}:{' '}
-                                        <span className={`mono live-stats-dropdown-count${count > 0 ? ' live-stats-dropdown-count--active' : ''}`}>
-                                            {count}
-                                        </span>
+                                        {opt?.label ?? 'All'}
                                     </span>
                                 );
                             }}
@@ -1192,8 +1189,7 @@ export default function PreGame() {
                                 const hot = opt.value !== 'all' && isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
                                 return (
                                     <span className={`live-stats-dropdown-option${hot ? ' live-stats-dropdown-option--hot' : ''}${count === 0 ? ' live-stats-dropdown-option--empty' : ''}`}>
-                                        {opt.label}:{' '}
-                                        <span className={`mono${count > 0 ? ' live-stats-dropdown-count--active' : ''}`}>{count}</span>
+                                        {opt.label}
                                     </span>
                                 );
                             }}
