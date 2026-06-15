@@ -281,20 +281,30 @@ const drawHUD = (global, graph) => {
     // Timern visas nu istället på knappen i Game.jsx
 };
 
-const drawGrid = (global, player, screen, graph) => {
+const drawGrid = (global, player, screen, graph, viewZoom = 1) => {
     graph.lineWidth = 1;
-    graph.strokeStyle = global.lineColor; // Använd global.lineColor
-    graph.globalAlpha = 0.08; // Väldigt svagt rutnät för proffsig känsla
+    graph.strokeStyle = global.lineColor;
+    graph.globalAlpha = 0.08;
     graph.beginPath();
 
-    for (let x = -player.x; x < screen.width; x += screen.height / 18) {
-        graph.moveTo(x, 0);
-        graph.lineTo(x, screen.height);
+    const step = screen.height / 18 / viewZoom;
+    const halfW = screen.width / (2 * viewZoom);
+    const halfH = screen.height / (2 * viewZoom);
+    const startX = Math.floor((player.x - halfW) / step) * step;
+    const endX = player.x + halfW;
+    const startY = Math.floor((player.y - halfH) / step) * step;
+    const endY = player.y + halfH;
+
+    for (let gx = startX; gx <= endX; gx += step) {
+        const sx = (gx - player.x) * viewZoom + screen.width / 2;
+        graph.moveTo(sx, 0);
+        graph.lineTo(sx, screen.height);
     }
 
-    for (let y = -player.y; y < screen.height; y += screen.height / 18) {
-        graph.moveTo(0, y);
-        graph.lineTo(screen.width, y);
+    for (let gy = startY; gy <= endY; gy += step) {
+        const sy = (gy - player.y) * viewZoom + screen.height / 2;
+        graph.moveTo(0, sy);
+        graph.lineTo(screen.width, sy);
     }
 
     graph.stroke();

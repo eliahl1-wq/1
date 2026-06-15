@@ -1,43 +1,34 @@
 import { isTouchDevice } from './mobile';
 
-/** Phone held upright — game still renders as landscape via CSS rotation. */
-export function isPortraitViewport() {
-    return window.innerHeight > window.innerWidth;
+/** < 1 = zoomed out (more world visible). Desktop always 1. */
+export const MOBILE_VIEW_ZOOM = 0.68;
+
+export function getMobileViewZoom() {
+    return isTouchDevice() ? MOBILE_VIEW_ZOOM : 1;
 }
 
-export function isPortraitLockActive() {
-    return isTouchDevice() && isPortraitViewport();
-}
-
-/** Logical in-game screen size (always landscape-shaped on mobile). */
+/** Canvas pixel size (matches the physical screen). */
 export function getGameScreenSize() {
-    if (isPortraitLockActive()) {
-        return { width: window.innerHeight, height: window.innerWidth };
-    }
     return { width: window.innerWidth, height: window.innerHeight };
 }
 
 /**
- * Map a screen pointer position into game space (relative to canvas center).
- * Handles the 90° CSS rotation applied in portrait-lock mode.
+ * Map pointer position to game-space offset from player center.
+ * Also returns inflated screen dims so the server sends a wider view on mobile.
  */
 export function mapPointerToGameSpace(clientX, clientY, element) {
     const { width, height } = getGameScreenSize();
+    const viewZoom = getMobileViewZoom();
     const rect = element.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    let dx = clientX - cx;
-    let dy = clientY - cy;
 
-    if (isPortraitLockActive()) {
-        // inverse of translate(-50%,-50%) rotate(90deg)
-        const lx = dy;
-        const ly = -dx;
-        dx = lx;
-        dy = ly;
-    }
-
-    return { x: dx, y: dy, screenWidth: width, screenHeight: height };
+    return {
+        x: (clientX - cx) / viewZoom,
+        y: (clientY - cy) / viewZoom,
+        screenWidth: width / viewZoom,
+        screenHeight: height / viewZoom,
+    };
 }
 
 export const GAME_LAYOUT_CHANGE = 'gamelayoutchange';

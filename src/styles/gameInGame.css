@@ -1,14 +1,3 @@
-/* Force landscape layout when the phone is held portrait (iOS / no orientation lock) */
-
-.game-viewport.game-viewport--mobile.game-viewport--portrait-lock {
-    top: 50% !important;
-    left: 50% !important;
-    width: 100vh !important;
-    height: 100vw !important;
-    transform: translate(-50%, -50%) rotate(90deg);
-    transform-origin: center center;
-}
-
 /* In-game HUD + overlays — mobile (touch) layout tweaks */
 
 .game-viewport--mobile .modern-overlay-card {

@@ -12,7 +12,8 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { AgarMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape';
+import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
+import { drawGameMinimap, normalizeMinimapDots } from '../minimap.js';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -423,14 +424,15 @@ export default function Game() {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const { width, height } = getGameScreenSize();
+        const viewZoom = getMobileViewZoom();
         canvas.width = width;
         canvas.height = height;
         if (socketRef.current?.connected) {
             socketRef.current.emit('0', {
                 x: 0,
                 y: 0,
-                screenWidth: canvas.width,
-                screenHeight: canvas.height,
+                screenWidth: width / viewZoom,
+                screenHeight: height / viewZoom,
             });
         }
     };
@@ -443,18 +445,19 @@ export default function Game() {
         const gameLoop = () => {
             const { player, users, viruses, ejected, zoneSize } = gameData.current;
             const screen = { width: canvas.width, height: canvas.height };
+            const viewZoom = getMobileViewZoom();
             
             // CRASH FIX: Kontrollera att vi inte är döda och att spelardata finns
             if (isConnected && !isDead && player && player.x !== undefined) {
                 const worldToScreen = (wx, wy) => ({
-                    x: wx - player.x + screen.width / 2,
-                    y: wy - player.y + screen.height / 2,
+                    x: (wx - player.x) * viewZoom + screen.width / 2,
+                    y: (wy - player.y) * viewZoom + screen.height / 2,
                 });
 
                 graph.fillStyle = global.backgroundColor;
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
-                renderUtils.drawGrid(global, { x: player.x, y: player.y }, screen, graph);
+                renderUtils.drawGrid(global, { x: player.x, y: player.y }, screen, graph, viewZoom);
 
                 if (brZone && player.x != null) {
                     const { x: zx, y: zy } = worldToScreen(brZone.cx, brZone.cy);
@@ -462,42 +465,42 @@ export default function Game() {
                     graph.fillStyle = 'rgba(255, 59, 48, 0.14)';
                     graph.beginPath();
                     graph.rect(0, 0, screen.width, screen.height);
-                    graph.arc(zx, zy, brZone.radius, 0, Math.PI * 2, true);
+                    graph.arc(zx, zy, brZone.radius * viewZoom, 0, Math.PI * 2, true);
                     graph.fill('evenodd');
                     graph.strokeStyle = 'rgba(255, 107, 107, 0.85)';
                     graph.lineWidth = 3;
                     graph.setLineDash([12, 8]);
                     graph.beginPath();
-                    graph.arc(zx, zy, brZone.radius, 0, Math.PI * 2);
+                    graph.arc(zx, zy, brZone.radius * viewZoom, 0, Math.PI * 2);
                     graph.stroke();
                     graph.setLineDash([]);
                     graph.restore();
                 }
                 
-                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width, screen.height, users);
-                const halfW = screen.width / 2 + 120;
-                const halfH = screen.height / 2 + 120;
+                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width / viewZoom, screen.height / viewZoom, users);
+                const halfW = screen.width / (2 * viewZoom) + 120;
+                const halfH = screen.height / (2 * viewZoom) + 120;
                 const myCells = users.find(u => u.id === myIdRef.current)?.cells || [];
                 for (const f of foodCacheRef.current.values()) {
                     if (Math.abs(f.x - player.x) > halfW || Math.abs(f.y - player.y) > halfH) continue;
                     const underMe = myCells.some(c => Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0));
                     if (underMe) continue;
-                    renderUtils.drawFood(worldToScreen(f.x, f.y), f, graph);
+                    renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: (f.radius || 5) * viewZoom }, graph);
                 }
 
                 (ejected || []).forEach(m => {
-                    renderUtils.drawFireFood(worldToScreen(m.x, m.y), m, { border: 6 }, graph);
+                    renderUtils.drawFireFood(worldToScreen(m.x, m.y), { ...m, radius: (m.radius || 5) * viewZoom }, { border: 6 * viewZoom }, graph);
                 });
 
                 viruses.forEach(v => {
-                    renderUtils.drawVirus(worldToScreen(v.x, v.y), v, graph);
+                    renderUtils.drawVirus(worldToScreen(v.x, v.y), { ...v, radius: (v.radius || 50) * viewZoom }, graph);
                 });
 
                 let borders = {
-                    left: screen.width / 2 - player.x,
-                    right: screen.width / 2 + global.game.width - player.x,
-                    top: screen.height / 2 - player.y,
-                    bottom: screen.height / 2 + global.game.height - player.y
+                    left: screen.width / 2 - player.x * viewZoom,
+                    right: screen.width / 2 + (global.game.width - player.x) * viewZoom,
+                    top: screen.height / 2 - player.y * viewZoom,
+                    bottom: screen.height / 2 + (global.game.height - player.y) * viewZoom
                 };
 
                 // Rita celler
@@ -508,11 +511,36 @@ export default function Game() {
                     isCashingOut: u.isCashingOut,
                     color: u.color.fill || u.color, 
                     borderColor: u.color.border || '#000',
+                    radius: (c.radius || 0) * viewZoom,
                     ...worldToScreen(c.x, c.y),
                 })));
                 
-                renderUtils.drawCells(cellsToDraw, { border: 6, textBorderSize: 3, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
+                renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
                 renderUtils.drawHUD(global, graph);
+
+                const fallbackDots = users.map(u => ({
+                    x: u.x,
+                    y: u.y,
+                    color: u.color?.fill || u.color,
+                    isYou: u.id === myIdRef.current,
+                }));
+                drawGameMinimap(graph, {
+                    screenW: screen.width,
+                    screenH: screen.height,
+                    isMobile: IS_MOBILE,
+                    bounds: {
+                        minX: 0,
+                        maxX: global.game.width,
+                        minY: 0,
+                        maxY: global.game.height,
+                    },
+                    cameraX: player.x,
+                    cameraY: player.y,
+                    viewHalfW: screen.width / (2 * viewZoom),
+                    viewHalfH: screen.height / (2 * viewZoom),
+                    dots: normalizeMinimapDots(gameData.current.rewardInfo?.minimap, fallbackDots),
+                    zone: brZone,
+                });
             }
             if (!isDead) animationFrameId.current = requestAnimationFrame(gameLoop);
         };

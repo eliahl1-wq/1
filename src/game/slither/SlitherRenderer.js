@@ -3,7 +3,8 @@
  */
 
 import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
-import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
+import { drawGameMinimap, normalizeMinimapDots } from '../minimap.js';
+import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -97,7 +98,7 @@ export class SlitherRenderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null };
+        this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null, minimap: [] };
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
         this.smooth = new Map();
@@ -106,8 +107,9 @@ export class SlitherRenderer {
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
-        this.zoom = 2.65;
-        this.baseZoom = 2.65;
+        this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+        this.baseZoom = this.isMobile ? 1.65 : 2.65;
+        this.zoom = this.baseZoom;
         this.snakeThickness = 0.9;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
@@ -120,7 +122,6 @@ export class SlitherRenderer {
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
-        this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         this._lastTapAt = 0;
         this.running = false;
         this._raf = null;
@@ -193,7 +194,9 @@ export class SlitherRenderer {
     }
 
     _setInputFromScreen(sx, sy) {
-        const { x, y } = mapPointerToGameSpace(sx, sy, this.canvas);
+        const rect = this.canvas.getBoundingClientRect();
+        const x = sx - rect.left - this.W / 2;
+        const y = sy - rect.top - this.H / 2;
         const mag = Math.hypot(x, y);
         if (mag < 8) return;
         this.inputDx = (x / mag) * 4;
@@ -237,6 +240,7 @@ export class SlitherRenderer {
             you: tick.you ?? this.state.you,
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
             zone: tick.battleRoyale ? (tick.zone !== undefined ? tick.zone : this.state.zone) : null,
+            minimap: tick.minimap ?? this.state.minimap,
         };
         if (tick.battleRoyale !== undefined) {
             this.state.battleRoyale = !!tick.battleRoyale;
@@ -1166,7 +1170,8 @@ export class SlitherRenderer {
 
             // slither.io-style zoom-out as the snake grows
             const meR = me.radius || 6.2;
-            const targetZoom = Math.min(this.baseZoom, Math.max(1.35, this.baseZoom * Math.pow(6.2 / meR, 0.4)));
+            const minZoom = this.isMobile ? 0.95 : 1.35;
+            const targetZoom = Math.min(this.baseZoom, Math.max(minZoom, this.baseZoom * Math.pow(6.2 / meR, 0.4)));
             const za = 1 - Math.exp(-dt / 0.6);
             this.zoom += (targetZoom - this.zoom) * za;
         }
@@ -1218,6 +1223,34 @@ export class SlitherRenderer {
             }
 
             this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
+        }
+
+        if (me?.segments?.[0]) {
+            const fallbackDots = renderSnakes
+                .filter(s => s.segments?.[0])
+                .map(s => ({
+                    x: s.segments[0].x,
+                    y: s.segments[0].y,
+                    color: s.color,
+                    isYou: s.isYou,
+                }));
+            drawGameMinimap(ctx, {
+                screenW: W,
+                screenH: H,
+                isMobile: this.isMobile,
+                bounds: {
+                    minX: -worldHalf,
+                    maxX: worldHalf,
+                    minY: -worldHalf,
+                    maxY: worldHalf,
+                },
+                cameraX: cx,
+                cameraY: cy,
+                viewHalfW: W / (2 * zoom),
+                viewHalfH: H / (2 * zoom),
+                dots: normalizeMinimapDots(this.state.minimap, fallbackDots),
+                zone: this.state.zone,
+            });
         }
     }
 
