@@ -812,13 +812,6 @@
 
 .live-stats-bottom .label { color: var(--text-2); font-weight: 600; text-transform: uppercase; font-size: 0.62rem; }
 
-.live-stats-mode-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: var(--text-h);
-  letter-spacing: 0.04em;
-}
-
 .live-stats-playing {
   font-size: 0.68rem;
   color: var(--text-2);
@@ -830,66 +823,67 @@
   font-weight: 700;
 }
 
-.live-gamemode-picker {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  overflow: hidden;
+.live-stats-mode-select {
   margin-bottom: 10px;
 }
 
-.live-gamemode-row {
+.live-stats-mode-select .dropdown {
   display: block;
   width: 100%;
-  padding: 4px 10px;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  appearance: none;
-  color: inherit;
-  transition: background-color 0.15s ease;
 }
 
-.live-gamemode-row:last-child {
-  border-bottom: none;
+.live-stats-mode-select .dropdown-trigger {
+  width: 100%;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: var(--r-sm);
 }
 
-.live-gamemode-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+.live-stats-mode-select .dropdown-panel {
+  left: 0;
+  right: 0;
+  min-width: unset;
+  bottom: calc(100% + 4px);
+  top: auto;
+  transform: translateY(4px) scale(0.97);
 }
 
-.live-gamemode-row--selected {
-  background: rgba(124, 58, 255, 0.1);
+.live-stats-mode-select .dropdown.open .dropdown-panel {
+  transform: translateY(0) scale(1);
 }
 
-.live-gamemode-row--selected .live-gamemode-row__text {
+.live-stats-mode-select .dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 6px 8px;
+}
+
+.live-stats-dropdown-value,
+.live-stats-dropdown-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
   color: var(--text-h);
 }
 
-.live-gamemode-row__text {
-  font-size: 0.58rem;
-  font-weight: 600;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-
-.live-gamemode-row--empty .live-gamemode-row__text {
+.live-stats-dropdown-option--empty {
   color: var(--text-3);
 }
 
-.live-gamemode-row__count {
-  color: var(--text-3);
-  font-weight: 700;
-}
-
-.live-gamemode-row__count--active {
+.live-stats-dropdown-count--active {
   color: var(--green);
 }
 
-.live-gamemode-row--hot .live-gamemode-row__text,
-.live-gamemode-row--hot .live-gamemode-row__count {
+.live-stats-dropdown-value--hot,
+.live-stats-dropdown-option--hot {
   animation: gmHotPulse 2.2s ease-in-out infinite;
 }
 

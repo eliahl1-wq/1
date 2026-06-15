@@ -187,8 +187,6 @@ export default function PreGame() {
         }));
     }, [liveStats.playersByGamemode, liveStats.totalPlayersOnline, liveStats.playersOnline]);
 
-    const liveViewLabel = LIVE_GAMEMODE_OPTIONS.find(o => o.key === liveViewGamemode)?.label ?? 'All';
-
     const playingCountForLiveView = useMemo(() => {
         if (liveViewGamemode === 'all') {
             return liveStats.totalPlayersOnline ?? liveStats.playersOnline ?? 0;
@@ -1162,10 +1160,7 @@ export default function PreGame() {
             <div className="bottom-stats-row">
                 <div className="stats-card live-stats-bottom">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                            <span className="label" style={{ color: 'var(--text)', fontSize: '0.7rem' }}>LIVE</span>
-                            <span className="live-stats-mode-label">{liveViewLabel}</span>
-                        </div>
+                        <span className="label" style={{ color: 'var(--text)', fontSize: '0.7rem' }}>LIVE</span>
                         <div className="live-dot" />
                     </div>
 
@@ -1173,30 +1168,36 @@ export default function PreGame() {
                         Playing: <span className="mono">{playingCountForLiveView}</span>
                     </div>
 
-                    <div className="live-gamemode-picker">
-                        {liveGamemodeOptions.map(({ key, label, count }) => {
-                            const hot = key !== 'all' && isHotGamemode(
-                                count,
-                                topGamemodeCount,
-                                secondGamemodeCount
-                            );
-                            const selected = liveViewGamemode === key;
-                            return (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    className={`live-gamemode-row${selected ? ' live-gamemode-row--selected' : ''}${hot ? ' live-gamemode-row--hot' : ''}${count > 0 ? '' : ' live-gamemode-row--empty'}`}
-                                    onClick={() => setLiveViewGamemode(key)}
-                                >
-                                    <span className="live-gamemode-row__text mono">
-                                        {label}:{' '}
-                                        <span className={`live-gamemode-row__count${count > 0 ? ' live-gamemode-row__count--active' : ''}`}>
+                    <div className="live-stats-mode-select">
+                        <CustomDropdown
+                            options={liveGamemodeOptions.map(({ key, label }) => ({ value: key, label }))}
+                            value={liveViewGamemode}
+                            onChange={setLiveViewGamemode}
+                            renderValue={(key) => {
+                                const opt = liveGamemodeOptions.find(o => o.key === key);
+                                const count = opt?.count ?? 0;
+                                const hot = key !== 'all' && isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
+                                return (
+                                    <span className={`live-stats-dropdown-value${hot ? ' live-stats-dropdown-value--hot' : ''}`}>
+                                        {opt?.label ?? 'All'}:{' '}
+                                        <span className={`mono live-stats-dropdown-count${count > 0 ? ' live-stats-dropdown-count--active' : ''}`}>
                                             {count}
                                         </span>
                                     </span>
-                                </button>
-                            );
-                        })}
+                                );
+                            }}
+                            renderOption={(opt) => {
+                                const row = liveGamemodeOptions.find(o => o.key === opt.value);
+                                const count = row?.count ?? 0;
+                                const hot = opt.value !== 'all' && isHotGamemode(count, topGamemodeCount, secondGamemodeCount);
+                                return (
+                                    <span className={`live-stats-dropdown-option${hot ? ' live-stats-dropdown-option--hot' : ''}${count === 0 ? ' live-stats-dropdown-option--empty' : ''}`}>
+                                        {opt.label}:{' '}
+                                        <span className={`mono${count > 0 ? ' live-stats-dropdown-count--active' : ''}`}>{count}</span>
+                                    </span>
+                                );
+                            }}
+                        />
                     </div>
 
                     <div className="live-stats-panel">
