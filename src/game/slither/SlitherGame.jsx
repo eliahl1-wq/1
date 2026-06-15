@@ -14,6 +14,7 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
+import { playSlitherEatSound } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -47,6 +48,7 @@ export default function SlitherGame() {
     const cashoutActiveRef = useRef(false);
 
     const myIdRef = useRef(null);
+    const prevBalanceRef = useRef(null);
 
     const cashOutTotalRef = useRef(10);
     const cashOutEndAtRef = useRef(0);
@@ -311,6 +313,7 @@ export default function SlitherGame() {
             renderer.resetSession();
             if (!gameSizes?.battleRoyale) {
                 const bal = playerSettings.balance ?? 1.0;
+                prevBalanceRef.current = bal;
                 setCurrentBalance(bal);
                 rendererRef.current?.setHud({ balance: bal });
             }
@@ -323,7 +326,12 @@ export default function SlitherGame() {
         socket.on('slitherTick', (tick) => {
             renderer.updateState(tick);
             if (!tick.battleRoyale && tick.balance != null) {
-                setCurrentBalance((prev) => (prev === tick.balance ? prev : tick.balance));
+                const prev = prevBalanceRef.current;
+                if (prev != null && tick.balance > prev + 0.001) {
+                    playSlitherEatSound();
+                }
+                prevBalanceRef.current = tick.balance;
+                setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
             }
             if (tick.battleRoyale) {
                 const now = Date.now();

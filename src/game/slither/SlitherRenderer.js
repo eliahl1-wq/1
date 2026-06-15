@@ -3,8 +3,9 @@
  */
 
 import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
-import { drawGameMinimap, normalizeMinimapDots } from '../minimap.js';
+import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
+import { unlockGameAudio } from '../../audio/synthSounds.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -108,9 +109,10 @@ export class SlitherRenderer {
         this._cameraInit = false;
         this._lastFrameTime = 0;
         this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
-        this.baseZoom = this.isMobile ? 1.65 : 2.65;
+        this.baseZoom = this.isMobile ? 2.05 : 2.65;
         this.zoom = this.baseZoom;
-        this.snakeThickness = 0.9;
+        this.snakeThickness = this.isMobile ? 1.0 : 0.9;
+        this._dpr = 1;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
         /** o.pr_imgs — normal + boost overlay canvases per (cs, radius) */
@@ -142,6 +144,7 @@ export class SlitherRenderer {
         this._onMouseMove = (e) => this._handleMouse(e);
         this._onMouseDown = (e) => {
             if (e.target !== this.canvas) return;
+            unlockGameAudio();
             this.boost = true;
             this._emitInput?.();
         };
@@ -159,6 +162,7 @@ export class SlitherRenderer {
             if (t) this._setInputFromScreen(t.clientX, t.clientY);
         };
         this._onTouchStart = (e) => {
+            unlockGameAudio();
             const t = e.touches[0];
             if (t) this._setInputFromScreen(t.clientX, t.clientY);
             const now = Date.now();
@@ -187,8 +191,13 @@ export class SlitherRenderer {
 
     resize() {
         const { width, height } = getGameScreenSize();
-        this.canvas.width = width;
-        this.canvas.height = height;
+        const rawDpr = window.devicePixelRatio || 1;
+        this._dpr = this.isMobile ? Math.min(1.75, rawDpr) : rawDpr;
+        if (this._dpr < 1) this._dpr = 1;
+        this.canvas.width = Math.round(width * this._dpr);
+        this.canvas.height = Math.round(height * this._dpr);
+        this.canvas.style.width = `${width}px`;
+        this.canvas.style.height = `${height}px`;
         this.W = width;
         this.H = height;
     }
@@ -307,7 +316,7 @@ export class SlitherRenderer {
             if (s.segments.length > len) s.segments.length = len;
 
             if (snake.isYou) {
-                // Large delta = respawn/teleport → snap whole spine, otherwise interpolate below.
+                // Large delta = respawn/teleport → snap whole spine.
                 const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
                 const headDy = tgt[0].y - (s.segments[0]?.y ?? tgt[0].y);
                 if (headDx * headDx + headDy * headDy > SNAP_SQ) {
@@ -315,6 +324,28 @@ export class SlitherRenderer {
                     s.angle = snake.angle || 0;
                     continue;
                 }
+
+                // Rigid translation + light shape correction — avoids per-segment crawl.
+                const tau = 0.048;
+                const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
+                const tx = headDx * a;
+                const ty = headDy * a;
+                for (let i = 0; i < len; i++) {
+                    if (i >= s.segments.length) {
+                        this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                        continue;
+                    }
+                    s.segments[i].x += tx;
+                    s.segments[i].y += ty;
+                    const cx2 = tgt[i].x - s.segments[i].x;
+                    const cy2 = tgt[i].y - s.segments[i].y;
+                    s.segments[i].x += cx2 * a * 0.25;
+                    s.segments[i].y += cy2 * a * 0.25;
+                }
+                let da = (snake.angle || 0) - s.angle;
+                da = Math.atan2(Math.sin(da), Math.cos(da));
+                s.angle += da * a;
+                continue;
             }
 
             if (offScreen) {
@@ -439,7 +470,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, zoom) {
-        ctx.fillStyle = '#1a1a1e';
+        ctx.fillStyle = '#1e1e24';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getBgPattern(ctx);
@@ -611,8 +642,8 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const simpleFood = this._quality < 0.6;
-        const foodStride = this._quality < 0.45 ? 2 : 1;
+        const simpleFood = this._quality < 0.45;
+        const foodStride = this._quality < 0.38 ? 2 : 1;
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
@@ -709,13 +740,13 @@ export class SlitherRenderer {
         
         // 1. Base Radial Gradient
         // Offset center slightly up to simulate top-down light
-        const baseGrad = g.createRadialGradient(c, c - rPx * 0.15, rPx * 0.1, c, c, rPx);
-        const centerCol = shadeColor(col, Math.round(15 * k));
+        const baseGrad = g.createRadialGradient(c, c - rPx * 0.18, rPx * 0.08, c, c, rPx);
+        const centerCol = shadeColor(col, Math.round(18 * k));
         const midCol = col;
-        const edgeCol = shadeColor(col, Math.round(-60 * k)); // Dark edge for the overlap crease
+        const edgeCol = shadeColor(col, Math.round(-52 * k));
         
         baseGrad.addColorStop(0, toHex(centerCol));
-        baseGrad.addColorStop(0.6, toHex(midCol));
+        baseGrad.addColorStop(0.55, toHex(midCol));
         baseGrad.addColorStop(1, toHex(edgeCol));
         
         g.fillStyle = baseGrad;
@@ -723,13 +754,16 @@ export class SlitherRenderer {
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // 2. Specular Highlight (Top band)
-        const hiCol = shadeColor(col, Math.round(75 * k));
+        // 2. Specular Highlight (Top band) — alternate phase shifts band like slither.io bumps
+        const hiCol = shadeColor(col, Math.round(80 * k));
         const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        hiGrad.addColorStop(0.02, 'rgba(255,255,255,0)');
-        hiGrad.addColorStop(0.08, rgb(hiCol, 0.35 * k)); // The bright band (more matte now)
-        hiGrad.addColorStop(0.18, rgb(hiCol, 0.05 * k));
-        hiGrad.addColorStop(0.25, 'rgba(255,255,255,0)');
+        const hiStart = phase ? 0.05 : 0.02;
+        const hiPeak = phase ? 0.13 : 0.09;
+        const hiEnd = phase ? 0.22 : 0.19;
+        hiGrad.addColorStop(hiStart, 'rgba(255,255,255,0)');
+        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.42 * k));
+        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.06 * k));
+        hiGrad.addColorStop(hiEnd + 0.06, 'rgba(255,255,255,0)');
         
         g.fillStyle = hiGrad;
         g.fill();
@@ -768,27 +802,27 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v18|${key}|0`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v19|${key}|0`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1);
         });
 
-        const alt = this._getSprite(`pr_norm_v18|${key}|1`, rPx * 2 + 4, (g, sz) => {
+        const alt = this._getSprite(`pr_norm_v19|${key}|1`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 1, 1);
         });
 
-        const boostBody = this._getSprite(`pr_norm_v18|${key}|boost`, rPx * 2 + 4, (g, sz) => {
+        const boostBody = this._getSprite(`pr_norm_v19|${key}|boost`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1.25);
         });
 
         const glowPad = Math.ceil(rPx * 0.45);
-        const glow = this._getSprite(`pr_glow_v18|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+        const glow = this._getSprite(`pr_glow_v19|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
             this._paintSnakeGlow(g, sz / 2, rPx, cs);
         });
 
         const col = parseColor(cs);
         const bright = shadeColor(col, 35);
         const pad = Math.max(3, Math.ceil(rPx * 0.2));
-        const boostOverlay = this._getSprite(`pr_boost_v18|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
+        const boostOverlay = this._getSprite(`pr_boost_v19|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
             const c = sz / 2;
             const glowR = rPx * 1.4 + pad;
             const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
@@ -802,7 +836,7 @@ export class SlitherRenderer {
             g.fill();
         });
 
-        const trailGlow = this._getSprite(`pr_trail_v18|${key}`, rPx * 3 + 8, (g, sz) => {
+        const trailGlow = this._getSprite(`pr_trail_v19|${key}`, rPx * 3 + 8, (g, sz) => {
             const c = sz / 2;
             const glowR = rPx * 1.7;
             const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
@@ -872,13 +906,14 @@ export class SlitherRenderer {
         }
 
         const worldRadius = snake.radius || 6;
-        const overlapMul = isYou ? 0.45 : 0.58;
-        const boostSpaceMul = isYou ? 0.60 : 0.72;
+        const overlapMul = isYou ? 0.38 : 0.48;
+        const boostSpaceMul = isYou ? 0.55 : 0.68;
         // Bump spacing in WORLD units so it stays constant while zoom animates each frame.
-        const bumpStepWorld = Math.max(2.8, worldRadius * (boosting ? boostSpaceMul : overlapMul));
+        const bumpStepWorld = Math.max(2.6, worldRadius * (boosting ? boostSpaceMul : overlapMul));
         const q = this._quality;
+        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
         const maxBumps = Math.round(
-            (isYou ? (boosting ? 95 : 75) : (boosting ? 48 : 38)) * Math.max(0.75, this._quality),
+            (isYou ? (boosting ? 100 : 82) : (boosting ? 52 : 42)) * qMul,
         );
         // Arc-length resample → evenly spaced, temporally stable bumps (kills body shimmer).
         const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf);
@@ -907,7 +942,7 @@ export class SlitherRenderer {
         } else {
             snake._lastSpriteR = rawR;
         }
-        const { normal, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
         const halfT = trailGlow.width / 2;
         const halfB = boostOverlay.width / 2;
         const bumpCount = bumps.length;
@@ -944,12 +979,12 @@ export class SlitherRenderer {
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const isHead = i === 0;
-            const sprite = (boosting && isHead) ? boostBody : normal;
+            const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
             this._blitSprite(ctx, sprite, p.x, p.y);
         }
 
         // Ambient glow — local snake only (doubles draw calls otherwise)
-        if (isYou && q >= 0.65) {
+        if (isYou && q >= 0.5) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = boosting ? 0.15 * pulse : 0.08;
@@ -1118,11 +1153,13 @@ export class SlitherRenderer {
 
         const frameMs = dt * 1000;
         this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
-        if (this._perfEma > 28) this._quality = 0.65;
-        else if (this._perfEma > 20) this._quality = Math.min(this._quality, 0.82);
-        else if (this._perfEma < 15) this._quality = Math.min(1, this._quality + 0.03);
+        const qFloor = this.isMobile ? 0.88 : 0.72;
+        if (this._perfEma > 32) this._quality = Math.max(qFloor, 0.84);
+        else if (this._perfEma > 24) this._quality = Math.min(this._quality, Math.max(qFloor, 0.94));
+        else if (this._perfEma > 20) this._quality = Math.min(this._quality, Math.max(qFloor, 0.97));
+        else if (this._perfEma < 15) this._quality = Math.min(1, this._quality + 0.025);
 
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
@@ -1226,29 +1263,34 @@ export class SlitherRenderer {
         }
 
         if (me?.segments?.[0]) {
-            const fallbackDots = renderSnakes
-                .filter(s => s.segments?.[0])
-                .map(s => ({
-                    x: s.segments[0].x,
-                    y: s.segments[0].y,
-                    color: s.color,
-                    isYou: s.isYou,
-                }));
+            const viewHalfW = W / (2 * zoom);
+            const viewHalfH = H / (2 * zoom);
+            const fallback = {
+                players: renderSnakes
+                    .filter(s => s.segments?.[0])
+                    .map(s => ({
+                        x: s.segments[0].x,
+                        y: s.segments[0].y,
+                        isYou: s.isYou,
+                    })),
+                food: this._foodDrawList.map(f => ({
+                    x: f.x,
+                    y: f.y,
+                    golden: f.golden,
+                    hue: f.hue,
+                })),
+            };
+            const minimap = normalizeMinimapData(this.state.minimap, fallback);
             drawGameMinimap(ctx, {
                 screenW: W,
                 screenH: H,
                 isMobile: this.isMobile,
-                bounds: {
-                    minX: -worldHalf,
-                    maxX: worldHalf,
-                    minY: -worldHalf,
-                    maxY: worldHalf,
-                },
-                cameraX: cx,
-                cameraY: cy,
-                viewHalfW: W / (2 * zoom),
-                viewHalfH: H / (2 * zoom),
-                dots: normalizeMinimapDots(this.state.minimap, fallbackDots),
+                centerX: cx,
+                centerY: cy,
+                viewHalfW,
+                viewHalfH,
+                players: minimap.players,
+                food: minimap.food,
                 zone: this.state.zone,
             });
         }

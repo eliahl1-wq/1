@@ -1,5 +1,6 @@
 /**
- * slither.io-style circular minimap — bottom-left, mobile-scaled.
+ * Local radar minimap — larger than screen view, not the full world.
+ * Enemies: red blinking dots. Off-map threats tint the rim red.
  */
 
 import { isTouchDevice } from '../utils/mobile.js';
@@ -8,96 +9,80 @@ const DESKTOP_SIZE = 132;
 const MOBILE_SIZE = 76;
 const MARGIN_DESKTOP = 14;
 const MARGIN_MOBILE = 8;
+const RANGE_MULT_DESKTOP = 2.35;
+const RANGE_MULT_MOBILE = 2.0;
+const THREAT_MULT = 1.55;
+const EDGE_BUCKETS = 40;
 
-function parseColor(color) {
-    if (!color) return '#7acc7a';
-    if (typeof color === 'object' && color !== null) color = color.fill || color.border || '#7acc7a';
-    if (typeof color !== 'string') return '#7acc7a';
-    const h = color.replace('#', '');
-    if (h.length === 3) {
-        return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`;
-    }
-    return h.length >= 6 ? `#${h.slice(0, 6)}` : '#7acc7a';
+export function getMinimapHalfRange(viewHalfW, viewHalfH, isMobile) {
+    const mult = isMobile ? RANGE_MULT_MOBILE : RANGE_MULT_DESKTOP;
+    return Math.max(viewHalfW, viewHalfH) * mult;
 }
 
-function worldCenter(bounds) {
-    return {
-        x: (bounds.minX + bounds.maxX) / 2,
-        y: (bounds.minY + bounds.maxY) / 2,
-    };
-}
-
-function worldSpan(bounds) {
-    return Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+function inRange(x, y, cx, cy, range) {
+    const dx = x - cx;
+    const dy = y - cy;
+    return dx * dx + dy * dy <= range * range;
 }
 
 /**
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} opts
- * @param {number} opts.screenW
- * @param {number} opts.screenH
- * @param {{ minX: number, maxX: number, minY: number, maxY: number }} opts.bounds
- * @param {number} opts.cameraX
- * @param {number} opts.cameraY
- * @param {number} opts.viewHalfW
- * @param {number} opts.viewHalfH
- * @param {Array<{ x: number, y: number, color?: string, c?: string, isYou?: boolean, you?: boolean }>} opts.dots
- * @param {{ cx: number, cy: number, radius: number } | null} [opts.zone]
- * @param {boolean} [opts.isMobile]
  */
 export function drawGameMinimap(ctx, opts) {
     const {
         screenW,
         screenH,
-        bounds,
-        cameraX,
-        cameraY,
+        centerX,
+        centerY,
         viewHalfW,
         viewHalfH,
-        dots = [],
+        players = [],
+        food = [],
+        viruses = [],
+        ejected = [],
         zone = null,
+        time = performance.now(),
     } = opts;
 
-    if (!bounds || !screenW || !screenH) return;
+    if (centerX == null || centerY == null || !screenW || !screenH) return;
 
     const isMobile = opts.isMobile ?? isTouchDevice();
     const size = isMobile ? MOBILE_SIZE : DESKTOP_SIZE;
     const margin = isMobile ? MARGIN_MOBILE : MARGIN_DESKTOP;
-    const mapPad = isMobile ? 0.86 : 0.84;
 
     const cx = margin + size / 2;
     const cy = screenH - margin - size / 2;
     const radius = size / 2;
-    const worldW = bounds.maxX - bounds.minX;
-    const worldH = bounds.maxY - bounds.minY;
-    const scale = (size * mapPad) / Math.max(worldW, worldH);
-    const wc = worldCenter(bounds);
+    const mapPad = isMobile ? 0.88 : 0.86;
+
+    const halfRange = getMinimapHalfRange(viewHalfW, viewHalfH, isMobile);
+    const threatRange = halfRange * THREAT_MULT;
+    const scale = (radius * mapPad * 2) / (halfRange * 2);
 
     const toMini = (wx, wy) => ({
-        x: cx + (wx - wc.x) * scale,
-        y: cy + (wy - wc.y) * scale,
+        x: cx + (wx - centerX) * scale,
+        y: cy + (wy - centerY) * scale,
     });
 
-    ctx.save();
+    const blink = 0.5 + 0.5 * Math.sin(time * 0.009);
+    const enemies = players.filter(p => !(p.isYou || p.you) && p.x != null && p.y != null);
 
+    ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.clip();
 
-    // slither.io dark purple fill
     const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
     bg.addColorStop(0, 'rgba(28, 22, 42, 0.94)');
     bg.addColorStop(1, 'rgba(12, 10, 20, 0.96)');
     ctx.fillStyle = bg;
     ctx.fillRect(cx - radius, cy - radius, size, size);
 
-    // subtle dot grid
     const gridStep = isMobile ? 14 : 18;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-    const gridLeft = cx - radius;
-    const gridTop = cy - radius;
-    for (let gx = gridLeft; gx <= cx + radius; gx += gridStep) {
-        for (let gy = gridTop; gy <= cy + radius; gy += gridStep) {
+    for (let gx = cx - radius; gx <= cx + radius; gx += gridStep) {
+        for (let gy = cy - radius; gy <= cy + radius; gy += gridStep) {
             const dx = gx - cx;
             const dy = gy - cy;
             if (dx * dx + dy * dy <= radius * radius) {
@@ -106,98 +91,168 @@ export function drawGameMinimap(ctx, opts) {
         }
     }
 
-    // world border (red danger zone)
-    const tl = toMini(bounds.minX, bounds.minY);
-    const br = toMini(bounds.maxX, bounds.maxY);
-    const mapX = Math.min(tl.x, br.x);
-    const mapY = Math.min(tl.y, br.y);
-    const mapW = Math.abs(br.x - tl.x);
-    const mapH = Math.abs(br.y - tl.y);
-
-    ctx.strokeStyle = 'rgba(210, 45, 45, 0.92)';
-    ctx.lineWidth = isMobile ? 1.1 : 1.6;
-    ctx.strokeRect(mapX, mapY, mapW, mapH);
-
-    // BR safe zone
+    // BR zone edge when it crosses the local radar
     if (zone?.radius > 0) {
         const zc = toMini(zone.cx, zone.cy);
+        const zr = zone.radius * scale;
         ctx.beginPath();
-        ctx.arc(zc.x, zc.y, zone.radius * scale, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255, 107, 107, 0.75)';
-        ctx.lineWidth = isMobile ? 1 : 1.4;
-        ctx.setLineDash([3, 3]);
+        ctx.arc(zc.x, zc.y, zr, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 107, 107, 0.55)';
+        ctx.lineWidth = isMobile ? 1 : 1.3;
+        ctx.setLineDash([3, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
     }
 
-    // viewport rectangle
-    if (cameraX != null && cameraY != null && viewHalfW > 0 && viewHalfH > 0) {
-        const vtl = toMini(cameraX - viewHalfW, cameraY - viewHalfH);
-        const vbr = toMini(cameraX + viewHalfW, cameraY + viewHalfH);
-        const vx = Math.min(vtl.x, vbr.x);
-        const vy = Math.min(vtl.y, vbr.y);
-        const vw = Math.abs(vbr.x - vtl.x);
-        const vh = Math.abs(vbr.y - vtl.y);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.fillRect(vx, vy, vw, vh);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(vx + 0.5, vy + 0.5, vw - 1, vh - 1);
-    }
-
-    // other players
-    const otherR = isMobile ? 1.6 : 2.2;
-    for (const dot of dots) {
-        const isYou = dot.isYou || dot.you;
-        if (isYou || dot.x == null || dot.y == null) continue;
-        const p = toMini(dot.x, dot.y);
-        ctx.fillStyle = parseColor(dot.color || dot.c);
+    // food pellets
+    const foodR = isMobile ? 0.9 : 1.1;
+    for (const f of food) {
+        if (f.x == null || f.y == null) continue;
+        if (!inRange(f.x, f.y, centerX, centerY, halfRange)) continue;
+        const p = toMini(f.x, f.y);
+        if (f.golden || f.g) {
+            ctx.fillStyle = `rgba(255, 210, 60, ${0.75 + blink * 0.2})`;
+        } else if (f.hue != null || f.h != null) {
+            const hue = f.hue ?? f.h;
+            ctx.fillStyle = `hsla(${hue}, 70%, 58%, 0.55)`;
+        } else {
+            ctx.fillStyle = 'rgba(180, 185, 200, 0.45)';
+        }
         ctx.beginPath();
-        ctx.arc(p.x, p.y, otherR, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, foodR, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // your position — bright white dot
-    for (const dot of dots) {
-        const isYou = dot.isYou || dot.you;
-        if (!isYou || dot.x == null || dot.y == null) continue;
-        const p = toMini(dot.x, dot.y);
-        const meR = isMobile ? 2.6 : 3.2;
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.75)';
-        ctx.shadowBlur = isMobile ? 3 : 5;
-        ctx.fillStyle = '#ffffff';
+    // ejected mass
+    const ejR = isMobile ? 1.2 : 1.5;
+    for (const m of ejected) {
+        if (m.x == null || m.y == null) continue;
+        if (!inRange(m.x, m.y, centerX, centerY, halfRange)) continue;
+        const p = toMini(m.x, m.y);
+        ctx.fillStyle = 'rgba(255, 140, 50, 0.7)';
         ctx.beginPath();
-        ctx.arc(p.x, p.y, meR, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, ejR, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // viruses
+    const virusR = isMobile ? 2 : 2.6;
+    for (const v of viruses) {
+        if (v.x == null || v.y == null) continue;
+        if (!inRange(v.x, v.y, centerX, centerY, halfRange)) continue;
+        const p = toMini(v.x, v.y);
+        ctx.fillStyle = 'rgba(80, 210, 100, 0.75)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, virusR, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // enemies on radar — red blinking
+    const enemyR = isMobile ? 2 : 2.6;
+    for (const e of enemies) {
+        if (!inRange(e.x, e.y, centerX, centerY, halfRange)) continue;
+        const p = toMini(e.x, e.y);
+        ctx.globalAlpha = blink;
+        ctx.fillStyle = '#ff2a2a';
+        ctx.shadowColor = 'rgba(255, 40, 40, 0.9)';
+        ctx.shadowBlur = isMobile ? 3 : 5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, enemyR, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
-        break;
+        ctx.globalAlpha = 1;
     }
+
+    // you — always centered
+    const meR = isMobile ? 2.4 : 3;
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+    ctx.shadowBlur = isMobile ? 3 : 5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, meR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
 
     ctx.restore();
 
-    // outer ring
+    // rim threat from enemies outside radar but nearby
+    const edgeThreat = new Array(EDGE_BUCKETS).fill(0);
+    let maxThreat = 0;
+    for (const e of enemies) {
+        const dx = e.x - centerX;
+        const dy = e.y - centerY;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= halfRange || dist > threatRange) continue;
+        const t = 1 - (dist - halfRange) / (threatRange - halfRange);
+        const angle = Math.atan2(dy, dx);
+        const bucket = Math.floor(((angle + Math.PI) / (Math.PI * 2)) * EDGE_BUCKETS) % EDGE_BUCKETS;
+        edgeThreat[bucket] = Math.max(edgeThreat[bucket], t);
+        maxThreat = Math.max(maxThreat, t);
+    }
+
+    const baseRingAlpha = 0.22;
+    const ringR = radius;
     ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${baseRingAlpha})`;
     ctx.lineWidth = isMobile ? 1.4 : 2;
     ctx.stroke();
 
+    for (let i = 0; i < EDGE_BUCKETS; i++) {
+        const t = edgeThreat[i];
+        if (t <= 0.02) continue;
+        const a0 = (i / EDGE_BUCKETS) * Math.PI * 2 - Math.PI;
+        const a1 = ((i + 1) / EDGE_BUCKETS) * Math.PI * 2 - Math.PI;
+        const alpha = (0.35 + t * 0.65) * (0.65 + blink * 0.35);
+        ctx.beginPath();
+        ctx.arc(cx, cy, ringR - 1, a0, a1);
+        ctx.strokeStyle = `rgba(255, 35, 35, ${alpha})`;
+        ctx.lineWidth = isMobile ? 2.5 : 3.5;
+        ctx.lineCap = 'butt';
+        ctx.stroke();
+    }
+
+    if (maxThreat > 0.05) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 1.5, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 50, 50, ${(0.12 + maxThreat * 0.35) * (0.7 + blink * 0.3)})`;
+        ctx.lineWidth = isMobile ? 2 : 2.5;
+        ctx.stroke();
+    }
+
     ctx.beginPath();
     ctx.arc(cx, cy, radius - 1.5, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.38)';
     ctx.lineWidth = 1;
     ctx.stroke();
 }
 
-/** Normalize server minimap payload to draw dots. */
-export function normalizeMinimapDots(raw, fallback = []) {
-    if (Array.isArray(raw) && raw.length > 0) {
-        return raw.map(d => ({
-            x: d.x,
-            y: d.y,
-            color: d.c || d.color,
-            isYou: !!(d.you || d.isYou),
-        }));
+/** Normalize server minimap payload or build from local game state. */
+export function normalizeMinimapData(raw, fallback = {}) {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        return {
+            players: raw.players || raw.p || fallback.players || [],
+            food: raw.food || raw.f || fallback.food || [],
+            viruses: raw.viruses || raw.v || fallback.viruses || [],
+            ejected: raw.ejected || raw.e || fallback.ejected || [],
+        };
     }
-    return fallback;
+    if (Array.isArray(raw) && raw.length > 0) {
+        return {
+            players: raw.map(d => ({
+                x: d.x,
+                y: d.y,
+                isYou: !!(d.you || d.isYou),
+            })),
+            food: fallback.food || [],
+            viruses: fallback.viruses || [],
+            ejected: fallback.ejected || [],
+        };
+    }
+    return {
+        players: fallback.players || [],
+        food: fallback.food || [],
+        viruses: fallback.viruses || [],
+        ejected: fallback.ejected || [],
+    };
 }

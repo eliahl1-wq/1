@@ -10,10 +10,11 @@ import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } 
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
-import { AgarMobileControls } from '../../components/MobileGameControls';
+import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
-import { drawGameMinimap, normalizeMinimapDots } from '../minimap.js';
+import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
+import { playAgarEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -32,8 +33,22 @@ function foodLikelyEaten(f, users) {
     return false;
 }
 
+/** True when the local player's cell overlaps this pellet. */
+function foodEatenByPlayer(f, myId, users) {
+    if (!myId || !users?.length) return false;
+    const me = users.find(u => u.id === myId);
+    if (!me) return false;
+    const fr = f.radius || 5;
+    for (const c of me.cells || []) {
+        if (Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0) + fr * 0.5) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /** Drop stale cached pellets; keep edge blobs briefly through spatial-filter gaps. */
-function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users) {
+function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
     const margin = 240;
     const halfW = screenW / 2 + margin;
     const halfH = screenH / 2 + margin;
@@ -42,6 +57,7 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users) {
         if (miss === 0) continue;
         const inView = Math.abs(f.x - px) <= halfW && Math.abs(f.y - py) <= halfH;
         if (foodLikelyEaten(f, users)) {
+            if (foodEatenByPlayer(f, myId, users)) playAgarEatSound();
             foodMap.delete(id);
         } else if (!inView) {
             if (miss >= 8) foodMap.delete(id);
@@ -131,6 +147,18 @@ export default function Game() {
         global.battleRoyale = isBattleRoyale;
         return () => clearInterval(itv);
     }, [isBattleRoyale]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const unlock = () => unlockGameAudio();
+        canvas.addEventListener('pointerdown', unlock, { once: true });
+        window.addEventListener('keydown', unlock, { once: true });
+        return () => {
+            canvas.removeEventListener('pointerdown', unlock);
+            window.removeEventListener('keydown', unlock);
+        };
+    }, []);
 
     useEffect(() => {
         if (!token) {
@@ -261,6 +289,7 @@ export default function Game() {
                 if (seen.has(id)) continue;
                 const nextMiss = (f._missStreak || 0) + 1;
                 if (foodLikelyEaten(f, userData)) {
+                    if (foodEatenByPlayer(f, myIdRef.current, userData)) playAgarEatSound();
                     foodMap.delete(id);
                 } else {
                     foodMap.set(id, { ...f, _missStreak: nextMiss });
@@ -477,7 +506,7 @@ export default function Game() {
                     graph.restore();
                 }
                 
-                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width / viewZoom, screen.height / viewZoom, users);
+                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width / viewZoom, screen.height / viewZoom, users, myIdRef.current);
                 const halfW = screen.width / (2 * viewZoom) + 120;
                 const halfH = screen.height / (2 * viewZoom) + 120;
                 const myCells = users.find(u => u.id === myIdRef.current)?.cells || [];
@@ -518,27 +547,36 @@ export default function Game() {
                 renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
                 renderUtils.drawHUD(global, graph);
 
-                const fallbackDots = users.map(u => ({
-                    x: u.x,
-                    y: u.y,
-                    color: u.color?.fill || u.color,
-                    isYou: u.id === myIdRef.current,
-                }));
+                const viewHalfW = screen.width / (2 * viewZoom);
+                const viewHalfH = screen.height / (2 * viewZoom);
+                const fallback = {
+                    players: users.map(u => ({
+                        x: u.x,
+                        y: u.y,
+                        isYou: u.id === myIdRef.current,
+                    })),
+                    food: Array.from(foodCacheRef.current.values()).map(f => ({
+                        x: f.x,
+                        y: f.y,
+                        golden: f.golden,
+                        hue: f.hue,
+                    })),
+                    viruses: (viruses || []).map(v => ({ x: v.x, y: v.y })),
+                    ejected: (ejected || []).map(m => ({ x: m.x, y: m.y })),
+                };
+                const minimap = normalizeMinimapData(gameData.current.rewardInfo?.minimap, fallback);
                 drawGameMinimap(graph, {
                     screenW: screen.width,
                     screenH: screen.height,
                     isMobile: IS_MOBILE,
-                    bounds: {
-                        minX: 0,
-                        maxX: global.game.width,
-                        minY: 0,
-                        maxY: global.game.height,
-                    },
-                    cameraX: player.x,
-                    cameraY: player.y,
-                    viewHalfW: screen.width / (2 * viewZoom),
-                    viewHalfH: screen.height / (2 * viewZoom),
-                    dots: normalizeMinimapDots(gameData.current.rewardInfo?.minimap, fallbackDots),
+                    centerX: player.x,
+                    centerY: player.y,
+                    viewHalfW,
+                    viewHalfH,
+                    players: minimap.players,
+                    food: minimap.food,
+                    viruses: minimap.viruses,
+                    ejected: minimap.ejected,
                     zone: brZone,
                 });
             }
@@ -547,6 +585,11 @@ export default function Game() {
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);
     }, [isConnected, isDead, brZone]); 
+
+    const tryDoubleTapEject = useMobileDoubleTapEject(
+        IS_MOBILE && isConnected && !isDead,
+        () => socketRef.current?.emit('1'),
+    );
 
     const handleMouseMove = (e) => {
         const canvas = canvasRef.current;
@@ -564,6 +607,7 @@ export default function Game() {
         if (!canvas) return;
         const t = e.touches?.[0];
         if (!t) return;
+        tryDoubleTapEject(t.clientX, t.clientY);
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(t.clientX, t.clientY, canvas);
         socketRef.current?.emit('0', {
             x, y,
@@ -613,10 +657,7 @@ export default function Game() {
             <MobileGameSession containerRef={viewportRef} />
 
             {IS_MOBILE && isConnected && !isDead && (
-                <AgarMobileControls
-                    onSplit={() => socketRef.current?.emit('2')}
-                    onEject={() => socketRef.current?.emit('1')}
-                />
+                <AgarMobileControls onSplit={() => socketRef.current?.emit('2')} />
             )}
 
             {cashedAmount !== null && (
