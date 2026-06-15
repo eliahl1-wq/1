@@ -86,6 +86,7 @@ export default function PreGame() {
     const [liveStats, setLiveStats] = useState({
         playersOnline: 0,
         totalPlayersOnline: 0,
+        totalUserBalanceUsd: 0,
         biggestPayout: 0,
         topPlayer: null,
         topPlayers: [],
@@ -1088,6 +1089,15 @@ export default function PreGame() {
                         {playBtnLabel}
                     </button>
 
+                    <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-2)', fontWeight: 600 }}>
+                            Global Player Earnings
+                        </div>
+                        <div className="mono" style={{ marginTop: '3px', fontSize: '1rem', color: 'var(--green)', fontWeight: 800 }}>
+                            {formatUsd(liveStats?.totalUserBalanceUsd || 0)}
+                        </div>
+                    </div>
+
                     {isAlreadyInGame && currentGameMode && (
                         <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
                             Active session: {currentGameMode.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}
@@ -1173,12 +1183,10 @@ export default function PreGame() {
             <div className="bottom-stats-row">
                 <div className="stats-card live-stats-bottom">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <span className="label" style={{ color: 'var(--text)', fontSize: '0.7rem' }}>LIVE</span>
+                        <div className="live-stats-playing" style={{ marginBottom: 0 }}>
+                            Playing: <span className="mono">{playingCountForLiveView}</span>
+                        </div>
                         <div className="live-dot" />
-                    </div>
-
-                    <div className="live-stats-playing">
-                        Playing: <span className="mono">{playingCountForLiveView}</span>
                     </div>
 
                     <div className="live-stats-mode-select">

@@ -14,7 +14,7 @@ import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/Mo
 import { isTouchDevice } from '../../utils/mobile';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
-import { playAgarEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
+import { playAgarEatSound, unlockGameAudio, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -353,6 +353,7 @@ export default function Game() {
             setCashedAmount(usdAmount);
             
             // Professional count-up animation for money being "added" to balance
+            startCashoutCountUpSound(usdAmount, 1200);
             const startTime = performance.now();
             const duration = 1200;
             const animate = (currentTime) => {
@@ -361,6 +362,7 @@ export default function Game() {
                 const eased = 1 - Math.pow(1 - progress, 4); // Ease-out Quart
                 setDisplayCashedAmount(eased * usdAmount);
                 if (progress < 1) requestAnimationFrame(animate);
+                else stopCashoutCountUpSound();
             };
             requestAnimationFrame(animate);
 

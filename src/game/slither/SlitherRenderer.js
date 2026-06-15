@@ -718,13 +718,13 @@ export class SlitherRenderer {
         
         // 1. Base Radial Gradient
         // Offset center slightly up to simulate top-down light
-        const baseGrad = g.createRadialGradient(c, c - rPx * 0.18, rPx * 0.08, c, c, rPx);
-        const centerCol = shadeColor(col, Math.round(18 * k));
+        const baseGrad = g.createRadialGradient(c, c - rPx * 0.16, rPx * 0.12, c, c, rPx);
+        const centerCol = shadeColor(col, Math.round(12 * k));
         const midCol = col;
-        const edgeCol = shadeColor(col, Math.round(-52 * k));
+        const edgeCol = shadeColor(col, Math.round(-34 * k));
         
         baseGrad.addColorStop(0, toHex(centerCol));
-        baseGrad.addColorStop(0.55, toHex(midCol));
+        baseGrad.addColorStop(0.6, toHex(midCol));
         baseGrad.addColorStop(1, toHex(edgeCol));
         
         g.fillStyle = baseGrad;
@@ -733,27 +733,37 @@ export class SlitherRenderer {
         g.fill();
 
         // 2. Specular Highlight (Top band) — alternate phase shifts band like slither.io bumps
-        const hiCol = shadeColor(col, Math.round(80 * k));
+        const hiCol = shadeColor(col, Math.round(58 * k));
         const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        const hiStart = phase ? 0.05 : 0.02;
-        const hiPeak = phase ? 0.13 : 0.09;
-        const hiEnd = phase ? 0.22 : 0.19;
+        const hiStart = phase ? 0.07 : 0.05;
+        const hiPeak = phase ? 0.16 : 0.13;
+        const hiEnd = phase ? 0.28 : 0.25;
         hiGrad.addColorStop(hiStart, 'rgba(255,255,255,0)');
-        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.42 * k));
-        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.06 * k));
+        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.26 * k));
+        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.045 * k));
         hiGrad.addColorStop(hiEnd + 0.06, 'rgba(255,255,255,0)');
         
         g.fillStyle = hiGrad;
         g.fill();
 
         // 3. Ambient Shadow (Bottom)
-        const shCol = shadeColor(col, Math.round(-70 * k));
+        const shCol = shadeColor(col, Math.round(-52 * k));
         const shGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        shGrad.addColorStop(0.7, 'rgba(0,0,0,0)');
-        shGrad.addColorStop(0.95, rgb(shCol, 0.6 * k));
-        shGrad.addColorStop(1.0, rgb(shCol, 0.8 * k));
+        shGrad.addColorStop(0.68, 'rgba(0,0,0,0)');
+        shGrad.addColorStop(0.94, rgb(shCol, 0.4 * k));
+        shGrad.addColorStop(1.0, rgb(shCol, 0.56 * k));
         
         g.fillStyle = shGrad;
+        g.fill();
+
+        // 4. Soft edge vignette to hide metallic hard segment border.
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.72, c, c, rPx * 1.03);
+        edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(0.88, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -30), 0.16 * k));
+        g.fillStyle = edgeShadow;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
     }
 
@@ -780,27 +790,27 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v19|${key}|0`, rPx * 2 + 4, (g, sz) => {
+        const normal = this._getSprite(`pr_norm_v20|${key}|0`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1);
         });
 
-        const alt = this._getSprite(`pr_norm_v19|${key}|1`, rPx * 2 + 4, (g, sz) => {
+        const alt = this._getSprite(`pr_norm_v20|${key}|1`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 1, 1);
         });
 
-        const boostBody = this._getSprite(`pr_norm_v19|${key}|boost`, rPx * 2 + 4, (g, sz) => {
+        const boostBody = this._getSprite(`pr_norm_v20|${key}|boost`, rPx * 2 + 4, (g, sz) => {
             this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1.25);
         });
 
         const glowPad = Math.ceil(rPx * 0.45);
-        const glow = this._getSprite(`pr_glow_v19|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+        const glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
             this._paintSnakeGlow(g, sz / 2, rPx, cs);
         });
 
         const col = parseColor(cs);
         const bright = shadeColor(col, 35);
         const pad = Math.max(3, Math.ceil(rPx * 0.2));
-        const boostOverlay = this._getSprite(`pr_boost_v19|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
+        const boostOverlay = this._getSprite(`pr_boost_v20|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
             const c = sz / 2;
             const glowR = rPx * 1.4 + pad;
             const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
@@ -814,7 +824,7 @@ export class SlitherRenderer {
             g.fill();
         });
 
-        const trailGlow = this._getSprite(`pr_trail_v19|${key}`, rPx * 3 + 8, (g, sz) => {
+        const trailGlow = this._getSprite(`pr_trail_v20|${key}`, rPx * 3 + 8, (g, sz) => {
             const c = sz / 2;
             const glowR = rPx * 1.7;
             const grad = g.createRadialGradient(c, c, 0, c, c, glowR);

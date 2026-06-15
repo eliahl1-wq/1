@@ -14,7 +14,7 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { playSlitherEatSound } from '../../audio/synthSounds.js';
+import { playSlitherEatSound, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -395,6 +395,7 @@ export default function SlitherGame() {
 
             setCashedAmount(amount);
 
+            startCashoutCountUpSound(amount, 1200);
             const startTime = performance.now();
 
             const duration = 1200;
@@ -410,6 +411,7 @@ export default function SlitherGame() {
                 setDisplayCashedAmount(eased * amount);
 
                 if (progress < 1) requestAnimationFrame(animate);
+                else stopCashoutCountUpSound();
 
             };
 
