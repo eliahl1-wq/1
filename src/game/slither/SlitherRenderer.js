@@ -95,7 +95,7 @@ function shadeColor({ r, g, b }, amount) {
 export class SlitherRenderer {
     constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+        this.ctx = canvas.getContext('2d');
         this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null };
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
@@ -432,7 +432,7 @@ export class SlitherRenderer {
         return this._bgPattern;
     }
 
-    _drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom) {
+    _drawBackground(ctx, W, H, cx, cy, worldHalf, zoom) {
         ctx.fillStyle = '#1a1a1e';
         ctx.fillRect(0, 0, W, H);
 
@@ -451,22 +451,25 @@ export class SlitherRenderer {
         }
 
         const limit = worldHalf;
-        const tl = toScreen(-limit, -limit);
-        const br = toScreen(limit, limit);
-        const playW = br.x - tl.x;
-        const playH = br.y - tl.y;
+        // Inline projection — toScreen() reuses a scratch object and must not be called twice here.
+        const tlX = (-limit - cx) * zoom + W / 2;
+        const tlY = (-limit - cy) * zoom + H / 2;
+        const brX = (limit - cx) * zoom + W / 2;
+        const brY = (limit - cy) * zoom + H / 2;
+        const playW = brX - tlX;
+        const playH = brY - tlY;
         ctx.save();
         ctx.fillStyle = 'rgba(72, 4, 9, 0.96)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
-        ctx.rect(tl.x, tl.y, playW, playH);
+        ctx.rect(tlX, tlY, playW, playH);
         ctx.fill('evenodd');
         ctx.strokeStyle = 'rgba(255, 45, 45, 0.28)';
         ctx.lineWidth = 14;
-        ctx.strokeRect(tl.x, tl.y, playW, playH);
+        ctx.strokeRect(tlX, tlY, playW, playH);
         ctx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
         ctx.lineWidth = 3;
-        ctx.strokeRect(tl.x, tl.y, playW, playH);
+        ctx.strokeRect(tlX, tlY, playW, playH);
         ctx.restore();
     }
 
@@ -574,8 +577,8 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const simpleFood = this._quality < 0.72;
-        const foodStride = this._quality < 0.55 ? 2 : 1;
+        const simpleFood = this._quality < 0.6;
+        const foodStride = this._quality < 0.45 ? 2 : 1;
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
@@ -838,7 +841,7 @@ export class SlitherRenderer {
         const bumpStep = Math.max(2.5, bodyRadius * (boosting ? boostSpaceMul : overlapMul));
         const q = this._quality;
         const maxBumps = Math.round(
-            (isYou ? (boosting ? 110 : 85) : (boosting ? 42 : 32)) * q,
+            (isYou ? (boosting ? 95 : 75) : (boosting ? 48 : 38)) * Math.max(0.75, this._quality),
         );
         const dense = this._densifySpine(pts, bumpStep, this._denseBuf);
         const bumps = this._capBumps(dense, this._bumpsBuf, maxBumps);
@@ -1034,9 +1037,9 @@ export class SlitherRenderer {
 
         const frameMs = dt * 1000;
         this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
-        if (this._perfEma > 24) this._quality = 0.5;
-        else if (this._perfEma > 18) this._quality = Math.min(this._quality, 0.72);
-        else if (this._perfEma < 14.5) this._quality = Math.min(1, this._quality + 0.04);
+        if (this._perfEma > 28) this._quality = 0.65;
+        else if (this._perfEma > 20) this._quality = Math.min(this._quality, 0.82);
+        else if (this._perfEma < 15) this._quality = Math.min(1, this._quality + 0.03);
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalAlpha = 1;
@@ -1101,7 +1104,7 @@ export class SlitherRenderer {
             return scratch;
         };
 
-        this._drawBackground(ctx, W, H, cx, cy, worldHalf, toScreen, zoom);
+        this._drawBackground(ctx, W, H, cx, cy, worldHalf, zoom);
         this._drawZone(ctx, toScreen, W, H);
         this._drawFood(ctx, this._foodDrawList, toScreen, W, H, zoom);
 
