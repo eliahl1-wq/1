@@ -817,9 +817,9 @@
   max-height: 98px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 0;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -834,8 +834,6 @@
 
 .leaderboard-list:hover,
 .leaderboard-list--scrolling {
-  padding-right: 4px;
-  scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
