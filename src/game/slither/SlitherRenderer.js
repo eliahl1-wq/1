@@ -215,7 +215,7 @@ export class SlitherRenderer {
         const x = sx - rect.left - this.W / 2;
         const y = sy - rect.top - this.H / 2;
         const mag = Math.hypot(x, y);
-        if (mag < 6) return;
+        if (mag < 8) return;
         this.inputDx = (x / mag) * 4;
         this.inputDy = (y / mag) * 4;
     }
@@ -348,14 +348,13 @@ export class SlitherRenderer {
                 continue;
             }
 
-            // Smooth toward server spine. Head snaps faster than tail for tighter input feel.
-            const baseTau = snake.isYou ? 0.026 : 0.09;
+            // Smooth toward server spine. Local snake is slightly snappier for input feel.
+            // Arc-length resampling at draw time keeps spacing even regardless of lerp phase.
+            const tau = snake.isYou ? 0.05 : 0.09;
+            const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
 
             for (let i = 0; i < len; i++) {
                 if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-
-                const segTau = snake.isYou ? baseTau * (1 + i * 0.012) : baseTau;
-                const a = 1 - Math.exp(-dt / Math.max(segTau, 0.0001));
 
                 const dx = tgt[i].x - s.segments[i].x;
                 const dy = tgt[i].y - s.segments[i].y;
@@ -370,21 +369,7 @@ export class SlitherRenderer {
 
             let da = (snake.angle || 0) - s.angle;
             da = Math.atan2(Math.sin(da), Math.cos(da));
-            const angleTau = snake.isYou ? 0.018 : baseTau;
-            const angleBlend = 1 - Math.exp(-dt / Math.max(angleTau, 0.0001));
-            s.angle += da * angleBlend;
-
-            // Blend local heading toward cursor for instant visual steering feedback.
-            if (snake.isYou) {
-                const im = Math.hypot(this.inputDx, this.inputDy);
-                if (im > 0.001) {
-                    const desired = Math.atan2(this.inputDy, this.inputDx);
-                    let ida = desired - s.angle;
-                    ida = Math.atan2(Math.sin(ida), Math.cos(ida));
-                    const inputBlend = 1 - Math.exp(-dt / 0.014);
-                    s.angle += ida * inputBlend;
-                }
-            }
+            s.angle += da * a;
         }
 
         for (const id of this.smooth.keys()) {

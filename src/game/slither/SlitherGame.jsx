@@ -548,7 +548,7 @@ export default function SlitherGame() {
 
 
 
-        inputIntervalRef.current = setInterval(emitInput, 16);
+        inputIntervalRef.current = setInterval(emitInput, 25);
 
 
 

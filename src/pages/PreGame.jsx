@@ -84,7 +84,7 @@ export default function PreGame() {
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
     const [statusMsg, setStatusMsg] = useState(''); // Moved here to avoid conflicts
-    const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [] });
+    const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [], globalEarningsUsd: 0 });
     const [liveLeaderboardEvents, setLiveLeaderboardEvents] = useState([]);
     const [liveTabPulse, setLiveTabPulse] = useState(false);
     const liveTabSeenIdRef = useRef(null);
@@ -171,7 +171,11 @@ export default function PreGame() {
 
 
     const siteUsersOnline = liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0;
-    const globalCashoutTotalUsd = liveStats.totalUserBalanceUsd ?? 0;
+    const globalCashoutTotalUsd =
+        liveStats.globalPlayerEarningsUsd
+        ?? liveStats.totalUserBalanceUsd
+        ?? leaderboardData.globalEarningsUsd
+        ?? 0;
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
@@ -336,7 +340,8 @@ export default function PreGame() {
                     const d = await r.json();
                     setLeaderboardData({
                         alltime: d.alltime || [],
-                        week: d.week || []
+                        week: d.week || [],
+                        globalEarningsUsd: d.globalEarningsUsd ?? 0,
                     });
                 }
             } catch { }
