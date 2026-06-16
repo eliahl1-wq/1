@@ -168,16 +168,21 @@ function ModeCard({ mode, title, desc, playing, badge, badgeAccent, onPlay }) {
 
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
-            <div className="gm-card-row">
-                <div className="gm-card-text">
+            <div className="gm-card-layout">
+                <div className="gm-card-main">
                     <div className="gm-card-title-row">
                         <div className="gm-card-title">{title}</div>
                         {badge && <span className="gm-badge" style={badgeStyle}>{badge}</span>}
                     </div>
                     <div className="gm-card-desc">{desc}</div>
-                    {playing != null && (
-                        <div className="gm-card-playing">{playing} playing</div>
-                    )}
+                    <div className="gm-card-footer">
+                        {playing != null && (
+                            <div className="gm-card-playing">{playing} playing</div>
+                        )}
+                        {!isDisabled && (
+                            <button className="gm-play-btn" onClick={onPlay}>Select</button>
+                        )}
+                    </div>
                 </div>
                 {mode && (
                     <div className="gm-card-preview-wrap">
@@ -185,9 +190,6 @@ function ModeCard({ mode, title, desc, playing, badge, badgeAccent, onPlay }) {
                     </div>
                 )}
             </div>
-            {!isDisabled && (
-                <button className="gm-play-btn gm-card-select" onClick={onPlay}>Select</button>
-            )}
         </div>
     );
 }
