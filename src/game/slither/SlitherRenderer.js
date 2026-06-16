@@ -7,6 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
+import { rebuildPathFromSegments, stepLocalSnake, stepRemoteSnake } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -313,9 +314,8 @@ export class SlitherRenderer {
     }
 
     /**
-     * Exponential smoothing of every snake's segments toward the latest server
-     * positions. Server ticks arrive at ~40Hz with jitter; rendering at 60fps
-     * without this makes movement look choppy and teleporty.
+     * Interpolate remote snakes toward server spine. Local snake runs client-side
+     * path physics every frame so the body tracks the head smoothly at display rate.
      */
     _updateSmoothing(dt) {
         const SNAP_SQ = 220 * 220;
@@ -336,62 +336,61 @@ export class SlitherRenderer {
 
             let s = this.smooth.get(snake.id);
             if (!s) {
-                s = { segments: [], angle: snake.angle || 0 };
+                s = { segments: [], angle: snake.angle || 0, path: null };
                 this.smooth.set(snake.id, s);
                 for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
+                rebuildPathFromSegments(s, s.segments);
                 continue;
             }
 
             if (s.segments.length > len) s.segments.length = len;
 
             if (snake.isYou) {
-                // Large delta = respawn/teleport → snap whole spine, otherwise interpolate below.
                 const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
                 const headDy = tgt[0].y - (s.segments[0]?.y ?? tgt[0].y);
                 if (headDx * headDx + headDy * headDy > SNAP_SQ) {
                     for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     s.angle = snake.angle || 0;
+                    rebuildPathFromSegments(s, s.segments);
                     continue;
                 }
+
+                stepLocalSnake(
+                    s,
+                    {
+                        segmentCount: len,
+                        sc: snake.sc,
+                        radius: snake.radius,
+                        angle: snake.angle,
+                    },
+                    tgt[0],
+                    dt,
+                    this.inputDx,
+                    this.inputDy,
+                    !!(snake.boost || this.boost),
+                );
+                continue;
             }
 
             if (offScreen) {
                 for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
+                rebuildPathFromSegments(s, s.segments);
                 continue;
             }
 
-            // Smooth toward server spine. Local snake is slightly snappier for input feel.
-            // Arc-length resampling at draw time keeps spacing even regardless of lerp phase.
-            const tau = snake.isYou ? 0.04 : 0.09;
-            const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
-
-            for (let i = 0; i < len; i++) {
-                if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-
-                // Body follows the server spine exactly; only the head is smoothed
-                // so growth and turns do not stretch or gap the rendered tube.
-                if (snake.isYou && i > 0) {
-                    s.segments[i].x = tgt[i].x;
-                    s.segments[i].y = tgt[i].y;
-                    continue;
-                }
-
-                const dx = tgt[i].x - s.segments[i].x;
-                const dy = tgt[i].y - s.segments[i].y;
-                if (dx * dx + dy * dy > SNAP_SQ) {
-                    s.segments[i].x = tgt[i].x;
-                    s.segments[i].y = tgt[i].y;
-                } else {
-                    s.segments[i].x += dx * a;
-                    s.segments[i].y += dy * a;
-                }
-            }
-
-            let da = (snake.angle || 0) - s.angle;
-            da = Math.atan2(Math.sin(da), Math.cos(da));
-            s.angle += da * a;
+            stepRemoteSnake(
+                s,
+                {
+                    segmentCount: len,
+                    sc: snake.sc,
+                    radius: snake.radius,
+                },
+                tgt[0],
+                snake.angle || 0,
+                dt,
+            );
         }
 
         for (const id of this.smooth.keys()) {
