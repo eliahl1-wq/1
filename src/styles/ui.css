@@ -817,9 +817,9 @@
   max-height: 98px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  padding-right: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -828,8 +828,20 @@
 }
 
 .leaderboard-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: transparent;
   border-radius: 4px;
+}
+
+.leaderboard-list:hover,
+.leaderboard-list--scrolling {
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.leaderboard-list:hover::-webkit-scrollbar-thumb,
+.leaderboard-list--scrolling::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .leaderboard-entry {

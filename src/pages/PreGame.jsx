@@ -105,6 +105,8 @@ export default function PreGame() {
     const [liveLeaderboardEvents, setLiveLeaderboardEvents] = useState([]);
     const [liveTabPulse, setLiveTabPulse] = useState(false);
     const liveTabSeenIdRef = useRef(null);
+    const leaderboardListRef = useRef(null);
+    const leaderboardScrollHideRef = useRef(null);
     const [nickname, setNickname] = useState(
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
@@ -258,6 +260,16 @@ export default function PreGame() {
 
     const statusClass = statusMsg.startsWith('✅') || statusMsg.includes('copied')
         ? 'success' : statusMsg.startsWith('❌') ? 'error' : 'info';
+
+    const handleLeaderboardScroll = useCallback(() => {
+        const el = leaderboardListRef.current;
+        if (!el) return;
+        el.classList.add('leaderboard-list--scrolling');
+        clearTimeout(leaderboardScrollHideRef.current);
+        leaderboardScrollHideRef.current = setTimeout(() => {
+            el.classList.remove('leaderboard-list--scrolling');
+        }, 700);
+    }, []);
 
     // ── Effects ────────────────────────────────────────
     useEffect(() => {
@@ -1202,7 +1214,11 @@ export default function PreGame() {
                         {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>No data yet</div>
                         ) : (
-                            <div className="leaderboard-list">
+                            <div
+                                ref={leaderboardListRef}
+                                className="leaderboard-list"
+                                onScroll={handleLeaderboardScroll}
+                            >
                                 {leaderboardTab === 'alltime' ? (
                                     leaderboardData.alltime.map((entry, i) => (
                                         <div key={i} className="leaderboard-entry">
