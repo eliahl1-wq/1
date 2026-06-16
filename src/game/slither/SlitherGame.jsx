@@ -11,7 +11,9 @@ import { SlitherRenderer } from './SlitherRenderer.js';
 import { normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import GameResultModal from '../../components/GameResultModal';
+import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
+import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
@@ -24,6 +26,10 @@ const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.lo
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
+const SLITHER_WORLD_HALF = 3000;
+const SLITHER_SPEC_ZOOM = IS_MOBILE ? 2.05 : 2.65;
+const SLITHER_SPEC_MIN_ZOOM = IS_MOBILE ? 0.95 : 1.35;
+const SLITHER_SPEC_MAX_ZOOM = IS_MOBILE ? 3.5 : 4.2;
 
 
 
@@ -58,6 +64,7 @@ export default function SlitherGame() {
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const cashOutEndAtRef = useRef(0);
     const sessionStartAtRef = useRef(null);
+    const spectatorCamRef = useRef({ x: 0, y: 0 });
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 10, isBR: false });
 
 
@@ -74,6 +81,7 @@ export default function SlitherGame() {
 
     const [cashedAmount, setCashedAmount] = useState(null);
     const [showResultModal, setShowResultModal] = useState(false);
+    const [isSpectating, setIsSpectating] = useState(false);
     const [isRejoining, setIsRejoining] = useState(false);
     const [sessionStats, setSessionStats] = useState({ timeSurvivedMs: 0, eliminations: 0 });
 
@@ -98,8 +106,40 @@ export default function SlitherGame() {
     const lastBrHudAtRef = useRef(0);
 
     const lastBalanceUiAtRef = useRef(0);
+    const blockInputRef = useRef(false);
+    blockInputRef.current = isSpectating || isDead || cashedAmount !== null;
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
+
+    const { camRef: specCamRef, seed: seedSpecCam } = useSpectatorCamera({
+        active: isSpectating,
+        canvasRef,
+        worldBounds: {
+            minX: -SLITHER_WORLD_HALF + 80,
+            maxX: SLITHER_WORLD_HALF - 80,
+            minY: -SLITHER_WORLD_HALF + 80,
+            maxY: SLITHER_WORLD_HALF - 80,
+        },
+        baseViewZoom: 1,
+        minZoom: SLITHER_SPEC_MIN_ZOOM,
+        maxZoom: SLITHER_SPEC_MAX_ZOOM,
+        initialZoom: SLITHER_SPEC_ZOOM,
+    });
+
+    const enterSpectate = useCallback(() => {
+        const renderer = rendererRef.current;
+        const startX = renderer?.camera?.x ?? spectatorCamRef.current.x;
+        const startY = renderer?.camera?.y ?? spectatorCamRef.current.y;
+        const startZoom = renderer?.zoom ?? SLITHER_SPEC_ZOOM;
+        seedSpecCam(startX, startY, startZoom);
+        setIsSpectating(true);
+        setShowResultModal(false);
+    }, [seedSpecCam]);
+
+    const exitSpectate = useCallback(() => {
+        setIsSpectating(false);
+        setShowResultModal(true);
+    }, []);
 
     const handlePlayAgain = useCallback(() => {
         const { nickname, entryFeeUsd: fee } = joinParamsRef.current;
@@ -109,6 +149,7 @@ export default function SlitherGame() {
         setIsDead(false);
         setCashedAmount(null);
         setShowResultModal(false);
+        setIsSpectating(false);
         setIsRejoining(true);
         setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
         setLocalTimer(0);
@@ -247,6 +288,29 @@ export default function SlitherGame() {
         if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
     }, [localTimer, isDead, cashedAmount, isBattleRoyale, cancelHold]);
 
+    useEffect(() => {
+        const renderer = rendererRef.current;
+        if (!renderer) return undefined;
+        if (!isSpectating) {
+            renderer.setSpectatorMode(false);
+            renderer.setInputEnabled(!blockInputRef.current);
+            return undefined;
+        }
+        renderer.setInputEnabled(false);
+        let rafId = 0;
+        const sync = () => {
+            const cam = specCamRef.current;
+            renderer.setSpectatorMode(true, { x: cam.x, y: cam.y, zoom: cam.zoom });
+            rafId = requestAnimationFrame(sync);
+        };
+        sync();
+        return () => {
+            cancelAnimationFrame(rafId);
+            renderer.setSpectatorMode(false);
+            renderer.setInputEnabled(!blockInputRef.current);
+        };
+    }, [isSpectating, isDead, cashedAmount, specCamRef]);
+
 
 
     useEffect(() => {
@@ -286,13 +350,10 @@ export default function SlitherGame() {
 
 
         const emitInput = () => {
-
+            if (blockInputRef.current) return;
             if (socketRef.current?.connected && rendererRef.current) {
-
                 socketRef.current.emit('slitherInput', rendererRef.current.getInput());
-
             }
-
         };
 
         renderer.setInputEmitter(emitInput);
@@ -387,6 +448,9 @@ export default function SlitherGame() {
                 const me = tick.snakes.find(s => s.id === tick.you);
                 if (me?.kills != null) {
                     prevKillsRef.current = me.kills;
+                }
+                if (me?.segments?.[0]) {
+                    spectatorCamRef.current = { x: me.segments[0].x, y: me.segments[0].y };
                 }
             }
 
@@ -486,6 +550,7 @@ export default function SlitherGame() {
             });
             setCashedAmount(amount);
             setShowResultModal(true);
+            setIsSpectating(false);
             refreshUser?.();
         });
 
@@ -520,7 +585,13 @@ export default function SlitherGame() {
             setCashOutEndAt(0);
             cashoutActiveRef.current = false;
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
-            rendererRef.current?.pause();
+            const startedAt = sessionStartAtRef.current || Date.now();
+            setSessionStats({
+                timeSurvivedMs: Date.now() - startedAt,
+                eliminations: prevKillsRef.current ?? 0,
+            });
+            setShowResultModal(true);
+            setIsSpectating(false);
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
             if (wasBR) {
@@ -658,16 +729,20 @@ export default function SlitherGame() {
 
             <MobileGameSession containerRef={viewportRef} />
 
-            {IS_MOBILE && gameReady && isConnected && !isDead && cashedAmount === null && (
+            {IS_MOBILE && gameReady && isConnected && !isDead && cashedAmount === null && !isSpectating && (
                 <SlitherMobileControls onBoostChange={handleBoostChange} />
+            )}
+
+            {isSpectating && (
+                <GameSpectateHud onBack={exitSpectate} />
             )}
 
 
 
-            {!isBattleRoyale && cashedAmount !== null && showResultModal && (
+            {!isBattleRoyale && (cashedAmount !== null || isDead) && showResultModal && (
                 <GameResultModal
-                    type="cashout"
-                    amount={cashedAmount}
+                    type={cashedAmount !== null ? 'cashout' : 'death'}
+                    amount={cashedAmount ?? undefined}
                     timeSurvivedMs={sessionStats.timeSurvivedMs}
                     eliminations={sessionStats.eliminations}
                     walletBalanceUsd={user?.balanceUsd ?? (user?.balanceSol ?? 0) * (user?.solPrice ?? 0)}
@@ -676,18 +751,8 @@ export default function SlitherGame() {
                     isJoining={isRejoining}
                     onPlayAgain={handlePlayAgain}
                     onHome={handleLobby}
-                    onSpectate={() => setShowResultModal(false)}
-                    onClose={() => setShowResultModal(false)}
-                />
-            )}
-
-            {!isBattleRoyale && isDead && (
-                <GameResultModal
-                    type="death"
-                    isJoining={isRejoining}
-                    onPlayAgain={handlePlayAgain}
-                    onHome={handleLobby}
-                    onClose={handleLobby}
+                    onSpectate={enterSpectate}
+                    onClose={enterSpectate}
                 />
             )}
 

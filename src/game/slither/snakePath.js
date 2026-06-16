@@ -1,16 +1,7 @@
-/** Client-side slither path/body helpers — mirrors server slither-engine physics. */
+/** Client-side slither path/body — keeps head + body moving together at display rate. */
 
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
-const TURN_RATE = 4.8;
-const NSP1 = 5.39;
-const NSP2 = 0.4;
-const NSP3 = 14;
-const SLITHER_TICK = 125;
-const SERVER_TICK = 40;
-const SPEED_MUL = 1.2;
-const WORLD_HALF = 3000;
-const SLITHER_RADIUS = 21600;
 
 function dist(x1, y1, x2, y2) {
     return Math.hypot(x1 - x2, y1 - y2);
@@ -20,16 +11,6 @@ export function segmentSpacingForSnake(snake) {
     if (snake?.sc) return SEG_SEP * snake.sc;
     const r = snake?.radius || BASE_RADIUS;
     return Math.max(2.6, r * (SEG_SEP / BASE_RADIUS));
-}
-
-export function speedPerSecond(sc, boosting = false) {
-    const worldScale = (WORLD_HALF * 2) / (SLITHER_RADIUS * 2);
-    const units = boosting ? NSP3 : NSP1 + NSP2 * sc;
-    return (units * SLITHER_TICK * worldScale / SERVER_TICK) * SPEED_MUL;
-}
-
-export function turnRateRad(sc) {
-    return TURN_RATE / (0.7 + 0.3 * Math.max(1, sc));
 }
 
 function pathArcLength(path) {
@@ -81,9 +62,29 @@ function ensurePathArcLength(path, segmentCount, spacing, angle = 0) {
     }
 }
 
+function syncSegmentCount(state, targetCount, spacing, refHead, angle = 0) {
+    const segments = state.segments;
+    while (segments.length < targetCount) {
+        const tail = segments[segments.length - 1] || refHead;
+        const prev = segments.length >= 2 ? segments[segments.length - 2] : tail;
+        let dx = tail.x - prev.x;
+        let dy = tail.y - prev.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 1e-6) {
+            dx /= d;
+            dy /= d;
+        } else {
+            dx = -Math.cos(angle);
+            dy = -Math.sin(angle);
+        }
+        segments.push({ x: tail.x - dx * spacing, y: tail.y - dy * spacing });
+    }
+    if (segments.length > targetCount) segments.length = targetCount;
+}
+
 /**
- * Place body segments along a head path at fixed spacing.
- * Mutates segments[1..] and state.path.
+ * Place body segments along the head's traveled path at fixed spacing.
+ * Mutates segments[1..] and state.path every frame.
  */
 export function updateBodyAlongPath(state, segments, spacing, headX, headY, angle = 0) {
     if (!segments.length) return;
@@ -152,118 +153,63 @@ export function updateBodyAlongPath(state, segments, spacing, headX, headY, angl
     trimPath(path, segments.length * spacing + spacing * 4);
 }
 
-/** Rebuild path history from an authoritative spine (respawn / large correction). */
+/** Rebuild path history from an authoritative spine (respawn / teleport). */
 export function rebuildPathFromSegments(state, segments) {
-    state.path = segments.map(s => ({ x: s.x, y: s.y }));
+    const path = [];
+    for (let i = 0; i < segments.length; i++) {
+        const s = segments[i];
+        if (!s) continue;
+        if (path.length > 0) {
+            const prev = path[path.length - 1];
+            if (dist(prev.x, prev.y, s.x, s.y) < 0.01) continue;
+        }
+        path.push({ x: s.x, y: s.y });
+    }
+    if (path.length < 2 && segments[0]) {
+        const h = segments[0];
+        const a = 0;
+        path.push({ x: h.x - Math.cos(a) * 4, y: h.y - Math.sin(a) * 4 });
+    }
+    state.path = path;
 }
 
 /**
- * Advance the local snake each display frame: predict head from input,
- * gently correct toward server, then derive the body from path history.
+ * Smooth head toward server, then derive the whole body from path history.
+ * Head and body always move together — never render a detached head.
  */
-export function stepLocalSnake(state, meta, serverHead, dt, inputDx, inputDy, boosting) {
+export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau = 0.035) {
     const len = meta.segmentCount || 0;
     if (len === 0 || !serverHead) return;
 
     const spacing = segmentSpacingForSnake(meta);
-
-    while (state.segments.length < len) {
-        const tail = state.segments[state.segments.length - 1] || serverHead;
-        const prev = state.segments.length >= 2
-            ? state.segments[state.segments.length - 2]
-            : tail;
-        let dx = tail.x - prev.x;
-        let dy = tail.y - prev.y;
-        const d = Math.hypot(dx, dy);
-        if (d > 1e-6) {
-            dx /= d;
-            dy /= d;
-        } else {
-            dx = -Math.cos(state.angle ?? meta.angle ?? 0);
-            dy = -Math.sin(state.angle ?? meta.angle ?? 0);
-        }
-        state.segments.push({ x: tail.x - dx * spacing, y: tail.y - dy * spacing });
-    }
-    if (state.segments.length > len) state.segments.length = len;
-
     if (!state.segments[0]) {
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
 
+    syncSegmentCount(state, len, spacing, serverHead, state.angle ?? serverAngle ?? 0);
+
     const head = state.segments[0];
-    const sc = meta.sc || 1;
-    let angle = state.angle ?? meta.angle ?? 0;
 
-    const inputMag = Math.hypot(inputDx, inputDy);
-    if (inputMag > 0.001) {
-        const desired = Math.atan2(inputDy, inputDx);
-        let da = desired - angle;
-        da = Math.atan2(Math.sin(da), Math.cos(da));
-        const maxTurn = turnRateRad(sc) * dt;
-        if (da > maxTurn) da = maxTurn;
-        else if (da < -maxTurn) da = -maxTurn;
-        angle += da;
-    }
-    state.angle = angle;
-
-    const step = speedPerSecond(sc, boosting) * dt;
-    head.x += Math.cos(angle) * step;
-    head.y += Math.sin(angle) * step;
-
-    const corr = 1 - Math.exp(-dt / 0.07);
-    head.x += (serverHead.x - head.x) * corr;
-    head.y += (serverHead.y - head.y) * corr;
-
-    updateBodyAlongPath(state, state.segments, spacing, head.x, head.y, angle);
-}
-
-/**
- * Remote snakes: smooth the head toward server, derive body from path each frame.
- */
-export function stepRemoteSnake(state, meta, serverHead, serverAngle, dt) {
-    const len = meta.segmentCount || 0;
-    if (len === 0 || !serverHead) return;
-
-    const spacing = segmentSpacingForSnake(meta);
-
-    while (state.segments.length < len) {
-        const tail = state.segments[state.segments.length - 1] || serverHead;
-        const prev = state.segments.length >= 2
-            ? state.segments[state.segments.length - 2]
-            : tail;
-        let dx = tail.x - prev.x;
-        let dy = tail.y - prev.y;
-        const d = Math.hypot(dx, dy);
-        if (d > 1e-6) {
-            dx /= d;
-            dy /= d;
-        } else {
-            dx = -Math.cos(state.angle ?? serverAngle ?? 0);
-            dy = -Math.sin(state.angle ?? serverAngle ?? 0);
+    if (state._prevSrvHead) {
+        const vx = serverHead.x - state._prevSrvHead.x;
+        const vy = serverHead.y - state._prevSrvHead.y;
+        if (vx * vx + vy * vy > 0.0001) {
+            state._extrapX = vx;
+            state._extrapY = vy;
         }
-        state.segments.push({ x: tail.x - dx * spacing, y: tail.y - dy * spacing });
     }
-    if (state.segments.length > len) state.segments.length = len;
+    state._prevSrvHead = { x: serverHead.x, y: serverHead.y };
 
-    if (!state.segments[0]) {
-        state.segments[0] = { x: serverHead.x, y: serverHead.y };
-    }
+    const targetX = serverHead.x + (state._extrapX || 0) * 0.85;
+    const targetY = serverHead.y + (state._extrapY || 0) * 0.85;
 
-    const headA = 1 - Math.exp(-dt / 0.06);
-    const head = state.segments[0];
-    head.x += (serverHead.x - head.x) * headA;
-    head.y += (serverHead.y - head.y) * headA;
+    const headA = 1 - Math.exp(-dt / Math.max(headTau, 0.0001));
+    head.x += (targetX - head.x) * headA;
+    head.y += (targetY - head.y) * headA;
 
     let da = (serverAngle || 0) - (state.angle || 0);
     da = Math.atan2(Math.sin(da), Math.cos(da));
     state.angle = (state.angle || 0) + da * headA;
 
-    updateBodyAlongPath(
-        state,
-        state.segments,
-        spacing,
-        head.x,
-        head.y,
-        state.angle,
-    );
+    updateBodyAlongPath(state, state.segments, spacing, head.x, head.y, state.angle);
 }

@@ -32,15 +32,19 @@ function ClockIcon() {
     );
 }
 
-function FlameIcon() {
+function SkullIcon() {
     return (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
-                d="M12 22c4-2.5 6-6 6-10a6 6 0 0 0-11-3 6 6 0 0 0-5 13z"
+                d="M12 3C8.5 3 6 5.8 6 9.2c0 2.1 1 3.9 2.5 5.1V17h7v-2.7c1.5-1.2 2.5-3 2.5-5.1C18 5.8 15.5 3 12 3z"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.9"
                 strokeLinejoin="round"
             />
+            <circle cx="9.5" cy="9.5" r="1.1" fill="currentColor" />
+            <circle cx="14.5" cy="9.5" r="1.1" fill="currentColor" />
+            <path d="M10 13.5h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M9 17v2M12 17v2M15 17v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
     );
 }
@@ -173,7 +177,7 @@ export default function GameResultModal({
                             </div>
                             <div className="game-result-stat">
                                 <div className="game-result-stat-icon game-result-stat-icon--kills">
-                                    <FlameIcon />
+                                    <SkullIcon />
                                 </div>
                                 <div className="game-result-stat-value game-result-stat-value--kills">
                                     {eliminations}
@@ -197,13 +201,11 @@ export default function GameResultModal({
                     </>
                 )}
 
-                <div className={`game-result-actions${isWin ? '' : ' game-result-actions--death'}`}>
-                    {isWin && (
-                        <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onSpectate}>
-                            <EyeIcon />
-                            Spectate
-                        </button>
-                    )}
+                <div className="game-result-actions">
+                    <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onSpectate}>
+                        <EyeIcon />
+                        Spectate
+                    </button>
                     <button
                         type="button"
                         className="game-result-btn btn btn-primary game-result-btn--play"

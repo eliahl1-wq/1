@@ -9,7 +9,9 @@ import * as renderUtils from './render.js';
 import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import GameResultModal from '../../components/GameResultModal';
+import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
+import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
@@ -111,6 +113,7 @@ export default function Game() {
     const [leaderboard, setLeaderboard] = useState([]);
     const [cashedAmount, setCashedAmount] = useState(null);
     const [showResultModal, setShowResultModal] = useState(false);
+    const [isSpectating, setIsSpectating] = useState(false);
     const [isRejoining, setIsRejoining] = useState(false);
     const [sessionStats, setSessionStats] = useState({ timeSurvivedMs: 0, eliminations: 0 });
     const [isDead, setIsDead] = useState(false);
@@ -133,6 +136,26 @@ export default function Game() {
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
+    const baseViewZoom = getMobileViewZoom();
+    const { camRef: specCamRef, seed: seedSpecCam } = useSpectatorCamera({
+        active: isSpectating,
+        canvasRef,
+        worldWidth: WORLD_SIZE,
+        worldHeight: WORLD_SIZE,
+        baseViewZoom,
+    });
+
+    const enterSpectate = useCallback(() => {
+        seedSpecCam(spectatorCamRef.current.x, spectatorCamRef.current.y, 1);
+        setIsSpectating(true);
+        setShowResultModal(false);
+    }, [seedSpecCam]);
+
+    const exitSpectate = useCallback(() => {
+        setIsSpectating(false);
+        setShowResultModal(true);
+    }, []);
+
     const handlePlayAgain = useCallback(() => {
         const { nickname, entryFeeUsd: fee, mode } = joinParamsRef.current;
         const playMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
@@ -142,6 +165,7 @@ export default function Game() {
         setIsDead(false);
         setCashedAmount(null);
         setShowResultModal(false);
+        setIsSpectating(false);
         setIsRejoining(true);
         setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
         setLocalTimer(0);
@@ -455,6 +479,7 @@ export default function Game() {
             });
             setCashedAmount(amount);
             setShowResultModal(true);
+            setIsSpectating(false);
             refreshUser?.();
         });
 
@@ -466,7 +491,13 @@ export default function Game() {
             setCashOutEndAt(0);
             setLocalTimer(0);
             cashoutActiveRef.current = false;
-            foodCacheRef.current.clear();
+            const startedAt = sessionStartAtRef.current || Date.now();
+            setSessionStats({
+                timeSurvivedMs: Date.now() - startedAt,
+                eliminations: prevKillsRef.current ?? 0,
+            });
+            setShowResultModal(true);
+            setIsSpectating(false);
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
             if (wasBR) {
@@ -578,14 +609,18 @@ export default function Game() {
         const gameLoop = () => {
             const { player, users, viruses, ejected, zoneSize } = gameData.current;
             const screen = { width: canvas.width, height: canvas.height };
-            const viewZoom = getMobileViewZoom();
             const hasPlayer = player && player.x !== undefined;
-            if (hasPlayer) {
+            if (hasPlayer && !isSpectating) {
                 spectatorCamRef.current = { x: player.x, y: player.y };
             }
-            const camX = hasPlayer ? player.x : spectatorCamRef.current.x;
-            const camY = hasPlayer ? player.y : spectatorCamRef.current.y;
-            const canRenderWorld = isConnected && !isDead && (hasPlayer || cashedAmount !== null);
+            const camX = isSpectating
+                ? specCamRef.current.x
+                : (hasPlayer ? player.x : spectatorCamRef.current.x);
+            const camY = isSpectating
+                ? specCamRef.current.y
+                : (hasPlayer ? player.y : spectatorCamRef.current.y);
+            const viewZoom = baseViewZoom * (isSpectating ? specCamRef.current.zoom : 1);
+            const canRenderWorld = isConnected && (!isDead || isSpectating) && (hasPlayer || cashedAmount !== null || isSpectating);
             
             if (canRenderWorld) {
                 const worldToScreen = (wx, wy) => ({
@@ -690,18 +725,19 @@ export default function Game() {
                     zone: brZone,
                 });
             }
-            if (!isDead) animationFrameId.current = requestAnimationFrame(gameLoop);
+            if (!isDead || isSpectating) animationFrameId.current = requestAnimationFrame(gameLoop);
         };
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);
-    }, [isConnected, isDead, brZone, cashedAmount]); 
+    }, [isConnected, isDead, brZone, cashedAmount, isSpectating, baseViewZoom]); 
 
     const tryDoubleTapEject = useMobileDoubleTapEject(
-        IS_MOBILE && isConnected && !isDead,
+        IS_MOBILE && isConnected && !isDead && !isSpectating && cashedAmount === null,
         () => socketRef.current?.emit('1'),
     );
 
     const handleMouseMove = (e) => {
+        if (isSpectating || isDead || cashedAmount !== null) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
@@ -713,6 +749,7 @@ export default function Game() {
     };
 
     const handleTouch = (e) => {
+        if (isSpectating || isDead || cashedAmount !== null) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const t = e.touches?.[0];
@@ -766,14 +803,18 @@ export default function Game() {
 
             <MobileGameSession containerRef={viewportRef} />
 
-            {IS_MOBILE && isConnected && !isDead && cashedAmount === null && (
+            {isSpectating && (
+                <GameSpectateHud onBack={exitSpectate} />
+            )}
+
+            {IS_MOBILE && isConnected && !isDead && cashedAmount === null && !isSpectating && (
                 <AgarMobileControls onSplit={() => socketRef.current?.emit('2')} />
             )}
 
-            {!isBattleRoyale && cashedAmount !== null && showResultModal && (
+            {!isBattleRoyale && (cashedAmount !== null || isDead) && showResultModal && (
                 <GameResultModal
-                    type="cashout"
-                    amount={cashedAmount}
+                    type={cashedAmount !== null ? 'cashout' : 'death'}
+                    amount={cashedAmount ?? undefined}
                     timeSurvivedMs={sessionStats.timeSurvivedMs}
                     eliminations={sessionStats.eliminations}
                     walletBalanceUsd={user?.balanceUsd ?? (user?.balanceSol ?? 0) * (user?.solPrice ?? 0)}
@@ -782,18 +823,8 @@ export default function Game() {
                     isJoining={isRejoining}
                     onPlayAgain={handlePlayAgain}
                     onHome={handleLobby}
-                    onSpectate={() => setShowResultModal(false)}
-                    onClose={() => setShowResultModal(false)}
-                />
-            )}
-
-            {!isBattleRoyale && isDead && (
-                <GameResultModal
-                    type="death"
-                    isJoining={isRejoining}
-                    onPlayAgain={handlePlayAgain}
-                    onHome={handleLobby}
-                    onClose={handleLobby}
+                    onSpectate={enterSpectate}
+                    onClose={enterSpectate}
                 />
             )}
 

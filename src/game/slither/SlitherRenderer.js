@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { rebuildPathFromSegments, stepLocalSnake, stepRemoteSnake } from './snakePath.js';
+import { rebuildPathFromSegments, stepSnakeBody } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -133,6 +133,8 @@ export class SlitherRenderer {
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
+        this._inputEnabled = true;
+        this.spectatorMode = false;
         this._inputEmitQueued = false;
         this._lastTapAt = 0;
         this.running = false;
@@ -153,12 +155,14 @@ export class SlitherRenderer {
         this._onLayoutChange = () => this.resize();
         this._onMouseMove = (e) => this._handleMouse(e);
         this._onMouseDown = (e) => {
+            if (!this._inputEnabled || this.spectatorMode) return;
             if (e.target !== this.canvas) return;
             unlockGameAudio();
             this.boost = true;
             this._emitInput?.();
         };
         this._onMouseUp = (e) => {
+            if (!this._inputEnabled || this.spectatorMode) return;
             if (e.target !== this.canvas) return;
             this.boost = false;
             this._emitInput?.();
@@ -167,11 +171,13 @@ export class SlitherRenderer {
         // the head); boost is a double-tap-and-hold or a second finger — a plain
         // touch must NOT boost, otherwise steering bleeds mass on every turn.
         this._onTouchMove = (e) => {
+            if (!this._inputEnabled || this.spectatorMode) return;
             e.preventDefault();
             const t = e.touches[0];
             if (t) this._setInputFromScreen(t.clientX, t.clientY);
         };
         this._onTouchStart = (e) => {
+            if (!this._inputEnabled || this.spectatorMode) return;
             unlockGameAudio();
             const t = e.touches[0];
             if (t) this._setInputFromScreen(t.clientX, t.clientY);
@@ -183,6 +189,7 @@ export class SlitherRenderer {
             this._emitInput?.();
         };
         this._onTouchEnd = (e) => {
+            if (!this._inputEnabled || this.spectatorMode) return;
             if (!e?.touches || e.touches.length === 0) this.boost = false;
             this._emitInput?.();
         };
@@ -222,6 +229,7 @@ export class SlitherRenderer {
     }
 
     _setInputFromScreen(sx, sy) {
+        if (!this._inputEnabled || this.spectatorMode) return;
         const rect = this.canvas.getBoundingClientRect();
         const x = sx - rect.left - this.W / 2;
         const y = sy - rect.top - this.H / 2;
@@ -245,6 +253,7 @@ export class SlitherRenderer {
     }
 
     _handleMouse(e) {
+        if (!this._inputEnabled || this.spectatorMode) return;
         this._setInputFromScreen(e.clientX, e.clientY);
     }
 
@@ -313,9 +322,28 @@ export class SlitherRenderer {
         this.hud = { ...this.hud, ...hud };
     }
 
+    setInputEnabled(enabled) {
+        this._inputEnabled = !!enabled;
+        if (!enabled) {
+            this.inputDx = 0;
+            this.inputDy = 0;
+            this.boost = false;
+        }
+    }
+
+    setSpectatorMode(active, camera) {
+        this.spectatorMode = !!active;
+        if (active && camera) {
+            if (camera.x != null) this.camera.x = camera.x;
+            if (camera.y != null) this.camera.y = camera.y;
+            if (camera.zoom != null) this.zoom = camera.zoom;
+            this._cameraInit = true;
+        }
+    }
+
     /**
-     * Interpolate remote snakes toward server spine. Local snake runs client-side
-     * path physics every frame so the body tracks the head smoothly at display rate.
+     * Smooth head toward server each frame, derive body from path history so head
+     * and body always move together at display rate (not 40Hz server spine).
      */
     _updateSmoothing(dt) {
         const SNAP_SQ = 220 * 220;
@@ -329,7 +357,7 @@ export class SlitherRenderer {
             seen.add(snake.id);
             const tgt = snake.segments || [];
             const len = tgt.length;
-            if (len === 0) continue;
+            if (len === 0 || !tgt[0]) continue;
 
             const head = tgt[0];
             const offScreen = head && !snake.isYou && (head.x - cx) ** 2 + (head.y - cy) ** 2 > viewR * viewR;
@@ -341,10 +369,15 @@ export class SlitherRenderer {
                 for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
                 rebuildPathFromSegments(s, s.segments);
-                continue;
             }
 
             if (s.segments.length > len) s.segments.length = len;
+
+            const meta = {
+                segmentCount: len,
+                sc: snake.sc,
+                radius: snake.radius,
+            };
 
             if (snake.isYou) {
                 const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
@@ -353,23 +386,11 @@ export class SlitherRenderer {
                     for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     s.angle = snake.angle || 0;
                     rebuildPathFromSegments(s, s.segments);
-                    continue;
+                    delete s._prevSrvHead;
+                    delete s._extrapX;
+                    delete s._extrapY;
                 }
-
-                stepLocalSnake(
-                    s,
-                    {
-                        segmentCount: len,
-                        sc: snake.sc,
-                        radius: snake.radius,
-                        angle: snake.angle,
-                    },
-                    tgt[0],
-                    dt,
-                    this.inputDx,
-                    this.inputDy,
-                    !!(snake.boost || this.boost),
-                );
+                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.028);
                 continue;
             }
 
@@ -380,17 +401,7 @@ export class SlitherRenderer {
                 continue;
             }
 
-            stepRemoteSnake(
-                s,
-                {
-                    segmentCount: len,
-                    sc: snake.sc,
-                    radius: snake.radius,
-                },
-                tgt[0],
-                snake.angle || 0,
-                dt,
-            );
+            stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.06);
         }
 
         for (const id of this.smooth.keys()) {
@@ -1050,8 +1061,8 @@ export class SlitherRenderer {
             b.y = (wy - cy) * zoom + this.H / 2;
         }
 
-        const hx = (segs[0].x - cx) * zoom + this.W / 2;
-        const hy = (segs[0].y - cy) * zoom + this.H / 2;
+        const hx = bumps[0].x;
+        const hy = bumps[0].y;
 
         // Coarse radius buckets with hysteresis so sprite set doesn't swap every frame.
         const rawR = Math.max(4, Math.round(bodyRadius / 4) * 4);
@@ -1283,7 +1294,9 @@ export class SlitherRenderer {
                 break;
             }
         }
-        if (me?.segments?.[0]) {
+        if (this.spectatorMode) {
+            // Camera driven externally while spectating.
+        } else if (me?.segments?.[0]) {
             const head = me.segments[0];
             if (!this._cameraInit) {
                 this.camera.x = head.x;
