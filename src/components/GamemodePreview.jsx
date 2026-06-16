@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { drawGamemodePreview } from './gamemodePreviewDraw.js';
 
-const PREVIEW_W = 640;
-const PREVIEW_H = 320;
+const PREVIEW_W = 480;
+const PREVIEW_H = 480;
 
 export default function GamemodePreview({ mode, className = '' }) {
     const canvasRef = useRef(null);

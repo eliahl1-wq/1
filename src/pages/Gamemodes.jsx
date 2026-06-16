@@ -158,19 +158,23 @@ function ModeCard({ mode, title, desc, playing, onPlay }) {
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
             <div className="gm-card-layout">
-                <div className="gm-card-title">{title}</div>
-                <div className="gm-card-desc">{desc}</div>
-                {playing != null && (
-                    <div className="gm-card-playing">{playing} playing</div>
-                )}
-                {mode && (
-                    <div className="gm-card-preview-wrap">
-                        <GamemodePreview mode={mode} className="gm-card-preview" />
-                    </div>
-                )}
-                {!isDisabled && (
-                    <button className="gm-play-btn" onClick={onPlay}>Select</button>
-                )}
+                <div className="gm-card-left">
+                    <div className="gm-card-title">{title}</div>
+                    <div className="gm-card-desc">{desc}</div>
+                    {playing != null && (
+                        <div className="gm-card-playing">{playing} playing</div>
+                    )}
+                </div>
+                <div className="gm-card-right">
+                    {mode && (
+                        <div className="gm-card-preview-wrap">
+                            <GamemodePreview mode={mode} className="gm-card-preview" />
+                        </div>
+                    )}
+                    {!isDisabled && (
+                        <button className="gm-play-btn" onClick={onPlay}>Select</button>
+                    )}
+                </div>
             </div>
         </div>
     );
