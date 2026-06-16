@@ -41,58 +41,193 @@
     line-height: 1.45;
 }
 
-.game-viewport--mobile .game-stake-wrap {
-    top: 4px;
-    left: 4px;
-}
-
-.game-viewport--mobile .game-stake-panel {
-    padding: 5px 8px;
-    border-radius: 10px;
-    gap: 5px;
-    min-width: 0;
-    max-width: 96px;
-}
-
-.game-viewport--mobile .game-stake-panel--br {
-    max-width: 118px;
-    padding: 6px 9px;
-}
-
-.game-viewport--mobile .game-stake-label {
-    font-size: 0.46rem !important;
-    letter-spacing: 0.8px !important;
-}
-
-.game-viewport--mobile .game-stake-amount {
-    font-size: 1.05rem !important;
-}
-
-.game-viewport--mobile .game-stake-br-meta {
-    font-size: 0.5rem !important;
-    margin-top: 2px !important;
-    line-height: 1.25;
-}
-
-.game-viewport--mobile .game-stake-securing {
-    padding: 4px 6px !important;
-    border-radius: 8px !important;
-    gap: 3px !important;
-}
-
-.game-viewport--mobile .game-stake-securing-label {
-    font-size: 0.46rem !important;
-}
-
-.game-viewport--mobile .game-stake-securing-time {
-    font-size: 0.65rem !important;
+.game-viewport--mobile .game-cashout-wrap {
+    bottom: max(14px, env(safe-area-inset-bottom, 0px) + 10px);
+    gap: 0;
 }
 
 .game-viewport--mobile .game-cashout-btn {
-    padding: 5px 6px !important;
-    font-size: 0.54rem !important;
-    border-radius: 7px !important;
-    letter-spacing: 0.3px !important;
+    padding: 9px 16px !important;
+    font-size: 0.75rem !important;
+}
+
+.game-viewport--mobile .game-cashout-hint,
+.game-viewport--mobile .game-cashout-sep {
+    display: none;
+}
+
+.game-viewport--mobile .game-br-hud {
+    top: max(88px, env(safe-area-inset-top, 0px) + 72px);
+    left: max(8px, env(safe-area-inset-left, 0px) + 4px);
+    transform: none;
+    text-align: left;
+    padding: 6px 10px;
+}
+
+.game-viewport--mobile .game-br-hud-amount {
+    font-size: 1.15rem !important;
+}
+
+.game-viewport--mobile .game-controls-hint {
+    bottom: max(8px, env(safe-area-inset-bottom, 0px) + 4px);
+    left: max(8px, env(safe-area-inset-left, 0px) + 4px);
+    font-size: 0.68rem;
+    max-width: 42vw;
+    line-height: 1.35;
+}
+
+/* Bottom-center cashout bar */
+
+.game-cashout-wrap {
+    position: absolute;
+    bottom: max(24px, env(safe-area-inset-bottom, 0px) + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 110;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    pointer-events: none;
+}
+
+.game-cashout-btn {
+    pointer-events: auto;
+    padding: 10px 22px !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    border-radius: var(--r-md) !important;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.game-cashout-icon {
+    flex-shrink: 0;
+    opacity: 0.92;
+}
+
+.game-cashout-hint {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.82rem;
+    font-weight: 500;
+    pointer-events: none;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.game-cashout-sep {
+    color: rgba(255, 255, 255, 0.22);
+    font-size: 0.95rem;
+    font-weight: 300;
+    pointer-events: none;
+    user-select: none;
+}
+
+.game-cashout-securing {
+    pointer-events: none;
+    min-width: 200px;
+    padding: 10px 14px;
+    border-radius: var(--r-md);
+    background: rgba(12, 10, 20, 0.88);
+    border: 1px solid rgba(124, 58, 255, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.game-cashout-securing-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.game-cashout-securing-label {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+}
+
+.game-cashout-securing-time {
+    font-size: 0.9rem;
+    font-weight: 900;
+    color: var(--accent);
+    font-family: var(--mono);
+}
+
+.game-cashout-securing-track {
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.game-cashout-securing-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7C3AFF, #4D8CFF);
+    border-radius: 2px;
+    transition: width 1s linear;
+}
+
+/* Battle Royale HUD (top center, clear of minimap) */
+
+.game-br-hud {
+    position: absolute;
+    top: max(18px, env(safe-area-inset-top, 0px) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    text-align: center;
+    color: white;
+    pointer-events: none;
+    user-select: none;
+}
+
+.game-br-hud-label {
+    margin: 0;
+    opacity: 0.35;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 800;
+}
+
+.game-br-hud-amount {
+    font-size: 1.75rem;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
+    line-height: 1.1;
+}
+
+.game-br-hud-meta {
+    font-size: 0.72rem;
+    color: #FF6B6B;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.game-br-hud-sub {
+    font-size: 0.62rem;
+    color: rgba(255, 255, 255, 0.35);
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+/* Controls hint — tucked in bottom-left corner */
+
+.game-controls-hint {
+    position: absolute;
+    bottom: max(14px, env(safe-area-inset-bottom, 0px) + 10px);
+    left: max(14px, env(safe-area-inset-left, 0px) + 10px);
+    color: rgba(255, 255, 255, 0.28);
+    font-size: 0.85rem;
+    z-index: 100;
+    pointer-events: none;
+    user-select: none;
+    line-height: 1.4;
 }
 
 /* On-screen action buttons (boost / split) */
@@ -215,31 +350,29 @@
 
 /* ─── Mobile landscape (phone held sideways) ─── */
 @media (orientation: landscape) and (max-height: 520px) {
-    .game-viewport--mobile .game-stake-wrap {
-        top: 4px;
-        left: max(4px, env(safe-area-inset-left, 0px));
+    .game-viewport--mobile .game-br-hud {
+        top: max(4px, env(safe-area-inset-top, 0px));
+        left: max(88px, env(safe-area-inset-left, 0px) + 72px);
     }
 
-    .game-viewport--mobile .game-stake-panel {
-        max-width: 82px;
-        padding: 4px 6px;
-        gap: 4px;
+    .game-viewport--mobile .game-br-hud-amount {
+        font-size: 0.95rem !important;
     }
 
-    .game-viewport--mobile .game-stake-panel--br {
-        max-width: 96px;
-    }
-
-    .game-viewport--mobile .game-stake-amount {
-        font-size: 0.9rem !important;
+    .game-viewport--mobile .game-cashout-wrap {
+        bottom: max(8px, env(safe-area-inset-bottom, 0px) + 4px);
     }
 
     .game-viewport--mobile .game-cashout-btn {
-        padding: 4px 5px !important;
-        font-size: 0.46rem !important;
-        letter-spacing: 0.2px !important;
-        width: 100% !important;
-        max-width: 100%;
+        padding: 7px 12px !important;
+        font-size: 0.68rem !important;
+    }
+
+    .game-viewport--mobile .game-controls-hint {
+        bottom: max(4px, env(safe-area-inset-bottom, 0px));
+        left: max(4px, env(safe-area-inset-left, 0px));
+        font-size: 0.58rem;
+        max-width: 36vw;
     }
 
     .game-viewport--mobile .game-logo-wrap {
@@ -295,4 +428,143 @@
         width: 56px;
         height: 56px;
     }
+}
+
+/* Session result modal (non-BR cashout / death) */
+.game-result-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(5, 5, 8, 0.55);
+    backdrop-filter: blur(6px);
+}
+
+.game-result-modal {
+    width: 100%;
+    max-width: 380px;
+    padding: 28px 24px 24px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(16, 17, 24, 0.94);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+    text-align: center;
+    animation: gameResultIn 0.25s ease-out;
+}
+
+.game-result-modal--win {
+    border-color: rgba(20, 241, 149, 0.25);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 40px rgba(20, 241, 149, 0.08);
+}
+
+.game-result-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 100px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+
+.game-result-badge--win {
+    background: rgba(20, 241, 149, 0.12);
+    color: #14F195;
+}
+
+.game-result-badge--loss {
+    background: rgba(255, 59, 48, 0.12);
+    color: #FF6B6B;
+}
+
+.game-result-title {
+    margin: 0 0 12px;
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+}
+
+.game-result-amount {
+    font-size: 2.75rem;
+    font-weight: 900;
+    color: #14F195;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    letter-spacing: -1.5px;
+    line-height: 1;
+    margin-bottom: 10px;
+    animation: gameResultAmountPop 0.5s cubic-bezier(0.2, 1, 0.2, 1);
+}
+
+.game-result-amount-unit {
+    opacity: 0.35;
+    margin-right: 2px;
+}
+
+.game-result-caption {
+    margin: 0 0 22px;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.game-result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.game-result-btn {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    border: none;
+}
+
+.game-result-btn:active {
+    transform: scale(0.98);
+}
+
+.game-result-btn--primary {
+    background: linear-gradient(135deg, #0DBF76 0%, #14F195 100%);
+    color: #001a0d;
+    box-shadow: 0 4px 20px rgba(20, 241, 149, 0.25);
+}
+
+.game-result-btn--secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-viewport--mobile .game-result-modal {
+    max-width: min(88vw, 340px);
+    padding: 22px 18px 18px;
+}
+
+.game-viewport--mobile .game-result-title {
+    font-size: 1.25rem;
+}
+
+.game-viewport--mobile .game-result-amount {
+    font-size: 2.2rem;
+}
+
+@keyframes gameResultIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes gameResultAmountPop {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
 }

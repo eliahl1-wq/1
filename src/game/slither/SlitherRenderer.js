@@ -241,7 +241,7 @@ export class SlitherRenderer {
             this.targetSnakes = tick.snakes;
             if (tick.you) {
                 const me = tick.snakes.find(s => s.id === tick.you);
-                if (me?.balance != null) this.hud.balance = me.balance;
+                if (me?.balance != null && !tick.competitiveSlither) this.hud.balance = me.balance;
             }
         }
         if (tick.food) {
@@ -251,15 +251,23 @@ export class SlitherRenderer {
                 list[i] = tick.food[i];
             }
         }
+        const isCompetitive = tick.competitiveSlither ?? this.state.competitiveSlither;
         this.state = {
             snakes: tick.snakes ?? this.state.snakes,
             you: tick.you ?? this.state.you,
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
-            zone: tick.battleRoyale ? (tick.zone !== undefined ? tick.zone : this.state.zone) : null,
+            zone: isCompetitive
+                ? (tick.zone !== undefined ? tick.zone : this.state.zone)
+                : (tick.battleRoyale ? (tick.zone !== undefined ? tick.zone : this.state.zone) : null),
             minimap: tick.minimap ?? this.state.minimap,
+            circularMap: tick.circularMap ?? this.state.circularMap,
+            competitiveSlither: isCompetitive,
         };
         if (tick.battleRoyale !== undefined) {
             this.state.battleRoyale = !!tick.battleRoyale;
+        }
+        if (isCompetitive && tick.dollarBalance != null) {
+            this.hud.balance = tick.dollarBalance;
         }
     }
 
@@ -492,6 +500,50 @@ export class SlitherRenderer {
         ctx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
         ctx.lineWidth = 3;
         ctx.strokeRect(tlX, tlY, playW, playH);
+        ctx.restore();
+    }
+
+    _drawCircularBackground(ctx, W, H, cx, cy, worldHalf, zoom, zone) {
+        ctx.fillStyle = '#1e1e24';
+        ctx.fillRect(0, 0, W, H);
+
+        const radius = zone?.radius ?? worldHalf;
+        const pattern = this._getBgPattern(ctx);
+        const { x: zx, y: zy } = { x: (0 - cx) * zoom + W / 2, y: (0 - cy) * zoom + H / 2 };
+        const screenRadius = radius * zoom;
+
+        if (pattern) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.translate(W / 2, H / 2);
+            ctx.scale(zoom, zoom);
+            ctx.translate(-cx, -cy);
+            ctx.fillStyle = pattern;
+            const vw = W / zoom;
+            const vh = H / zoom;
+            const margin = 240;
+            ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
+            ctx.restore();
+        }
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(72, 4, 9, 0.96)';
+        ctx.beginPath();
+        ctx.rect(0, 0, W, H);
+        ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2, true);
+        ctx.fill('evenodd');
+
+        const shrinking = zone?.shrinking;
+        ctx.strokeStyle = shrinking ? 'rgba(255, 85, 85, 0.95)' : 'rgba(255, 60, 60, 0.9)';
+        ctx.lineWidth = shrinking ? 5 : 3;
+        if (shrinking) {
+            ctx.setLineDash([14, 10]);
+        }
+        ctx.beginPath();
+        ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -1286,8 +1338,12 @@ export class SlitherRenderer {
             return scratch;
         };
 
-        this._drawBackground(ctx, W, H, cx, cy, worldHalf, zoom);
-        this._drawZone(ctx, toScreen, W, H);
+        if (this.state.circularMap) {
+            this._drawCircularBackground(ctx, W, H, cx, cy, worldHalf, zoom, this.state.zone);
+        } else {
+            this._drawBackground(ctx, W, H, cx, cy, worldHalf, zoom);
+            this._drawZone(ctx, toScreen, W, H);
+        }
         this._drawFood(ctx, this._foodDrawList, toScreen, W, H, zoom);
 
         const sorted = this._sortedRenderSnakes;
@@ -1322,7 +1378,15 @@ export class SlitherRenderer {
                 drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
             }
 
-            this._drawBalanceBadge(ctx, hx, hy + headRadius + 14, me.balance ?? this.hud.balance ?? 1, true);
+            this._drawBalanceBadge(
+                ctx,
+                hx,
+                hy + headRadius + 14,
+                this.state.competitiveSlither
+                    ? (this.hud.balance ?? me.dollarBalance ?? 0)
+                    : (me.balance ?? this.hud.balance ?? 1),
+                true,
+            );
         }
 
         if (me?.segments?.[0]) {

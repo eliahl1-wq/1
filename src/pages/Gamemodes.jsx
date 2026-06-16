@@ -18,6 +18,7 @@ export default function Gamemodes() {
         slither: 0,
         brAgar: 0,
         brSlither: 0,
+        competitiveSlither: 0,
     });
 
     useEffect(() => {
@@ -121,7 +122,18 @@ export default function Gamemodes() {
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                             />
                             <ModeCard
-                                title="Slither Battle Royale"
+                                title="Competitive Slither"
+                                desc="$5 entry — real players only. Circular arena, shrinking zone before reset. Cash out your dollar balance anytime."
+                                playing={playersByGamemode.competitiveSlither}
+                                badge="NEW"
+                                badgeAccent
+                                onPlay={() => {
+                                    localStorage.setItem('selected_gamemode', 'competitive-slither');
+                                    localStorage.setItem('selected_entry_fee', '5');
+                                    navigate('/pre-game', { state: { selectedMode: 'competitive-slither' } });
+                                }}
+                            />
+                            <ModeCard
                                 desc="5–10 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brSlither}
                                 badge="NEW"

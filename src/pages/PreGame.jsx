@@ -32,6 +32,7 @@ const GAMEMODE_STATS = [
     { key: 'agar', label: 'Agar Normal' },
     { key: 'brAgar', label: 'Agar Battle Royale' },
     { key: 'slither', label: 'Slither Normal' },
+    { key: 'competitiveSlither', label: 'Competitive Slither' },
     { key: 'brSlither', label: 'Slither Battle Royale' },
 ];
 
@@ -42,6 +43,7 @@ const LIVE_GAMEMODE_OPTIONS = [
 
 const modeToLiveStatsKey = (mode) => {
     if (mode === 'slither') return 'slither';
+    if (mode === 'competitive-slither' || mode === 'competitiveSlither') return 'competitiveSlither';
     if (mode === 'br-agar' || mode === 'brAgar') return 'brAgar';
     if (mode === 'br-slither' || mode === 'brSlither') return 'brSlither';
     return 'agar';
@@ -95,7 +97,7 @@ export default function PreGame() {
         playersByEntryFee: {},
         playersByModeAndFee: { agar: {}, slither: {} },
         brPlayersByFee: {},
-        playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0 },
+        playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0, competitiveSlither: 0 },
     });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
@@ -171,14 +173,20 @@ export default function PreGame() {
     const entryFeeForSession = isAlreadyInGame && activeEntryFee != null ? activeEntryFee : selectedEntryFee;
     const economy = tierEconomy(entryFeeForSession);
     const isBattleRoyaleMode = selectedMode.startsWith('br-');
+    const isCompetitiveSlitherMode = selectedMode === 'competitive-slither';
     const brVariant = isBattleRoyaleMode ? selectedMode.replace(/^br-/, '') : null;
-    const tierOptions = isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS;
+    const tierOptions = isCompetitiveSlitherMode
+        ? [5]
+        : (isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS);
 
     useEffect(() => {
+        if (isCompetitiveSlitherMode && selectedEntryFee !== 5) {
+            setSelectedEntryFee(5);
+        }
         if (isBattleRoyaleMode && !BR_ENTRY_TIERS.includes(selectedEntryFee)) {
             setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
         }
-    }, [selectedMode, isBattleRoyaleMode, selectedEntryFee]);
+    }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, selectedEntryFee]);
 
     const normalModeKey = selectedMode.replace(/^br-/, '');
 
@@ -583,7 +591,7 @@ export default function PreGame() {
             return;
         }
 
-        const targetPath = (activeMode === 'slither') ? '/slither-game' : '/game';
+        const targetPath = (activeMode === 'slither' || activeMode === 'competitive-slither') ? '/slither-game' : '/game';
         const baseMode = activeMode.replace(/^br-/, '');
         setTimeout(() => navigate(targetPath, {
             state: {

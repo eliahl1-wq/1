@@ -52,7 +52,7 @@ export function drawGameMinimap(ctx, opts) {
     const margin = isMobile ? MARGIN_MOBILE : MARGIN_DESKTOP;
 
     const cx = margin + size / 2;
-    const cy = screenH - margin - size / 2;
+    const cy = margin + size / 2;
     const radius = size / 2;
     const mapPad = isMobile ? 0.88 : 0.86;
 

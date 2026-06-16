@@ -8,13 +8,16 @@ import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
 import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
+import GameResultModal from '../../components/GameResultModal';
+import GameCashoutBar from '../../components/GameCashoutBar';
+import GameBRHud from '../../components/GameBRHud';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
-import { playFoodEatSound, playGoldenFoodSound, playAgarAbsorbSound, playKillSound, isGoldenPickupDelta, unlockGameAudio, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
+import { playFoodEatSound, playGoldenFoodSound, playAgarAbsorbSound, playKillSound, isGoldenPickupDelta, unlockGameAudio } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -109,7 +112,6 @@ export default function Game() {
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
     const [cashedAmount, setCashedAmount] = useState(null);
-    const [displayCashedAmount, setDisplayCashedAmount] = useState(0);
     const [isDead, setIsDead] = useState(false);
     const [localTimer, setLocalTimer] = useState(0);
     const initialBR = () => {
@@ -125,8 +127,43 @@ export default function Game() {
     const [brPlayerCount, setBrPlayerCount] = useState(0);
     const brIntroTriggeredRef = useRef(false);
     const foodCacheRef = useRef(new Map());
+    const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: DEFAULT_ENTRY_FEE, mode: 'agar' });
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
+
+    const handlePlayAgain = useCallback(() => {
+        const { nickname, entryFeeUsd: fee, mode } = joinParamsRef.current;
+        const playMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
+        localStorage.setItem('current_game_mode', playMode);
+        localStorage.setItem('selected_gamemode', playMode);
+
+        setIsDead(false);
+        setCashedAmount(null);
+        setLocalTimer(0);
+        prevBalanceRef.current = null;
+        prevKillsRef.current = null;
+        cashoutActiveRef.current = false;
+        global.cashOutTimer = 0;
+        global.cashOutEndAt = 0;
+        foodCacheRef.current.clear();
+        gameData.current = { player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null };
+
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('joinGame', {
+                username: nickname,
+                token,
+                mode: playMode,
+                entryFeeUsd: fee,
+            });
+        }
+    }, [token]);
+
+    const handleLobby = useCallback(() => {
+        localStorage.removeItem('current_game_mode');
+        const mode = joinParamsRef.current.mode;
+        const selectedMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
+        navigate('/pre-game', { state: { selectedMode } });
+    }, [navigate]);
 
     const canCashOutRef = useRef(false);
     canCashOutRef.current = !isBattleRoyale && localTimer <= 0 && cashedAmount === null && !isDead;
@@ -201,6 +238,12 @@ export default function Game() {
         const entryFeeUsd = isBR
             ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
             : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
+
+        joinParamsRef.current = {
+            nickname: matchNickname,
+            entryFeeUsd,
+            mode: isBR ? gameMode : (gameMode.replace(/^br-/, '') || 'agar'),
+        };
 
         const socket = io(apiUrl, {
             auth: { token },
@@ -380,26 +423,7 @@ export default function Game() {
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
             localStorage.removeItem('current_game_mode');
-            const usdAmount = amount;
-            setCashedAmount(usdAmount);
-            
-            // Professional count-up animation for money being "added" to balance
-            startCashoutCountUpSound(usdAmount, 900);
-            const startTime = performance.now();
-            const duration = 900;
-            const animate = (currentTime) => {
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                const eased = 1 - Math.pow(1 - progress, 4); // Ease-out Quart
-                setDisplayCashedAmount(eased * usdAmount);
-                if (progress < 1) requestAnimationFrame(animate);
-                else stopCashoutCountUpSound();
-            };
-            requestAnimationFrame(animate);
-
-            setTimeout(() => {
-                navigate('/pre-game');
-            }, 4500);
+            setCashedAmount(amount);
         });
 
         const handleDeath = () => {
@@ -409,12 +433,11 @@ export default function Game() {
             foodCacheRef.current.clear();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
-            setTimeout(() => {
-                navigate(
-                    wasBR ? '/gamemodes' : '/pre-game',
-                    wasBR ? { state: { selectedMode: 'agar' } } : undefined,
-                );
-            }, 4000);
+            if (wasBR) {
+                setTimeout(() => {
+                    navigate('/gamemodes', { state: { selectedMode: 'agar' } });
+                }, 4000);
+            }
         };
 
         socket.on('forcedDisconnect', () => {
@@ -696,25 +719,28 @@ export default function Game() {
                 <AgarMobileControls onSplit={() => socketRef.current?.emit('2')} />
             )}
 
-            {cashedAmount !== null && (
-                <div className="modern-overlay-backdrop">
-                    <div className="modern-overlay-card success">
-                        <div className="overlay-badge success">Transaction Confirmed</div>
-                        <h2 className="overlay-heading">Profit Secured</h2>
-                        <div className="overlay-amount success">
-                            <span className="unit">$</span>{displayCashedAmount.toFixed(2)}
-                        </div>
-                        <div className="overlay-divider" />
-                        <p className="overlay-caption">Capital has been successfully reconciled to your account balance.</p>
-                    </div>
-                </div>
+            {!isBattleRoyale && cashedAmount !== null && (
+                <GameResultModal
+                    type="cashout"
+                    amount={cashedAmount}
+                    onPlayAgain={handlePlayAgain}
+                    onLobby={handleLobby}
+                />
             )}
 
-            {isDead && (
+            {!isBattleRoyale && isDead && (
+                <GameResultModal
+                    type="death"
+                    onPlayAgain={handlePlayAgain}
+                    onLobby={handleLobby}
+                />
+            )}
+
+            {isBattleRoyale && isDead && (
                 <div className="modern-overlay-backdrop death">
                     <div className="modern-overlay-card death">
-                        <div className="overlay-badge error">{isBattleRoyale ? 'Eliminated' : 'Session Terminated'}</div>
-                        <h2 className="overlay-heading">{isBattleRoyale ? 'Out of the Zone' : 'Eliminated'}</h2>
+                        <div className="overlay-badge error">Eliminated</div>
+                        <h2 className="overlay-heading">Out of the Zone</h2>
                         <div className="overlay-icon error">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -723,9 +749,7 @@ export default function Game() {
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">
-                            {isBattleRoyale
-                                ? `${brAliveCount} players remain. Prize pool: $${brPrizePool.toFixed(2)}`
-                                : 'Your stake has been liquidated. Redirecting to terminal...'}
+                            {`${brAliveCount} players remain. Prize pool: $${brPrizePool.toFixed(2)}`}
                         </p>
                     </div>
                 </div>
@@ -836,105 +860,22 @@ export default function Game() {
                 </div>
             )}
 
-            {/* UI Overlay */}
-            <div className="game-stake-wrap" style={{ 
-                position: 'absolute', 
-                top: '30px', 
-                left: '30px', 
-                zIndex: 100
-            }}>
-                <div className={`game-stake-panel${isBattleRoyale ? ' game-stake-panel--br' : ''}`} style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    backdropFilter: 'blur(20px)',
-                    padding: '15px 25px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'stretch',
-                    gap: '12px',
-                    minWidth: '190px',
-                }}>
-                    {(!IS_MOBILE || isBattleRoyale) && (
-                    <div style={{ textAlign: 'center' }}>
-                        <h3 className="game-stake-label" style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
-                            {isBattleRoyale ? 'Prize Pool' : 'Active Stake'}
-                        </h3>
-                        <div className="game-stake-amount" style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                            {isBattleRoyale ? `$${brPrizePool.toFixed(2)}` : `$${(currentBalance ?? 0).toFixed(2)}`}
-                        </div>
-                        {isBattleRoyale && (
-                            <div className="game-stake-br-meta" style={{ fontSize: '0.75rem', color: '#FF6B6B', fontWeight: 700, marginTop: '4px' }}>
-                                {brAliveCount} ALIVE · WINNER TAKES ${brPrizePool.toFixed(2)}
-                            </div>
-                        )}
-                        {isBattleRoyale && brPlayerCount > 0 && (
-                            <div className="game-stake-br-meta" style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: '6px', fontWeight: 600 }}>
-                                {brPlayerCount} players · winner takes pool
-                            </div>
-                        )}
-                    </div>
-                    )}
+            {isBattleRoyale && (
+                <GameBRHud
+                    prizePool={brPrizePool}
+                    aliveCount={brAliveCount}
+                    playerCount={brPlayerCount}
+                />
+            )}
 
-                    {/* Exit timer badge */}
-                    {!isBattleRoyale && localTimer > 0 && (
-                        <div className="game-stake-securing" style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
-                            padding: '10px 12px',
-                            background: 'rgba(6, 10, 8, 0.85)',
-                            border: '1px solid rgba(20, 241, 149, 0.25)',
-                            borderRadius: '14px',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="game-stake-securing-label" style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '1.2px' }}>SECURING</span>
-                                <span className="game-stake-securing-time" style={{ fontSize: '0.9rem', fontWeight: 900, color: '#14F195', fontFamily: 'ui-monospace, monospace' }}>{localTimer}s</span>
-                            </div>
-                            <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                                <div style={{
-                                    height: '100%',
-                                    width: `${(localTimer / (global.cashOutTotal || 10)) * 100}%`,
-                                    background: 'linear-gradient(90deg, #0DBF76, #14F195)',
-                                    borderRadius: 2,
-                                    transition: 'width 1s linear',
-                                }} />
-                            </div>
-                        </div>
-                    )}
-                    {!isBattleRoyale && (
-                    <button
-                        className="game-cashout-btn"
-                        {...cashoutButtonProps}
-                        disabled={localTimer > 0 || isDead || cashedAmount !== null}
-                        style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            background: localTimer > 0
-                                ? 'rgba(255,255,255,0.04)'
-                                : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
-                            color: localTimer > 0 ? 'rgba(255,255,255,0.2)' : '#001a0d',
-                            border: localTimer > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                            padding: '10px 14px',
-                            borderRadius: '12px',
-                            fontWeight: '800',
-                            fontSize: '0.75rem',
-                            letterSpacing: '0.6px',
-                            cursor: localTimer > 0 ? 'not-allowed' : 'pointer',
-                            transition: '0.2s all ease',
-                            boxShadow: localTimer > 0 ? 'none' : '0 4px 20px rgba(20, 241, 149, 0.2)',
-                            opacity: localTimer > 0 ? 0.6 : 1
-                        }}
-                    >
-                        {IS_MOBILE ? 'CASH OUT' : 'Q · CASH OUT'}
-                    </button>
-                    )}
-                </div>
-            </div>
+            {!isBattleRoyale && (
+                <GameCashoutBar
+                    {...cashoutButtonProps}
+                    disabled={localTimer > 0 || isDead || cashedAmount !== null}
+                    localTimer={localTimer}
+                    cashOutTotal={global.cashOutTotal || 10}
+                />
+            )}
 
             {brVictoryAmount != null && (
                 <BRVictoryOverlay show amount={brVictoryAmount} />
@@ -948,18 +889,9 @@ export default function Game() {
                 onComplete={dismissBrIntro}
             />
 
-            {/* Controls Info — hidden on mobile (no keyboard) */}
             {!IS_MOBILE && (
-            <div style={{ 
-                position: 'absolute', 
-                bottom: '30px', 
-                left: '30px', 
-                color: 'rgba(255,255,255,0.3)',
-                fontSize: '0.9rem'
-            }}>
-                {isBattleRoyale
-                    ? 'SPACE to Split • W to Eject • Mouse to Move'
-                    : 'SPACE to Split • W to Eject • Hold Q to Cash Out • Mouse to Move'}
+            <div className="game-controls-hint">
+                SPACE to Split • W to Eject • Mouse to Move
             </div>
             )}
 

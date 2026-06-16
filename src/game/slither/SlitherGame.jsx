@@ -10,11 +10,14 @@ import { SlitherRenderer } from './SlitherRenderer.js';
 
 import { normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
+import GameResultModal from '../../components/GameResultModal';
+import GameCashoutBar from '../../components/GameCashoutBar';
+import GameBRHud from '../../components/GameBRHud';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { playFoodEatSound, playGoldenFoodSound, playKillSound, isGoldenPickupDelta, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
+import { playFoodEatSound, playGoldenFoodSound, playKillSound, isGoldenPickupDelta } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -69,8 +72,6 @@ export default function SlitherGame() {
 
     const [cashedAmount, setCashedAmount] = useState(null);
 
-    const [displayCashedAmount, setDisplayCashedAmount] = useState(0);
-
     const [localTimer, setLocalTimer] = useState(0);
 
     const [resetCountdown, setResetCountdown] = useState(null);
@@ -94,6 +95,39 @@ export default function SlitherGame() {
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
+    const handlePlayAgain = useCallback(() => {
+        const { nickname, entryFeeUsd: fee } = joinParamsRef.current;
+        localStorage.setItem('current_game_mode', 'slither');
+        localStorage.setItem('selected_gamemode', 'slither');
+
+        setIsDead(false);
+        setCashedAmount(null);
+        setLocalTimer(0);
+        setIsSecuringCashout(false);
+        setGameReady(false);
+        prevBalanceRef.current = null;
+        prevKillsRef.current = null;
+        cashoutActiveRef.current = false;
+        cashOutEndAtRef.current = 0;
+
+        rendererRef.current?.resetSession();
+        rendererRef.current?.start();
+
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('joinGame', {
+                username: nickname,
+                token: authToken,
+                mode: joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither',
+                entryFeeUsd: fee,
+            });
+        }
+    }, [authToken]);
+
+    const handleLobby = useCallback(() => {
+        localStorage.removeItem('current_game_mode');
+        navigate('/pre-game', { state: { selectedMode: 'slither' } });
+    }, [navigate]);
+
     const handleBoostChange = useCallback((active) => {
         rendererRef.current?.setBoost(active);
     }, []);
@@ -101,6 +135,7 @@ export default function SlitherGame() {
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
     const isBRMode = gameModeStored.startsWith('br-') || !!location.state?.battleRoyale;
+    const isCompetitiveMode = gameModeStored === 'competitive-slither' || location.state?.selectedMode === 'competitive-slither';
     const entryFeeUsd = isBRMode
         ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
         : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
@@ -109,6 +144,7 @@ export default function SlitherGame() {
         nickname: matchNickname,
         entryFeeUsd,
         isBR: isBRMode,
+        isCompetitive: isCompetitiveMode,
     };
 
 
@@ -262,6 +298,7 @@ export default function SlitherGame() {
 
         const gameMode = localStorage.getItem('current_game_mode') || 'slither';
         const isBR = gameMode.startsWith('br-') || !!location.state?.battleRoyale;
+        const isCompetitive = gameMode === 'competitive-slither' || !!location.state?.selectedMode && location.state.selectedMode === 'competitive-slither';
         if (isBR) setIsBattleRoyale(true);
 
         const socket = io(API_URL, {
@@ -287,7 +324,8 @@ export default function SlitherGame() {
                 if (br) {
                     socket.emit('brRejoinMatch', { token: authToken });
                 } else {
-                    socket.emit('joinGame', { username: nickname, token: authToken, mode: 'slither', entryFeeUsd: fee });
+                    const joinMode = joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither';
+                    socket.emit('joinGame', { username: nickname, token: authToken, mode: joinMode, entryFeeUsd: fee });
                 }
                 hasJoinedRef.current = true;
             }
@@ -305,8 +343,15 @@ export default function SlitherGame() {
             if (gameSizes?.playerCount) setBrPlayerCount(gameSizes.playerCount);
             if (gameSizes?.battleRoyale && gameSizes?.zone) {
                 renderer.updateState({ zone: gameSizes.zone, battleRoyale: true });
+            } else if (gameSizes?.competitiveSlither && gameSizes?.zone) {
+                renderer.updateState({
+                    zone: gameSizes.zone,
+                    battleRoyale: false,
+                    competitiveSlither: true,
+                    circularMap: true,
+                });
             } else {
-                renderer.updateState({ zone: null, battleRoyale: false });
+                renderer.updateState({ zone: null, battleRoyale: false, competitiveSlither: false, circularMap: false });
             }
             if (gameSizes?.battleRoyale && gameSizes?.prizePool && !brIntroTriggeredRef.current) {
                 brIntroTriggeredRef.current = true;
@@ -316,7 +361,9 @@ export default function SlitherGame() {
             renderer.resetSession();
             prevKillsRef.current = playerSettings.kills ?? 0;
             if (!gameSizes?.battleRoyale) {
-                const bal = playerSettings.balance ?? 1.0;
+                const bal = isCompetitive
+                    ? (playerSettings.dollarBalance ?? playerSettings.balance ?? 5)
+                    : (playerSettings.balance ?? 1.0);
                 prevBalanceRef.current = bal;
                 setCurrentBalance(bal);
                 rendererRef.current?.setHud({ balance: bal });
@@ -344,19 +391,24 @@ export default function SlitherGame() {
                 if (prev != null) {
                     const delta = tick.balance - prev;
                     if (delta > 0.001) {
-                        if (isGoldenPickupDelta(delta)) playGoldenFoodSound();
+                        if (tick.competitiveSlither || isGoldenPickupDelta(delta)) playGoldenFoodSound();
                         else playFoodEatSound();
                     }
                 }
                 prevBalanceRef.current = tick.balance;
-                // The live balance is already drawn on the snake-head badge by the renderer,
-                // so the top-left panel only needs ~8Hz updates. Throttling this avoids
-                // re-rendering the whole (blur-heavy) overlay tree on every server tick.
                 const nowB = Date.now();
                 if (nowB - lastBalanceUiAtRef.current >= 120) {
                     lastBalanceUiAtRef.current = nowB;
                     setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
+                    rendererRef.current?.setHud({ balance: tick.balance });
                 }
+            }
+            if (tick.competitiveSlither && tick.zone) {
+                renderer.updateState({
+                    zone: tick.zone,
+                    competitiveSlither: true,
+                    circularMap: true,
+                });
             }
             if (tick.battleRoyale) {
                 const now = Date.now();
@@ -409,41 +461,13 @@ export default function SlitherGame() {
 
 
         socket.on('cashOutSuccess', ({ amount }) => {
-
             cashoutActiveRef.current = false;
             setIsSecuringCashout(false);
             cashOutEndAtRef.current = 0;
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             rendererRef.current?.pause();
-
             localStorage.removeItem('current_game_mode');
-
             setCashedAmount(amount);
-
-            startCashoutCountUpSound(amount, 900);
-            const startTime = performance.now();
-
-            const duration = 900;
-
-            const animate = (time) => {
-
-                const elapsed = time - startTime;
-
-                const progress = Math.min(elapsed / duration, 1);
-
-                const eased = 1 - Math.pow(1 - progress, 4);
-
-                setDisplayCashedAmount(eased * amount);
-
-                if (progress < 1) requestAnimationFrame(animate);
-                else stopCashoutCountUpSound();
-
-            };
-
-            requestAnimationFrame(animate);
-
-            setTimeout(() => navigate('/pre-game', { state: { selectedMode: 'slither' } }), 4500);
-
         });
 
 
@@ -482,12 +506,11 @@ export default function SlitherGame() {
             rendererRef.current?.pause();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
-            setTimeout(() => {
-                navigate(
-                    wasBR ? '/gamemodes' : '/pre-game',
-                    { state: { selectedMode: 'slither' } },
-                );
-            }, 4000);
+            if (wasBR) {
+                setTimeout(() => {
+                    navigate('/gamemodes', { state: { selectedMode: 'slither' } });
+                }, 4000);
+            }
         });
 
 
@@ -614,39 +637,28 @@ export default function SlitherGame() {
 
 
 
-            {cashedAmount !== null && (
-
-                <div className="modern-overlay-backdrop">
-
-                    <div className="modern-overlay-card success">
-
-                        <div className="overlay-badge success">Transaction Confirmed</div>
-
-                        <h2 className="overlay-heading">Profit Secured</h2>
-
-                        <div className="overlay-amount success">
-
-                            <span className="unit">$</span>{displayCashedAmount.toFixed(2)}
-
-                        </div>
-
-                        <div className="overlay-divider" />
-
-                        <p className="overlay-caption">Capital has been successfully reconciled to your account balance.</p>
-
-                    </div>
-
-                </div>
-
+            {!isBattleRoyale && cashedAmount !== null && (
+                <GameResultModal
+                    type="cashout"
+                    amount={cashedAmount}
+                    onPlayAgain={handlePlayAgain}
+                    onLobby={handleLobby}
+                />
             )}
 
+            {!isBattleRoyale && isDead && (
+                <GameResultModal
+                    type="death"
+                    onPlayAgain={handlePlayAgain}
+                    onLobby={handleLobby}
+                />
+            )}
 
-
-            {isDead && (
+            {isBattleRoyale && isDead && (
                 <div className="modern-overlay-backdrop death">
                     <div className="modern-overlay-card death">
-                        <div className="overlay-badge error">{isBattleRoyale ? 'Eliminated' : 'Session Terminated'}</div>
-                        <h2 className="overlay-heading">{isBattleRoyale ? 'Out of the Zone' : 'Eliminated'}</h2>
+                        <div className="overlay-badge error">Eliminated</div>
+                        <h2 className="overlay-heading">Out of the Zone</h2>
                         <div className="overlay-icon error">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -654,9 +666,7 @@ export default function SlitherGame() {
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">
-                            {isBattleRoyale
-                                ? `${brAliveCount} players remain. Prize pool: $${brPrizePool.toFixed(2)}`
-                                : 'Your stake has been liquidated. Redirecting to terminal...'}
+                            {`${brAliveCount} players remain. Prize pool: $${brPrizePool.toFixed(2)}`}
                         </p>
                     </div>
                 </div>
@@ -778,131 +788,30 @@ export default function SlitherGame() {
 
 
 
-            {/* Stake panel — matches Agar */}
+            {isBattleRoyale && (
+                <GameBRHud
+                    prizePool={brPrizePool}
+                    aliveCount={brAliveCount}
+                    playerCount={brPlayerCount}
+                />
+            )}
 
-            <div className="game-stake-wrap" style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 100 }}>
-
-                <div className={`game-stake-panel${isBattleRoyale ? ' game-stake-panel--br' : ''}`} style={{
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    backdropFilter: 'blur(20px)',
-                    padding: '15px 25px',
-                    borderRadius: '20px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    boxShadow: '0 0 20px rgba(124, 58, 255, 0.2)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'stretch',
-                    gap: '12px',
-                    minWidth: '190px',
-                }}>
-
-                    {(!IS_MOBILE || isBattleRoyale) && (
-                    <div style={{ textAlign: 'center' }}>
-                        <h3 className="game-stake-label" style={{ margin: 0, opacity: 0.3, fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '800' }}>
-                            {isBattleRoyale ? 'Prize Pool' : 'Active Stake'}
-                        </h3>
-                        <div className="game-stake-amount" style={{ fontSize: '2.2rem', fontWeight: '900', color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>
-                            {isBattleRoyale ? `$${brPrizePool.toFixed(2)}` : `$${(currentBalance ?? 0).toFixed(2)}`}
-                        </div>
-                        {isBattleRoyale && (
-                            <div className="game-stake-br-meta" style={{ fontSize: '0.75rem', color: '#FF6B6B', fontWeight: 700, marginTop: '4px' }}>
-                                {brAliveCount} ALIVE · WINNER TAKES ${brPrizePool.toFixed(2)}
-                            </div>
-                        )}
-                        {isBattleRoyale && brPlayerCount > 0 && (
-                            <div className="game-stake-br-meta" style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: '6px', fontWeight: 600 }}>
-                                {brPlayerCount} players · winner takes pool
-                            </div>
-                        )}
-                    </div>
-                    )}
-
-                    {!isBattleRoyale && localTimer > 0 && (
-
-                        <div className="game-stake-securing" style={{
-
-                            display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px 12px',
-
-                            background: 'rgba(6, 10, 8, 0.85)', border: '1px solid rgba(20, 241, 149, 0.25)',
-
-                            borderRadius: '14px', width: '100%', boxSizing: 'border-box',
-
-                        }}>
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-
-                                <span className="game-stake-securing-label" style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '1.2px' }}>SECURING</span>
-
-                                <span className="game-stake-securing-time" style={{ fontSize: '0.9rem', fontWeight: 900, color: '#14F195', fontFamily: 'ui-monospace, monospace' }}>{localTimer}s</span>
-
-                            </div>
-
-                            <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-
-                                <div style={{
-
-                                    height: '100%',
-
-                                    width: `${(localTimer / (cashOutTotalRef.current || 10)) * 100}%`,
-
-                                    background: 'linear-gradient(90deg, #0DBF76, #14F195)',
-
-                                    borderRadius: 2,
-
-                                    transition: 'width 1s linear',
-
-                                }} />
-
-                            </div>
-
-                        </div>
-
-                    )}
-
-                    {!isBattleRoyale && (
-                    <button
-                        className="game-cashout-btn"
-                        {...cashoutButtonProps}
-                        disabled={!cashoutReady}
-
-                        style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            background: !cashoutReady ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg, #0DBF76 0%, #14F195 100%)',
-                            color: !cashoutReady ? 'rgba(255,255,255,0.2)' : '#001a0d',
-                            border: !cashoutReady ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                            padding: '10px 14px',
-                            borderRadius: '12px',
-                            fontWeight: '800',
-                            fontSize: '0.75rem',
-                            letterSpacing: '0.6px',
-                            cursor: !cashoutReady ? 'not-allowed' : 'pointer',
-                            transition: '0.2s all ease',
-                            boxShadow: !cashoutReady ? 'none' : '0 4px 20px rgba(20, 241, 149, 0.2)',
-                            opacity: !cashoutReady ? 0.6 : 1
-                        }}
-
-                    >
-                        {IS_MOBILE ? 'CASH OUT' : 'Q · CASH OUT'}
-                    </button>
-                    )}
-
-                </div>
-
-            </div>
+            {!isBattleRoyale && (
+                <GameCashoutBar
+                    {...cashoutButtonProps}
+                    disabled={!cashoutReady}
+                    localTimer={localTimer}
+                    cashOutTotal={cashOutTotalRef.current || 10}
+                />
+            )}
 
 
-
-            {/* Controls — hidden on mobile (no keyboard/mouse) */}
 
             {!IS_MOBILE && (
-            <div style={{ position: 'absolute', bottom: '30px', left: '30px', color: 'rgba(255,255,255,0.3)', fontSize: '0.9rem', zIndex: 100 }}>
-
+            <div className="game-controls-hint">
                 {isBattleRoyale
                     ? 'Mouse to Move • Click to Boost'
-                    : 'Mouse to Move • Click to Boost • Hold Q to Cash Out'}
-
+                    : 'Mouse to Move • Click to Boost'}
             </div>
             )}
 
