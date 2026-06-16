@@ -1,6 +1,115 @@
 import React, { useEffect, useState } from 'react';
 
-export default function GameResultModal({ type, amount, onPlayAgain, onLobby }) {
+function formatTimeSurvived(ms) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    if (mins > 0) return `${mins}m ${secs}s`;
+    return `${secs}s`;
+}
+
+function TrophyIcon() {
+    return (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+                d="M8 21h8M12 17v4M7 4h10v3a5 5 0 0 1-10 0V4zM5 4H3v2a3 3 0 0 0 3 3M19 4h2v2a3 3 0 0 1-3 3"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path d="M7 7H17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+function ClockIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+            <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+function FlameIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+                d="M12 22c4-2.5 6-6 6-10a6 6 0 0 0-11-3 6 6 0 0 0-5 13z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
+
+function WalletIcon() {
+    return (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+                d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" stroke="currentColor" strokeWidth="2" />
+        </svg>
+    );
+}
+
+function EyeIcon() {
+    return (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="2" />
+            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+        </svg>
+    );
+}
+
+function RefreshIcon() {
+    return (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+                d="M21 12a9 9 0 1 1-2.64-6.36"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+            />
+            <path d="M21 3v6h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+function HomeIcon() {
+    return (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+                d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
+
+export default function GameResultModal({
+    type,
+    amount,
+    timeSurvivedMs = 0,
+    eliminations = 0,
+    walletBalanceUsd = 0,
+    walletBalanceSol = 0,
+    solPrice = 0,
+    isJoining = false,
+    onPlayAgain,
+    onHome,
+    onSpectate,
+    onClose,
+}) {
     const isWin = type === 'cashout';
     const [displayAmount, setDisplayAmount] = useState(0);
 
@@ -26,33 +135,87 @@ export default function GameResultModal({ type, amount, onPlayAgain, onLobby }) 
         return () => cancelAnimationFrame(raf);
     }, [isWin, amount]);
 
+    const amountSol = solPrice > 0 ? displayAmount / solPrice : 0;
+
     return (
         <div className="game-result-backdrop">
             <div className={`game-result-modal${isWin ? ' game-result-modal--win' : ''}`}>
+                <button type="button" className="game-result-close" onClick={onClose} aria-label="Close">
+                    ×
+                </button>
+
                 {isWin ? (
                     <>
-                        <div className="game-result-badge game-result-badge--win">Cash out</div>
-                        <h2 className="game-result-title">You won</h2>
-                        <div className="game-result-amount">
-                            <span className="game-result-amount-unit">$</span>
-                            {displayAmount.toFixed(2)}
+                        <div className="game-result-trophy" aria-hidden="true">
+                            <TrophyIcon />
                         </div>
-                        <p className="game-result-caption">Added to your account balance</p>
+                        <h2 className="game-result-title game-result-title--win">Cashout Successful!</h2>
+
+                        <p className="game-result-label">Amount Received</p>
+                        <div className="game-result-amount">
+                            ${displayAmount.toFixed(2)}
+                        </div>
+                        <p className="game-result-sol">
+                            {amountSol.toFixed(6)} SOL
+                        </p>
+
+                        <div className="game-result-divider" />
+
+                        <div className="game-result-stats">
+                            <div className="game-result-stat">
+                                <div className="game-result-stat-icon game-result-stat-icon--time">
+                                    <ClockIcon />
+                                </div>
+                                <div className="game-result-stat-value game-result-stat-value--time">
+                                    {formatTimeSurvived(timeSurvivedMs)}
+                                </div>
+                                <div className="game-result-stat-label">Time Survived</div>
+                            </div>
+                            <div className="game-result-stat">
+                                <div className="game-result-stat-icon game-result-stat-icon--kills">
+                                    <FlameIcon />
+                                </div>
+                                <div className="game-result-stat-value game-result-stat-value--kills">
+                                    {eliminations}
+                                </div>
+                                <div className="game-result-stat-label">Eliminations</div>
+                            </div>
+                        </div>
+
+                        <div className="game-result-wallet">
+                            <WalletIcon />
+                            <span>
+                                ${Number(walletBalanceUsd).toFixed(2)} / {Number(walletBalanceSol).toFixed(6)} SOL
+                            </span>
+                        </div>
                     </>
                 ) : (
                     <>
                         <div className="game-result-badge game-result-badge--loss">Eliminated</div>
                         <h2 className="game-result-title">Game over</h2>
-                        <p className="game-result-caption">Your stake was lost. Play again or return to the lobby.</p>
+                        <p className="game-result-caption">Your stake was lost. Play again or return home.</p>
                     </>
                 )}
 
-                <div className="game-result-actions">
-                    <button type="button" className="game-result-btn game-result-btn--primary" onClick={onPlayAgain}>
-                        Play again
+                <div className={`game-result-actions${isWin ? '' : ' game-result-actions--death'}`}>
+                    {isWin && (
+                        <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onSpectate}>
+                            <EyeIcon />
+                            Spectate
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        className="game-result-btn btn btn-primary game-result-btn--play"
+                        onClick={onPlayAgain}
+                        disabled={isJoining}
+                    >
+                        <RefreshIcon />
+                        {isJoining ? 'Joining…' : 'Play Again'}
                     </button>
-                    <button type="button" className="game-result-btn game-result-btn--secondary" onClick={onLobby}>
-                        Lobby
+                    <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onHome}>
+                        <HomeIcon />
+                        Home
                     </button>
                 </div>
             </div>

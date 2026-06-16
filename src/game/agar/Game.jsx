@@ -21,6 +21,7 @@ import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
+const CASHOUT_SECONDS = 10;
 
 /** True when any cell overlaps this pellet (server already removed it). */
 function foodLikelyEaten(f, users) {
@@ -83,7 +84,7 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
 export default function Game() {
     const canvasRef = useRef(null);
     const viewportRef = useRef(null);
-    const { user, token } = useAuth();
+    const { user, token, refreshUser } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const socketRef = useRef(null);
@@ -98,6 +99,10 @@ export default function Game() {
     const timerIntervalRef = useRef(null);
     const animationFrameId = useRef(null);
     const cashoutActiveRef = useRef(false);
+    const cashOutEndAtRef = useRef(0);
+    const cashOutTotalRef = useRef(CASHOUT_SECONDS);
+    const sessionStartAtRef = useRef(null);
+    const spectatorCamRef = useRef({ x: 3000, y: 3000 });
     
     const WORLD_SIZE = 6000;
 
@@ -105,8 +110,12 @@ export default function Game() {
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
     const [cashedAmount, setCashedAmount] = useState(null);
+    const [showResultModal, setShowResultModal] = useState(false);
+    const [isRejoining, setIsRejoining] = useState(false);
+    const [sessionStats, setSessionStats] = useState({ timeSurvivedMs: 0, eliminations: 0 });
     const [isDead, setIsDead] = useState(false);
     const [localTimer, setLocalTimer] = useState(0);
+    const [cashOutEndAt, setCashOutEndAt] = useState(0);
     const initialBR = () => {
         const mode = localStorage.getItem('current_game_mode') || '';
         return mode.startsWith('br-') || !!location.state?.battleRoyale;
@@ -132,12 +141,17 @@ export default function Game() {
 
         setIsDead(false);
         setCashedAmount(null);
+        setShowResultModal(false);
+        setIsRejoining(true);
+        setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
         setLocalTimer(0);
         prevBalanceRef.current = null;
         prevKillsRef.current = null;
         cashoutActiveRef.current = false;
         global.cashOutTimer = 0;
         global.cashOutEndAt = 0;
+        cashOutEndAtRef.current = 0;
+        setCashOutEndAt(0);
         foodCacheRef.current.clear();
         gameData.current = { player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null };
 
@@ -158,13 +172,47 @@ export default function Game() {
         navigate('/pre-game', { state: { selectedMode } });
     }, [navigate]);
 
+    const startCashoutCountdown = useCallback((seconds) => {
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        cashoutActiveRef.current = true;
+
+        let timeLeft = seconds;
+        cashOutTotalRef.current = seconds;
+        global.cashOutTotal = seconds;
+        const endAt = Date.now() + seconds * 1000;
+        cashOutEndAtRef.current = endAt;
+        global.cashOutEndAt = endAt;
+        global.cashOutTimer = timeLeft;
+        setCashOutEndAt(endAt);
+        setLocalTimer(timeLeft);
+
+        const intervalId = setInterval(() => {
+            setLocalTimer((prev) => {
+                const next = Math.max(0, prev - 1);
+                global.cashOutTimer = next;
+                if (next <= 0) {
+                    global.cashOutEndAt = 0;
+                    cashOutEndAtRef.current = 0;
+                    setCashOutEndAt(0);
+                    clearInterval(intervalId);
+                    timerIntervalRef.current = null;
+                    cashoutActiveRef.current = false;
+                }
+                return next;
+            });
+        }, 1000);
+        timerIntervalRef.current = intervalId;
+    }, []);
+
     const canCashOutRef = useRef(false);
     canCashOutRef.current = !isBattleRoyale && localTimer <= 0 && cashedAmount === null && !isDead;
 
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
+        if (cashoutActiveRef.current) return;
+        startCashoutCountdown(CASHOUT_SECONDS);
         socketRef.current?.emit('cashOut');
-    }, []);
+    }, [startCashoutCountdown]);
 
     const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
@@ -284,6 +332,9 @@ export default function Game() {
             gameData.current.player = playerSettings;
             global.game.width = gameSizes.width;
             global.game.height = gameSizes.height;
+            sessionStartAtRef.current = Date.now();
+            setIsRejoining(false);
+            setShowResultModal(false);
             setIsConnected(true);
             const startBal = playerSettings.balance ?? 1.0;
             prevBalanceRef.current = startBal;
@@ -297,33 +348,20 @@ export default function Game() {
         });
 
         socket.on('cashOutStarting', (data) => {
-            startCashoutCountdown(data.seconds);
-        });
-
-        const startCashoutCountdown = (seconds) => {
-            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-            cashoutActiveRef.current = true;
-
-            let timeLeft = seconds;
+            const seconds = data?.seconds ?? CASHOUT_SECONDS;
+            if (!cashoutActiveRef.current) {
+                startCashoutCountdown(seconds);
+                return;
+            }
+            cashOutTotalRef.current = seconds;
             global.cashOutTotal = seconds;
-            global.cashOutEndAt = Date.now() + seconds * 1000;
-            global.cashOutTimer = timeLeft;
-            setLocalTimer(timeLeft);
-
-            const intervalId = setInterval(() => {
-                setLocalTimer(prev => {
-                    const next = Math.max(0, prev - 1);
-                    global.cashOutTimer = next;
-                    if (next <= 0) {
-                        global.cashOutEndAt = 0;
-                        clearInterval(intervalId);
-                        timerIntervalRef.current = null;
-                    }
-                    return next;
-                });
-            }, 1000);
-            timerIntervalRef.current = intervalId;
-        };
+            const endAt = Date.now() + seconds * 1000;
+            cashOutEndAtRef.current = endAt;
+            global.cashOutEndAt = endAt;
+            setCashOutEndAt(endAt);
+            setLocalTimer(seconds);
+            global.cashOutTimer = seconds;
+        });
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
             const foodMap = foodCacheRef.current;
@@ -363,6 +401,7 @@ export default function Game() {
                     const newBal = me.balance ?? 0;
                     prevBalanceRef.current = newBal;
                     setCurrentBalance(newBal);
+                    if (me.kills != null) prevKillsRef.current = me.kills;
                 }
             }
         });
@@ -403,14 +442,30 @@ export default function Game() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            global.cashOutTimer = 0;
+            global.cashOutEndAt = 0;
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            setLocalTimer(0);
             localStorage.removeItem('current_game_mode');
+            const startedAt = sessionStartAtRef.current || Date.now();
+            setSessionStats({
+                timeSurvivedMs: Date.now() - startedAt,
+                eliminations: prevKillsRef.current ?? 0,
+            });
             setCashedAmount(amount);
+            setShowResultModal(true);
+            refreshUser?.();
         });
 
         const handleDeath = () => {
             setIsDead(true);
             global.cashOutTimer = 0;
             global.cashOutEndAt = 0;
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            setLocalTimer(0);
+            cashoutActiveRef.current = false;
             foodCacheRef.current.clear();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
@@ -444,6 +499,15 @@ export default function Game() {
             console.error('Server error:', msg);
             if (cashoutActiveRef.current) {
                 cashoutActiveRef.current = false;
+                global.cashOutTimer = 0;
+                global.cashOutEndAt = 0;
+                cashOutEndAtRef.current = 0;
+                setCashOutEndAt(0);
+                setLocalTimer(0);
+                if (timerIntervalRef.current) {
+                    clearInterval(timerIntervalRef.current);
+                    timerIntervalRef.current = null;
+                }
             }
             if (typeof msg === 'string' && msg.includes('balance')) {
                 alert(msg);
@@ -487,7 +551,7 @@ export default function Game() {
             global.battleRoyale = false;
             hasJoinedGameRef.current = false;
         };
-    }, [token, navigate, location.state?.nickname]);
+    }, [token, navigate, location.state?.nickname, startCashoutCountdown]);
 
     const handleResize = () => {
         const canvas = canvasRef.current;
@@ -515,20 +579,26 @@ export default function Game() {
             const { player, users, viruses, ejected, zoneSize } = gameData.current;
             const screen = { width: canvas.width, height: canvas.height };
             const viewZoom = getMobileViewZoom();
+            const hasPlayer = player && player.x !== undefined;
+            if (hasPlayer) {
+                spectatorCamRef.current = { x: player.x, y: player.y };
+            }
+            const camX = hasPlayer ? player.x : spectatorCamRef.current.x;
+            const camY = hasPlayer ? player.y : spectatorCamRef.current.y;
+            const canRenderWorld = isConnected && !isDead && (hasPlayer || cashedAmount !== null);
             
-            // CRASH FIX: Kontrollera att vi inte är döda och att spelardata finns
-            if (isConnected && !isDead && player && player.x !== undefined) {
+            if (canRenderWorld) {
                 const worldToScreen = (wx, wy) => ({
-                    x: (wx - player.x) * viewZoom + screen.width / 2,
-                    y: (wy - player.y) * viewZoom + screen.height / 2,
+                    x: (wx - camX) * viewZoom + screen.width / 2,
+                    y: (wy - camY) * viewZoom + screen.height / 2,
                 });
 
                 graph.fillStyle = global.backgroundColor;
                 graph.fillRect(0, 0, screen.width, screen.height);
                 
-                renderUtils.drawGrid(global, { x: player.x, y: player.y }, screen, graph, viewZoom);
+                renderUtils.drawGrid(global, { x: camX, y: camY }, screen, graph, viewZoom);
 
-                if (brZone && player.x != null) {
+                if (brZone && camX != null) {
                     const { x: zx, y: zy } = worldToScreen(brZone.cx, brZone.cy);
                     graph.save();
                     graph.fillStyle = 'rgba(255, 59, 48, 0.14)';
@@ -546,12 +616,12 @@ export default function Game() {
                     graph.restore();
                 }
                 
-                pruneAgarFoodCache(foodCacheRef.current, player.x, player.y, screen.width / viewZoom, screen.height / viewZoom, users, myIdRef.current);
+                pruneAgarFoodCache(foodCacheRef.current, camX, camY, screen.width / viewZoom, screen.height / viewZoom, users, myIdRef.current);
                 const halfW = screen.width / (2 * viewZoom) + 120;
                 const halfH = screen.height / (2 * viewZoom) + 120;
                 const myCells = users.find(u => u.id === myIdRef.current)?.cells || [];
                 for (const f of foodCacheRef.current.values()) {
-                    if (Math.abs(f.x - player.x) > halfW || Math.abs(f.y - player.y) > halfH) continue;
+                    if (Math.abs(f.x - camX) > halfW || Math.abs(f.y - camY) > halfH) continue;
                     const underMe = myCells.some(c => Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0));
                     if (underMe) continue;
                     renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: (f.radius || 5) * viewZoom }, graph);
@@ -566,10 +636,10 @@ export default function Game() {
                 });
 
                 let borders = {
-                    left: screen.width / 2 - player.x * viewZoom,
-                    right: screen.width / 2 + (global.game.width - player.x) * viewZoom,
-                    top: screen.height / 2 - player.y * viewZoom,
-                    bottom: screen.height / 2 + (global.game.height - player.y) * viewZoom
+                    left: screen.width / 2 - camX * viewZoom,
+                    right: screen.width / 2 + (global.game.width - camX) * viewZoom,
+                    top: screen.height / 2 - camY * viewZoom,
+                    bottom: screen.height / 2 + (global.game.height - camY) * viewZoom
                 };
 
                 // Rita celler
@@ -609,8 +679,8 @@ export default function Game() {
                     screenW: screen.width,
                     screenH: screen.height,
                     isMobile: IS_MOBILE,
-                    centerX: player.x,
-                    centerY: player.y,
+                    centerX: camX,
+                    centerY: camY,
                     viewHalfW,
                     viewHalfH,
                     players: minimap.players,
@@ -624,7 +694,7 @@ export default function Game() {
         };
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);
-    }, [isConnected, isDead, brZone]); 
+    }, [isConnected, isDead, brZone, cashedAmount]); 
 
     const tryDoubleTapEject = useMobileDoubleTapEject(
         IS_MOBILE && isConnected && !isDead,
@@ -696,24 +766,34 @@ export default function Game() {
 
             <MobileGameSession containerRef={viewportRef} />
 
-            {IS_MOBILE && isConnected && !isDead && (
+            {IS_MOBILE && isConnected && !isDead && cashedAmount === null && (
                 <AgarMobileControls onSplit={() => socketRef.current?.emit('2')} />
             )}
 
-            {!isBattleRoyale && cashedAmount !== null && (
+            {!isBattleRoyale && cashedAmount !== null && showResultModal && (
                 <GameResultModal
                     type="cashout"
                     amount={cashedAmount}
+                    timeSurvivedMs={sessionStats.timeSurvivedMs}
+                    eliminations={sessionStats.eliminations}
+                    walletBalanceUsd={user?.balanceUsd ?? (user?.balanceSol ?? 0) * (user?.solPrice ?? 0)}
+                    walletBalanceSol={user?.balanceSol ?? user?.balance ?? 0}
+                    solPrice={user?.solPrice ?? 0}
+                    isJoining={isRejoining}
                     onPlayAgain={handlePlayAgain}
-                    onLobby={handleLobby}
+                    onHome={handleLobby}
+                    onSpectate={() => setShowResultModal(false)}
+                    onClose={() => setShowResultModal(false)}
                 />
             )}
 
             {!isBattleRoyale && isDead && (
                 <GameResultModal
                     type="death"
+                    isJoining={isRejoining}
                     onPlayAgain={handlePlayAgain}
-                    onLobby={handleLobby}
+                    onHome={handleLobby}
+                    onClose={handleLobby}
                 />
             )}
 
@@ -849,14 +929,15 @@ export default function Game() {
                 />
             )}
 
-            {!isBattleRoyale && (
+            {!isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={localTimer > 0 || isDead || cashedAmount !== null}
                     holdProgress={holdProgress}
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}
-                    cashOutTotal={global.cashOutTotal || 10}
+                    cashOutTotal={cashOutTotalRef.current || CASHOUT_SECONDS}
+                    cashOutEndAt={cashOutEndAt}
                 />
             )}
 

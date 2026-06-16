@@ -55,10 +55,12 @@ export default function Gamemodes() {
         localStorage.setItem('selected_gamemode', mode);
     };
 
+    const isSlitherTab = activeTab === 'slither' || activeTab === 'br-slither' || activeTab === 'competitive-slither';
+    const isAgarTab = activeTab === 'agar' || activeTab === 'br-agar';
+
     useEffect(() => {
-        const isSlither = activeTab === 'slither' || activeTab === 'br-slither';
-        setPageSeo(isSlither ? SEO.gamemodesSlither : SEO.gamemodesAgar);
-    }, [activeTab]);
+        setPageSeo(isSlitherTab ? SEO.gamemodesSlither : SEO.gamemodesAgar);
+    }, [isSlitherTab]);
 
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
@@ -76,13 +78,13 @@ export default function Gamemodes() {
                 {/* Tabs */}
                 <div className="gm-tabs">
                     <button
-                        className={`gm-tab${activeTab === 'agar' ? ' gm-tab--active' : ''}`}
+                        className={`gm-tab${isAgarTab ? ' gm-tab--active' : ''}`}
                         onClick={() => handleTabChange('agar')}
                     >
                         Agar
                     </button>
                     <button
-                        className={`gm-tab${activeTab === 'slither' ? ' gm-tab--active' : ''}`}
+                        className={`gm-tab${isSlitherTab ? ' gm-tab--active' : ''}`}
                         onClick={() => handleTabChange('slither')}
                     >
                         Slither
@@ -91,7 +93,7 @@ export default function Gamemodes() {
 
                 {/* Mode cards */}
                 <div className="gm-grid">
-                    {activeTab === 'agar' ? (
+                    {isAgarTab ? (
                         <>
                             <ModeCard
                                 title="Agar Normal"
@@ -122,7 +124,7 @@ export default function Gamemodes() {
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                             />
                             <ModeCard
-                                title="Competitive Slither"
+                                title="Slither Arena"
                                 desc="$5 entry — real players only. Circular arena, shrinking zone before reset. Cash out your dollar balance anytime."
                                 playing={playersByGamemode.competitiveSlither}
                                 badge="NEW"
@@ -134,6 +136,7 @@ export default function Gamemodes() {
                                 }}
                             />
                             <ModeCard
+                                title="Slither Battle Royale"
                                 desc="5–10 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brSlither}
                                 badge="NEW"

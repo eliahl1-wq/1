@@ -107,79 +107,19 @@ function drawOrganicCell(cell, borders, graph) {
     graph.stroke();
 }
 
-function drawGlassPill(graph, x, y, w, h, r, { fill, stroke, lineWidth = 1 }) {
-    graph.beginPath();
-    graph.roundRect(x, y, w, h, r);
-    graph.fillStyle = fill;
-    graph.fill();
-    if (stroke) {
-        graph.strokeStyle = stroke;
-        graph.lineWidth = lineWidth;
-        graph.stroke();
-    }
-}
 
 function drawBalanceBadge(graph, cell, nameY, fontSize) {
     const pillY = nameY + fontSize / 1.35;
     drawBalanceBadgePill(graph, cell.x, pillY, cell.balance, cell.isMe);
 }
 
-function drawCashoutOverlay(graph, cell) {
+function drawPlayerCashoutRing(graph, cell) {
     const total = global.cashOutTotal || 10;
     const progress = global.cashOutEndAt
         ? getCashoutRingProgress(global.cashOutEndAt, total)
         : Math.max(0, global.cashOutTimer) / total;
-    const remaining = global.cashOutEndAt
-        ? Math.ceil(Math.max(0, global.cashOutEndAt - Date.now()) / 1000)
-        : Math.max(0, global.cashOutTimer);
-
     const ringR = cell.radius + 10;
     drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress);
-
-    // Floating pill above blob
-    const label = 'SECURING';
-    const timerText = `${remaining}s`;
-    const labelSize = 9;
-    const timerSize = 15;
-    graph.font = `700 ${labelSize}px system-ui, sans-serif`;
-    const labelW = graph.measureText(label).width;
-    graph.font = `900 ${timerSize}px ui-monospace, monospace`;
-    const timerW = graph.measureText(timerText).width;
-    const pillW = Math.max(labelW, timerW) + 28;
-    const pillH = labelSize + timerSize + 16;
-    const pillX = cell.x - pillW / 2;
-    const pillY = cell.y - cell.radius - pillH - 22;
-
-    drawGlassPill(graph, pillX, pillY, pillW, pillH, 12, {
-        fill: 'rgba(6, 10, 8, 0.92)',
-        stroke: 'rgba(20, 241, 149, 0.45)',
-        lineWidth: 1.5,
-    });
-
-    // Progress bar inside pill
-    const barPad = 10;
-    const barY = pillY + pillH - 9;
-    const barW = pillW - barPad * 2;
-    graph.fillStyle = 'rgba(255,255,255,0.08)';
-    graph.beginPath();
-    graph.roundRect(pillX + barPad, barY, barW, 3, 2);
-    graph.fill();
-    if (progress > 0) {
-        graph.fillStyle = '#14F195';
-        graph.beginPath();
-        graph.roundRect(pillX + barPad, barY, barW * progress, 3, 2);
-        graph.fill();
-    }
-
-    graph.textAlign = 'center';
-    graph.textBaseline = 'middle';
-    graph.font = `700 ${labelSize}px system-ui, sans-serif`;
-    graph.fillStyle = 'rgba(255,255,255,0.45)';
-    graph.fillText(label, cell.x, pillY + 12);
-
-    graph.font = `900 ${timerSize}px ui-monospace, monospace`;
-    graph.fillStyle = '#ffffff';
-    graph.fillText(timerText, cell.x, pillY + pillH * 0.52);
 }
 
 const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
@@ -189,11 +129,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.lineWidth = 6;
         
         // High-stakes glow effect
-        if (cell.isCashingOut) {
-            const pulse = 0.6 + Math.sin(Date.now() * 0.012) * 0.4;
-            graph.shadowBlur = 30 * pulse;
-            graph.shadowColor = '#14F195';
-        } else if (!global.battleRoyale && cell.balance > 50) {
+        if (!global.battleRoyale && cell.balance > 50) {
             graph.shadowBlur = 40; // Starkare glöd
             graph.shadowColor = '#FFD700'; // Guld-färg
         } else {
@@ -240,7 +176,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
 
         if (cell.isMe && global.cashOutTimer > 0) {
             graph.shadowBlur = 0;
-            drawCashoutOverlay(graph, cell);
+            drawPlayerCashoutRing(graph, cell);
         }
     }
 };

@@ -21,6 +21,8 @@ globalThis.snake = class snake {
         for (let i = 0; i < 50; i++)
             this.v[i] = { x: this.x, y: this.y };
 
+        this.path = this.v.map(p => ({ x: p.x, y: p.y }));
+
         this.sn_im = new Image();
         this.sn_im.src = "/images/head.png";
         this.bd_im = new Image();
@@ -72,11 +74,54 @@ globalThis.snake = class snake {
         this.v[0].x += this.dx * this.speed * (globalThis.SPEED || 1);
         this.v[0].y += this.dy * this.speed * (globalThis.SPEED || 1);
 
-        for (let i = 1; i < this.v.length; i++) {
-            if (this.range(this.v[i], this.v[i - 1]) > this.size / 10) { // Mindre tröskel för smidigare kropp
-                this.v[i].x += (this.v[i - 1].x - this.v[i].x) * 0.5; // Mjuk interpolering
-                this.v[i].y += (this.v[i - 1].y - this.v[i].y) * 0.5; // Mjuk interpolering
+        const spacing = this.size / 10;
+        const head = this.v[0];
+        const path = this.path;
+
+        if (this.range(path[0], head) > 0.01) {
+            path.unshift({ x: head.x, y: head.y });
+        } else {
+            path[0].x = head.x;
+            path[0].y = head.y;
+        }
+
+        for (let segIdx = 1; segIdx < this.v.length; segIdx++) {
+            const targetDist = segIdx * spacing;
+            let walked = 0;
+            let placed = false;
+
+            for (let i = 0; i < path.length - 1; i++) {
+                const ax = path[i].x;
+                const ay = path[i].y;
+                const bx = path[i + 1].x;
+                const by = path[i + 1].y;
+                const edgeLen = this.range(path[i], path[i + 1]);
+
+                if (walked + edgeLen >= targetDist) {
+                    const t = edgeLen > 1e-6 ? (targetDist - walked) / edgeLen : 0;
+                    this.v[segIdx].x = ax + (bx - ax) * t;
+                    this.v[segIdx].y = ay + (by - ay) * t;
+                    placed = true;
+                    break;
+                }
+                walked += edgeLen;
             }
+
+            if (!placed) {
+                const tail = path[path.length - 1];
+                this.v[segIdx].x = tail.x;
+                this.v[segIdx].y = tail.y;
+            }
+        }
+
+        let arc = 0;
+        for (let i = 0; i < path.length - 1; i++) {
+            arc += this.range(path[i], path[i + 1]);
+        }
+        const maxArc = this.v.length * spacing + spacing * 4;
+        while (path.length > 2 && arc > maxArc) {
+            const last = path.pop();
+            arc -= this.range(path[path.length - 1], last);
         }
 
         if (this.speed == 2)

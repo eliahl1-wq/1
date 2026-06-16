@@ -1,5 +1,8 @@
 const FULL_ANGLE = Math.PI * 2;
 
+/** Brand purple — matches --accent / cashout button styling. */
+export const CASHOUT_RING_COLOR = '#785eff';
+
 /** Smooth frame-based progress from a wall-clock end timestamp. */
 export function getCashoutRingProgress(endAtMs, totalSeconds) {
     if (!endAtMs || !totalSeconds) return 0;
@@ -8,7 +11,7 @@ export function getCashoutRingProgress(endAtMs, totalSeconds) {
 }
 
 /**
- * Green progress ring — same style as the cashout countdown timer.
+ * Purple progress ring — same style as the cashout countdown timer.
  * Timer drains clockwise; hold-to-cashout fills counter-clockwise.
  */
 export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) {
@@ -33,7 +36,7 @@ export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) 
 
     ctx.beginPath();
     ctx.arc(x, y, radius, start, end, counterClockwise);
-    ctx.strokeStyle = '#14F195';
+    ctx.strokeStyle = CASHOUT_RING_COLOR;
     ctx.lineWidth = lineWidth;
     ctx.stroke();
 }

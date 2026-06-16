@@ -23,6 +23,7 @@ import '../../styles/gameInGame.css';
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 
 const IS_MOBILE = isTouchDevice();
+const CASHOUT_SECONDS = 10;
 
 
 
@@ -32,7 +33,7 @@ export default function SlitherGame() {
 
     const location = useLocation();
 
-    const { user, token: authToken } = useAuth();
+    const { user, token: authToken, refreshUser } = useAuth();
 
     const canvasRef = useRef(null);
 
@@ -54,8 +55,9 @@ export default function SlitherGame() {
     const prevBalanceRef = useRef(null);
     const prevKillsRef = useRef(null);
 
-    const cashOutTotalRef = useRef(10);
+    const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const cashOutEndAtRef = useRef(0);
+    const sessionStartAtRef = useRef(null);
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 10, isBR: false });
 
 
@@ -71,8 +73,12 @@ export default function SlitherGame() {
     const [isDead, setIsDead] = useState(false);
 
     const [cashedAmount, setCashedAmount] = useState(null);
+    const [showResultModal, setShowResultModal] = useState(false);
+    const [isRejoining, setIsRejoining] = useState(false);
+    const [sessionStats, setSessionStats] = useState({ timeSurvivedMs: 0, eliminations: 0 });
 
     const [localTimer, setLocalTimer] = useState(0);
+    const [cashOutEndAt, setCashOutEndAt] = useState(0);
 
     const [resetCountdown, setResetCountdown] = useState(null);
     const initialBR = () => {
@@ -102,8 +108,11 @@ export default function SlitherGame() {
 
         setIsDead(false);
         setCashedAmount(null);
+        setShowResultModal(false);
+        setIsRejoining(true);
+        setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
         setLocalTimer(0);
-        setIsSecuringCashout(false);
+        setCashOutEndAt(0);
         setGameReady(false);
         prevBalanceRef.current = null;
         prevKillsRef.current = null;
@@ -166,21 +175,16 @@ export default function SlitherGame() {
         };
     }, []);
 
-    const [isSecuringCashout, setIsSecuringCashout] = useState(false);
-
-    const startCashoutCountdown = useCallback((seconds, securing = false) => {
-
+    const startCashoutCountdown = useCallback((seconds) => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
         cashoutActiveRef.current = true;
-        setIsSecuringCashout(securing);
-
         cashOutTotalRef.current = seconds;
         const endAt = Date.now() + seconds * 1000;
         cashOutEndAtRef.current = endAt;
+        setCashOutEndAt(endAt);
 
         let timeLeft = seconds;
-
         setLocalTimer(timeLeft);
 
         rendererRef.current?.setHud({
@@ -190,29 +194,20 @@ export default function SlitherGame() {
         });
 
         const intervalId = setInterval(() => {
-
             timeLeft = Math.max(0, timeLeft - 1);
-
             setLocalTimer(timeLeft);
 
             if (timeLeft <= 0) {
-
                 clearInterval(intervalId);
-
                 timerIntervalRef.current = null;
-                setIsSecuringCashout(false);
                 cashOutEndAtRef.current = 0;
+                setCashOutEndAt(0);
                 rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
-
             }
-
         }, 1000);
 
         timerIntervalRef.current = intervalId;
-
     }, []);
-
-
 
     const canCashOutRef = useRef(false);
     canCashOutRef.current = !isBattleRoyale && gameReady && isConnected
@@ -221,8 +216,10 @@ export default function SlitherGame() {
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
         if (!socketRef.current?.connected) return;
+        if (cashoutActiveRef.current) return;
+        startCashoutCountdown(CASHOUT_SECONDS);
         socketRef.current.emit('cashOut');
-    }, []);
+    }, [startCashoutCountdown]);
 
     const handleHoldProgress = useCallback((progress) => {
         rendererRef.current?.setHud({ holdProgress: progress });
@@ -237,16 +234,14 @@ export default function SlitherGame() {
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
         && localTimer <= 0 && cashedAmount === null && !isDead;
 
-    // Feed balance + cash-out timer to the renderer (hold progress goes via onProgress callback)
     useLayoutEffect(() => {
         rendererRef.current?.setHud({
             balance: currentBalance,
             cashoutSeconds: localTimer,
-            cashoutTotal: cashOutTotalRef.current || 10,
+            cashoutTotal: cashOutTotalRef.current || CASHOUT_SECONDS,
             cashoutEndAt: cashOutEndAtRef.current,
-            securingCashout: isSecuringCashout,
         });
-    }, [currentBalance, localTimer, isSecuringCashout]);
+    }, [currentBalance, localTimer]);
 
     useEffect(() => {
         if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
@@ -367,6 +362,9 @@ export default function SlitherGame() {
             }
             myIdRef.current = playerSettings.id;
             renderer.resetSession();
+            sessionStartAtRef.current = Date.now();
+            setIsRejoining(false);
+            setShowResultModal(false);
             prevKillsRef.current = playerSettings.kills ?? 0;
             if (!gameSizes?.battleRoyale) {
                 const bal = isCompetitive
@@ -455,21 +453,40 @@ export default function SlitherGame() {
 
 
         socket.on('cashOutStarting', ({ seconds }) => {
-
-            startCashoutCountdown(seconds, true);
-
+            const total = seconds ?? CASHOUT_SECONDS;
+            if (!cashoutActiveRef.current) {
+                startCashoutCountdown(total);
+                return;
+            }
+            cashOutTotalRef.current = total;
+            const endAt = Date.now() + total * 1000;
+            cashOutEndAtRef.current = endAt;
+            setCashOutEndAt(endAt);
+            setLocalTimer(total);
+            rendererRef.current?.setHud({
+                cashoutEndAt: endAt,
+                cashoutTotal: total,
+                cashoutSeconds: total,
+            });
         });
 
 
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
-            setIsSecuringCashout(false);
             cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            setLocalTimer(0);
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
-            rendererRef.current?.pause();
             localStorage.removeItem('current_game_mode');
+            const startedAt = sessionStartAtRef.current || Date.now();
+            setSessionStats({
+                timeSurvivedMs: Date.now() - startedAt,
+                eliminations: prevKillsRef.current ?? 0,
+            });
             setCashedAmount(amount);
+            setShowResultModal(true);
+            refreshUser?.();
         });
 
 
@@ -499,8 +516,9 @@ export default function SlitherGame() {
         socket.on('RIP', () => {
             setIsDead(true);
             setLocalTimer(0);
-            setIsSecuringCashout(false);
             cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            cashoutActiveRef.current = false;
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             rendererRef.current?.pause();
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
@@ -524,7 +542,17 @@ export default function SlitherGame() {
 
         socket.on('error', (msg) => {
 
-            if (cashoutActiveRef.current) cashoutActiveRef.current = false;
+            if (cashoutActiveRef.current) {
+                cashoutActiveRef.current = false;
+                cashOutEndAtRef.current = 0;
+                setCashOutEndAt(0);
+                setLocalTimer(0);
+                if (timerIntervalRef.current) {
+                    clearInterval(timerIntervalRef.current);
+                    timerIntervalRef.current = null;
+                }
+                rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
+            }
 
             if (typeof msg === 'string' && (msg.includes('balance') || msg.includes('Account'))) {
 
@@ -630,26 +658,36 @@ export default function SlitherGame() {
 
             <MobileGameSession containerRef={viewportRef} />
 
-            {IS_MOBILE && gameReady && isConnected && !isDead && (
+            {IS_MOBILE && gameReady && isConnected && !isDead && cashedAmount === null && (
                 <SlitherMobileControls onBoostChange={handleBoostChange} />
             )}
 
 
 
-            {!isBattleRoyale && cashedAmount !== null && (
+            {!isBattleRoyale && cashedAmount !== null && showResultModal && (
                 <GameResultModal
                     type="cashout"
                     amount={cashedAmount}
+                    timeSurvivedMs={sessionStats.timeSurvivedMs}
+                    eliminations={sessionStats.eliminations}
+                    walletBalanceUsd={user?.balanceUsd ?? (user?.balanceSol ?? 0) * (user?.solPrice ?? 0)}
+                    walletBalanceSol={user?.balanceSol ?? user?.balance ?? 0}
+                    solPrice={user?.solPrice ?? 0}
+                    isJoining={isRejoining}
                     onPlayAgain={handlePlayAgain}
-                    onLobby={handleLobby}
+                    onHome={handleLobby}
+                    onSpectate={() => setShowResultModal(false)}
+                    onClose={() => setShowResultModal(false)}
                 />
             )}
 
             {!isBattleRoyale && isDead && (
                 <GameResultModal
                     type="death"
+                    isJoining={isRejoining}
                     onPlayAgain={handlePlayAgain}
-                    onLobby={handleLobby}
+                    onHome={handleLobby}
+                    onClose={handleLobby}
                 />
             )}
 
@@ -795,14 +833,15 @@ export default function SlitherGame() {
                 />
             )}
 
-            {!isBattleRoyale && (
+            {!isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={!cashoutReady}
                     holdProgress={holdProgress}
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}
-                    cashOutTotal={cashOutTotalRef.current || 10}
+                    cashOutTotal={cashOutTotalRef.current || CASHOUT_SECONDS}
+                    cashOutEndAt={cashOutEndAt}
                 />
             )}
 
@@ -835,7 +874,7 @@ export default function SlitherGame() {
                 </div>
 
                 <div className="game-logo-sub" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
-                    {isBattleRoyale ? 'Battle Royale' : 'Slither Mode'}
+                    {isBattleRoyale ? 'Battle Royale' : (isCompetitiveMode ? 'Slither Arena' : 'Slither Mode')}
                 </div>
                 {!isBattleRoyale && (
                 <div className="game-logo-reset" style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '4px', fontWeight: '700', letterSpacing: '0.5px' }}>

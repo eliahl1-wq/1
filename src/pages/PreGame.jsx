@@ -22,6 +22,36 @@ const SolLogo = ({ size = 13, style }) => (
     />
 );
 
+function formatLiveTime(iso) {
+    if (!iso) return '';
+    const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (sec < 10) return 'now';
+    if (sec < 60) return `${sec}s`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h`;
+    return `${Math.floor(hr / 24)}d`;
+}
+
+const WalletIcon = ({ size = 14, style }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        style={{ opacity: 0.55, flexShrink: 0, ...style }}
+    >
+        <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+        <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    </svg>
+);
+
 /* ── Currency toggle options ── */
 const CUR_OPTIONS = [
     { label: 'USD', value: 'USD' },
@@ -631,7 +661,9 @@ export default function PreGame() {
                 : canJoin ? 'play-btn play-btn-ready'
                     : 'play-btn play-btn-disabled';
 
-    const modeBaseName = (isBattleRoyaleMode ? brVariant : selectedMode) === 'slither' ? 'Slither' : 'Agar';
+    const modeBaseName = isCompetitiveSlitherMode
+        ? 'Slither Arena'
+        : ((isBattleRoyaleMode ? brVariant : selectedMode) === 'slither' ? 'Slither' : 'Agar');
 
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding match…' : 'Joining…'}</>
@@ -668,16 +700,19 @@ export default function PreGame() {
                                         onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
                                         style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(124, 58, 255, 0.15)' } : {}}
                                     >
+                                        <WalletIcon size={14} />
                                         {isCurSOL ? (
-                                            <SolLogo size={12} />
+                                            <>
+                                                <SolLogo size={12} />
+                                                <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                                                    {fmt(balanceSol)}
+                                                </span>
+                                            </>
                                         ) : (
-                                            <span style={{ opacity: 0.45, fontSize: '0.7rem', fontFamily: 'var(--sans)' }}>USD</span>
+                                            <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                                                ${fmt(balanceUsd)}
+                                            </span>
                                         )}
-                                        <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
-                                            {isCurSOL
-                                                ? `${fmt(balanceSol)} SOL`
-                                                : `$${fmt(balanceUsd)}`}
-                                        </span>
                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
                                             <path d="M6 9l6 6 6-6" />
                                         </svg>
@@ -1147,16 +1182,19 @@ export default function PreGame() {
 
                 <div className="right-panel-stack">
                     <div className="leaderboard-card">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                            <span className="label">Leaderboard</span>
-                        </div>
-                        <div className="tab-bar" style={{ marginBottom: '12px' }}>
-                            {[{ id: 'alltime', label: 'All Time' }, { id: 'live', label: 'LIVE' }].map(tab => (
+                        <div className="tab-bar leaderboard-tab-bar">
+                            {[{ id: 'alltime', label: 'Leaderboard' }, { id: 'live', label: 'LIVE', dot: true }].map(tab => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setLeaderboardTab(tab.id)}
-                                    className={leaderboardTab === tab.id ? 'tab-btn active' : `tab-btn${tab.id === 'live' && liveTabPulse ? ' tab-btn-live-pulse' : ''}`}
+                                    className={[
+                                        'tab-btn',
+                                        leaderboardTab === tab.id ? 'active' : '',
+                                        tab.id === 'live' ? 'tab-btn--live' : '',
+                                        tab.id === 'live' && liveTabPulse ? 'tab-btn-live-pulse' : '',
+                                    ].filter(Boolean).join(' ')}
                                 >
+                                    {tab.dot && <span className="live-dot live-dot--tab" aria-hidden="true" />}
                                     {tab.label}
                                 </button>
                             ))}
@@ -1167,7 +1205,7 @@ export default function PreGame() {
                         ) : (
                             <div
                                 ref={leaderboardListRef}
-                                className="leaderboard-list"
+                                className={`leaderboard-list${leaderboardTab === 'live' ? ' leaderboard-list--live' : ''}`}
                                 onScroll={handleLeaderboardScroll}
                             >
                                 {leaderboardTab === 'alltime' ? (
@@ -1183,13 +1221,30 @@ export default function PreGame() {
                                     ))
                                 ) : (
                                     liveLeaderboardEvents.map((event, i) => (
-                                        <div key={event.id || i} className="leaderboard-entry leaderboard-entry--live">
-                                            <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>
-                                                {event.text}
-                                            </span>
-                                            <span className="mono" style={{ fontSize: '0.7rem', color: event.type === 'cashout' ? 'var(--green)' : 'var(--yellow)', fontWeight: 700 }}>
-                                                {event.type === 'cashout' ? 'cashout' : 'death'}
-                                            </span>
+                                        <div key={event.id || i} className={`live-feed-item live-feed-item--${event.type}`}>
+                                            <div className="live-feed-icon" aria-hidden="true">
+                                                {event.type === 'cashout' ? (
+                                                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                                        <path d="M6 9V3M6 3L3.5 5.5M6 3L8.5 5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                                        <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <div className="live-feed-body">
+                                                <span className="live-feed-name">{event.username}</span>
+                                                <span className="live-feed-action">
+                                                    {event.type === 'cashout' ? 'Cashed out' : 'Died with'}
+                                                </span>
+                                            </div>
+                                            <div className="live-feed-right">
+                                                <span className="live-feed-amount mono">${Number(event.amountUsd || 0).toFixed(2)}</span>
+                                                {event.createdAt && (
+                                                    <span className="live-feed-time">{formatLiveTime(event.createdAt)}</span>
+                                                )}
+                                            </div>
                                         </div>
                                     ))
                                 )}

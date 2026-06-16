@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { isTouchDevice } from '../utils/mobile';
 import { CASHOUT_HOLD_MS } from '../hooks/useHoldKeyCashout';
+import { getCashoutRingProgress } from '../game/cashoutRing';
 
 const IS_MOBILE = isTouchDevice();
 const HOLD_SECONDS = CASHOUT_HOLD_MS / 1000;
@@ -20,8 +21,21 @@ export default function GameCashoutBar({
     onHoldEnd,
     localTimer = 0,
     cashOutTotal = 10,
+    cashOutEndAt = 0,
 }) {
     const isHolding = holdProgress > 0 && holdProgress < 1;
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        if (localTimer <= 0) return undefined;
+        let rafId = 0;
+        const tick = () => {
+            setNow(Date.now());
+            rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafId);
+    }, [localTimer]);
 
     const handleHoldStart = (e) => {
         e.preventDefault();
@@ -35,17 +49,25 @@ export default function GameCashoutBar({
     };
 
     if (localTimer > 0) {
+        const total = cashOutTotal || 10;
+        const progress = cashOutEndAt
+            ? getCashoutRingProgress(cashOutEndAt, total)
+            : localTimer / total;
+        const remainingSec = cashOutEndAt
+            ? Math.max(0, Math.ceil((cashOutEndAt - now) / 1000))
+            : localTimer;
+
         return (
             <div className="game-cashout-wrap">
                 <div className="game-cashout-securing">
                     <div className="game-cashout-securing-head">
                         <span className="game-cashout-securing-label">Securing</span>
-                        <span className="game-cashout-securing-time">{localTimer}s</span>
+                        <span className="game-cashout-securing-time">{remainingSec}s</span>
                     </div>
                     <div className="game-cashout-securing-track">
                         <div
                             className="game-cashout-securing-fill"
-                            style={{ width: `${(localTimer / (cashOutTotal || 10)) * 100}%` }}
+                            style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }}
                         />
                     </div>
                 </div>

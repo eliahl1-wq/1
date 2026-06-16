@@ -112,7 +112,7 @@ export class SlitherRenderer {
         this.targetSnakes = [];
         this.smooth = new Map();
         this._foodDrawList = [];
-        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0, securingCashout: false };
+        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._lastFrameTime = 0;
@@ -369,6 +369,14 @@ export class SlitherRenderer {
 
             for (let i = 0; i < len; i++) {
                 if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+
+                // Body follows the server spine exactly; only the head is smoothed
+                // so growth and turns do not stretch or gap the rendered tube.
+                if (snake.isYou && i > 0) {
+                    s.segments[i].x = tgt[i].x;
+                    s.segments[i].y = tgt[i].y;
+                    continue;
+                }
 
                 const dx = tgt[i].x - s.segments[i].x;
                 const dy = tgt[i].y - s.segments[i].y;
@@ -1017,14 +1025,15 @@ export class SlitherRenderer {
         }
 
         const worldRadius = snake.radius || 6;
-        const overlapMul = isYou ? 0.38 : 0.48;
-        const boostSpaceMul = isYou ? 0.55 : 0.68;
+        const sizeMul = Math.min(1.15, 1 + Math.max(0, worldRadius - 10) * 0.012);
+        const overlapMul = (isYou ? 0.38 : 0.48) * sizeMul;
+        const boostSpaceMul = (isYou ? 0.55 : 0.68) * sizeMul;
         // Bump spacing in WORLD units so it stays constant while zoom animates each frame.
         const bumpStepWorld = Math.max(2.6, worldRadius * (boosting ? boostSpaceMul : overlapMul));
         const q = this._quality;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
         const maxBumps = Math.round(
-            (isYou ? (boosting ? 100 : 82) : (boosting ? 52 : 42)) * qMul,
+            (isYou ? (boosting ? 120 : 100) : (boosting ? 52 : 42)) * qMul * Math.min(1.35, 1 + segs.length / 260),
         );
         // Arc-length resample → evenly spaced, temporally stable bumps (kills body shimmer).
         const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf);

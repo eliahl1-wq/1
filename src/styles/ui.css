@@ -845,6 +845,27 @@
   flex-direction: column;
 }
 
+.leaderboard-tab-bar {
+  margin-bottom: 14px;
+}
+
+.tab-btn--live {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.tab-btn--live.active {
+  color: #14F195;
+}
+
+.live-dot--tab {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+}
+
 .leaderboard-list {
   display: flex;
   flex-direction: column;
@@ -877,6 +898,11 @@
   background: rgba(255, 255, 255, 0.18);
 }
 
+.leaderboard-list--live {
+  gap: 6px;
+  max-height: 132px;
+}
+
 .leaderboard-entry {
   display: flex;
   justify-content: space-between;
@@ -885,8 +911,99 @@
   flex-shrink: 0;
 }
 
-.leaderboard-entry--live {
+.live-feed-item {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.live-feed-item--cashout {
+  border-left: 2px solid rgba(20, 241, 149, 0.55);
+}
+
+.live-feed-item--death {
+  border-left: 2px solid rgba(255, 200, 50, 0.55);
+}
+
+.live-feed-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.live-feed-item--cashout .live-feed-icon {
+  background: rgba(20, 241, 149, 0.1);
+  color: var(--green);
+}
+
+.live-feed-item--death .live-feed-icon {
+  background: rgba(255, 200, 50, 0.1);
+  color: var(--yellow);
+}
+
+.live-feed-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.live-feed-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.live-feed-action {
+  font-size: 0.6rem;
+  color: var(--text-3);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.live-feed-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.live-feed-amount {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.live-feed-item--cashout .live-feed-amount {
+  color: var(--green);
+}
+
+.live-feed-item--death .live-feed-amount {
+  color: var(--yellow);
+}
+
+.live-feed-time {
+  font-size: 0.56rem;
+  color: var(--text-3);
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0.85;
 }
 
 .leaderboard-total {
