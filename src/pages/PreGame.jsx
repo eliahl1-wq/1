@@ -28,14 +28,6 @@ const CUR_OPTIONS = [
     { label: 'SOL', value: 'SOL' },
 ];
 
-const modeToStatsKey = (mode) => {
-    if (mode === 'slither') return 'slither';
-    if (mode === 'competitive-slither' || mode === 'competitiveSlither') return 'competitiveSlither';
-    if (mode === 'br-agar' || mode === 'brAgar') return 'brAgar';
-    if (mode === 'br-slither' || mode === 'brSlither') return 'brSlither';
-    return 'agar';
-};
-
 const getOrCreatePresenceId = () => {
     const key = 'site_presence_id';
     let id = localStorage.getItem(key);
@@ -178,8 +170,8 @@ export default function PreGame() {
     }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, selectedEntryFee]);
 
 
-    const playingCountForMode = liveStats.playersByGamemode?.[modeToStatsKey(selectedMode)] ?? 0;
     const siteUsersOnline = liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0;
+    const globalCashoutTotalUsd = liveStats.totalUserBalanceUsd ?? 0;
 
     // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
@@ -1042,7 +1034,7 @@ export default function PreGame() {
                         Change
                     </button>
 
-                    <div style={{ marginTop: '14px', width: '100%' }}>
+                    <div className="mode-card-stake">
                         <span className="label" style={{ display: 'block', marginBottom: '8px' }}>
                             {isBattleRoyaleMode ? 'Entry fee' : 'Entry stake'}
                         </span>
@@ -1064,7 +1056,10 @@ export default function PreGame() {
                             })}
                         </div>
                         <div className="mode-playing-count">
-                            Playing: <span className="mono">{playingCountForMode}</span>
+                            <span className="live-dot" aria-hidden="true" />
+                            <span>
+                                Playing: <span className="mono">{siteUsersOnline}</span>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -1147,12 +1142,6 @@ export default function PreGame() {
 
                 <div className="right-panel-stack">
                     <div className="leaderboard-card">
-                        <div className="leaderboard-online">
-                            <span className="live-dot" aria-hidden="true" />
-                            <span className="leaderboard-online-label">
-                                {siteUsersOnline} online
-                            </span>
-                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                             <span className="label">Leaderboard</span>
                         </div>
@@ -1201,12 +1190,14 @@ export default function PreGame() {
                                 )}
                             </div>
                         )}
-                        <div className="divider" style={{ margin: '10px 0 8px' }} />
-                        <div className="leaderboard-total">
-                            <span className="leaderboard-total-label">Global earnings</span>
-                            <span className="mono leaderboard-total-value">
-                                ${Math.round(Number(liveStats?.totalUserBalanceUsd || 0))}
-                            </span>
+                        <div className="leaderboard-footer">
+                            <div className="divider" style={{ margin: '10px 0 8px' }} />
+                            <div className="leaderboard-total">
+                                <span className="leaderboard-total-label">Global earnings</span>
+                                <span className="mono leaderboard-total-value">
+                                    ${Math.round(Number(globalCashoutTotalUsd))}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>

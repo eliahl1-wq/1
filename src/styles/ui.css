@@ -319,7 +319,7 @@
   display: grid;
   grid-template-columns: 250px minmax(320px, 420px) 250px;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
   justify-content: center;
   justify-items: center;
   margin: 18px auto 0;
@@ -332,13 +332,21 @@
   padding: 24px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 12px;
   min-height: 140px;
+  height: 100%;
   width: 100%;
   max-width: 250px;
   text-align: center;
+  box-sizing: border-box;
+}
+
+.mode-card-stake {
+  margin-top: auto;
+  width: 100%;
+  padding-top: 14px;
 }
 .mode-card-label {
   font-family: var(--ui);
@@ -432,35 +440,21 @@
 
 .mode-playing-count {
   margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--text-h);
+  color: #fff;
   text-align: center;
   letter-spacing: -0.2px;
 }
 
 .mode-playing-count .mono {
-  color: var(--green);
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-.leaderboard-online {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.leaderboard-online-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--text-2);
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
+  color: #fff;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .leaderboard-tab {
@@ -714,11 +708,14 @@
   position: relative;
   z-index: 10;
   animation: fadeUp 0.3s ease-out;
+  box-sizing: border-box;
 }
 .game-card.main-card {
   width: 100%;
   max-width: 420px;
+  height: 100%;
   justify-self: center;
+  box-sizing: border-box;
 }
 
 /* ─── Nickname input ─── */
@@ -830,17 +827,22 @@
   flex-direction: column;
   gap: 20px;
   width: 100%;
+  height: 100%;
 }
 
 .leaderboard-card {
   width: 100%;
   max-width: 250px;
+  height: 100%;
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--r-2xl);
   padding: 24px;
   box-shadow: var(--shadow-xl);
   font-family: var(--ui);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .leaderboard-list {
@@ -893,6 +895,10 @@
   align-items: center;
   gap: 2px;
   text-align: center;
+}
+
+.leaderboard-footer {
+  margin-top: auto;
 }
 
 .leaderboard-total-label {
