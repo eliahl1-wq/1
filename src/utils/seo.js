@@ -52,8 +52,8 @@ export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
 
 export const SEO = {
     home: {
-        tabTitle: 'AgarStake | Agar & Slither',
-        description: 'AgarStake — competitive Agar.io and Slither.io with Solana stakes. Deposit SOL, outplay rivals, and cash out instantly.',
+        tabTitle: 'AgarStake | Competitive PvP Games with Real Cash & Crypto Wagers',
+        description: 'Earn money playing Agar and Slither on AgarStake. Deposit Solana, compete against real players, dominate the map, and cash out crypto instantly.',
         keywords: BASE_KEYWORDS,
         path: '/',
     },
