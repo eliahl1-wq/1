@@ -98,7 +98,14 @@ function shadeColor({ r, g, b }, amount) {
 export class SlitherRenderer {
     constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+        // Opaque canvas — background is fully painted every frame, so skipping the
+        // alpha channel makes page compositing cheaper with no visual change.
+        this.ctx = canvas.getContext('2d', { alpha: false });
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
+        // Body sprites are authored at this supersample factor and blitted down,
+        // which gives crisp, well-antialiased snake edges instead of upscaled-blurry ones.
+        this._bodySS = 2;
         this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null, minimap: [] };
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
@@ -685,9 +692,16 @@ export class SlitherRenderer {
         }
     }
 
-    _blitSprite(ctx, sprite, x, y) {
-        const half = sprite.width >> 1;
-        ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0);
+    _blitSprite(ctx, sprite, x, y, scale = 1) {
+        if (scale === 1) {
+            const half = sprite.width >> 1;
+            ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0);
+            return;
+        }
+        // Supersampled sprite — draw at its intended display size (downscale = crisp AA edges).
+        const dw = sprite.width / scale;
+        const dh = sprite.height / scale;
+        ctx.drawImage(sprite, x - dw / 2, y - dh / 2, dw, dh);
     }
 
     /** Tangent angle at bump index (radians, toward head). */
@@ -790,16 +804,22 @@ export class SlitherRenderer {
         let pair = this._prImgs.get(key);
         if (pair) return pair;
 
-        const normal = this._getSprite(`pr_norm_v20|${key}|0`, rPx * 2 + 4, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1);
+        // Supersample the visible body sprites for smooth edges, but scale the factor
+        // down for very large radii so sprite memory stays bounded.
+        const bodySS = rPx <= 44 ? this._bodySS : rPx <= 84 ? 1.5 : 1.25;
+        const ssR = rPx * bodySS;
+        const ssSize = ssR * 2 + 4;
+
+        const normal = this._getSprite(`pr_norm_v21|${key}|0`, ssSize, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
         });
 
-        const alt = this._getSprite(`pr_norm_v20|${key}|1`, rPx * 2 + 4, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, rPx, cs, 1, 1);
+        const alt = this._getSprite(`pr_norm_v21|${key}|1`, ssSize, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
         });
 
-        const boostBody = this._getSprite(`pr_norm_v20|${key}|boost`, rPx * 2 + 4, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, rPx, cs, 0, 1.25);
+        const boostBody = this._getSprite(`pr_norm_v21|${key}|boost`, ssSize, (g, sz) => {
+            this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
         });
 
         const glowPad = Math.ceil(rPx * 0.45);
@@ -837,7 +857,7 @@ export class SlitherRenderer {
             g.fill();
         });
 
-        pair = { normal, alt, boostBody, glow, boostOverlay, trailGlow };
+        pair = { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS };
         this._prImgs.set(key, pair);
         return pair;
     }
@@ -930,7 +950,7 @@ export class SlitherRenderer {
         } else {
             snake._lastSpriteR = rawR;
         }
-        const { normal, alt, boostBody, glow, boostOverlay, trailGlow } = this._getSnakePrImgs(cs, r);
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakePrImgs(cs, r);
         const halfT = trailGlow.width / 2;
         const halfB = boostOverlay.width / 2;
         const bumpCount = bumps.length;
@@ -968,15 +988,19 @@ export class SlitherRenderer {
 
             const isHead = i === 0;
             const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
-            this._blitSprite(ctx, sprite, p.x, p.y);
+            this._blitSprite(ctx, sprite, p.x, p.y, bodySS);
         }
 
-        // Ambient glow — local snake only (doubles draw calls otherwise)
+        // Ambient glow — local snake only (doubles draw calls otherwise). The glow
+        // sprite is large and additive, so stride the loop: overlapping bumps make
+        // the gaps invisible while roughly halving this pass's fillrate.
         if (isYou && q >= 0.5) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = boosting ? 0.15 * pulse : 0.08;
-            for (let i = bumpCount - 1; i >= 0; i--) {
+            // Alpha bumped to roughly compensate for the strided (sparser) additive blits.
+            ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
+            const glowStride = boosting ? 2 : 3;
+            for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 this._blitSprite(ctx, glow, p.x, p.y);
@@ -984,17 +1008,17 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // Boost overlay (local snake only)
+        // Boost overlay (local snake only) — strided for the same reason as the glow.
         if (isYou && boosting && q >= 0.55) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            for (let i = bumpCount - 1; i >= 0; i--) {
+            for (let i = bumpCount - 1; i >= 0; i -= 2) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
                 const headProx = 1 - along;
 
-                ctx.globalAlpha = (0.15 + headProx * 0.15) * pulse;
+                ctx.globalAlpha = (0.22 + headProx * 0.22) * pulse;
                 this._blitSprite(ctx, boostOverlay, p.x, p.y);
             }
             ctx.restore();

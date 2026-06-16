@@ -90,6 +90,8 @@ export default function SlitherGame() {
 
     const lastBrHudAtRef = useRef(0);
 
+    const lastBalanceUiAtRef = useRef(0);
+
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
     const handleBoostChange = useCallback((active) => {
@@ -343,7 +345,14 @@ export default function SlitherGame() {
                     playFoodEatSound();
                 }
                 prevBalanceRef.current = tick.balance;
-                setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
+                // The live balance is already drawn on the snake-head badge by the renderer,
+                // so the top-left panel only needs ~8Hz updates. Throttling this avoids
+                // re-rendering the whole (blur-heavy) overlay tree on every server tick.
+                const nowB = Date.now();
+                if (nowB - lastBalanceUiAtRef.current >= 120) {
+                    lastBalanceUiAtRef.current = nowB;
+                    setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
+                }
             }
             if (tick.battleRoyale) {
                 const now = Date.now();

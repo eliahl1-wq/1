@@ -1199,44 +1199,40 @@ export default function PreGame() {
                             ))}
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>No data yet</div>
-                            ) : (
-                                <div style={{ maxHeight: '124px', overflowY: 'auto', paddingRight: '4px' }}>
-                                    {leaderboardTab === 'alltime' ? (
-                                        leaderboardData.alltime.map((entry, i) => (
-                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', marginBottom: i === leaderboardData.alltime.length - 1 ? 0 : '10px' }}>
-                                                <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
-                                                    {i + 1}. {entry.username}
-                                                </span>
-                                                <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
-                                                    ${Number(entry.amount || entry.balance || 0).toFixed(2)}
-                                                </span>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        liveLeaderboardEvents.map((event, i) => (
-                                            <div key={event.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '0.72rem', marginBottom: i === liveLeaderboardEvents.length - 1 ? 0 : '10px' }}>
-                                                <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>
-                                                    {event.text}
-                                                </span>
-                                                <span className="mono" style={{ fontSize: '0.7rem', color: event.type === 'cashout' ? 'var(--green)' : 'var(--yellow)', fontWeight: 700 }}>
-                                                    {event.type === 'cashout' ? 'cashout' : 'death'}
-                                                </span>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <div className="divider" style={{ margin: '12px 0 10px' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-2)', fontWeight: 600 }}>
-                                Global Player Earnings
-                            </span>
-                            <span className="mono" style={{ fontSize: '0.9rem', color: 'var(--green)', fontWeight: 800 }}>
-                                {formatUsd(liveStats?.totalUserBalanceUsd || 0)}
+                        {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>No data yet</div>
+                        ) : (
+                            <div className="leaderboard-list">
+                                {leaderboardTab === 'alltime' ? (
+                                    leaderboardData.alltime.map((entry, i) => (
+                                        <div key={i} className="leaderboard-entry">
+                                            <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
+                                                {i + 1}. {entry.username}
+                                            </span>
+                                            <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
+                                                ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    liveLeaderboardEvents.map((event, i) => (
+                                        <div key={event.id || i} className="leaderboard-entry leaderboard-entry--live">
+                                            <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>
+                                                {event.text}
+                                            </span>
+                                            <span className="mono" style={{ fontSize: '0.7rem', color: event.type === 'cashout' ? 'var(--green)' : 'var(--yellow)', fontWeight: 700 }}>
+                                                {event.type === 'cashout' ? 'cashout' : 'death'}
+                                            </span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                        <div className="divider" style={{ margin: '10px 0 8px' }} />
+                        <div className="leaderboard-total">
+                            <span className="leaderboard-total-label">Global earnings</span>
+                            <span className="mono leaderboard-total-value">
+                                ${Math.round(Number(liveStats?.totalUserBalanceUsd || 0))}
                             </span>
                         </div>
                     </div>
