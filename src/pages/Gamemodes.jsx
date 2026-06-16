@@ -101,7 +101,6 @@ export default function Gamemodes() {
                                 title="Agar Normal"
                                 desc="The classic high-stakes Agar experience. Grow, absorb, dominate. Choose $5, $10, or $20 entry in the lobby."
                                 playing={playersByGamemode.agar}
-                                badge={null}
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                             />
                             <ModeCard
@@ -109,8 +108,6 @@ export default function Gamemodes() {
                                 title="Agar Battle Royale"
                                 desc="5–10 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brAgar}
-                                badge="NEW"
-                                badgeAccent
                                 onPlay={() => {
                                     localStorage.setItem('selected_gamemode', 'br-agar');
                                     navigate('/pre-game', { state: { selectedMode: 'br-agar' } });
@@ -124,7 +121,6 @@ export default function Gamemodes() {
                                 title="Slither Normal"
                                 desc="Classic high-stakes snake arena. Outmaneuver enemies, grow longer. $5 / $10 / $20 entry."
                                 playing={playersByGamemode.slither}
-                                badge={null}
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                             />
                             <ModeCard
@@ -132,8 +128,6 @@ export default function Gamemodes() {
                                 title="Slither Arena"
                                 desc="$5 entry — real players only. Circular arena, shrinking zone before reset. Cash out your dollar balance anytime."
                                 playing={playersByGamemode.competitiveSlither}
-                                badge="NEW"
-                                badgeAccent
                                 onPlay={() => {
                                     localStorage.setItem('selected_gamemode', 'competitive-slither');
                                     localStorage.setItem('selected_entry_fee', '5');
@@ -145,8 +139,6 @@ export default function Gamemodes() {
                                 title="Slither Battle Royale"
                                 desc="5–10 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brSlither}
-                                badge="NEW"
-                                badgeAccent
                                 onPlay={() => {
                                     localStorage.setItem('selected_gamemode', 'br-slither');
                                     navigate('/pre-game', { state: { selectedMode: 'br-slither' } });
@@ -160,34 +152,24 @@ export default function Gamemodes() {
     );
 }
 
-function ModeCard({ mode, title, desc, playing, badge, badgeAccent, onPlay }) {
+function ModeCard({ mode, title, desc, playing, onPlay }) {
     const isDisabled = !onPlay;
-    const badgeStyle = badgeAccent
-        ? { color: '#14F195', borderColor: 'rgba(20,241,149,0.3)', background: 'rgba(20,241,149,0.08)' }
-        : undefined;
 
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
             <div className="gm-card-layout">
-                <div className="gm-card-main">
-                    <div className="gm-card-title-row">
-                        <div className="gm-card-title">{title}</div>
-                        {badge && <span className="gm-badge" style={badgeStyle}>{badge}</span>}
-                    </div>
-                    <div className="gm-card-desc">{desc}</div>
-                    <div className="gm-card-footer">
-                        {playing != null && (
-                            <div className="gm-card-playing">{playing} playing</div>
-                        )}
-                        {!isDisabled && (
-                            <button className="gm-play-btn" onClick={onPlay}>Select</button>
-                        )}
-                    </div>
-                </div>
+                <div className="gm-card-title">{title}</div>
+                <div className="gm-card-desc">{desc}</div>
+                {playing != null && (
+                    <div className="gm-card-playing">{playing} playing</div>
+                )}
                 {mode && (
                     <div className="gm-card-preview-wrap">
                         <GamemodePreview mode={mode} className="gm-card-preview" />
                     </div>
+                )}
+                {!isDisabled && (
+                    <button className="gm-play-btn" onClick={onPlay}>Select</button>
                 )}
             </div>
         </div>
