@@ -179,13 +179,15 @@ function ModeCard({ mode, title, desc, playing, badge, badgeAccent, onPlay }) {
                         <div className="gm-card-playing">{playing} playing</div>
                     )}
                 </div>
-                <div className="gm-card-aside">
-                    {mode && <GamemodePreview mode={mode} className="gm-card-preview" />}
-                    {!isDisabled && (
-                        <button className="gm-play-btn" onClick={onPlay}>Select</button>
-                    )}
-                </div>
+                {mode && (
+                    <div className="gm-card-preview-wrap">
+                        <GamemodePreview mode={mode} className="gm-card-preview" />
+                    </div>
+                )}
             </div>
+            {!isDisabled && (
+                <button className="gm-play-btn gm-card-select" onClick={onPlay}>Select</button>
+            )}
         </div>
     );
 }
