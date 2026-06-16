@@ -1570,13 +1570,35 @@
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--r-2xl);
-  padding: 28px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-lg);
+}
+
+.gm-card-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.gm-card-inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 20px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow-lg);
+  padding: 20px 28px 28px;
+}
+
+.gm-card-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .gm-card--active {
@@ -2193,9 +2215,13 @@
   }
 
   .gm-card {
+    padding: 0;
+  }
+
+  .gm-card-inner {
     flex-direction: column;
     align-items: stretch;
-    padding: 20px;
+    padding: 16px 20px 20px;
   }
 
   .gm-card-desc {
@@ -2311,6 +2337,11 @@
   }
 
   .gm-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gm-card-inner {
     flex-direction: row;
     align-items: center;
   }

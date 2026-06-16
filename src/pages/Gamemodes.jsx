@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import GamemodePreview from '../components/GamemodePreview';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
 
@@ -96,6 +97,7 @@ export default function Gamemodes() {
                     {isAgarTab ? (
                         <>
                             <ModeCard
+                                mode="agar"
                                 title="Agar Normal"
                                 desc="The classic high-stakes Agar experience. Grow, absorb, dominate. Choose $5, $10, or $20 entry in the lobby."
                                 playing={playersByGamemode.agar}
@@ -103,6 +105,7 @@ export default function Gamemodes() {
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                             />
                             <ModeCard
+                                mode="br-agar"
                                 title="Agar Battle Royale"
                                 desc="5–10 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brAgar}
@@ -117,6 +120,7 @@ export default function Gamemodes() {
                     ) : (
                         <>
                             <ModeCard
+                                mode="slither"
                                 title="Slither Normal"
                                 desc="Classic high-stakes snake arena. Outmaneuver enemies, grow longer. $5 / $10 / $20 entry."
                                 playing={playersByGamemode.slither}
@@ -124,6 +128,7 @@ export default function Gamemodes() {
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                             />
                             <ModeCard
+                                mode="competitive-slither"
                                 title="Slither Arena"
                                 desc="$5 entry — real players only. Circular arena, shrinking zone before reset. Cash out your dollar balance anytime."
                                 playing={playersByGamemode.competitiveSlither}
@@ -136,6 +141,7 @@ export default function Gamemodes() {
                                 }}
                             />
                             <ModeCard
+                                mode="br-slither"
                                 title="Slither Battle Royale"
                                 desc="5–10 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
                                 playing={playersByGamemode.brSlither}
@@ -154,26 +160,29 @@ export default function Gamemodes() {
     );
 }
 
-function ModeCard({ title, desc, playing, badge, badgeAccent, onPlay }) {
+function ModeCard({ mode, title, desc, playing, badge, badgeAccent, onPlay }) {
     const isDisabled = !onPlay;
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
-            <div>
-                <div className="gm-card-title">{title}</div>
-                <div className="gm-card-desc">{desc}</div>
-                {playing != null && (
-                    <div className="gm-card-playing">{playing} playing</div>
-                )}
+            {mode && <GamemodePreview mode={mode} className="gm-card-preview" />}
+            <div className="gm-card-inner">
+                <div className="gm-card-main">
+                    <div className="gm-card-title">{title}</div>
+                    <div className="gm-card-desc">{desc}</div>
+                    {playing != null && (
+                        <div className="gm-card-playing">{playing} playing</div>
+                    )}
+                </div>
+                {isDisabled
+                    ? <span className="gm-badge">{badge}</span>
+                    : badge
+                        ? <div className="gm-card-actions">
+                            <span className="gm-badge" style={badgeAccent ? { color: '#14F195', borderColor: 'rgba(20,241,149,0.3)', background: 'rgba(20,241,149,0.08)' } : undefined}>{badge}</span>
+                            <button className="gm-play-btn" onClick={onPlay}>Select</button>
+                          </div>
+                        : <button className="gm-play-btn" onClick={onPlay}>Select</button>
+                }
             </div>
-            {isDisabled
-                ? <span className="gm-badge">{badge}</span>
-                : badge
-                    ? <div className="gm-card-actions">
-                        <span className="gm-badge" style={badgeAccent ? { color: '#14F195', borderColor: 'rgba(20,241,149,0.3)', background: 'rgba(20,241,149,0.08)' } : undefined}>{badge}</span>
-                        <button className="gm-play-btn" onClick={onPlay}>Select</button>
-                      </div>
-                    : <button className="gm-play-btn" onClick={onPlay}>Select</button>
-            }
         </div>
     );
 }
