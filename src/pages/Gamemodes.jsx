@@ -157,9 +157,9 @@ function ModeCard({ mode, title, desc, playing, onPlay }) {
 
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
-            <div className="gm-card-title" title={title}>{title}</div>
             <div className="gm-card-body">
                 <div className="gm-card-left">
+                    <div className="gm-card-title" title={title}>{title}</div>
                     <div className="gm-card-desc">{desc}</div>
                     {playing != null && (
                         <div className="gm-card-playing">{playing} playing</div>
