@@ -14,7 +14,7 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { playFoodEatSound, playKillSound, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
+import { playFoodEatSound, playGoldenFoodSound, playKillSound, isGoldenPickupDelta, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -341,8 +341,12 @@ export default function SlitherGame() {
 
             if (!tick.battleRoyale && tick.balance != null) {
                 const prev = prevBalanceRef.current;
-                if (prev != null && tick.balance > prev + 0.001) {
-                    playFoodEatSound();
+                if (prev != null) {
+                    const delta = tick.balance - prev;
+                    if (delta > 0.001) {
+                        if (isGoldenPickupDelta(delta)) playGoldenFoodSound();
+                        else playFoodEatSound();
+                    }
                 }
                 prevBalanceRef.current = tick.balance;
                 // The live balance is already drawn on the snake-head badge by the renderer,
