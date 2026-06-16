@@ -630,11 +630,30 @@ export class SlitherRenderer {
         const simpleFood = this._quality < 0.45;
         const foodStride = this._quality < 0.38 ? 2 : 1;
 
+        // Magnet: food within this world radius of the mouth drifts toward it.
+        const mouthValid = this._mouthValid;
+        const mouthX = this._mouthX;
+        const mouthY = this._mouthY;
+        const attractR = ((this._mouthR || 6) * 3) + 46;
+        const attractR2 = attractR * attractR;
+        const maxPull = attractR * 0.32;
+
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
             if (Math.abs(f.x - cx) > halfW || Math.abs(f.y - cy) > halfH) continue;
 
-            let { x: fx, y: fy } = toScreen(f.x, f.y);
+            // Per-food random phase so pulse/jiggle isn't synchronized across the field.
+            if (f._phase == null) {
+                let h = 0;
+                const id = String(f.id ?? `${f.x},${f.y}`);
+                for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+                f._phase = (Math.abs(h) % 1000) / 1000 * Math.PI * 2;
+                f._sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
+            }
+
+            // Live world position with a tiny wobble + magnet pull toward the mouth.
+            let wx = f.x;
+            let wy = f.y;
 
             const isGolden = !!f.golden;
             const hue = isGolden ? 48 : Math.round((f.hue ?? 120) / 12) * 12;
@@ -645,20 +664,37 @@ export class SlitherRenderer {
             if (isGolden) {
                 const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
                 sizeMul = 0.85 + pulse;
-                fx += Math.sin(now * 0.003 + f.y) * 6 * zoom;
-                fy += Math.cos(now * 0.0035 + f.x) * 6 * zoom;
+                wx += Math.sin(now * 0.003 + f.y) * 6;
+                wy += Math.cos(now * 0.0035 + f.x) * 6;
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
+                // Soft breathing pulse + gentle drift.
+                sizeMul *= 1 + Math.sin(now * 0.0035 + f._phase) * 0.07;
+                wx += Math.sin(now * 0.0022 + f._phase) * 1.4;
+                wy += Math.cos(now * 0.0026 + f._phase * 1.3) * 1.4;
             } else {
-                if (f._sizeMul == null) {
-                    let h = 0;
-                    const id = String(f.id ?? `${f.x},${f.y}`);
-                    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-                    f._sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
-                }
-                sizeMul = f._sizeMul;
+                // Pellets gently pulse and jiggle so they feel alive, not static.
+                sizeMul = f._sizeMul * (1 + Math.sin(now * 0.004 + f._phase) * 0.09);
+                wx += Math.sin(now * 0.0024 + f._phase) * 1.5;
+                wy += Math.cos(now * 0.0028 + f._phase * 1.3) * 1.5;
             }
+
+            // Magnet attraction — pull toward the mouth, easing in as it gets closer.
+            if (mouthValid && !f.deathDrop) {
+                const dxm = mouthX - wx;
+                const dym = mouthY - wy;
+                const dist2 = dxm * dxm + dym * dym;
+                if (dist2 < attractR2 && dist2 > 0.01) {
+                    const dist = Math.sqrt(dist2);
+                    const t = 1 - dist / attractR;
+                    const pull = Math.min(t * t * maxPull, dist);
+                    wx += (dxm / dist) * pull;
+                    wy += (dym / dist) * pull;
+                }
+            }
+
+            let { x: fx, y: fy } = toScreen(wx, wy);
 
             const baseR = (f.radius || 3) * sizeMul;
             const screenR = Math.max(4.5, baseR * zoom * 1.65);
@@ -1228,6 +1264,21 @@ export class SlitherRenderer {
         const cx = this.camera.x;
         const cy = this.camera.y;
         const zoom = this.zoom;
+
+        // Player "mouth" point — slightly ahead of the head along the heading.
+        // Food drifts toward this like a magnet when it gets close (see _drawFood).
+        if (me?.segments?.[0]) {
+            const h = me.segments[0];
+            const a = me.angle || 0;
+            const fwd = (me.radius || 6) * 0.8;
+            this._mouthX = h.x + Math.cos(a) * fwd;
+            this._mouthY = h.y + Math.sin(a) * fwd;
+            this._mouthR = me.radius || 6;
+            this._mouthValid = true;
+        } else {
+            this._mouthValid = false;
+        }
+
         const scratch = this._screenScratch;
         const toScreen = (wx, wy) => {
             scratch.x = (wx - cx) * zoom + W / 2;

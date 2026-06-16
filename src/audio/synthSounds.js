@@ -124,7 +124,12 @@ function addSoftSparkle(ctx, bus, { start, duration, freq, level }) {
     osc.stop(t + duration + 0.02);
 }
 
-/** Shared food — bright kling with harmonic body, rises on streaks. */
+/**
+ * Shared food — plop + kling hybrid.
+ * A short rounded "bloop" body (downward sine glide + wet attack transient)
+ * fused with a bright bell-like kling tail that rings out a touch longer.
+ * Pitch rises on rapid streaks for a satisfying climb.
+ */
 export function playFoodEatSound() {
     if (shouldThrottleFood()) return;
     unlockGameAudio();
@@ -132,17 +137,52 @@ export function playFoodEatSound() {
     const ctx = getCtx();
     if (!ctx || ctx.state !== 'running') return;
 
+    const t = ctx.currentTime;
     const streak = nextFoodStreak();
-    const duration = 0.068;
-    const lift = streak * 24;
-    const base = 392 + lift + (Math.random() - 0.5) * 14;
-    const gain = 0.042 + Math.min(streak, 8) * 0.0025;
-    const bus = createBus(ctx, gain, duration, 0.0015);
+    const lift = streak * 26;
+    const base = 430 + lift + (Math.random() - 0.5) * 16;
+    const gain = 0.044 + Math.min(streak, 8) * 0.0025;
 
-    addChimePartial(ctx, bus, { duration, freq: base, freqEnd: base * 0.86, level: 0.5, detune: -4 });
-    addChimePartial(ctx, bus, { duration, freq: base, freqEnd: base * 0.88, level: 0.5, detune: 5 });
-    addChimePartial(ctx, bus, { start: 0.002, duration: duration * 0.95, freq: base * 2.01, freqEnd: base * 1.82, level: 0.38, detune: 0 });
-    addSoftSparkle(ctx, bus, { start: 0.004, duration: duration * 0.55, freq: base * 3.04, level: 0.12 });
+    // Overall envelope: quick wet attack, gentle kling release.
+    const klingDur = 0.13;
+    const bus = createBus(ctx, gain, klingDur, 0.0015);
+
+    // --- PLOP BODY: short sine sweeping down (the rounded "bloop") ---
+    const plopDur = 0.055;
+    const plop = ctx.createOscillator();
+    const plopG = ctx.createGain();
+    plop.type = 'sine';
+    plop.frequency.setValueAtTime(base * 1.7, t);
+    plop.frequency.exponentialRampToValueAtTime(Math.max(base * 0.7, 40), t + plopDur * 0.9);
+    plopG.gain.setValueAtTime(0.0001, t);
+    plopG.gain.linearRampToValueAtTime(0.6, t + 0.004);
+    plopG.gain.exponentialRampToValueAtTime(0.0001, t + plopDur);
+    plop.connect(plopG);
+    plopG.connect(bus);
+    plop.start(t);
+    plop.stop(t + plopDur + 0.02);
+
+    // --- WET ATTACK: tiny filtered noise blip for the "p" of plop ---
+    const blip = ctx.createBufferSource();
+    blip.buffer = getNoiseBuffer(ctx, 0.014);
+    const blipBp = ctx.createBiquadFilter();
+    blipBp.type = 'bandpass';
+    blipBp.frequency.value = base * 1.6;
+    blipBp.Q.value = 0.8;
+    const blipG = ctx.createGain();
+    blipG.gain.setValueAtTime(0.18, t);
+    blipG.gain.exponentialRampToValueAtTime(0.0001, t + 0.016);
+    blip.connect(blipBp);
+    blipBp.connect(blipG);
+    blipG.connect(bus);
+    blip.start(t);
+    blip.stop(t + 0.018);
+
+    // --- KLING TAIL: detuned bell partials that ring slightly longer ---
+    addChimePartial(ctx, bus, { start: 0.002, duration: klingDur, freq: base * 2.0, freqEnd: base * 1.9, level: 0.42, detune: -5 });
+    addChimePartial(ctx, bus, { start: 0.002, duration: klingDur, freq: base * 2.0, freqEnd: base * 1.92, level: 0.42, detune: 6 });
+    addChimePartial(ctx, bus, { start: 0.004, duration: klingDur * 0.85, freq: base * 3.01, freqEnd: base * 2.86, level: 0.22, detune: 0 });
+    addSoftSparkle(ctx, bus, { start: 0.005, duration: klingDur * 0.5, freq: base * 4.02, level: 0.1 });
 }
 
 /** Golden blob — excited di-ding double kling (+ soft third sparkle). */
@@ -251,27 +291,29 @@ function playCounterTick(progress = 0) {
     const ctx = getCtx();
     if (!ctx || ctx.state !== 'running') return;
 
-    const duration = 0.024;
-    const base = 548 + progress * 110 + (Math.random() - 0.5) * 18;
-    const gain = 0.036;
+    const duration = 0.026;
+    // Bright, cash-register climb: starts mid-high and rises a full octave+
+    // across the count-up so the money pile-up feels increasingly valuable.
+    const base = 760 + progress * progress * 620 + progress * 240 + (Math.random() - 0.5) * 22;
+    const gain = 0.034;
     const bus = createBus(ctx, gain, duration, 0.001);
 
-    addChimePartial(ctx, bus, { duration, freq: base, freqEnd: base * 0.92, level: 0.62, detune: -3 });
-    addChimePartial(ctx, bus, { start: 0.002, duration: duration * 0.9, freq: base * 1.98, freqEnd: base * 1.86, level: 0.34, detune: 4 });
+    addChimePartial(ctx, bus, { duration, freq: base, freqEnd: base * 0.94, level: 0.6, detune: -3 });
+    addChimePartial(ctx, bus, { start: 0.001, duration: duration * 0.92, freq: base * 2.0, freqEnd: base * 1.9, level: 0.4, detune: 5 });
+    addSoftSparkle(ctx, bus, { start: 0.002, duration: duration * 0.7, freq: base * 3.0, level: 0.16 });
 
     const click = ctx.createBufferSource();
-    click.buffer = getNoiseBuffer(ctx, 0.01);
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = base * 1.35;
-    bp.Q.value = 1.8;
+    click.buffer = getNoiseBuffer(ctx, 0.009);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = base * 1.6;
     const clickG = ctx.createGain();
-    clickG.gain.value = 0.1;
-    click.connect(bp);
-    bp.connect(clickG);
+    clickG.gain.value = 0.08;
+    click.connect(hp);
+    hp.connect(clickG);
     clickG.connect(bus);
     click.start(ctx.currentTime);
-    click.stop(ctx.currentTime + 0.012);
+    click.stop(ctx.currentTime + 0.011);
 }
 
 export function stopCashoutCountUpSound() {
