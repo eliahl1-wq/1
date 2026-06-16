@@ -178,10 +178,6 @@ export default function Game() {
         onComplete: handleCashOut,
     });
 
-    const cashoutButtonProps = {
-        onClick: (e) => { e.preventDefault(); if (canCashOutRef.current) handleCashOut(); },
-    };
-
     useLayoutEffect(() => {
         global.holdCashoutProgress = holdProgress;
     }, [holdProgress]);
@@ -870,8 +866,10 @@ export default function Game() {
 
             {!isBattleRoyale && (
                 <GameCashoutBar
-                    {...cashoutButtonProps}
                     disabled={localTimer > 0 || isDead || cashedAmount !== null}
+                    holdProgress={holdProgress}
+                    onHoldStart={startHold}
+                    onHoldEnd={cancelHold}
                     localTimer={localTimer}
                     cashOutTotal={global.cashOutTotal || 10}
                 />

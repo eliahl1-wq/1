@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export const CASHOUT_HOLD_MS = 750;
+export const CASHOUT_HOLD_MS = 1000;
 
 /**
  * Hold Q (or press-and-hold the cashout button) before starting the cashout timer.
@@ -21,7 +21,7 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress }) {
     const pushProgress = useCallback((progress) => {
         onProgressRef.current?.(progress);
         const now = Date.now();
-        if (progress === 0 || now - lastUiUpdateRef.current >= 100) {
+        if (progress === 0 || progress >= 1 || now - lastUiUpdateRef.current >= 32) {
             lastUiUpdateRef.current = now;
             setHoldProgress(progress);
         }

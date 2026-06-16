@@ -225,10 +225,6 @@ export default function SlitherGame() {
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
         && localTimer <= 0 && cashedAmount === null && !isDead;
 
-    const cashoutButtonProps = {
-        onClick: (e) => { e.preventDefault(); if (cashoutReady) handleCashOut(); },
-    };
-
     // Feed balance + cash-out timer to the renderer (hold progress goes via onProgress callback)
     useLayoutEffect(() => {
         rendererRef.current?.setHud({
@@ -798,8 +794,10 @@ export default function SlitherGame() {
 
             {!isBattleRoyale && (
                 <GameCashoutBar
-                    {...cashoutButtonProps}
                     disabled={!cashoutReady}
+                    holdProgress={holdProgress}
+                    onHoldStart={startHold}
+                    onHoldEnd={cancelHold}
                     localTimer={localTimer}
                     cashOutTotal={cashOutTotalRef.current || 10}
                 />

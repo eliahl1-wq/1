@@ -51,8 +51,7 @@
     font-size: 0.75rem !important;
 }
 
-.game-viewport--mobile .game-cashout-hint,
-.game-viewport--mobile .game-cashout-sep {
+.game-viewport--mobile .game-cashout-hint {
     display: none;
 }
 
@@ -84,13 +83,19 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 110;
+    pointer-events: none;
+}
+
+.game-cashout-stack {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: 8px;
     pointer-events: none;
 }
 
 .game-cashout-btn {
+    position: relative;
     pointer-events: auto;
     padding: 10px 22px !important;
     font-size: 0.82rem !important;
@@ -100,6 +105,63 @@
     border-radius: var(--r-md) !important;
     gap: 8px;
     white-space: nowrap;
+    overflow: hidden;
+    isolation: isolate;
+    transition: transform 0.1s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.1s cubic-bezier(0.2, 0.8, 0.2, 1),
+                filter 0.1s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+.game-cashout-btn--holding {
+    transform: translateY(2px) scale(0.97);
+    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(124, 58, 255, 0.25) !important;
+    filter: brightness(0.92);
+}
+
+.game-cashout-btn--complete {
+    transform: translateY(3px) scale(0.96);
+}
+
+.game-cashout-btn-progress {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12));
+    transform-origin: left center;
+    transform: scaleX(0);
+    pointer-events: none;
+    will-change: transform;
+}
+
+.game-cashout-btn-shine {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(
+        105deg,
+        transparent 40%,
+        rgba(255, 255, 255, 0.14) 50%,
+        transparent 60%
+    );
+    transform: translateX(-120%);
+    pointer-events: none;
+    opacity: 0;
+}
+
+.game-cashout-btn--holding .game-cashout-btn-shine {
+    opacity: 1;
+    animation: gameCashoutShine 0.85s ease-in-out infinite;
+}
+
+.game-cashout-btn-content {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .game-cashout-icon {
@@ -107,21 +169,49 @@
     opacity: 0.92;
 }
 
+.game-cashout-dollar {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
 .game-cashout-hint {
-    color: rgba(255, 255, 255, 0.35);
-    font-size: 0.82rem;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.32);
+    font-size: 0.72rem;
     font-weight: 500;
     pointer-events: none;
     white-space: nowrap;
     user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
 }
 
-.game-cashout-sep {
-    color: rgba(255, 255, 255, 0.22);
-    font-size: 0.95rem;
-    font-weight: 300;
-    pointer-events: none;
-    user-select: none;
+.game-keycap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.45em;
+    height: 1.45em;
+    padding: 0 0.35em;
+    border-radius: 5px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    font-family: var(--mono);
+    font-size: 0.95em;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1;
+    font-style: normal;
+}
+
+@keyframes gameCashoutShine {
+    from { transform: translateX(-120%); }
+    to { transform: translateX(120%); }
 }
 
 .game-cashout-securing {

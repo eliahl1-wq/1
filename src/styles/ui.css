@@ -430,6 +430,39 @@
   text-align: center;
 }
 
+.mode-playing-count {
+  margin-top: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-h);
+  text-align: center;
+  letter-spacing: -0.2px;
+}
+
+.mode-playing-count .mono {
+  color: var(--green);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.leaderboard-online {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.leaderboard-online-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-2);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
 .leaderboard-tab {
   flex: 1;
   padding: 8px 0;

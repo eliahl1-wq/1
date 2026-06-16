@@ -1,5 +1,6 @@
 import global from './global.js';
 import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
+import { drawBalanceBadge as drawBalanceBadgePill } from '../balanceBadge.js';
 
 const FULL_ANGLE = 2 * Math.PI;
 
@@ -119,40 +120,8 @@ function drawGlassPill(graph, x, y, w, h, r, { fill, stroke, lineWidth = 1 }) {
 }
 
 function drawBalanceBadge(graph, cell, nameY, fontSize) {
-    const amount = (cell.balance || 0).toFixed(2);
-    const amountFontSize = Math.max(fontSize * 0.62, 11);
-    const unitFontSize = Math.max(amountFontSize * 0.72, 9);
-    const gap = 2;
-
-    graph.font = `800 ${amountFontSize}px ui-monospace, SFMono-Regular, monospace`;
-    const amountW = graph.measureText(amount).width;
-    graph.font = `600 ${unitFontSize}px ui-monospace, SFMono-Regular, monospace`;
-    const unitW = graph.measureText('$').width;
-
-    const padX = 10;
-    const pillW = unitW + gap + amountW + padX * 2;
-    const pillH = amountFontSize + 10;
-    const pillX = cell.x - pillW / 2;
     const pillY = nameY + fontSize / 1.35;
-
-    const accent = cell.isMe ? 'rgba(20, 241, 149, 0.35)' : 'rgba(255, 255, 255, 0.12)';
-    drawGlassPill(graph, pillX, pillY, pillW, pillH, pillH / 2, {
-        fill: cell.isMe ? 'rgba(6, 12, 10, 0.82)' : 'rgba(8, 9, 13, 0.78)',
-        stroke: accent,
-        lineWidth: cell.isMe ? 1.25 : 1,
-    });
-
-    const midY = pillY + pillH / 2 + 1;
-    graph.textAlign = 'left';
-    graph.textBaseline = 'middle';
-    graph.font = `600 ${unitFontSize}px ui-monospace, SFMono-Regular, monospace`;
-    graph.fillStyle = cell.isMe ? 'rgba(20, 241, 149, 0.55)' : 'rgba(255,255,255,0.35)';
-    graph.fillText('$', pillX + padX, midY);
-
-    graph.font = `800 ${amountFontSize}px ui-monospace, SFMono-Regular, monospace`;
-    graph.fillStyle = cell.isMe ? '#14F195' : 'rgba(255,255,255,0.92)';
-    graph.fillText(amount, pillX + padX + unitW + gap, midY);
-    graph.textAlign = 'center';
+    drawBalanceBadgePill(graph, cell.x, pillY, cell.balance, cell.isMe);
 }
 
 function drawCashoutOverlay(graph, cell) {

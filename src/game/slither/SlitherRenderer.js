@@ -3,6 +3,7 @@
  */
 
 import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
+import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
@@ -1203,41 +1204,7 @@ export class SlitherRenderer {
     }
 
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
-        const amount = (balance || 0).toFixed(2);
-        const amountFont = 13;
-        const unitFont = 10;
-        const gap = 2;
-
-        ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, monospace`;
-        const amountW = ctx.measureText(amount).width;
-        ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, monospace`;
-        const unitW = ctx.measureText('$').width;
-
-        const padX = 10;
-        const pillW = unitW + gap + amountW + padX * 2;
-        const pillH = amountFont + 10;
-        const pillX = screenX - pillW / 2;
-        const pillY = screenY;
-
-        ctx.beginPath();
-        ctx.roundRect(pillX, pillY, pillW, pillH, pillH / 2);
-        ctx.fillStyle = isMe ? 'rgba(6, 12, 10, 0.82)' : 'rgba(8, 9, 13, 0.78)';
-        ctx.fill();
-        ctx.strokeStyle = isMe ? 'rgba(20, 241, 149, 0.35)' : 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = isMe ? 1.25 : 1;
-        ctx.stroke();
-
-        const midY = pillY + pillH / 2 + 1;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, monospace`;
-        ctx.fillStyle = isMe ? 'rgba(20, 241, 149, 0.55)' : 'rgba(255,255,255,0.35)';
-        ctx.fillText('$', pillX + padX, midY);
-
-        ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, monospace`;
-        ctx.fillStyle = isMe ? '#14F195' : 'rgba(255,255,255,0.92)';
-        ctx.fillText(amount, pillX + padX + unitW + gap, midY);
-        ctx.textAlign = 'center';
+        drawBalanceBadge(ctx, screenX, screenY, balance, isMe);
     }
 
     draw() {

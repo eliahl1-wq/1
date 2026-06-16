@@ -1,40 +1,39 @@
 import React from 'react';
 import { isTouchDevice } from '../utils/mobile';
+import { CASHOUT_HOLD_MS } from '../hooks/useHoldKeyCashout';
 
 const IS_MOBILE = isTouchDevice();
+const HOLD_SECONDS = CASHOUT_HOLD_MS / 1000;
 
-function ExitIcon() {
-    return (
-        <svg
-            className="game-cashout-icon"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-        >
-            <path d="M15 3h6v6" />
-            <path d="M10 14 21 3" />
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-        </svg>
-    );
+function DollarIcon() {
+    return <span className="game-cashout-icon game-cashout-dollar" aria-hidden>$</span>;
+}
+
+function KeyCap({ children }) {
+    return <kbd className="game-keycap">{children}</kbd>;
 }
 
 export default function GameCashoutBar({
     disabled,
-    onClick,
-    onMouseDown,
-    onMouseUp,
-    onMouseLeave,
-    onTouchStart,
-    onTouchEnd,
+    holdProgress = 0,
+    onHoldStart,
+    onHoldEnd,
     localTimer = 0,
     cashOutTotal = 10,
 }) {
+    const isHolding = holdProgress > 0 && holdProgress < 1;
+
+    const handleHoldStart = (e) => {
+        e.preventDefault();
+        if (disabled) return;
+        onHoldStart?.();
+    };
+
+    const handleHoldEnd = (e) => {
+        e.preventDefault();
+        onHoldEnd?.();
+    };
+
     if (localTimer > 0) {
         return (
             <div className="game-cashout-wrap">
@@ -56,26 +55,36 @@ export default function GameCashoutBar({
 
     return (
         <div className="game-cashout-wrap">
-            <button
-                type="button"
-                className="game-cashout-btn btn btn-primary"
-                onClick={onClick}
-                onMouseDown={onMouseDown}
-                onMouseUp={onMouseUp}
-                onMouseLeave={onMouseLeave}
-                onTouchStart={onTouchStart}
-                onTouchEnd={onTouchEnd}
-                disabled={disabled}
-            >
-                <ExitIcon />
-                Cash Out
-            </button>
-            {!IS_MOBILE && (
-                <>
-                    <span className="game-cashout-sep" aria-hidden>—</span>
-                    <span className="game-cashout-hint">Hold Q to Cash Out</span>
-                </>
-            )}
+            <div className="game-cashout-stack">
+                <button
+                    type="button"
+                    className={`game-cashout-btn btn btn-primary${isHolding ? ' game-cashout-btn--holding' : ''}${holdProgress >= 1 ? ' game-cashout-btn--complete' : ''}`}
+                    onMouseDown={handleHoldStart}
+                    onMouseUp={handleHoldEnd}
+                    onMouseLeave={handleHoldEnd}
+                    onTouchStart={handleHoldStart}
+                    onTouchEnd={handleHoldEnd}
+                    onTouchCancel={handleHoldEnd}
+                    onContextMenu={(e) => e.preventDefault()}
+                    disabled={disabled}
+                >
+                    <span
+                        className="game-cashout-btn-progress"
+                        style={{ transform: `scaleX(${holdProgress})` }}
+                        aria-hidden
+                    />
+                    <span className="game-cashout-btn-shine" aria-hidden />
+                    <span className="game-cashout-btn-content">
+                        <DollarIcon />
+                        Cash Out
+                    </span>
+                </button>
+                {!IS_MOBILE && (
+                    <p className="game-cashout-hint">
+                        Hold <KeyCap>Q</KeyCap> for {HOLD_SECONDS} second{HOLD_SECONDS === 1 ? '' : 's'}
+                    </p>
+                )}
+            </div>
         </div>
     );
 }
