@@ -11,11 +11,14 @@ let foodStreak = 0;
 let foodStreakAt = 0;
 
 function getCtx() {
-    if (!audioCtx) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return null;
-        audioCtx = new Ctx();
-    }
+    return audioCtx;
+}
+
+function createCtx() {
+    if (audioCtx) return audioCtx;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    audioCtx = new Ctx();
     return audioCtx;
 }
 
@@ -30,16 +33,22 @@ function getNoiseBuffer(ctx, durationSec = 0.03) {
 
 /** Unlock audio after a user gesture (required by browsers). */
 export function unlockGameAudio() {
-    const ctx = getCtx();
-    if (!ctx) return;
-    if (ctx.state === 'suspended') ctx.resume();
-    if (!unlocked) {
+    const ctx = createCtx();
+    if (!ctx || unlocked) return;
+
+    const prime = () => {
         const buffer = ctx.createBuffer(1, 1, 22050);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.connect(ctx.destination);
         source.start(0);
         unlocked = true;
+    };
+
+    if (ctx.state === 'suspended') {
+        ctx.resume().then(prime).catch(() => {});
+    } else {
+        prime();
     }
 }
 
@@ -62,10 +71,9 @@ export function playFoodEatSound() {
     const now = performance.now();
     if (now - lastFoodEatAt < THROTTLE_MS) return;
     lastFoodEatAt = now;
-    unlockGameAudio();
 
     const ctx = getCtx();
-    if (!ctx || ctx.state !== 'running') return;
+    if (!ctx || !unlocked || ctx.state !== 'running') return;
 
     const t = ctx.currentTime;
     const streak = nextStreak();

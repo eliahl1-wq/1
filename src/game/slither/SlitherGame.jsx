@@ -17,7 +17,7 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { playFoodEatSound } from '../../audio/synthSounds.js';
+import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -152,6 +152,18 @@ export default function SlitherGame() {
     useEffect(() => {
         document.body.style.backgroundColor = '#0a0a0c';
         document.title = 'AgarStake | Slither';
+    }, []);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const unlock = () => unlockGameAudio();
+        canvas.addEventListener('pointerdown', unlock, { once: true });
+        window.addEventListener('keydown', unlock, { once: true });
+        return () => {
+            canvas.removeEventListener('pointerdown', unlock);
+            window.removeEventListener('keydown', unlock);
+        };
     }, []);
 
     const [isSecuringCashout, setIsSecuringCashout] = useState(false);
@@ -548,7 +560,7 @@ export default function SlitherGame() {
 
 
 
-        inputIntervalRef.current = setInterval(emitInput, 25);
+        inputIntervalRef.current = setInterval(emitInput, 16);
 
 
 

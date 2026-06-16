@@ -132,6 +132,7 @@ export class SlitherRenderer {
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
+        this._inputEmitQueued = false;
         this._lastTapAt = 0;
         this.running = false;
         this._raf = null;
@@ -210,14 +211,27 @@ export class SlitherRenderer {
         this.H = height;
     }
 
+    _scheduleInputEmit() {
+        if (this._inputEmitQueued) return;
+        this._inputEmitQueued = true;
+        requestAnimationFrame(() => {
+            this._inputEmitQueued = false;
+            this._emitInput?.();
+        });
+    }
+
     _setInputFromScreen(sx, sy) {
         const rect = this.canvas.getBoundingClientRect();
         const x = sx - rect.left - this.W / 2;
         const y = sy - rect.top - this.H / 2;
         const mag = Math.hypot(x, y);
-        if (mag < 8) return;
-        this.inputDx = (x / mag) * 4;
-        this.inputDy = (y / mag) * 4;
+        if (mag < 6) return;
+        const ndx = (x / mag) * 4;
+        const ndy = (y / mag) * 4;
+        if (Math.abs(ndx - this.inputDx) < 0.02 && Math.abs(ndy - this.inputDy) < 0.02) return;
+        this.inputDx = ndx;
+        this.inputDy = ndy;
+        this._scheduleInputEmit();
     }
 
     setInputEmitter(fn) {
@@ -350,7 +364,7 @@ export class SlitherRenderer {
 
             // Smooth toward server spine. Local snake is slightly snappier for input feel.
             // Arc-length resampling at draw time keeps spacing even regardless of lerp phase.
-            const tau = snake.isYou ? 0.05 : 0.09;
+            const tau = snake.isYou ? 0.04 : 0.09;
             const a = 1 - Math.exp(-dt / Math.max(tau, 0.0001));
 
             for (let i = 0; i < len; i++) {
