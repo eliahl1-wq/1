@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Background from '../components/Background';
 import '../styles/ui.css';
+import { setPageSeo, SEO } from '../utils/seo';
 
 const TYPE_COLOR = {
     deposit:  'var(--green)',
@@ -23,7 +24,7 @@ export default function Transactions() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        document.title = 'AgarStake | History';
+        setPageSeo(SEO.transactions);
         const fetch_ = async () => {
             setLoading(true);
             try {

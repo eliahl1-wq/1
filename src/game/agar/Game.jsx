@@ -14,7 +14,7 @@ import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/Mo
 import { isTouchDevice } from '../../utils/mobile';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
-import { playAgarEatSound, unlockGameAudio, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
+import { playFoodEatSound, playAgarAbsorbSound, playKillSound, unlockGameAudio, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -61,7 +61,7 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
         if (miss === 0) continue;
         const inView = Math.abs(f.x - px) <= halfW && Math.abs(f.y - py) <= halfH;
         if (foodLikelyEaten(f, users)) {
-            if (foodEatenByPlayer(f, myId, users)) playAgarEatSound();
+            if (foodEatenByPlayer(f, myId, users)) playFoodEatSound();
             foodMap.delete(id);
         } else if (!inView) {
             if (miss >= OFF_VIEW_MISS_LIMIT) foodMap.delete(id);
@@ -90,6 +90,8 @@ export default function Game() {
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null });
     const myIdRef = useRef(null);
+    const prevBalanceRef = useRef(null);
+    const prevKillsRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const animationFrameId = useRef(null);
     const cashoutActiveRef = useRef(false);
@@ -244,7 +246,10 @@ export default function Game() {
             global.game.width = gameSizes.width;
             global.game.height = gameSizes.height;
             setIsConnected(true);
-            setCurrentBalance(playerSettings.balance ?? 1.0);
+            const startBal = playerSettings.balance ?? 1.0;
+            prevBalanceRef.current = startBal;
+            prevKillsRef.current = playerSettings.kills ?? 0;
+            setCurrentBalance(startBal);
             
             // Återuppta cashout-timer om man refreashar mitt i
             if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
@@ -292,7 +297,7 @@ export default function Game() {
                 if (seen.has(id)) continue;
                 const nextMiss = (f._missStreak || 0) + 1;
                 if (foodLikelyEaten(f, userData)) {
-                    if (foodEatenByPlayer(f, myIdRef.current, userData)) playAgarEatSound();
+                    if (foodEatenByPlayer(f, myIdRef.current, userData)) playFoodEatSound();
                     foodMap.delete(id);
                 } else {
                     foodMap.set(id, { ...f, _missStreak: nextMiss });
@@ -315,7 +320,15 @@ export default function Game() {
             }
             if (!rewardInfo?.battleRoyale) {
                 const me = userData.find(p => p.id === myIdRef.current);
-                if (me) setCurrentBalance(me.balance ?? 0);
+                if (me) {
+                    const newBal = me.balance ?? 0;
+                    const prev = prevBalanceRef.current;
+                    if (prev != null && newBal > prev + 0.4) {
+                        playAgarAbsorbSound();
+                    }
+                    prevBalanceRef.current = newBal;
+                    setCurrentBalance(newBal);
+                }
             }
         });
 
@@ -338,7 +351,17 @@ export default function Game() {
         });
 
         socket.on('leaderboard', (data) => {
-            setLeaderboard((data.leaderboard || []).map(p => ({
+            const lb = data.leaderboard || [];
+            if (data.battleRoyale && myIdRef.current) {
+                const me = lb.find(p => p.id === myIdRef.current);
+                if (me) {
+                    const prevK = prevKillsRef.current;
+                    const newK = me.kills ?? 0;
+                    if (prevK != null && newK > prevK) playKillSound();
+                    prevKillsRef.current = newK;
+                }
+            }
+            setLeaderboard(lb.map(p => ({
                 ...p,
                 balance: parseFloat(p.balance) || 0,
                 kills: p.kills || 0,
@@ -353,9 +376,9 @@ export default function Game() {
             setCashedAmount(usdAmount);
             
             // Professional count-up animation for money being "added" to balance
-            startCashoutCountUpSound(usdAmount, 1200);
+            startCashoutCountUpSound(usdAmount, 900);
             const startTime = performance.now();
-            const duration = 1200;
+            const duration = 900;
             const animate = (currentTime) => {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);

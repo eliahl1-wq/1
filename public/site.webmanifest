@@ -1,0 +1,21 @@
+{
+  "name": "AgarStake",
+  "short_name": "AgarStake",
+  "description": "Competitive Agar.io and Slither.io with Solana stakes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "icons": [
+    {
+      "src": "/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

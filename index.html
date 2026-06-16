@@ -2,24 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/favicon-192.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google-site-verification" content="680c9e97322f5664" />
     <meta name="robots" content="index, follow" />
     <meta name="author" content="AgarStake" />
     <meta name="application-name" content="AgarStake" />
-    <title>AgarStake | Arena</title>
-    <meta name="description" content="AgarStake — play Agar.io and Slither.io with real money. Deposit Solana (SOL), grow your blob or snake, dominate the arena, and cash out crypto instantly. Agar with money, Slither with money, real-money .io games." />
+    <title>AgarStake | Agar &amp; Slither</title>
+    <meta name="description" content="AgarStake — competitive Agar.io and Slither.io with Solana stakes. Deposit SOL, outplay rivals, and cash out instantly." />
     <meta name="keywords" content="agarstake, agar stake, agararena, agar with money, agar.io with money, slither with money, slither.io with money, io games with money, real money io games, play agar for money, play slither for money, crypto io games, web3 browser games, solana wager game, earn crypto playing games, real money agario, real money slitherio, agar.io real money, slither.io real money" />
-    <meta property="og:title" content="AgarStake - Play .io Games with Real Money" />
-    <meta property="og:description" content="Deposit SOL, outsmart players, and cash out instantly. Play Agar and Slither for real crypto." />
+    <meta property="og:title" content="AgarStake — Agar &amp; Slither.io" />
+    <meta property="og:description" content="Competitive Agar.io and Slither.io with Solana stakes. Deposit SOL, outplay rivals, and cash out instantly." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.agararena.space/" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="AgarStake - Play .io Games with Real Money" />
-    <meta name="twitter:description" content="Deposit SOL, outsmart players, and cash out instantly. Play Agar and Slither for real crypto." />
+    <meta property="og:image" content="https://www.agararena.space/logo-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="AgarStake — Agar &amp; Slither.io" />
+    <meta name="twitter:description" content="Competitive Agar.io and Slither.io with Solana stakes. Deposit SOL, outplay rivals, and cash out instantly." />
+    <meta name="twitter:image" content="https://www.agararena.space/logo-512.png" />
     <link rel="canonical" href="https://www.agararena.space/" />
     <script type="application/ld+json">
     {
@@ -30,14 +33,15 @@
           "name": "AgarStake",
           "alternateName": ["Agar Stake", "AgarArena", "agarstake", "agararena.space"],
           "url": "https://www.agararena.space",
-          "description": "Play Agar.io and Slither.io with real money. Deposit Solana and cash out crypto instantly."
+          "description": "Competitive Agar.io and Slither.io with Solana stakes.",
+          "publisher": { "@id": "https://www.agararena.space/#organization" }
         },
         {
           "@type": "WebApplication",
           "name": "AgarStake",
           "alternateName": ["Agar Stake", "AgarArena"],
           "url": "https://www.agararena.space",
-          "description": "AgarStake — play Agar.io and Slither.io with real money. Agar with money, Slither with money, real-money crypto .io games.",
+          "description": "Competitive Agar.io and Slither.io with Solana stakes. Deposit SOL and cash out instantly.",
           "applicationCategory": "GameApplication",
           "operatingSystem": "Web browser",
           "browserRequirements": "Requires JavaScript",
@@ -49,9 +53,27 @@
         },
         {
           "@type": "Organization",
+          "@id": "https://www.agararena.space/#organization",
           "name": "AgarStake",
           "url": "https://www.agararena.space",
-          "logo": "https://www.agararena.space/vite.svg"
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://www.agararena.space/logo-512.png",
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "@type": "ItemList",
+          "name": "AgarStake Site Navigation",
+          "itemListElement": [
+            { "@type": "SiteNavigationElement", "position": 1, "name": "Agar", "url": "https://www.agararena.space/agar" },
+            { "@type": "SiteNavigationElement", "position": 2, "name": "Slither", "url": "https://www.agararena.space/slither" },
+            { "@type": "SiteNavigationElement", "position": 3, "name": "Gamemodes", "url": "https://www.agararena.space/gamemodes" },
+            { "@type": "SiteNavigationElement", "position": 4, "name": "Lobby", "url": "https://www.agararena.space/lobby" },
+            { "@type": "SiteNavigationElement", "position": 5, "name": "Login", "url": "https://www.agararena.space/login" },
+            { "@type": "SiteNavigationElement", "position": 6, "name": "Register", "url": "https://www.agararena.space/register" }
+          ]
         }
       ]
     }
@@ -59,8 +81,20 @@
   </head>
   <body>
     <noscript>
-      <h1>AgarStake — Agar.io &amp; Slither.io with Real Money</h1>
-      <p>Play Agar with money and Slither with money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly. Real-money .io games at agararena.space.</p>
+      <header>
+        <h1>AgarStake — Agar.io &amp; Slither.io</h1>
+        <p>Competitive Agar and Slither with Solana stakes. Deposit SOL, play, and cash out instantly at agararena.space.</p>
+      </header>
+      <nav aria-label="Site navigation">
+        <ul>
+          <li><a href="https://www.agararena.space/agar">Agar</a></li>
+          <li><a href="https://www.agararena.space/slither">Slither</a></li>
+          <li><a href="https://www.agararena.space/gamemodes">Gamemodes</a></li>
+          <li><a href="https://www.agararena.space/lobby">Lobby</a></li>
+          <li><a href="https://www.agararena.space/login">Login</a></li>
+          <li><a href="https://www.agararena.space/register">Register</a></li>
+        </ul>
+      </nav>
     </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

@@ -111,7 +111,11 @@ export default function PreGame() {
 
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
-        () => localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar'
+        () => {
+            if (location.pathname === '/slither') return 'slither';
+            if (location.pathname === '/agar') return 'agar';
+            return localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar';
+        }
     );
     const [selectedEntryFee, setSelectedEntryFee] = useState(
         () => Number(localStorage.getItem('selected_entry_fee')) || DEFAULT_ENTRY_FEE
@@ -130,10 +134,12 @@ export default function PreGame() {
     }, [selectedEntryFee]);
 
     useEffect(() => {
-        if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
+        if (location.pathname === '/slither') setSelectedMode('slither');
+        else if (location.pathname === '/agar') setSelectedMode('agar');
+        else if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
             setSelectedMode(location.state.selectedMode);
         }
-    }, [location.state?.selectedMode, selectedMode]);
+    }, [location.pathname, location.state?.selectedMode, selectedMode]);
 
     useEffect(() => {
         if (currentGameMode) {
@@ -255,9 +261,17 @@ export default function PreGame() {
 
     // ── Effects ────────────────────────────────────────
     useEffect(() => {
+        if (location.pathname === '/agar') {
+            setPageSeo(SEO.agar);
+            return;
+        }
+        if (location.pathname === '/slither') {
+            setPageSeo(SEO.slither);
+            return;
+        }
         const base = selectedMode.replace(/^br-/, '');
         setPageSeo(base === 'slither' ? SEO.preGameSlither : SEO.preGameAgar);
-    }, [selectedMode]);
+    }, [selectedMode, location.pathname]);
 
     useEffect(() => {
         if (publicKey && !withdrawAddress) setWithdrawAddress(publicKey.toBase58());

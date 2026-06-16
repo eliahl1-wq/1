@@ -51,34 +51,76 @@ export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
 }
 
 export const SEO = {
+    home: {
+        tabTitle: 'AgarStake | Agar & Slither',
+        description: 'AgarStake — competitive Agar.io and Slither.io with Solana stakes. Deposit SOL, outplay rivals, and cash out instantly.',
+        keywords: BASE_KEYWORDS,
+        path: '/',
+    },
+    agar: {
+        tabTitle: 'AgarStake | Agar',
+        description: 'Play Agar.io on AgarStake. Stake Solana, grow your blob, dominate rivals, and cash out crypto instantly.',
+        keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
+        path: '/agar',
+    },
+    slither: {
+        tabTitle: 'AgarStake | Slither',
+        description: 'Play Slither.io on AgarStake. Stake Solana, grow your snake, trap opponents, and cash out instantly.',
+        keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
+        path: '/slither',
+    },
     gamemodesAgar: {
         tabTitle: 'AgarStake | Agar',
-        description: 'AgarStake: play Agar.io with real money. Deposit SOL, grow your blob, eat rivals, and cash out crypto instantly. The real-money Agar arena at agararena.space.',
+        description: 'Choose your Agar mode on AgarStake — Normal or Battle Royale. Stake SOL, compete, and cash out crypto.',
         keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
         path: '/gamemodes',
     },
     gamemodesSlither: {
         tabTitle: 'AgarStake | Slither',
-        description: 'AgarStake: play Slither.io with real money. Deposit Solana, grow your snake, trap opponents, and cash out instantly. Slither with money — crypto Slither.io arena.',
+        description: 'Choose your Slither mode on AgarStake — Normal or Battle Royale. Stake SOL, compete, and cash out crypto.',
         keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
         path: '/gamemodes',
     },
     preGameAgar: {
-        tabTitle: 'AgarStake | Arena',
-        description: 'AgarStake arena: play Agar with real money. Stake SOL, dominate the blob battle, and withdraw when you cash out. Agar.io with money — join the arena now.',
-        keywords: `${BASE_KEYWORDS}, agar arena, agar.io cash out`,
+        tabTitle: 'AgarStake | Agar',
+        description: 'Join the Agar lobby on AgarStake. Pick your stake tier, enter the game, and cash out when you dominate.',
+        keywords: `${BASE_KEYWORDS}, agar.io cash out`,
         path: '/pre-game',
     },
     preGameSlither: {
         tabTitle: 'AgarStake | Slither',
-        description: 'AgarStake Slither arena: play Slither with real money. Stake SOL, outgrow rival snakes, and cash out crypto instantly. Slither.io with money — join now.',
-        keywords: `${BASE_KEYWORDS}, slither arena, slither.io cash out`,
+        description: 'Join the Slither lobby on AgarStake. Pick your stake tier, enter the game, and cash out when you dominate.',
+        keywords: `${BASE_KEYWORDS}, slither.io cash out`,
         path: '/pre-game',
     },
     lobby: {
         tabTitle: 'AgarStake | Lobby',
-        description: 'Fund your AgarStake wallet with Solana. Play Agar.io and Slither.io with real money — deposit SOL, pick your arena, and earn crypto in browser .io games.',
+        description: 'Fund your AgarStake wallet with Solana. Deposit SOL to play Agar and Slither, then join a match.',
         keywords: `${BASE_KEYWORDS}, deposit solana, crypto game lobby`,
         path: '/lobby',
+    },
+    login: {
+        tabTitle: 'AgarStake | Login',
+        description: 'Log in to your AgarStake account to play Agar.io and Slither.io with Solana stakes.',
+        keywords: `${BASE_KEYWORDS}, agarstake login`,
+        path: '/login',
+    },
+    register: {
+        tabTitle: 'AgarStake | Register',
+        description: 'Create your AgarStake account and start playing Agar.io and Slither.io with Solana stakes.',
+        keywords: `${BASE_KEYWORDS}, agarstake register, sign up`,
+        path: '/register',
+    },
+    profile: {
+        tabTitle: 'AgarStake | Profile',
+        description: 'View your AgarStake profile, balance, and game history.',
+        keywords: `${BASE_KEYWORDS}, agarstake profile`,
+        path: '/profile',
+    },
+    transactions: {
+        tabTitle: 'AgarStake | History',
+        description: 'View your AgarStake deposit and withdrawal history.',
+        keywords: `${BASE_KEYWORDS}, agarstake transactions`,
+        path: '/transactions',
     },
 };

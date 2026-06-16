@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import Background from '../components/Background';
+import { setPageSeo, SEO } from '../utils/seo';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -12,7 +13,7 @@ export default function LoginPage() {
     const { login, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
 
-    useEffect(() => { document.title = 'AgarStake | Login'; }, []);
+    useEffect(() => { setPageSeo(SEO.login); }, []);
 
     useEffect(() => {
         if (isAuthenticated) {

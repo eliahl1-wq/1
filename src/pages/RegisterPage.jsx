@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Background from '../components/Background';
 import { identifyMixpanelUser, trackMixpanelEvent } from '../utils/mixpanel';
+import { setPageSeo, SEO } from '../utils/seo';
 
 export default function RegisterPage() {
     const [email, setEmail]       = useState('');
@@ -13,7 +14,7 @@ export default function RegisterPage() {
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    useEffect(() => { document.title = 'AgarStake | Register'; }, []);
+    useEffect(() => { setPageSeo(SEO.register); }, []);
 
     const handleRegister = async (e) => {
         e.preventDefault();

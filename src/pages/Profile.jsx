@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import '../styles/ui.css';
+import { setPageSeo, SEO } from '../utils/seo';
 
 export default function Profile() {
     const { user, token, refreshUser, login } = useAuth();
@@ -25,7 +26,7 @@ export default function Profile() {
     }, [user?.username, user?.walletAddress]);
 
     useEffect(() => {
-        document.title = 'AgarStake | Profile';
+        setPageSeo(SEO.profile);
         const fetchLogs = async () => {
             try {
                 const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {

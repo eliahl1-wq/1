@@ -29,9 +29,9 @@ function buildWalletAdapters() {
         projectId: '8b2f78d206bbaec981376e03d9d15376',
         metadata: {
           name: 'AgarStake',
-          description: 'Stake SOL and dominate the arena in this high-stakes agar clone.',
+          description: 'Competitive Agar.io and Slither.io with Solana stakes.',
           url: 'https://www.agararena.space',
-          icons: ['https://www.agararena.space/vite.svg'],
+          icons: ['https://www.agararena.space/logo-512.png'],
         },
       },
     }),
@@ -110,9 +110,10 @@ function App() {
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path="/gamemodes" element={<Gamemodes />} />
+                <Route path="/agar" element={<PreGame />} />
+                <Route path="/slither" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                {/* Pregame lobbyn är nu startsidan */}
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>
             </AuthProvider>

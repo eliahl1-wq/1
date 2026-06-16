@@ -14,7 +14,7 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { playSlitherEatSound, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
+import { playFoodEatSound, playKillSound, startCashoutCountUpSound, stopCashoutCountUpSound } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -49,6 +49,7 @@ export default function SlitherGame() {
 
     const myIdRef = useRef(null);
     const prevBalanceRef = useRef(null);
+    const prevKillsRef = useRef(null);
 
     const cashOutTotalRef = useRef(10);
     const cashOutEndAtRef = useRef(0);
@@ -311,6 +312,7 @@ export default function SlitherGame() {
             }
             myIdRef.current = playerSettings.id;
             renderer.resetSession();
+            prevKillsRef.current = playerSettings.kills ?? 0;
             if (!gameSizes?.battleRoyale) {
                 const bal = playerSettings.balance ?? 1.0;
                 prevBalanceRef.current = bal;
@@ -325,10 +327,20 @@ export default function SlitherGame() {
 
         socket.on('slitherTick', (tick) => {
             renderer.updateState(tick);
+
+            if (tick.snakes && tick.you) {
+                const me = tick.snakes.find(s => s.id === tick.you);
+                if (me?.kills != null) {
+                    const prevK = prevKillsRef.current;
+                    if (prevK != null && me.kills > prevK) playKillSound();
+                    prevKillsRef.current = me.kills;
+                }
+            }
+
             if (!tick.battleRoyale && tick.balance != null) {
                 const prev = prevBalanceRef.current;
                 if (prev != null && tick.balance > prev + 0.001) {
-                    playSlitherEatSound();
+                    playFoodEatSound();
                 }
                 prevBalanceRef.current = tick.balance;
                 setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
@@ -395,10 +407,10 @@ export default function SlitherGame() {
 
             setCashedAmount(amount);
 
-            startCashoutCountUpSound(amount, 1200);
+            startCashoutCountUpSound(amount, 900);
             const startTime = performance.now();
 
-            const duration = 1200;
+            const duration = 900;
 
             const animate = (time) => {
 
@@ -427,6 +439,15 @@ export default function SlitherGame() {
             const now = Date.now();
             if (now - lastLeaderboardAtRef.current < 400) return;
             lastLeaderboardAtRef.current = now;
+            if (lbBR && myIdRef.current) {
+                const me = lb.find(p => p.id === myIdRef.current);
+                if (me) {
+                    const prevK = prevKillsRef.current;
+                    const newK = me.kills ?? 0;
+                    if (prevK != null && newK > prevK) playKillSound();
+                    prevKillsRef.current = newK;
+                }
+            }
             setLeaderboard(lb.map(p => ({
                 id: p.id,
                 name: p.name,
