@@ -1567,38 +1567,48 @@
 }
 
 .gm-card {
+  --gm-preview-w: 92px;
+  --gm-preview-gap: 14px;
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--r-2xl);
-  padding: 0;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  overflow: hidden;
+  gap: 14px;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-shadow: var(--shadow-lg);
 }
 
+.gm-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gm-preview-gap);
+}
+
 .gm-card-preview {
   display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 2 / 1;
+  width: var(--gm-preview-w);
+  height: calc(var(--gm-preview-w) / 2);
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
   object-fit: cover;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.gm-card-inner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  padding: 20px 28px 28px;
-}
-
-.gm-card-main {
+.gm-card-text {
   flex: 1;
   min-width: 0;
+}
+
+.gm-card-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-left: calc(var(--gm-preview-w) + var(--gm-preview-gap));
 }
 
 .gm-card--active {
@@ -1632,7 +1642,6 @@
   font-size: 0.8rem;
   color: var(--text-3);
   line-height: 1.5;
-  max-width: 280px;
 }
 
 .gm-card-playing {
@@ -1684,12 +1693,12 @@
 
 .gm-play-btn:active { transform: scale(0.97); }
 
-.gm-card-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  flex-shrink: 0;
+.gm-card-footer .gm-play-btn {
+  width: 100%;
+}
+
+.gm-card-footer .gm-badge {
+  align-self: flex-start;
 }
 
 /* ─── Profile ─── */
@@ -2215,26 +2224,14 @@
   }
 
   .gm-card {
-    padding: 0;
+    padding: 18px 20px;
   }
 
-  .gm-card-inner {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 16px 20px 20px;
-  }
-
-  .gm-card-desc {
-    max-width: none;
-  }
-
-  .gm-card-actions {
-    align-items: stretch;
-    width: 100%;
+  .gm-card-footer {
+    margin-left: 0;
   }
 
   .gm-play-btn {
-    width: 100%;
     padding: 12px 22px;
   }
 
@@ -2334,16 +2331,6 @@
 
   .profile-stat-grid {
     grid-template-columns: repeat(3, 1fr);
-  }
-
-  .gm-card {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .gm-card-inner {
-    flex-direction: row;
-    align-items: center;
   }
 
   .gm-grid {

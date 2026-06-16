@@ -162,27 +162,31 @@ export default function Gamemodes() {
 
 function ModeCard({ mode, title, desc, playing, badge, badgeAccent, onPlay }) {
     const isDisabled = !onPlay;
+    const badgeStyle = badgeAccent
+        ? { color: '#14F195', borderColor: 'rgba(20,241,149,0.3)', background: 'rgba(20,241,149,0.08)' }
+        : undefined;
+
     return (
         <div className={`gm-card ${isDisabled ? 'gm-card--disabled' : 'gm-card--active'}`}>
-            {mode && <GamemodePreview mode={mode} className="gm-card-preview" />}
-            <div className="gm-card-inner">
-                <div className="gm-card-main">
+            <div className="gm-card-row">
+                {mode && <GamemodePreview mode={mode} className="gm-card-preview" />}
+                <div className="gm-card-text">
                     <div className="gm-card-title">{title}</div>
                     <div className="gm-card-desc">{desc}</div>
                     {playing != null && (
                         <div className="gm-card-playing">{playing} playing</div>
                     )}
                 </div>
-                {isDisabled
-                    ? <span className="gm-badge">{badge}</span>
-                    : badge
-                        ? <div className="gm-card-actions">
-                            <span className="gm-badge" style={badgeAccent ? { color: '#14F195', borderColor: 'rgba(20,241,149,0.3)', background: 'rgba(20,241,149,0.08)' } : undefined}>{badge}</span>
-                            <button className="gm-play-btn" onClick={onPlay}>Select</button>
-                          </div>
-                        : <button className="gm-play-btn" onClick={onPlay}>Select</button>
-                }
             </div>
+            {isDisabled
+                ? badge && <span className="gm-badge">{badge}</span>
+                : (
+                    <div className="gm-card-footer">
+                        {badge && <span className="gm-badge" style={badgeStyle}>{badge}</span>}
+                        <button className="gm-play-btn" onClick={onPlay}>Select</button>
+                    </div>
+                )
+            }
         </div>
     );
 }
