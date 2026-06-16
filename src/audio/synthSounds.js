@@ -1,19 +1,14 @@
-import { normalizeEntryFee, DEFAULT_ENTRY_FEE, tierEconomy } from '../constants/economy.js';
-
 let audioCtx = null;
 let unlocked = false;
 let noiseBuffer = null;
 
-const THROTTLE_MS = 36;
-const GOLDEN_THROTTLE_MS = 180;
-const STREAK_WINDOW_MS = 260;
-const MAX_STREAK = 14;
+const THROTTLE_MS = 38;
+const STREAK_WINDOW_MS = 220;
+const MAX_STREAK = 12;
 
 let lastFoodEatAt = 0;
-let lastGoldenAt = 0;
 let foodStreak = 0;
 let foodStreakAt = 0;
-let cashoutTickTimer = null;
 
 function getCtx() {
     if (!audioCtx) {
@@ -24,17 +19,7 @@ function getCtx() {
     return audioCtx;
 }
 
-function getEntryFeeUsd() {
-    return normalizeEntryFee(Number(localStorage.getItem('selected_entry_fee')) || DEFAULT_ENTRY_FEE);
-}
-
-export function isGoldenPickupDelta(delta) {
-    if (delta <= 0) return false;
-    const golden = tierEconomy(getEntryFeeUsd()).goldenBlobValue;
-    return delta >= golden * 0.82 && delta <= golden * 1.28;
-}
-
-function getNoiseBuffer(ctx, durationSec = 0.06) {
+function getNoiseBuffer(ctx, durationSec = 0.03) {
     if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer;
     const len = Math.ceil(ctx.sampleRate * durationSec);
     noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -43,7 +28,7 @@ function getNoiseBuffer(ctx, durationSec = 0.06) {
     return noiseBuffer;
 }
 
-/** Call once after a user gesture so browsers allow playback. */
+/** Unlock audio after a user gesture (required by browsers). */
 export function unlockGameAudio() {
     const ctx = getCtx();
     if (!ctx) return;
@@ -58,7 +43,7 @@ export function unlockGameAudio() {
     }
 }
 
-function nextFoodStreak() {
+function nextStreak() {
     const now = performance.now();
     if (now - foodStreakAt <= STREAK_WINDOW_MS) {
         foodStreak = Math.min(foodStreak + 1, MAX_STREAK);
@@ -69,286 +54,86 @@ function nextFoodStreak() {
     return foodStreak;
 }
 
-function shouldThrottleFood() {
-    const now = performance.now();
-    if (now - lastFoodEatAt < THROTTLE_MS) return true;
-    lastFoodEatAt = now;
-    return false;
-}
-
-function createBus(ctx, gain, duration, attack = 0.002) {
-    const t = ctx.currentTime;
-    const bus = ctx.createGain();
-    bus.gain.setValueAtTime(0.0001, t);
-    bus.gain.linearRampToValueAtTime(gain, t + attack);
-    bus.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    bus.connect(ctx.destination);
-    return bus;
-}
-
-/** Layered sine partials with slight detune for a fuller tone. */
-function addChimePartial(ctx, bus, {
-    start = 0, duration, freq, freqEnd, level, detune = 0,
-}) {
-    const t = ctx.currentTime + start;
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = 'sine';
-    osc.detune.value = detune;
-    osc.frequency.setValueAtTime(freq, t);
-    if (freqEnd) {
-        osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 40), t + duration * 0.92);
-    }
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(level, t + 0.003);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    osc.connect(g);
-    g.connect(bus);
-    osc.start(t);
-    osc.stop(t + duration + 0.03);
-}
-
-function addSoftSparkle(ctx, bus, { start, duration, freq, level }) {
-    const t = ctx.currentTime + start;
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, t);
-    osc.frequency.exponentialRampToValueAtTime(Math.max(freq * 0.9, 40), t + duration);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(level, t + 0.001);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.85);
-    osc.connect(g);
-    g.connect(bus);
-    osc.start(t);
-    osc.stop(t + duration + 0.02);
-}
-
 /**
- * Shared food — plop + kling hybrid.
- * A short rounded "bloop" body (downward sine glide + wet attack transient)
- * fused with a bright bell-like kling tail that rings out a touch longer.
- * Pitch rises on rapid streaks for a satisfying climb.
+ * Minecraft-style item pickup pop — short, sharp, bubbly, organic plop.
+ * Quick downward pitch swoop + soft body + tiny wet attack.
  */
 export function playFoodEatSound() {
-    if (shouldThrottleFood()) return;
-    unlockGameAudio();
-
-    const ctx = getCtx();
-    if (!ctx || ctx.state !== 'running') return;
-
-    const t = ctx.currentTime;
-    const streak = nextFoodStreak();
-    const lift = streak * 26;
-    const base = 430 + lift + (Math.random() - 0.5) * 16;
-    const gain = 0.044 + Math.min(streak, 8) * 0.0025;
-
-    // Overall envelope: quick wet attack, gentle kling release.
-    const klingDur = 0.13;
-    const bus = createBus(ctx, gain, klingDur, 0.0015);
-
-    // --- PLOP BODY: short sine sweeping down (the rounded "bloop") ---
-    const plopDur = 0.055;
-    const plop = ctx.createOscillator();
-    const plopG = ctx.createGain();
-    plop.type = 'sine';
-    plop.frequency.setValueAtTime(base * 1.7, t);
-    plop.frequency.exponentialRampToValueAtTime(Math.max(base * 0.7, 40), t + plopDur * 0.9);
-    plopG.gain.setValueAtTime(0.0001, t);
-    plopG.gain.linearRampToValueAtTime(0.6, t + 0.004);
-    plopG.gain.exponentialRampToValueAtTime(0.0001, t + plopDur);
-    plop.connect(plopG);
-    plopG.connect(bus);
-    plop.start(t);
-    plop.stop(t + plopDur + 0.02);
-
-    // --- WET ATTACK: tiny filtered noise blip for the "p" of plop ---
-    const blip = ctx.createBufferSource();
-    blip.buffer = getNoiseBuffer(ctx, 0.014);
-    const blipBp = ctx.createBiquadFilter();
-    blipBp.type = 'bandpass';
-    blipBp.frequency.value = base * 1.6;
-    blipBp.Q.value = 0.8;
-    const blipG = ctx.createGain();
-    blipG.gain.setValueAtTime(0.18, t);
-    blipG.gain.exponentialRampToValueAtTime(0.0001, t + 0.016);
-    blip.connect(blipBp);
-    blipBp.connect(blipG);
-    blipG.connect(bus);
-    blip.start(t);
-    blip.stop(t + 0.018);
-
-    // --- KLING TAIL: detuned bell partials that ring slightly longer ---
-    addChimePartial(ctx, bus, { start: 0.002, duration: klingDur, freq: base * 2.0, freqEnd: base * 1.9, level: 0.42, detune: -5 });
-    addChimePartial(ctx, bus, { start: 0.002, duration: klingDur, freq: base * 2.0, freqEnd: base * 1.92, level: 0.42, detune: 6 });
-    addChimePartial(ctx, bus, { start: 0.004, duration: klingDur * 0.85, freq: base * 3.01, freqEnd: base * 2.86, level: 0.22, detune: 0 });
-    addSoftSparkle(ctx, bus, { start: 0.005, duration: klingDur * 0.5, freq: base * 4.02, level: 0.1 });
-}
-
-/** Golden blob — excited di-ding double kling (+ soft third sparkle). */
-export function playGoldenFoodSound() {
     const now = performance.now();
-    if (now - lastGoldenAt < GOLDEN_THROTTLE_MS) return;
-    lastGoldenAt = now;
+    if (now - lastFoodEatAt < THROTTLE_MS) return;
     lastFoodEatAt = now;
     unlockGameAudio();
 
     const ctx = getCtx();
     if (!ctx || ctx.state !== 'running') return;
 
-    const jitter = (Math.random() - 0.5) * 10;
-    const di = 587 + jitter;
-    const ding = 740 + jitter * 0.6;
-    const sparkle = 880 + jitter * 0.4;
-    const gain = 0.056;
-
-    const bus1 = createBus(ctx, gain * 0.92, 0.12, 0.001);
-    addChimePartial(ctx, bus1, { duration: 0.11, freq: di, freqEnd: di * 0.91, level: 0.55, detune: -3 });
-    addChimePartial(ctx, bus1, { duration: 0.11, freq: di * 2.0, freqEnd: di * 1.85, level: 0.42, detune: 2 });
-    addSoftSparkle(ctx, bus1, { start: 0.003, duration: 0.08, freq: di * 3.02, level: 0.18 });
-
-    const bus2 = createBus(ctx, gain, 0.15, 0.001);
-    addChimePartial(ctx, bus2, { start: 0.07, duration: 0.13, freq: ding, freqEnd: ding * 0.93, level: 0.58, detune: -2 });
-    addChimePartial(ctx, bus2, { start: 0.07, duration: 0.13, freq: ding * 2.01, freqEnd: ding * 1.88, level: 0.48, detune: 4 });
-    addChimePartial(ctx, bus2, { start: 0.075, duration: 0.1, freq: ding * 1.5, freqEnd: ding * 1.42, level: 0.22, detune: 0 });
-
-    const bus3 = createBus(ctx, gain * 0.45, 0.09, 0.001);
-    addSoftSparkle(ctx, bus3, { start: 0.115, duration: 0.085, freq: sparkle, level: 0.35 });
-    addChimePartial(ctx, bus3, { start: 0.115, duration: 0.085, freq: sparkle * 1.26, freqEnd: sparkle * 1.15, level: 0.2, detune: 6 });
-}
-
-/** Darker layered thud on elimination. */
-export function playKillSound() {
-    unlockGameAudio();
-    const ctx = getCtx();
-    if (!ctx || ctx.state !== 'running') return;
-
     const t = ctx.currentTime;
-    const duration = 0.16;
-    const gain = 0.052;
+    const streak = nextStreak();
+    const lift = streak * 18;
+    const jitter = (Math.random() - 0.5) * 70;
+    const startHz = 780 + lift + jitter;
+    const endHz = 310 + lift * 0.35 + jitter * 0.2;
+    const duration = 0.048;
+    const gain = 0.036;
 
-    const bus = createBus(ctx, gain, duration, 0.003);
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, t);
+    bus.gain.linearRampToValueAtTime(gain, t + 0.0006);
+    bus.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    bus.connect(ctx.destination);
 
-    const delay = ctx.createDelay();
-    delay.delayTime.value = 0.055;
-    const echo = ctx.createGain();
-    echo.gain.value = 0.22;
-    bus.connect(delay);
-    delay.connect(echo);
-    echo.connect(ctx.destination);
+    // Main pop — fast downward glide (the iconic "boop").
+    const pop = ctx.createOscillator();
+    const popG = ctx.createGain();
+    pop.type = 'sine';
+    pop.frequency.setValueAtTime(startHz, t);
+    pop.frequency.exponentialRampToValueAtTime(Math.max(endHz, 40), t + duration * 0.52);
+    popG.gain.value = 0.72;
+    pop.connect(popG);
+    popG.connect(bus);
+    pop.start(t);
+    pop.stop(t + duration + 0.015);
 
-    addChimePartial(ctx, bus, { duration, freq: 148, freqEnd: 68, level: 0.65, detune: 0 });
-    addChimePartial(ctx, bus, { duration: duration * 0.9, freq: 96, freqEnd: 52, level: 0.45, detune: -8 });
+    // Warm organic body underneath.
+    const body = ctx.createOscillator();
+    const bodyG = ctx.createGain();
+    body.type = 'triangle';
+    body.frequency.setValueAtTime(startHz * 0.52, t);
+    body.frequency.exponentialRampToValueAtTime(Math.max(endHz * 0.75, 40), t + duration * 0.58);
+    bodyG.gain.setValueAtTime(0.0001, t);
+    bodyG.gain.linearRampToValueAtTime(0.28, t + 0.002);
+    bodyG.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.7);
+    body.connect(bodyG);
+    bodyG.connect(bus);
+    body.start(t);
+    body.stop(t + duration + 0.015);
 
-    const noise = ctx.createBufferSource();
-    noise.buffer = getNoiseBuffer(ctx, duration);
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(280, t);
-    lp.frequency.exponentialRampToValueAtTime(75, t + duration);
-    const noiseG = ctx.createGain();
-    noiseG.gain.value = 0.28;
-    noise.connect(lp);
-    lp.connect(noiseG);
-    noiseG.connect(bus);
-    noise.start(t);
-    noise.stop(t + duration);
-}
-
-/** Agar-only: slow absorb flooomp when eating another cell. */
-export function playAgarAbsorbSound() {
-    unlockGameAudio();
-    const ctx = getCtx();
-    if (!ctx || ctx.state !== 'running') return;
-
-    const t = ctx.currentTime;
-    const duration = 0.24;
-    const gain = 0.034;
-    const bus = createBus(ctx, gain, duration, 0.02);
-
-    addChimePartial(ctx, bus, { duration, freq: 112, freqEnd: 58, level: 0.7, detune: 0 });
-    addChimePartial(ctx, bus, { start: 0.025, duration: duration * 0.85, freq: 168, freqEnd: 88, level: 0.35, detune: -6 });
-
-    const noise = ctx.createBufferSource();
-    noise.buffer = getNoiseBuffer(ctx, duration);
+    // Bubbly wet attack — short bandpassed noise blip.
+    const blip = ctx.createBufferSource();
+    blip.buffer = getNoiseBuffer(ctx, 0.012);
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(420, t);
-    bp.frequency.exponentialRampToValueAtTime(120, t + duration);
-    bp.Q.value = 0.85;
-    const noiseG = ctx.createGain();
-    noiseG.gain.setValueAtTime(0.0001, t);
-    noiseG.gain.linearRampToValueAtTime(0.32, t + 0.03);
-    noiseG.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.88);
-    noise.connect(bp);
-    bp.connect(noiseG);
-    noiseG.connect(bus);
-    noise.start(t);
-    noise.stop(t + duration);
-}
+    bp.frequency.value = startHz * 1.15;
+    bp.Q.value = 1.1;
+    const blipG = ctx.createGain();
+    blipG.gain.setValueAtTime(0.22, t);
+    blipG.gain.exponentialRampToValueAtTime(0.0001, t + 0.014);
+    blip.connect(bp);
+    bp.connect(blipG);
+    blipG.connect(bus);
+    blip.start(t);
+    blip.stop(t + 0.016);
 
-function playCounterTick(progress = 0) {
-    const ctx = getCtx();
-    if (!ctx || ctx.state !== 'running') return;
-
-    const duration = 0.026;
-    // Bright, cash-register climb: starts mid-high and rises a full octave+
-    // across the count-up so the money pile-up feels increasingly valuable.
-    const base = 760 + progress * progress * 620 + progress * 240 + (Math.random() - 0.5) * 22;
-    const gain = 0.034;
-    const bus = createBus(ctx, gain, duration, 0.001);
-
-    addChimePartial(ctx, bus, { duration, freq: base, freqEnd: base * 0.94, level: 0.6, detune: -3 });
-    addChimePartial(ctx, bus, { start: 0.001, duration: duration * 0.92, freq: base * 2.0, freqEnd: base * 1.9, level: 0.4, detune: 5 });
-    addSoftSparkle(ctx, bus, { start: 0.002, duration: duration * 0.7, freq: base * 3.0, level: 0.16 });
-
-    const click = ctx.createBufferSource();
-    click.buffer = getNoiseBuffer(ctx, 0.009);
-    const hp = ctx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.value = base * 1.6;
-    const clickG = ctx.createGain();
-    clickG.gain.value = 0.08;
-    click.connect(hp);
-    hp.connect(clickG);
-    clickG.connect(bus);
-    click.start(ctx.currentTime);
-    click.stop(ctx.currentTime + 0.011);
-}
-
-export function stopCashoutCountUpSound() {
-    if (cashoutTickTimer != null) {
-        clearInterval(cashoutTickTimer);
-        cashoutTickTimer = null;
-    }
-}
-
-export function startCashoutCountUpSound(amount, durationMs = 900) {
-    unlockGameAudio();
-    stopCashoutCountUpSound();
-
-    const tickCount = Math.min(Math.max(Math.round(Number(amount) * 3.5), 14), 40);
-    const intervalMs = durationMs / tickCount;
-    let tick = 0;
-
-    playCounterTick(0);
-
-    cashoutTickTimer = setInterval(() => {
-        tick += 1;
-        if (tick >= tickCount) {
-            stopCashoutCountUpSound();
-            return;
-        }
-        playCounterTick(tick / tickCount);
-    }, intervalMs);
-}
-
-/** @deprecated use playFoodEatSound */
-export function playAgarEatSound() {
-    playFoodEatSound();
-}
-
-/** @deprecated use playFoodEatSound */
-export function playSlitherEatSound() {
-    playFoodEatSound();
+    // Tiny high sparkle at the very start — the sharp "pickup" edge.
+    const spark = ctx.createOscillator();
+    const sparkG = ctx.createGain();
+    spark.type = 'sine';
+    spark.frequency.setValueAtTime(startHz * 1.45, t);
+    spark.frequency.exponentialRampToValueAtTime(Math.max(startHz * 0.95, 40), t + 0.022);
+    sparkG.gain.setValueAtTime(0.14, t);
+    sparkG.gain.exponentialRampToValueAtTime(0.0001, t + 0.024);
+    spark.connect(sparkG);
+    sparkG.connect(bus);
+    spark.start(t);
+    spark.stop(t + 0.028);
 }

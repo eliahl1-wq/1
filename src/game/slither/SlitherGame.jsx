@@ -17,7 +17,7 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { playFoodEatSound, playGoldenFoodSound, playKillSound, isGoldenPickupDelta } from '../../audio/synthSounds.js';
+import { playFoodEatSound } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -376,20 +376,14 @@ export default function SlitherGame() {
             if (tick.snakes && tick.you) {
                 const me = tick.snakes.find(s => s.id === tick.you);
                 if (me?.kills != null) {
-                    const prevK = prevKillsRef.current;
-                    if (prevK != null && me.kills > prevK) playKillSound();
                     prevKillsRef.current = me.kills;
                 }
             }
 
             if (!tick.battleRoyale && tick.balance != null) {
                 const prev = prevBalanceRef.current;
-                if (prev != null) {
-                    const delta = tick.balance - prev;
-                    if (delta > 0.001) {
-                        if (tick.competitiveSlither || isGoldenPickupDelta(delta)) playGoldenFoodSound();
-                        else playFoodEatSound();
-                    }
+                if (prev != null && tick.balance > prev + 0.001) {
+                    playFoodEatSound();
                 }
                 prevBalanceRef.current = tick.balance;
                 const nowB = Date.now();
@@ -475,10 +469,7 @@ export default function SlitherGame() {
             if (lbBR && myIdRef.current) {
                 const me = lb.find(p => p.id === myIdRef.current);
                 if (me) {
-                    const prevK = prevKillsRef.current;
-                    const newK = me.kills ?? 0;
-                    if (prevK != null && newK > prevK) playKillSound();
-                    prevKillsRef.current = newK;
+                    prevKillsRef.current = me.kills ?? 0;
                 }
             }
             setLeaderboard(lb.map(p => ({

@@ -17,7 +17,7 @@ import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/Mo
 import { isTouchDevice } from '../../utils/mobile';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
-import { playFoodEatSound, playGoldenFoodSound, playAgarAbsorbSound, playKillSound, isGoldenPickupDelta, unlockGameAudio } from '../../audio/synthSounds.js';
+import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -50,13 +50,6 @@ function foodEatenByPlayer(f, myId, users) {
     return false;
 }
 
-/** Play the right pickup sound when local player eats a pellet. */
-function notifyAgarFoodEaten(f, myId, users) {
-    if (!foodEatenByPlayer(f, myId, users)) return;
-    if (f.golden) playGoldenFoodSound();
-    else playFoodEatSound();
-}
-
 /** Drop stale cached pellets; keep edge blobs briefly through spatial-filter gaps. */
 function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
     const margin = 240;
@@ -71,7 +64,7 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
         if (miss === 0) continue;
         const inView = Math.abs(f.x - px) <= halfW && Math.abs(f.y - py) <= halfH;
         if (foodLikelyEaten(f, users)) {
-            notifyAgarFoodEaten(f, myId, users);
+            if (foodEatenByPlayer(f, myId, users)) playFoodEatSound();
             foodMap.delete(id);
         } else if (!inView) {
             if (miss >= OFF_VIEW_MISS_LIMIT) foodMap.delete(id);
@@ -343,7 +336,7 @@ export default function Game() {
                 if (seen.has(id)) continue;
                 const nextMiss = (f._missStreak || 0) + 1;
                 if (foodLikelyEaten(f, userData)) {
-                    notifyAgarFoodEaten(f, myIdRef.current, userData);
+                    if (foodEatenByPlayer(f, myIdRef.current, userData)) playFoodEatSound();
                     foodMap.delete(id);
                 } else {
                     foodMap.set(id, { ...f, _missStreak: nextMiss });
@@ -368,11 +361,6 @@ export default function Game() {
                 const me = userData.find(p => p.id === myIdRef.current);
                 if (me) {
                     const newBal = me.balance ?? 0;
-                    const prev = prevBalanceRef.current;
-                    const delta = newBal - prev;
-                    if (prev != null && delta > 0.4 && !isGoldenPickupDelta(delta)) {
-                        playAgarAbsorbSound();
-                    }
                     prevBalanceRef.current = newBal;
                     setCurrentBalance(newBal);
                 }
@@ -402,10 +390,7 @@ export default function Game() {
             if (data.battleRoyale && myIdRef.current) {
                 const me = lb.find(p => p.id === myIdRef.current);
                 if (me) {
-                    const prevK = prevKillsRef.current;
-                    const newK = me.kills ?? 0;
-                    if (prevK != null && newK > prevK) playKillSound();
-                    prevKillsRef.current = newK;
+                    prevKillsRef.current = me.kills ?? 0;
                 }
             }
             setLeaderboard(lb.map(p => ({

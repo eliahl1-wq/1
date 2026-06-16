@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { startCashoutCountUpSound, stopCashoutCountUpSound } from '../audio/synthSounds.js';
 
 export default function GameResultModal({ type, amount, onPlayAgain, onLobby }) {
     const isWin = type === 'cashout';
@@ -12,7 +11,6 @@ export default function GameResultModal({ type, amount, onPlayAgain, onLobby }) 
         }
 
         const target = Number(amount) || 0;
-        startCashoutCountUpSound(target, 900);
         const start = performance.now();
         const duration = 900;
         let raf;
@@ -21,18 +19,11 @@ export default function GameResultModal({ type, amount, onPlayAgain, onLobby }) 
             const p = Math.min(1, (t - start) / duration);
             const eased = 1 - Math.pow(1 - p, 4);
             setDisplayAmount(eased * target);
-            if (p < 1) {
-                raf = requestAnimationFrame(tick);
-            } else {
-                stopCashoutCountUpSound();
-            }
+            if (p < 1) raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
 
-        return () => {
-            cancelAnimationFrame(raf);
-            stopCashoutCountUpSound();
-        };
+        return () => cancelAnimationFrame(raf);
     }, [isWin, amount]);
 
     return (
