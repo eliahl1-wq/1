@@ -129,13 +129,11 @@ function hslToRgb({ h, s, l }) {
     return { r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 };
 }
 
-/** Cyclic stripe bands: +10% or -10% brightness & saturation. */
-function bandColor(cs, bandShift) {
-    if (!bandShift) return cs;
+/** Dark rib band: -15% brightness (color only, no size change). */
+function bandColor(cs, brightnessShift) {
+    if (!brightnessShift) return cs;
     const hsl = rgbToHsl(parseColor(cs));
-    const mul = 1 + bandShift;
-    hsl.l = Math.max(0, Math.min(1, hsl.l * mul));
-    hsl.s = Math.max(0, Math.min(1, hsl.s * mul));
+    hsl.l = Math.max(0, Math.min(1, hsl.l * (1 + brightnessShift)));
     return toHex(hslToRgb(hsl));
 }
 
@@ -671,12 +669,11 @@ export class SlitherRenderer {
     }
 
     /**
-     * Resample a spine at fixed arc-length intervals, capped at maxPoints.
-     * One pass replaces densify+subsample: output bumps are evenly spaced and
-     * temporally stable (no index hopping), which removes body shimmer, and the
-     * cap keeps long snakes cheap. Output points are pooled via _bumpPoint.
+     * Arc-length resample with optional strict step (for dense tube overlap).
+     * When enforceDense is true the step is never widened to fit maxPoints —
+     * points are capped instead so the outer silhouette stays smooth.
      */
-    _resampleSpine(spine, stepWorld, maxPoints, out) {
+    _resampleSpine(spine, stepWorld, maxPoints, out, { enforceDense = false } = {}) {
         out.length = 0;
         const n = spine.length;
         if (n === 0) return out;
@@ -693,8 +690,10 @@ export class SlitherRenderer {
         }
 
         let step = stepWorld;
-        const minStep = total / Math.max(1, maxPoints - 1);
-        if (step < minStep) step = minStep;
+        if (!enforceDense) {
+            const minStep = total / Math.max(1, maxPoints - 1);
+            if (step < minStep) step = minStep;
+        }
         if (step < 0.0001) step = 0.0001;
 
         let bi = 0;
@@ -731,6 +730,21 @@ export class SlitherRenderer {
             out.push(this._bumpPoint(bi, tail.x, tail.y));
         }
         return out;
+    }
+
+    /** 95% overlap → center spacing is 5% of diameter (0.1 × radius). */
+    _tubeStepWorld(worldRadius) {
+        return Math.max(0.06, worldRadius * 0.1);
+    }
+
+    /** Uniform body width; smooth taper only in the last 10% (tail → head index). */
+    _tailRadiusMul(i, bumpCount) {
+        const tailStart = Math.floor(bumpCount * 0.9);
+        if (i < tailStart) return 1;
+        const denom = Math.max(1, bumpCount - 1 - tailStart);
+        const t = (i - tailStart) / denom;
+        const eased = t * t * (3 - 2 * t);
+        return 1 - eased * 0.88;
     }
 
     _drawZone(ctx, toScreen, W, H) {
@@ -901,41 +915,36 @@ export class SlitherRenderer {
 
     _blitSprite(ctx, sprite, x, y, scale = 1, displayMul = 1) {
         if (scale === 1 && displayMul === 1) {
-            const half = sprite.width >> 1;
-            ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0);
+            const half = sprite.width * 0.5;
+            ctx.drawImage(sprite, x - half, y - half);
             return;
         }
-        // Supersampled sprite — draw at its intended display size (downscale = crisp AA edges).
         const dw = (sprite.width / scale) * displayMul;
         const dh = (sprite.height / scale) * displayMul;
         ctx.drawImage(sprite, x - dw / 2, y - dh / 2, dw, dh);
     }
 
     /**
-     * Single-pass bloom along the snake spine — one shadowBlur stroke instead of
-     * per-segment blur (cheaper and closer to slither.io's soft body glow).
+     * Soft cylindrical tube segment — wide sheen, no harsh specular hotspots.
+     * darkBand toggles rib color (-15% brightness) without changing radius.
      */
-    _drawSnakeBloom(ctx, bumps, bumpCount, cs, headRadius, boosting) {
-        if (bumpCount < 2) return;
+    _paintTubeSegment(g, c, rPx, cs, darkBand = false, boost = false) {
+        const baseCs = darkBand ? bandColor(cs, -0.15) : cs;
+        const col = parseColor(boost ? bandColor(baseCs, 0.06) : baseCs);
+        const edgeCol = shadeColor(col, -38);
 
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = boosting ? 0.22 : 0.16;
-        ctx.strokeStyle = cs;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.shadowBlur = Math.max(18, headRadius * 2.8);
-        ctx.shadowColor = cs;
-        ctx.lineWidth = headRadius * 1.35;
+        const hx = c - rPx * 0.24;
+        const hy = c - rPx * 0.24;
+        const grad = g.createRadialGradient(hx, hy, 0, c, c, rPx);
+        grad.addColorStop(0, 'rgba(255,255,255,0.15)');
+        grad.addColorStop(0.55, toHex(col));
+        grad.addColorStop(0.92, toHex(col));
+        grad.addColorStop(1, toHex(edgeCol));
 
-        ctx.beginPath();
-        const tail = bumps[bumpCount - 1];
-        ctx.moveTo(tail.x, tail.y);
-        for (let i = bumpCount - 2; i >= 0; i--) {
-            ctx.lineTo(bumps[i].x, bumps[i].y);
-        }
-        ctx.stroke();
-        ctx.restore();
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
     }
 
     /** Tangent angle at bump index (radians, toward head). */
@@ -957,34 +966,7 @@ export class SlitherRenderer {
     }
 
     /**
-     * Organic 3D segment — single radial gradient with upper-left highlight,
-     * mid-tone body, and dark rim. bandShift: +0.1 / -0.1 for striped bands.
-     */
-    _paintSnakeSegment(g, c, rPx, cs, bandShift = 0, boost = false) {
-        const tinted = bandColor(cs, bandShift);
-        const col = parseColor(tinted);
-        const midCol = boost ? shadeColor(col, 14) : col;
-        const edgeCol = shadeColor(midCol, -42);
-        const rimCol = shadeColor(midCol, -28);
-
-        // Highlight sits upper-left; falloff toward center/right/bottom simulates volume.
-        const hx = c - rPx * 0.38;
-        const hy = c - rPx * 0.38;
-        const grad = g.createRadialGradient(hx, hy, rPx * 0.04, c, c, rPx);
-        grad.addColorStop(0, 'rgba(255,255,255,0.42)');
-        grad.addColorStop(0.22, rgb(shadeColor(midCol, 22), 0.55));
-        grad.addColorStop(0.52, toHex(midCol));
-        grad.addColorStop(0.82, toHex(rimCol));
-        grad.addColorStop(1, toHex(edgeCol));
-
-        g.fillStyle = grad;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-    }
-
-    /**
-     * Pre-render stripe-band segments + optional boost overlays into o.pr_imgs cache.
+     * Pre-render tube segments: normal + dark rib bands (color only).
      */
     _getSnakePrImgs(cs, rPx, needs = {}) {
         const key = `${cs}|${rPx}`;
@@ -1002,17 +984,17 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v22|${key}|+`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0.1, false);
+            pair.normal = this._getSprite(`pr_tube_v23|${key}|base`, ssSize, (g, sz) => {
+                this._paintTubeSegment(g, sz / 2, ssR, cs, false, false);
             });
-            pair.alt = this._getSprite(`pr_norm_v22|${key}|-`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, -0.1, false);
+            pair.alt = this._getSprite(`pr_tube_v23|${key}|dark`, ssSize, (g, sz) => {
+                this._paintTubeSegment(g, sz / 2, ssR, cs, true, false);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v22|${key}|boost+`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0.1, true);
+            pair.boostBody = this._getSprite(`pr_tube_v23|${key}|boostBase`, ssSize, (g, sz) => {
+                this._paintTubeSegment(g, sz / 2, ssR, cs, false, true);
             });
-            pair.boostBodyAlt = this._getSprite(`pr_norm_v22|${key}|boost-`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, -0.1, true);
+            pair.boostBodyAlt = this._getSprite(`pr_tube_v23|${key}|boostDark`, ssSize, (g, sz) => {
+                this._paintTubeSegment(g, sz / 2, ssR, cs, true, true);
             });
         }
 
@@ -1107,17 +1089,25 @@ export class SlitherRenderer {
         }
 
         const worldRadius = snake.radius || 6;
-        // 75% overlap: center spacing = 25% of diameter (0.5 × radius).
-        const overlapStep = worldRadius * 0.5;
-        const bumpStepWorld = Math.max(1.4, overlapStep);
+        const desiredStep = this._tubeStepWorld(worldRadius);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
-        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.88 : 1);
-        const maxBumps = Math.round(
-            (isYou ? (boosting ? 110 : 92) : (boosting ? 48 : 38)) * qMul * Math.min(1.25, 1 + segs.length / 300),
-        );
-        // Arc-length resample → evenly spaced, temporally stable bumps (kills body shimmer).
-        const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf);
+
+        // Estimate spine length for point budget (95% overlap when cap allows).
+        let spineLen = 0;
+        for (let si = 1; si < segs.length; si++) {
+            const dx = segs[si].x - segs[si - 1].x;
+            const dy = segs[si].y - segs[si - 1].y;
+            spineLen += Math.sqrt(dx * dx + dy * dy);
+        }
+        const capYou = cashoutPerf ? 320 : (this.isMobile ? 480 : 640);
+        const capRemote = this.isMobile ? 160 : 260;
+        const maxBumps = Math.max(20, isYou ? capYou : capRemote);
+        const fullCoverStep = spineLen / Math.max(1, maxBumps - 1);
+        const bumpStepWorld = Math.min(desiredStep, fullCoverStep);
+        const denseTube = bumpStepWorld <= desiredStep * 1.02;
+
+        const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf, { enforceDense: denseTube });
         if (bumps.length < 1) {
             ctx.restore();
             return;
@@ -1178,30 +1168,23 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // Global bloom pass — one blurred stroke before detailed segments.
-        if (!cashoutPerf && q >= 0.42) {
-            this._drawSnakeBloom(ctx, bumps, bumpCount, cs, headRadius, boosting);
-        }
-
-        // Draw body segments (tail → head): 5-segment stripe bands + linear tail taper.
-        const tailDenom = Math.max(1, bumpCount - 1);
+        // Smooth cylindrical tube — tail → head, uniform width, color-only rib bands.
+        const RIB_SEGMENTS = 10;
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
-            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+            if (p.x < -100 || p.y < -100 || p.x > this.W + 100 || p.y > this.H + 100) continue;
 
             const isHead = i === 0;
-            const stripeBand = Math.floor(i / 5) % 2;
-            const brightBand = stripeBand === 0;
+            const darkBand = Math.floor(i / RIB_SEGMENTS) % 2 === 1;
             let sprite;
             if (boosting && isHead) {
-                sprite = brightBand ? boostBody : (boostBodyAlt || boostBody);
+                sprite = darkBand ? (boostBodyAlt || boostBody) : boostBody;
             } else {
-                sprite = brightBand ? normal : alt;
+                sprite = darkBand ? alt : normal;
             }
 
-            // Head = 100% width, tail = 60% width.
-            const taper = 1 - (i / tailDenom) * 0.4;
-            this._blitSprite(ctx, sprite, p.x, p.y, bodySS, taper);
+            const tailMul = this._tailRadiusMul(i, bumpCount);
+            this._blitSprite(ctx, sprite, p.x, p.y, bodySS, tailMul);
         }
 
         // Boost overlay (local snake only) — strided for the same reason as the glow.
