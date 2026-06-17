@@ -629,12 +629,11 @@ export class SlitherRenderer {
     }
 
     /**
-     * Resample a spine at fixed arc-length intervals, capped at maxPoints.
-     * One pass replaces densify+subsample: output bumps are evenly spaced and
-     * temporally stable (no index hopping), which removes body shimmer, and the
-     * cap keeps long snakes cheap. Output points are pooled via _bumpPoint.
+     * Render-only path interpolation: resample a spine at a fixed world-space
+     * interval for stamping. Step is never widened — stamps stay tightly packed
+     * even during fast motion. Output points are pooled via _bumpPoint.
      */
-    _resampleSpine(spine, stepWorld, maxPoints, out) {
+    _interpolateSnakeDrawPath(spine, stepWorld, maxPoints, out) {
         out.length = 0;
         const n = spine.length;
         if (n === 0) return out;
@@ -643,18 +642,7 @@ export class SlitherRenderer {
             return out;
         }
 
-        let total = 0;
-        for (let i = 1; i < n; i++) {
-            const dx = spine[i].x - spine[i - 1].x;
-            const dy = spine[i].y - spine[i - 1].y;
-            total += Math.sqrt(dx * dx + dy * dy);
-        }
-
-        let step = stepWorld;
-        const minStep = total / Math.max(1, maxPoints - 1);
-        if (step < minStep) step = minStep;
-        if (step < 0.0001) step = 0.0001;
-
+        const step = Math.max(0.0001, stepWorld);
         let bi = 0;
         out.push(this._bumpPoint(bi++, spine[0].x, spine[0].y));
 
@@ -1038,6 +1026,11 @@ export class SlitherRenderer {
         return pair;
     }
 
+    /** Pre-rendered segment stamp cache — body sprites built once per color/radius. */
+    _getSnakeSegmentStamp(cs, rPx, needs = {}) {
+        return this._getSnakePrImgs(cs, rPx, needs);
+    }
+
     _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
         ctx.save();
@@ -1090,19 +1083,19 @@ export class SlitherRenderer {
         }
 
         const worldRadius = snake.radius || 6;
-        const sizeMul = Math.min(1.15, 1 + Math.max(0, worldRadius - 10) * 0.012);
-        const overlapMul = (isYou ? 0.38 : 0.48) * sizeMul;
-        const boostSpaceMul = (isYou ? 0.55 : 0.68) * sizeMul;
-        // Bump spacing in WORLD units so it stays constant while zoom animates each frame.
-        const bumpStepWorld = Math.max(2.6, worldRadius * (boosting ? boostSpaceMul : overlapMul));
+        // Fixed visual stamp spacing — render-only, never affects movement physics.
+        const stampStepWorld = Math.max(1, worldRadius * 0.25);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.88 : 1);
-        const maxBumps = Math.round(
-            (isYou ? (boosting ? 110 : 92) : (boosting ? 48 : 38)) * qMul * Math.min(1.25, 1 + segs.length / 300),
+        const stampDensity = Math.max(1, (worldRadius * 0.38) / stampStepWorld);
+        const maxStamps = Math.round(
+            (isYou ? (boosting ? 110 : 92) : (boosting ? 48 : 38))
+            * qMul
+            * stampDensity
+            * Math.min(1.25, 1 + segs.length / 300),
         );
-        // Arc-length resample → evenly spaced, temporally stable bumps (kills body shimmer).
-        const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf);
+        const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
             ctx.restore();
             return;
@@ -1133,7 +1126,7 @@ export class SlitherRenderer {
             boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
             trailGlow: isYou && boosting && !cashoutPerf,
         };
-        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakePrImgs(cs, r, prNeeds);
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, r, prNeeds);
         const halfT = trailGlow ? trailGlow.width / 2 : 0;
         const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
         const bumpCount = bumps.length;
