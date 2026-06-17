@@ -3,7 +3,7 @@
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
 const MAX_PATH_POINTS = 420;
-const MIN_HEAD_RECORD = 0.35;
+const MIN_HEAD_RECORD = 0.22;
 /** Cap simulated spine points — render resamples anyway; saves CPU on long snakes. */
 const MAX_SIM_SEGMENTS = 160;
 

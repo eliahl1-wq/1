@@ -364,6 +364,8 @@ export class SlitherRenderer {
     removeSnake(id) {
         if (!id) return;
         this.smooth.delete(id);
+        const rs = this._renderPool.get(id);
+        if (rs) delete rs._dispScreenR;
         this._renderPool.delete(id);
         this.targetSnakes = this.targetSnakes.filter(s => s.id !== id);
         if (this.state.you === id) {
@@ -449,7 +451,7 @@ export class SlitherRenderer {
                     delete s._extrapX;
                     delete s._extrapY;
                 }
-                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.028);
+                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.018);
                 continue;
             }
 
@@ -459,7 +461,7 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = 0.08;
+            const tau = 0.055;
             const a = 1 - Math.exp(-dt / tau);
             for (let i = 0; i < spineLen; i++) {
                 if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
@@ -781,21 +783,12 @@ export class SlitherRenderer {
         return out;
     }
 
-    /** Last ~8% only: smooth ease-out taper to rounded tip (min 48% width). */
-    _tailDrawScale(pathIndex, pathLen) {
-        const tailStart = Math.ceil(pathLen * 0.92);
-        if (pathIndex < tailStart) return 1;
-        const denom = Math.max(1, pathLen - 1 - tailStart);
-        const t = (pathIndex - tailStart) / denom;
-        const eased = 1 - Math.pow(1 - t, 2.2);
-        return Math.max(0.48, 1 - eased * 0.52);
-    }
-
     /**
-     * Pre-rendered rib stamp — slither.io reference shading, no shadowBlur.
+     * Pre-rendered stamp — slither.io reference: cylindrical highlight, uniform width.
+     * No shadowBlur. Tail and head use identical full-size circles.
      */
     _getSnakeBodyCache(baseColor, rPx) {
-        const key = `slither_v25|${baseColor}|${rPx}`;
+        const key = `slither_v26|${baseColor}|${Math.round(rPx)}`;
         let cache = this._ribCache.get(key);
         if (cache) {
             cache._lastUsed = this._frame;
@@ -804,52 +797,60 @@ export class SlitherRenderer {
 
         const stampSize = Math.ceil(rPx * 2);
         const r = rPx;
-        const cx = r;
-        const cy = r;
-        const hx = r * 0.38;
-        const hy = r * 0.32;
 
         const bakeStamp = (color) => {
             const cv = document.createElement('canvas');
             cv.width = stampSize;
             cv.height = stampSize;
             const g = cv.getContext('2d');
-            const lit = lightenColor(color, 0.06);
-            const edge = darkenColor(color, 0.14);
 
-            const grad = g.createRadialGradient(hx, hy, r * 0.06, cx, cy, r);
-            grad.addColorStop(0, 'rgba(255,255,255,0.22)');
-            grad.addColorStop(0.18, lit);
-            grad.addColorStop(0.48, color);
-            grad.addColorStop(0.78, color);
-            grad.addColorStop(0.93, darkenColor(color, 0.07));
-            grad.addColorStop(1, edge);
-
-            g.fillStyle = grad;
+            g.save();
             g.beginPath();
-            g.arc(cx, cy, r, 0, Math.PI * 2);
-            g.fill();
+            g.arc(r, r, r, 0, Math.PI * 2);
+            g.clip();
 
-            const crescent = g.createRadialGradient(r * 0.72, r * 0.78, 0, r * 0.62, r * 0.68, r * 0.92);
-            crescent.addColorStop(0, 'rgba(0,0,0,0)');
-            crescent.addColorStop(0.55, 'rgba(0,0,0,0)');
-            crescent.addColorStop(1, 'rgba(0,0,0,0.07)');
-            g.fillStyle = crescent;
-            g.beginPath();
-            g.arc(cx, cy, r, 0, Math.PI * 2);
-            g.fill();
+            const cyl = g.createLinearGradient(0, 0, 0, stampSize);
+            cyl.addColorStop(0, darkenColor(color, 0.10));
+            cyl.addColorStop(0.20, color);
+            cyl.addColorStop(0.44, lightenColor(color, 0.07));
+            cyl.addColorStop(0.50, 'rgba(255,255,255,0.20)');
+            cyl.addColorStop(0.56, lightenColor(color, 0.05));
+            cyl.addColorStop(0.78, color);
+            cyl.addColorStop(1, darkenColor(color, 0.10));
+            g.fillStyle = cyl;
+            g.fillRect(0, 0, stampSize, stampSize);
+
+            const spec = g.createRadialGradient(r * 0.44, r * 0.40, 0, r, r * 0.48, r * 0.95);
+            spec.addColorStop(0, 'rgba(255,255,255,0.10)');
+            spec.addColorStop(1, 'rgba(255,255,255,0)');
+            g.fillStyle = spec;
+            g.fillRect(0, 0, stampSize, stampSize);
+            g.restore();
 
             return cv;
         };
 
         cache = {
             canvasNormal: bakeStamp(baseColor),
-            canvasStripe: bakeStamp(darkenColor(baseColor, 0.06)),
+            canvasStripe: bakeStamp(darkenColor(baseColor, 0.04)),
             stampSize,
+            bodyR: r,
             _lastUsed: this._frame,
         };
         this._ribCache.set(key, cache);
         return cache;
+    }
+
+    /** Smooth display radius — grows gradually instead of jumping per food batch. */
+    _smoothSnakeRadius(snake, targetScreenR) {
+        let cur = snake._dispScreenR;
+        if (cur == null || !Number.isFinite(cur)) {
+            cur = targetScreenR;
+        } else {
+            cur += (targetScreenR - cur) * 0.16;
+        }
+        snake._dispScreenR = cur;
+        return cur;
     }
 
     _drawSnake(snake, toScreen, zoom) {
@@ -858,15 +859,21 @@ export class SlitherRenderer {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
-        const segs = snake.segments || [];
+        let segs = snake.segments || [];
         if (segs.length === 0) {
             ctx.restore();
             return;
         }
 
+        const sct = snake.sct;
+        if (sct && sct > 0 && sct < segs.length) {
+            segs = segs.slice(0, sct);
+        }
+
         const thick = this.snakeThickness ?? 1;
         const worldRadius = snake.radius || 6;
-        const headRadius = worldRadius * zoom * thick;
+        const targetHeadR = worldRadius * zoom * thick;
+        const headRadius = this._smoothSnakeRadius(snake, targetHeadR);
         const angle = snake.angle || 0;
         const isYou = !!snake.isYou;
 
@@ -900,13 +907,9 @@ export class SlitherRenderer {
         }
 
         const pointCap = isYou ? 4500 : 1800;
-        const splineSubdiv = isYou ? 10 : 7;
-
-        // 1) Catmull-Rom smooth curve  2) dense equidistant resample
-        const spline = this._buildCatmullRomPath(segs, splineSubdiv, this._splinePathBuf, pointCap * 2);
-        const stampInterval = Math.max(0.02, worldRadius * thick * 0.085);
+        const stampInterval = Math.max(0.018, worldRadius * thick * 0.065);
         const drawPoints = this._equidistantResample(
-            spline, stampInterval, this._drawPointsBuf, pointCap,
+            segs, stampInterval, this._drawPointsBuf, pointCap,
         );
         const pathLen = drawPoints.length;
         if (pathLen === 0) {
@@ -925,42 +928,34 @@ export class SlitherRenderer {
         const hx = drawPoints[0].x;
         const hy = drawPoints[0].y;
 
-        const rawR = Math.max(4, Math.round(headRadius / 4) * 4);
-        let rPx = rawR;
-        if (snake._lastSpriteR != null && Math.abs(rawR - snake._lastSpriteR) < 8) {
-            rPx = snake._lastSpriteR;
-        } else {
-            snake._lastSpriteR = rawR;
-        }
+        const cacheR = Math.max(4, Math.round(headRadius));
+        const sizeMul = headRadius / cacheR;
+        const { canvasNormal, canvasStripe, stampSize } = this._getSnakeBodyCache(cs, cacheR);
+        const cullPad = stampSize * sizeMul + 32;
+        const STAMPS_PER_BAND = 6;
+        const drawDiam = stampSize * sizeMul;
 
-        const { canvasNormal, canvasStripe, stampSize } = this._getSnakeBodyCache(cs, rPx);
-        const cullPad = stampSize + 32;
-        const STAMPS_PER_BAND = 5;
-
-        const stampAt = (p, canvas, scale) => {
-            const drawSize = stampSize * scale;
-            const half = drawSize * 0.5;
-            ctx.drawImage(canvas, p.x - half, p.y - half, drawSize, drawSize);
+        const stampAt = (p, canvas) => {
+            const half = drawDiam * 0.5;
+            ctx.drawImage(canvas, p.x - half, p.y - half, drawDiam, drawDiam);
         };
 
-        // Body tail → neck (index 0 = head, drawn separately on top)
+        // Body: tail → neck — UNIFORM width (scale 1.0), no taper
         for (let i = pathLen - 1; i >= 1; i--) {
             const p = drawPoints[i];
             if (p.x < -cullPad || p.y < -cullPad || p.x > this.W + cullPad || p.y > this.H + cullPad) {
                 continue;
             }
-
             const stampIdx = pathLen - 1 - i;
             const useNormal = Math.floor(stampIdx / STAMPS_PER_BAND) % 2 === 0;
-            const canvas = useNormal ? canvasNormal : canvasStripe;
-            stampAt(p, canvas, this._tailDrawScale(i, pathLen));
+            stampAt(p, useNormal ? canvasNormal : canvasStripe);
         }
 
-        // Head on top — same diameter as body
+        // Head on top — identical diameter to body
         const headPt = drawPoints[0];
         if (headPt.x >= -cullPad && headPt.y >= -cullPad
             && headPt.x <= this.W + cullPad && headPt.y <= this.H + cullPad) {
-            stampAt(headPt, canvasNormal, 1);
+            stampAt(headPt, canvasNormal);
         }
 
         const headEyeRadius = headRadius;
