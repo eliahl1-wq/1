@@ -1337,12 +1337,12 @@ export class SlitherRenderer {
             }
             rs.id = snake.id;
             rs.color = snake.color;
+            const s = this.smooth.get(snake.id);
             rs.radius = (snake.isYou && s?.visualRadius != null) ? s.visualRadius : snake.radius;
             rs.boost = snake.boost;
             rs.isYou = snake.isYou;
             rs.name = snake.name;
             rs.balance = snake.balance;
-            const s = this.smooth.get(snake.id);
             rs.segments = s ? s.segments : snake.segments;
             rs.drawSpine = (snake.isYou && s?.path?.length >= 2) ? s.path : rs.segments;
             rs.angle = s ? s.angle : snake.angle;
