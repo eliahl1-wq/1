@@ -157,8 +157,8 @@ export class SlitherRenderer {
         this.zoom = this.baseZoom;
         this.snakeThickness = this.isMobile ? 1.0 : 0.9;
         this._dpr = 1;
-        // Pre-rendered stamp caches (Phase 1) — keyed by color + screen radius bucket
-        this._stampCache = new Map();
+        // Pre-rendered rib stamps — keyed by color + screen radius bucket
+        this._ribCache = new Map();
         this._sprites = new Map();
         this._bgTileImage = null;
         this._bgPattern = null;
@@ -176,8 +176,8 @@ export class SlitherRenderer {
         this._frame = 0;
         this._renderSnakeBuf = [];
         this._sortedRenderSnakes = [];
-        this._interpPathBuf = [];
-        this._interpPool = [];
+        this._drawPointsBuf = [];
+        this._drawPointPool = [];
         this._renderPool = new Map();
         this._smoothSeen = new Set();
         this._screenScratch = { x: 0, y: 0 };
@@ -511,11 +511,11 @@ export class SlitherRenderer {
             for (let i = 0; i < 96 && i < entries.length; i++) {
                 this._sprites.delete(entries[i][0]);
             }
-            if (this._stampCache.size > 256) {
-                const stampEntries = [...this._stampCache.entries()]
+            if (this._ribCache.size > 256) {
+                const stampEntries = [...this._ribCache.entries()]
                     .sort((a, b) => (a[1]._lastUsed || 0) - (b[1]._lastUsed || 0));
                 for (let i = 0; i < 48 && i < stampEntries.length; i++) {
-                    this._stampCache.delete(stampEntries[i][0]);
+                    this._ribCache.delete(stampEntries[i][0]);
                 }
             }
         }
@@ -649,13 +649,13 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    // ─── Snake stamp renderer (Pre-rendered Stamping & Path Interpolation) ───
+    // ─── Equidistant rib-tube renderer ───
 
-    _interpPoint(i, x, y) {
-        let p = this._interpPool[i];
+    _drawPoint(i, x, y) {
+        let p = this._drawPointPool[i];
         if (!p) {
             p = { x: 0, y: 0 };
-            this._interpPool[i] = p;
+            this._drawPointPool[i] = p;
         }
         p.x = x;
         p.y = y;
@@ -663,129 +663,114 @@ export class SlitherRenderer {
     }
 
     /**
-     * Phase 2: Densify path — insert lerp sub-points wherever consecutive
-     * spine vertices exceed maxDist (worldRadius × 0.1).
+     * Equidistant path resampling — places drawPoints at a fixed arc-length
+     * interval (worldRadius × 0.25) via linear interpolation along the spine.
      */
-    _interpolateSnakePath(segments, maxDist, out, maxPoints) {
+    _equidistantResample(segments, interval, out, maxPoints) {
         out.length = 0;
         const n = segments.length;
         if (n === 0) return out;
+        if (n === 1) {
+            out.push(this._drawPoint(0, segments[0].x, segments[0].y));
+            return out;
+        }
+
+        let totalLen = 0;
+        const acc = new Float32Array(n);
+        acc[0] = 0;
+        for (let i = 1; i < n; i++) {
+            const dx = segments[i].x - segments[i - 1].x;
+            const dy = segments[i].y - segments[i - 1].y;
+            totalLen += Math.sqrt(dx * dx + dy * dy);
+            acc[i] = totalLen;
+        }
+
+        if (totalLen < 1e-8 || interval < 1e-8) {
+            out.push(this._drawPoint(0, segments[0].x, segments[0].y));
+            return out;
+        }
 
         let pi = 0;
-        const pushPt = (x, y) => {
-            if (pi >= maxPoints) return false;
-            out.push(this._interpPoint(pi++, x, y));
-            return true;
+        const sampleAt = (dist) => {
+            if (pi >= maxPoints) return;
+
+            let seg = 1;
+            while (seg < n && acc[seg] < dist) seg++;
+            if (seg >= n) seg = n - 1;
+
+            const segStart = acc[seg - 1];
+            const segLen = acc[seg] - segStart;
+            const t = segLen > 1e-9 ? (dist - segStart) / segLen : 0;
+            const p0 = segments[seg - 1];
+            const p1 = segments[seg];
+            out.push(this._drawPoint(
+                pi++,
+                p0.x + (p1.x - p0.x) * t,
+                p0.y + (p1.y - p0.y) * t,
+            ));
         };
 
-        pushPt(segments[0].x, segments[0].y);
-        let ax = segments[0].x;
-        let ay = segments[0].y;
-
-        for (let i = 1; i < n; i++) {
-            const bx = segments[i].x;
-            const by = segments[i].y;
-            let dx = bx - ax;
-            let dy = by - ay;
-            let dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist <= maxDist || dist < 1e-6) {
-                const last = out[out.length - 1];
-                if (!last || last.x !== bx || last.y !== by) {
-                    if (!pushPt(bx, by)) break;
-                }
-                ax = bx;
-                ay = by;
-                continue;
-            }
-
-            const ux = dx / dist;
-            const uy = dy / dist;
-            let walked = maxDist;
-            while (walked < dist) {
-                ax += ux * maxDist;
-                ay += uy * maxDist;
-                if (!pushPt(ax, ay)) {
-                    ax = bx;
-                    ay = by;
-                    break;
-                }
-                walked += maxDist;
-            }
-
-            if (pi >= maxPoints) break;
-            const last = out[out.length - 1];
-            if (!last || (last.x - bx) ** 2 + (last.y - by) ** 2 > 1e-6) {
-                if (!pushPt(bx, by)) break;
-            }
-            ax = bx;
-            ay = by;
+        sampleAt(0);
+        for (let d = interval; d <= totalLen + 1e-6 && pi < maxPoints; d += interval) {
+            sampleAt(d);
         }
         return out;
     }
 
-    /** Phase 4: uniform 1.0 until last 15%, then linear taper to 0.3 at tail tip. */
-    _tailStampScale(pathIndex, pathLen) {
+    /** Last 15% of path tapers linearly from scale 1.0 → 0.2 at the tail tip. */
+    _tailDrawScale(pathIndex, pathLen) {
         const tailStart = Math.floor(pathLen * 0.85);
         if (pathIndex < tailStart) return 1;
         const denom = Math.max(1, pathLen - 1 - tailStart);
         const t = (pathIndex - tailStart) / denom;
-        return 1 - t * 0.7;
+        return 1 - t * 0.8;
     }
 
     /**
-     * Phase 1: Build cacheCanvasA (base) + cacheCanvasB (−8% brightness) once per
-     * color/radius bucket. Gradients and neon glow are baked off-screen only.
+     * Pre-render canvasNormal + canvasStripe once per color/radius.
+     * Size = radius×2, no shadowBlur, 3D radial gradient only.
      */
-    _getSnakeStampCache(baseColor, rPx) {
+    _getSnakeRibCache(baseColor, rPx) {
         const key = `${baseColor}|${rPx}`;
-        let cache = this._stampCache.get(key);
+        let cache = this._ribCache.get(key);
         if (cache) {
             cache._lastUsed = this._frame;
             return cache;
         }
 
-        const glowBlur = rPx * 0.8;
-        const stampSize = rPx * 2 + glowBlur * 2;
-        const cx = glowBlur + rPx;
-        const cy = glowBlur + rPx;
-        const gx = glowBlur + rPx * 0.7;
-        const gy = glowBlur + rPx * 0.7;
+        const stampSize = rPx * 2;
+        const r = rPx;
+        const gx = r * 0.6;
+        const gy = r * 0.6;
 
-        const bakeStamp = (color) => {
+        const bakeRib = (color) => {
             const cv = document.createElement('canvas');
             cv.width = stampSize;
             cv.height = stampSize;
             const g = cv.getContext('2d');
             const coreShadow = darkenColor(color, 0.15);
-            const grad = g.createRadialGradient(gx, gy, 0, cx, cy, rPx);
-            grad.addColorStop(0, 'rgba(255,255,255,0.4)');
-            grad.addColorStop(0.3, color);
+            const grad = g.createRadialGradient(gx, gy, 0, r, r, r);
+            grad.addColorStop(0, 'rgba(255,255,255,0.2)');
+            grad.addColorStop(0.4, color);
             grad.addColorStop(0.85, coreShadow);
-            grad.addColorStop(1, 'rgba(0,0,0,0.5)');
-            g.shadowBlur = glowBlur;
-            g.shadowColor = color;
+            grad.addColorStop(1, 'rgba(0,0,0,0.4)');
             g.fillStyle = grad;
             g.beginPath();
-            g.arc(cx, cy, rPx, 0, Math.PI * 2);
+            g.arc(r, r, r, 0, Math.PI * 2);
             g.fill();
-            g.shadowBlur = 0;
             return cv;
         };
 
         cache = {
-            cacheCanvasA: bakeStamp(baseColor),
-            cacheCanvasB: bakeStamp(darkenColor(baseColor, 0.08)),
+            canvasNormal: bakeRib(baseColor),
+            canvasStripe: bakeRib(darkenColor(baseColor, 0.08)),
             stampSize,
             _lastUsed: this._frame,
         };
-        this._stampCache.set(key, cache);
+        this._ribCache.set(key, cache);
         return cache;
     }
 
-    /**
-     * Phase 3 main loop: interpolate → project → stamp tail→head via drawImage only.
-     */
     _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
         ctx.save();
@@ -803,7 +788,6 @@ export class SlitherRenderer {
         const headRadius = worldRadius * zoom * thick;
         const angle = snake.angle || 0;
         const isYou = !!snake.isYou;
-        const cashoutPerf = isYou && this._cashoutPerf;
 
         let cs = snake._csCache;
         if (cs === undefined || snake._csColor !== snake.color) {
@@ -812,21 +796,21 @@ export class SlitherRenderer {
             snake._csColor = snake.color;
         }
 
-        const cx = this.camera.x;
-        const cy = this.camera.y;
+        const camX = this.camera.x;
+        const camY = this.camera.y;
         const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 160;
         const viewR2 = viewR * viewR;
         let onScreen = false;
         const checkStride = Math.max(1, Math.floor(segs.length / 12));
         for (let i = 0; i < segs.length; i += checkStride) {
-            const dx = segs[i].x - cx;
-            const dy = segs[i].y - cy;
+            const dx = segs[i].x - camX;
+            const dy = segs[i].y - camY;
             if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
         }
         if (!onScreen) {
             const tail = segs[segs.length - 1];
-            const tdx = tail.x - cx;
-            const tdy = tail.y - cy;
+            const tdx = tail.x - camX;
+            const tdy = tail.y - camY;
             if (tdx * tdx + tdy * tdy <= viewR2) onScreen = true;
         }
         if (!onScreen) {
@@ -834,31 +818,28 @@ export class SlitherRenderer {
             return;
         }
 
-        // Phase 2 — interpolate sub-points at max world spacing of radius × 0.1
-        const maxDist = Math.max(0.05, worldRadius * 0.1);
-        const pointCap = isYou
-            ? (cashoutPerf ? 900 : (this.isMobile ? 1400 : 2200))
-            : (this.isMobile ? 500 : 900);
-        const path = this._interpolateSnakePath(segs, maxDist, this._interpPathBuf, pointCap);
-        const pathLen = path.length;
+        // Fixed equidistant interval: radius × 0.25 (world units, matches screen spacing)
+        const interval = Math.max(0.04, worldRadius * thick * 0.25);
+        const pointCap = isYou ? 3000 : 1200;
+        const drawPoints = this._equidistantResample(
+            segs, interval, this._drawPointsBuf, pointCap,
+        );
+        const pathLen = drawPoints.length;
         if (pathLen === 0) {
             ctx.restore();
             return;
         }
 
-        // Project interpolated path to screen space (index 0 = head, pathLen-1 = tail)
         const halfW = this.W / 2;
         const halfH = this.H / 2;
         for (let i = 0; i < pathLen; i++) {
-            const p = path[i];
-            const wx = p.x;
-            const wy = p.y;
-            p.x = (wx - cx) * zoom + halfW;
-            p.y = (wy - cy) * zoom + halfH;
+            const p = drawPoints[i];
+            p.x = (p.x - camX) * zoom + halfW;
+            p.y = (p.y - camY) * zoom + halfH;
         }
 
-        const hx = path[0].x;
-        const hy = path[0].y;
+        const hx = drawPoints[0].x;
+        const hy = drawPoints[0].y;
 
         const rawR = Math.max(4, Math.round(headRadius / 2) * 2);
         let rPx = rawR;
@@ -868,28 +849,26 @@ export class SlitherRenderer {
             snake._lastSpriteR = rawR;
         }
 
-        const stamps = this._getSnakeStampCache(cs, rPx);
-        const { cacheCanvasA, cacheCanvasB, stampSize } = stamps;
-        const pad = this.W + stampSize;
+        const { canvasNormal, canvasStripe, stampSize } = this._getSnakeRibCache(cs, rPx);
+        const cullPad = stampSize + 40;
+        const STAMPS_PER_BAND = 4;
 
-        const STAMPS_PER_BAND = 6;
-
-        // Phase 3 — stamp pre-rendered canvases tail → head (head drawn last)
         for (let i = pathLen - 1; i >= 0; i--) {
-            const p = path[i];
-            if (p.x < -pad || p.y < -pad || p.x > pad || p.y > pad) continue;
+            const p = drawPoints[i];
+            if (p.x < -cullPad || p.y < -cullPad || p.x > this.W + cullPad || p.y > this.H + cullPad) {
+                continue;
+            }
 
             const stampIdx = pathLen - 1 - i;
-            const useA = Math.floor(stampIdx / STAMPS_PER_BAND) % 2 === 0;
-            const canvas = useA ? cacheCanvasA : cacheCanvasB;
+            const useNormal = Math.floor(stampIdx / STAMPS_PER_BAND) % 2 === 0;
+            const canvas = useNormal ? canvasNormal : canvasStripe;
 
-            const scale = this._tailStampScale(i, pathLen);
+            const scale = this._tailDrawScale(i, pathLen);
             const drawSize = stampSize * scale;
             const half = drawSize * 0.5;
             ctx.drawImage(canvas, p.x - half, p.y - half, drawSize, drawSize);
         }
 
-        // Eyes (only live primitives on the head — not part of the stamp pass)
         const headEyeRadius = headRadius;
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
