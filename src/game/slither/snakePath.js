@@ -230,19 +230,38 @@ function lerpAngle(a, b, t) {
     return a + da * t;
 }
 
-/** Reset tick interpolation after teleport / respawn. */
+function copySpineSnapshot(segments, maxPoints) {
+    const n = Math.min(segments.length, maxPoints);
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+        out[i] = { x: segments[i].x, y: segments[i].y };
+    }
+    return out;
+}
+
+function spinePointAt(snap, idx, simCount) {
+    const n = snap.length;
+    if (n === 0) return { x: 0, y: 0 };
+    if (n === 1 || simCount <= 1) return snap[0];
+    const mapped = Math.min(n - 1, Math.round(idx * (n - 1) / Math.max(1, simCount - 1)));
+    return snap[mapped];
+}
+
+/** Reset snapshot interpolation after teleport / respawn. */
 export function resetSnakeBodyTick(state) {
-    delete state._tickHead;
-    delete state._prevTickHead;
-    delete state._tickAngle;
-    delete state._prevTickAngle;
-    delete state._tickAt;
-    delete state._tickInterval;
+    delete state._snapA;
+    delete state._snapB;
+    delete state._snapAT;
+    delete state._snapBT;
+    delete state._snapAAngle;
+    delete state._snapBAngle;
+    delete state._tickMs;
+    delete state._lastSnapKey;
 }
 
 /**
- * Display-rate body: linear head interpolation between server ticks, body
- * follows the traveled path (no spine lerp — that caused lag and shake).
+ * Interpolate between the previous and current server spine snapshots.
+ * Avoids backward head jumps and path re-simulation fighting server data.
  */
 export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowMs = performance.now()) {
     const len = meta.segmentCount || 0;
@@ -253,60 +272,49 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     const spineLen = serverSegments.length;
     stepVisualGrowth(state, meta, simCount, dt);
     const spacing = segmentSpacingForSnake(meta);
-    const minRecord = Math.max(0.22, spacing * MIN_HEAD_RECORD);
 
     if (!state.segments[0]) {
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
     syncSegmentCount(state, simCount, spacing, serverHead, serverAngle ?? state.angle ?? 0);
 
-    const th = state._tickHead;
-    const newTick = !th || th.x !== serverHead.x || th.y !== serverHead.y
-        || state._tickAngle !== (serverAngle || 0);
-
-    if (newTick) {
-        if (th) {
-            state._prevTickHead = { x: th.x, y: th.y };
-            state._prevTickAngle = state._tickAngle ?? serverAngle ?? 0;
-            const gap = nowMs - (state._tickAt ?? nowMs);
+    const snapKey = `${serverHead.x}|${serverHead.y}|${spineLen}|${serverAngle || 0}`;
+    if (state._lastSnapKey !== snapKey) {
+        state._lastSnapKey = snapKey;
+        if (state._snapB) {
+            state._snapA = state._snapB;
+            state._snapAT = state._snapBT;
+            state._snapAAngle = state._snapBAngle;
+            const gap = nowMs - (state._snapBT ?? nowMs);
             if (gap > 8 && gap < 500) {
-                state._tickInterval = state._tickInterval
-                    ? state._tickInterval * 0.85 + gap * 0.15
-                    : gap;
+                state._tickMs = state._tickMs ? state._tickMs * 0.88 + gap * 0.12 : gap;
             }
-        } else {
-            state._prevTickHead = { x: serverHead.x, y: serverHead.y };
-            state._prevTickAngle = serverAngle || 0;
         }
-        state._tickHead = { x: serverHead.x, y: serverHead.y };
-        state._tickAngle = serverAngle || 0;
-        state._tickAt = nowMs;
-
-        if (!state.path || state.path.length < 2) {
-            const seed = [];
-            for (let i = 0; i < Math.min(spineLen, simCount); i++) {
-                seed.push({ x: serverSegments[i].x, y: serverSegments[i].y });
-            }
-            rebuildPathFromSegments(state, seed.length ? seed : state.segments);
-        } else {
-            recordHeadOnPath(state.path, serverHead.x, serverHead.y, minRecord);
+        state._snapB = copySpineSnapshot(serverSegments, spineLen);
+        state._snapBT = nowMs;
+        state._snapBAngle = serverAngle || 0;
+        if (!state._snapA) {
+            state._snapA = copySpineSnapshot(serverSegments, spineLen);
+            state._snapAT = state._snapBT;
+            state._snapAAngle = state._snapBAngle;
         }
     }
 
-    const tickMs = Math.max(20, state._tickInterval || 40);
-    const elapsed = nowMs - (state._tickAt ?? nowMs);
-    const t = Math.min(1, elapsed / tickMs);
-
-    const head = state.segments[0];
-    if (state._prevTickHead) {
-        head.x = state._prevTickHead.x + (state._tickHead.x - state._prevTickHead.x) * t;
-        head.y = state._prevTickHead.y + (state._tickHead.y - state._prevTickHead.y) * t;
-        state.angle = lerpAngle(state._prevTickAngle ?? state._tickAngle, state._tickAngle, t);
-    } else {
-        head.x = state._tickHead.x;
-        head.y = state._tickHead.y;
-        state.angle = state._tickAngle;
+    let t = 1;
+    if (state._snapA && state._snapB && state._snapBT > state._snapAT) {
+        t = (nowMs - state._snapAT) / (state._snapBT - state._snapAT);
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
     }
 
-    updateBodyAlongPath(state, state.segments, spacing, head.x, head.y, state.angle, len);
+    const snapA = state._snapA || state._snapB;
+    const snapB = state._snapB;
+    for (let i = 0; i < simCount; i++) {
+        const a = spinePointAt(snapA, i, simCount);
+        const b = spinePointAt(snapB, i, simCount);
+        const seg = state.segments[i];
+        seg.x = a.x + (b.x - a.x) * t;
+        seg.y = a.y + (b.y - a.y) * t;
+    }
+    state.angle = lerpAngle(state._snapAAngle ?? state._snapBAngle, state._snapBAngle, t);
 }
