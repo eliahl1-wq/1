@@ -155,7 +155,7 @@ export class SlitherRenderer {
         this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         this.baseZoom = this.isMobile ? 2.05 : 2.65;
         this.zoom = this.baseZoom;
-        this.snakeThickness = this.isMobile ? 1.0 : 0.9;
+        this.snakeThickness = this.isMobile ? 1.12 : 1.18;
         this._dpr = 1;
         // Pre-rendered rib stamps — keyed by color + screen radius bucket
         this._ribCache = new Map();
@@ -177,6 +177,7 @@ export class SlitherRenderer {
         this._renderSnakeBuf = [];
         this._sortedRenderSnakes = [];
         this._drawPointsBuf = [];
+        this._splinePathBuf = [];
         this._drawPointPool = [];
         this._renderPool = new Map();
         this._smoothSeen = new Set();
@@ -649,7 +650,7 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    // ─── Equidistant rib-tube renderer ───
+    // ─── Slither.io-style smooth tube renderer ───
 
     _drawPoint(i, x, y) {
         let p = this._drawPointPool[i];
@@ -662,11 +663,29 @@ export class SlitherRenderer {
         return p;
     }
 
+    _catmullRom(p0, p1, p2, p3, t) {
+        const t2 = t * t;
+        const t3 = t2 * t;
+        return {
+            x: 0.5 * (
+                (2 * p1.x)
+                + (-p0.x + p2.x) * t
+                + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2
+                + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+            ),
+            y: 0.5 * (
+                (2 * p1.y)
+                + (-p0.y + p2.y) * t
+                + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
+                + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+            ),
+        };
+    }
+
     /**
-     * Equidistant path resampling — places drawPoints at a fixed arc-length
-     * interval (worldRadius × 0.25) via linear interpolation along the spine.
+     * Catmull-Rom spline through spine control points — smooth turns, no kinks.
      */
-    _equidistantResample(segments, interval, out, maxPoints) {
+    _buildCatmullRomPath(segments, subdivisions, out, maxPoints) {
         out.length = 0;
         const n = segments.length;
         if (n === 0) return out;
@@ -674,19 +693,58 @@ export class SlitherRenderer {
             out.push(this._drawPoint(0, segments[0].x, segments[0].y));
             return out;
         }
+        if (n === 2) {
+            out.push(this._drawPoint(0, segments[0].x, segments[0].y));
+            out.push(this._drawPoint(1, segments[1].x, segments[1].y));
+            return out;
+        }
+
+        let pi = 0;
+        const push = (x, y) => {
+            if (pi >= maxPoints) return false;
+            out.push(this._drawPoint(pi++, x, y));
+            return true;
+        };
+
+        push(segments[0].x, segments[0].y);
+
+        for (let i = 0; i < n - 1; i++) {
+            const p0 = segments[Math.max(0, i - 1)];
+            const p1 = segments[i];
+            const p2 = segments[i + 1];
+            const p3 = segments[Math.min(n - 1, i + 2)];
+            const steps = subdivisions;
+            for (let s = 1; s <= steps; s++) {
+                if (pi >= maxPoints) return out;
+                const pt = this._catmullRom(p0, p1, p2, p3, s / steps);
+                push(pt.x, pt.y);
+            }
+        }
+        return out;
+    }
+
+    /** Equally spaced samples along a polyline (arc-length parameterization). */
+    _equidistantResample(points, interval, out, maxPoints) {
+        out.length = 0;
+        const n = points.length;
+        if (n === 0) return out;
+        if (n === 1) {
+            out.push(this._drawPoint(0, points[0].x, points[0].y));
+            return out;
+        }
 
         let totalLen = 0;
         const acc = new Float32Array(n);
         acc[0] = 0;
         for (let i = 1; i < n; i++) {
-            const dx = segments[i].x - segments[i - 1].x;
-            const dy = segments[i].y - segments[i - 1].y;
+            const dx = points[i].x - points[i - 1].x;
+            const dy = points[i].y - points[i - 1].y;
             totalLen += Math.sqrt(dx * dx + dy * dy);
             acc[i] = totalLen;
         }
 
         if (totalLen < 1e-8 || interval < 1e-8) {
-            out.push(this._drawPoint(0, segments[0].x, segments[0].y));
+            out.push(this._drawPoint(0, points[0].x, points[0].y));
             return out;
         }
 
@@ -701,8 +759,8 @@ export class SlitherRenderer {
             const segStart = acc[seg - 1];
             const segLen = acc[seg] - segStart;
             const t = segLen > 1e-9 ? (dist - segStart) / segLen : 0;
-            const p0 = segments[seg - 1];
-            const p1 = segments[seg];
+            const p0 = points[seg - 1];
+            const p1 = points[seg];
             out.push(this._drawPoint(
                 pi++,
                 p0.x + (p1.x - p0.x) * t,
@@ -717,43 +775,43 @@ export class SlitherRenderer {
         return out;
     }
 
-    /** Last 15% of path tapers linearly from scale 1.0 → 0.2 at the tail tip. */
+    /** Last 15%: ease-out taper 1.0 → 0.4 (never thinner). Index 0 = head. */
     _tailDrawScale(pathIndex, pathLen) {
         const tailStart = Math.floor(pathLen * 0.85);
         if (pathIndex < tailStart) return 1;
         const denom = Math.max(1, pathLen - 1 - tailStart);
         const t = (pathIndex - tailStart) / denom;
-        return 1 - t * 0.8;
+        const eased = 1 - (1 - t) * (1 - t);
+        return Math.max(0.4, 1 - eased * 0.6);
     }
 
     /**
-     * Pre-render canvasNormal + canvasStripe once per color/radius.
-     * Size = radius×2, no shadowBlur, 3D radial gradient only.
+     * Soft glossy body stamp — no dark rim, subtle highlight, rubber-tube look.
      */
-    _getSnakeRibCache(baseColor, rPx) {
-        const key = `${baseColor}|${rPx}`;
+    _getSnakeBodyCache(baseColor, rPx) {
+        const key = `slither_v24|${baseColor}|${rPx}`;
         let cache = this._ribCache.get(key);
         if (cache) {
             cache._lastUsed = this._frame;
             return cache;
         }
 
-        const stampSize = rPx * 2;
+        const stampSize = Math.ceil(rPx * 2);
         const r = rPx;
-        const gx = r * 0.6;
-        const gy = r * 0.6;
+        const hx = r * 0.52;
+        const hy = r * 0.48;
 
-        const bakeRib = (color) => {
+        const bakeSoftStamp = (color) => {
             const cv = document.createElement('canvas');
             cv.width = stampSize;
             cv.height = stampSize;
             const g = cv.getContext('2d');
-            const coreShadow = darkenColor(color, 0.15);
-            const grad = g.createRadialGradient(gx, gy, 0, r, r, r);
-            grad.addColorStop(0, 'rgba(255,255,255,0.2)');
-            grad.addColorStop(0.4, color);
-            grad.addColorStop(0.85, coreShadow);
-            grad.addColorStop(1, 'rgba(0,0,0,0.4)');
+            const edgeTint = darkenColor(color, 0.03);
+            const grad = g.createRadialGradient(hx, hy, r * 0.05, r, r, r);
+            grad.addColorStop(0, 'rgba(255,255,255,0.13)');
+            grad.addColorStop(0.28, color);
+            grad.addColorStop(0.72, color);
+            grad.addColorStop(1, edgeTint);
             g.fillStyle = grad;
             g.beginPath();
             g.arc(r, r, r, 0, Math.PI * 2);
@@ -762,8 +820,8 @@ export class SlitherRenderer {
         };
 
         cache = {
-            canvasNormal: bakeRib(baseColor),
-            canvasStripe: bakeRib(darkenColor(baseColor, 0.08)),
+            canvasNormal: bakeSoftStamp(baseColor),
+            canvasStripe: bakeSoftStamp(darkenColor(baseColor, 0.05)),
             stampSize,
             _lastUsed: this._frame,
         };
@@ -818,11 +876,14 @@ export class SlitherRenderer {
             return;
         }
 
-        // Fixed equidistant interval: radius × 0.25 (world units, matches screen spacing)
-        const interval = Math.max(0.04, worldRadius * thick * 0.25);
-        const pointCap = isYou ? 3000 : 1200;
+        const pointCap = isYou ? 4500 : 1800;
+        const splineSubdiv = isYou ? 10 : 7;
+
+        // 1) Catmull-Rom smooth curve  2) dense equidistant resample
+        const spline = this._buildCatmullRomPath(segs, splineSubdiv, this._splinePathBuf, pointCap * 2);
+        const stampInterval = Math.max(0.025, worldRadius * thick * 0.075);
         const drawPoints = this._equidistantResample(
-            segs, interval, this._drawPointsBuf, pointCap,
+            spline, stampInterval, this._drawPointsBuf, pointCap,
         );
         const pathLen = drawPoints.length;
         if (pathLen === 0) {
@@ -841,7 +902,7 @@ export class SlitherRenderer {
         const hx = drawPoints[0].x;
         const hy = drawPoints[0].y;
 
-        const rawR = Math.max(4, Math.round(headRadius / 2) * 2);
+        const rawR = Math.max(5, Math.round(headRadius / 2) * 2);
         let rPx = rawR;
         if (snake._lastSpriteR != null && Math.abs(rawR - snake._lastSpriteR) < 6) {
             rPx = snake._lastSpriteR;
@@ -849,11 +910,18 @@ export class SlitherRenderer {
             snake._lastSpriteR = rawR;
         }
 
-        const { canvasNormal, canvasStripe, stampSize } = this._getSnakeRibCache(cs, rPx);
-        const cullPad = stampSize + 40;
-        const STAMPS_PER_BAND = 4;
+        const { canvasNormal, canvasStripe, stampSize } = this._getSnakeBodyCache(cs, rPx);
+        const cullPad = stampSize + 48;
+        const STAMPS_PER_BAND = 8;
 
-        for (let i = pathLen - 1; i >= 0; i--) {
+        const stampAt = (p, canvas, scale) => {
+            const drawSize = stampSize * scale;
+            const half = drawSize * 0.5;
+            ctx.drawImage(canvas, p.x - half, p.y - half, drawSize, drawSize);
+        };
+
+        // Body: tail → neck (skip head index 0 — drawn last)
+        for (let i = pathLen - 1; i >= 1; i--) {
             const p = drawPoints[i];
             if (p.x < -cullPad || p.y < -cullPad || p.x > this.W + cullPad || p.y > this.H + cullPad) {
                 continue;
@@ -862,11 +930,24 @@ export class SlitherRenderer {
             const stampIdx = pathLen - 1 - i;
             const useNormal = Math.floor(stampIdx / STAMPS_PER_BAND) % 2 === 0;
             const canvas = useNormal ? canvasNormal : canvasStripe;
+            stampAt(p, canvas, this._tailDrawScale(i, pathLen));
+        }
 
-            const scale = this._tailDrawScale(i, pathLen);
-            const drawSize = stampSize * scale;
-            const half = drawSize * 0.5;
-            ctx.drawImage(canvas, p.x - half, p.y - half, drawSize, drawSize);
+        // Rounded tail cap
+        if (pathLen > 1) {
+            const tailPt = drawPoints[pathLen - 1];
+            const tailScale = this._tailDrawScale(pathLen - 1, pathLen);
+            if (tailPt.x >= -cullPad && tailPt.y >= -cullPad
+                && tailPt.x <= this.W + cullPad && tailPt.y <= this.H + cullPad) {
+                stampAt(tailPt, canvasNormal, tailScale);
+            }
+        }
+
+        // Head on top (always last, full size)
+        const headPt = drawPoints[0];
+        if (headPt.x >= -cullPad && headPt.y >= -cullPad
+            && headPt.x <= this.W + cullPad && headPt.y <= this.H + cullPad) {
+            stampAt(headPt, canvasNormal, 1);
         }
 
         const headEyeRadius = headRadius;
@@ -874,12 +955,12 @@ export class SlitherRenderer {
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headEyeRadius * 0.35;
-        const eyeFwd = headEyeRadius * 0.35;
-        const eyeR = Math.max(2.5, headEyeRadius * 0.32);
-        const pupilR = eyeR * 0.45;
+        const eyeSide = headEyeRadius * 0.38;
+        const eyeFwd = headEyeRadius * 0.32;
+        const eyeR = Math.max(3, headEyeRadius * 0.36);
+        const pupilR = eyeR * 0.42;
 
-        if (isYou || this._quality >= 0.68) {
+        if (isYou || this._quality >= 0.65) {
             for (const side of [-1, 1]) {
                 const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
                 const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
@@ -889,11 +970,11 @@ export class SlitherRenderer {
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
 
-                const px = ex + fwdX * eyeR * 0.4;
-                const py = ey + fwdY * eyeR * 0.4;
+                const px = ex + fwdX * eyeR * 0.35;
+                const py = ey + fwdY * eyeR * 0.35;
                 ctx.beginPath();
                 ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-                ctx.fillStyle = '#000000';
+                ctx.fillStyle = '#1a1a1a';
                 ctx.fill();
             }
         }
