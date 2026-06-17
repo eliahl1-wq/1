@@ -790,6 +790,7 @@ export default function SlitherGame() {
                     onHome={handleLobby}
                     onSpectate={enterSpectate}
                     onClose={enterSpectate}
+                    showSpectate={isCompetitiveMode}
                 />
             )}
 

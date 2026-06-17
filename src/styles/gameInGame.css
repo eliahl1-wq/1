@@ -260,6 +260,19 @@
     border-radius: 2px;
 }
 
+@keyframes game-cashout-securing-progress {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+
+.game-cashout-securing-fill--active {
+    width: 100%;
+    transform-origin: left center;
+    animation: game-cashout-securing-progress var(--cashout-duration, 10s) linear forwards;
+    animation-delay: calc(-1 * var(--cashout-elapsed, 0s));
+    will-change: transform;
+}
+
 /* Battle Royale HUD (top center, clear of minimap) */
 
 .game-br-hud {

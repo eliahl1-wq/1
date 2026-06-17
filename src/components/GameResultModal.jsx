@@ -113,6 +113,7 @@ export default function GameResultModal({
     onHome,
     onSpectate,
     onClose,
+    showSpectate = false,
 }) {
     const isWin = type === 'cashout';
     const [displayAmount, setDisplayAmount] = useState(0);
@@ -202,10 +203,12 @@ export default function GameResultModal({
                 )}
 
                 <div className="game-result-actions">
-                    <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onSpectate}>
-                        <EyeIcon />
-                        Spectate
-                    </button>
+                    {!isWin && showSpectate && (
+                        <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onSpectate}>
+                            <EyeIcon />
+                            Spectate
+                        </button>
+                    )}
                     <button
                         type="button"
                         className="game-result-btn btn btn-primary game-result-btn--play"

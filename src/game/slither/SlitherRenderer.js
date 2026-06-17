@@ -211,7 +211,7 @@ export class SlitherRenderer {
     resize() {
         const { width, height } = getGameScreenSize();
         const rawDpr = window.devicePixelRatio || 1;
-        this._dpr = this.isMobile ? Math.min(1.75, rawDpr) : rawDpr;
+        this._dpr = this.isMobile ? Math.min(1.75, rawDpr) : Math.min(2, rawDpr);
         if (this._dpr < 1) this._dpr = 1;
         this.canvas.width = Math.round(width * this._dpr);
         this.canvas.height = Math.round(height * this._dpr);
@@ -334,7 +334,14 @@ export class SlitherRenderer {
     }
 
     setHud(hud) {
-        this.hud = { ...this.hud, ...hud };
+        for (const key in hud) {
+            if (hud[key] !== undefined) this.hud[key] = hud[key];
+        }
+    }
+
+    _isCashoutActive(nowMs = Date.now()) {
+        const end = this.hud.cashoutEndAt;
+        return end > 0 && end > nowMs;
     }
 
     setInputEnabled(enabled) {
@@ -737,16 +744,19 @@ export class SlitherRenderer {
     }
 
     _drawFood(ctx, foodList, toScreen, W, H, zoom) {
-        const now = Date.now();
+        const now = performance.now();
         const cx = this.camera.x;
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const simpleFood = this._quality < 0.45;
-        const foodStride = this._quality < 0.38 ? 2 : 1;
+        const cashoutPerf = this._cashoutPerf;
+        const simpleFood = this._quality < 0.45 || cashoutPerf;
+        const foodStride = cashoutPerf ? 2 : (this._quality < 0.38 ? 2 : 1);
+        const skipMagnet = cashoutPerf || this._quality < 0.55;
+        const skipWobble = cashoutPerf;
 
         // Magnet: food within this world radius of the mouth drifts toward it.
-        const mouthValid = this._mouthValid;
+        const mouthValid = !skipMagnet && this._mouthValid;
         const mouthX = this._mouthX;
         const mouthY = this._mouthY;
         const attractR = ((this._mouthR || 6) * 3.6) + 54;
@@ -776,23 +786,27 @@ export class SlitherRenderer {
             let sizeMul = 1;
             let alpha = 1;
 
-            if (isGolden) {
-                const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
-                sizeMul = 0.85 + pulse;
-                wx += Math.sin(now * 0.003 + f.y) * 6;
-                wy += Math.cos(now * 0.0035 + f.x) * 6;
-                alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
+            if (!skipWobble) {
+                if (isGolden) {
+                    const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
+                    sizeMul = 0.85 + pulse;
+                    wx += Math.sin(now * 0.003 + f.y) * 6;
+                    wy += Math.cos(now * 0.0035 + f.x) * 6;
+                    alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
+                } else if (f.deathDrop) {
+                    sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
+                    sizeMul *= 1 + Math.sin(now * 0.0035 + f._phase) * 0.07;
+                    wx += Math.sin(now * 0.0022 + f._phase) * 1.4;
+                    wy += Math.cos(now * 0.0026 + f._phase * 1.3) * 1.4;
+                } else {
+                    sizeMul = f._sizeMul * (1 + Math.sin(now * 0.004 + f._phase) * 0.09);
+                    wx += Math.sin(now * 0.0024 + f._phase) * 1.5;
+                    wy += Math.cos(now * 0.0028 + f._phase * 1.3) * 1.5;
+                }
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
-                // Soft breathing pulse + gentle drift.
-                sizeMul *= 1 + Math.sin(now * 0.0035 + f._phase) * 0.07;
-                wx += Math.sin(now * 0.0022 + f._phase) * 1.4;
-                wy += Math.cos(now * 0.0026 + f._phase * 1.3) * 1.4;
-            } else {
-                // Pellets gently pulse and jiggle so they feel alive, not static.
-                sizeMul = f._sizeMul * (1 + Math.sin(now * 0.004 + f._phase) * 0.09);
-                wx += Math.sin(now * 0.0024 + f._phase) * 1.5;
-                wy += Math.cos(now * 0.0028 + f._phase * 1.3) * 1.5;
+            } else if (!isGolden) {
+                sizeMul = f._sizeMul;
             }
 
             // Magnet attraction — pull toward the mouth, easing in as it gets closer.
@@ -948,68 +962,79 @@ export class SlitherRenderer {
     }
 
     /**
-     * Pre-render normal segment + glow + boost overlay into o.pr_imgs cache.
+     * Pre-render normal segment + optional glow/boost overlays into o.pr_imgs cache.
+     * Heavy overlays are built lazily — remote snakes only need normal/alt/boostBody.
      */
-    _getSnakePrImgs(cs, rPx) {
+    _getSnakePrImgs(cs, rPx, needs = {}) {
         const key = `${cs}|${rPx}`;
         let pair = this._prImgs.get(key);
-        if (pair) return pair;
-
-        // Supersample the visible body sprites for smooth edges, but scale the factor
-        // down for very large radii so sprite memory stays bounded.
         const bodySS = rPx <= 44 ? this._bodySS : rPx <= 84 ? 1.5 : 1.25;
+
+        if (!pair) {
+            pair = { bodySS };
+            this._prImgs.set(key, pair);
+        } else {
+            pair.bodySS = bodySS;
+        }
+
         const ssR = rPx * bodySS;
         const ssSize = ssR * 2 + 4;
 
-        const normal = this._getSprite(`pr_norm_v21|${key}|0`, ssSize, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
-        });
+        if (!pair.normal) {
+            pair.normal = this._getSprite(`pr_norm_v21|${key}|0`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
+            });
+            pair.alt = this._getSprite(`pr_norm_v21|${key}|1`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
+            });
+            pair.boostBody = this._getSprite(`pr_norm_v21|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
+            });
+        }
 
-        const alt = this._getSprite(`pr_norm_v21|${key}|1`, ssSize, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
-        });
+        if (needs.glow && !pair.glow) {
+            const glowPad = Math.ceil(rPx * 0.45);
+            pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+                this._paintSnakeGlow(g, sz / 2, rPx, cs);
+            });
+        }
 
-        const boostBody = this._getSprite(`pr_norm_v21|${key}|boost`, ssSize, (g, sz) => {
-            this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
-        });
+        if (needs.boostOverlay && !pair.boostOverlay) {
+            const col = parseColor(cs);
+            const bright = shadeColor(col, 35);
+            const pad = Math.max(3, Math.ceil(rPx * 0.2));
+            pair.boostOverlay = this._getSprite(`pr_boost_v20|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
+                const c = sz / 2;
+                const glowR = rPx * 1.4 + pad;
+                const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
+                aura.addColorStop(0, rgb(bright, 0.05));
+                aura.addColorStop(0.4, rgb(bright, 0.15));
+                aura.addColorStop(0.7, rgb(bright, 0.08));
+                aura.addColorStop(1, 'rgba(255,255,255,0)');
+                g.fillStyle = aura;
+                g.beginPath();
+                g.arc(c, c, glowR, 0, Math.PI * 2);
+                g.fill();
+            });
+        }
 
-        const glowPad = Math.ceil(rPx * 0.45);
-        const glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
-            this._paintSnakeGlow(g, sz / 2, rPx, cs);
-        });
+        if (needs.trailGlow && !pair.trailGlow) {
+            const col = parseColor(cs);
+            const bright = shadeColor(col, 35);
+            pair.trailGlow = this._getSprite(`pr_trail_v20|${key}`, rPx * 3 + 8, (g, sz) => {
+                const c = sz / 2;
+                const glowR = rPx * 1.7;
+                const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
+                grad.addColorStop(0, rgb(bright, 0.12));
+                grad.addColorStop(0.40, rgb(col, 0.06));
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                g.fillStyle = grad;
+                g.beginPath();
+                g.arc(c, c, glowR, 0, Math.PI * 2);
+                g.fill();
+            });
+        }
 
-        const col = parseColor(cs);
-        const bright = shadeColor(col, 35);
-        const pad = Math.max(3, Math.ceil(rPx * 0.2));
-        const boostOverlay = this._getSprite(`pr_boost_v20|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
-            const c = sz / 2;
-            const glowR = rPx * 1.4 + pad;
-            const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
-            aura.addColorStop(0, rgb(bright, 0.05));
-            aura.addColorStop(0.4, rgb(bright, 0.15));
-            aura.addColorStop(0.7, rgb(bright, 0.08));
-            aura.addColorStop(1, 'rgba(255,255,255,0)');
-            g.fillStyle = aura;
-            g.beginPath();
-            g.arc(c, c, glowR, 0, Math.PI * 2);
-            g.fill();
-        });
-
-        const trailGlow = this._getSprite(`pr_trail_v20|${key}`, rPx * 3 + 8, (g, sz) => {
-            const c = sz / 2;
-            const glowR = rPx * 1.7;
-            const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
-            grad.addColorStop(0, rgb(bright, 0.12));
-            grad.addColorStop(0.40, rgb(col, 0.06));
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            g.fillStyle = grad;
-            g.beginPath();
-            g.arc(c, c, glowR, 0, Math.PI * 2);
-            g.fill();
-        });
-
-        pair = { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS };
-        this._prImgs.set(key, pair);
         return pair;
     }
 
@@ -1071,7 +1096,8 @@ export class SlitherRenderer {
         // Bump spacing in WORLD units so it stays constant while zoom animates each frame.
         const bumpStepWorld = Math.max(2.6, worldRadius * (boosting ? boostSpaceMul : overlapMul));
         const q = this._quality;
-        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
+        const cashoutPerf = isYou && this._cashoutPerf;
+        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.88 : 1);
         const maxBumps = Math.round(
             (isYou ? (boosting ? 110 : 92) : (boosting ? 48 : 38)) * qMul * Math.min(1.25, 1 + segs.length / 300),
         );
@@ -1102,9 +1128,14 @@ export class SlitherRenderer {
         } else {
             snake._lastSpriteR = rawR;
         }
-        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakePrImgs(cs, r);
-        const halfT = trailGlow.width / 2;
-        const halfB = boostOverlay.width / 2;
+        const prNeeds = {
+            glow: isYou && !cashoutPerf && q >= 0.5,
+            boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
+            trailGlow: isYou && boosting && !cashoutPerf,
+        };
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakePrImgs(cs, r, prNeeds);
+        const halfT = trailGlow ? trailGlow.width / 2 : 0;
+        const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
         const bumpCount = bumps.length;
 
         const headBump = bumps[0];
@@ -1122,7 +1153,7 @@ export class SlitherRenderer {
         }
 
         // Motion blur trailing afterimages during boost (local snake only)
-        if (isYou && boosting && trail.length > 1) {
+        if (isYou && boosting && !cashoutPerf && trailGlow && trail.length > 1) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             for (let t = 1; t < trail.length; t++) {
@@ -1146,12 +1177,11 @@ export class SlitherRenderer {
         // Ambient glow — local snake only (doubles draw calls otherwise). The glow
         // sprite is large and additive, so stride the loop: overlapping bumps make
         // the gaps invisible while roughly halving this pass's fillrate.
-        if (isYou && q >= 0.5) {
+        if (isYou && prNeeds.glow && glow) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            // Alpha bumped to roughly compensate for the strided (sparser) additive blits.
             ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
-            const glowStride = boosting ? 2 : 3;
+            const glowStride = cashoutPerf ? 4 : (boosting ? 2 : 3);
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -1161,7 +1191,7 @@ export class SlitherRenderer {
         }
 
         // Boost overlay (local snake only) — strided for the same reason as the glow.
-        if (isYou && boosting && q >= 0.55) {
+        if (isYou && boosting && prNeeds.boostOverlay && boostOverlay) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             for (let i = bumpCount - 1; i >= 0; i -= 2) {
@@ -1283,11 +1313,16 @@ export class SlitherRenderer {
 
         const frameMs = dt * 1000;
         this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
+        const nowMs = Date.now();
+        this._cashoutPerf = this._isCashoutActive(nowMs);
         const qFloor = this.isMobile ? 0.88 : 0.72;
         if (this._perfEma > 32) this._quality = Math.max(qFloor, 0.84);
         else if (this._perfEma > 24) this._quality = Math.min(this._quality, Math.max(qFloor, 0.94));
         else if (this._perfEma > 20) this._quality = Math.min(this._quality, Math.max(qFloor, 0.97));
         else if (this._perfEma < 15) this._quality = Math.min(1, this._quality + 0.025);
+        if (this._cashoutPerf) {
+            this._quality = Math.min(this._quality, this.isMobile ? 0.92 : 0.86);
+        }
 
         ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
         ctx.globalAlpha = 1;
@@ -1419,10 +1454,10 @@ export class SlitherRenderer {
             );
         }
 
-        if (me?.segments?.[0]) {
+        if (me?.segments?.[0] || this.spectatorMode) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
-            if ((this._minimapFrame++ & 3) === 0) {
+            if ((this._minimapFrame++ & 3) === 0 && !this._cashoutPerf) {
                 const fbPlayers = this._minimapFallback.players;
                 fbPlayers.length = 0;
                 for (let i = 0; i < renderSnakes.length; i++) {
