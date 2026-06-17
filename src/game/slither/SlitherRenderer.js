@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { rebuildPathFromSegments, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
+import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -411,11 +411,12 @@ export class SlitherRenderer {
                     s.angle = snake.angle || 0;
                     rebuildPathFromSegments(s, s.segments);
                     resetVisualGrowth(s, snake.radius, segCount);
+                    resetSnakeBodyTick(s);
                     delete s._prevSrvHead;
                     delete s._extrapX;
                     delete s._extrapY;
                 }
-                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt);
+                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now());
                 continue;
             }
 
@@ -1344,7 +1345,7 @@ export class SlitherRenderer {
             rs.name = snake.name;
             rs.balance = snake.balance;
             rs.segments = s ? s.segments : snake.segments;
-            rs.drawSpine = rs.segments;
+            rs.drawSpine = (snake.isYou && s?.path?.length >= 2) ? s.path : rs.segments;
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);
         }

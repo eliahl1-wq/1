@@ -825,6 +825,7 @@ export default function Game() {
                     onHome={handleLobby}
                     onSpectate={enterSpectate}
                     onClose={enterSpectate}
+                    showSpectate
                 />
             )}
 

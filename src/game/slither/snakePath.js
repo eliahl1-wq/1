@@ -224,11 +224,27 @@ function stepVisualGrowth(state, meta, targetSegCount, dt) {
     };
 }
 
+function lerpAngle(a, b, t) {
+    let da = b - a;
+    da = Math.atan2(Math.sin(da), Math.cos(da));
+    return a + da * t;
+}
+
+/** Reset tick interpolation after teleport / respawn. */
+export function resetSnakeBodyTick(state) {
+    delete state._tickHead;
+    delete state._prevTickHead;
+    delete state._tickAngle;
+    delete state._prevTickAngle;
+    delete state._tickAt;
+    delete state._tickInterval;
+}
+
 /**
- * Smooth head toward server, follow body from authoritative server spine.
- * Avoids client path re-simulation that fights server ticks and causes shake.
+ * Display-rate body: linear head interpolation between server ticks, body
+ * follows the traveled path (no spine lerp — that caused lag and shake).
  */
-export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt) {
+export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowMs = performance.now()) {
     const len = meta.segmentCount || 0;
     if (len === 0 || !serverSegments?.[0]) return;
 
@@ -237,36 +253,60 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt) {
     const spineLen = serverSegments.length;
     stepVisualGrowth(state, meta, simCount, dt);
     const spacing = segmentSpacingForSnake(meta);
+    const minRecord = Math.max(0.22, spacing * MIN_HEAD_RECORD);
 
     if (!state.segments[0]) {
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
-
     syncSegmentCount(state, simCount, spacing, serverHead, serverAngle ?? state.angle ?? 0);
 
-    const head = state.segments[0];
-    head.x = serverHead.x;
-    head.y = serverHead.y;
-    state.angle = serverAngle || 0;
+    const th = state._tickHead;
+    const newTick = !th || th.x !== serverHead.x || th.y !== serverHead.y
+        || state._tickAngle !== (serverAngle || 0);
 
-    const tau = 0.028;
-    const a = 1 - Math.exp(-dt / tau);
-    for (let i = 1; i < simCount; i++) {
-        const seg = state.segments[i];
-        const mappedIdx = spineLen > 1
-            ? Math.min(spineLen - 1, Math.round(i * (spineLen - 1) / Math.max(1, simCount - 1)))
-            : 0;
-        const tgt = serverSegments[mappedIdx];
-        if (!tgt) continue;
-        const dx = tgt.x - seg.x;
-        const dy = tgt.y - seg.y;
-        const snap = dx * dx + dy * dy > spacing * spacing * 4;
-        const blend = snap ? Math.min(1, a * 2.5) : a;
-        seg.x += dx * blend;
-        seg.y += dy * blend;
+    if (newTick) {
+        if (th) {
+            state._prevTickHead = { x: th.x, y: th.y };
+            state._prevTickAngle = state._tickAngle ?? serverAngle ?? 0;
+            const gap = nowMs - (state._tickAt ?? nowMs);
+            if (gap > 8 && gap < 500) {
+                state._tickInterval = state._tickInterval
+                    ? state._tickInterval * 0.85 + gap * 0.15
+                    : gap;
+            }
+        } else {
+            state._prevTickHead = { x: serverHead.x, y: serverHead.y };
+            state._prevTickAngle = serverAngle || 0;
+        }
+        state._tickHead = { x: serverHead.x, y: serverHead.y };
+        state._tickAngle = serverAngle || 0;
+        state._tickAt = nowMs;
+
+        if (!state.path || state.path.length < 2) {
+            const seed = [];
+            for (let i = 0; i < Math.min(spineLen, simCount); i++) {
+                seed.push({ x: serverSegments[i].x, y: serverSegments[i].y });
+            }
+            rebuildPathFromSegments(state, seed.length ? seed : state.segments);
+        } else {
+            recordHeadOnPath(state.path, serverHead.x, serverHead.y, minRecord);
+        }
     }
 
-    delete state._prevSrvHead;
-    delete state._extrapX;
-    delete state._extrapY;
+    const tickMs = Math.max(20, state._tickInterval || 40);
+    const elapsed = nowMs - (state._tickAt ?? nowMs);
+    const t = Math.min(1, elapsed / tickMs);
+
+    const head = state.segments[0];
+    if (state._prevTickHead) {
+        head.x = state._prevTickHead.x + (state._tickHead.x - state._prevTickHead.x) * t;
+        head.y = state._prevTickHead.y + (state._tickHead.y - state._prevTickHead.y) * t;
+        state.angle = lerpAngle(state._prevTickAngle ?? state._tickAngle, state._tickAngle, t);
+    } else {
+        head.x = state._tickHead.x;
+        head.y = state._tickHead.y;
+        state.angle = state._tickAngle;
+    }
+
+    updateBodyAlongPath(state, state.segments, spacing, head.x, head.y, state.angle, len);
 }
