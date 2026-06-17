@@ -293,6 +293,56 @@ function drawSlitherFood(ctx, x, y, r, hue, golden = false) {
     ctx.fill();
 }
 
+/** Larger, softer pellets left when a snake dies — matches in-game death drops. */
+function drawDeathDropFood(ctx, x, y, r, hue) {
+    const halo = r * 1.95;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, halo);
+    grad.addColorStop(0, `hsla(${hue}, 95%, 86%, 0.60)`);
+    grad.addColorStop(0.22, `hsla(${hue}, 95%, 68%, 0.42)`);
+    grad.addColorStop(0.46, `hsla(${hue}, 95%, 58%, 0.18)`);
+    grad.addColorStop(0.78, `hsla(${hue}, 95%, 48%, 0.012)`);
+    grad.addColorStop(1, `hsla(${hue}, 95%, 46%, 0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, halo, 0, FULL);
+    ctx.fill();
+}
+
+function drawDeathDropTrail(ctx, points, hue, sizeBase = 5.5) {
+    for (let i = 0; i < points.length; i++) {
+        const t = i / Math.max(1, points.length - 1);
+        drawDeathDropFood(ctx, points[i].x, points[i].y, sizeBase * (0.65 + t * 0.55), hue);
+    }
+}
+
+/** Snake body trailing backward from the head; faceAngle = direction the head looks. */
+function sampleSnakeToward(startX, startY, faceAngle, length, count) {
+    const pts = [];
+    let x = startX;
+    let y = startY;
+    const backAngle = faceAngle + Math.PI;
+    for (let i = 0; i < count; i++) {
+        pts.push({ x, y });
+        const wobble = Math.sin(i * 0.45) * 0.14;
+        x += Math.cos(backAngle + wobble) * length;
+        y += Math.sin(backAngle + wobble) * length;
+    }
+    return pts;
+}
+
+function sampleSnakeArc(cx, cy, startAngle, arcSpan, radius, count) {
+    const pts = [];
+    for (let i = 0; i < count; i++) {
+        const t = i / Math.max(1, count - 1);
+        const a = startAngle + arcSpan * t;
+        pts.push({
+            x: cx + Math.cos(a) * radius,
+            y: cy + Math.sin(a) * radius,
+        });
+    }
+    return pts;
+}
+
 function drawSlitherPreview(ctx, W, H, opts = {}) {
     const {
         arena = 'square',
@@ -335,19 +385,80 @@ function drawSlitherPreview(ctx, W, H, opts = {}) {
     }
 }
 
+/** Slither Arena — large safe zone, unique snakes, death-drop loot pile. */
+function drawCompetitiveSlitherPreview(ctx, W, H) {
+    drawSlitherTilePattern(ctx, W, H);
+    drawSlitherPlayFill(ctx, W, H, 'circle');
+
+    const zcx = W * 0.5;
+    const zcy = H * 0.5;
+    const zr = Math.min(W, H) * 0.41;
+    drawSlitherZone(ctx, W, H, zcx, zcy, zr, { shrinking: true });
+
+    drawSlitherFood(ctx, W * 0.24, H * 0.22, 3.5, 180);
+    drawSlitherFood(ctx, W * 0.78, H * 0.18, 3, 300);
+
+    // Dead snake remains — orange trail where a rival got eliminated
+    const deadTrail = sampleSnakeArc(W * 0.44, H * 0.56, Math.PI * 0.15, Math.PI * 0.85, 34, 11);
+    drawDeathDropTrail(ctx, deadTrail, 24, 6);
+
+    // You: long purple snake along the bottom edge, cashing out
+    const youPts = sampleSnakeArc(W * 0.62, H * 0.78, Math.PI * 1.05, Math.PI * 0.55, 52, 18);
+    drawSnakePath(ctx, youPts, 7.5, '#c4a8ff');
+    if (youPts[0]) {
+        drawBalanceBadge(ctx, youPts[0].x, youPts[0].y + 12, 14.5, true);
+        drawCashoutProgressRing(ctx, youPts[0].x, youPts[0].y, 13, 0.45, { counterClockwise: true });
+    }
+
+    // Rival circling the loot — amber coil, distinct from normal-mode snakes
+    drawSnakePath(
+        ctx,
+        sampleSnakeArc(W * 0.46, H * 0.48, Math.PI * 1.35, Math.PI * 0.9, 38, 13),
+        6,
+        '#ffb066',
+    );
+}
+
+/** Slither Battle Royale — tight zone, standoff, death loot inside the ring. */
+function drawBRSlitherPreview(ctx, W, H) {
+    drawSlitherTilePattern(ctx, W, H);
+    drawSlitherPlayFill(ctx, W, H, 'square');
+
+    const zcx = W * 0.5;
+    const zcy = H * 0.5;
+    const zr = Math.min(W, H) * 0.19;
+    drawSlitherZone(ctx, W, H, zcx, zcy, zr, { shrinking: true });
+
+    // Victim died inside the closing zone — pink death drops at the center
+    const killSite = sampleSnakeArc(zcx, zcy, Math.PI * 0.5, Math.PI * 1.35, 14, 9);
+    drawDeathDropTrail(ctx, killSite, 340, 5.5);
+    drawDeathDropFood(ctx, zcx, zcy, 7, 340);
+
+    drawSlitherFood(ctx, W * 0.2, H * 0.24, 3.5, 120);
+    drawSlitherFood(ctx, W * 0.82, H * 0.76, 3.5, 260);
+
+    const faceOff = [
+        { x: W * 0.36, y: H * 0.5, angle: 0, color: '#ff7b7b', r: 6.5, n: 11 },
+        { x: W * 0.64, y: H * 0.5, angle: Math.PI, color: '#7bd4ff', r: 6.5, n: 11 },
+        { x: W * 0.5, y: H * 0.36, angle: Math.PI * 0.5, color: '#ffd47b', r: 5.5, n: 9 },
+        { x: W * 0.5, y: H * 0.64, angle: -Math.PI * 0.5, color: '#b07bff', r: 5.5, n: 9 },
+    ];
+    for (const s of faceOff) {
+        drawSnakePath(
+            ctx,
+            sampleSnakeToward(s.x, s.y, s.angle, 8, s.n),
+            s.r,
+            s.color,
+        );
+    }
+}
+
 const DRAWERS = {
     agar: (ctx, W, H) => drawAgarPreview(ctx, W, H),
     'br-agar': (ctx, W, H) => drawAgarPreview(ctx, W, H, { battleRoyale: true }),
     slither: (ctx, W, H) => drawSlitherPreview(ctx, W, H, { arena: 'square', showCashout: true }),
-    'competitive-slither': (ctx, W, H) => drawSlitherPreview(ctx, W, H, {
-        arena: 'circle',
-        zone: { radius: Math.min(W, H) * 0.28, shrinking: true },
-        showCashout: true,
-    }),
-    'br-slither': (ctx, W, H) => drawSlitherPreview(ctx, W, H, {
-        arena: 'square',
-        zone: { cx: W * 0.5, cy: H * 0.5, radius: Math.min(W, H) * 0.3 },
-    }),
+    'competitive-slither': (ctx, W, H) => drawCompetitiveSlitherPreview(ctx, W, H),
+    'br-slither': (ctx, W, H) => drawBRSlitherPreview(ctx, W, H),
 };
 
 export function drawGamemodePreview(ctx, W, H, mode) {

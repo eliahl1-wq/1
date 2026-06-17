@@ -104,7 +104,7 @@ export class SlitherRenderer {
         // alpha channel makes page compositing cheaper with no visual change.
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'high';
+        this.ctx.imageSmoothingQuality = 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
         // which gives crisp, well-antialiased snake edges instead of upscaled-blurry ones.
         this._bodySS = 2;
@@ -150,6 +150,8 @@ export class SlitherRenderer {
         this._screenScratch = { x: 0, y: 0 };
         this._perfEma = 16.7;
         this._quality = 1;
+        this._minimapFallback = { players: [], food: [] };
+        this._minimapFrame = 0;
 
         this._onResize = () => this.resize();
         this._onLayoutChange = () => this.resize();
@@ -264,10 +266,6 @@ export class SlitherRenderer {
     updateState(tick) {
         if (tick.snakes) {
             this.targetSnakes = tick.snakes;
-            if (tick.you) {
-                const me = tick.snakes.find(s => s.id === tick.you);
-                if (me?.balance != null && !tick.competitiveSlither) this.hud.balance = me.balance;
-            }
         }
         if (tick.food) {
             const list = this._foodDrawList;
@@ -277,9 +275,12 @@ export class SlitherRenderer {
             }
         }
         const isCompetitive = tick.competitiveSlither ?? this.state.competitiveSlither;
+        const nextYou = tick.spectating
+            ? null
+            : (tick.you !== undefined ? tick.you : this.state.you);
         this.state = {
             snakes: tick.snakes ?? this.state.snakes,
-            you: tick.you ?? this.state.you,
+            you: nextYou,
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
             zone: isCompetitive
                 ? (tick.zone !== undefined ? tick.zone : this.state.zone)
@@ -293,6 +294,8 @@ export class SlitherRenderer {
         }
         if (isCompetitive && tick.dollarBalance != null) {
             this.hud.balance = tick.dollarBalance;
+        } else if (!isCompetitive && tick.balance != null && !tick.battleRoyale) {
+            this.hud.balance = tick.balance;
         }
     }
 
@@ -316,6 +319,18 @@ export class SlitherRenderer {
         this.camera.y = 0;
         this.zoom = this.baseZoom;
         this.targetSnakes = [];
+        this.state = { ...this.state, you: null };
+    }
+
+    removeSnake(id) {
+        if (!id) return;
+        this.smooth.delete(id);
+        this._renderPool.delete(id);
+        this._boostTrailPool.delete(id);
+        this.targetSnakes = this.targetSnakes.filter(s => s.id !== id);
+        if (this.state.you === id) {
+            this.state = { ...this.state, you: null };
+        }
     }
 
     setHud(hud) {
@@ -342,8 +357,7 @@ export class SlitherRenderer {
     }
 
     /**
-     * Smooth head toward server each frame, derive body from path history so head
-     * and body always move together at display rate (not 40Hz server spine).
+     * Local snake: path body at display rate. Remote snakes: lerp spine only (cheaper).
      */
     _updateSmoothing(dt) {
         const SNAP_SQ = 220 * 220;
@@ -356,9 +370,10 @@ export class SlitherRenderer {
         for (const snake of this.targetSnakes) {
             seen.add(snake.id);
             const tgt = snake.segments || [];
-            const len = tgt.length;
-            if (len === 0 || !tgt[0]) continue;
+            const spineLen = tgt.length;
+            if (spineLen === 0 || !tgt[0]) continue;
 
+            const segCount = snake.sct || spineLen;
             const head = tgt[0];
             const offScreen = head && !snake.isYou && (head.x - cx) ** 2 + (head.y - cy) ** 2 > viewR * viewR;
 
@@ -366,15 +381,14 @@ export class SlitherRenderer {
             if (!s) {
                 s = { segments: [], angle: snake.angle || 0, path: null };
                 this.smooth.set(snake.id, s);
-                for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
-                rebuildPathFromSegments(s, s.segments);
+                if (snake.isYou) rebuildPathFromSegments(s, s.segments);
+                continue;
             }
 
-            if (s.segments.length > len) s.segments.length = len;
-
             const meta = {
-                segmentCount: len,
+                segmentCount: segCount,
                 sc: snake.sc,
                 radius: snake.radius,
             };
@@ -383,7 +397,7 @@ export class SlitherRenderer {
                 const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
                 const headDy = tgt[0].y - (s.segments[0]?.y ?? tgt[0].y);
                 if (headDx * headDx + headDy * headDy > SNAP_SQ) {
-                    for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                    for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     s.angle = snake.angle || 0;
                     rebuildPathFromSegments(s, s.segments);
                     delete s._prevSrvHead;
@@ -395,13 +409,29 @@ export class SlitherRenderer {
             }
 
             if (offScreen) {
-                for (let i = 0; i < len; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
-                rebuildPathFromSegments(s, s.segments);
                 continue;
             }
 
-            stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.06);
+            const tau = 0.08;
+            const a = 1 - Math.exp(-dt / tau);
+            for (let i = 0; i < spineLen; i++) {
+                if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                const dx = tgt[i].x - s.segments[i].x;
+                const dy = tgt[i].y - s.segments[i].y;
+                if (dx * dx + dy * dy > SNAP_SQ) {
+                    s.segments[i].x = tgt[i].x;
+                    s.segments[i].y = tgt[i].y;
+                } else {
+                    s.segments[i].x += dx * a;
+                    s.segments[i].y += dy * a;
+                }
+            }
+            if (s.segments.length > spineLen) s.segments.length = spineLen;
+            let da = (snake.angle || 0) - s.angle;
+            da = Math.atan2(Math.sin(da), Math.cos(da));
+            s.angle += da * a;
         }
 
         for (const id of this.smooth.keys()) {
@@ -719,9 +749,9 @@ export class SlitherRenderer {
         const mouthValid = this._mouthValid;
         const mouthX = this._mouthX;
         const mouthY = this._mouthY;
-        const attractR = ((this._mouthR || 6) * 3) + 46;
+        const attractR = ((this._mouthR || 6) * 3.6) + 54;
         const attractR2 = attractR * attractR;
-        const maxPull = attractR * 0.32;
+        const maxPull = attractR * 0.42;
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
@@ -766,7 +796,7 @@ export class SlitherRenderer {
             }
 
             // Magnet attraction — pull toward the mouth, easing in as it gets closer.
-            if (mouthValid && !f.deathDrop) {
+            if (mouthValid) {
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
                 const dist2 = dxm * dxm + dym * dym;
@@ -1043,7 +1073,7 @@ export class SlitherRenderer {
         const q = this._quality;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
         const maxBumps = Math.round(
-            (isYou ? (boosting ? 120 : 100) : (boosting ? 52 : 42)) * qMul * Math.min(1.35, 1 + segs.length / 260),
+            (isYou ? (boosting ? 110 : 92) : (boosting ? 48 : 38)) * qMul * Math.min(1.25, 1 + segs.length / 300),
         );
         // Arc-length resample → evenly spaced, temporally stable bumps (kills body shimmer).
         const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf);
@@ -1384,9 +1414,7 @@ export class SlitherRenderer {
                 ctx,
                 hx,
                 hy + headRadius + 14,
-                this.state.competitiveSlither
-                    ? (this.hud.balance ?? me.dollarBalance ?? 0)
-                    : (me.balance ?? this.hud.balance ?? 1),
+                this.hud.balance ?? me.dollarBalance ?? me.balance ?? 1,
                 true,
             );
         }
@@ -1394,22 +1422,35 @@ export class SlitherRenderer {
         if (me?.segments?.[0]) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
-            const fallback = {
-                players: renderSnakes
-                    .filter(s => s.segments?.[0])
-                    .map(s => ({
+            if ((this._minimapFrame++ & 3) === 0) {
+                const fbPlayers = this._minimapFallback.players;
+                fbPlayers.length = 0;
+                for (let i = 0; i < renderSnakes.length; i++) {
+                    const s = renderSnakes[i];
+                    if (!s.segments?.[0]) continue;
+                    fbPlayers.push({
                         x: s.segments[0].x,
                         y: s.segments[0].y,
                         isYou: s.isYou,
-                    })),
-                food: this._foodDrawList.map(f => ({
-                    x: f.x,
-                    y: f.y,
-                    golden: f.golden,
-                    hue: f.hue,
-                })),
-            };
-            const minimap = normalizeMinimapData(this.state.minimap, fallback);
+                    });
+                }
+                const fbFood = this._minimapFallback.food;
+                const foodList = this._foodDrawList;
+                fbFood.length = foodList.length;
+                for (let i = 0; i < foodList.length; i++) {
+                    const f = foodList[i];
+                    let entry = fbFood[i];
+                    if (!entry) {
+                        entry = {};
+                        fbFood[i] = entry;
+                    }
+                    entry.x = f.x;
+                    entry.y = f.y;
+                    entry.golden = f.golden;
+                    entry.hue = f.hue;
+                }
+            }
+            const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
             drawGameMinimap(ctx, {
                 screenW: W,
                 screenH: H,

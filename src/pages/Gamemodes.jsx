@@ -126,11 +126,10 @@ export default function Gamemodes() {
                             <ModeCard
                                 mode="competitive-slither"
                                 title="Slither Arena"
-                                desc="$5 entry — real players only. Circular arena, shrinking zone before reset. Cash out your dollar balance anytime."
+                                desc="$2 or $5 entry — separate pools, real players only. Circular arena, shrinking zone before reset. Cash out your dollar balance anytime."
                                 playing={playersByGamemode.competitiveSlither}
                                 onPlay={() => {
                                     localStorage.setItem('selected_gamemode', 'competitive-slither');
-                                    localStorage.setItem('selected_entry_fee', '5');
                                     navigate('/pre-game', { state: { selectedMode: 'competitive-slither' } });
                                 }}
                             />

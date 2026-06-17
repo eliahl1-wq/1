@@ -2,6 +2,16 @@
 
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
+const MAX_PATH_POINTS = 420;
+const MIN_HEAD_RECORD = 0.35;
+/** Cap simulated spine points — render resamples anyway; saves CPU on long snakes. */
+const MAX_SIM_SEGMENTS = 160;
+
+function distSq(x1, y1, x2, y2) {
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    return dx * dx + dy * dy;
+}
 
 function dist(x1, y1, x2, y2) {
     return Math.hypot(x1 - x2, y1 - y2);
@@ -13,9 +23,10 @@ export function segmentSpacingForSnake(snake) {
     return Math.max(2.6, r * (SEG_SEP / BASE_RADIUS));
 }
 
-function pathArcLength(path) {
+function pathArcLength(path, end = path.length) {
     let arc = 0;
-    for (let i = 0; i < path.length - 1; i++) {
+    const last = Math.min(end, path.length) - 1;
+    for (let i = 0; i < last; i++) {
         arc += dist(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y);
     }
     return arc;
@@ -24,9 +35,10 @@ function pathArcLength(path) {
 function trimPath(path, maxArcLength) {
     if (path.length <= 2) return;
     let arc = pathArcLength(path);
-    while (path.length > 2 && arc > maxArcLength) {
+    while (path.length > 2 && (arc > maxArcLength || path.length > MAX_PATH_POINTS)) {
         const last = path.pop();
-        arc -= dist(path[path.length - 1].x, path[path.length - 1].y, last.x, last.y);
+        const prev = path[path.length - 1];
+        arc -= dist(prev.x, prev.y, last.x, last.y);
     }
 }
 
@@ -54,11 +66,25 @@ function ensurePathArcLength(path, segmentCount, spacing, angle = 0) {
     }
 
     let last = path[path.length - 1];
-    while (arc < required) {
+    while (arc < required && path.length < MAX_PATH_POINTS) {
         const add = Math.min(spacing, required - arc);
         last = { x: last.x + dirX * add, y: last.y + dirY * add };
         path.push(last);
         arc += add;
+    }
+}
+
+function recordHeadOnPath(path, headX, headY, minDist) {
+    const minDistSq = minDist * minDist;
+    if (!path.length) {
+        path.push({ x: headX, y: headY });
+        return;
+    }
+    if (distSq(path[0].x, path[0].y, headX, headY) > minDistSq) {
+        path.unshift({ x: headX, y: headY });
+    } else {
+        path[0].x = headX;
+        path[0].y = headY;
     }
 }
 
@@ -84,9 +110,8 @@ function syncSegmentCount(state, targetCount, spacing, refHead, angle = 0) {
 
 /**
  * Place body segments along the head's traveled path at fixed spacing.
- * Mutates segments[1..] and state.path every frame.
  */
-export function updateBodyAlongPath(state, segments, spacing, headX, headY, angle = 0) {
+export function updateBodyAlongPath(state, segments, spacing, headX, headY, angle = 0, fullSegmentCount = segments.length) {
     if (!segments.length) return;
 
     let path = state.path;
@@ -97,15 +122,9 @@ export function updateBodyAlongPath(state, segments, spacing, headX, headY, angl
 
     segments[0].x = headX;
     segments[0].y = headY;
+    recordHeadOnPath(path, headX, headY, Math.max(0.5, spacing * MIN_HEAD_RECORD));
 
-    if (dist(path[0].x, path[0].y, headX, headY) > 0.01) {
-        path.unshift({ x: headX, y: headY });
-    } else {
-        path[0].x = headX;
-        path[0].y = headY;
-    }
-
-    ensurePathArcLength(path, segments.length, spacing, angle);
+    ensurePathArcLength(path, fullSegmentCount, spacing, angle);
 
     let pathIndex = 0;
     let pathOffset = 0;
@@ -150,7 +169,7 @@ export function updateBodyAlongPath(state, segments, spacing, headX, headY, angl
         }
     }
 
-    trimPath(path, segments.length * spacing + spacing * 4);
+    trimPath(path, fullSegmentCount * spacing + spacing * 4);
 }
 
 /** Rebuild path history from an authoritative spine (respawn / teleport). */
@@ -161,21 +180,20 @@ export function rebuildPathFromSegments(state, segments) {
         if (!s) continue;
         if (path.length > 0) {
             const prev = path[path.length - 1];
-            if (dist(prev.x, prev.y, s.x, s.y) < 0.01) continue;
+            if (distSq(prev.x, prev.y, s.x, s.y) < 0.01) continue;
         }
         path.push({ x: s.x, y: s.y });
     }
     if (path.length < 2 && segments[0]) {
         const h = segments[0];
-        const a = 0;
-        path.push({ x: h.x - Math.cos(a) * 4, y: h.y - Math.sin(a) * 4 });
+        path.push({ x: h.x - 4, y: h.y });
     }
     state.path = path;
 }
 
 /**
- * Smooth head toward server, then derive the whole body from path history.
- * Head and body always move together — never render a detached head.
+ * Smooth head toward server, derive body from path history.
+ * Only used for the local snake — remote snakes use spine lerp instead.
  */
 export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau = 0.035) {
     const len = meta.segmentCount || 0;
@@ -186,7 +204,8 @@ export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau 
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
 
-    syncSegmentCount(state, len, spacing, serverHead, state.angle ?? serverAngle ?? 0);
+    const simCount = Math.min(len, MAX_SIM_SEGMENTS);
+    syncSegmentCount(state, simCount, spacing, serverHead, state.angle ?? serverAngle ?? 0);
 
     const head = state.segments[0];
 
@@ -196,12 +215,15 @@ export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau 
         if (vx * vx + vy * vy > 0.0001) {
             state._extrapX = vx;
             state._extrapY = vy;
+        } else {
+            state._extrapX = 0;
+            state._extrapY = 0;
         }
     }
     state._prevSrvHead = { x: serverHead.x, y: serverHead.y };
 
-    const targetX = serverHead.x + (state._extrapX || 0) * 0.85;
-    const targetY = serverHead.y + (state._extrapY || 0) * 0.85;
+    const targetX = serverHead.x + (state._extrapX || 0) * 0.6;
+    const targetY = serverHead.y + (state._extrapY || 0) * 0.6;
 
     const headA = 1 - Math.exp(-dt / Math.max(headTau, 0.0001));
     head.x += (targetX - head.x) * headA;
@@ -211,5 +233,5 @@ export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau 
     da = Math.atan2(Math.sin(da), Math.cos(da));
     state.angle = (state.angle || 0) + da * headA;
 
-    updateBodyAlongPath(state, state.segments, spacing, head.x, head.y, state.angle);
+    updateBodyAlongPath(state, state.segments, spacing, head.x, head.y, state.angle, len);
 }

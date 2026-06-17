@@ -9,7 +9,7 @@ import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
-import { ENTRY_TIERS, BR_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, tierEconomy, formatUsd } from '../constants/economy';
+import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, tierEconomy, competitiveTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
 
@@ -70,6 +70,20 @@ const getOrCreatePresenceId = () => {
     return id;
 };
 
+function readStoredGameMode() {
+    return localStorage.getItem('selected_gamemode') || localStorage.getItem('current_game_mode') || null;
+}
+
+function resolvePreGameMode(pathname, locationStateMode) {
+    const stored = readStoredGameMode();
+    if (pathname === '/agar') return 'agar';
+    if (pathname === '/slither') {
+        if (stored === 'competitive-slither' || stored === 'br-slither') return stored;
+        return 'slither';
+    }
+    return stored || locationStateMode || 'agar';
+}
+
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
     const navigate = useNavigate();
@@ -126,11 +140,7 @@ export default function PreGame() {
 
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
-        () => {
-            if (location.pathname === '/slither') return 'slither';
-            if (location.pathname === '/agar') return 'agar';
-            return localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || location.state?.selectedMode || 'agar';
-        }
+        () => resolvePreGameMode(location.pathname, location.state?.selectedMode)
     );
     const [selectedEntryFee, setSelectedEntryFee] = useState(
         () => Number(localStorage.getItem('selected_entry_fee')) || DEFAULT_ENTRY_FEE
@@ -149,9 +159,11 @@ export default function PreGame() {
     }, [selectedEntryFee]);
 
     useEffect(() => {
-        if (location.pathname === '/slither') setSelectedMode('slither');
-        else if (location.pathname === '/agar') setSelectedMode('agar');
-        else if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
+        if (location.pathname === '/slither') {
+            setSelectedMode(resolvePreGameMode('/slither', location.state?.selectedMode));
+        } else if (location.pathname === '/agar') {
+            setSelectedMode('agar');
+        } else if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
             setSelectedMode(location.state.selectedMode);
         }
     }, [location.pathname, location.state?.selectedMode, selectedMode]);
@@ -182,17 +194,19 @@ export default function PreGame() {
     const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
     const entryFeeForSession = isAlreadyInGame && activeEntryFee != null ? activeEntryFee : selectedEntryFee;
-    const economy = tierEconomy(entryFeeForSession);
     const isBattleRoyaleMode = selectedMode.startsWith('br-');
     const isCompetitiveSlitherMode = selectedMode === 'competitive-slither';
+    const economy = isCompetitiveSlitherMode
+        ? competitiveTierEconomy(entryFeeForSession)
+        : tierEconomy(entryFeeForSession);
     const brVariant = isBattleRoyaleMode ? selectedMode.replace(/^br-/, '') : null;
     const tierOptions = isCompetitiveSlitherMode
-        ? [5]
+        ? COMPETITIVE_ENTRY_TIERS
         : (isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS);
 
     useEffect(() => {
-        if (isCompetitiveSlitherMode && selectedEntryFee !== 5) {
-            setSelectedEntryFee(5);
+        if (isCompetitiveSlitherMode && !COMPETITIVE_ENTRY_TIERS.includes(selectedEntryFee)) {
+            setSelectedEntryFee(DEFAULT_COMPETITIVE_ENTRY_FEE);
         }
         if (isBattleRoyaleMode && !BR_ENTRY_TIERS.includes(selectedEntryFee)) {
             setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
@@ -457,11 +471,13 @@ export default function PreGame() {
                     localStorage.setItem('selected_gamemode', d.mode);
                     if (d.entryFeeUsd) localStorage.setItem('selected_entry_fee', String(d.entryFeeUsd));
                 } else if (r.ok) {
-                    // Only clear when server confirms we're not in a game
+                    // Only clear active session — keep selected_gamemode so lobby shows the last mode played
                     setCurrentGameMode(null);
                     setActiveGameBalance(null);
                     setActiveEntryFee(null);
                     localStorage.removeItem('current_game_mode');
+                    const savedMode = localStorage.getItem('selected_gamemode');
+                    if (savedMode) setSelectedMode(savedMode);
                 }
             } catch { /* ignore */ }
         };
@@ -661,9 +677,18 @@ export default function PreGame() {
                 : canJoin ? 'play-btn play-btn-ready'
                     : 'play-btn play-btn-disabled';
 
-    const modeBaseName = isCompetitiveSlitherMode
-        ? 'Slither Arena'
-        : ((isBattleRoyaleMode ? brVariant : selectedMode) === 'slither' ? 'Slither' : 'Agar');
+    const isSlitherFamily = selectedMode === 'slither'
+        || selectedMode === 'competitive-slither'
+        || (isBattleRoyaleMode && brVariant === 'slither');
+    const modeCardTitle = isSlitherFamily ? 'Slither' : 'Agar';
+    const modeSubtitle = isBattleRoyaleMode
+        ? 'Battle Royale'
+        : isCompetitiveSlitherMode
+            ? 'Arena'
+            : 'Normal';
+    const modeBaseName = modeSubtitle === 'Normal'
+        ? `${modeCardTitle} Normal`
+        : `${modeCardTitle} ${modeSubtitle}`;
 
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding match…' : 'Joining…'}</>
@@ -1060,12 +1085,10 @@ export default function PreGame() {
             <div className="pre-game-grid">
                 <div className="mode-card">
                     <span className="mode-card-label">Gamemode</span>
-                    <div className={isBattleRoyaleMode ? 'mode-card-title mode-card-title--stacked' : 'mode-card-title'}>
-                        {modeBaseName.toUpperCase()}
+                    <div className="mode-card-title mode-card-title--stacked">
+                        {modeCardTitle.toUpperCase()}
                     </div>
-                    {isBattleRoyaleMode && (
-                        <div className="mode-card-subtitle">Battle Royale</div>
-                    )}
+                    <div className="mode-card-subtitle">{modeSubtitle}</div>
                     <button
                         type="button"
                         className="mode-card-action"
@@ -1159,22 +1182,51 @@ export default function PreGame() {
                         </div>
                         {showHowItWorks && (
                             <div className="hiw-content">
-                                <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                    <span>Entry fee</span>
-                                    <span className="mono">{formatUsd(entryFeeForSession)}</span>
-                                </div>
-                                <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                    <span>Starting balance</span>
-                                    <span className="mono">{formatUsd(economy.startBalance)}</span>
-                                </div>
-                                <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
-                                    Eat food & other players. Cash out anytime.
-                                </div>
-                                <div className="divider" style={{ margin: '6px 0' }} />
-                                <div className="stat-row">
-                                    <span>Golden Blob value</span>
-                                    <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
-                                </div>
+                                {isCompetitiveSlitherMode ? (
+                                    <>
+                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                            <span>Entry fee</span>
+                                            <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                        </div>
+                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                            <span>Starting dollars</span>
+                                            <span className="mono">{formatUsd(economy.dollarStart)}</span>
+                                        </div>
+                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                            <span>Cashout fee</span>
+                                            <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
+                                        </div>
+                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                            <span>You keep on cashout</span>
+                                            <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
+                                        </div>
+                                        <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
+                                            Real players only — ${entryFeeForSession} matches are a separate pool from other stakes.
+                                            Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
+                                            Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
+                                            Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                            <span>Entry fee</span>
+                                            <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                        </div>
+                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                            <span>Starting balance</span>
+                                            <span className="mono">{formatUsd(economy.startBalance)}</span>
+                                        </div>
+                                        <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
+                                            Eat food & other players. Cash out anytime.
+                                        </div>
+                                        <div className="divider" style={{ margin: '6px 0' }} />
+                                        <div className="stat-row">
+                                            <span>Golden Blob value</span>
+                                            <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>

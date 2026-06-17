@@ -27,9 +27,21 @@ const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.lo
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
 const SLITHER_WORLD_HALF = 3000;
+const COMPETITIVE_WORLD_HALF = SLITHER_WORLD_HALF * 0.3;
 const SLITHER_SPEC_ZOOM = IS_MOBILE ? 2.05 : 2.65;
 const SLITHER_SPEC_MIN_ZOOM = IS_MOBILE ? 0.95 : 1.35;
 const SLITHER_SPEC_MAX_ZOOM = IS_MOBILE ? 3.5 : 4.2;
+
+function lobbyModeForSession(isCompetitive) {
+    return isCompetitive ? 'competitive-slither' : 'slither';
+}
+
+function persistLobbyGameMode(isCompetitive) {
+    const mode = lobbyModeForSession(isCompetitive);
+    localStorage.removeItem('current_game_mode');
+    localStorage.setItem('selected_gamemode', mode);
+    return mode;
+}
 
 
 
@@ -111,10 +123,30 @@ export default function SlitherGame() {
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
+    const matchNickname = location.state?.nickname || user?.username || 'Guest';
+    const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
+    const isBRMode = gameModeStored.startsWith('br-') || !!location.state?.battleRoyale;
+    const isCompetitiveMode = gameModeStored === 'competitive-slither' || location.state?.selectedMode === 'competitive-slither';
+    const entryFeeUsd = isBRMode
+        ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
+        : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
+
+    joinParamsRef.current = {
+        nickname: matchNickname,
+        entryFeeUsd,
+        isBR: isBRMode,
+        isCompetitive: isCompetitiveMode,
+    };
+
     const { camRef: specCamRef, seed: seedSpecCam } = useSpectatorCamera({
         active: isSpectating,
         canvasRef,
-        worldBounds: {
+        worldBounds: isCompetitiveMode ? {
+            minX: -COMPETITIVE_WORLD_HALF + 80,
+            maxX: COMPETITIVE_WORLD_HALF - 80,
+            minY: -COMPETITIVE_WORLD_HALF + 80,
+            maxY: COMPETITIVE_WORLD_HALF - 80,
+        } : {
             minX: -SLITHER_WORLD_HALF + 80,
             maxX: SLITHER_WORLD_HALF - 80,
             minY: -SLITHER_WORLD_HALF + 80,
@@ -131,9 +163,13 @@ export default function SlitherGame() {
         const startX = renderer?.camera?.x ?? spectatorCamRef.current.x;
         const startY = renderer?.camera?.y ?? spectatorCamRef.current.y;
         const startZoom = renderer?.zoom ?? SLITHER_SPEC_ZOOM;
+        if (myIdRef.current) {
+            renderer?.removeSnake(myIdRef.current);
+        }
         seedSpecCam(startX, startY, startZoom);
         setIsSpectating(true);
         setShowResultModal(false);
+        socketRef.current?.emit('slitherSpectateCam', { x: startX, y: startY });
     }, [seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
@@ -142,9 +178,10 @@ export default function SlitherGame() {
     }, []);
 
     const handlePlayAgain = useCallback(() => {
-        const { nickname, entryFeeUsd: fee } = joinParamsRef.current;
-        localStorage.setItem('current_game_mode', 'slither');
-        localStorage.setItem('selected_gamemode', 'slither');
+        const { nickname, entryFeeUsd: fee, isCompetitive } = joinParamsRef.current;
+        const modeKey = isCompetitive ? 'competitive-slither' : 'slither';
+        localStorage.setItem('current_game_mode', modeKey);
+        localStorage.setItem('selected_gamemode', modeKey);
 
         setIsDead(false);
         setCashedAmount(null);
@@ -174,30 +211,13 @@ export default function SlitherGame() {
     }, [authToken]);
 
     const handleLobby = useCallback(() => {
-        localStorage.removeItem('current_game_mode');
-        navigate('/pre-game', { state: { selectedMode: 'slither' } });
+        const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+        navigate('/pre-game', { state: { selectedMode: mode } });
     }, [navigate]);
 
     const handleBoostChange = useCallback((active) => {
         rendererRef.current?.setBoost(active);
     }, []);
-
-    const matchNickname = location.state?.nickname || user?.username || 'Guest';
-    const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
-    const isBRMode = gameModeStored.startsWith('br-') || !!location.state?.battleRoyale;
-    const isCompetitiveMode = gameModeStored === 'competitive-slither' || location.state?.selectedMode === 'competitive-slither';
-    const entryFeeUsd = isBRMode
-        ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
-        : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
-
-    joinParamsRef.current = {
-        nickname: matchNickname,
-        entryFeeUsd,
-        isBR: isBRMode,
-        isCompetitive: isCompetitiveMode,
-    };
-
-
 
     useEffect(() => {
         document.body.style.backgroundColor = '#0a0a0c';
@@ -311,6 +331,17 @@ export default function SlitherGame() {
         };
     }, [isSpectating, isDead, cashedAmount, specCamRef]);
 
+    useEffect(() => {
+        if (!isSpectating) return undefined;
+        const syncCam = () => {
+            const cam = specCamRef.current;
+            socketRef.current?.emit('slitherSpectateCam', { x: cam.x, y: cam.y });
+        };
+        syncCam();
+        const id = setInterval(syncCam, 120);
+        return () => clearInterval(id);
+    }, [isSpectating, specCamRef]);
+
 
 
     useEffect(() => {
@@ -398,7 +429,9 @@ export default function SlitherGame() {
 
 
         socket.on('welcome', (playerSettings, gameSizes) => {
-            localStorage.setItem('current_game_mode', gameSizes?.mode || 'slither');
+            const mode = gameSizes?.mode || lobbyModeForSession(joinParamsRef.current.isCompetitive);
+            localStorage.setItem('current_game_mode', mode);
+            localStorage.setItem('selected_gamemode', mode);
             if (gameSizes?.entryFeeUsd) {
                 localStorage.setItem('selected_entry_fee', String(gameSizes.entryFeeUsd));
             }
@@ -430,7 +463,7 @@ export default function SlitherGame() {
             if (!gameSizes?.battleRoyale) {
                 const bal = isCompetitive
                     ? (playerSettings.dollarBalance ?? playerSettings.balance ?? 5)
-                    : (playerSettings.balance ?? 1.0);
+                    : (playerSettings.dollarBalance ?? playerSettings.balance ?? 1.0);
                 prevBalanceRef.current = bal;
                 setCurrentBalance(bal);
                 rendererRef.current?.setHud({ balance: bal });
@@ -542,7 +575,7 @@ export default function SlitherGame() {
             setCashOutEndAt(0);
             setLocalTimer(0);
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
-            localStorage.removeItem('current_game_mode');
+            persistLobbyGameMode(joinParamsRef.current.isCompetitive);
             const startedAt = sessionStartAtRef.current || Date.now();
             setSessionStats({
                 timeSurvivedMs: Date.now() - startedAt,
@@ -579,6 +612,9 @@ export default function SlitherGame() {
 
 
         socket.on('RIP', () => {
+            if (myIdRef.current) {
+                rendererRef.current?.removeSnake(myIdRef.current);
+            }
             setIsDead(true);
             setLocalTimer(0);
             cashOutEndAtRef.current = 0;
@@ -592,8 +628,9 @@ export default function SlitherGame() {
             });
             setShowResultModal(true);
             setIsSpectating(false);
-            const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
-            localStorage.removeItem('current_game_mode');
+            const wasBR = joinParamsRef.current.isBR
+                || localStorage.getItem('current_game_mode')?.startsWith('br-');
+            persistLobbyGameMode(joinParamsRef.current.isCompetitive);
             if (wasBR) {
                 setTimeout(() => {
                     navigate('/gamemodes', { state: { selectedMode: 'slither' } });
@@ -604,9 +641,8 @@ export default function SlitherGame() {
 
 
         socket.on('forcedDisconnect', () => {
-
-            navigate('/pre-game', { state: { selectedMode: 'slither' } });
-
+            const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+            navigate('/pre-game', { state: { selectedMode: mode } });
         });
 
 
@@ -629,7 +665,8 @@ export default function SlitherGame() {
 
                 alert(msg);
 
-                navigate('/pre-game', { state: { selectedMode: 'slither' } });
+                const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+                navigate('/pre-game', { state: { selectedMode: mode } });
 
             } else if (typeof msg === 'string' && /battle royale/i.test(msg)) {
 
