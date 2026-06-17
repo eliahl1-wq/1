@@ -415,7 +415,7 @@ export class SlitherRenderer {
                     delete s._extrapX;
                     delete s._extrapY;
                 }
-                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.014);
+                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt);
                 continue;
             }
 
@@ -1344,7 +1344,7 @@ export class SlitherRenderer {
             rs.name = snake.name;
             rs.balance = snake.balance;
             rs.segments = s ? s.segments : snake.segments;
-            rs.drawSpine = (snake.isYou && s?.path?.length >= 2) ? s.path : rs.segments;
+            rs.drawSpine = rs.segments;
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);
         }

@@ -225,15 +225,16 @@ function stepVisualGrowth(state, meta, targetSegCount, dt) {
 }
 
 /**
- * Smooth head toward server, derive body from path history.
- * Only used for the local snake — remote snakes use spine lerp instead.
+ * Smooth head toward server, follow body from authoritative server spine.
+ * Avoids client path re-simulation that fights server ticks and causes shake.
  */
-export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau = 0.014) {
+export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt) {
     const len = meta.segmentCount || 0;
-    if (len === 0 || !serverHead) return;
+    if (len === 0 || !serverSegments?.[0]) return;
 
+    const serverHead = serverSegments[0];
     const simCount = Math.min(len, MAX_SIM_SEGMENTS);
-    // Visual growth only affects render radius — body uses authoritative server size.
+    const spineLen = serverSegments.length;
     stepVisualGrowth(state, meta, simCount, dt);
     const spacing = segmentSpacingForSnake(meta);
 
@@ -241,33 +242,31 @@ export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau 
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
 
-    syncSegmentCount(state, simCount, spacing, serverHead, state.angle ?? serverAngle ?? 0);
+    syncSegmentCount(state, simCount, spacing, serverHead, serverAngle ?? state.angle ?? 0);
 
     const head = state.segments[0];
+    head.x = serverHead.x;
+    head.y = serverHead.y;
+    state.angle = serverAngle || 0;
 
-    if (state._prevSrvHead) {
-        const vx = serverHead.x - state._prevSrvHead.x;
-        const vy = serverHead.y - state._prevSrvHead.y;
-        if (vx * vx + vy * vy > 0.0001) {
-            state._extrapX = vx;
-            state._extrapY = vy;
-        } else {
-            state._extrapX = 0;
-            state._extrapY = 0;
-        }
+    const tau = 0.028;
+    const a = 1 - Math.exp(-dt / tau);
+    for (let i = 1; i < simCount; i++) {
+        const seg = state.segments[i];
+        const mappedIdx = spineLen > 1
+            ? Math.min(spineLen - 1, Math.round(i * (spineLen - 1) / Math.max(1, simCount - 1)))
+            : 0;
+        const tgt = serverSegments[mappedIdx];
+        if (!tgt) continue;
+        const dx = tgt.x - seg.x;
+        const dy = tgt.y - seg.y;
+        const snap = dx * dx + dy * dy > spacing * spacing * 4;
+        const blend = snap ? Math.min(1, a * 2.5) : a;
+        seg.x += dx * blend;
+        seg.y += dy * blend;
     }
-    state._prevSrvHead = { x: serverHead.x, y: serverHead.y };
 
-    const targetX = serverHead.x + (state._extrapX || 0) * 0.85;
-    const targetY = serverHead.y + (state._extrapY || 0) * 0.85;
-
-    const headA = 1 - Math.exp(-dt / Math.max(headTau, 0.0001));
-    head.x += (targetX - head.x) * headA;
-    head.y += (targetY - head.y) * headA;
-
-    let da = (serverAngle || 0) - (state.angle || 0);
-    da = Math.atan2(Math.sin(da), Math.cos(da));
-    state.angle = (state.angle || 0) + da * headA;
-
-    updateBodyAlongPath(state, state.segments, spacing, head.x, head.y, state.angle, len);
+    delete state._prevSrvHead;
+    delete state._extrapX;
+    delete state._extrapY;
 }
