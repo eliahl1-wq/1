@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
+import { extendSpineTail, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -120,7 +120,7 @@ export class SlitherRenderer {
         this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         this.baseZoom = this.isMobile ? 2.05 : 2.65;
         this.zoom = this.baseZoom;
-        this.snakeThickness = this.isMobile ? 1.0 : 0.9;
+        this.snakeThickness = this.isMobile ? 1.0 : 1.05;
         this._dpr = 1;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
@@ -392,7 +392,7 @@ export class SlitherRenderer {
                 s.angle = snake.angle || 0;
                 if (snake.isYou) {
                     rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, snake.radius);
+                    resetVisualGrowth(s, snake.radius, snake.fam ?? 0, segCount);
                 }
                 continue;
             }
@@ -401,6 +401,7 @@ export class SlitherRenderer {
                 segmentCount: segCount,
                 sc: snake.sc,
                 radius: snake.radius,
+                fam: snake.fam ?? 0,
             };
 
             if (snake.isYou) {
@@ -410,7 +411,7 @@ export class SlitherRenderer {
                     for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     s.angle = snake.angle || 0;
                     rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, snake.radius);
+                    resetVisualGrowth(s, snake.radius, snake.fam ?? 0, segCount);
                     resetSnakeBodyTick(s);
                     delete s._prevSrvHead;
                     delete s._extrapX;
@@ -1087,21 +1088,21 @@ export class SlitherRenderer {
         }
 
         const sc = snake.sc ?? ((snake.radius || 6.2) / 6.2);
-        // Slither.io wsep = 6*sc; stamp overlap ~40% of segment spacing for smooth body.
-        const segSpacing = 3.6 * sc;
-        const idealStampStep = Math.max(1.4, segSpacing * 0.42);
+        const bodyRadiusWorld = snake.radius || (6.2 * sc);
+        // Overlapping stamps — step tied to body width so circles never gap (slither.io style).
+        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.28);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
-        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.88 : 1);
-        const maxStamps = Math.round((isYou ? (boosting ? 76 : 68) : (boosting ? 36 : 30)) * qMul);
-        // Long snakes: widen stamp spacing instead of drawing more stamps (perf + correct proportions).
+        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.9 : 1);
         let arcLen = 0;
         for (let i = 1; i < segs.length; i++) {
             const dx = segs[i].x - segs[i - 1].x;
             const dy = segs[i].y - segs[i - 1].y;
             arcLen += Math.sqrt(dx * dx + dy * dy);
         }
-        const stampStepWorld = Math.max(idealStampStep, arcLen / Math.max(1, maxStamps - 1));
+        const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
+        const stampCap = Math.round((isYou ? (boosting ? 150 : 130) : (boosting ? 64 : 52)) * qMul);
+        const maxStamps = Math.min(Math.max(neededStamps, 8), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
             ctx.restore();
@@ -1343,13 +1344,20 @@ export class SlitherRenderer {
             rs.color = snake.color;
             const s = this.smooth.get(snake.id);
             rs.radius = snake.isYou ? (s?.visualRadius ?? snake.radius) : snake.radius;
-            rs.sc = snake.sc ?? (rs.radius / 6.2);
+            rs.sc = snake.isYou
+                ? ((s?.visualRadius ?? snake.radius) / 6.2)
+                : (snake.sc ?? (rs.radius / 6.2));
+            rs.fam = snake.fam ?? 0;
             rs.boost = snake.boost;
             rs.isYou = snake.isYou;
             rs.name = snake.name;
             rs.balance = snake.balance;
             rs.segments = s ? s.segments : snake.segments;
-            rs.drawSpine = rs.segments;
+            const spacing = 3.6 * rs.sc;
+            const spineBase = (s?.drawSpine?.length ? s.drawSpine : rs.segments);
+            rs.drawSpine = (!snake.isYou && (snake.fam ?? 0) > 0.01)
+                ? extendSpineTail(spineBase, snake.fam, spacing)
+                : spineBase;
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);
         }
@@ -1377,7 +1385,7 @@ export class SlitherRenderer {
             // slither.io-style zoom-out as the snake grows
             const meR = me.radius || 6.2;
             const minZoom = this.isMobile ? 0.95 : 1.35;
-            const targetZoom = Math.min(this.baseZoom, Math.max(minZoom, this.baseZoom * Math.pow(6.2 / meR, 0.4)));
+            const targetZoom = Math.min(this.baseZoom, Math.max(minZoom, this.baseZoom * Math.pow(6.2 / meR, 0.2)));
             const za = 1 - Math.exp(-dt / 0.6);
             this.zoom += (targetZoom - this.zoom) * za;
         }

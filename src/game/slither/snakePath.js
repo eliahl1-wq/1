@@ -190,22 +190,58 @@ export function rebuildPathFromSegments(state, segments) {
 }
 
 /** Snap visual thickness to server after teleport or respawn. */
-export function resetVisualGrowth(state, radius) {
+export function resetVisualGrowth(state, radius, fam = 0, sct = 1) {
     state.visualRadius = radius ?? BASE_RADIUS;
+    state.visualFam = fam;
+    state._prevTargetSct = sct;
 }
 
-/** Ease display thickness toward server radius — length comes from the spine. */
+/** Ease display thickness and tail fullness toward server values. */
 function stepVisualGrowth(state, meta, dt) {
     const targetRadius = meta.radius || BASE_RADIUS;
+    const targetFam = meta.fam ?? 0;
+    const targetSct = meta.segmentCount || 1;
     if (state.visualRadius == null) state.visualRadius = targetRadius;
+    if (state.visualFam == null) state.visualFam = targetFam;
+    if (state._prevTargetSct == null) state._prevTargetSct = targetSct;
 
-    const radiusA = 1 - Math.exp(-dt / 0.16);
+    // New segment just landed — keep tail visually continuous (fam was ~1, server resets low).
+    if (targetSct > state._prevTargetSct) {
+        state.visualFam = 1;
+    }
+    state._prevTargetSct = targetSct;
+
+    const radiusA = 1 - Math.exp(-dt / 0.5);
+    const famA = 1 - Math.exp(-dt / 0.65);
     state.visualRadius += (targetRadius - state.visualRadius) * radiusA;
+    state.visualFam += (targetFam - state.visualFam) * famA;
 
     return {
         radius: state.visualRadius,
         sc: state.visualRadius / BASE_RADIUS,
+        fam: state.visualFam,
     };
+}
+
+export function extendSpineTail(segments, fam, spacing) {
+    if (!segments.length || fam < 0.01 || spacing < 0.1) return segments;
+    const n = segments.length;
+    const tail = segments[n - 1];
+    const prev = segments[Math.max(0, n - 2)];
+    let dx = tail.x - prev.x;
+    let dy = tail.y - prev.y;
+    let d = Math.hypot(dx, dy);
+    if (d < 1e-4 && n >= 3) {
+        const p2 = segments[n - 3];
+        dx = tail.x - p2.x;
+        dy = tail.y - p2.y;
+        d = Math.hypot(dx, dy);
+    }
+    if (d < 1e-4) return segments;
+    const ext = fam * spacing;
+    const out = segments.slice();
+    out.push({ x: tail.x + (dx / d) * ext, y: tail.y + (dy / d) * ext });
+    return out;
 }
 
 function lerpAngle(a, b, t) {
@@ -250,7 +286,7 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     if (spineLen === 0 || !serverSegments[0]) return;
 
     const serverHead = serverSegments[0];
-    stepVisualGrowth(state, meta, dt);
+    const growth = stepVisualGrowth(state, meta, dt);
 
     if (!state.segments[0]) {
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
@@ -296,4 +332,8 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
         seg.y = a.y + (b.y - a.y) * t;
     }
     state.angle = lerpAngle(state._snapAAngle ?? state._snapBAngle, state._snapBAngle, t);
+
+    const visFam = growth.fam ?? meta.fam ?? 0;
+    const visSpacing = segmentSpacingForSnake({ sc: growth.sc ?? meta.sc, radius: growth.radius ?? meta.radius });
+    state.drawSpine = extendSpineTail(state.segments, visFam, visSpacing);
 }
