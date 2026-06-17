@@ -129,6 +129,12 @@ function hslToRgb({ h, s, l }) {
     return { r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 };
 }
 
+function lightenColor(hex, amount) {
+    const hsl = rgbToHsl(parseColor(hex));
+    hsl.l = Math.max(0, Math.min(1, hsl.l * (1 + amount)));
+    return toHex(hslToRgb(hsl));
+}
+
 function darkenColor(hex, amount) {
     const hsl = rgbToHsl(parseColor(hex));
     hsl.l = Math.max(0, Math.min(1, hsl.l * (1 - amount)));
@@ -155,7 +161,7 @@ export class SlitherRenderer {
         this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         this.baseZoom = this.isMobile ? 2.05 : 2.65;
         this.zoom = this.baseZoom;
-        this.snakeThickness = this.isMobile ? 1.12 : 1.18;
+        this.snakeThickness = this.isMobile ? 1.0 : 0.9;
         this._dpr = 1;
         // Pre-rendered rib stamps — keyed by color + screen radius bucket
         this._ribCache = new Map();
@@ -775,21 +781,21 @@ export class SlitherRenderer {
         return out;
     }
 
-    /** Last 15%: ease-out taper 1.0 → 0.4 (never thinner). Index 0 = head. */
+    /** Last ~8% only: smooth ease-out taper to rounded tip (min 48% width). */
     _tailDrawScale(pathIndex, pathLen) {
-        const tailStart = Math.floor(pathLen * 0.85);
+        const tailStart = Math.ceil(pathLen * 0.92);
         if (pathIndex < tailStart) return 1;
         const denom = Math.max(1, pathLen - 1 - tailStart);
         const t = (pathIndex - tailStart) / denom;
-        const eased = 1 - (1 - t) * (1 - t);
-        return Math.max(0.4, 1 - eased * 0.6);
+        const eased = 1 - Math.pow(1 - t, 2.2);
+        return Math.max(0.48, 1 - eased * 0.52);
     }
 
     /**
-     * Soft glossy body stamp — no dark rim, subtle highlight, rubber-tube look.
+     * Pre-rendered rib stamp — slither.io reference shading, no shadowBlur.
      */
     _getSnakeBodyCache(baseColor, rPx) {
-        const key = `slither_v24|${baseColor}|${rPx}`;
+        const key = `slither_v25|${baseColor}|${rPx}`;
         let cache = this._ribCache.get(key);
         if (cache) {
             cache._lastUsed = this._frame;
@@ -798,30 +804,47 @@ export class SlitherRenderer {
 
         const stampSize = Math.ceil(rPx * 2);
         const r = rPx;
-        const hx = r * 0.52;
-        const hy = r * 0.48;
+        const cx = r;
+        const cy = r;
+        const hx = r * 0.38;
+        const hy = r * 0.32;
 
-        const bakeSoftStamp = (color) => {
+        const bakeStamp = (color) => {
             const cv = document.createElement('canvas');
             cv.width = stampSize;
             cv.height = stampSize;
             const g = cv.getContext('2d');
-            const edgeTint = darkenColor(color, 0.03);
-            const grad = g.createRadialGradient(hx, hy, r * 0.05, r, r, r);
-            grad.addColorStop(0, 'rgba(255,255,255,0.13)');
-            grad.addColorStop(0.28, color);
-            grad.addColorStop(0.72, color);
-            grad.addColorStop(1, edgeTint);
+            const lit = lightenColor(color, 0.06);
+            const edge = darkenColor(color, 0.14);
+
+            const grad = g.createRadialGradient(hx, hy, r * 0.06, cx, cy, r);
+            grad.addColorStop(0, 'rgba(255,255,255,0.22)');
+            grad.addColorStop(0.18, lit);
+            grad.addColorStop(0.48, color);
+            grad.addColorStop(0.78, color);
+            grad.addColorStop(0.93, darkenColor(color, 0.07));
+            grad.addColorStop(1, edge);
+
             g.fillStyle = grad;
             g.beginPath();
-            g.arc(r, r, r, 0, Math.PI * 2);
+            g.arc(cx, cy, r, 0, Math.PI * 2);
             g.fill();
+
+            const crescent = g.createRadialGradient(r * 0.72, r * 0.78, 0, r * 0.62, r * 0.68, r * 0.92);
+            crescent.addColorStop(0, 'rgba(0,0,0,0)');
+            crescent.addColorStop(0.55, 'rgba(0,0,0,0)');
+            crescent.addColorStop(1, 'rgba(0,0,0,0.07)');
+            g.fillStyle = crescent;
+            g.beginPath();
+            g.arc(cx, cy, r, 0, Math.PI * 2);
+            g.fill();
+
             return cv;
         };
 
         cache = {
-            canvasNormal: bakeSoftStamp(baseColor),
-            canvasStripe: bakeSoftStamp(darkenColor(baseColor, 0.05)),
+            canvasNormal: bakeStamp(baseColor),
+            canvasStripe: bakeStamp(darkenColor(baseColor, 0.06)),
             stampSize,
             _lastUsed: this._frame,
         };
@@ -881,7 +904,7 @@ export class SlitherRenderer {
 
         // 1) Catmull-Rom smooth curve  2) dense equidistant resample
         const spline = this._buildCatmullRomPath(segs, splineSubdiv, this._splinePathBuf, pointCap * 2);
-        const stampInterval = Math.max(0.025, worldRadius * thick * 0.075);
+        const stampInterval = Math.max(0.02, worldRadius * thick * 0.085);
         const drawPoints = this._equidistantResample(
             spline, stampInterval, this._drawPointsBuf, pointCap,
         );
@@ -902,17 +925,17 @@ export class SlitherRenderer {
         const hx = drawPoints[0].x;
         const hy = drawPoints[0].y;
 
-        const rawR = Math.max(5, Math.round(headRadius / 2) * 2);
+        const rawR = Math.max(4, Math.round(headRadius / 4) * 4);
         let rPx = rawR;
-        if (snake._lastSpriteR != null && Math.abs(rawR - snake._lastSpriteR) < 6) {
+        if (snake._lastSpriteR != null && Math.abs(rawR - snake._lastSpriteR) < 8) {
             rPx = snake._lastSpriteR;
         } else {
             snake._lastSpriteR = rawR;
         }
 
         const { canvasNormal, canvasStripe, stampSize } = this._getSnakeBodyCache(cs, rPx);
-        const cullPad = stampSize + 48;
-        const STAMPS_PER_BAND = 8;
+        const cullPad = stampSize + 32;
+        const STAMPS_PER_BAND = 5;
 
         const stampAt = (p, canvas, scale) => {
             const drawSize = stampSize * scale;
@@ -920,7 +943,7 @@ export class SlitherRenderer {
             ctx.drawImage(canvas, p.x - half, p.y - half, drawSize, drawSize);
         };
 
-        // Body: tail → neck (skip head index 0 — drawn last)
+        // Body tail → neck (index 0 = head, drawn separately on top)
         for (let i = pathLen - 1; i >= 1; i--) {
             const p = drawPoints[i];
             if (p.x < -cullPad || p.y < -cullPad || p.x > this.W + cullPad || p.y > this.H + cullPad) {
@@ -933,17 +956,7 @@ export class SlitherRenderer {
             stampAt(p, canvas, this._tailDrawScale(i, pathLen));
         }
 
-        // Rounded tail cap
-        if (pathLen > 1) {
-            const tailPt = drawPoints[pathLen - 1];
-            const tailScale = this._tailDrawScale(pathLen - 1, pathLen);
-            if (tailPt.x >= -cullPad && tailPt.y >= -cullPad
-                && tailPt.x <= this.W + cullPad && tailPt.y <= this.H + cullPad) {
-                stampAt(tailPt, canvasNormal, tailScale);
-            }
-        }
-
-        // Head on top (always last, full size)
+        // Head on top — same diameter as body
         const headPt = drawPoints[0];
         if (headPt.x >= -cullPad && headPt.y >= -cullPad
             && headPt.x <= this.W + cullPad && headPt.y <= this.H + cullPad) {
@@ -955,12 +968,12 @@ export class SlitherRenderer {
         const perpY = -Math.cos(angle);
         const fwdX = Math.cos(angle);
         const fwdY = Math.sin(angle);
-        const eyeSide = headEyeRadius * 0.38;
-        const eyeFwd = headEyeRadius * 0.32;
-        const eyeR = Math.max(3, headEyeRadius * 0.36);
-        const pupilR = eyeR * 0.42;
+        const eyeSide = headEyeRadius * 0.35;
+        const eyeFwd = headEyeRadius * 0.35;
+        const eyeR = Math.max(2.5, headEyeRadius * 0.32);
+        const pupilR = eyeR * 0.45;
 
-        if (isYou || this._quality >= 0.65) {
+        if (isYou || this._quality >= 0.68) {
             for (const side of [-1, 1]) {
                 const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
                 const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
@@ -970,11 +983,11 @@ export class SlitherRenderer {
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
 
-                const px = ex + fwdX * eyeR * 0.35;
-                const py = ey + fwdY * eyeR * 0.35;
+                const px = ex + fwdX * eyeR * 0.4;
+                const py = ey + fwdY * eyeR * 0.4;
                 ctx.beginPath();
                 ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-                ctx.fillStyle = '#1a1a1a';
+                ctx.fillStyle = '#000000';
                 ctx.fill();
             }
         }
