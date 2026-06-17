@@ -4,8 +4,6 @@ const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
 const MAX_PATH_POINTS = 560;
 const MIN_HEAD_RECORD = 0.14;
-/** Cap simulated spine points — render resamples anyway; saves CPU on long snakes. */
-const MAX_SIM_SEGMENTS = 240;
 
 function distSq(x1, y1, x2, y2) {
     const dx = x1 - x2;
@@ -191,34 +189,20 @@ export function rebuildPathFromSegments(state, segments) {
     state.path = path;
 }
 
-/** Snap visual size/length to server after teleport or respawn. */
-export function resetVisualGrowth(state, radius, segmentCount) {
+/** Snap visual thickness to server after teleport or respawn. */
+export function resetVisualGrowth(state, radius) {
     state.visualRadius = radius ?? BASE_RADIUS;
-    state.visualSegCount = segmentCount ?? state.segments?.length ?? 1;
 }
 
-/**
- * Ease display length and radius toward server values so eating reads as
- * gradual growth — authoritative balance/segment totals are unchanged.
- */
-function stepVisualGrowth(state, meta, targetSegCount, dt) {
+/** Ease display thickness toward server radius — length comes from the spine. */
+function stepVisualGrowth(state, meta, dt) {
     const targetRadius = meta.radius || BASE_RADIUS;
     if (state.visualRadius == null) state.visualRadius = targetRadius;
-    if (state.visualSegCount == null) state.visualSegCount = targetSegCount;
 
     const radiusA = 1 - Math.exp(-dt / 0.16);
     state.visualRadius += (targetRadius - state.visualRadius) * radiusA;
 
-    if (state.visualSegCount < targetSegCount) {
-        const growA = 1 - Math.exp(-dt / 0.1);
-        state.visualSegCount += (targetSegCount - state.visualSegCount) * growA;
-    } else if (state.visualSegCount > targetSegCount) {
-        const shrinkA = 1 - Math.exp(-dt / 0.06);
-        state.visualSegCount += (targetSegCount - state.visualSegCount) * shrinkA;
-    }
-
     return {
-        segCount: Math.max(1, Math.round(state.visualSegCount)),
         radius: state.visualRadius,
         sc: state.visualRadius / BASE_RADIUS,
     };
@@ -239,12 +223,10 @@ function copySpineSnapshot(segments, maxPoints) {
     return out;
 }
 
-function spinePointAt(snap, idx, simCount) {
+function spinePointAt(snap, idx) {
     const n = snap.length;
     if (n === 0) return { x: 0, y: 0 };
-    if (n === 1 || simCount <= 1) return snap[0];
-    const mapped = Math.min(n - 1, Math.round(idx * (n - 1) / Math.max(1, simCount - 1)));
-    return snap[mapped];
+    return snap[Math.min(idx, n - 1)];
 }
 
 /** Reset snapshot interpolation after teleport / respawn. */
@@ -264,19 +246,16 @@ export function resetSnakeBodyTick(state) {
  * Avoids backward head jumps and path re-simulation fighting server data.
  */
 export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowMs = performance.now()) {
-    const len = meta.segmentCount || 0;
-    if (len === 0 || !serverSegments?.[0]) return;
+    const spineLen = serverSegments?.length || 0;
+    if (spineLen === 0 || !serverSegments[0]) return;
 
     const serverHead = serverSegments[0];
-    const simCount = Math.min(len, MAX_SIM_SEGMENTS);
-    const spineLen = serverSegments.length;
-    stepVisualGrowth(state, meta, simCount, dt);
-    const spacing = segmentSpacingForSnake(meta);
+    stepVisualGrowth(state, meta, dt);
 
     if (!state.segments[0]) {
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
-    syncSegmentCount(state, simCount, spacing, serverHead, serverAngle ?? state.angle ?? 0);
+    syncSegmentCount(state, spineLen, 1, serverHead, serverAngle ?? state.angle ?? 0);
 
     const snapKey = `${serverHead.x}|${serverHead.y}|${spineLen}|${serverAngle || 0}`;
     if (state._lastSnapKey !== snapKey) {
@@ -309,9 +288,9 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
 
     const snapA = state._snapA || state._snapB;
     const snapB = state._snapB;
-    for (let i = 0; i < simCount; i++) {
-        const a = spinePointAt(snapA, i, simCount);
-        const b = spinePointAt(snapB, i, simCount);
+    for (let i = 0; i < spineLen; i++) {
+        const a = spinePointAt(snapA, i);
+        const b = spinePointAt(snapB, i);
         const seg = state.segments[i];
         seg.x = a.x + (b.x - a.x) * t;
         seg.y = a.y + (b.y - a.y) * t;

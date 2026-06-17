@@ -392,7 +392,7 @@ export class SlitherRenderer {
                 s.angle = snake.angle || 0;
                 if (snake.isYou) {
                     rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, snake.radius, segCount);
+                    resetVisualGrowth(s, snake.radius);
                 }
                 continue;
             }
@@ -410,7 +410,7 @@ export class SlitherRenderer {
                     for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     s.angle = snake.angle || 0;
                     rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, snake.radius, segCount);
+                    resetVisualGrowth(s, snake.radius);
                     resetSnakeBodyTick(s);
                     delete s._prevSrvHead;
                     delete s._extrapX;
@@ -1086,19 +1086,22 @@ export class SlitherRenderer {
             return;
         }
 
-        const worldRadius = snake.radius || 6;
-        // Fixed visual stamp spacing — render-only, never affects movement physics.
-        const stampStepWorld = Math.max(1, worldRadius * 0.25);
+        const sc = snake.sc ?? ((snake.radius || 6.2) / 6.2);
+        // Slither.io wsep = 6*sc; stamp overlap ~40% of segment spacing for smooth body.
+        const segSpacing = 3.6 * sc;
+        const idealStampStep = Math.max(1.4, segSpacing * 0.42);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.88 : 1);
-        const stampDensity = Math.max(1, (worldRadius * 0.38) / stampStepWorld);
-        const maxStamps = Math.round(
-            (isYou ? (boosting ? 110 : 92) : (boosting ? 48 : 38))
-            * qMul
-            * stampDensity
-            * Math.min(1.25, 1 + segs.length / 300),
-        );
+        const maxStamps = Math.round((isYou ? (boosting ? 76 : 68) : (boosting ? 36 : 30)) * qMul);
+        // Long snakes: widen stamp spacing instead of drawing more stamps (perf + correct proportions).
+        let arcLen = 0;
+        for (let i = 1; i < segs.length; i++) {
+            const dx = segs[i].x - segs[i - 1].x;
+            const dy = segs[i].y - segs[i - 1].y;
+            arcLen += Math.sqrt(dx * dx + dy * dy);
+        }
+        const stampStepWorld = Math.max(idealStampStep, arcLen / Math.max(1, maxStamps - 1));
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
             ctx.restore();
@@ -1339,7 +1342,8 @@ export class SlitherRenderer {
             rs.id = snake.id;
             rs.color = snake.color;
             const s = this.smooth.get(snake.id);
-            rs.radius = snake.isYou ? (snake.radius ?? s?.visualRadius) : snake.radius;
+            rs.radius = snake.isYou ? (s?.visualRadius ?? snake.radius) : snake.radius;
+            rs.sc = snake.sc ?? (rs.radius / 6.2);
             rs.boost = snake.boost;
             rs.isYou = snake.isYou;
             rs.name = snake.name;
