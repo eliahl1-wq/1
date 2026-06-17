@@ -97,50 +97,6 @@ function shadeColor({ r, g, b }, amount) {
     };
 }
 
-function rgbToHsl({ r, g, b }) {
-    const rn = r / 255, gn = g / 255, bn = b / 255;
-    const max = Math.max(rn, gn, bn);
-    const min = Math.min(rn, gn, bn);
-    let h = 0;
-    let s = 0;
-    const l = (max + min) / 2;
-    if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        if (max === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
-        else if (max === gn) h = ((bn - rn) / d + 2) / 6;
-        else h = ((rn - gn) / d + 4) / 6;
-    }
-    return { h: h * 360, s, l };
-}
-
-function hslToRgb({ h, s, l }) {
-    const hh = ((h % 360) + 360) % 360;
-    const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
-    const m = l - c / 2;
-    let rr = 0, gg = 0, bb = 0;
-    if (hh < 60) [rr, gg, bb] = [c, x, 0];
-    else if (hh < 120) [rr, gg, bb] = [x, c, 0];
-    else if (hh < 180) [rr, gg, bb] = [0, c, x];
-    else if (hh < 240) [rr, gg, bb] = [0, x, c];
-    else if (hh < 300) [rr, gg, bb] = [x, 0, c];
-    else [rr, gg, bb] = [c, 0, x];
-    return { r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 };
-}
-
-function lightenColor(hex, amount) {
-    const hsl = rgbToHsl(parseColor(hex));
-    hsl.l = Math.max(0, Math.min(1, hsl.l * (1 + amount)));
-    return toHex(hslToRgb(hsl));
-}
-
-function darkenColor(hex, amount) {
-    const hsl = rgbToHsl(parseColor(hex));
-    hsl.l = Math.max(0, Math.min(1, hsl.l * (1 - amount)));
-    return toHex(hslToRgb(hsl));
-}
-
 export class SlitherRenderer {
     constructor(canvas) {
         this.canvas = canvas;
@@ -149,6 +105,9 @@ export class SlitherRenderer {
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.imageSmoothingQuality = 'medium';
+        // Body sprites are authored at this supersample factor and blitted down,
+        // which gives crisp, well-antialiased snake edges instead of upscaled-blurry ones.
+        this._bodySS = 2;
         this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null, minimap: [] };
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
@@ -163,9 +122,10 @@ export class SlitherRenderer {
         this.zoom = this.baseZoom;
         this.snakeThickness = this.isMobile ? 1.0 : 0.9;
         this._dpr = 1;
-        // Pre-rendered rib stamps — keyed by color + screen radius bucket
-        this._ribCache = new Map();
+        // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
+        /** o.pr_imgs — normal + boost overlay canvases per (cs, radius) */
+        this._prImgs = new Map();
         this._bgTileImage = null;
         this._bgPattern = null;
         this._bgPatternScale = 0;
@@ -182,10 +142,10 @@ export class SlitherRenderer {
         this._frame = 0;
         this._renderSnakeBuf = [];
         this._sortedRenderSnakes = [];
-        this._drawPointsBuf = [];
-        this._splinePathBuf = [];
-        this._drawPointPool = [];
+        this._bumpsBuf = [];
         this._renderPool = new Map();
+        this._bumpPool = [];
+        this._boostTrailPool = new Map();
         this._smoothSeen = new Set();
         this._screenScratch = { x: 0, y: 0 };
         this._perfEma = 16.7;
@@ -353,6 +313,7 @@ export class SlitherRenderer {
     resetSession() {
         this.smooth.clear();
         this._renderPool.clear();
+        this._boostTrailPool.clear();
         this._cameraInit = false;
         this.camera.x = 0;
         this.camera.y = 0;
@@ -364,9 +325,8 @@ export class SlitherRenderer {
     removeSnake(id) {
         if (!id) return;
         this.smooth.delete(id);
-        const rs = this._renderPool.get(id);
-        if (rs) delete rs._dispScreenR;
         this._renderPool.delete(id);
+        this._boostTrailPool.delete(id);
         this.targetSnakes = this.targetSnakes.filter(s => s.id !== id);
         if (this.state.you === id) {
             this.state = { ...this.state, you: null };
@@ -451,7 +411,7 @@ export class SlitherRenderer {
                     delete s._extrapX;
                     delete s._extrapY;
                 }
-                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.018);
+                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.028);
                 continue;
             }
 
@@ -461,7 +421,7 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = 0.055;
+            const tau = 0.08;
             const a = 1 - Math.exp(-dt / tau);
             for (let i = 0; i < spineLen; i++) {
                 if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
@@ -486,6 +446,9 @@ export class SlitherRenderer {
         }
         for (const id of this._renderPool.keys()) {
             if (!seen.has(id)) this._renderPool.delete(id);
+        }
+        for (const id of this._boostTrailPool.keys()) {
+            if (!seen.has(id)) this._boostTrailPool.delete(id);
         }
     }
 
@@ -520,12 +483,8 @@ export class SlitherRenderer {
             for (let i = 0; i < 96 && i < entries.length; i++) {
                 this._sprites.delete(entries[i][0]);
             }
-            if (this._ribCache.size > 256) {
-                const stampEntries = [...this._ribCache.entries()]
-                    .sort((a, b) => (a[1]._lastUsed || 0) - (b[1]._lastUsed || 0));
-                for (let i = 0; i < 48 && i < stampEntries.length; i++) {
-                    this._ribCache.delete(stampEntries[i][0]);
-                }
+            if (this._prImgs.size > 200) {
+                this._prImgs.clear();
             }
         }
         const cv = document.createElement('canvas');
@@ -658,372 +617,78 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    // ─── Slither.io-style smooth tube renderer ───
-
-    _drawPoint(i, x, y) {
-        let p = this._drawPointPool[i];
+    _bumpPoint(i, x, y) {
+        let p = this._bumpPool[i];
         if (!p) {
             p = { x: 0, y: 0 };
-            this._drawPointPool[i] = p;
+            this._bumpPool[i] = p;
         }
         p.x = x;
         p.y = y;
         return p;
     }
 
-    _catmullRom(p0, p1, p2, p3, t) {
-        const t2 = t * t;
-        const t3 = t2 * t;
-        return {
-            x: 0.5 * (
-                (2 * p1.x)
-                + (-p0.x + p2.x) * t
-                + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2
-                + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
-            ),
-            y: 0.5 * (
-                (2 * p1.y)
-                + (-p0.y + p2.y) * t
-                + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
-                + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
-            ),
-        };
-    }
-
     /**
-     * Catmull-Rom spline through spine control points — smooth turns, no kinks.
+     * Resample a spine at fixed arc-length intervals, capped at maxPoints.
+     * One pass replaces densify+subsample: output bumps are evenly spaced and
+     * temporally stable (no index hopping), which removes body shimmer, and the
+     * cap keeps long snakes cheap. Output points are pooled via _bumpPoint.
      */
-    _buildCatmullRomPath(segments, subdivisions, out, maxPoints) {
+    _resampleSpine(spine, stepWorld, maxPoints, out) {
         out.length = 0;
-        const n = segments.length;
+        const n = spine.length;
         if (n === 0) return out;
         if (n === 1) {
-            out.push(this._drawPoint(0, segments[0].x, segments[0].y));
-            return out;
-        }
-        if (n === 2) {
-            out.push(this._drawPoint(0, segments[0].x, segments[0].y));
-            out.push(this._drawPoint(1, segments[1].x, segments[1].y));
+            out.push(this._bumpPoint(0, spine[0].x, spine[0].y));
             return out;
         }
 
-        let pi = 0;
-        const push = (x, y) => {
-            if (pi >= maxPoints) return false;
-            out.push(this._drawPoint(pi++, x, y));
-            return true;
-        };
-
-        push(segments[0].x, segments[0].y);
-
-        for (let i = 0; i < n - 1; i++) {
-            const p0 = segments[Math.max(0, i - 1)];
-            const p1 = segments[i];
-            const p2 = segments[i + 1];
-            const p3 = segments[Math.min(n - 1, i + 2)];
-            const steps = subdivisions;
-            for (let s = 1; s <= steps; s++) {
-                if (pi >= maxPoints) return out;
-                const pt = this._catmullRom(p0, p1, p2, p3, s / steps);
-                push(pt.x, pt.y);
-            }
-        }
-        return out;
-    }
-
-    /** Equally spaced samples along a polyline (arc-length parameterization). */
-    _equidistantResample(points, interval, out, maxPoints) {
-        out.length = 0;
-        const n = points.length;
-        if (n === 0) return out;
-        if (n === 1) {
-            out.push(this._drawPoint(0, points[0].x, points[0].y));
-            return out;
-        }
-
-        let totalLen = 0;
-        const acc = new Float32Array(n);
-        acc[0] = 0;
+        let total = 0;
         for (let i = 1; i < n; i++) {
-            const dx = points[i].x - points[i - 1].x;
-            const dy = points[i].y - points[i - 1].y;
-            totalLen += Math.sqrt(dx * dx + dy * dy);
-            acc[i] = totalLen;
+            const dx = spine[i].x - spine[i - 1].x;
+            const dy = spine[i].y - spine[i - 1].y;
+            total += Math.sqrt(dx * dx + dy * dy);
         }
 
-        if (totalLen < 1e-8 || interval < 1e-8) {
-            out.push(this._drawPoint(0, points[0].x, points[0].y));
-            return out;
+        let step = stepWorld;
+        const minStep = total / Math.max(1, maxPoints - 1);
+        if (step < minStep) step = minStep;
+        if (step < 0.0001) step = 0.0001;
+
+        let bi = 0;
+        out.push(this._bumpPoint(bi++, spine[0].x, spine[0].y));
+
+        let acc = 0;
+        let ax = spine[0].x;
+        let ay = spine[0].y;
+        for (let i = 1; i < n && bi < maxPoints; i++) {
+            const bx = spine[i].x;
+            const by = spine[i].y;
+            let dx = bx - ax;
+            let dy = by - ay;
+            let segLen = Math.sqrt(dx * dx + dy * dy);
+
+            while (segLen > 0 && acc + segLen >= step && bi < maxPoints) {
+                const t = (step - acc) / segLen;
+                ax += dx * t;
+                ay += dy * t;
+                out.push(this._bumpPoint(bi++, ax, ay));
+                acc = 0;
+                dx = bx - ax;
+                dy = by - ay;
+                segLen = Math.sqrt(dx * dx + dy * dy);
+            }
+            acc += segLen;
+            ax = bx;
+            ay = by;
         }
 
-        let pi = 0;
-        const sampleAt = (dist) => {
-            if (pi >= maxPoints) return;
-
-            let seg = 1;
-            while (seg < n && acc[seg] < dist) seg++;
-            if (seg >= n) seg = n - 1;
-
-            const segStart = acc[seg - 1];
-            const segLen = acc[seg] - segStart;
-            const t = segLen > 1e-9 ? (dist - segStart) / segLen : 0;
-            const p0 = points[seg - 1];
-            const p1 = points[seg];
-            out.push(this._drawPoint(
-                pi++,
-                p0.x + (p1.x - p0.x) * t,
-                p0.y + (p1.y - p0.y) * t,
-            ));
-        };
-
-        sampleAt(0);
-        for (let d = interval; d <= totalLen + 1e-6 && pi < maxPoints; d += interval) {
-            sampleAt(d);
+        const tail = spine[n - 1];
+        const last = out[out.length - 1];
+        if (bi < maxPoints && (last.x !== tail.x || last.y !== tail.y)) {
+            out.push(this._bumpPoint(bi, tail.x, tail.y));
         }
         return out;
-    }
-
-    /**
-     * Pre-rendered stamp — slither.io reference: cylindrical highlight, uniform width.
-     * No shadowBlur. Tail and head use identical full-size circles.
-     */
-    _getSnakeBodyCache(baseColor, rPx) {
-        const key = `slither_v26|${baseColor}|${Math.round(rPx)}`;
-        let cache = this._ribCache.get(key);
-        if (cache) {
-            cache._lastUsed = this._frame;
-            return cache;
-        }
-
-        const stampSize = Math.ceil(rPx * 2);
-        const r = rPx;
-
-        const bakeStamp = (color) => {
-            const cv = document.createElement('canvas');
-            cv.width = stampSize;
-            cv.height = stampSize;
-            const g = cv.getContext('2d');
-
-            g.save();
-            g.beginPath();
-            g.arc(r, r, r, 0, Math.PI * 2);
-            g.clip();
-
-            const cyl = g.createLinearGradient(0, 0, 0, stampSize);
-            cyl.addColorStop(0, darkenColor(color, 0.10));
-            cyl.addColorStop(0.20, color);
-            cyl.addColorStop(0.44, lightenColor(color, 0.07));
-            cyl.addColorStop(0.50, 'rgba(255,255,255,0.20)');
-            cyl.addColorStop(0.56, lightenColor(color, 0.05));
-            cyl.addColorStop(0.78, color);
-            cyl.addColorStop(1, darkenColor(color, 0.10));
-            g.fillStyle = cyl;
-            g.fillRect(0, 0, stampSize, stampSize);
-
-            const spec = g.createRadialGradient(r * 0.44, r * 0.40, 0, r, r * 0.48, r * 0.95);
-            spec.addColorStop(0, 'rgba(255,255,255,0.10)');
-            spec.addColorStop(1, 'rgba(255,255,255,0)');
-            g.fillStyle = spec;
-            g.fillRect(0, 0, stampSize, stampSize);
-            g.restore();
-
-            return cv;
-        };
-
-        cache = {
-            canvasNormal: bakeStamp(baseColor),
-            canvasStripe: bakeStamp(darkenColor(baseColor, 0.04)),
-            stampSize,
-            bodyR: r,
-            _lastUsed: this._frame,
-        };
-        this._ribCache.set(key, cache);
-        return cache;
-    }
-
-    /** Smooth display radius — grows gradually instead of jumping per food batch. */
-    _smoothSnakeRadius(snake, targetScreenR) {
-        let cur = snake._dispScreenR;
-        if (cur == null || !Number.isFinite(cur)) {
-            cur = targetScreenR;
-        } else {
-            cur += (targetScreenR - cur) * 0.16;
-        }
-        snake._dispScreenR = cur;
-        return cur;
-    }
-
-    _drawSnake(snake, toScreen, zoom) {
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
-
-        let segs = snake.segments || [];
-        if (segs.length === 0) {
-            ctx.restore();
-            return;
-        }
-
-        const sct = snake.sct;
-        if (sct && sct > 0 && sct < segs.length) {
-            segs = segs.slice(0, sct);
-        }
-
-        const thick = this.snakeThickness ?? 1;
-        const worldRadius = snake.radius || 6;
-        const targetHeadR = worldRadius * zoom * thick;
-        const headRadius = this._smoothSnakeRadius(snake, targetHeadR);
-        const angle = snake.angle || 0;
-        const isYou = !!snake.isYou;
-
-        let cs = snake._csCache;
-        if (cs === undefined || snake._csColor !== snake.color) {
-            cs = bucketSnakeColor(snake.color);
-            snake._csCache = cs;
-            snake._csColor = snake.color;
-        }
-
-        const camX = this.camera.x;
-        const camY = this.camera.y;
-        const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 160;
-        const viewR2 = viewR * viewR;
-        let onScreen = false;
-        const checkStride = Math.max(1, Math.floor(segs.length / 12));
-        for (let i = 0; i < segs.length; i += checkStride) {
-            const dx = segs[i].x - camX;
-            const dy = segs[i].y - camY;
-            if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
-        }
-        if (!onScreen) {
-            const tail = segs[segs.length - 1];
-            const tdx = tail.x - camX;
-            const tdy = tail.y - camY;
-            if (tdx * tdx + tdy * tdy <= viewR2) onScreen = true;
-        }
-        if (!onScreen) {
-            ctx.restore();
-            return;
-        }
-
-        const pointCap = isYou ? 4500 : 1800;
-        const stampInterval = Math.max(0.018, worldRadius * thick * 0.065);
-        const drawPoints = this._equidistantResample(
-            segs, stampInterval, this._drawPointsBuf, pointCap,
-        );
-        const pathLen = drawPoints.length;
-        if (pathLen === 0) {
-            ctx.restore();
-            return;
-        }
-
-        const halfW = this.W / 2;
-        const halfH = this.H / 2;
-        for (let i = 0; i < pathLen; i++) {
-            const p = drawPoints[i];
-            p.x = (p.x - camX) * zoom + halfW;
-            p.y = (p.y - camY) * zoom + halfH;
-        }
-
-        const hx = drawPoints[0].x;
-        const hy = drawPoints[0].y;
-
-        const cacheR = Math.max(4, Math.round(headRadius));
-        const sizeMul = headRadius / cacheR;
-        const { canvasNormal, canvasStripe, stampSize } = this._getSnakeBodyCache(cs, cacheR);
-        const cullPad = stampSize * sizeMul + 32;
-        const STAMPS_PER_BAND = 6;
-        const drawDiam = stampSize * sizeMul;
-
-        const stampAt = (p, canvas) => {
-            const half = drawDiam * 0.5;
-            ctx.drawImage(canvas, p.x - half, p.y - half, drawDiam, drawDiam);
-        };
-
-        // Body: tail → neck — UNIFORM width (scale 1.0), no taper
-        for (let i = pathLen - 1; i >= 1; i--) {
-            const p = drawPoints[i];
-            if (p.x < -cullPad || p.y < -cullPad || p.x > this.W + cullPad || p.y > this.H + cullPad) {
-                continue;
-            }
-            const stampIdx = pathLen - 1 - i;
-            const useNormal = Math.floor(stampIdx / STAMPS_PER_BAND) % 2 === 0;
-            stampAt(p, useNormal ? canvasNormal : canvasStripe);
-        }
-
-        // Head on top — identical diameter to body
-        const headPt = drawPoints[0];
-        if (headPt.x >= -cullPad && headPt.y >= -cullPad
-            && headPt.x <= this.W + cullPad && headPt.y <= this.H + cullPad) {
-            stampAt(headPt, canvasNormal);
-        }
-
-        const headEyeRadius = headRadius;
-        const perpX = Math.sin(angle);
-        const perpY = -Math.cos(angle);
-        const fwdX = Math.cos(angle);
-        const fwdY = Math.sin(angle);
-        const eyeSide = headEyeRadius * 0.35;
-        const eyeFwd = headEyeRadius * 0.35;
-        const eyeR = Math.max(2.5, headEyeRadius * 0.32);
-        const pupilR = eyeR * 0.45;
-
-        if (isYou || this._quality >= 0.68) {
-            for (const side of [-1, 1]) {
-                const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
-                const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
-
-                ctx.beginPath();
-                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-
-                const px = ex + fwdX * eyeR * 0.4;
-                const py = ey + fwdY * eyeR * 0.4;
-                ctx.beginPath();
-                ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-                ctx.fillStyle = '#000000';
-                ctx.fill();
-            }
-        }
-
-        if (snake.name && isYou) {
-            ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-            ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
-            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
-        }
-
-        if (isYou && this.isMobile) {
-            const am = Math.hypot(this.inputDx, this.inputDy);
-            const aang = am > 0.001 ? Math.atan2(this.inputDy, this.inputDx) : angle;
-            const size = Math.max(11, Math.min(22, headRadius * 0.95));
-            const gap = headRadius * 1.9 + size;
-            const ax = hx + Math.cos(aang) * gap;
-            const ay = hy + Math.sin(aang) * gap;
-
-            ctx.save();
-            ctx.translate(ax, ay);
-            ctx.rotate(aang);
-            ctx.globalAlpha = 0.9;
-            ctx.beginPath();
-            ctx.moveTo(size, 0);
-            ctx.lineTo(-size * 0.7, size * 0.7);
-            ctx.lineTo(-size * 0.32, 0);
-            ctx.lineTo(-size * 0.7, -size * 0.7);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(255,255,255,0.92)';
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        ctx.restore();
     }
 
     _drawZone(ctx, toScreen, W, H) {
@@ -1190,6 +855,445 @@ export class SlitherRenderer {
                 ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
             }
         }
+    }
+
+    _blitSprite(ctx, sprite, x, y, scale = 1) {
+        if (scale === 1) {
+            const half = sprite.width >> 1;
+            ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0);
+            return;
+        }
+        // Supersampled sprite — draw at its intended display size (downscale = crisp AA edges).
+        const dw = sprite.width / scale;
+        const dh = sprite.height / scale;
+        ctx.drawImage(sprite, x - dw / 2, y - dh / 2, dw, dh);
+    }
+
+    /** Tangent angle at bump index (radians, toward head). */
+    _bumpTangent(bumps, i) {
+        if (bumps.length < 2) return 0;
+        if (i <= 0) {
+            const a = bumps[0];
+            const b = bumps[1];
+            return Math.atan2(a.y - b.y, a.x - b.x);
+        }
+        if (i >= bumps.length - 1) {
+            const a = bumps[i];
+            const b = bumps[i - 1];
+            return Math.atan2(b.y - a.y, b.x - a.x);
+        }
+        const prev = bumps[i - 1];
+        const next = bumps[i + 1];
+        return Math.atan2(prev.y - next.y, prev.x - next.x);
+    }
+
+    /**
+     * Glossy gel-like segment — radial body, top-left specular, bottom-right depth.
+     * Designed to overlap heavily to form a continuous rubber-like tube.
+     */
+    _paintSnakeSegment(g, c, rPx, cs, phase = 0, contrast = 1) {
+        const col = parseColor(cs);
+        const k = contrast;
+        
+        // 1. Base Radial Gradient
+        // Offset center slightly up to simulate top-down light
+        const baseGrad = g.createRadialGradient(c, c - rPx * 0.16, rPx * 0.12, c, c, rPx);
+        const centerCol = shadeColor(col, Math.round(12 * k));
+        const midCol = col;
+        const edgeCol = shadeColor(col, Math.round(-34 * k));
+        
+        baseGrad.addColorStop(0, toHex(centerCol));
+        baseGrad.addColorStop(0.6, toHex(midCol));
+        baseGrad.addColorStop(1, toHex(edgeCol));
+        
+        g.fillStyle = baseGrad;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        // 2. Specular Highlight (Top band) — alternate phase shifts band like slither.io bumps
+        const hiCol = shadeColor(col, Math.round(58 * k));
+        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        const hiStart = phase ? 0.07 : 0.05;
+        const hiPeak = phase ? 0.16 : 0.13;
+        const hiEnd = phase ? 0.28 : 0.25;
+        hiGrad.addColorStop(hiStart, 'rgba(255,255,255,0)');
+        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.26 * k));
+        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.045 * k));
+        hiGrad.addColorStop(hiEnd + 0.06, 'rgba(255,255,255,0)');
+        
+        g.fillStyle = hiGrad;
+        g.fill();
+
+        // 3. Ambient Shadow (Bottom)
+        const shCol = shadeColor(col, Math.round(-52 * k));
+        const shGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        shGrad.addColorStop(0.68, 'rgba(0,0,0,0)');
+        shGrad.addColorStop(0.94, rgb(shCol, 0.4 * k));
+        shGrad.addColorStop(1.0, rgb(shCol, 0.56 * k));
+        
+        g.fillStyle = shGrad;
+        g.fill();
+
+        // 4. Soft edge vignette to hide metallic hard segment border.
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.72, c, c, rPx * 1.03);
+        edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(0.88, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -30), 0.16 * k));
+        g.fillStyle = edgeShadow;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+    }
+
+    /** Soft outer glow for additive body pass. Extremely subtle bloom. */
+    _paintSnakeGlow(g, c, rPx, cs) {
+        const col = parseColor(cs);
+        const bright = shadeColor(col, 20);
+        const glowR = rPx * 1.35;
+        const grad = g.createRadialGradient(c, c, rPx * 0.4, c, c, glowR);
+        grad.addColorStop(0, rgb(bright, 0.1));
+        grad.addColorStop(0.5, rgb(col, 0.04));
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(c, c, glowR, 0, Math.PI * 2);
+        g.fill();
+    }
+
+    /**
+     * Pre-render normal segment + optional glow/boost overlays into o.pr_imgs cache.
+     * Heavy overlays are built lazily — remote snakes only need normal/alt/boostBody.
+     */
+    _getSnakePrImgs(cs, rPx, needs = {}) {
+        const key = `${cs}|${rPx}`;
+        let pair = this._prImgs.get(key);
+        const bodySS = rPx <= 44 ? this._bodySS : rPx <= 84 ? 1.5 : 1.25;
+
+        if (!pair) {
+            pair = { bodySS };
+            this._prImgs.set(key, pair);
+        } else {
+            pair.bodySS = bodySS;
+        }
+
+        const ssR = rPx * bodySS;
+        const ssSize = ssR * 2 + 4;
+
+        if (!pair.normal) {
+            pair.normal = this._getSprite(`pr_norm_v21|${key}|0`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
+            });
+            pair.alt = this._getSprite(`pr_norm_v21|${key}|1`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
+            });
+            pair.boostBody = this._getSprite(`pr_norm_v21|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
+            });
+        }
+
+        if (needs.glow && !pair.glow) {
+            const glowPad = Math.ceil(rPx * 0.45);
+            pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+                this._paintSnakeGlow(g, sz / 2, rPx, cs);
+            });
+        }
+
+        if (needs.boostOverlay && !pair.boostOverlay) {
+            const col = parseColor(cs);
+            const bright = shadeColor(col, 35);
+            const pad = Math.max(3, Math.ceil(rPx * 0.2));
+            pair.boostOverlay = this._getSprite(`pr_boost_v20|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
+                const c = sz / 2;
+                const glowR = rPx * 1.4 + pad;
+                const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
+                aura.addColorStop(0, rgb(bright, 0.05));
+                aura.addColorStop(0.4, rgb(bright, 0.15));
+                aura.addColorStop(0.7, rgb(bright, 0.08));
+                aura.addColorStop(1, 'rgba(255,255,255,0)');
+                g.fillStyle = aura;
+                g.beginPath();
+                g.arc(c, c, glowR, 0, Math.PI * 2);
+                g.fill();
+            });
+        }
+
+        if (needs.trailGlow && !pair.trailGlow) {
+            const col = parseColor(cs);
+            const bright = shadeColor(col, 35);
+            pair.trailGlow = this._getSprite(`pr_trail_v20|${key}`, rPx * 3 + 8, (g, sz) => {
+                const c = sz / 2;
+                const glowR = rPx * 1.7;
+                const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
+                grad.addColorStop(0, rgb(bright, 0.12));
+                grad.addColorStop(0.40, rgb(col, 0.06));
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                g.fillStyle = grad;
+                g.beginPath();
+                g.arc(c, c, glowR, 0, Math.PI * 2);
+                g.fill();
+            });
+        }
+
+        return pair;
+    }
+
+    _drawSnake(snake, toScreen, zoom) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+
+        const segs = snake.segments || [];
+        if (segs.length === 0) {
+            ctx.restore();
+            return;
+        }
+
+        const gsc = zoom;
+        const thick = this.snakeThickness ?? 1;
+        const headRadius = (snake.radius || 6) * gsc * thick;
+        const bodyRadius = headRadius;
+        const angle = snake.angle || 0;
+        // Cache the (expensive) HSL color bucketing across frames per snake.
+        let cs = snake._csCache;
+        if (cs === undefined || snake._csColor !== snake.color) {
+            cs = bucketSnakeColor(snake.color);
+            snake._csCache = cs;
+            snake._csColor = snake.color;
+        }
+        const boosting = !!snake.boost;
+        const isYou = !!snake.isYou;
+        const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.16);
+
+        // Cheap on-screen cull straight from the world-space spine before any resampling.
+        const cx = this.camera.x;
+        const cy = this.camera.y;
+        const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 160;
+        const viewR2 = viewR * viewR;
+        let onScreen = false;
+        const checkStride = Math.max(1, Math.floor(segs.length / 12));
+        for (let i = 0; i < segs.length; i += checkStride) {
+            const dx = segs[i].x - cx;
+            const dy = segs[i].y - cy;
+            if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
+        }
+        if (!onScreen) {
+            const tail = segs[segs.length - 1];
+            const dx = tail.x - cx;
+            const dy = tail.y - cy;
+            if (dx * dx + dy * dy <= viewR2) onScreen = true;
+        }
+        if (!onScreen) {
+            ctx.restore();
+            return;
+        }
+
+        const worldRadius = snake.radius || 6;
+        const sizeMul = Math.min(1.15, 1 + Math.max(0, worldRadius - 10) * 0.012);
+        const overlapMul = (isYou ? 0.38 : 0.48) * sizeMul;
+        const boostSpaceMul = (isYou ? 0.55 : 0.68) * sizeMul;
+        // Bump spacing in WORLD units so it stays constant while zoom animates each frame.
+        const bumpStepWorld = Math.max(2.6, worldRadius * (boosting ? boostSpaceMul : overlapMul));
+        const q = this._quality;
+        const cashoutPerf = isYou && this._cashoutPerf;
+        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.88 : 1);
+        const maxBumps = Math.round(
+            (isYou ? (boosting ? 110 : 92) : (boosting ? 48 : 38)) * qMul * Math.min(1.25, 1 + segs.length / 300),
+        );
+        // Arc-length resample → evenly spaced, temporally stable bumps (kills body shimmer).
+        const bumps = this._resampleSpine(segs, bumpStepWorld, maxBumps, this._bumpsBuf);
+        if (bumps.length < 1) {
+            ctx.restore();
+            return;
+        }
+
+        // Project bumps to screen once — stable world spacing, single projection.
+        for (let i = 0; i < bumps.length; i++) {
+            const b = bumps[i];
+            const wx = b.x;
+            const wy = b.y;
+            b.x = (wx - cx) * zoom + this.W / 2;
+            b.y = (wy - cy) * zoom + this.H / 2;
+        }
+
+        const hx = bumps[0].x;
+        const hy = bumps[0].y;
+
+        // Coarse radius buckets with hysteresis so sprite set doesn't swap every frame.
+        const rawR = Math.max(4, Math.round(bodyRadius / 4) * 4);
+        let r = rawR;
+        if (snake._lastSpriteR != null && Math.abs(rawR - snake._lastSpriteR) < 8) {
+            r = snake._lastSpriteR;
+        } else {
+            snake._lastSpriteR = rawR;
+        }
+        const prNeeds = {
+            glow: isYou && !cashoutPerf && q >= 0.5,
+            boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
+            trailGlow: isYou && boosting && !cashoutPerf,
+        };
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakePrImgs(cs, r, prNeeds);
+        const halfT = trailGlow ? trailGlow.width / 2 : 0;
+        const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
+        const bumpCount = bumps.length;
+
+        const headBump = bumps[0];
+
+        let trail = this._boostTrailPool.get(snake.id);
+        if (!trail) {
+            trail = [];
+            this._boostTrailPool.set(snake.id, trail);
+        }
+        if (isYou && boosting) {
+            trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
+            if (trail.length > 6) trail.length = 6;
+        } else if (trail.length > 0) {
+            trail.length = 0;
+        }
+
+        // Motion blur trailing afterimages during boost (local snake only)
+        if (isYou && boosting && !cashoutPerf && trailGlow && trail.length > 1) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let t = 1; t < trail.length; t++) {
+                const tr = trail[t];
+                ctx.globalAlpha = (1 - t / trail.length) * 0.12 * pulse;
+                ctx.drawImage(trailGlow, tr.x - halfT, tr.y - halfT);
+            }
+            ctx.restore();
+        }
+
+        // Draw body segments (tail to head)
+        for (let i = bumpCount - 1; i >= 0; i--) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+
+            const isHead = i === 0;
+            const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
+            this._blitSprite(ctx, sprite, p.x, p.y, bodySS);
+        }
+
+        // Ambient glow — local snake only (doubles draw calls otherwise). The glow
+        // sprite is large and additive, so stride the loop: overlapping bumps make
+        // the gaps invisible while roughly halving this pass's fillrate.
+        if (isYou && prNeeds.glow && glow) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
+            const glowStride = cashoutPerf ? 4 : (boosting ? 2 : 3);
+            for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                this._blitSprite(ctx, glow, p.x, p.y);
+            }
+            ctx.restore();
+        }
+
+        // Boost overlay (local snake only) — strided for the same reason as the glow.
+        if (isYou && boosting && prNeeds.boostOverlay && boostOverlay) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = bumpCount - 1; i >= 0; i -= 2) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                const along = i / Math.max(1, bumpCount - 1);
+                const headProx = 1 - along;
+
+                ctx.globalAlpha = (0.22 + headProx * 0.22) * pulse;
+                this._blitSprite(ctx, boostOverlay, p.x, p.y);
+            }
+            ctx.restore();
+        }
+
+        // Head and Eyes
+        const perpX = Math.sin(angle);
+        const perpY = -Math.cos(angle);
+        const fwdX = Math.cos(angle);
+        const fwdY = Math.sin(angle);
+        
+        // Head is exactly the same size as the body
+        const headEyeRadius = headRadius;
+        
+        // Eye positioning
+        const eyeSide = headEyeRadius * 0.35;
+        const eyeFwd = headEyeRadius * 0.35;
+        const eyeR = Math.max(2.5, headEyeRadius * 0.32);
+        const pupilR = eyeR * 0.45;
+
+        // Head boost glow
+        if (boosting) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.25 * pulse;
+            ctx.translate(hx + fwdX * headRadius * 0.08, hy + fwdY * headRadius * 0.08);
+            ctx.rotate(angle);
+            ctx.scale(1.12, 0.95);
+            ctx.drawImage(boostOverlay, -halfB, -halfB);
+            ctx.restore();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+
+        if (isYou || this._quality >= 0.68) {
+            for (const side of [-1, 1]) {
+                const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
+                const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
+
+                ctx.beginPath();
+                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                const px = ex + fwdX * eyeR * 0.4;
+                const py = ey + fwdY * eyeR * 0.4;
+                ctx.beginPath();
+                ctx.arc(px, py, pupilR, 0, Math.PI * 2);
+                ctx.fillStyle = '#000000';
+                ctx.fill();
+            }
+        }
+
+        if (snake.name && isYou) {
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+            ctx.lineWidth = 3;
+            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
+            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
+        }
+
+        // Mobile steering arrow (slither.io "arrow mode") — points just ahead of the
+        // head toward where the finger is steering the snake.
+        if (isYou && this.isMobile) {
+            const am = Math.hypot(this.inputDx, this.inputDy);
+            const aang = am > 0.001 ? Math.atan2(this.inputDy, this.inputDx) : angle;
+            const size = Math.max(11, Math.min(22, headRadius * 0.95));
+            const gap = headRadius * 1.9 + size;
+            const ax = hx + Math.cos(aang) * gap;
+            const ay = hy + Math.sin(aang) * gap;
+
+            ctx.save();
+            ctx.translate(ax, ay);
+            ctx.rotate(aang);
+            ctx.globalAlpha = 0.9;
+            ctx.beginPath();
+            ctx.moveTo(size, 0);
+            ctx.lineTo(-size * 0.7, size * 0.7);
+            ctx.lineTo(-size * 0.32, 0);
+            ctx.lineTo(-size * 0.7, -size * 0.7);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255,255,255,0.92)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.restore();
     }
 
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
@@ -1399,6 +1503,7 @@ export class SlitherRenderer {
 
     destroy() {
         this.pause();
+        this._boostTrailPool.clear();
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
         document.removeEventListener('mousemove', this._onMouseMove);
