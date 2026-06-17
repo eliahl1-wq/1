@@ -97,6 +97,48 @@ function shadeColor({ r, g, b }, amount) {
     };
 }
 
+function rgbToHsl({ r, g, b }) {
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
+    if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+        else if (max === gn) h = ((bn - rn) / d + 2) / 6;
+        else h = ((rn - gn) / d + 4) / 6;
+    }
+    return { h: h * 360, s, l };
+}
+
+function hslToRgb({ h, s, l }) {
+    const hh = ((h % 360) + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
+    const m = l - c / 2;
+    let rr = 0, gg = 0, bb = 0;
+    if (hh < 60) [rr, gg, bb] = [c, x, 0];
+    else if (hh < 120) [rr, gg, bb] = [x, c, 0];
+    else if (hh < 180) [rr, gg, bb] = [0, c, x];
+    else if (hh < 240) [rr, gg, bb] = [0, x, c];
+    else if (hh < 300) [rr, gg, bb] = [x, 0, c];
+    else [rr, gg, bb] = [c, 0, x];
+    return { r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 };
+}
+
+/** Cyclic stripe bands: +10% or -10% brightness & saturation. */
+function bandColor(cs, bandShift) {
+    if (!bandShift) return cs;
+    const hsl = rgbToHsl(parseColor(cs));
+    const mul = 1 + bandShift;
+    hsl.l = Math.max(0, Math.min(1, hsl.l * mul));
+    hsl.s = Math.max(0, Math.min(1, hsl.s * mul));
+    return toHex(hslToRgb(hsl));
+}
+
 export class SlitherRenderer {
     constructor(canvas) {
         this.canvas = canvas;
@@ -857,16 +899,43 @@ export class SlitherRenderer {
         }
     }
 
-    _blitSprite(ctx, sprite, x, y, scale = 1) {
-        if (scale === 1) {
+    _blitSprite(ctx, sprite, x, y, scale = 1, displayMul = 1) {
+        if (scale === 1 && displayMul === 1) {
             const half = sprite.width >> 1;
             ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0);
             return;
         }
         // Supersampled sprite — draw at its intended display size (downscale = crisp AA edges).
-        const dw = sprite.width / scale;
-        const dh = sprite.height / scale;
+        const dw = (sprite.width / scale) * displayMul;
+        const dh = (sprite.height / scale) * displayMul;
         ctx.drawImage(sprite, x - dw / 2, y - dh / 2, dw, dh);
+    }
+
+    /**
+     * Single-pass bloom along the snake spine — one shadowBlur stroke instead of
+     * per-segment blur (cheaper and closer to slither.io's soft body glow).
+     */
+    _drawSnakeBloom(ctx, bumps, bumpCount, cs, headRadius, boosting) {
+        if (bumpCount < 2) return;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = boosting ? 0.22 : 0.16;
+        ctx.strokeStyle = cs;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowBlur = Math.max(18, headRadius * 2.8);
+        ctx.shadowColor = cs;
+        ctx.lineWidth = headRadius * 1.35;
+
+        ctx.beginPath();
+        const tail = bumps[bumpCount - 1];
+        ctx.moveTo(tail.x, tail.y);
+        for (let i = bumpCount - 2; i >= 0; i--) {
+            ctx.lineTo(bumps[i].x, bumps[i].y);
+        }
+        ctx.stroke();
+        ctx.restore();
     }
 
     /** Tangent angle at bump index (radians, toward head). */
@@ -888,82 +957,34 @@ export class SlitherRenderer {
     }
 
     /**
-     * Glossy gel-like segment — radial body, top-left specular, bottom-right depth.
-     * Designed to overlap heavily to form a continuous rubber-like tube.
+     * Organic 3D segment — single radial gradient with upper-left highlight,
+     * mid-tone body, and dark rim. bandShift: +0.1 / -0.1 for striped bands.
      */
-    _paintSnakeSegment(g, c, rPx, cs, phase = 0, contrast = 1) {
-        const col = parseColor(cs);
-        const k = contrast;
-        
-        // 1. Base Radial Gradient
-        // Offset center slightly up to simulate top-down light
-        const baseGrad = g.createRadialGradient(c, c - rPx * 0.16, rPx * 0.12, c, c, rPx);
-        const centerCol = shadeColor(col, Math.round(12 * k));
-        const midCol = col;
-        const edgeCol = shadeColor(col, Math.round(-34 * k));
-        
-        baseGrad.addColorStop(0, toHex(centerCol));
-        baseGrad.addColorStop(0.6, toHex(midCol));
-        baseGrad.addColorStop(1, toHex(edgeCol));
-        
-        g.fillStyle = baseGrad;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
+    _paintSnakeSegment(g, c, rPx, cs, bandShift = 0, boost = false) {
+        const tinted = bandColor(cs, bandShift);
+        const col = parseColor(tinted);
+        const midCol = boost ? shadeColor(col, 14) : col;
+        const edgeCol = shadeColor(midCol, -42);
+        const rimCol = shadeColor(midCol, -28);
 
-        // 2. Specular Highlight (Top band) — alternate phase shifts band like slither.io bumps
-        const hiCol = shadeColor(col, Math.round(58 * k));
-        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        const hiStart = phase ? 0.07 : 0.05;
-        const hiPeak = phase ? 0.16 : 0.13;
-        const hiEnd = phase ? 0.28 : 0.25;
-        hiGrad.addColorStop(hiStart, 'rgba(255,255,255,0)');
-        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.26 * k));
-        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.045 * k));
-        hiGrad.addColorStop(hiEnd + 0.06, 'rgba(255,255,255,0)');
-        
-        g.fillStyle = hiGrad;
-        g.fill();
+        // Highlight sits upper-left; falloff toward center/right/bottom simulates volume.
+        const hx = c - rPx * 0.38;
+        const hy = c - rPx * 0.38;
+        const grad = g.createRadialGradient(hx, hy, rPx * 0.04, c, c, rPx);
+        grad.addColorStop(0, 'rgba(255,255,255,0.42)');
+        grad.addColorStop(0.22, rgb(shadeColor(midCol, 22), 0.55));
+        grad.addColorStop(0.52, toHex(midCol));
+        grad.addColorStop(0.82, toHex(rimCol));
+        grad.addColorStop(1, toHex(edgeCol));
 
-        // 3. Ambient Shadow (Bottom)
-        const shCol = shadeColor(col, Math.round(-52 * k));
-        const shGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        shGrad.addColorStop(0.68, 'rgba(0,0,0,0)');
-        shGrad.addColorStop(0.94, rgb(shCol, 0.4 * k));
-        shGrad.addColorStop(1.0, rgb(shCol, 0.56 * k));
-        
-        g.fillStyle = shGrad;
-        g.fill();
-
-        // 4. Soft edge vignette to hide metallic hard segment border.
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.72, c, c, rPx * 1.03);
-        edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.88, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -30), 0.16 * k));
-        g.fillStyle = edgeShadow;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-    }
-
-    /** Soft outer glow for additive body pass. Extremely subtle bloom. */
-    _paintSnakeGlow(g, c, rPx, cs) {
-        const col = parseColor(cs);
-        const bright = shadeColor(col, 20);
-        const glowR = rPx * 1.35;
-        const grad = g.createRadialGradient(c, c, rPx * 0.4, c, c, glowR);
-        grad.addColorStop(0, rgb(bright, 0.1));
-        grad.addColorStop(0.5, rgb(col, 0.04));
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = grad;
         g.beginPath();
-        g.arc(c, c, glowR, 0, Math.PI * 2);
+        g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
     }
 
     /**
-     * Pre-render normal segment + optional glow/boost overlays into o.pr_imgs cache.
-     * Heavy overlays are built lazily — remote snakes only need normal/alt/boostBody.
+     * Pre-render stripe-band segments + optional boost overlays into o.pr_imgs cache.
      */
     _getSnakePrImgs(cs, rPx, needs = {}) {
         const key = `${cs}|${rPx}`;
@@ -981,21 +1002,17 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v21|${key}|0`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
+            pair.normal = this._getSprite(`pr_norm_v22|${key}|+`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0.1, false);
             });
-            pair.alt = this._getSprite(`pr_norm_v21|${key}|1`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
+            pair.alt = this._getSprite(`pr_norm_v22|${key}|-`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, -0.1, false);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v21|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
+            pair.boostBody = this._getSprite(`pr_norm_v22|${key}|boost+`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0.1, true);
             });
-        }
-
-        if (needs.glow && !pair.glow) {
-            const glowPad = Math.ceil(rPx * 0.45);
-            pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
-                this._paintSnakeGlow(g, sz / 2, rPx, cs);
+            pair.boostBodyAlt = this._getSprite(`pr_norm_v22|${key}|boost-`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, -0.1, true);
             });
         }
 
@@ -1090,11 +1107,9 @@ export class SlitherRenderer {
         }
 
         const worldRadius = snake.radius || 6;
-        const sizeMul = Math.min(1.15, 1 + Math.max(0, worldRadius - 10) * 0.012);
-        const overlapMul = (isYou ? 0.38 : 0.48) * sizeMul;
-        const boostSpaceMul = (isYou ? 0.55 : 0.68) * sizeMul;
-        // Bump spacing in WORLD units so it stays constant while zoom animates each frame.
-        const bumpStepWorld = Math.max(2.6, worldRadius * (boosting ? boostSpaceMul : overlapMul));
+        // 75% overlap: center spacing = 25% of diameter (0.5 × radius).
+        const overlapStep = worldRadius * 0.5;
+        const bumpStepWorld = Math.max(1.4, overlapStep);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.88 : 1);
@@ -1129,11 +1144,10 @@ export class SlitherRenderer {
             snake._lastSpriteR = rawR;
         }
         const prNeeds = {
-            glow: isYou && !cashoutPerf && q >= 0.5,
             boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
             trailGlow: isYou && boosting && !cashoutPerf,
         };
-        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakePrImgs(cs, r, prNeeds);
+        const { normal, alt, boostBody, boostBodyAlt, boostOverlay, trailGlow, bodySS } = this._getSnakePrImgs(cs, r, prNeeds);
         const halfT = trailGlow ? trailGlow.width / 2 : 0;
         const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
         const bumpCount = bumps.length;
@@ -1164,30 +1178,30 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // Draw body segments (tail to head)
+        // Global bloom pass — one blurred stroke before detailed segments.
+        if (!cashoutPerf && q >= 0.42) {
+            this._drawSnakeBloom(ctx, bumps, bumpCount, cs, headRadius, boosting);
+        }
+
+        // Draw body segments (tail → head): 5-segment stripe bands + linear tail taper.
+        const tailDenom = Math.max(1, bumpCount - 1);
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const isHead = i === 0;
-            const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
-            this._blitSprite(ctx, sprite, p.x, p.y, bodySS);
-        }
-
-        // Ambient glow — local snake only (doubles draw calls otherwise). The glow
-        // sprite is large and additive, so stride the loop: overlapping bumps make
-        // the gaps invisible while roughly halving this pass's fillrate.
-        if (isYou && prNeeds.glow && glow) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
-            const glowStride = cashoutPerf ? 4 : (boosting ? 2 : 3);
-            for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
-                const p = bumps[i];
-                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-                this._blitSprite(ctx, glow, p.x, p.y);
+            const stripeBand = Math.floor(i / 5) % 2;
+            const brightBand = stripeBand === 0;
+            let sprite;
+            if (boosting && isHead) {
+                sprite = brightBand ? boostBody : (boostBodyAlt || boostBody);
+            } else {
+                sprite = brightBand ? normal : alt;
             }
-            ctx.restore();
+
+            // Head = 100% width, tail = 60% width.
+            const taper = 1 - (i / tailDenom) * 0.4;
+            this._blitSprite(ctx, sprite, p.x, p.y, bodySS, taper);
         }
 
         // Boost overlay (local snake only) — strided for the same reason as the glow.
