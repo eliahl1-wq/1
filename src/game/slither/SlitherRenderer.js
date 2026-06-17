@@ -415,7 +415,7 @@ export class SlitherRenderer {
                     delete s._extrapX;
                     delete s._extrapY;
                 }
-                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.028);
+                stepSnakeBody(s, meta, tgt[0], snake.angle || 0, dt, 0.014);
                 continue;
             }
 

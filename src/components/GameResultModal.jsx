@@ -202,8 +202,8 @@ export default function GameResultModal({
                     </>
                 )}
 
-                <div className={`game-result-actions${!isWin && !showSpectate ? ' game-result-actions--death' : ''}`}>
-                    {!isWin && showSpectate && (
+                <div className={`game-result-actions${showSpectate ? '' : !isWin ? ' game-result-actions--death' : ''}`}>
+                    {showSpectate && (
                         <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onSpectate}>
                             <EyeIcon />
                             Spectate

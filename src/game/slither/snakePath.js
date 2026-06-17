@@ -2,10 +2,10 @@
 
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
-const MAX_PATH_POINTS = 420;
-const MIN_HEAD_RECORD = 0.35;
+const MAX_PATH_POINTS = 560;
+const MIN_HEAD_RECORD = 0.14;
 /** Cap simulated spine points — render resamples anyway; saves CPU on long snakes. */
-const MAX_SIM_SEGMENTS = 160;
+const MAX_SIM_SEGMENTS = 240;
 
 function distSq(x1, y1, x2, y2) {
     const dx = x1 - x2;
@@ -122,7 +122,7 @@ export function updateBodyAlongPath(state, segments, spacing, headX, headY, angl
 
     segments[0].x = headX;
     segments[0].y = headY;
-    recordHeadOnPath(path, headX, headY, Math.max(0.5, spacing * MIN_HEAD_RECORD));
+    recordHeadOnPath(path, headX, headY, Math.max(0.22, spacing * MIN_HEAD_RECORD));
 
     ensurePathArcLength(path, fullSegmentCount, spacing, angle);
 
@@ -228,19 +228,20 @@ function stepVisualGrowth(state, meta, targetSegCount, dt) {
  * Smooth head toward server, derive body from path history.
  * Only used for the local snake — remote snakes use spine lerp instead.
  */
-export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau = 0.035) {
+export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau = 0.014) {
     const len = meta.segmentCount || 0;
     if (len === 0 || !serverHead) return;
 
     const simCount = Math.min(len, MAX_SIM_SEGMENTS);
-    const visual = stepVisualGrowth(state, meta, simCount, dt);
-    const spacing = segmentSpacingForSnake({ radius: visual.radius, sc: visual.sc });
+    // Visual growth only affects render radius — body uses authoritative server size.
+    stepVisualGrowth(state, meta, simCount, dt);
+    const spacing = segmentSpacingForSnake(meta);
 
     if (!state.segments[0]) {
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
 
-    syncSegmentCount(state, visual.segCount, spacing, serverHead, state.angle ?? serverAngle ?? 0);
+    syncSegmentCount(state, simCount, spacing, serverHead, state.angle ?? serverAngle ?? 0);
 
     const head = state.segments[0];
 
@@ -257,8 +258,8 @@ export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau 
     }
     state._prevSrvHead = { x: serverHead.x, y: serverHead.y };
 
-    const targetX = serverHead.x + (state._extrapX || 0) * 0.6;
-    const targetY = serverHead.y + (state._extrapY || 0) * 0.6;
+    const targetX = serverHead.x + (state._extrapX || 0) * 0.85;
+    const targetY = serverHead.y + (state._extrapY || 0) * 0.85;
 
     const headA = 1 - Math.exp(-dt / Math.max(headTau, 0.0001));
     head.x += (targetX - head.x) * headA;
