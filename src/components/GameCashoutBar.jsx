@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { isTouchDevice } from '../utils/mobile';
 import { CASHOUT_HOLD_MS } from '../hooks/useHoldKeyCashout';
 
@@ -13,6 +13,36 @@ function KeyCap({ children }) {
     return <kbd className="game-keycap">{children}</kbd>;
 }
 
+function useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt) {
+    const [progress, setProgress] = useState(0);
+
+    useEffect(() => {
+        if (localTimer <= 0) {
+            setProgress(0);
+            return undefined;
+        }
+
+        const total = cashOutTotal || 10;
+        let raf = 0;
+
+        const tick = () => {
+            const remainingSec = cashOutEndAt > 0
+                ? Math.max(0, cashOutEndAt - Date.now()) / 1000
+                : localTimer;
+            const next = total > 0
+                ? Math.min(1, Math.max(0, 1 - remainingSec / total))
+                : 0;
+            setProgress(next);
+            if (remainingSec > 0) raf = requestAnimationFrame(tick);
+        };
+
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [localTimer, cashOutTotal, cashOutEndAt]);
+
+    return progress;
+}
+
 export default function GameCashoutBar({
     disabled,
     holdProgress = 0,
@@ -23,6 +53,7 @@ export default function GameCashoutBar({
     cashOutEndAt = 0,
 }) {
     const isHolding = holdProgress > 0 && holdProgress < 1;
+    const securingProgress = useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt);
 
     const handleHoldStart = (e) => {
         e.preventDefault();
@@ -36,11 +67,6 @@ export default function GameCashoutBar({
     };
 
     if (localTimer > 0) {
-        const total = cashOutTotal || 10;
-        const elapsed = cashOutEndAt
-            ? Math.max(0, (total * 1000 - Math.max(0, cashOutEndAt - Date.now())) / 1000)
-            : total - localTimer;
-
         return (
             <div className="game-cashout-wrap">
                 <div className="game-cashout-securing">
@@ -50,11 +76,8 @@ export default function GameCashoutBar({
                     </div>
                     <div className="game-cashout-securing-track">
                         <div
-                            className="game-cashout-securing-fill game-cashout-securing-fill--active"
-                            style={{
-                                '--cashout-duration': `${total}s`,
-                                '--cashout-elapsed': `${elapsed}s`,
-                            }}
+                            className="game-cashout-securing-fill"
+                            style={{ transform: `scaleX(${securingProgress})` }}
                         />
                     </div>
                 </div>

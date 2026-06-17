@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { rebuildPathFromSegments, stepSnakeBody } from './snakePath.js';
+import { rebuildPathFromSegments, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -390,7 +390,10 @@ export class SlitherRenderer {
                 this.smooth.set(snake.id, s);
                 for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
-                if (snake.isYou) rebuildPathFromSegments(s, s.segments);
+                if (snake.isYou) {
+                    rebuildPathFromSegments(s, s.segments);
+                    resetVisualGrowth(s, snake.radius, segCount);
+                }
                 continue;
             }
 
@@ -407,6 +410,7 @@ export class SlitherRenderer {
                     for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     s.angle = snake.angle || 0;
                     rebuildPathFromSegments(s, s.segments);
+                    resetVisualGrowth(s, snake.radius, segCount);
                     delete s._prevSrvHead;
                     delete s._extrapX;
                     delete s._extrapY;
@@ -737,11 +741,10 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const cashoutPerf = this._cashoutPerf;
-        const simpleFood = this._quality < 0.45 || cashoutPerf;
-        const foodStride = cashoutPerf ? 2 : (this._quality < 0.38 ? 2 : 1);
-        const skipMagnet = cashoutPerf || this._quality < 0.55;
-        const skipWobble = cashoutPerf;
+        const simpleFood = this._quality < 0.45;
+        const foodStride = this._quality < 0.38 ? 2 : 1;
+        const skipMagnet = this._quality < 0.55;
+        const skipWobble = false;
 
         // Magnet: food within this world radius of the mouth drifts toward it.
         const mouthValid = !skipMagnet && this._mouthValid;
@@ -1037,7 +1040,7 @@ export class SlitherRenderer {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
-        const segs = snake.segments || [];
+        const segs = snake.drawSpine || snake.segments || [];
         if (segs.length === 0) {
             ctx.restore();
             return;
@@ -1334,13 +1337,14 @@ export class SlitherRenderer {
             }
             rs.id = snake.id;
             rs.color = snake.color;
-            rs.radius = snake.radius;
+            rs.radius = (snake.isYou && s?.visualRadius != null) ? s.visualRadius : snake.radius;
             rs.boost = snake.boost;
             rs.isYou = snake.isYou;
             rs.name = snake.name;
             rs.balance = snake.balance;
             const s = this.smooth.get(snake.id);
             rs.segments = s ? s.segments : snake.segments;
+            rs.drawSpine = (snake.isYou && s?.path?.length >= 2) ? s.path : rs.segments;
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);
         }

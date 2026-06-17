@@ -191,6 +191,39 @@ export function rebuildPathFromSegments(state, segments) {
     state.path = path;
 }
 
+/** Snap visual size/length to server after teleport or respawn. */
+export function resetVisualGrowth(state, radius, segmentCount) {
+    state.visualRadius = radius ?? BASE_RADIUS;
+    state.visualSegCount = segmentCount ?? state.segments?.length ?? 1;
+}
+
+/**
+ * Ease display length and radius toward server values so eating reads as
+ * gradual growth — authoritative balance/segment totals are unchanged.
+ */
+function stepVisualGrowth(state, meta, targetSegCount, dt) {
+    const targetRadius = meta.radius || BASE_RADIUS;
+    if (state.visualRadius == null) state.visualRadius = targetRadius;
+    if (state.visualSegCount == null) state.visualSegCount = targetSegCount;
+
+    const radiusA = 1 - Math.exp(-dt / 0.16);
+    state.visualRadius += (targetRadius - state.visualRadius) * radiusA;
+
+    if (state.visualSegCount < targetSegCount) {
+        const growA = 1 - Math.exp(-dt / 0.1);
+        state.visualSegCount += (targetSegCount - state.visualSegCount) * growA;
+    } else if (state.visualSegCount > targetSegCount) {
+        const shrinkA = 1 - Math.exp(-dt / 0.06);
+        state.visualSegCount += (targetSegCount - state.visualSegCount) * shrinkA;
+    }
+
+    return {
+        segCount: Math.max(1, Math.round(state.visualSegCount)),
+        radius: state.visualRadius,
+        sc: state.visualRadius / BASE_RADIUS,
+    };
+}
+
 /**
  * Smooth head toward server, derive body from path history.
  * Only used for the local snake — remote snakes use spine lerp instead.
@@ -199,13 +232,15 @@ export function stepSnakeBody(state, meta, serverHead, serverAngle, dt, headTau 
     const len = meta.segmentCount || 0;
     if (len === 0 || !serverHead) return;
 
-    const spacing = segmentSpacingForSnake(meta);
+    const simCount = Math.min(len, MAX_SIM_SEGMENTS);
+    const visual = stepVisualGrowth(state, meta, simCount, dt);
+    const spacing = segmentSpacingForSnake({ radius: visual.radius, sc: visual.sc });
+
     if (!state.segments[0]) {
         state.segments[0] = { x: serverHead.x, y: serverHead.y };
     }
 
-    const simCount = Math.min(len, MAX_SIM_SEGMENTS);
-    syncSegmentCount(state, simCount, spacing, serverHead, state.angle ?? serverAngle ?? 0);
+    syncSegmentCount(state, visual.segCount, spacing, serverHead, state.angle ?? serverAngle ?? 0);
 
     const head = state.segments[0];
 

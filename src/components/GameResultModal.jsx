@@ -203,7 +203,7 @@ export default function GameResultModal({
                 )}
 
                 <div className="game-result-actions">
-                    {!isWin && showSpectate && (
+                    {showSpectate && (
                         <button type="button" className="game-result-btn game-result-btn--ghost" onClick={onSpectate}>
                             <EyeIcon />
                             Spectate
