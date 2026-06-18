@@ -892,35 +892,78 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.12, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(4 * k))));
-        baseGrad.addColorStop(0.55, toHex(col));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-40 * k))));
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.14, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(2 * k))));
+        baseGrad.addColorStop(0.58, toHex(col));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-42 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hiCol = shadeColor(col, Math.round(42 * k));
+        const hiCol = shadeColor(col, Math.round(34 * k));
         const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -44), 0.22 * k));
-        tubeGrad.addColorStop(0.28, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.5, rgb(hiCol, 0.17 * k));
-        tubeGrad.addColorStop(0.72, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -44), 0.22 * k));
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -48), 0.30 * k));
+        tubeGrad.addColorStop(0.22, rgb(shadeColor(col, -32), 0.10 * k));
+        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.5, rgb(hiCol, 0.13 * k));
+        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.78, rgb(shadeColor(col, -32), 0.10 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -48), 0.30 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
 
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.62, c, c, rPx * 1.02);
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.58, c, c, rPx * 1.02);
         edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.9, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -36), 0.18 * k));
+        edgeShadow.addColorStop(0.88, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -38), 0.22 * k));
         g.fillStyle = edgeShadow;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
+    }
+
+    /** Turn strength [0,1] and sign (+1 left, -1 right) at bump — for crease shading in bends. */
+    _bumpTurn(bumps, i) {
+        if (i < 1 || i >= bumps.length - 1) return { strength: 0, side: 0 };
+        const tPrev = this._bumpTangent(bumps, i - 1);
+        const tNext = this._bumpTangent(bumps, i);
+        let d = tNext - tPrev;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        if (Math.abs(d) < 0.04) return { strength: 0, side: 0 };
+        return {
+            strength: Math.min(1, Math.abs(d) / 0.48),
+            side: d > 0 ? 1 : -1,
+        };
+    }
+
+    /** Extra inner-edge shade on sharp bends — body-local, applied per frame. */
+    _blitBendCrease(ctx, x, y, tangent, radius, turn) {
+        if (turn.strength < 0.07) return;
+        const r = radius * 0.94;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(tangent);
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = Math.min(0.38, 0.12 + turn.strength * 0.26);
+        const g = ctx.createLinearGradient(0, -r, 0, r);
+        if (turn.side > 0) {
+            g.addColorStop(0, 'rgba(0,0,0,0)');
+            g.addColorStop(0.42, 'rgba(0,0,0,0)');
+            g.addColorStop(1, 'rgba(0,0,0,0.72)');
+        } else {
+            g.addColorStop(0, 'rgba(0,0,0,0.72)');
+            g.addColorStop(0.58, 'rgba(0,0,0,0)');
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+        }
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     /** Soft outer glow for additive body pass. */
@@ -957,11 +1000,11 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v26|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v27|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v26|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.12);
+            pair.boostBody = this._getSprite(`pr_norm_v27|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.1);
             });
         }
 
@@ -1137,6 +1180,8 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
+        const stampRadius = bodyRadius;
+
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -1145,6 +1190,7 @@ export class SlitherRenderer {
             const sprite = (boosting && isHead) ? boostBody : normal;
             const tangent = this._bumpTangent(bumps, i);
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
+            this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
 
         if (isYou && prNeeds.glow && glow) {
@@ -1184,9 +1230,9 @@ export class SlitherRenderer {
         const headEyeRadius = headRadius;
         
         // Eye positioning
-        const eyeSide = headEyeRadius * 0.34;
-        const eyeFwd = headEyeRadius * 0.33;
-        const eyeR = Math.max(2.8, headEyeRadius * 0.38);
+        const eyeSide = headEyeRadius * 0.39;
+        const eyeFwd = headEyeRadius * 0.31;
+        const eyeR = Math.max(3, headEyeRadius * 0.43);
         const pupilR = eyeR * 0.48;
 
         if (boosting && boostOverlay) {
