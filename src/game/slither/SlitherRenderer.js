@@ -130,6 +130,9 @@ export class SlitherRenderer {
         this.targetSnakes = [];
         this.smooth = new Map();
         this._foodDrawList = [];
+        this._visibleFoodBuf = [];
+        this._foodSpatialGrid = new Map();
+        this._FOOD_CELL = 64;
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
@@ -356,6 +359,7 @@ export class SlitherRenderer {
             for (const id of this._foodAnimCache.keys()) {
                 if (!seenFood.has(id)) this._foodAnimCache.delete(id);
             }
+            this._rebuildVisibleFoodBuf();
         }
         const isCompetitive = tick.competitiveSlither ?? this.state.competitiveSlither;
         const nextYou = tick.spectating
@@ -380,6 +384,60 @@ export class SlitherRenderer {
         } else if (!isCompetitive && tick.balance != null && !tick.battleRoyale) {
             this.hud.balance = tick.balance;
         }
+    }
+
+    _rebuildVisibleFoodBuf(cx = this.camera.x, cy = this.camera.y, halfW = null, halfH = null) {
+        const W = this.W;
+        const H = this.H;
+        const zoom = this.zoom;
+        if (halfW == null) halfW = W / 2 / zoom + 160 / zoom;
+        if (halfH == null) halfH = H / 2 / zoom + 160 / zoom;
+
+        const src = this._foodDrawList;
+        const dest = this._visibleFoodBuf;
+        dest.length = 0;
+        for (let i = 0; i < src.length; i++) {
+            const f = src[i];
+            const dx = f.x - cx;
+            const dy = f.y - cy;
+            if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfH) {
+                dest.push(f);
+            }
+        }
+    }
+
+    _buildFoodSpatialGrid(foodList) {
+        const grid = this._foodSpatialGrid;
+        grid.clear();
+        const cell = this._FOOD_CELL;
+        for (let i = 0; i < foodList.length; i++) {
+            const f = foodList[i];
+            const key = `${Math.floor(f.x / cell)},${Math.floor(f.y / cell)}`;
+            let bucket = grid.get(key);
+            if (!bucket) {
+                bucket = [];
+                grid.set(key, bucket);
+            }
+            bucket.push(f);
+        }
+        return grid;
+    }
+
+    _foodNearPoint(grid, wx, wy, reach) {
+        const cell = this._FOOD_CELL;
+        const minCx = Math.floor((wx - reach) / cell);
+        const maxCx = Math.floor((wx + reach) / cell);
+        const minCy = Math.floor((wy - reach) / cell);
+        const maxCy = Math.floor((wy + reach) / cell);
+        const out = [];
+        for (let cx = minCx; cx <= maxCx; cx++) {
+            for (let cy = minCy; cy <= maxCy; cy++) {
+                const bucket = grid.get(`${cx},${cy}`);
+                if (!bucket) continue;
+                for (let i = 0; i < bucket.length; i++) out.push(bucket[i]);
+            }
+        }
+        return out;
     }
 
     _smoothSeg(s, i, x, y) {
@@ -885,7 +943,12 @@ export class SlitherRenderer {
         const mouthR = this._mouthR || 6;
         const slurpK = 1 - Math.exp(-dt / 0.11);
         const maxSlurpReach = (mouthR + 4) * 1.55 + 14 + mouthR * 0.55;
-        const maxSlurpReach2 = maxSlurpReach * maxSlurpReach;
+
+        const foodGrid = this._buildFoodSpatialGrid(foodList);
+        let slurpSet = null;
+        if (mouthValid && !this._holdActive) {
+            slurpSet = new Set(this._foodNearPoint(foodGrid, mouthX, mouthY, maxSlurpReach));
+        }
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
@@ -938,8 +1001,10 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 2.2;
             }
 
-            // Slurp only for food near the mouth — skip while holding cashout (Q).
-            if (mouthValid && !this._holdActive && !f.deathDrop && !isGolden) {
+            const runSlurp = mouthValid && !this._holdActive && !f.deathDrop && !isGolden
+                && (slurpSet?.has(f) || anim.slurp > 0.001);
+
+            if (runSlurp) {
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
                 const nearMouth = Math.abs(dxm) < maxSlurpReach && Math.abs(dym) < maxSlurpReach;
@@ -1733,7 +1798,10 @@ export class SlitherRenderer {
             this._drawBackground(ctx, W, H, cx, cy, worldHalf, zoom);
             this._drawZone(ctx, toScreen, W, H);
         }
-        this._drawFood(ctx, this._foodDrawList, toScreen, W, H, zoom, dt);
+        const foodHalfW = W / 2 / zoom + 160 / zoom;
+        const foodHalfH = H / 2 / zoom + 160 / zoom;
+        this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
+        this._drawFood(ctx, this._visibleFoodBuf, toScreen, W, H, zoom, dt);
 
         const sorted = this._sortedRenderSnakes;
         if (this._sortDirty || sorted.length !== renderSnakes.length) {
@@ -1791,22 +1859,8 @@ export class SlitherRenderer {
                         isYou: s.isYou,
                     });
                 }
-                const fbFood = this._minimapFallback.food;
-                const foodList = this._foodDrawList;
-                fbFood.length = foodList.length;
-                for (let i = 0; i < foodList.length; i++) {
-                    const f = foodList[i];
-                    let entry = fbFood[i];
-                    if (!entry) {
-                        entry = {};
-                        fbFood[i] = entry;
-                    }
-                    entry.x = f.x;
-                    entry.y = f.y;
-                    entry.golden = f.golden;
-                    entry.hue = f.hue;
-                }
             }
+            const skipMinimapFood = this._foodDrawList.length > 180;
             const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
             drawGameMinimap(ctx, {
                 screenW: W,
@@ -1817,7 +1871,7 @@ export class SlitherRenderer {
                 viewHalfW,
                 viewHalfH,
                 players: minimap.players,
-                food: minimap.food,
+                food: skipMinimapFood ? [] : minimap.food,
                 zone: this.state.zone,
             });
         }
@@ -1830,6 +1884,8 @@ export class SlitherRenderer {
         this._prImgs.clear();
         this._foodAnimCache.clear();
         this._slurpGhosts.length = 0;
+        this._visibleFoodBuf.length = 0;
+        this._foodSpatialGrid.clear();
         this._renderPool.clear();
         this.smooth.clear();
         this._holdStartAt = 0;
