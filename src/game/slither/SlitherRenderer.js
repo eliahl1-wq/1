@@ -878,41 +878,82 @@ export class SlitherRenderer {
     }
 
     /**
-     * Body-local tube — soft lateral shade + feathered rim. Dorsal highlight is spine-only.
+     * Baked stack-blur tube shadow — symmetric flanks, darker toward the ventral edge.
+     * Drawn on a temp canvas then multiplied onto the segment (body-local).
      */
-    _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
+    _applyBlurTubeShadow(g, c, rPx, sz, k = 1) {
+        const sh = document.createElement('canvas');
+        sh.width = sz;
+        sh.height = sz;
+        const sg = sh.getContext('2d');
+
+        // Hard mask before blur — light center/top, ramps darker toward sides and bottom
+        const rGrad = sg.createRadialGradient(c, c - rPx * 0.28, rPx * 0.08, c, c, rPx * 1.05);
+        rGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        rGrad.addColorStop(0.48, 'rgba(0,0,0,0)');
+        rGrad.addColorStop(0.70, `rgba(0,0,0,${0.14 * k})`);
+        rGrad.addColorStop(0.86, `rgba(0,0,0,${0.32 * k})`);
+        rGrad.addColorStop(1, `rgba(0,0,0,${0.52 * k})`);
+        sg.fillStyle = rGrad;
+        sg.beginPath();
+        sg.arc(c, c, rPx, 0, Math.PI * 2);
+        sg.fill();
+
+        // Symmetric lateral bands — blur smears these into soft flanks
+        for (const sign of [-1, 1]) {
+            const xEdge = c + sign * rPx;
+            const xInner = c + sign * rPx * 0.32;
+            const lg = sg.createLinearGradient(xEdge, 0, xInner, 0);
+            lg.addColorStop(0, `rgba(0,0,0,${0.62 * k})`);
+            lg.addColorStop(0.42, `rgba(0,0,0,${0.18 * k})`);
+            lg.addColorStop(1, 'rgba(0,0,0,0)');
+            sg.fillStyle = lg;
+            sg.beginPath();
+            sg.arc(c, c, rPx, 0, Math.PI * 2);
+            sg.fill();
+        }
+
+        // Ventral falloff — progressively darker toward local bottom (+Y)
+        const vGrad = sg.createLinearGradient(0, c - rPx * 0.15, 0, c + rPx);
+        vGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        vGrad.addColorStop(0.52, 'rgba(0,0,0,0)');
+        vGrad.addColorStop(0.78, `rgba(0,0,0,${0.16 * k})`);
+        vGrad.addColorStop(1, `rgba(0,0,0,${0.38 * k})`);
+        sg.fillStyle = vGrad;
+        sg.beginPath();
+        sg.arc(c, c, rPx, 0, Math.PI * 2);
+        sg.fill();
+
+        const blurR = Math.max(4, Math.round(rPx * 0.62));
+        stackBlurCanvas(sh, 0, 0, sz, sz, blurR);
+
+        g.save();
+        g.globalCompositeOperation = 'multiply';
+        g.globalAlpha = 0.94;
+        g.drawImage(sh, 0, 0);
+        g.restore();
+    }
+
+    /**
+     * Body-local tube — base fill + stack-blur shadow + dorsal highlight.
+     */
+    _paintSnakeSegment(g, c, rPx, cs, contrast = 1, sz = Math.ceil(c * 2)) {
         const col = parseColor(cs);
         const k = contrast;
 
-        // Base fill — soft radial; lighter center band, rim darkens only at the edge
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.08, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(6 * k))));
-        baseGrad.addColorStop(0.55, toHex(col));
-        baseGrad.addColorStop(0.78, toHex(shadeColor(col, Math.round(-4 * k))));
-        baseGrad.addColorStop(0.92, toHex(shadeColor(col, Math.round(-10 * k))));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-18 * k))));
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.1, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(5 * k))));
+        baseGrad.addColorStop(0.58, toHex(col));
+        baseGrad.addColorStop(0.82, toHex(shadeColor(col, Math.round(-3 * k))));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-8 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Symmetric tube shading — clear center, gradual darkening toward both edges
-        const tubeGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -34), 0.11 * k));
-        tubeGrad.addColorStop(0.10, rgb(shadeColor(col, -18), 0.055 * k));
-        tubeGrad.addColorStop(0.24, rgb(shadeColor(col, -5), 0.012 * k));
-        tubeGrad.addColorStop(0.42, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.58, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.76, rgb(shadeColor(col, -5), 0.012 * k));
-        tubeGrad.addColorStop(0.90, rgb(shadeColor(col, -18), 0.055 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -34), 0.11 * k));
+        this._applyBlurTubeShadow(g, c, rPx, sz, k);
 
-        g.fillStyle = tubeGrad;
-        g.fill();
-
-        // Subtle dorsal highlight — soft, broad glow on top for roundness
         const hlGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
         hlGrad.addColorStop(0, rgb(shadeColor(col, 55), 0.13 * k));
         hlGrad.addColorStop(0.18, rgb(shadeColor(col, 40), 0.08 * k));
@@ -920,6 +961,8 @@ export class SlitherRenderer {
         hlGrad.addColorStop(1, 'rgba(0,0,0,0)');
 
         g.fillStyle = hlGrad;
+        g.beginPath();
+        g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
     }
 
@@ -1037,11 +1080,11 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v37|${key}`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
+            pair.normal = this._getSprite(`pr_norm_v38|${key}`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, sz);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v37|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
+            pair.boostBody = this._getSprite(`pr_norm_v38|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04, sz);
             });
         }
 
