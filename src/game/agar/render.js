@@ -129,14 +129,8 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.strokeStyle = cell.borderColor;
         graph.lineWidth = 6;
         
-        // High-stakes glow effect
-        if (!global.battleRoyale && cell.balance > 50) {
-            graph.shadowBlur = 40; // Starkare glöd
-            graph.shadowColor = '#FFD700'; // Guld-färg
-        } else {
-            graph.shadowBlur = 15;
-            graph.shadowColor = cell.color;
-        }
+        // Disable shadow glow completely for performance and clean aesthetic
+        graph.shadowBlur = 0;
         
         // Använd den organiska ritningen för slimy-effekt
         drawOrganicCell(cell, borders, graph);

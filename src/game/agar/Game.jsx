@@ -339,6 +339,7 @@ export default function Game() {
         socket.on('welcome', (playerSettings, gameSizes) => {
             const isRejoin = gameSizes?.rejoin === true;
             console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
+            foodCacheRef.current.clear(); // Prevent flickering from old food cache
             localStorage.setItem('current_game_mode', gameSizes?.mode || 'agar');
             if (gameSizes?.entryFeeUsd) {
                 localStorage.setItem('selected_entry_fee', String(gameSizes.entryFeeUsd));

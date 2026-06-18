@@ -732,15 +732,16 @@ export class SlitherRenderer {
         const attractR2 = attractR * attractR;
         const maxPull = attractR * 0.42;
 
+        // Cache resolved food sprites during the frame to avoid Map lookup for every item
+        const spriteCache = {};
+
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
             if (Math.abs(f.x - cx) > halfW || Math.abs(f.y - cy) > halfH) continue;
 
-            // Per-food random phase so pulse/jiggle isn't synchronized across the field.
+            // Per-food random phase: optimized to avoid string hashing
             if (f._phase == null) {
-                let h = 0;
-                const id = String(f.id ?? `${f.x},${f.y}`);
-                for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+                const h = typeof f.id === 'number' ? f.id : (typeof f.id === 'string' ? f.id.length : (f.x * 73 + f.y * 31));
                 f._phase = (Math.abs(h) % 1000) / 1000 * Math.PI * 2;
                 f._sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
             }
@@ -810,7 +811,12 @@ export class SlitherRenderer {
             }
 
             const spriteR = 4;
-            const sprite = this._foodSprite(hue, spriteR, isGolden, !!f.deathDrop);
+            const cacheKey = `${hue}_${isGolden}_${!!f.deathDrop}`;
+            let sprite = spriteCache[cacheKey];
+            if (!sprite) {
+                sprite = this._foodSprite(hue, spriteR, isGolden, !!f.deathDrop);
+                spriteCache[cacheKey] = sprite;
+            }
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
 
@@ -818,10 +824,10 @@ export class SlitherRenderer {
                 ctx.save();
                 ctx.globalAlpha = alpha;
                 ctx.globalCompositeOperation = 'lighter';
-                ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+                ctx.drawImage(sprite, (fx - half) | 0, (fy - half) | 0, size | 0, size | 0);
                 ctx.restore();
             } else {
-                ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+                ctx.drawImage(sprite, (fx - half) | 0, (fy - half) | 0, size | 0, size | 0);
             }
         }
     }
@@ -866,26 +872,27 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        // Shift highlight slightly along local Y axis to create a smooth dorsal line when overlapping
-        const highlightX = c;
-        const highlightY = c - rPx * 0.12;
+        // Shift highlight slightly along local axes to create a prominent dorsal line that follows the body
+        const highlightX = c - rPx * 0.05;
+        const highlightY = c - rPx * 0.15;
 
         const baseGrad = g.createRadialGradient(
             highlightX, highlightY, rPx * 0.02,
             c, c, rPx * 1.05
         );
 
-        // Soft matte colors
-        const brightColor = toHex(shadeColor(col, Math.round(65 * k)));
-        const lightColor = toHex(shadeColor(col, Math.round(30 * k)));
-        const shadowColor = toHex(shadeColor(col, Math.round(-16 * k)));
-        const darkColor = toHex(shadeColor(col, Math.round(-28 * k)));
+        // Brighter, more visible matte highlight
+        const brightColor = toHex(shadeColor(col, Math.round(110 * k)));
+        const lightColor = toHex(shadeColor(col, Math.round(45 * k)));
+        // Deeper, softer shadows on the sides to enhance the cylindrical 3D look
+        const shadowColor = toHex(shadeColor(col, Math.round(-30 * k)));
+        const darkColor = toHex(shadeColor(col, Math.round(-52 * k)));
 
-        baseGrad.addColorStop(0, brightColor); // Matte soft highlight center
-        baseGrad.addColorStop(0.28, lightColor); // Soft transition
-        baseGrad.addColorStop(0.65, toHex(col)); // Base body color
-        baseGrad.addColorStop(0.88, shadowColor); // Gentle shadow
-        baseGrad.addColorStop(1, darkColor); // Soft border shadow
+        baseGrad.addColorStop(0, brightColor); // Brighter highlight center
+        baseGrad.addColorStop(0.24, lightColor); // Soft glow transition
+        baseGrad.addColorStop(0.60, toHex(col)); // Base body color
+        baseGrad.addColorStop(0.85, shadowColor); // Deeper shading on the sides
+        baseGrad.addColorStop(1, darkColor); // Dark silhouette outline
 
         g.fillStyle = baseGrad;
         g.beginPath();
