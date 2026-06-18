@@ -869,10 +869,12 @@ export class SlitherRenderer {
      * Body-local tube — soft lateral shade + feathered rim. Dorsal highlight is spine-only.
      */
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
-        const col = parseColor(cs);
+        // Parse and darken the base color overall
+        let col = parseColor(cs);
+        col = shadeColor(col, -32);
         const k = contrast;
 
-        // Radial gradient for the base color + bright highlight on the spine
+        // Radial gradient for the base color
         // Keep the outer edge very close to the base color so overlapping circles blend seamlessly
         const highlightX = c;
         const highlightY = c - rPx * 0.08;
@@ -897,22 +899,64 @@ export class SlitherRenderer {
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Linear gradient (tube shader) to shade the left and right sides of the snake body
+        // Linear gradient (tube shader) with black shadows to shade the left and right sides of the snake body
         const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -48), 0.32 * k)); // Soft dark shadow on side
-        tubeGrad.addColorStop(0.18, rgb(shadeColor(col, -24), 0.16 * k));
-        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.82, rgb(shadeColor(col, -24), 0.16 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -48), 0.32 * k)); // Soft dark shadow on other side
+        tubeGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)'); // Strong dark shadow on side
+        tubeGrad.addColorStop(0.2, 'rgba(0, 0, 0, 0.28)');
+        tubeGrad.addColorStop(0.45, 'rgba(0, 0, 0, 0)');
+        tubeGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0)');
+        tubeGrad.addColorStop(0.8, 'rgba(0, 0, 0, 0.28)');
+        tubeGrad.addColorStop(1, 'rgba(0, 0, 0, 0.65)'); // Strong dark shadow on other side
 
         g.fillStyle = tubeGrad;
         g.fill();
     }
 
-    /** Thin dorsal highlight — drawn to offscreen buffer + StackBlur for soft matte falloff. */
+    /** Thin dorsal highlight — narrow, glowing neon streak. */
     _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1, opts = {}) {
-        return; // Disable spine highlight for a clean 3D overlapping sphere look matching the image
+        if (count < 2) return;
+        const k = alphaMul;
+
+        const tracePath = (targetCtx) => {
+            targetCtx.beginPath();
+            let started = false;
+            for (let i = count - 1; i >= 0; i--) {
+                const p = bumps[i];
+                if (!started) {
+                    targetCtx.moveTo(p.x, p.y);
+                    started = true;
+                } else {
+                    targetCtx.lineTo(p.x, p.y);
+                }
+            }
+            return started;
+        };
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // 1. Draw soft, wide outer glow (warm gold)
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = 'rgba(255, 235, 130, 0.38)';
+        ctx.lineWidth = radius * 0.28;
+        ctx.filter = 'blur(6px)';
+        if (tracePath(ctx)) ctx.stroke();
+
+        // 2. Draw tighter, brighter mid-glow
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = radius * 0.12;
+        ctx.filter = 'blur(2px)';
+        if (tracePath(ctx)) ctx.stroke();
+
+        // 3. Draw the very sharp, narrow white core
+        ctx.filter = 'none';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = radius * 0.045; // Very thin
+        ctx.globalAlpha = 0.95 * k;
+        if (tracePath(ctx)) ctx.stroke();
+
+        ctx.restore();
     }
 
 
