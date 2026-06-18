@@ -911,12 +911,10 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.25, c, c, rPx * 1.02);
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.25, c, c, rPx);
         baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
-        baseGrad.addColorStop(0.72, toHex(col));
-        baseGrad.addColorStop(0.9, toHex(shadeColor(col, Math.round(-14 * k))));
-        baseGrad.addColorStop(0.97, toHex(shadeColor(col, Math.round(-20 * k))));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-24 * k))));
+        baseGrad.addColorStop(0.75, toHex(col));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-22 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
@@ -933,26 +931,6 @@ export class SlitherRenderer {
         tubeGrad.addColorStop(1, rgb(shadeColor(col, -46), 0.26 * k));
 
         g.fillStyle = tubeGrad;
-        g.fill();
-
-        const seamGrad = g.createLinearGradient(c - rPx, c, c + rPx * 0.55, c);
-        seamGrad.addColorStop(0, rgb(shadeColor(col, -28), 0.05 * k));
-        seamGrad.addColorStop(0.25, rgb(shadeColor(col, -16), 0.02 * k));
-        seamGrad.addColorStop(0.55, 'rgba(0,0,0,0)');
-        seamGrad.addColorStop(1, 'rgba(0,0,0,0)');
-
-        g.fillStyle = seamGrad;
-        g.fill();
-
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.38, c, c, rPx * 1.06);
-        edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.65, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.82, rgb(shadeColor(col, -22), 0.03 * k));
-        edgeShadow.addColorStop(0.94, rgb(shadeColor(col, -26), 0.05 * k));
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -28), 0.06 * k));
-        g.fillStyle = edgeShadow;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
     }
 
@@ -1113,14 +1091,13 @@ export class SlitherRenderer {
         const ssR = rPx * bodySS;
         const ssSize = ssR * 2 + 4;
 
-        const segBlur = bodySS >= 2 ? 3 : 2;
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v32|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v33|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
-            }, segBlur);
-            pair.boostBody = this._getSprite(`pr_norm_v32|${key}|boost`, ssSize, (g, sz) => {
+            });
+            pair.boostBody = this._getSprite(`pr_norm_v33|${key}|boost`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
-            }, segBlur);
+            });
         }
 
         if (needs.glow && !pair.glow) {
