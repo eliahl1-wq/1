@@ -114,9 +114,11 @@
     touch-action: none;
 }
 
-.game-cashout-btn--holding {
+.game-cashout-btn--holding,
+.game-cashout-btn--holding:hover:not(:disabled) {
     transform: translateY(2px) scale(0.97);
     box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(124, 58, 255, 0.25) !important;
+    filter: none;
 }
 
 .game-cashout-btn--complete {
@@ -134,24 +136,8 @@
     will-change: transform;
 }
 
-.game-cashout-btn-shine {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: linear-gradient(
-        105deg,
-        transparent 40%,
-        rgba(255, 255, 255, 0.14) 50%,
-        transparent 60%
-    );
-    transform: translateX(-120%);
-    pointer-events: none;
-    opacity: 0;
-}
-
-.game-cashout-btn--holding .game-cashout-btn-shine {
-    opacity: 1;
-    animation: gameCashoutShine 1.15s ease-in-out infinite;
+.game-cashout-btn--holding .game-cashout-btn-progress {
+    animation: gameCashoutHoldFill var(--cashout-hold-ms, 1000ms) linear forwards;
 }
 
 .game-cashout-btn-content {
@@ -207,9 +193,9 @@
     font-style: normal;
 }
 
-@keyframes gameCashoutShine {
-    from { transform: translateX(-120%); }
-    to { transform: translateX(120%); }
+@keyframes gameCashoutHoldFill {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
 }
 
 .game-cashout-securing {

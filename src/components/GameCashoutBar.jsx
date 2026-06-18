@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { isTouchDevice } from '../utils/mobile';
 import { CASHOUT_HOLD_MS } from '../hooks/useHoldKeyCashout';
 
@@ -43,35 +43,6 @@ function useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt) {
     return progress;
 }
 
-/** Local RAF fill — avoids re-rendering the whole game page every tick. */
-function useHoldFill(isHolding) {
-    const [fill, setFill] = useState(0);
-    const startRef = useRef(0);
-    const rafRef = useRef(0);
-
-    useEffect(() => {
-        if (!isHolding) {
-            setFill(0);
-            return undefined;
-        }
-
-        startRef.current = performance.now();
-        const tick = () => {
-            const p = Math.min(1, (performance.now() - startRef.current) / CASHOUT_HOLD_MS);
-            setFill(p);
-            if (p < 1 && startRef.current) rafRef.current = requestAnimationFrame(tick);
-        };
-        rafRef.current = requestAnimationFrame(tick);
-
-        return () => {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = 0;
-        };
-    }, [isHolding]);
-
-    return fill;
-}
-
 export default function GameCashoutBar({
     disabled,
     isHolding = false,
@@ -81,7 +52,6 @@ export default function GameCashoutBar({
     cashOutTotal = 10,
     cashOutEndAt = 0,
 }) {
-    const holdFill = useHoldFill(isHolding);
     const securingProgress = useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt);
 
     const handleHoldStart = (e) => {
@@ -120,6 +90,7 @@ export default function GameCashoutBar({
                 <button
                     type="button"
                     className={`game-cashout-btn btn btn-primary${isHolding ? ' game-cashout-btn--holding' : ''}`}
+                    style={{ '--cashout-hold-ms': `${CASHOUT_HOLD_MS}ms` }}
                     onMouseDown={handleHoldStart}
                     onMouseUp={handleHoldEnd}
                     onMouseLeave={handleHoldEnd}
@@ -129,12 +100,7 @@ export default function GameCashoutBar({
                     onContextMenu={(e) => e.preventDefault()}
                     disabled={disabled}
                 >
-                    <span
-                        className="game-cashout-btn-progress"
-                        style={{ transform: `scaleX(${holdFill})` }}
-                        aria-hidden
-                    />
-                    <span className="game-cashout-btn-shine" aria-hidden />
+                    <span className="game-cashout-btn-progress" aria-hidden />
                     <span className="game-cashout-btn-content">
                         <DollarIcon />
                         Cash Out
