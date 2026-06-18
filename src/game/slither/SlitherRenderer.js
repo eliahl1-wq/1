@@ -110,9 +110,12 @@ export class SlitherRenderer {
         this._pendingTick = null;
         this._tickApplyScheduled = false;
         this._foodAnimCache = new Map();
+        this._mouseRafQueued = false;
+        this._lastMouseX = 0;
+        this._lastMouseY = 0;
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
-        this.ctx = canvas.getContext('2d', { alpha: false });
+        this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.imageSmoothingQuality = 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
@@ -285,7 +288,14 @@ export class SlitherRenderer {
 
     _handleMouse(e) {
         if (!this._inputEnabled || this.spectatorMode) return;
-        this._setInputFromScreen(e.clientX, e.clientY);
+        this._lastMouseX = e.clientX;
+        this._lastMouseY = e.clientY;
+        if (this._mouseRafQueued) return;
+        this._mouseRafQueued = true;
+        requestAnimationFrame(() => {
+            this._mouseRafQueued = false;
+            this._setInputFromScreen(this._lastMouseX, this._lastMouseY);
+        });
     }
 
     getInput() {
@@ -834,13 +844,10 @@ export class SlitherRenderer {
         const farCullR = Math.min(halfW, halfH) * 0.58;
         const farCullR2 = farCullR * farCullR;
 
-        const mouthValid = this._mouthValid && this._quality >= 0.40;
+        const mouthValid = this._mouthValid;
         const mouthX = this._mouthX;
         const mouthY = this._mouthY;
-        const attractR = ((this._mouthR || 6) * 3.6) + 54;
-        const attractR2 = attractR * attractR;
-        const maxPull = attractR * 0.42;
-        let magnetBudget = heavyArena ? 72 : crowdedArena ? 110 : 180;
+        const mouthR = this._mouthR || 6;
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
@@ -891,22 +898,21 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 1.5;
             }
 
-            if (mouthValid && !f.deathDrop && magnetBudget > 0) {
+            // slither.io-style: no long-range pull — only a short slurp when within eat range
+            if (mouthValid && !f.deathDrop && !isGolden) {
+                const foodR = f.radius || 3;
+                const eatReach = (mouthR + foodR) * 1.55 + 14;
+                const eatReach2 = eatReach * eatReach;
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
-                const adxm = Math.abs(dxm);
-                const adym = Math.abs(dym);
-                if (adxm < attractR && adym < attractR) {
-                    const dist2 = dxm * dxm + dym * dym;
-                    if (dist2 < attractR2 && dist2 > 0.01) {
-                        magnetBudget--;
-                        const invDist = 1 / Math.sqrt(dist2);
-                        const dist = 1 / invDist;
-                        const t = 1 - dist / attractR;
-                        const pull = Math.min(t * t * maxPull, dist);
-                        wx += dxm * invDist * pull;
-                        wy += dym * invDist * pull;
-                    }
+                const dist2 = dxm * dxm + dym * dym;
+                if (dist2 < eatReach2 && dist2 > 0.01) {
+                    const dist = Math.sqrt(dist2);
+                    const t = 1 - dist / eatReach;
+                    const suck = t * t * t;
+                    wx += (dxm / dist) * dist * suck * 0.9;
+                    wy += (dym / dist) * dist * suck * 0.9;
+                    sizeMul *= Math.max(0.6, 1 - suck * 0.3);
                 }
             }
 
@@ -1616,8 +1622,7 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const zoom = this.zoom;
 
-        // Player "mouth" point — slightly ahead of the head along the heading.
-        // Food drifts toward this like a magnet when it gets close (see _drawFood).
+        // Mouth point for eat-range slurp animation (see _drawFood).
         if (me?.segments?.[0]) {
             const h = me.segments[0];
             const a = me.angle || 0;

@@ -408,11 +408,21 @@ export default function SlitherGame() {
 
 
 
+        const lastInputSentRef = { dx: NaN, dy: NaN, boost: null };
+
         const emitInput = () => {
             if (blockInputRef.current) return;
-            if (socketRef.current?.connected && rendererRef.current) {
-                socketRef.current.emit('slitherInput', rendererRef.current.getInput());
-            }
+            if (!socketRef.current?.connected || !rendererRef.current) return;
+            const inp = rendererRef.current.getInput();
+            if (
+                inp.dx === lastInputSentRef.dx
+                && inp.dy === lastInputSentRef.dy
+                && inp.boost === lastInputSentRef.boost
+            ) return;
+            lastInputSentRef.dx = inp.dx;
+            lastInputSentRef.dy = inp.dy;
+            lastInputSentRef.boost = inp.boost;
+            socketRef.current.emit('slitherInput', inp);
         };
 
         renderer.setInputEmitter(emitInput);
@@ -741,12 +751,7 @@ export default function SlitherGame() {
 
 
 
-        inputIntervalRef.current = setInterval(emitInput, 16);
-
-
-
         return () => {
-            if (inputIntervalRef.current) clearInterval(inputIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             renderer.destroy();
             rendererRef.current = null;
