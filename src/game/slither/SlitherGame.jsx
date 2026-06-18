@@ -20,6 +20,7 @@ import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
+import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -53,6 +54,9 @@ export default function SlitherGame() {
 
     const { user, token: authToken, refreshUser } = useAuth();
 
+    const pendingAtMount = loadPendingResult('slither');
+    const blockAutoJoinRef = useRef(!!pendingAtMount);
+
     const canvasRef = useRef(null);
 
     const viewportRef = useRef(null);
@@ -81,21 +85,31 @@ export default function SlitherGame() {
 
 
 
-    const [isConnected, setIsConnected] = useState(false);
+    const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
 
-    const [gameReady, setGameReady] = useState(false);
+    const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
 
     const [currentBalance, setCurrentBalance] = useState(1.0);
 
     const [leaderboard, setLeaderboard] = useState([]);
 
-    const [isDead, setIsDead] = useState(false);
+    const [isDead, setIsDead] = useState(() => pendingAtMount?.type === 'death');
 
-    const [cashedAmount, setCashedAmount] = useState(null);
-    const [showResultModal, setShowResultModal] = useState(false);
+    const [cashedAmount, setCashedAmount] = useState(() => (
+        pendingAtMount?.type === 'cashout' ? pendingAtMount.cashedAmount : null
+    ));
+    const [showResultModal, setShowResultModal] = useState(() => !!pendingAtMount);
     const [isSpectating, setIsSpectating] = useState(false);
     const [isRejoining, setIsRejoining] = useState(false);
-    const [sessionStats, setSessionStats] = useState({ timeSurvivedMs: 0, eliminations: 0 });
+    const [sessionStats, setSessionStats] = useState(() => (
+        pendingAtMount
+            ? {
+                timeSurvivedMs: pendingAtMount.timeSurvivedMs ?? 0,
+                eliminations: pendingAtMount.eliminations ?? 0,
+            }
+            : { timeSurvivedMs: 0, eliminations: 0 }
+    ));
+    const [liveSession, setLiveSession] = useState(() => !pendingAtMount);
 
     const [localTimer, setLocalTimer] = useState(0);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
@@ -183,6 +197,9 @@ export default function SlitherGame() {
         localStorage.setItem('current_game_mode', modeKey);
         localStorage.setItem('selected_gamemode', modeKey);
 
+        clearPendingResult('slither');
+        blockAutoJoinRef.current = false;
+
         setIsDead(false);
         setCashedAmount(null);
         setShowResultModal(false);
@@ -197,6 +214,11 @@ export default function SlitherGame() {
         cashoutActiveRef.current = false;
         cashOutEndAtRef.current = 0;
 
+        if (!liveSession) {
+            setLiveSession(true);
+            return;
+        }
+
         rendererRef.current?.resetSession();
         rendererRef.current?.start();
 
@@ -208,9 +230,11 @@ export default function SlitherGame() {
                 entryFeeUsd: fee,
             });
         }
-    }, [authToken]);
+    }, [authToken, liveSession]);
 
     const handleLobby = useCallback(() => {
+        clearPendingResult('slither');
+        blockAutoJoinRef.current = false;
         const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
         navigate('/pre-game', { state: { selectedMode: mode } });
     }, [navigate]);
@@ -346,9 +370,11 @@ export default function SlitherGame() {
 
     useEffect(() => {
 
-        if (!canvasRef.current) return;
+        if (!liveSession) return undefined;
 
-        if (typeof authToken !== 'string' || authToken.length === 0) return;
+        if (!canvasRef.current) return undefined;
+
+        if (typeof authToken !== 'string' || authToken.length === 0) return undefined;
 
 
 
@@ -414,7 +440,7 @@ export default function SlitherGame() {
 
         socket.on('connect', () => {
             setIsConnected(true);
-            if (!hasJoinedRef.current) {
+            if (!hasJoinedRef.current && !blockAutoJoinRef.current) {
                 const { nickname, entryFeeUsd: fee, isBR: br } = joinParamsRef.current;
                 if (br) {
                     socket.emit('brRejoinMatch', { token: authToken });
@@ -429,6 +455,7 @@ export default function SlitherGame() {
 
 
         socket.on('welcome', (playerSettings, gameSizes) => {
+            clearPendingResult('slither');
             const mode = gameSizes?.mode || lobbyModeForSession(joinParamsRef.current.isCompetitive);
             localStorage.setItem('current_game_mode', mode);
             localStorage.setItem('selected_gamemode', mode);
@@ -577,13 +604,20 @@ export default function SlitherGame() {
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             persistLobbyGameMode(joinParamsRef.current.isCompetitive);
             const startedAt = sessionStartAtRef.current || Date.now();
-            setSessionStats({
+            const stats = {
                 timeSurvivedMs: Date.now() - startedAt,
                 eliminations: prevKillsRef.current ?? 0,
-            });
+            };
+            setSessionStats(stats);
             setCashedAmount(amount);
             setShowResultModal(true);
             setIsSpectating(false);
+            savePendingResult('slither', {
+                type: 'cashout',
+                cashedAmount: amount,
+                ...stats,
+                isCompetitive: joinParamsRef.current.isCompetitive,
+            });
             refreshUser?.();
         });
 
@@ -622,12 +656,19 @@ export default function SlitherGame() {
             cashoutActiveRef.current = false;
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             const startedAt = sessionStartAtRef.current || Date.now();
-            setSessionStats({
+            const stats = {
                 timeSurvivedMs: Date.now() - startedAt,
                 eliminations: prevKillsRef.current ?? 0,
-            });
+            };
+            setSessionStats(stats);
             setShowResultModal(true);
             setIsSpectating(false);
+            savePendingResult('slither', {
+                type: 'death',
+                cashedAmount: null,
+                ...stats,
+                isCompetitive: joinParamsRef.current.isCompetitive,
+            });
             const wasBR = joinParamsRef.current.isBR
                 || localStorage.getItem('current_game_mode')?.startsWith('br-');
             persistLobbyGameMode(joinParamsRef.current.isCompetitive);
@@ -714,7 +755,7 @@ export default function SlitherGame() {
             hasJoinedRef.current = false;
         };
 
-    }, [authToken, navigate, startCashoutCountdown]);
+    }, [authToken, navigate, startCashoutCountdown, liveSession]);
 
 
 

@@ -17,6 +17,7 @@ import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
+import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
@@ -87,6 +88,9 @@ export default function Game() {
     const canvasRef = useRef(null);
     const viewportRef = useRef(null);
     const { user, token, refreshUser } = useAuth();
+
+    const pendingAtMount = loadPendingResult('agar');
+    const blockAutoJoinRef = useRef(!!pendingAtMount);
     const location = useLocation();
     const navigate = useNavigate();
     const socketRef = useRef(null);
@@ -108,15 +112,25 @@ export default function Game() {
     
     const WORLD_SIZE = 6000;
 
-    const [isConnected, setIsConnected] = useState(false);
+    const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
-    const [cashedAmount, setCashedAmount] = useState(null);
-    const [showResultModal, setShowResultModal] = useState(false);
+    const [cashedAmount, setCashedAmount] = useState(() => (
+        pendingAtMount?.type === 'cashout' ? pendingAtMount.cashedAmount : null
+    ));
+    const [showResultModal, setShowResultModal] = useState(() => !!pendingAtMount);
     const [isSpectating, setIsSpectating] = useState(false);
     const [isRejoining, setIsRejoining] = useState(false);
-    const [sessionStats, setSessionStats] = useState({ timeSurvivedMs: 0, eliminations: 0 });
-    const [isDead, setIsDead] = useState(false);
+    const [sessionStats, setSessionStats] = useState(() => (
+        pendingAtMount
+            ? {
+                timeSurvivedMs: pendingAtMount.timeSurvivedMs ?? 0,
+                eliminations: pendingAtMount.eliminations ?? 0,
+            }
+            : { timeSurvivedMs: 0, eliminations: 0 }
+    ));
+    const [isDead, setIsDead] = useState(() => pendingAtMount?.type === 'death');
+    const [liveSession, setLiveSession] = useState(() => !pendingAtMount);
     const [localTimer, setLocalTimer] = useState(0);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
     const initialBR = () => {
@@ -162,6 +176,9 @@ export default function Game() {
         localStorage.setItem('current_game_mode', playMode);
         localStorage.setItem('selected_gamemode', playMode);
 
+        clearPendingResult('agar');
+        blockAutoJoinRef.current = false;
+
         setIsDead(false);
         setCashedAmount(null);
         setShowResultModal(false);
@@ -179,6 +196,11 @@ export default function Game() {
         foodCacheRef.current.clear();
         gameData.current = { player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null };
 
+        if (!liveSession) {
+            setLiveSession(true);
+            return;
+        }
+
         if (socketRef.current?.connected) {
             socketRef.current.emit('joinGame', {
                 username: nickname,
@@ -187,9 +209,11 @@ export default function Game() {
                 entryFeeUsd: fee,
             });
         }
-    }, [token]);
+    }, [token, liveSession]);
 
     const handleLobby = useCallback(() => {
+        clearPendingResult('agar');
+        blockAutoJoinRef.current = false;
         localStorage.removeItem('current_game_mode');
         const mode = joinParamsRef.current.mode;
         const selectedMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
@@ -271,6 +295,8 @@ export default function Game() {
     }, []);
 
     useEffect(() => {
+        if (!liveSession) return undefined;
+
         if (!token) {
             if (socketRef.current) {
                 socketRef.current.disconnect();
@@ -322,7 +348,7 @@ export default function Game() {
         socket.on('connect', () => {
             console.log('Connected to socket server');
             setIsConnected(true);
-            if (!hasJoinedGameRef.current) {
+            if (!hasJoinedGameRef.current && !blockAutoJoinRef.current) {
                 if (isBR) {
                     socket.emit('brRejoinMatch', { token });
                 } else {
@@ -337,6 +363,7 @@ export default function Game() {
         });
 
         socket.on('welcome', (playerSettings, gameSizes) => {
+            clearPendingResult('agar');
             const isRejoin = gameSizes?.rejoin === true;
             console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
             foodCacheRef.current.clear(); // Prevent flickering from old food cache
@@ -474,13 +501,19 @@ export default function Game() {
             setLocalTimer(0);
             localStorage.removeItem('current_game_mode');
             const startedAt = sessionStartAtRef.current || Date.now();
-            setSessionStats({
+            const stats = {
                 timeSurvivedMs: Date.now() - startedAt,
                 eliminations: prevKillsRef.current ?? 0,
-            });
+            };
+            setSessionStats(stats);
             setCashedAmount(amount);
             setShowResultModal(true);
             setIsSpectating(false);
+            savePendingResult('agar', {
+                type: 'cashout',
+                cashedAmount: amount,
+                ...stats,
+            });
             refreshUser?.();
         });
 
@@ -493,12 +526,18 @@ export default function Game() {
             setLocalTimer(0);
             cashoutActiveRef.current = false;
             const startedAt = sessionStartAtRef.current || Date.now();
-            setSessionStats({
+            const stats = {
                 timeSurvivedMs: Date.now() - startedAt,
                 eliminations: prevKillsRef.current ?? 0,
-            });
+            };
+            setSessionStats(stats);
             setShowResultModal(true);
             setIsSpectating(false);
+            savePendingResult('agar', {
+                type: 'death',
+                cashedAmount: null,
+                ...stats,
+            });
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
             localStorage.removeItem('current_game_mode');
             if (wasBR) {
@@ -583,7 +622,7 @@ export default function Game() {
             global.battleRoyale = false;
             hasJoinedGameRef.current = false;
         };
-    }, [token, navigate, location.state?.nickname, startCashoutCountdown]);
+    }, [token, navigate, location.state?.nickname, startCashoutCountdown, liveSession]);
 
     const handleResize = () => {
         const canvas = canvasRef.current;
