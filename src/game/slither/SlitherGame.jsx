@@ -731,7 +731,7 @@ export default function SlitherGame() {
 
             } else if (typeof msg === 'string' && /battle royale/i.test(msg)) {
 
-                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'br-slither' } });
+                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'slither' } });
 
             } else if (typeof msg === 'string') {
 

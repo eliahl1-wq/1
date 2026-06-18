@@ -5,15 +5,20 @@ import AppTopbar from '../components/AppTopbar';
 import GamemodePreview from '../components/GamemodePreview';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
+import { useAuth } from '../context/AuthContext';
+import { isBattleRoyaleAvailable, isBattleRoyaleMode, normalizeGamemodeForLobby } from '../constants/features';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 
 export default function Gamemodes() {
     const navigate = useNavigate();
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState(
-        () => location.state?.selectedMode || localStorage.getItem('selected_gamemode') || 'agar'
-    );
+    const { user } = useAuth();
+    const brAvailable = isBattleRoyaleAvailable(!!user?.isAdmin);
+    const [activeTab, setActiveTab] = useState(() => {
+        const raw = location.state?.selectedMode || localStorage.getItem('selected_gamemode') || 'agar';
+        return normalizeGamemodeForLobby(raw, false);
+    });
     const [playersByGamemode, setPlayersByGamemode] = useState({
         agar: 0,
         slither: 0,
@@ -21,6 +26,14 @@ export default function Gamemodes() {
         brSlither: 0,
         competitiveSlither: 0,
     });
+
+    useEffect(() => {
+        if (user == null) return;
+        const raw = location.state?.selectedMode || localStorage.getItem('selected_gamemode');
+        if (raw && isBattleRoyaleMode(raw) && brAvailable) {
+            setActiveTab(raw);
+        }
+    }, [user?.isAdmin, brAvailable, location.state?.selectedMode]);
 
     useEffect(() => {
         let alive = true;
@@ -56,8 +69,9 @@ export default function Gamemodes() {
         localStorage.setItem('selected_gamemode', mode);
     };
 
-    const isSlitherTab = activeTab === 'slither' || activeTab === 'br-slither' || activeTab === 'competitive-slither';
-    const isAgarTab = activeTab === 'agar' || activeTab === 'br-agar';
+    const isSlitherTab = activeTab === 'slither' || activeTab === 'competitive-slither'
+        || (brAvailable && activeTab === 'br-slither');
+    const isAgarTab = activeTab === 'agar' || (brAvailable && activeTab === 'br-agar');
 
     useEffect(() => {
         setPageSeo(isSlitherTab ? SEO.gamemodesSlither : SEO.gamemodesAgar);
@@ -103,16 +117,18 @@ export default function Gamemodes() {
                                 playing={playersByGamemode.agar}
                                 onPlay={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                             />
-                            <ModeCard
-                                mode="br-agar"
-                                title="Agar Battle Royale"
-                                desc="5–10 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
-                                playing={playersByGamemode.brAgar}
-                                onPlay={() => {
-                                    localStorage.setItem('selected_gamemode', 'br-agar');
-                                    navigate('/pre-game', { state: { selectedMode: 'br-agar' } });
-                                }}
-                            />
+                            {brAvailable && (
+                                <ModeCard
+                                    mode="br-agar"
+                                    title="Agar Battle Royale"
+                                    desc="5–10 players, shrinking zone, last one standing wins the pool. $5 or $10 entry, no cash-out."
+                                    playing={playersByGamemode.brAgar}
+                                    onPlay={() => {
+                                        localStorage.setItem('selected_gamemode', 'br-agar');
+                                        navigate('/pre-game', { state: { selectedMode: 'br-agar' } });
+                                    }}
+                                />
+                            )}
                         </>
                     ) : (
                         <>
@@ -133,16 +149,18 @@ export default function Gamemodes() {
                                     navigate('/pre-game', { state: { selectedMode: 'competitive-slither' } });
                                 }}
                             />
-                            <ModeCard
-                                mode="br-slither"
-                                title="Slither Battle Royale"
-                                desc="5–10 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
-                                playing={playersByGamemode.brSlither}
-                                onPlay={() => {
-                                    localStorage.setItem('selected_gamemode', 'br-slither');
-                                    navigate('/pre-game', { state: { selectedMode: 'br-slither' } });
-                                }}
-                            />
+                            {brAvailable && (
+                                <ModeCard
+                                    mode="br-slither"
+                                    title="Slither Battle Royale"
+                                    desc="5–10 snakes, deadly zone closes in, winner takes all. $5 or $10 entry, no cash-out."
+                                    playing={playersByGamemode.brSlither}
+                                    onPlay={() => {
+                                        localStorage.setItem('selected_gamemode', 'br-slither');
+                                        navigate('/pre-game', { state: { selectedMode: 'br-slither' } });
+                                    }}
+                                />
+                            )}
                         </>
                     )}
                 </div>

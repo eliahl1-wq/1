@@ -586,7 +586,7 @@ export default function Game() {
                 alert(msg);
                 navigate('/pre-game');
             } else if (typeof msg === 'string' && /battle royale/i.test(msg)) {
-                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'br-agar' } });
+                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'agar' } });
             } else if (typeof msg === 'string' && msg.includes('Account')) {
                 alert(msg);
             }

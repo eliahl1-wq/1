@@ -12,6 +12,7 @@ import AppTopbar from '../components/AppTopbar';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, tierEconomy, competitiveTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
+import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeGamemodeForLobby } from '../constants/features';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -74,14 +75,17 @@ function readStoredGameMode() {
     return localStorage.getItem('selected_gamemode') || localStorage.getItem('current_game_mode') || null;
 }
 
-function resolvePreGameMode(pathname, locationStateMode) {
+function resolvePreGameMode(pathname, locationStateMode, isAdmin = false) {
     const stored = readStoredGameMode();
+    const brAvailable = isBattleRoyaleAvailable(isAdmin);
     if (pathname === '/agar') return 'agar';
     if (pathname === '/slither') {
-        if (stored === 'competitive-slither' || stored === 'br-slither') return stored;
+        if (stored === 'competitive-slither') return stored;
+        if (brAvailable && stored === 'br-slither') return stored;
         return 'slither';
     }
-    return stored || locationStateMode || 'agar';
+    const raw = stored || locationStateMode || 'agar';
+    return normalizeGamemodeForLobby(raw, isAdmin);
 }
 
 export default function PreGame() {
@@ -160,13 +164,13 @@ export default function PreGame() {
 
     useEffect(() => {
         if (location.pathname === '/slither') {
-            setSelectedMode(resolvePreGameMode('/slither', location.state?.selectedMode));
+            setSelectedMode(resolvePreGameMode('/slither', location.state?.selectedMode, !!user?.isAdmin));
         } else if (location.pathname === '/agar') {
             setSelectedMode('agar');
         } else if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
-            setSelectedMode(location.state.selectedMode);
+            setSelectedMode(normalizeGamemodeForLobby(location.state.selectedMode, !!user?.isAdmin));
         }
-    }, [location.pathname, location.state?.selectedMode, selectedMode]);
+    }, [location.pathname, location.state?.selectedMode, selectedMode, user?.isAdmin]);
 
     useEffect(() => {
         if (currentGameMode) {
@@ -192,9 +196,11 @@ export default function PreGame() {
 
     const depositAddress = user?.depositAddress;
     const SOL_ADDR_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    const brAvailable = isBattleRoyaleAvailable(!!user?.isAdmin);
 
     const entryFeeForSession = isAlreadyInGame && activeEntryFee != null ? activeEntryFee : selectedEntryFee;
-    const isBattleRoyaleMode = selectedMode.startsWith('br-');
+    const isBattleRoyaleMode = isBRGamemode(selectedMode)
+        && (brAvailable || (isAlreadyInGame && isBRGamemode(currentGameMode)));
     const isCompetitiveSlitherMode = selectedMode === 'competitive-slither';
     const economy = isCompetitiveSlitherMode
         ? competitiveTierEconomy(entryFeeForSession)
@@ -212,6 +218,21 @@ export default function PreGame() {
             setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
         }
     }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, selectedEntryFee]);
+
+    useEffect(() => {
+        const raw = localStorage.getItem('selected_gamemode');
+        if (!raw || !isBRGamemode(raw)) return;
+        if (isAlreadyInGame) return;
+
+        if (brAvailable) {
+            setSelectedMode(raw);
+            return;
+        }
+
+        const normalized = normalizeGamemodeForLobby(raw, false);
+        setSelectedMode(normalized);
+        localStorage.setItem('selected_gamemode', normalized);
+    }, [user?.isAdmin, brAvailable, isAlreadyInGame]);
 
 
     const siteUsersOnline = liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0;
@@ -475,7 +496,7 @@ export default function PreGame() {
                     setActiveEntryFee(null);
                     localStorage.removeItem('current_game_mode');
                     const savedMode = localStorage.getItem('selected_gamemode');
-                    if (savedMode) setSelectedMode(savedMode);
+                    if (savedMode) setSelectedMode(normalizeGamemodeForLobby(savedMode, !!user?.isAdmin));
                 }
             } catch { /* ignore */ }
         };
@@ -490,7 +511,7 @@ export default function PreGame() {
             clearInterval(id);
             window.removeEventListener('focus', onFocus);
         };
-    }, [token, API_URL]);
+    }, [token, API_URL, user?.isAdmin]);
 
     // ── Drag panel ─────────────────────────────────────
     useEffect(() => {
@@ -555,7 +576,7 @@ export default function PreGame() {
         localStorage.setItem('current_game_mode', activeMode);
         localStorage.setItem('selected_gamemode', activeMode);
 
-        const isBR = activeMode.startsWith('br-');
+        const isBR = isBRGamemode(activeMode) && brAvailable;
         if (isBR) {
             const variant = activeMode.replace(/^br-/, '');
             if (isAlreadyInGame && canRejoinThisMode) {

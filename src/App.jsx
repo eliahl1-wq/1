@@ -21,6 +21,7 @@ import { BraveWalletAdapter } from '@solana/wallet-adapter-brave';
 import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { MIN_ENTRY_FEE } from './constants/economy';
+import { isBattleRoyaleAvailable } from './constants/features';
 
 function buildWalletAdapters() {
   const adapters = [
@@ -53,8 +54,9 @@ function PrivateRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
-function isBattleRoyaleSession() {
+function isBattleRoyaleSession(isAdmin = false) {
   if (typeof window === 'undefined') return false;
+  if (!isBattleRoyaleAvailable(isAdmin)) return false;
   const mode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || '';
   return mode.startsWith('br-');
 }
@@ -64,7 +66,7 @@ function ArenaRoute({ children }) {
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
-  if (isBattleRoyaleSession()) return children;
+  if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
   if (user && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
   return children;
 }
