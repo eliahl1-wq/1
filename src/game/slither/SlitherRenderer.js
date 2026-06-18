@@ -866,27 +866,26 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        // Shift light source to top-left to simulate a global light direction
-        const highlightX = c - rPx * 0.22;
-        const highlightY = c - rPx * 0.22;
+        // Shift highlight slightly along local Y axis to create a smooth dorsal line when overlapping
+        const highlightX = c;
+        const highlightY = c - rPx * 0.12;
 
         const baseGrad = g.createRadialGradient(
-            highlightX, highlightY, rPx * 0.05,
-            c - rPx * 0.05, c - rPx * 0.05, rPx * 1.05
+            highlightX, highlightY, rPx * 0.02,
+            c, c, rPx * 1.05
         );
 
-        // Generate dynamic highlight, light, shadow, and deep outline colors
-        const brightColor = toHex(shadeColor(col, Math.round(130 * k)));
-        const lightColor = toHex(shadeColor(col, Math.round(60 * k)));
-        const shadowColor = toHex(shadeColor(col, Math.round(-35 * k)));
-        const darkColor = toHex(shadeColor(col, Math.round(-65 * k)));
+        // Soft matte colors
+        const brightColor = toHex(shadeColor(col, Math.round(65 * k)));
+        const lightColor = toHex(shadeColor(col, Math.round(30 * k)));
+        const shadowColor = toHex(shadeColor(col, Math.round(-16 * k)));
+        const darkColor = toHex(shadeColor(col, Math.round(-28 * k)));
 
-        baseGrad.addColorStop(0, '#ffffff'); // Pure white center reflection
-        baseGrad.addColorStop(0.12, brightColor); // Pale shiny tone
-        baseGrad.addColorStop(0.32, lightColor); // Midtone shading transition
-        baseGrad.addColorStop(0.68, toHex(col)); // Base snake skin color
-        baseGrad.addColorStop(0.90, shadowColor); // Spherical shadow falloff
-        baseGrad.addColorStop(1, darkColor); // Rich edge border silhouette
+        baseGrad.addColorStop(0, brightColor); // Matte soft highlight center
+        baseGrad.addColorStop(0.28, lightColor); // Soft transition
+        baseGrad.addColorStop(0.65, toHex(col)); // Base body color
+        baseGrad.addColorStop(0.88, shadowColor); // Gentle shadow
+        baseGrad.addColorStop(1, darkColor); // Soft border shadow
 
         g.fillStyle = baseGrad;
         g.beginPath();
@@ -1168,8 +1167,8 @@ export class SlitherRenderer {
             const isHead = i === 0;
             const sprite = (boosting && isHead) ? boostBody : normal;
             const tangent = this._bumpTangent(bumps, i);
-            // Draw segment sprite at angle 0 so highlight is consistently top-left on screen
-            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, 0);
+            // Draw segment sprite at tangent angle to allow local rotation of the matte highlight
+            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
             this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
 
@@ -1240,9 +1239,6 @@ export class SlitherRenderer {
                 ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
-                ctx.lineWidth = Math.max(1.5, headEyeRadius * 0.05);
-                ctx.strokeStyle = '#000000';
-                ctx.stroke();
 
                 const px = ex + fwdX * eyeR * 0.35;
                 const py = ey + fwdY * eyeR * 0.35;
