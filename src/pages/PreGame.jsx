@@ -221,9 +221,8 @@ export default function PreGame() {
         ?? leaderboardData.globalEarningsUsd
         ?? 0;
 
-    // Lita på user.balanceSol som nu synkas automatiskt mot kedjan i /api/me
     const balanceSol = user?.balanceSol || 0;
-    const balanceUsd = balanceSol * solPrice;
+    const balanceUsd = user?.balanceUsd ?? (balanceSol * solPrice);
     const freePlay = !!user?.freePlay;
 
     const canJoin = freePlay || balanceUsd >= entryFeeForSession;

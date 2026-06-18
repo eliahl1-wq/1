@@ -102,8 +102,10 @@ function shadeColor({ r, g, b }, amount) {
 }
 
 export class SlitherRenderer {
-    constructor(canvas) {
+    constructor(canvas, options = {}) {
         this.canvas = canvas;
+        this._resizeToCanvas = options.resizeToCanvas === true;
+        this._externalCameraGetter = null;
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
         this.ctx = canvas.getContext('2d', { alpha: false });
@@ -223,7 +225,15 @@ export class SlitherRenderer {
     }
 
     resize() {
-        const { width, height } = getGameScreenSize();
+        let width;
+        let height;
+        if (this._resizeToCanvas) {
+            const parent = this.canvas.parentElement;
+            width = parent?.clientWidth || this.canvas.clientWidth || window.innerWidth;
+            height = parent?.clientHeight || this.canvas.clientHeight || window.innerHeight;
+        } else {
+            ({ width, height } = getGameScreenSize());
+        }
         const rawDpr = window.devicePixelRatio || 1;
         // Cap at 1× CSS pixels — avoids 1.5×/2× internal buffers on HiDPI (major CPU win for canvas).
         this._dpr = this.isMobile ? Math.min(1.25, rawDpr) : 1;
@@ -382,6 +392,10 @@ export class SlitherRenderer {
         }
     }
 
+    setExternalCameraGetter(fn) {
+        this._externalCameraGetter = typeof fn === 'function' ? fn : null;
+    }
+
     setHideOverlays(hide) {
         this.hideOverlays = !!hide;
     }
@@ -484,6 +498,14 @@ export class SlitherRenderer {
         this.running = true;
         const loop = () => {
             if (!this.running) return;
+            if (this.spectatorMode && this._externalCameraGetter) {
+                const cam = this._externalCameraGetter();
+                if (cam) {
+                    if (cam.x != null) this.camera.x = cam.x;
+                    if (cam.y != null) this.camera.y = cam.y;
+                    if (cam.zoom != null) this.zoom = cam.zoom;
+                }
+            }
             this._frame++;
             this.draw();
             this._raf = requestAnimationFrame(loop);
@@ -1464,6 +1486,13 @@ export class SlitherRenderer {
         else if (this._perfEma > 16) this._quality = Math.min(this._quality, Math.max(qFloor, this.isMobile ? 0.94 : 0.88));
         else if (this._perfEma < 14) this._quality = Math.min(1, this._quality + 0.02);
 
+        const snakeCount = this.targetSnakes.length;
+        if (snakeCount > 10) this._quality = Math.min(this._quality, 0.72);
+        else if (snakeCount > 6) this._quality = Math.min(this._quality, 0.82);
+        if (this.hideOverlays || this.spectatorMode) {
+            this._quality = Math.min(this._quality, 0.65);
+        }
+
         if (!this.isMobile && this._quality < 0.88) {
             this.ctx.imageSmoothingQuality = 'low';
         } else {
@@ -1624,7 +1653,7 @@ export class SlitherRenderer {
             );
         }
 
-        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
+        if (!this.hideOverlays && !this.spectatorMode && (me?.segments?.[0] || this.spectatorMode)) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
             if ((this._minimapFrame++ & 3) === 0 && !this._cashoutActive) {

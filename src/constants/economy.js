@@ -2,7 +2,8 @@ export const ENTRY_TIERS = [5, 10, 20];
 export const BR_ENTRY_TIERS = [5, 10];
 export const COMPETITIVE_ENTRY_TIERS = [2, 5];
 export const DEFAULT_ENTRY_FEE = 10;
-export const MIN_ENTRY_FEE = 5;
+/** Lowest stake tier across all modes — lobby only when balance is below this. */
+export const MIN_ENTRY_FEE = Math.min(...COMPETITIVE_ENTRY_TIERS, ...ENTRY_TIERS, ...BR_ENTRY_TIERS);
 export const DEFAULT_BR_ENTRY_FEE = 5;
 export const DEFAULT_COMPETITIVE_ENTRY_FEE = 5;
 

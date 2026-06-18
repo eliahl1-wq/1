@@ -44,6 +44,8 @@ export default function AdminSandbox() {
     const hasJoinedRef = useRef(false);
     const hideOverlaysRef = useRef(false);
     const pausedRef = useRef(false);
+    const editModeRef = useRef(false);
+    const selectedWormRef = useRef(null);
 
     const [mode, setMode] = useState('slither');
     const [connected, setConnected] = useState(false);
@@ -100,6 +102,14 @@ export default function AdminSandbox() {
     useEffect(() => {
         pausedRef.current = paused;
     }, [paused]);
+
+    useEffect(() => {
+        editModeRef.current = editMode;
+    }, [editMode]);
+
+    useEffect(() => {
+        selectedWormRef.current = selectedWorm;
+    }, [selectedWorm]);
 
     const sendControl = useCallback((action, params = {}) => {
         socketRef.current?.emit('sandboxControl', { token, mode, action, params });
@@ -247,6 +257,7 @@ export default function AdminSandbox() {
     useEffect(() => {
         const renderer = rendererRef.current;
         if (!paused || mode !== 'slither' || !renderer) {
+            renderer?.setExternalCameraGetter(null);
             if (renderer && mode === 'slither' && !paused) {
                 renderer.setSpectatorMode(false);
                 renderer.setInputEnabled(true);
@@ -254,15 +265,14 @@ export default function AdminSandbox() {
             return undefined;
         }
         renderer.setInputEnabled(false);
-        let rafId = 0;
-        const sync = () => {
-            const cam = specCamRef.current;
-            renderer.setSpectatorMode(true, { x: cam.x, y: cam.y, zoom: cam.zoom });
-            rafId = requestAnimationFrame(sync);
-        };
-        sync();
+        renderer.setSpectatorMode(true, {
+            x: specCamRef.current.x,
+            y: specCamRef.current.y,
+            zoom: specCamRef.current.zoom,
+        });
+        renderer.setExternalCameraGetter(() => specCamRef.current);
         return () => {
-            cancelAnimationFrame(rafId);
+            renderer.setExternalCameraGetter(null);
             renderer.setSpectatorMode(false);
             renderer.setInputEnabled(true);
         };
@@ -279,13 +289,19 @@ export default function AdminSandbox() {
         const resize = () => {
             const parent = canvas.parentElement;
             if (!parent) return;
-            canvas.width = parent.clientWidth;
-            canvas.height = parent.clientHeight;
+            if (mode === 'slither' && rendererRef.current) {
+                rendererRef.current.resize();
+            } else {
+                canvas.width = parent.clientWidth;
+                canvas.height = parent.clientHeight;
+            }
             if (mode === 'agar' && socketRef.current?.connected) {
+                const w = canvas.width;
+                const h = canvas.height;
                 socketRef.current.emit('0', {
                     x: 0, y: 0,
-                    screenWidth: canvas.width,
-                    screenHeight: canvas.height,
+                    screenWidth: w,
+                    screenHeight: h,
                 });
             }
         };
@@ -293,7 +309,7 @@ export default function AdminSandbox() {
         window.addEventListener('resize', resize);
 
         if (mode === 'slither') {
-            const renderer = new SlitherRenderer(canvas);
+            const renderer = new SlitherRenderer(canvas, { resizeToCanvas: true });
             rendererRef.current = renderer;
             renderer.setHideOverlays(hideOverlaysRef.current);
             renderer.start();
@@ -344,13 +360,16 @@ export default function AdminSandbox() {
         });
 
         socket.on('slitherTick', (tick) => {
-            rendererRef.current?.updateState(tick);
+            const renderer = rendererRef.current;
+            if (!renderer) return;
             if (tick.zone) {
-                rendererRef.current?.updateState({
-                    zone: tick.zone,
+                renderer.updateState({
+                    ...tick,
                     competitiveSlither: true,
                     circularMap: true,
                 });
+            } else {
+                renderer.updateState(tick);
             }
         });
 
@@ -412,32 +431,43 @@ export default function AdminSandbox() {
         canvas.addEventListener('pointerdown', onPointer);
         window.addEventListener('keydown', onSplit);
 
-        // Static worm drag (slither edit mode)
+        return () => {
+            window.removeEventListener('resize', resize);
+            canvas.removeEventListener('pointermove', onPointer);
+            canvas.removeEventListener('pointerdown', onPointer);
+            window.removeEventListener('keydown', onSplit);
+            disconnectSocket();
+        };
+    }, [user, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, resetLocalSandboxState]);
+
+    useEffect(() => {
+        if (!gameReady || mode !== 'slither') return undefined;
+        const canvas = canvasRef.current;
+        if (!canvas) return undefined;
+
         const onCanvasClick = (e) => {
-            if (mode !== 'slither' || pausedRef.current || !editMode || !selectedWorm || !rendererRef.current) return;
+            if (pausedRef.current || !editModeRef.current || !selectedWormRef.current || !rendererRef.current) return;
             const rect = canvas.getBoundingClientRect();
             const screenX = e.clientX - rect.left;
             const screenY = e.clientY - rect.top;
             const cam = rendererRef.current.camera || { x: 0, y: 0 };
             const zoom = rendererRef.current.zoom || 1;
-            const worldX = (screenX - canvas.width / 2) / zoom + cam.x;
-            const worldY = (screenY - canvas.height / 2) / zoom + cam.y;
-            socket.emit('sandboxMoveStatic', { token, id: selectedWorm, x: worldX, y: worldY });
-            sendControl('moveStaticWorm', { id: selectedWorm, x: worldX, y: worldY });
+            const worldX = (screenX - rect.width / 2) / zoom + cam.x;
+            const worldY = (screenY - rect.height / 2) / zoom + cam.y;
+            const wormId = selectedWormRef.current;
+            socketRef.current?.emit('sandboxMoveStatic', { token, id: wormId, x: worldX, y: worldY });
+            socketRef.current?.emit('sandboxControl', {
+                token,
+                mode,
+                action: 'moveStaticWorm',
+                params: { id: wormId, x: worldX, y: worldY },
+            });
             setWormX(Math.round(worldX));
             setWormY(Math.round(worldY));
         };
         canvas.addEventListener('click', onCanvasClick);
-
-        return () => {
-            window.removeEventListener('resize', resize);
-            canvas.removeEventListener('pointermove', onPointer);
-            canvas.removeEventListener('pointerdown', onPointer);
-            canvas.removeEventListener('click', onCanvasClick);
-            window.removeEventListener('keydown', onSplit);
-            disconnectSocket();
-        };
-    }, [user, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, editMode, selectedWorm, sendControl, resetLocalSandboxState]);
+        return () => canvas.removeEventListener('click', onCanvasClick);
+    }, [gameReady, mode, token]);
 
     const switchMode = (newMode) => {
         if (newMode === mode) return;

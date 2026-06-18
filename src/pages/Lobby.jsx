@@ -398,7 +398,8 @@ export default function Lobby() {
                     style={{ width: '100%', padding: '14px', fontSize: '0.9rem', borderRadius: 'var(--r-lg)', letterSpacing: '0.01em' }}
                     onClick={() => {
                         if (!connected) { setArenaError('Connect your wallet first.'); return; }
-                        if (!isAlreadyInGame && (user?.balance ?? 0) < MIN_ENTRY_FEE) {
+                        const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
+                        if (!isAlreadyInGame && balanceUsd < MIN_ENTRY_FEE) {
                             setArenaError(`Deposit at least $${MIN_ENTRY_FEE} to enter.`); return;
                         }
                         setArenaError('');
