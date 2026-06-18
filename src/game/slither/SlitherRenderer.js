@@ -334,22 +334,23 @@ export class SlitherRenderer {
                 if (prev && this._mouthValid) {
                     const foodR = prev.radius || 3;
                     const eatReach = (this._mouthR + foodR) * 1.55 + 14;
-                    const visualReach = eatReach + this._mouthR * 0.85;
+                    const visualReach = eatReach + this._mouthR * 0.55;
                     const dx = this._mouthX - prev.x;
                     const dy = this._mouthY - prev.y;
-                    if (dx * dx + dy * dy <= visualReach * visualReach) {
-                        this._slurpGhosts.push({
-                            x: prev.x,
-                            y: prev.y,
-                            hue: prev.hue ?? 120,
-                            radius: prev.radius || 3,
-                            mouthX: this._mouthX,
-                            mouthY: this._mouthY,
-                            phase: anim?.phase ?? 0,
-                            sizeMul: anim?.sizeMul ?? 1,
-                            start: ghostStart,
-                            duration: 220,
-                        });
+                    const slurp = anim?.slurp ?? 0;
+                    const pull = slurp * slurp;
+                    if (dx * dx + dy * dy <= visualReach * visualReach || slurp > 0.1) {
+                        if (!anim?.ghosting) {
+                            this._spawnSlurpGhost({
+                                x: prev.x + dx * Math.max(pull, slurp * 0.65) * 0.95,
+                                y: prev.y + dy * Math.max(pull, slurp * 0.65) * 0.95,
+                                hue: prev.hue ?? 120,
+                                radius: prev.radius || 3,
+                                phase: anim?.phase ?? 0,
+                                sizeMul: anim?.sizeMul ?? 1,
+                                start: ghostStart,
+                            });
+                        }
                     }
                 }
                 this._foodAnimCache.delete(id);
@@ -849,7 +850,20 @@ export class SlitherRenderer {
         });
     }
 
-    _drawFood(ctx, foodList, toScreen, W, H, zoom) {
+    _spawnSlurpGhost({ x, y, hue, radius, phase, sizeMul, start }) {
+        this._slurpGhosts.push({
+            x,
+            y,
+            hue: hue ?? 120,
+            radius: radius || 3,
+            phase: phase ?? 0,
+            sizeMul: sizeMul ?? 1,
+            start: start ?? performance.now(),
+            duration: 300,
+        });
+    }
+
+    _drawFood(ctx, foodList, toScreen, W, H, zoom, dt = 1 / 60) {
         const now = performance.now();
         const cx = this.camera.x;
         const cy = this.camera.y;
@@ -889,9 +903,13 @@ export class SlitherRenderer {
                 anim = {
                     phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
                     sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
+                    slurp: 0,
+                    ghosting: false,
                 };
                 if (f.id != null) this._foodAnimCache.set(f.id, anim);
             }
+            if (anim.slurp == null) anim.slurp = 0;
+            if (anim.ghosting == null) anim.ghosting = false;
 
             let wx = f.x;
             let wy = f.y;
@@ -916,29 +934,48 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 2.2;
             }
 
-            // Slurp when within eat range — visible pull like slither.io (no long-range magnet).
-            if (mouthValid && !f.deathDrop && !isGolden) {
+            // Slurp when within eat range — smoothed pull (no per-frame snap).
+            if (mouthValid && !f.deathDrop && !isGolden && !anim.ghosting) {
                 const foodR = f.radius || 3;
                 const eatReach = (mouthR + foodR) * 1.55 + 14;
-                const visualReach = eatReach + mouthR * 0.85;
+                const visualReach = eatReach + mouthR * 0.55;
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
-                if (Math.abs(dxm) < visualReach && Math.abs(dym) < visualReach) {
-                    const dist2 = dxm * dxm + dym * dym;
-                    const visualReach2 = visualReach * visualReach;
-                    if (dist2 < visualReach2 && dist2 > 0.001) {
-                        const dist = Math.sqrt(dist2);
-                        const t = 1 - dist / visualReach;
-                        const suck = t * t;
-                        const snap = suck * suck;
-                        const pull = 0.22 + snap * 0.78;
-                        wx += dxm * pull;
-                        wy += dym * pull;
-                        sizeMul *= Math.max(0.18, 1 - snap * 0.82);
-                        alpha = Math.max(0.3, 1 - snap * 0.55);
-                    }
+                const dist = Math.hypot(dxm, dym);
+
+                let targetSlurp = 0;
+                if (dist < visualReach) {
+                    const t = 1 - dist / visualReach;
+                    targetSlurp = t * t;
+                }
+
+                const slurpK = 1 - Math.exp(-dt / 0.11);
+                anim.slurp += (targetSlurp - anim.slurp) * slurpK;
+
+                if (anim.slurp > 0.004) {
+                    const pull = anim.slurp * anim.slurp;
+                    wx += dxm * pull * 0.96;
+                    wy += dym * pull * 0.96;
+                    sizeMul *= Math.max(0.12, 1 - pull * 0.88);
+                    alpha = Math.max(0.2, 1 - pull * 0.65);
+                }
+
+                if (anim.slurp > 0.88 && f.id != null) {
+                    anim.ghosting = true;
+                    this._spawnSlurpGhost({
+                        x: wx,
+                        y: wy,
+                        hue,
+                        radius: f.radius || 3,
+                        phase: anim.phase,
+                        sizeMul: anim.sizeMul,
+                        start: now,
+                    });
+                    continue;
                 }
             }
+
+            if (anim.ghosting) continue;
 
             const { x: fx, y: fy } = toScreen(wx, wy);
 
@@ -976,10 +1013,10 @@ export class SlitherRenderer {
             }
         }
 
-        this._drawSlurpGhosts(ctx, toScreen, zoom, now);
+        this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
     }
 
-    _drawSlurpGhosts(ctx, toScreen, zoom, now) {
+    _drawSlurpGhosts(ctx, toScreen, zoom, now, mouthX, mouthY) {
         const ghosts = this._slurpGhosts;
         let kept = 0;
         for (let i = 0; i < ghosts.length; i++) {
@@ -987,23 +1024,30 @@ export class SlitherRenderer {
             const elapsed = now - g.start;
             if (elapsed >= g.duration) continue;
 
+            if (mouthX != null && mouthY != null) {
+                g.mouthX = mouthX;
+                g.mouthY = mouthY;
+            } else if (g.mouthX == null || g.mouthY == null) {
+                g.mouthX = g.x;
+                g.mouthY = g.y;
+            }
+
             const t = elapsed / g.duration;
-            const ease = t * t * (3 - 2 * t);
+            const ease = 1 - (1 - t) ** 3;
             const wx = g.x + (g.mouthX - g.x) * ease;
             const wy = g.y + (g.mouthY - g.y) * ease;
-            const wobble = Math.sin(now * 0.006 + g.phase) * (1 - ease) * 1.5;
             const hue = Math.round((g.hue ?? 120) / 12) * 12;
-            const sizeMul = (g.sizeMul ?? 1) * (1 - ease * 0.88);
+            const sizeMul = (g.sizeMul ?? 1) * (1 - ease * 0.9);
             const baseR = (g.radius || 3) * sizeMul;
             const screenR = Math.max(3, baseR * zoom * 1.65);
             const spriteR = 4;
             const sprite = this._foodSprite(hue, spriteR, false, false);
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
-            const { x: fx, y: fy } = toScreen(wx + wobble, wy - wobble);
+            const { x: fx, y: fy } = toScreen(wx, wy);
 
             ctx.save();
-            ctx.globalAlpha = Math.max(0.15, 1 - ease * 0.85);
+            ctx.globalAlpha = Math.max(0.12, 1 - ease * 0.88);
             ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
             ctx.restore();
 
@@ -1696,7 +1740,7 @@ export class SlitherRenderer {
             this._drawBackground(ctx, W, H, cx, cy, worldHalf, zoom);
             this._drawZone(ctx, toScreen, W, H);
         }
-        this._drawFood(ctx, this._foodDrawList, toScreen, W, H, zoom);
+        this._drawFood(ctx, this._foodDrawList, toScreen, W, H, zoom, dt);
 
         const sorted = this._sortedRenderSnakes;
         if (this._sortDirty || sorted.length !== renderSnakes.length) {
