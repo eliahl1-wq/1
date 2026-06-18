@@ -1167,7 +1167,7 @@ export default function PreGame() {
                         </div>
                     )}
 
-                    <div style={{ marginTop: '16px' }}>
+                    <div className="hiw-wrap">
                         <div
                             className="hiw-toggle"
                             onClick={() => setShowHowItWorks(v => !v)}
@@ -1178,7 +1178,7 @@ export default function PreGame() {
                                 <path d="M6 9l6 6 6-6" />
                             </svg>
                         </div>
-                        {showHowItWorks && (
+                        <div className={`hiw-dropdown${showHowItWorks ? ' hiw-dropdown--open' : ''}`}>
                             <div className="hiw-content">
                                 {isCompetitiveSlitherMode ? (
                                     <>
@@ -1226,7 +1226,7 @@ export default function PreGame() {
                                     </>
                                 )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 

@@ -173,7 +173,6 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
                 const ringR = cell.radius + 10;
                 drawCashoutProgressRing(graph, cell.x, cell.y, ringR, holdProgress, {
                     counterClockwise: true,
-                    softGlow: true,
                 });
             }
         }

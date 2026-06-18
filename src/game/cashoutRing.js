@@ -18,7 +18,7 @@ export function getCashoutRingProgress(endAtMs, totalSeconds) {
  * Timer drains clockwise; hold-to-cashout fills counter-clockwise.
  */
 export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) {
-    const { counterClockwise = false, showTrack = true, softGlow = false } = opts;
+    const { counterClockwise = false, showTrack = true } = opts;
     const lineWidth = 3.5;
 
     if (progress <= 0) return;
@@ -40,22 +40,6 @@ export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) 
     const end = counterClockwise
         ? start - progress * FULL_ANGLE
         : start + progress * FULL_ANGLE;
-
-    // Soft halo — two wide strokes, no GPU shadowBlur (same look, much cheaper).
-    if (softGlow && progress > 0.04) {
-        const t = Math.min(1, progress * 1.15);
-        ctx.beginPath();
-        ctx.arc(x, y, radius, start, end, counterClockwise);
-        ctx.strokeStyle = `rgba(120, 94, 255, ${0.1 + t * 0.14})`;
-        ctx.lineWidth = lineWidth + 8;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(x, y, radius, start, end, counterClockwise);
-        ctx.strokeStyle = `rgba(120, 94, 255, ${0.22 + t * 0.2})`;
-        ctx.lineWidth = lineWidth + 3;
-        ctx.stroke();
-    }
 
     ctx.beginPath();
     ctx.arc(x, y, radius, start, end, counterClockwise);

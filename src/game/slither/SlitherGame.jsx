@@ -1001,7 +1001,6 @@ export default function SlitherGame() {
                 <GameCashoutBar
                     disabled={!cashoutReady}
                     holdProgress={holdProgress}
-                    canvasHoldRing
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}

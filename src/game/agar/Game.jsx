@@ -1012,7 +1012,6 @@ export default function Game() {
                 <GameCashoutBar
                     disabled={localTimer > 0 || isDead || cashedAmount !== null}
                     holdProgress={holdProgress}
-                    canvasHoldRing
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}

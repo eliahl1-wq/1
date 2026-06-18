@@ -1727,10 +1727,7 @@ export class SlitherRenderer {
             const holdProgress = this._getHoldProgress(nowMs);
 
             if (holdProgress > 0 && (!cashoutEndAt || cashoutEndAt <= Date.now())) {
-                drawCashoutProgressRing(ctx, hx, hy, ringR, holdProgress, {
-                    counterClockwise: true,
-                    softGlow: true,
-                });
+                drawCashoutProgressRing(ctx, hx, hy, ringR, holdProgress, { counterClockwise: true });
             }
             if (cashoutEndAt && cashoutEndAt > Date.now()) {
                 const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);

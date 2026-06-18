@@ -108,8 +108,7 @@
     overflow: hidden;
     isolation: isolate;
     transition: transform 0.1s cubic-bezier(0.2, 0.8, 0.2, 1),
-                box-shadow 0.1s cubic-bezier(0.2, 0.8, 0.2, 1),
-                filter 0.1s ease;
+                box-shadow 0.1s cubic-bezier(0.2, 0.8, 0.2, 1);
     user-select: none;
     -webkit-user-select: none;
     touch-action: none;
@@ -118,7 +117,6 @@
 .game-cashout-btn--holding {
     transform: translateY(2px) scale(0.97);
     box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(124, 58, 255, 0.25) !important;
-    filter: brightness(0.92);
 }
 
 .game-cashout-btn--complete {
@@ -153,7 +151,7 @@
 
 .game-cashout-btn--holding .game-cashout-btn-shine {
     opacity: 1;
-    animation: gameCashoutShine 0.85s ease-in-out infinite;
+    animation: gameCashoutShine 1.15s ease-in-out infinite;
 }
 
 .game-cashout-btn-content {

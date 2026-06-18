@@ -51,12 +51,9 @@ export default function GameCashoutBar({
     localTimer = 0,
     cashOutTotal = 10,
     cashOutEndAt = 0,
-    /** When true, hold progress is shown on the in-game canvas ring — not the button fill. */
-    canvasHoldRing = false,
 }) {
     const isHolding = holdProgress > 0 && holdProgress < 1;
     const securingProgress = useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt);
-    const showButtonFill = !canvasHoldRing && isHolding;
 
     const handleHoldStart = (e) => {
         e.preventDefault();
@@ -103,13 +100,12 @@ export default function GameCashoutBar({
                     onContextMenu={(e) => e.preventDefault()}
                     disabled={disabled}
                 >
-                    {showButtonFill && (
-                        <span
-                            className="game-cashout-btn-progress"
-                            style={{ transform: `scaleX(${holdProgress})` }}
-                            aria-hidden
-                        />
-                    )}
+                    <span
+                        className="game-cashout-btn-progress"
+                        style={{ transform: `scaleX(${holdProgress})` }}
+                        aria-hidden
+                    />
+                    <span className="game-cashout-btn-shine" aria-hidden />
                     <span className="game-cashout-btn-content">
                         <DollarIcon />
                         Cash Out

@@ -319,10 +319,11 @@
   display: grid;
   grid-template-columns: 250px minmax(320px, 420px) 250px;
   gap: 20px;
-  align-items: stretch;
+  align-items: start;
   justify-content: center;
   justify-items: center;
   margin: 18px auto 0;
+  overflow: visible;
 }
 
 .mode-card {
@@ -713,9 +714,11 @@
 .game-card.main-card {
   width: 100%;
   max-width: 420px;
-  height: 100%;
+  height: auto;
+  padding-bottom: 18px;
   justify-self: center;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 /* ─── Nickname input ─── */
@@ -1349,6 +1352,11 @@
 }
 
 /* ─── How it works ─── */
+.hiw-wrap {
+  position: relative;
+  margin-top: 16px;
+}
+
 .hiw-toggle {
   display: flex;
   justify-content: center;
@@ -1366,17 +1374,40 @@
 }
 .hiw-toggle:hover { color: var(--text-2); }
 
+.hiw-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition:
+    max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.28s ease,
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hiw-dropdown--open {
+  max-height: 420px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 .hiw-content {
   font-family: var(--ui);
   font-size: 0.67rem;
   line-height: 1.55;
   color: var(--text-2);
-  margin-top: 10px;
   padding: 10px;
   background: rgba(0,0,0,0.2);
   border-radius: var(--r-md);
   border: 1px solid var(--border);
-  animation: fadeUp 0.15s ease-out;
+  box-shadow: var(--shadow-xl);
 }
 
 /* ─── Entry fee row ─── */
@@ -1409,7 +1440,7 @@
   align-items: center;
   justify-content: center;
   padding-bottom: 60px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .page-shell--scroll {
@@ -2469,128 +2500,4 @@
   .nav-deposit-btn--compact::after {
     content: none;
   }
-}
-
-/* ─── In-game cashout bar (Slither + Agar) — no filter/backdrop blur while holding ─── */
-.game-cashout-wrap {
-  position: fixed;
-  left: 50%;
-  bottom: calc(28px + env(safe-area-inset-bottom, 0));
-  transform: translateX(-50%);
-  z-index: 200;
-  width: min(320px, calc(100vw - 32px));
-  pointer-events: none;
-}
-
-.game-cashout-stack,
-.game-cashout-securing {
-  pointer-events: auto;
-}
-
-.game-cashout-btn {
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-  padding: 14px 20px;
-  border-radius: var(--r-lg);
-  contain: layout paint;
-}
-
-.game-cashout-btn-progress {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  background: rgba(255, 255, 255, 0.14);
-  will-change: transform;
-  pointer-events: none;
-}
-
-.game-cashout-btn-shine {
-  display: none;
-}
-
-.game-cashout-btn--holding {
-  box-shadow:
-    0 0 0 1px rgba(120, 94, 255, 0.45),
-    0 0 18px rgba(120, 94, 255, 0.22);
-  animation: cashout-hold-pulse 1s ease-in-out infinite;
-}
-
-@keyframes cashout-hold-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 0 1px rgba(120, 94, 255, 0.4),
-      0 0 14px rgba(120, 94, 255, 0.18);
-  }
-  50% {
-    box-shadow:
-      0 0 0 1px rgba(120, 94, 255, 0.55),
-      0 0 22px rgba(120, 94, 255, 0.28);
-  }
-}
-
-.game-cashout-btn-content {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--display);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.game-cashout-hint {
-  margin: 8px 0 0;
-  text-align: center;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.38);
-}
-
-.game-keycap {
-  display: inline-block;
-  min-width: 1.4em;
-  padding: 1px 6px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  font-family: var(--mono);
-  font-size: 0.85em;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.game-cashout-securing {
-  background: rgba(16, 17, 24, 0.92);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 12px 14px;
-}
-
-.game-cashout-securing-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.game-cashout-securing-time {
-  font-family: var(--mono);
-  color: var(--accent);
-}
-
-.game-cashout-securing-track {
-  height: 4px;
-  border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.game-cashout-securing-fill {
-  height: 100%;
-  transform-origin: left center;
-  background: var(--accent);
-  will-change: transform;
 }
