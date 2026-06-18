@@ -4,9 +4,9 @@ const TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN?.trim() || '';
 const API_HOST = import.meta.env.VITE_MIXPANEL_API_HOST?.trim() || '';
 const RECORD_SESSIONS_PERCENT = (() => {
     const raw = import.meta.env.VITE_MIXPANEL_RECORD_SESSIONS_PERCENT;
-    if (raw === undefined || raw === '') return 100;
+    if (raw === undefined || raw === '') return 0;
     const n = parseInt(raw, 10);
-    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
 })();
 const DEBUG = import.meta.env.DEV || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('mp_debug'));
 
@@ -88,6 +88,15 @@ export function startSessionRecording() {
     if (typeof mixpanel.start_session_recording === 'function') {
         mixpanel.start_session_recording();
         logStatus('session recording started manually');
+    }
+}
+
+export function stopSessionRecording() {
+    if (!TOKEN) return;
+    if (!initialized) return;
+    if (typeof mixpanel.stop_session_recording === 'function') {
+        mixpanel.stop_session_recording();
+        logStatus('session recording stopped');
     }
 }
 

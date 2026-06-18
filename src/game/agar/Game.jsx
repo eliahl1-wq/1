@@ -21,6 +21,7 @@ import { clearPendingResult, loadPendingResult, savePendingResult } from '../../
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
+import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
 
 const IS_MOBILE = isTouchDevice();
@@ -266,6 +267,7 @@ export default function Game() {
     }, [localTimer, isDead, cashedAmount, isBattleRoyale, cancelHold]);
 
     useEffect(() => {
+        stopSessionRecording();
         const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
         document.title = isBattleRoyale ? 'AgarStake | Battle Royale' : 'AgarStake | In Game';
         global.battleRoyale = isBattleRoyale;

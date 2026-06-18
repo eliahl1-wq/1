@@ -21,6 +21,7 @@ import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
+import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -248,6 +249,7 @@ export default function SlitherGame() {
     useEffect(() => {
         document.body.style.backgroundColor = '#0a0a0c';
         document.title = 'AgarStake | Slither';
+        stopSessionRecording();
     }, []);
 
     useEffect(() => {
