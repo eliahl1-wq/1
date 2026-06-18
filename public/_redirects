@@ -1,4 +1,13 @@
-/google680c9e97322f5664.html /google680c9e97322f5664.html 200
-/robots.txt /robots.txt 200
-/sitemap.xml /sitemap.xml 200
-/* /index.html 200
+# Static assets — must not SPA-fallback to index.html (breaks JS module MIME type)
+/assets/*  /assets/:splat  200
+/favicon-48.png  /favicon-48.png  200
+/favicon-192.png  /favicon-192.png  200
+/favicon.png  /favicon.png  200
+/logo-512.png  /logo-512.png  200
+/icons.svg  /icons.svg  200
+/site.webmanifest  /site.webmanifest  200
+/robots.txt  /robots.txt  200
+/sitemap.xml  /sitemap.xml  200
+/google680c9e97322f5664.html  /google680c9e97322f5664.html  200
+/solana-sol-logo.png  /solana-sol-logo.png  200
+/*  /index.html  200

@@ -789,7 +789,7 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0035 + f.x) * 6;
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
-                // Death pellets stay fixed — no wobble/pulse (saves perf when piles are large).
+                // Death pellets: fixed position + original glow sprite (no wobble, no magnet).
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
             } else {
                 sizeMul = f._sizeMul * (1 + Math.sin(now * 0.004 + f._phase) * 0.09);
@@ -797,7 +797,7 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0028 + f._phase * 1.3) * 1.5;
             }
 
-            if (mouthValid) {
+            if (mouthValid && !f.deathDrop) {
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
                 const dist2 = dxm * dxm + dym * dym;
@@ -815,7 +815,7 @@ export class SlitherRenderer {
             const baseR = (f.radius || 3) * sizeMul;
             const screenR = Math.max(4.5, baseR * zoom * 1.65);
 
-            if (simpleFood && !isGolden) {
+            if (simpleFood && !isGolden && !f.deathDrop) {
                 ctx.globalAlpha = f.deathDrop ? 0.85 : 0.55;
                 ctx.fillStyle = f.deathDrop
                     ? `hsla(${hue}, 95%, 62%, 0.75)`
