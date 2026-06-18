@@ -8,6 +8,7 @@ import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
+import { canvasRGBA as stackBlurCanvas } from 'stackblur-canvas';
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
@@ -155,6 +156,8 @@ export class SlitherRenderer {
         this._quality = 1;
         this._minimapFallback = { players: [], food: [] };
         this._minimapFrame = 0;
+        this._hlBlurCv = null;
+        this._hlBlurCtx = null;
 
         this._onResize = () => this.resize();
         this._onLayoutChange = () => this.resize();
@@ -478,7 +481,7 @@ export class SlitherRenderer {
     }
 
     /** Get (or build once) a cached sprite canvas. LRU eviction avoids full-cache clear stutters. */
-    _getSprite(key, size, painter) {
+    _getSprite(key, size, painter, blurRadius = 0) {
         let s = this._sprites.get(key);
         if (s) {
             s._lastUsed = this._frame;
@@ -499,9 +502,26 @@ export class SlitherRenderer {
         cv.width = sz;
         cv.height = sz;
         painter(cv.getContext('2d'), sz);
+        if (blurRadius > 0) {
+            stackBlurCanvas(cv, 0, 0, sz, sz, blurRadius);
+        }
         cv._lastUsed = this._frame;
         this._sprites.set(key, cv);
         return cv;
+    }
+
+    _ensureHlBlurCanvas(w, h) {
+        const bw = Math.max(2, Math.ceil(w));
+        const bh = Math.max(2, Math.ceil(h));
+        if (!this._hlBlurCv) {
+            this._hlBlurCv = document.createElement('canvas');
+            this._hlBlurCtx = this._hlBlurCv.getContext('2d', { alpha: true });
+        }
+        if (this._hlBlurCv.width < bw || this._hlBlurCv.height < bh) {
+            this._hlBlurCv.width = bw;
+            this._hlBlurCv.height = bh;
+        }
+        return { cv: this._hlBlurCv, ctx: this._hlBlurCtx, w: bw, h: bh };
     }
 
     _loadBgTile() {
@@ -936,38 +956,84 @@ export class SlitherRenderer {
         g.fill();
     }
 
-    /** Thin bright dorsal core with wide soft falloff — one continuous highlight. */
-    _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1) {
+    /** Thin dorsal highlight — drawn to offscreen buffer + StackBlur for soft matte falloff. */
+    _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1, opts = {}) {
         if (count < 2) return;
         const col = parseColor(cs);
-        const hi = shadeColor(col, 48);
+        const hi = shadeColor(col, 52);
         const k = alphaMul;
+        const { isYou = false, cashoutPerf = false, quality = 1 } = opts;
 
-        const trace = (lineW, alpha) => {
-            ctx.strokeStyle = rgb(hi, alpha * k);
-            ctx.lineWidth = lineW;
-            ctx.beginPath();
+        let blurR = 0;
+        if (isYou) blurR = cashoutPerf ? 5 : 7;
+        else if (quality >= 0.72) blurR = 5;
+        else if (quality >= 0.55) blurR = 3;
+
+        const trace = (targetCtx, lineW, alpha) => {
+            targetCtx.strokeStyle = rgb(hi, alpha * k);
+            targetCtx.lineWidth = lineW;
+            targetCtx.beginPath();
             let started = false;
             for (let i = count - 1; i >= 0; i--) {
                 const p = bumps[i];
                 if (!started) {
-                    ctx.moveTo(p.x, p.y);
+                    targetCtx.moveTo(p.x, p.y);
                     started = true;
                 } else {
-                    ctx.lineTo(p.x, p.y);
+                    targetCtx.lineTo(p.x, p.y);
                 }
             }
-            if (started) ctx.stroke();
+            if (started) targetCtx.stroke();
         };
+
+        const drawStrokes = (targetCtx) => {
+            targetCtx.save();
+            targetCtx.globalCompositeOperation = 'source-over';
+            targetCtx.lineCap = 'round';
+            targetCtx.lineJoin = 'round';
+            trace(targetCtx, radius * 0.55, 0.035);
+            trace(targetCtx, radius * 0.28, 0.06);
+            trace(targetCtx, radius * 0.12, 0.085);
+            targetCtx.restore();
+        };
+
+        if (blurR <= 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            drawStrokes(ctx);
+            ctx.restore();
+            return;
+        }
+
+        const pad = radius * 0.85;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (let i = 0; i < count; i++) {
+            const p = bumps[i];
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+        }
+        const bw = maxX - minX + pad * 2;
+        const bh = maxY - minY + pad * 2;
+        const ox = minX - pad;
+        const oy = minY - pad;
+        const { cv, ctx: hc, w, h } = this._ensureHlBlurCanvas(bw, bh);
+
+        hc.clearRect(0, 0, w, h);
+        hc.save();
+        hc.translate(-ox, -oy);
+        drawStrokes(hc);
+        hc.restore();
+
+        stackBlurCanvas(cv, 0, 0, w, h, blurR);
 
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        trace(radius * 0.62, 0.028);
-        trace(radius * 0.38, 0.045);
-        trace(radius * 0.2, 0.065);
-        trace(radius * 0.08, 0.08);
+        ctx.drawImage(cv, 0, 0, w, h, ox, oy, w, h);
         ctx.restore();
     }
 
@@ -986,7 +1052,7 @@ export class SlitherRenderer {
         };
     }
 
-    /** Extra inner-edge shade on sharp bends — body-local, applied per frame. */
+    /** Extra inner-edge shade on sharp bends — body-local multiply (no per-stamp blur). */
     _blitBendCrease(ctx, x, y, tangent, radius, turn) {
         if (turn.strength < 0.07) return;
         const r = radius * 0.94;
@@ -1047,13 +1113,14 @@ export class SlitherRenderer {
         const ssR = rPx * bodySS;
         const ssSize = ssR * 2 + 4;
 
+        const segBlur = bodySS >= 2 ? 3 : 2;
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v31|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v32|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
-            });
-            pair.boostBody = this._getSprite(`pr_norm_v31|${key}|boost`, ssSize, (g, sz) => {
+            }, segBlur);
+            pair.boostBody = this._getSprite(`pr_norm_v32|${key}|boost`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
-            });
+            }, segBlur);
         }
 
         if (needs.glow && !pair.glow) {
@@ -1230,6 +1297,8 @@ export class SlitherRenderer {
 
         const stampRadius = bodyRadius;
 
+        const hlOpts = { isYou, cashoutPerf, quality: this._quality };
+
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -1241,7 +1310,7 @@ export class SlitherRenderer {
             this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
 
-        this._blitSpineHighlight(ctx, bumps, bumpCount, stampRadius, cs, boosting ? 1.08 : 1);
+        this._blitSpineHighlight(ctx, bumps, bumpCount, stampRadius, cs, boosting ? 1.08 : 1, hlOpts);
 
         if (isYou && prNeeds.glow && glow) {
             ctx.save();
