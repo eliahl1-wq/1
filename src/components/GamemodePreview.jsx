@@ -1,6 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { drawGamemodePreview } from './gamemodePreviewDraw.js';
 
+const SLITHER_PREVIEW_IMAGES = {
+    slither: '/normal slither.png',
+    'competitive-slither': '/arena slither.png',
+    'br-slither': '/battle royale slither.png',
+};
+
 const DESKTOP_W = 480;
 const DESKTOP_H = 480;
 const MOBILE_MQ = '(max-width: 768px)';
@@ -10,9 +16,12 @@ function isMobileGamemodeLayout() {
 }
 
 export default function GamemodePreview({ mode, className = '' }) {
+    const imageSrc = SLITHER_PREVIEW_IMAGES[mode];
     const canvasRef = useRef(null);
 
     useEffect(() => {
+        if (imageSrc) return;
+
         const canvas = canvasRef.current;
         const wrap = canvas?.parentElement;
         if (!canvas || !wrap) return;
@@ -78,7 +87,19 @@ export default function GamemodePreview({ mode, className = '' }) {
             mq.removeEventListener('change', onMq);
             ro?.disconnect();
         };
-    }, [mode]);
+    }, [mode, imageSrc]);
+
+    if (imageSrc) {
+        return (
+            <img
+                src={imageSrc}
+                alt=""
+                className={className}
+                aria-hidden="true"
+                draggable={false}
+            />
+        );
+    }
 
     return (
         <canvas
