@@ -158,6 +158,9 @@ export class SlitherRenderer {
         this._minimapFrame = 0;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
+        this._foodGoldenBuf = [];
+        this._foodNearBuf = [];
+        this._foodBuckets = Array.from({ length: 24 }, () => []);
 
         this._onResize = () => this.resize();
         this._onLayoutChange = () => this.resize();
@@ -745,17 +748,155 @@ export class SlitherRenderer {
     }
 
     _drawFood(ctx, foodList, toScreen, W, H, zoom) {
+        const count = foodList.length;
+        if (!count) return;
+
+        const dense = count >= 72 || this._quality < 0.82 || this._cashoutPerf;
+        if (dense) {
+            this._drawFoodBatched(ctx, foodList, toScreen, W, H, zoom, count);
+            return;
+        }
+        this._drawFoodDetailed(ctx, foodList, toScreen, W, H, zoom, {
+            animate: true,
+            foodStride: 1,
+            useSprites: this._quality >= 0.55,
+        });
+    }
+
+    _applyFoodMagnet(wx, wy, mouthValid, mouthX, mouthY, attractR2, maxPull) {
+        if (!mouthValid) return { wx, wy };
+        const dxm = mouthX - wx;
+        const dym = mouthY - wy;
+        const dist2 = dxm * dxm + dym * dym;
+        if (dist2 >= attractR2 || dist2 <= 0.01) return { wx, wy };
+        const dist = Math.sqrt(dist2);
+        const t = 1 - dist / Math.sqrt(attractR2);
+        const pull = Math.min(t * t * maxPull, dist);
+        return {
+            wx: wx + (dxm / dist) * pull,
+            wy: wy + (dym / dist) * pull,
+        };
+    }
+
+    /** Batched flat pellets — one fill per hue bucket, no per-pellet glow or wobble. */
+    _drawFoodBatched(ctx, foodList, toScreen, W, H, zoom, count) {
+        const cx = this.camera.x;
+        const cy = this.camera.y;
+        const halfW = W / 2 / zoom + 160 / zoom;
+        const halfH = H / 2 / zoom + 160 / zoom;
+        const ultra = count >= 150 || this._quality < 0.72;
+        const stride = ultra ? 2 : 1;
+
+        const mouthValid = this._mouthValid;
+        const mouthX = this._mouthX;
+        const mouthY = this._mouthY;
+        const attractR = ((this._mouthR || 6) * 3.6) + 54;
+        const attractR2 = attractR * attractR;
+        const maxPull = attractR * 0.42;
+        const nearR2 = (attractR * 0.55) ** 2;
+
+        const buckets = this._foodBuckets;
+        for (let b = 0; b < buckets.length; b++) buckets[b].length = 0;
+        const golden = this._foodGoldenBuf;
+        golden.length = 0;
+        const near = this._foodNearBuf;
+        near.length = 0;
+        for (let fi = 0; fi < foodList.length; fi += stride) {
+            const f = foodList[fi];
+            if (Math.abs(f.x - cx) > halfW || Math.abs(f.y - cy) > halfH) continue;
+
+            if (f.golden) {
+                golden.push(f);
+                continue;
+            }
+
+            let wx = f.x;
+            let wy = f.y;
+            if (mouthValid) {
+                const dxm = mouthX - wx;
+                const dym = mouthY - wy;
+                const dist2 = dxm * dxm + dym * dym;
+                if (dist2 < nearR2) {
+                    const pulled = this._applyFoodMagnet(wx, wy, mouthValid, mouthX, mouthY, attractR2, maxPull);
+                    wx = pulled.wx;
+                    wy = pulled.wy;
+                    near.push(f, wx, wy);
+                    continue;
+                }
+                const pulled = this._applyFoodMagnet(wx, wy, mouthValid, mouthX, mouthY, attractR2, maxPull);
+                wx = pulled.wx;
+                wy = pulled.wy;
+            }
+
+            const hueKey = Math.round((f.hue ?? 120) / 30) % 12;
+            const bucketIdx = f.deathDrop ? hueKey : hueKey + 12;
+            const { x: fx, y: fy } = toScreen(wx, wy);
+            const baseR = (f.radius || 3) * (f.deathDrop ? 1.15 : 0.82);
+            const screenR = Math.max(2.2, baseR * zoom * (f.deathDrop ? 1.25 : 1.0));
+            const batch = buckets[bucketIdx];
+            batch.push(fx, fy, screenR);
+        }
+
+        for (let h = 0; h < 12; h++) {
+            const batch = buckets[h];
+            if (!batch.length) continue;
+            ctx.fillStyle = `hsla(${h * 30}, 86%, 58%, ${ultra ? 0.58 : 0.68})`;
+            ctx.beginPath();
+            for (let i = 0; i < batch.length; i += 3) {
+                const r = batch[i + 2];
+                ctx.moveTo(batch[i] + r, batch[i + 1]);
+                ctx.arc(batch[i], batch[i + 1], r, 0, Math.PI * 2);
+            }
+            ctx.fill();
+        }
+
+        for (let h = 0; h < 12; h++) {
+            const batch = buckets[h + 12];
+            if (!batch.length) continue;
+            ctx.fillStyle = `hsla(${h * 30}, 72%, 54%, ${ultra ? 0.34 : 0.42})`;
+            ctx.beginPath();
+            for (let i = 0; i < batch.length; i += 3) {
+                const r = batch[i + 2];
+                ctx.moveTo(batch[i] + r, batch[i + 1]);
+                ctx.arc(batch[i], batch[i + 1], r, 0, Math.PI * 2);
+            }
+            ctx.fill();
+        }
+
+        for (let i = 0; i < near.length; i += 3) {
+            const f = near[i];
+            const { x: fx, y: fy } = toScreen(near[i + 1], near[i + 2]);
+            const hue = Math.round((f.hue ?? 120) / 12) * 12;
+            const screenR = Math.max(3.5, (f.radius || 3) * zoom * 1.35);
+            ctx.fillStyle = f.deathDrop
+                ? `hsla(${hue}, 90%, 62%, 0.82)`
+                : `hsla(${hue}, 78%, 58%, 0.62)`;
+            ctx.beginPath();
+            ctx.arc(fx, fy, screenR * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        near.length = 0;
+
+        if (golden.length) {
+            this._drawFoodDetailed(ctx, golden, toScreen, W, H, zoom, {
+                animate: golden.length <= 3,
+                foodStride: 1,
+                useSprites: golden.length <= 2 && this._quality >= 0.65,
+            });
+        }
+    }
+
+    _drawFoodDetailed(ctx, foodList, toScreen, W, H, zoom, opts = {}) {
         const now = performance.now();
         const cx = this.camera.x;
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const simpleFood = this._quality < 0.50;
-        const foodStride = this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
+        const animate = opts.animate !== false;
+        const useSprites = opts.useSprites !== false;
+        const foodStride = opts.foodStride ?? 1;
         const skipMagnet = this._quality < 0.55;
-        const skipWobble = false;
 
-        // Magnet: food within this world radius of the mouth drifts toward it.
         const mouthValid = !skipMagnet && this._mouthValid;
         const mouthX = this._mouthX;
         const mouthY = this._mouthY;
@@ -767,7 +908,6 @@ export class SlitherRenderer {
             const f = foodList[fi];
             if (Math.abs(f.x - cx) > halfW || Math.abs(f.y - cy) > halfH) continue;
 
-            // Per-food random phase so pulse/jiggle isn't synchronized across the field.
             if (f._phase == null) {
                 let h = 0;
                 const id = String(f.id ?? `${f.x},${f.y}`);
@@ -776,7 +916,6 @@ export class SlitherRenderer {
                 f._sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
             }
 
-            // Live world position with a tiny wobble + magnet pull toward the mouth.
             let wx = f.x;
             let wy = f.y;
 
@@ -786,41 +925,30 @@ export class SlitherRenderer {
             let sizeMul = 1;
             let alpha = 1;
 
-            if (!skipWobble) {
+            if (animate) {
                 if (isGolden) {
                     const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
                     sizeMul = 0.85 + pulse;
                     wx += Math.sin(now * 0.003 + f.y) * 6;
                     wy += Math.cos(now * 0.0035 + f.x) * 6;
                     alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
-                } else if (f.deathDrop) {
-                    sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
-                    sizeMul *= 1 + Math.sin(now * 0.0035 + f._phase) * 0.07;
-                    wx += Math.sin(now * 0.0022 + f._phase) * 1.4;
-                    wy += Math.cos(now * 0.0026 + f._phase * 1.3) * 1.4;
-                } else {
+                } else if (!f.deathDrop) {
                     sizeMul = f._sizeMul * (1 + Math.sin(now * 0.004 + f._phase) * 0.09);
                     wx += Math.sin(now * 0.0024 + f._phase) * 1.5;
                     wy += Math.cos(now * 0.0028 + f._phase * 1.3) * 1.5;
+                } else {
+                    sizeMul = 1.2 + ((f.radius || 3) - 2) * 0.12;
                 }
             } else if (f.deathDrop) {
-                sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
+                sizeMul = 1.2 + ((f.radius || 3) - 2) * 0.12;
             } else if (!isGolden) {
                 sizeMul = f._sizeMul;
             }
 
-            // Magnet attraction — pull toward the mouth, easing in as it gets closer.
             if (mouthValid) {
-                const dxm = mouthX - wx;
-                const dym = mouthY - wy;
-                const dist2 = dxm * dxm + dym * dym;
-                if (dist2 < attractR2 && dist2 > 0.01) {
-                    const dist = Math.sqrt(dist2);
-                    const t = 1 - dist / attractR;
-                    const pull = Math.min(t * t * maxPull, dist);
-                    wx += (dxm / dist) * pull;
-                    wy += (dym / dist) * pull;
-                }
+                const pulled = this._applyFoodMagnet(wx, wy, mouthValid, mouthX, mouthY, attractR2, maxPull);
+                wx = pulled.wx;
+                wy = pulled.wy;
             }
 
             let { x: fx, y: fy } = toScreen(wx, wy);
@@ -828,11 +956,13 @@ export class SlitherRenderer {
             const baseR = (f.radius || 3) * sizeMul;
             const screenR = Math.max(4.5, baseR * zoom * 1.65);
 
-            if (simpleFood && !isGolden) {
-                ctx.globalAlpha = f.deathDrop ? 0.85 : 0.55;
+            if (!useSprites || f.deathDrop) {
+                ctx.globalAlpha = f.deathDrop ? 0.82 : (isGolden ? alpha : 0.55);
                 ctx.fillStyle = f.deathDrop
-                    ? `hsla(${hue}, 95%, 62%, 0.75)`
-                    : `hsla(${hue}, 82%, 58%, 0.5)`;
+                    ? `hsla(${hue}, 90%, 60%, 0.78)`
+                    : isGolden
+                        ? `hsla(48, 100%, 68%, 0.9)`
+                        : `hsla(${hue}, 78%, 56%, 0.5)`;
                 ctx.beginPath();
                 ctx.arc(fx, fy, screenR * 0.55, 0, Math.PI * 2);
                 ctx.fill();
@@ -841,7 +971,7 @@ export class SlitherRenderer {
             }
 
             const spriteR = 4;
-            const sprite = this._foodSprite(hue, spriteR, isGolden, !!f.deathDrop);
+            const sprite = this._foodSprite(hue, spriteR, isGolden, false);
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
 
@@ -1384,6 +1514,11 @@ export class SlitherRenderer {
         else if (this._perfEma > 22) this._quality = Math.min(this._quality, Math.max(qFloor, 0.88));
         else if (this._perfEma > 18) this._quality = Math.min(this._quality, Math.max(qFloor, 0.94));
         else if (this._perfEma < 14) this._quality = Math.min(1, this._quality + 0.02);
+        if (this._foodDrawList.length >= 120) {
+            this._quality = Math.min(this._quality, this.isMobile ? 0.86 : 0.78);
+        } else if (this._foodDrawList.length >= 80) {
+            this._quality = Math.min(this._quality, this.isMobile ? 0.92 : 0.84);
+        }
         if (this._cashoutPerf) {
             this._quality = Math.min(this._quality, this.isMobile ? 0.92 : 0.86);
         }
