@@ -463,7 +463,8 @@ const DRAWERS = {
 
 export function drawGamemodePreview(ctx, W, H, mode) {
     const draw = DRAWERS[mode] || DRAWERS.agar;
-    const zoom = 1.32;
+    const ref = 360;
+    const zoom = Math.min(1.32, 1.32 * (Math.min(W, H) / ref));
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);

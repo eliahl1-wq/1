@@ -1,33 +1,43 @@
 import React, { useEffect, useRef } from 'react';
 import { drawGamemodePreview } from './gamemodePreviewDraw.js';
 
-const PREVIEW_W = 480;
-const PREVIEW_H = 480;
-
 export default function GamemodePreview({ mode, className = '' }) {
     const canvasRef = useRef(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        const wrap = canvas?.parentElement;
+        if (!canvas || !wrap) return;
 
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.round(PREVIEW_W * dpr);
-        canvas.height = Math.round(PREVIEW_H * dpr);
+        const paint = () => {
+            const w = wrap.clientWidth;
+            const h = wrap.clientHeight;
+            if (w < 2 || h < 2) return;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            canvas.style.width = `${w}px`;
+            canvas.style.height = `${h}px`;
 
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        drawGamemodePreview(ctx, PREVIEW_W, PREVIEW_H, mode);
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            drawGamemodePreview(ctx, w, h, mode);
+        };
+
+        const ro = new ResizeObserver(paint);
+        ro.observe(wrap);
+        paint();
+
+        return () => ro.disconnect();
     }, [mode]);
 
     return (
         <canvas
             ref={canvasRef}
             className={className}
-            width={PREVIEW_W}
-            height={PREVIEW_H}
             aria-hidden="true"
         />
     );

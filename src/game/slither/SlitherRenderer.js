@@ -135,6 +135,7 @@ export class SlitherRenderer {
         this._bgPattern = null;
         this._bgPatternScale = 0;
         this._loadBgTile();
+        this._touchSteering = false;
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
@@ -182,12 +183,14 @@ export class SlitherRenderer {
         this._onTouchMove = (e) => {
             if (!this._inputEnabled || this.spectatorMode) return;
             e.preventDefault();
+            this._touchSteering = true;
             const t = e.touches[0];
             if (t) this._setInputFromScreen(t.clientX, t.clientY);
         };
         this._onTouchStart = (e) => {
             if (!this._inputEnabled || this.spectatorMode) return;
             unlockGameAudio();
+            this._touchSteering = true;
             const t = e.touches[0];
             if (t) this._setInputFromScreen(t.clientX, t.clientY);
             const now = Date.now();
@@ -199,7 +202,10 @@ export class SlitherRenderer {
         };
         this._onTouchEnd = (e) => {
             if (!this._inputEnabled || this.spectatorMode) return;
-            if (!e?.touches || e.touches.length === 0) this.boost = false;
+            if (!e?.touches || e.touches.length === 0) {
+                this.boost = false;
+                this._touchSteering = false;
+            }
             this._emitInput?.();
         };
 
@@ -218,7 +224,7 @@ export class SlitherRenderer {
     resize() {
         const { width, height } = getGameScreenSize();
         const rawDpr = window.devicePixelRatio || 1;
-        this._dpr = this.isMobile ? Math.min(1.75, rawDpr) : Math.min(2, rawDpr);
+        this._dpr = this.isMobile ? Math.min(1.75, rawDpr) : Math.min(1.5, rawDpr);
         if (this._dpr < 1) this._dpr = 1;
         this.canvas.width = Math.round(width * this._dpr);
         this.canvas.height = Math.round(height * this._dpr);
@@ -551,7 +557,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, zoom) {
-        ctx.fillStyle = '#32323c';
+        ctx.fillStyle = '#202026';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getBgPattern(ctx);
@@ -566,7 +572,7 @@ export class SlitherRenderer {
             const margin = 240;
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.globalAlpha = 0.92;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
@@ -580,7 +586,7 @@ export class SlitherRenderer {
         const playW = brX - tlX;
         const playH = brY - tlY;
         ctx.save();
-        ctx.fillStyle = 'rgba(48, 12, 16, 0.74)';
+        ctx.fillStyle = 'rgba(56, 10, 14, 0.86)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.rect(tlX, tlY, playW, playH);
@@ -595,7 +601,7 @@ export class SlitherRenderer {
     }
 
     _drawCircularBackground(ctx, W, H, cx, cy, worldHalf, zoom, zone) {
-        ctx.fillStyle = '#32323c';
+        ctx.fillStyle = '#202026';
         ctx.fillRect(0, 0, W, H);
 
         const radius = zone?.radius ?? worldHalf;
@@ -617,13 +623,13 @@ export class SlitherRenderer {
             const margin = 240;
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.globalAlpha = 0.92;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
 
         ctx.save();
-        ctx.fillStyle = 'rgba(48, 12, 16, 0.74)';
+        ctx.fillStyle = 'rgba(56, 10, 14, 0.86)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2, true);
@@ -969,25 +975,7 @@ export class SlitherRenderer {
         }, Math.max(2, Math.round(dotR * 0.48)));
     }
 
-    /** Larger/darker ventral blob — belly shadow further below the spine. */
-    _getBodyVentralShadowDot(radius) {
-        const dotR = Math.max(5, Math.ceil(radius * 0.72));
-        const key = `vent_sh_v1|${dotR}`;
-        return this._getSprite(key, dotR * 2 + 24, (g, sz) => {
-            const c = sz / 2;
-            const grad = g.createRadialGradient(c, c, 0, c, c, dotR);
-            grad.addColorStop(0, 'rgba(0,0,0,0.58)');
-            grad.addColorStop(0.32, 'rgba(0,0,0,0.34)');
-            grad.addColorStop(0.62, 'rgba(0,0,0,0.12)');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            g.fillStyle = grad;
-            g.beginPath();
-            g.arc(c, c, dotR, 0, Math.PI * 2);
-            g.fill();
-        }, Math.max(3, Math.round(dotR * 0.55)));
-    }
-
-    /** Blurred flank + ventral shadow along the body — offset from spine, not on segments. */
+    /** Blurred flank shadow along the body — offset from spine, not on segments. */
     _blitBodySideShadow(ctx, bumps, count, radius, opts = {}) {
         if (count < 3) return;
         const q = opts.quality ?? 1;
@@ -995,17 +983,12 @@ export class SlitherRenderer {
         if (!isYou && q < 0.50) return;
 
         const sideDot = this._getBodySideShadowDot(radius);
-        const ventDot = this._getBodyVentralShadowDot(radius);
         const sideHalf = sideDot.width / 2;
-        const ventHalf = ventDot.width / 2;
         const sideOff = radius * 0.88;
-        const ventOff = radius * 1.02;
         const sideStride = Math.max(1, Math.round(count / (isYou ? 30 : 18)));
-        const ventStride = Math.max(1, Math.round(count / (isYou ? 26 : 15)));
 
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
-
         ctx.globalAlpha = isYou ? 0.26 : 0.18;
         for (let i = count - 1; i >= 0; i -= sideStride) {
             const p = bumps[i];
@@ -1018,19 +1001,6 @@ export class SlitherRenderer {
                 const sy = p.y + sign * perpY * sideOff;
                 ctx.drawImage(sideDot, (sx - sideHalf) | 0, (sy - sideHalf) | 0);
             }
-        }
-
-        // Ventral (underside) — darker band further below the dorsal/top side
-        ctx.globalAlpha = isYou ? 0.36 : 0.26;
-        for (let i = count - 1; i >= 0; i -= ventStride) {
-            const p = bumps[i];
-            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            const tangent = this._bumpTangent(bumps, i);
-            const perpX = Math.sin(tangent);
-            const perpY = -Math.cos(tangent);
-            const sx = p.x - perpX * ventOff;
-            const sy = p.y - perpY * ventOff;
-            ctx.drawImage(ventDot, (sx - ventHalf) | 0, (sy - ventHalf) | 0);
         }
 
         ctx.restore();
@@ -1273,7 +1243,11 @@ export class SlitherRenderer {
             arcLen += Math.sqrt(dx * dx + dy * dy);
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
-        const stampCap = Math.round((isYou ? (boosting ? 150 : 130) : (boosting ? 48 : 38)) * qMul);
+        const stampCap = Math.round((
+            isYou
+                ? (boosting ? (this.isMobile ? 150 : 118) : (this.isMobile ? 130 : 105))
+                : (boosting ? (this.isMobile ? 48 : 40) : (this.isMobile ? 38 : 32))
+        ) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
@@ -1432,32 +1406,33 @@ export class SlitherRenderer {
             ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
         }
 
-        // Mobile steering arrow (slither.io "arrow mode") — points just ahead of the
-        // head toward where the finger is steering the snake.
-        if (isYou && this.isMobile) {
+        // Mobile steering arrow — only while finger is on screen, further ahead of the head.
+        if (isYou && this.isMobile && this._touchSteering) {
             const am = Math.hypot(this.inputDx, this.inputDy);
-            const aang = am > 0.001 ? Math.atan2(this.inputDy, this.inputDx) : angle;
-            const size = Math.max(11, Math.min(22, headRadius * 0.95));
-            const gap = headRadius * 1.9 + size;
-            const ax = hx + Math.cos(aang) * gap;
-            const ay = hy + Math.sin(aang) * gap;
+            if (am > 0.001) {
+                const aang = Math.atan2(this.inputDy, this.inputDx);
+                const size = Math.max(11, Math.min(22, headRadius * 0.95));
+                const gap = headRadius * 3.5 + size * 1.35;
+                const ax = hx + Math.cos(aang) * gap;
+                const ay = hy + Math.sin(aang) * gap;
 
-            ctx.save();
-            ctx.translate(ax, ay);
-            ctx.rotate(aang);
-            ctx.globalAlpha = 0.9;
-            ctx.beginPath();
-            ctx.moveTo(size, 0);
-            ctx.lineTo(-size * 0.7, size * 0.7);
-            ctx.lineTo(-size * 0.32, 0);
-            ctx.lineTo(-size * 0.7, -size * 0.7);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(255,255,255,0.92)';
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-            ctx.stroke();
-            ctx.restore();
+                ctx.save();
+                ctx.translate(ax, ay);
+                ctx.rotate(aang);
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath();
+                ctx.moveTo(size, 0);
+                ctx.lineTo(-size * 0.7, size * 0.7);
+                ctx.lineTo(-size * 0.32, 0);
+                ctx.lineTo(-size * 0.7, -size * 0.7);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+                ctx.stroke();
+                ctx.restore();
+            }
         }
 
         ctx.restore();
@@ -1483,11 +1458,17 @@ export class SlitherRenderer {
         const nowMs = Date.now();
         this._holdActive = this._isHoldActive();
         this._cashoutActive = this._isCashoutActive(nowMs);
-        const qFloor = this.isMobile ? 0.88 : 0.68;
-        if (this._perfEma > 28) this._quality = Math.max(qFloor, 0.78);
-        else if (this._perfEma > 22) this._quality = Math.min(this._quality, Math.max(qFloor, 0.88));
-        else if (this._perfEma > 18) this._quality = Math.min(this._quality, Math.max(qFloor, 0.94));
+        const qFloor = this.isMobile ? 0.88 : 0.76;
+        if (this._perfEma > 24) this._quality = Math.max(qFloor, this.isMobile ? 0.78 : 0.72);
+        else if (this._perfEma > 20) this._quality = Math.min(this._quality, Math.max(qFloor, this.isMobile ? 0.88 : 0.82));
+        else if (this._perfEma > 16) this._quality = Math.min(this._quality, Math.max(qFloor, this.isMobile ? 0.94 : 0.88));
         else if (this._perfEma < 14) this._quality = Math.min(1, this._quality + 0.02);
+
+        if (!this.isMobile && this._quality < 0.88) {
+            this.ctx.imageSmoothingQuality = 'low';
+        } else {
+            this.ctx.imageSmoothingQuality = 'medium';
+        }
 
         ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
         ctx.globalAlpha = 1;
