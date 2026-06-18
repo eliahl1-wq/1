@@ -885,17 +885,17 @@ export class SlitherRenderer {
     }
 
     /**
-     * Body-local tube — lateral shade, soft dorsal band, wide rim + trailing seam.
-     * Rotated per stamp so light moves with the body; spine pass is only a faint accent.
+     * Body-local tube — soft lateral shade + feathered rim. Dorsal highlight is spine-only.
      */
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.22, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-3 * k))));
-        baseGrad.addColorStop(0.7, toHex(col));
-        baseGrad.addColorStop(0.94, toHex(shadeColor(col, Math.round(-18 * k))));
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.25, c, c, rPx * 1.02);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
+        baseGrad.addColorStop(0.72, toHex(col));
+        baseGrad.addColorStop(0.9, toHex(shadeColor(col, Math.round(-14 * k))));
+        baseGrad.addColorStop(0.97, toHex(shadeColor(col, Math.round(-20 * k))));
         baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-24 * k))));
 
         g.fillStyle = baseGrad;
@@ -904,53 +904,47 @@ export class SlitherRenderer {
         g.fill();
 
         const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -52), 0.46 * k));
-        tubeGrad.addColorStop(0.22, rgb(shadeColor(col, -36), 0.2 * k));
-        tubeGrad.addColorStop(0.4, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.6, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.78, rgb(shadeColor(col, -36), 0.2 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -52), 0.46 * k));
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -46), 0.26 * k));
+        tubeGrad.addColorStop(0.14, rgb(shadeColor(col, -32), 0.14 * k));
+        tubeGrad.addColorStop(0.3, rgb(shadeColor(col, -18), 0.05 * k));
+        tubeGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.7, rgb(shadeColor(col, -18), 0.05 * k));
+        tubeGrad.addColorStop(0.86, rgb(shadeColor(col, -32), 0.14 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -46), 0.26 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
 
-        const dorsalGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
-        dorsalGrad.addColorStop(0, 'rgba(0,0,0,0)');
-        dorsalGrad.addColorStop(0.4, 'rgba(0,0,0,0)');
-        dorsalGrad.addColorStop(0.5, rgb(shadeColor(col, 14), 0.045 * k));
-        dorsalGrad.addColorStop(0.6, 'rgba(0,0,0,0)');
-        dorsalGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        const seamGrad = g.createLinearGradient(c - rPx, c, c + rPx * 0.55, c);
+        seamGrad.addColorStop(0, rgb(shadeColor(col, -28), 0.05 * k));
+        seamGrad.addColorStop(0.25, rgb(shadeColor(col, -16), 0.02 * k));
+        seamGrad.addColorStop(0.55, 'rgba(0,0,0,0)');
+        seamGrad.addColorStop(1, 'rgba(0,0,0,0)');
 
-        g.fillStyle = dorsalGrad;
+        g.fillStyle = seamGrad;
         g.fill();
 
-        const trailGrad = g.createLinearGradient(c - rPx, c, c + rPx * 0.35, c);
-        trailGrad.addColorStop(0, rgb(shadeColor(col, -36), 0.1 * k));
-        trailGrad.addColorStop(0.42, 'rgba(0,0,0,0)');
-        trailGrad.addColorStop(1, 'rgba(0,0,0,0)');
-
-        g.fillStyle = trailGrad;
-        g.fill();
-
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.5, c, c, rPx * 1.0);
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.38, c, c, rPx * 1.06);
         edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.55, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.88, rgb(shadeColor(col, -26), 0.04 * k));
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -30), 0.09 * k));
+        edgeShadow.addColorStop(0.65, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(0.82, rgb(shadeColor(col, -22), 0.03 * k));
+        edgeShadow.addColorStop(0.94, rgb(shadeColor(col, -26), 0.05 * k));
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -28), 0.06 * k));
         g.fillStyle = edgeShadow;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
     }
 
-    /** Faint spine accent — narrow, heavily smeared; segments carry the main dorsal light. */
+    /** Thin bright dorsal core with wide soft falloff — one continuous highlight. */
     _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1) {
         if (count < 2) return;
         const col = parseColor(cs);
+        const hi = shadeColor(col, 48);
         const k = alphaMul;
 
-        const trace = (lineW, color) => {
-            ctx.strokeStyle = color;
+        const trace = (lineW, alpha) => {
+            ctx.strokeStyle = rgb(hi, alpha * k);
             ctx.lineWidth = lineW;
             ctx.beginPath();
             let started = false;
@@ -967,11 +961,13 @@ export class SlitherRenderer {
         };
 
         ctx.save();
-        ctx.globalCompositeOperation = 'soft-light';
+        ctx.globalCompositeOperation = 'lighter';
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        trace(radius * 0.42, rgb(shadeColor(col, 20), 0.05 * k));
-        trace(radius * 0.18, rgb(shadeColor(col, 12), 0.055 * k));
+        trace(radius * 0.62, 0.028);
+        trace(radius * 0.38, 0.045);
+        trace(radius * 0.2, 0.065);
+        trace(radius * 0.08, 0.08);
         ctx.restore();
     }
 
@@ -998,15 +994,17 @@ export class SlitherRenderer {
         ctx.translate(x, y);
         ctx.rotate(tangent);
         ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = Math.min(0.38, 0.12 + turn.strength * 0.26);
+        ctx.globalAlpha = Math.min(0.28, 0.08 + turn.strength * 0.18);
         const g = ctx.createLinearGradient(0, -r, 0, r);
         if (turn.side > 0) {
             g.addColorStop(0, 'rgba(0,0,0,0)');
-            g.addColorStop(0.42, 'rgba(0,0,0,0)');
-            g.addColorStop(1, 'rgba(0,0,0,0.72)');
+            g.addColorStop(0.5, 'rgba(0,0,0,0)');
+            g.addColorStop(0.78, 'rgba(0,0,0,0.18)');
+            g.addColorStop(1, 'rgba(0,0,0,0.42)');
         } else {
-            g.addColorStop(0, 'rgba(0,0,0,0.72)');
-            g.addColorStop(0.58, 'rgba(0,0,0,0)');
+            g.addColorStop(0, 'rgba(0,0,0,0.42)');
+            g.addColorStop(0.22, 'rgba(0,0,0,0.18)');
+            g.addColorStop(0.5, 'rgba(0,0,0,0)');
             g.addColorStop(1, 'rgba(0,0,0,0)');
         }
         ctx.fillStyle = g;
@@ -1050,11 +1048,11 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v30|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v31|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v30|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.05);
+            pair.boostBody = this._getSprite(`pr_norm_v31|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
             });
         }
 
@@ -1162,7 +1160,7 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.30);
+        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.35);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.9 : 1);
