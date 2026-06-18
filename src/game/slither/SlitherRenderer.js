@@ -107,15 +107,13 @@ export class SlitherRenderer {
         this._resizeToCanvas = options.resizeToCanvas === true;
         this._externalCameraGetter = null;
         this._sortDirty = true;
-        this._pendingTick = null;
-        this._tickApplyScheduled = false;
         this._foodAnimCache = new Map();
         this._mouseRafQueued = false;
         this._lastMouseX = 0;
         this._lastMouseY = 0;
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
-        this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        this.ctx = canvas.getContext('2d', { alpha: false });
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.imageSmoothingQuality = 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
@@ -303,34 +301,6 @@ export class SlitherRenderer {
     }
 
     updateState(tick) {
-        if (!this._pendingTick) {
-            this._pendingTick = tick;
-        } else {
-            const prev = this._pendingTick;
-            this._pendingTick = {
-                ...prev,
-                ...tick,
-                snakes: tick.snakes ?? prev.snakes,
-                food: tick.food ?? prev.food,
-                minimap: tick.minimap ?? prev.minimap,
-                zone: tick.zone !== undefined ? tick.zone : prev.zone,
-                you: tick.you !== undefined ? tick.you : prev.you,
-                worldHalf: tick.worldHalf ?? prev.worldHalf,
-                balance: tick.balance ?? prev.balance,
-                dollarBalance: tick.dollarBalance ?? prev.dollarBalance,
-            };
-        }
-        if (this._tickApplyScheduled) return;
-        this._tickApplyScheduled = true;
-        queueMicrotask(() => {
-            this._tickApplyScheduled = false;
-            const merged = this._pendingTick;
-            this._pendingTick = null;
-            if (merged) this._commitTickState(merged);
-        });
-    }
-
-    _commitTickState(tick) {
         if (tick.snakes) {
             this.targetSnakes = tick.snakes;
             this._sortDirty = true;
