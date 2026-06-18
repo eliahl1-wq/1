@@ -66,8 +66,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 62%, 51%) — muted slither pastels
-    const s = 0.62, l = 0.51;
+    // HSL(h, 48%, 51%) — softer, less vivid slither pastels
+    const s = 0.48, l = 0.51;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -510,20 +510,6 @@ export class SlitherRenderer {
         return cv;
     }
 
-    _ensureHlBlurCanvas(w, h) {
-        const bw = Math.max(2, Math.ceil(w));
-        const bh = Math.max(2, Math.ceil(h));
-        if (!this._hlBlurCv) {
-            this._hlBlurCv = document.createElement('canvas');
-            this._hlBlurCtx = this._hlBlurCv.getContext('2d', { alpha: true });
-        }
-        if (this._hlBlurCv.width < bw || this._hlBlurCv.height < bh) {
-            this._hlBlurCv.width = bw;
-            this._hlBlurCv.height = bh;
-        }
-        return { cv: this._hlBlurCv, ctx: this._hlBlurCtx, w: bw, h: bh };
-    }
-
     _loadBgTile() {
         const img = new Image();
         img.onload = () => {
@@ -764,8 +750,8 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const simpleFood = this._quality < 0.45;
-        const foodStride = this._quality < 0.38 ? 2 : 1;
+        const simpleFood = this._quality < 0.50;
+        const foodStride = this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
         const skipMagnet = this._quality < 0.55;
         const skipWobble = false;
 
@@ -911,69 +897,76 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.28, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
-        baseGrad.addColorStop(0.78, toHex(col));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-16 * k))));
+        // Base fill — radial gradient from slightly lighter center to darker rim
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.15, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(8 * k))));
+        baseGrad.addColorStop(0.55, toHex(col));
+        baseGrad.addColorStop(0.82, toHex(shadeColor(col, Math.round(-12 * k))));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-28 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -38), 0.17 * k));
-        tubeGrad.addColorStop(0.1, rgb(shadeColor(col, -26), 0.1 * k));
-        tubeGrad.addColorStop(0.22, rgb(shadeColor(col, -14), 0.04 * k));
-        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.78, rgb(shadeColor(col, -14), 0.04 * k));
-        tubeGrad.addColorStop(0.9, rgb(shadeColor(col, -26), 0.1 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -38), 0.17 * k));
+        // Tube lateral shading — stronger shadows on sides for 3D depth
+        const tubeGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -52), 0.28 * k));
+        tubeGrad.addColorStop(0.12, rgb(shadeColor(col, -32), 0.14 * k));
+        tubeGrad.addColorStop(0.28, rgb(shadeColor(col, -12), 0.04 * k));
+        tubeGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.72, rgb(shadeColor(col, -12), 0.04 * k));
+        tubeGrad.addColorStop(0.88, rgb(shadeColor(col, -32), 0.14 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -52), 0.28 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
+
+        // Subtle dorsal highlight — soft, broad glow on top for roundness
+        const hlGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        hlGrad.addColorStop(0, rgb(shadeColor(col, 55), 0.13 * k));
+        hlGrad.addColorStop(0.18, rgb(shadeColor(col, 40), 0.08 * k));
+        hlGrad.addColorStop(0.38, 'rgba(255,255,255,0)');
+        hlGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+        g.fillStyle = hlGrad;
+        g.fill();
     }
 
-    /** Thin dorsal highlight — soft, faded, and blurred reflection. */
+    /** Cached pre-blurred spine highlight dot — stamped along spine (no per-frame blur). */
+    _getSpineHighlightDot(radius, cs) {
+        const dotR = Math.max(3, Math.ceil(radius * 0.38));
+        const key = `hl_dot_v3|${cs}|${dotR}`;
+        return this._getSprite(key, dotR * 2 + 6, (g, sz) => {
+            const c = sz / 2;
+            const col = parseColor(cs);
+            const hi = shadeColor(col, 62);
+            const grad = g.createRadialGradient(c, c, 0, c, c, dotR);
+            grad.addColorStop(0, rgb(hi, 0.22));
+            grad.addColorStop(0.35, rgb(hi, 0.10));
+            grad.addColorStop(0.7, rgb(hi, 0.03));
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            g.fillStyle = grad;
+            g.beginPath();
+            g.arc(c, c, dotR, 0, Math.PI * 2);
+            g.fill();
+        }, Math.max(1, Math.round(dotR * 0.4)));
+    }
+
+    /** Stamp pre-blurred highlight dots along the spine — cheap, no per-frame blur. */
     _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1, opts = {}) {
-        if (count < 2) return;
-        const col = parseColor(cs);
-        const hi = shadeColor(col, 62);
-        const k = alphaMul;
-
-        const tracePath = (targetCtx) => {
-            targetCtx.beginPath();
-            let started = false;
-            for (let i = count - 1; i >= 0; i--) {
-                const p = bumps[i];
-                if (!started) {
-                    targetCtx.moveTo(p.x, p.y);
-                    started = true;
-                } else {
-                    targetCtx.lineTo(p.x, p.y);
-                }
-            }
-            return started;
-        };
-
+        if (count < 3) return;
+        const dot = this._getSpineHighlightDot(radius, cs);
+        const half = dot.width / 2;
+        const stride = Math.max(1, Math.round(count / 40));
         ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
         ctx.globalCompositeOperation = 'lighter';
-
-        // 1. Draw wide, smeared-out reflection glow
-        ctx.filter = 'blur(8px)';
-        ctx.strokeStyle = rgb(hi, 0.14 * k);
-        ctx.lineWidth = radius * 0.45;
-        if (tracePath(ctx)) ctx.stroke();
-
-        // 2. Draw slightly tighter, soft white/gold reflection
-        ctx.filter = 'blur(3px)';
-        ctx.strokeStyle = rgb(hi, 0.12 * k);
-        ctx.lineWidth = radius * 0.20;
-        if (tracePath(ctx)) ctx.stroke();
-
+        ctx.globalAlpha = 0.35 * alphaMul;
+        for (let i = count - 1; i >= 0; i -= stride) {
+            const p = bumps[i];
+            if (p.x < -60 || p.y < -60 || p.x > this.W + 60 || p.y > this.H + 60) continue;
+            ctx.drawImage(dot, (p.x - half) | 0, (p.y - half) | 0);
+        }
         ctx.restore();
     }
 
@@ -1177,8 +1170,8 @@ export class SlitherRenderer {
             arcLen += Math.sqrt(dx * dx + dy * dy);
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
-        const stampCap = Math.round((isYou ? (boosting ? 150 : 130) : (boosting ? 64 : 52)) * qMul);
-        const maxStamps = Math.min(Math.max(neededStamps, 8), stampCap);
+        const stampCap = Math.round((isYou ? (boosting ? 150 : 130) : (boosting ? 48 : 38)) * qMul);
+        const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
             ctx.restore();
@@ -1199,8 +1192,8 @@ export class SlitherRenderer {
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
-            glow: isYou && !cashoutPerf && q >= 0.5,
-            boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
+            glow: isYou && !cashoutPerf && q >= 0.55,
+            boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.6,
             trailGlow: isYou && boosting && !cashoutPerf,
         };
         const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
@@ -1386,11 +1379,11 @@ export class SlitherRenderer {
         this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
         const nowMs = Date.now();
         this._cashoutPerf = this._isCashoutActive(nowMs);
-        const qFloor = this.isMobile ? 0.88 : 0.72;
-        if (this._perfEma > 32) this._quality = Math.max(qFloor, 0.84);
-        else if (this._perfEma > 24) this._quality = Math.min(this._quality, Math.max(qFloor, 0.94));
-        else if (this._perfEma > 20) this._quality = Math.min(this._quality, Math.max(qFloor, 0.97));
-        else if (this._perfEma < 15) this._quality = Math.min(1, this._quality + 0.025);
+        const qFloor = this.isMobile ? 0.88 : 0.68;
+        if (this._perfEma > 28) this._quality = Math.max(qFloor, 0.78);
+        else if (this._perfEma > 22) this._quality = Math.min(this._quality, Math.max(qFloor, 0.88));
+        else if (this._perfEma > 18) this._quality = Math.min(this._quality, Math.max(qFloor, 0.94));
+        else if (this._perfEma < 14) this._quality = Math.min(1, this._quality + 0.02);
         if (this._cashoutPerf) {
             this._quality = Math.min(this._quality, this.isMobile ? 0.92 : 0.86);
         }
@@ -1428,9 +1421,18 @@ export class SlitherRenderer {
             if (snake.isYou) {
                 rs.drawSpine = spineBase;
             } else {
-                const dense = densifySpine(spineBase, spacing * 0.45);
-                const targetArc = continuousArcLength(snake.sct || spineBase.length, snake.fam ?? 0, spacing);
-                rs.drawSpine = fitSpineToArcLength(dense, targetArc);
+                // Cache densified spine — only recompute when spine actually changes
+                const head = spineBase[0];
+                const spineKey = head ? `${head.x | 0},${head.y | 0},${spineBase.length}` : '';
+                if (rs._denseKey !== spineKey) {
+                    rs._denseKey = spineKey;
+                    const dense = densifySpine(spineBase, spacing * 0.45);
+                    const targetArc = continuousArcLength(snake.sct || spineBase.length, snake.fam ?? 0, spacing);
+                    rs.drawSpine = fitSpineToArcLength(dense, targetArc);
+                    rs._cachedDrawSpine = rs.drawSpine;
+                } else {
+                    rs.drawSpine = rs._cachedDrawSpine || spineBase;
+                }
             }
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);
