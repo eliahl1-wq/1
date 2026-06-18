@@ -872,31 +872,41 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        // Shift highlight slightly along local axes to create a prominent dorsal line that follows the body
-        const highlightX = c - rPx * 0.05;
-        const highlightY = c - rPx * 0.15;
+        // Radial gradient for the base color + bright highlight on the spine
+        // Keep the outer edge very close to the base color so overlapping circles blend seamlessly
+        const highlightX = c;
+        const highlightY = c - rPx * 0.08;
 
         const baseGrad = g.createRadialGradient(
             highlightX, highlightY, rPx * 0.02,
             c, c, rPx * 1.05
         );
 
-        // Brighter, more visible matte highlight
-        const brightColor = toHex(shadeColor(col, Math.round(110 * k)));
-        const lightColor = toHex(shadeColor(col, Math.round(45 * k)));
-        // Deeper, softer shadows on the sides to enhance the cylindrical 3D look
-        const shadowColor = toHex(shadeColor(col, Math.round(-30 * k)));
-        const darkColor = toHex(shadeColor(col, Math.round(-52 * k)));
+        const brightColor = toHex(shadeColor(col, Math.round(135 * k)));
+        const lightColor = toHex(shadeColor(col, Math.round(65 * k)));
+        const softEdgeColor = toHex(shadeColor(col, Math.round(-8 * k)));
 
-        baseGrad.addColorStop(0, brightColor); // Brighter highlight center
-        baseGrad.addColorStop(0.24, lightColor); // Soft glow transition
-        baseGrad.addColorStop(0.60, toHex(col)); // Base body color
-        baseGrad.addColorStop(0.85, shadowColor); // Deeper shading on the sides
-        baseGrad.addColorStop(1, darkColor); // Dark silhouette outline
+        baseGrad.addColorStop(0, '#ffffff'); // Shiny highlight core
+        baseGrad.addColorStop(0.12, brightColor); // Strong shiny highlight
+        baseGrad.addColorStop(0.38, lightColor); // Soft transition
+        baseGrad.addColorStop(0.72, toHex(col)); // Base body color
+        baseGrad.addColorStop(1, softEdgeColor); // Muted edge to let segments blend smoothly
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        // Linear gradient (tube shader) to shade the left and right sides of the snake body
+        const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -48), 0.32 * k)); // Soft dark shadow on side
+        tubeGrad.addColorStop(0.18, rgb(shadeColor(col, -24), 0.16 * k));
+        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.82, rgb(shadeColor(col, -24), 0.16 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -48), 0.32 * k)); // Soft dark shadow on other side
+
+        g.fillStyle = tubeGrad;
         g.fill();
     }
 
