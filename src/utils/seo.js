@@ -58,14 +58,14 @@ export const SEO = {
         path: '/',
     },
     agar: {
-        tabTitle: 'AgarStake | Agar',
-        description: 'Play Agar.io on AgarStake. Stake Solana, grow your blob, dominate rivals, and cash out crypto instantly.',
+        tabTitle: 'AgarStake | Play Agar with Real Money',
+        description: 'Play Agar.io for real money on AgarStake. Stake Solana, grow your blob, dominate rivals, and cash out crypto instantly.',
         keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
         path: '/agar',
     },
     slither: {
-        tabTitle: 'AgarStake | Slither',
-        description: 'Play Slither.io on AgarStake. Stake Solana, grow your snake, trap opponents, and cash out instantly.',
+        tabTitle: 'AgarStake | Play Slither with Real Money',
+        description: 'Play Slither.io for real money on AgarStake. Stake Solana, grow your snake, trap opponents, and cash out instantly.',
         keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
         path: '/slither',
     },

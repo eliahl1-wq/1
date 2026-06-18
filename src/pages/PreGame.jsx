@@ -267,9 +267,8 @@ export default function PreGame() {
             setPageSeo(SEO.slither);
             return;
         }
-        const base = selectedMode.replace(/^br-/, '');
-        setPageSeo(base === 'slither' ? SEO.preGameSlither : SEO.preGameAgar);
-    }, [selectedMode, location.pathname]);
+        setPageSeo(SEO.home);
+    }, [location.pathname]);
 
     useEffect(() => {
         if (publicKey && !withdrawAddress) setWithdrawAddress(publicKey.toBase58());
