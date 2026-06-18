@@ -141,6 +141,7 @@ export class SlitherRenderer {
         this.boost = false;
         this._inputEnabled = true;
         this.spectatorMode = false;
+        this.hideOverlays = false;
         this._inputEmitQueued = false;
         this._lastTapAt = 0;
         this.running = false;
@@ -378,6 +379,10 @@ export class SlitherRenderer {
             if (camera.zoom != null) this.zoom = camera.zoom;
             this._cameraInit = true;
         }
+    }
+
+    setHideOverlays(hide) {
+        this.hideOverlays = !!hide;
     }
 
     /**
@@ -1390,7 +1395,7 @@ export class SlitherRenderer {
             }
         }
 
-        if (snake.name && isYou) {
+        if (snake.name && isYou && !this.hideOverlays) {
             ctx.fillStyle = 'rgba(255,255,255,0.95)';
             ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
             ctx.textAlign = 'center';
@@ -1594,7 +1599,7 @@ export class SlitherRenderer {
         }
 
         // Balance badge + cashout rings on your snake head
-        if (me?.segments?.[0]) {
+        if (me?.segments?.[0] && !this.hideOverlays) {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
@@ -1618,7 +1623,7 @@ export class SlitherRenderer {
             );
         }
 
-        if (me?.segments?.[0] || this.spectatorMode) {
+        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
             if ((this._minimapFrame++ & 3) === 0 && !this._cashoutActive) {

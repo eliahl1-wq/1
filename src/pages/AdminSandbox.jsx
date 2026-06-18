@@ -38,6 +38,7 @@ export default function AdminSandbox() {
     const agarDataRef = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], zone: null });
     const animRef = useRef(null);
     const hasJoinedRef = useRef(false);
+    const hideOverlaysRef = useRef(false);
 
     const [mode, setMode] = useState('slither');
     const [connected, setConnected] = useState(false);
@@ -58,15 +59,27 @@ export default function AdminSandbox() {
     const [staticWorms, setStaticWorms] = useState([]);
     const [selectedWorm, setSelectedWorm] = useState(null);
     const [editMode, setEditMode] = useState(false);
+    const [hideOverlays, setHideOverlays] = useState(false);
     const [wormX, setWormX] = useState(0);
     const [wormY, setWormY] = useState(0);
     const [wormSize, setWormSize] = useState(8);
     const [wormAngle, setWormAngle] = useState(0);
     const [agarZone, setAgarZone] = useState(null);
+    const [sessionEpoch, setSessionEpoch] = useState(0);
+    const [restarting, setRestarting] = useState(false);
 
     const sendControl = useCallback((action, params = {}) => {
         socketRef.current?.emit('sandboxControl', { token, mode, action, params });
     }, [token, mode]);
+
+    const resetLocalSandboxState = useCallback(() => {
+        agarDataRef.current = { player: {}, users: [], food: [], viruses: [], ejected: [], zone: null };
+        setSandboxState(null);
+        setStaticWorms([]);
+        setSelectedWorm(null);
+        setAgarZone(null);
+        setPaused(false);
+    }, []);
 
     const disconnectSocket = useCallback(() => {
         if (animRef.current) cancelAnimationFrame(animRef.current);
@@ -83,6 +96,26 @@ export default function AdminSandbox() {
         setConnected(false);
         setGameReady(false);
     }, []);
+
+    const handleAbort = useCallback(() => {
+        if (!window.confirm('Avbryt och starta om sandboxen helt? Allt raderas, du kopplas från och en ny session startas.')) {
+            return;
+        }
+        setRestarting(true);
+        setGameReady(false);
+        const finishAbort = () => {
+            disconnectSocket();
+            resetLocalSandboxState();
+            setSessionEpoch((n) => n + 1);
+            setTimeout(() => setRestarting(false), 400);
+        };
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('sandboxControl', { token, mode, action: 'abort' });
+            setTimeout(finishAbort, 120);
+        } else {
+            finishAbort();
+        }
+    }, [token, mode, disconnectSocket, resetLocalSandboxState]);
 
     const startAgarLoop = useCallback(() => {
         const canvas = canvasRef.current;
@@ -147,13 +180,24 @@ export default function AdminSandbox() {
                 });
             });
             if (cellsToDraw.length) {
-                renderUtils.drawCells(cellsToDraw, { border: 6 * zoom, textBorderSize: 3 * zoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
+                if (hideOverlaysRef.current) {
+                    for (const cell of cellsToDraw) {
+                        renderUtils.drawOrganicCell(cell, borders, graph);
+                    }
+                } else {
+                    renderUtils.drawCells(cellsToDraw, { border: 6 * zoom, textBorderSize: 3 * zoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
+                }
             }
 
             animRef.current = requestAnimationFrame(loop);
         };
         animRef.current = requestAnimationFrame(loop);
     }, [agarZone]);
+
+    useEffect(() => {
+        hideOverlaysRef.current = hideOverlays;
+        rendererRef.current?.setHideOverlays(hideOverlays);
+    }, [hideOverlays]);
 
     useEffect(() => {
         if (!user?.isAdmin || !token) return undefined;
@@ -182,6 +226,7 @@ export default function AdminSandbox() {
         if (mode === 'slither') {
             const renderer = new SlitherRenderer(canvas);
             rendererRef.current = renderer;
+            renderer.setHideOverlays(hideOverlaysRef.current);
             renderer.start();
             renderer.setInputEmitter(() => {
                 if (socketRef.current?.connected && rendererRef.current) {
@@ -265,6 +310,15 @@ export default function AdminSandbox() {
         });
 
         socket.on('sandboxStaticWorms', (worms) => setStaticWorms(worms || []));
+        socket.on('sandboxAborted', () => {
+            disconnectSocket();
+            resetLocalSandboxState();
+            setGameReady(false);
+            setRestarting(true);
+            setSessionEpoch((n) => n + 1);
+            setTimeout(() => setRestarting(false), 400);
+        });
+
         socket.on('error', (msg) => console.error('Sandbox error:', msg));
         socket.on('disconnect', () => setConnected(false));
 
@@ -306,7 +360,7 @@ export default function AdminSandbox() {
             window.removeEventListener('keydown', onSplit);
             disconnectSocket();
         };
-    }, [user, token, mode, disconnectSocket, startAgarLoop, editMode, selectedWorm, sendControl]);
+    }, [user, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, editMode, selectedWorm, sendControl, resetLocalSandboxState]);
 
     const switchMode = (newMode) => {
         if (newMode === mode) return;
@@ -361,6 +415,14 @@ export default function AdminSandbox() {
                     </p>
 
                     <ControlSection title="Playback">
+                        <button
+                            type="button"
+                            className={`ui-btn sandbox-full-btn ${hideOverlays ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                            onClick={() => setHideOverlays(v => !v)}
+                        >
+                            {hideOverlays ? 'Show UI overlays' : 'Hide UI overlays'}
+                        </button>
+                        <p className="sandbox-hint">Döljer balance, nickname och minimap — bra för screenshots.</p>
                         <div className="sandbox-btn-row">
                             <button
                                 type="button"
@@ -553,6 +615,14 @@ export default function AdminSandbox() {
                         >
                             Clear sandbox
                         </button>
+                        <button
+                            type="button"
+                            className="ui-btn ui-btn-abort sandbox-full-btn"
+                            onClick={handleAbort}
+                        >
+                            Abort &amp; restart
+                        </button>
+                        <p className="sandbox-hint">Abort kopplar från, raderar allt (agar + slither) och startar en helt ny session — använd om det laggar eller kraschar.</p>
                     </ControlSection>
                 </aside>
 
@@ -560,7 +630,7 @@ export default function AdminSandbox() {
                     <canvas ref={canvasRef} className="sandbox-canvas" />
                     {!gameReady && (
                         <div className="sandbox-overlay">
-                            <p>Connecting to sandbox…</p>
+                            <p>{restarting ? 'Startar om sandbox…' : 'Connecting to sandbox…'}</p>
                         </div>
                     )}
                 </main>
@@ -681,6 +751,15 @@ export default function AdminSandbox() {
                     background: rgba(220, 50, 50, 0.2) !important;
                     border-color: rgba(220, 50, 50, 0.4) !important;
                     color: #ff6b6b !important;
+                }
+                .ui-btn-abort {
+                    background: rgba(180, 40, 40, 0.35) !important;
+                    border-color: rgba(255, 80, 80, 0.55) !important;
+                    color: #ff9999 !important;
+                    font-weight: 700;
+                }
+                .ui-btn-abort:hover {
+                    background: rgba(200, 50, 50, 0.5) !important;
                 }
             `}</style>
         </div>
