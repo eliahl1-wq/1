@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { extendSpineTail, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
+import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 function parseColor(hex) {
@@ -1087,7 +1087,7 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || 6.2) / 6.2);
         const bodyRadiusWorld = snake.radius || (6.2 * sc);
-        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.28);
+        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.26);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.9 : 1);
@@ -1346,9 +1346,13 @@ export class SlitherRenderer {
             rs.segments = s ? s.segments : snake.segments;
             const spacing = 3.6 * rs.sc;
             const spineBase = (s?.drawSpine?.length ? s.drawSpine : rs.segments);
-            rs.drawSpine = (!snake.isYou && (snake.fam ?? 0) > 0.01)
-                ? extendSpineTail(spineBase, snake.fam, spacing)
-                : spineBase;
+            if (snake.isYou) {
+                rs.drawSpine = spineBase;
+            } else {
+                const dense = densifySpine(spineBase, spacing * 0.45);
+                const targetArc = continuousArcLength(snake.sct || spineBase.length, snake.fam ?? 0, spacing);
+                rs.drawSpine = fitSpineToArcLength(dense, targetArc);
+            }
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);
         }

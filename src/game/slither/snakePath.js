@@ -196,33 +196,117 @@ export function continuousSc(sct, fam = 0) {
     return Math.min(MAX_SC, 1 + (Math.max(2, sct) - 2 + Math.max(0, fam)) / SC_DIV);
 }
 
+export function continuousArcLength(sct, fam, spacing) {
+    const sp = spacing ?? SEG_SEP * continuousSc(sct, fam);
+    return Math.max(sp, (Math.max(1, sct) - 1 + Math.max(0, fam)) * sp);
+}
+
+function spineArcLength(segments) {
+    let arc = 0;
+    for (let i = 1; i < segments.length; i++) {
+        arc += dist(segments[i - 1].x, segments[i - 1].y, segments[i].x, segments[i].y);
+    }
+    return arc;
+}
+
+/** Trim or extend a spine polyline to an exact arc length (head at index 0). */
+export function fitSpineToArcLength(segments, targetArc) {
+    if (!segments?.length || targetArc <= 0) return segments;
+    const currentArc = spineArcLength(segments);
+    if (Math.abs(currentArc - targetArc) < 0.08) return segments;
+
+    if (currentArc > targetArc) {
+        const out = [{ x: segments[0].x, y: segments[0].y }];
+        let remain = targetArc;
+        for (let i = 1; i < segments.length && remain > 1e-4; i++) {
+            const ax = segments[i - 1].x;
+            const ay = segments[i - 1].y;
+            const bx = segments[i].x;
+            const by = segments[i].y;
+            const edge = dist(ax, ay, bx, by);
+            if (edge <= remain + 1e-4) {
+                out.push({ x: bx, y: by });
+                remain -= edge;
+            } else if (edge > 1e-6) {
+                const t = remain / edge;
+                out.push({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t });
+                remain = 0;
+            }
+        }
+        return out.length > 1 ? out : segments;
+    }
+
+    const extra = targetArc - currentArc;
+    const n = segments.length;
+    const tail = segments[n - 1];
+    const prev = segments[Math.max(0, n - 2)];
+    let dx = tail.x - prev.x;
+    let dy = tail.y - prev.y;
+    let d = Math.hypot(dx, dy);
+    if (d < 1e-4 && n >= 3) {
+        const p2 = segments[n - 3];
+        dx = tail.x - p2.x;
+        dy = tail.y - p2.y;
+        d = Math.hypot(dx, dy);
+    }
+    if (d < 1e-4) return segments;
+    const out = segments.slice();
+    out.push({ x: tail.x + (dx / d) * extra, y: tail.y + (dy / d) * extra });
+    return out;
+}
+
+/** Subdivide long edges so turns stay round on large snakes. */
+export function densifySpine(spine, maxEdgeLen) {
+    if (!spine || spine.length < 2 || maxEdgeLen <= 0) return spine;
+    const out = [{ x: spine[0].x, y: spine[0].y }];
+    for (let i = 1; i < spine.length; i++) {
+        const ax = spine[i - 1].x;
+        const ay = spine[i - 1].y;
+        const bx = spine[i].x;
+        const by = spine[i].y;
+        const edge = dist(ax, ay, bx, by);
+        const steps = Math.max(1, Math.ceil(edge / maxEdgeLen));
+        for (let s = 1; s <= steps; s++) {
+            const t = s / steps;
+            out.push({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t });
+        }
+    }
+    return out;
+}
+
 /** Snap visual thickness to server after teleport or respawn. */
 export function resetVisualGrowth(state, radius, fam = 0, sct = 1) {
+    const sp = SEG_SEP * continuousSc(sct, fam);
     state.visualRadius = radius ?? BASE_RADIUS * continuousSc(sct, fam);
-    state.visualFam = fam;
+    state.visualArcLen = continuousArcLength(sct, fam, sp);
     state._prevTargetSct = sct;
 }
 
-/** Ease display thickness and tail fullness toward server values. */
+/** Ease display thickness and body length toward server sct+fam (slither.io fam model). */
 function stepVisualGrowth(state, meta, dt) {
     const targetFam = meta.fam ?? 0;
     const targetSct = meta.segmentCount || 1;
-    const targetRadius = BASE_RADIUS * continuousSc(targetSct, targetFam);
+    const targetSc = continuousSc(targetSct, targetFam);
+    const targetSpacing = SEG_SEP * targetSc;
+    const targetRadius = BASE_RADIUS * targetSc;
+    const targetArc = continuousArcLength(targetSct, targetFam, targetSpacing);
+
     if (state.visualRadius == null) state.visualRadius = targetRadius;
-    if (state.visualFam == null) state.visualFam = targetFam;
+    if (state.visualArcLen == null) state.visualArcLen = targetArc;
     if (state._prevTargetSct == null) state._prevTargetSct = targetSct;
     state._prevTargetSct = targetSct;
 
     const radiusA = 1 - Math.exp(-dt / 1.4);
-    const famA = 1 - Math.exp(-dt / 1.1);
+    const arcA = 1 - Math.exp(-dt / 1.5);
     state.visualRadius += (targetRadius - state.visualRadius) * radiusA;
-    state.visualFam += (targetFam - state.visualFam) * famA;
+    state.visualArcLen += (targetArc - state.visualArcLen) * arcA;
 
     const visSc = state.visualRadius / BASE_RADIUS;
     return {
         radius: state.visualRadius,
         sc: visSc,
-        fam: state.visualFam,
+        arcLen: state.visualArcLen,
+        spacing: SEG_SEP * visSc,
     };
 }
 
@@ -336,7 +420,7 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     }
     state.angle = lerpAngle(state._snapAAngle ?? state._snapBAngle, state._snapBAngle, t);
 
-    const visFam = growth.fam ?? meta.fam ?? 0;
-    const visSpacing = segmentSpacingForSnake({ sc: growth.sc ?? meta.sc, radius: growth.radius ?? meta.radius });
-    state.drawSpine = extendSpineTail(state.segments, visFam, visSpacing);
+    const visSpacing = growth.spacing ?? segmentSpacingForSnake({ sc: growth.sc, radius: growth.radius });
+    const dense = densifySpine(state.segments, visSpacing * 0.45);
+    state.drawSpine = fitSpineToArcLength(dense, growth.arcLen ?? continuousArcLength(meta.segmentCount || 1, meta.fam ?? 0, visSpacing));
 }
