@@ -33,6 +33,25 @@ function Row({ label, children }) {
     );
 }
 
+function parseNumInput(str, fallback) {
+    const n = parseFloat(String(str).replace(',', '.'));
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function NumInput({ value, onChange, min, max, step = 'any', className = '' }) {
+    return (
+        <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={className}
+        />
+    );
+}
+
 export default function AdminSandbox() {
     const navigate = useNavigate();
     const { user, token } = useAuth();
@@ -60,17 +79,19 @@ export default function AdminSandbox() {
     const [shrinkDuration, setShrinkDuration] = useState(120);
     const [shrinkEndRadius, setShrinkEndRadius] = useState(400);
     const [botCount, setBotCount] = useState(3);
-    const [botSize, setBotSize] = useState(5);
+    const [botSizeInput, setBotSizeInput] = useState('5');
     const [foodCount, setFoodCount] = useState(80);
-    const [playerSize, setPlayerSize] = useState(5);
+    const [playerSizeInput, setPlayerSizeInput] = useState('5');
     const [staticWorms, setStaticWorms] = useState([]);
+    const [controllableEntities, setControllableEntities] = useState([]);
     const [selectedWorm, setSelectedWorm] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [hideOverlays, setHideOverlays] = useState(false);
     const [wormX, setWormX] = useState(0);
     const [wormY, setWormY] = useState(0);
-    const [wormSize, setWormSize] = useState(8);
-    const [wormAngle, setWormAngle] = useState(0);
+    const [wormSizeInput, setWormSizeInput] = useState('8');
+    const [wormAngleInput, setWormAngleInput] = useState('0');
+    const [wormBendInput, setWormBendInput] = useState('0');
     const [agarZone, setAgarZone] = useState(null);
     const [sessionEpoch, setSessionEpoch] = useState(0);
     const [restarting, setRestarting] = useState(false);
@@ -110,6 +131,22 @@ export default function AdminSandbox() {
     useEffect(() => {
         selectedWormRef.current = selectedWorm;
     }, [selectedWorm]);
+
+    const syncWormEditorFromEntity = useCallback((entity) => {
+        if (!entity) return;
+        if (entity.x != null) setWormX(Math.round(entity.x));
+        if (entity.y != null) setWormY(Math.round(entity.y));
+        if (entity.balance != null) setWormSizeInput(String(entity.balance));
+        if (entity.angle != null) setWormAngleInput(String(entity.angle));
+        if (entity.bend != null) setWormBendInput(String(entity.bend));
+    }, []);
+
+    useEffect(() => {
+        if (!selectedWorm) return;
+        const fromStatic = staticWorms.find(w => w.id === selectedWorm);
+        const fromCtrl = controllableEntities.find(w => w.id === selectedWorm);
+        syncWormEditorFromEntity(fromStatic || fromCtrl);
+    }, [selectedWorm, staticWorms, controllableEntities, syncWormEditorFromEntity]);
 
     const sendControl = useCallback((action, params = {}) => {
         socketRef.current?.emit('sandboxControl', { token, mode, action, params });
@@ -392,16 +429,26 @@ export default function AdminSandbox() {
             if (state?.zone?.radius != null) setZoneRadius(Math.round(state.zone.radius));
             if (state?.staticWormIds?.length) {
                 setStaticWorms(state.staticWormIds);
-                if (!selectedWorm && state.staticWormIds[0]) {
+                if (!selectedWormRef.current && state.staticWormIds[0]) {
                     setSelectedWorm(state.staticWormIds[0].id);
                 }
+            } else if (state?.staticWormIds) {
+                setStaticWorms([]);
+            }
+            if (state?.controllableEntities) {
+                setControllableEntities(state.controllableEntities);
             }
             if (state?.lastAction === 'addStaticWorm' && state?.result) {
-                const { id, x, y, angle } = state.result;
+                const { id, x, y, angle, bend } = state.result;
                 if (id) setSelectedWorm(id);
                 if (x != null) setWormX(Math.round(x));
                 if (y != null) setWormY(Math.round(y));
-                if (angle != null) setWormAngle(angle);
+                if (angle != null) setWormAngleInput(String(angle));
+                if (bend != null) setWormBendInput(String(bend));
+            }
+            if (state?.lastAction === 'possessEntity') {
+                setPaused(false);
+                pausedRef.current = false;
             }
         });
 
@@ -468,6 +515,30 @@ export default function AdminSandbox() {
         canvas.addEventListener('click', onCanvasClick);
         return () => canvas.removeEventListener('click', onCanvasClick);
     }, [gameReady, mode, token]);
+
+    const applySelectedWorm = useCallback(() => {
+        if (!selectedWorm || !staticWorms.some(w => w.id === selectedWorm)) return;
+        const balance = parseNumInput(wormSizeInput, 8);
+        const angle = parseNumInput(wormAngleInput, 0);
+        const bend = parseNumInput(wormBendInput, 0);
+        sendControl('moveStaticWorm', {
+            id: selectedWorm,
+            x: wormX,
+            y: wormY,
+            angle,
+            bend,
+            balance,
+            useCustomPosition: true,
+        });
+    }, [selectedWorm, staticWorms, wormX, wormY, wormSizeInput, wormAngleInput, wormBendInput, sendControl]);
+
+    const possessEntity = useCallback((entityId) => {
+        if (!entityId) return;
+        sendControl('possessEntity', { id: entityId, leaveBody: true });
+        setPaused(false);
+        pausedRef.current = false;
+        sendControl('pause', { paused: false });
+    }, [sendControl]);
 
     const switchMode = (newMode) => {
         if (newMode === mode) return;
@@ -625,13 +696,14 @@ export default function AdminSandbox() {
 
                     <ControlSection title="Entities">
                         <Row label="Your size">
-                            <input
-                                type="number" min="0.5" max="500" step="0.5" value={playerSize}
-                                onChange={(e) => setPlayerSize(parseFloat(e.target.value) || 5)}
+                            <NumInput
+                                min="0.5" max="500" step="0.5"
+                                value={playerSizeInput}
+                                onChange={setPlayerSizeInput}
                             />
                             <button
                                 type="button" className="ui-btn ui-btn-ghost sandbox-mini-btn"
-                                onClick={() => sendControl('setEntitySize', { balance: playerSize })}
+                                onClick={() => sendControl('setEntitySize', { balance: parseNumInput(playerSizeInput, 5) })}
                             >
                                 Apply
                             </button>
@@ -640,11 +712,15 @@ export default function AdminSandbox() {
                             <input type="range" min="0" max="20" value={botCount} onChange={(e) => setBotCount(parseInt(e.target.value, 10))} />
                         </Row>
                         <Row label="Bot size">
-                            <input type="number" min="0.5" max="200" value={botSize} onChange={(e) => setBotSize(parseFloat(e.target.value) || 5)} />
+                            <NumInput
+                                min="0.5" max="200" step="0.5"
+                                value={botSizeInput}
+                                onChange={setBotSizeInput}
+                            />
                         </Row>
                         <button
                             type="button" className="ui-btn ui-btn-primary sandbox-full-btn"
-                            onClick={() => sendControl('spawnBots', { count: botCount, balance: botSize })}
+                            onClick={() => sendControl('spawnBots', { count: botCount, balance: parseNumInput(botSizeInput, 5) })}
                         >
                             Spawn bots
                         </button>
@@ -660,12 +736,16 @@ export default function AdminSandbox() {
                     </ControlSection>
 
                     {mode === 'slither' && (
-                        <ControlSection title="Static worms">
-                            <p className="sandbox-hint">Ormar som inte rör sig — perfekt för screenshots.</p>
+                        <ControlSection title="Static worms &amp; control">
+                            <p className="sandbox-hint">Lägg till statiska ormar, böj dem, eller ta kontroll och spela som dem.</p>
                             <button
                                 type="button" className="ui-btn ui-btn-primary sandbox-full-btn"
                                 onClick={() => {
-                                    sendControl('addStaticWorm', { balance: wormSize, angle: wormAngle });
+                                    sendControl('addStaticWorm', {
+                                        balance: parseNumInput(wormSizeInput, 8),
+                                        angle: parseNumInput(wormAngleInput, 0),
+                                        bend: parseNumInput(wormBendInput, 0),
+                                    });
                                 }}
                             >
                                 + Add worm (beside you)
@@ -674,8 +754,8 @@ export default function AdminSandbox() {
                                 <input type="checkbox" checked={editMode} onChange={(e) => setEditMode(e.target.checked)} />
                                 Click canvas to move selected worm
                             </label>
-                            {staticWorms.length > 0 && (
-                                <Row label="Selected worm">
+                            {(staticWorms.length > 0 || controllableEntities.length > 0) && (
+                                <Row label="Selected entity">
                                     <select
                                         value={selectedWorm || ''}
                                         onChange={(e) => setSelectedWorm(e.target.value)}
@@ -684,30 +764,67 @@ export default function AdminSandbox() {
                                         {staticWorms.map(w => (
                                             <option key={w.id} value={w.id}>{w.name || w.id} (${w.balance})</option>
                                         ))}
+                                        {controllableEntities.filter(e => e.type === 'bot').map(w => (
+                                            <option key={w.id} value={w.id}>{w.name || w.id} (bot ${w.balance})</option>
+                                        ))}
                                     </select>
                                 </Row>
                             )}
                             <Row label="X">
-                                <input type="number" value={wormX} onChange={(e) => setWormX(parseFloat(e.target.value) || 0)} />
+                                <NumInput value={String(wormX)} onChange={(v) => setWormX(parseNumInput(v, 0))} />
                             </Row>
                             <Row label="Y">
-                                <input type="number" value={wormY} onChange={(e) => setWormY(parseFloat(e.target.value) || 0)} />
+                                <NumInput value={String(wormY)} onChange={(v) => setWormY(parseNumInput(v, 0))} />
                             </Row>
                             <Row label="Size">
-                                <input type="number" min="1" max="200" value={wormSize} onChange={(e) => setWormSize(parseFloat(e.target.value) || 8)} />
+                                <NumInput min="0.5" max="200" step="0.5" value={wormSizeInput} onChange={setWormSizeInput} />
                             </Row>
-                            <Row label="Angle (rad)">
-                                <input type="number" step="0.1" value={wormAngle} onChange={(e) => setWormAngle(parseFloat(e.target.value) || 0)} />
+                            <Row label={`Angle: ${parseNumInput(wormAngleInput, 0).toFixed(2)} rad`}>
+                                <input
+                                    type="range" min={-3.14} max={3.14} step="0.05"
+                                    value={parseNumInput(wormAngleInput, 0)}
+                                    onChange={(e) => setWormAngleInput(e.target.value)}
+                                    onMouseUp={applySelectedWorm}
+                                    onTouchEnd={applySelectedWorm}
+                                />
                             </Row>
-                            {selectedWorm && (
+                            <Row label={`Bend: ${parseNumInput(wormBendInput, 0).toFixed(2)} rad/seg`}>
+                                <input
+                                    type="range" min={-0.35} max={0.35} step="0.01"
+                                    value={parseNumInput(wormBendInput, 0)}
+                                    onChange={(e) => setWormBendInput(e.target.value)}
+                                    onMouseUp={applySelectedWorm}
+                                    onTouchEnd={applySelectedWorm}
+                                />
+                            </Row>
+                            {selectedWorm && staticWorms.some(w => w.id === selectedWorm) && (
                                 <button
-                                    type="button" className="ui-btn ui-btn-ghost sandbox-full-btn"
-                                    onClick={() => {
-                                        sendControl('moveStaticWorm', { id: selectedWorm, x: wormX, y: wormY, angle: wormAngle, useCustomPosition: true });
-                                        sendControl('setEntitySize', { id: selectedWorm, balance: wormSize, angle: wormAngle });
-                                    }}
+                                    type="button"
+                                    className="ui-btn ui-btn-ghost sandbox-full-btn"
+                                    onClick={applySelectedWorm}
                                 >
                                     Apply to selected
+                                </button>
+                            )}
+                            {selectedWorm && (
+                                <button
+                                    type="button"
+                                    className="ui-btn ui-btn-primary sandbox-full-btn"
+                                    onClick={() => possessEntity(selectedWorm)}
+                                >
+                                    Take control (play as this)
+                                </button>
+                            )}
+                            {selectedWorm && staticWorms.some(w => w.id === selectedWorm) && (
+                                <button
+                                    type="button"
+                                    className="ui-btn ui-btn-ghost sandbox-full-btn"
+                                    onClick={() => {
+                                        sendControl('removeStaticWorm', { id: selectedWorm });
+                                        setSelectedWorm(null);
+                                    }}
+                                >
+                                    Remove static worm
                                 </button>
                             )}
                             {(sandboxState?.staticWorms > 0 || staticWorms.length > 0) && (
