@@ -1,0 +1,688 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import { useAuth } from '../context/AuthContext';
+import Background from '../components/Background';
+import AppTopbar from '../components/AppTopbar';
+import { SlitherRenderer } from '../game/slither/SlitherRenderer.js';
+import global from '../game/agar/global.js';
+import * as renderUtils from '../game/agar/render.js';
+import '../styles/ui.css';
+
+const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
+
+function ControlSection({ title, children }) {
+    return (
+        <div className="sandbox-section">
+            <h3 className="sandbox-section-title">{title}</h3>
+            {children}
+        </div>
+    );
+}
+
+function Row({ label, children }) {
+    return (
+        <label className="sandbox-row">
+            <span className="sandbox-label">{label}</span>
+            {children}
+        </label>
+    );
+}
+
+export default function AdminSandbox() {
+    const navigate = useNavigate();
+    const { user, token } = useAuth();
+    const canvasRef = useRef(null);
+    const socketRef = useRef(null);
+    const rendererRef = useRef(null);
+    const agarDataRef = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], zone: null });
+    const animRef = useRef(null);
+    const hasJoinedRef = useRef(false);
+
+    const [mode, setMode] = useState('slither');
+    const [connected, setConnected] = useState(false);
+    const [gameReady, setGameReady] = useState(false);
+    const [sandboxState, setSandboxState] = useState(null);
+    const [paused, setPaused] = useState(false);
+    const [speed, setSpeed] = useState(1);
+    const [botAi, setBotAi] = useState(true);
+    const [invincible, setInvincible] = useState(true);
+    const [worldHalf, setWorldHalf] = useState(3000);
+    const [zoneRadius, setZoneRadius] = useState(3000);
+    const [shrinkDuration, setShrinkDuration] = useState(120);
+    const [shrinkEndRadius, setShrinkEndRadius] = useState(400);
+    const [botCount, setBotCount] = useState(3);
+    const [botSize, setBotSize] = useState(5);
+    const [foodCount, setFoodCount] = useState(80);
+    const [playerSize, setPlayerSize] = useState(5);
+    const [staticWorms, setStaticWorms] = useState([]);
+    const [selectedWorm, setSelectedWorm] = useState(null);
+    const [editMode, setEditMode] = useState(false);
+    const [wormX, setWormX] = useState(0);
+    const [wormY, setWormY] = useState(0);
+    const [wormSize, setWormSize] = useState(8);
+    const [wormAngle, setWormAngle] = useState(0);
+    const [agarZone, setAgarZone] = useState(null);
+
+    const sendControl = useCallback((action, params = {}) => {
+        socketRef.current?.emit('sandboxControl', { token, mode, action, params });
+    }, [token, mode]);
+
+    const disconnectSocket = useCallback(() => {
+        if (animRef.current) cancelAnimationFrame(animRef.current);
+        if (rendererRef.current) {
+            rendererRef.current.stop?.();
+            rendererRef.current = null;
+        }
+        if (socketRef.current) {
+            socketRef.current.off();
+            socketRef.current.disconnect();
+            socketRef.current = null;
+        }
+        hasJoinedRef.current = false;
+        setConnected(false);
+        setGameReady(false);
+    }, []);
+
+    const startAgarLoop = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const graph = canvas.getContext('2d');
+
+        const loop = () => {
+            const { player, users, food, viruses, ejected, zone } = agarDataRef.current;
+            const W = canvas.width;
+            const H = canvas.height;
+            const camX = player?.x ?? 3000;
+            const camY = player?.y ?? 3000;
+            const zoom = 1;
+
+            graph.fillStyle = global.backgroundColor;
+            graph.fillRect(0, 0, W, H);
+            renderUtils.drawGrid(global, { x: camX, y: camY }, { width: W, height: H }, graph, zoom);
+
+            const z = zone || agarZone;
+            if (z?.radius != null) {
+                const zx = (z.cx - camX) * zoom + W / 2;
+                const zy = (z.cy - camY) * zoom + H / 2;
+                graph.save();
+                graph.fillStyle = 'rgba(255, 59, 48, 0.12)';
+                graph.beginPath();
+                graph.arc(zx, zy, z.radius * zoom, 0, Math.PI * 2);
+                graph.fill();
+                graph.strokeStyle = z.shrinking ? 'rgba(255, 80, 60, 0.85)' : 'rgba(255, 255, 255, 0.25)';
+                graph.lineWidth = 3;
+                graph.stroke();
+                graph.restore();
+            }
+
+            const worldToScreen = (wx, wy) => ({
+                x: (wx - camX) * zoom + W / 2,
+                y: (wy - camY) * zoom + H / 2,
+            });
+
+            food.forEach(f => {
+                renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: (f.radius || 5) * zoom }, graph);
+            });
+            viruses.forEach(v => {
+                renderUtils.drawVirus(worldToScreen(v.x, v.y), { ...v, radius: (v.radius || 50) * zoom }, graph);
+            });
+            ejected.forEach(e => {
+                renderUtils.drawFireFood(worldToScreen(e.x, e.y), { ...e, radius: (e.radius || 5) * zoom }, { border: 6 * zoom }, graph);
+            });
+
+            const cellsToDraw = [];
+            const borders = [];
+            users.forEach(u => {
+                (u.cells || []).forEach(cell => {
+                    cellsToDraw.push({
+                        ...cell,
+                        x: worldToScreen(cell.x, cell.y).x,
+                        y: worldToScreen(cell.x, cell.y).y,
+                        radius: (cell.radius || 20) * zoom,
+                        color: u.color,
+                        name: u.username,
+                    });
+                    borders.push({ x: cell.x, y: cell.y, radius: cell.radius });
+                });
+            });
+            if (cellsToDraw.length) {
+                renderUtils.drawCells(cellsToDraw, { border: 6 * zoom, textBorderSize: 3 * zoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
+            }
+
+            animRef.current = requestAnimationFrame(loop);
+        };
+        animRef.current = requestAnimationFrame(loop);
+    }, [agarZone]);
+
+    useEffect(() => {
+        if (!user?.isAdmin || !token) return undefined;
+
+        disconnectSocket();
+
+        const canvas = canvasRef.current;
+        if (!canvas) return undefined;
+
+        const resize = () => {
+            const parent = canvas.parentElement;
+            if (!parent) return;
+            canvas.width = parent.clientWidth;
+            canvas.height = parent.clientHeight;
+            if (mode === 'agar' && socketRef.current?.connected) {
+                socketRef.current.emit('0', {
+                    x: 0, y: 0,
+                    screenWidth: canvas.width,
+                    screenHeight: canvas.height,
+                });
+            }
+        };
+        resize();
+        window.addEventListener('resize', resize);
+
+        if (mode === 'slither') {
+            const renderer = new SlitherRenderer(canvas);
+            rendererRef.current = renderer;
+            renderer.start();
+            renderer.setInputEmitter(() => {
+                if (socketRef.current?.connected && rendererRef.current) {
+                    socketRef.current.emit('slitherInput', rendererRef.current.getInput());
+                }
+            });
+        } else {
+            startAgarLoop();
+        }
+
+        const socket = io(API_URL, {
+            auth: { token },
+            transports: ['polling', 'websocket'],
+            reconnection: true,
+        });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+            setConnected(true);
+            if (!hasJoinedRef.current) {
+                socket.emit('sandboxJoin', { token, mode, username: user.username });
+                hasJoinedRef.current = true;
+            }
+        });
+
+        socket.on('welcome', (player, meta) => {
+            setGameReady(true);
+            if (meta?.zone) {
+                if (mode === 'slither') {
+                    rendererRef.current?.updateState({
+                        zone: meta.zone,
+                        competitiveSlither: true,
+                        circularMap: true,
+                    });
+                } else {
+                    setAgarZone(meta.zone);
+                    agarDataRef.current.zone = meta.zone;
+                }
+            }
+            if (mode === 'slither') {
+                rendererRef.current?.resetSession();
+            } else {
+                agarDataRef.current.player = player;
+            }
+        });
+
+        socket.on('slitherTick', (tick) => {
+            rendererRef.current?.updateState(tick);
+            if (tick.zone) {
+                rendererRef.current?.updateState({
+                    zone: tick.zone,
+                    competitiveSlither: true,
+                    circularMap: true,
+                });
+            }
+        });
+
+        socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, meta) => {
+            agarDataRef.current.player = playerData;
+            agarDataRef.current.users = userData || [];
+            agarDataRef.current.food = foodList || [];
+            agarDataRef.current.ejected = massList || [];
+            agarDataRef.current.viruses = virusList || [];
+            if (meta?.zone) {
+                agarDataRef.current.zone = meta.zone;
+                setAgarZone(meta.zone);
+            }
+        });
+
+        socket.on('sandboxState', (state) => {
+            setSandboxState(state);
+            if (state?.paused != null) setPaused(state.paused);
+            if (state?.speedMultiplier != null) setSpeed(state.speedMultiplier);
+            if (state?.zone?.radius != null) setZoneRadius(Math.round(state.zone.radius));
+            if (state?.staticWormIds?.length) {
+                setStaticWorms(state.staticWormIds);
+                if (!selectedWorm && state.staticWormIds[0]) {
+                    setSelectedWorm(state.staticWormIds[0].id);
+                }
+            }
+        });
+
+        socket.on('sandboxStaticWorms', (worms) => setStaticWorms(worms || []));
+        socket.on('error', (msg) => console.error('Sandbox error:', msg));
+        socket.on('disconnect', () => setConnected(false));
+
+        // Agar mouse input
+        const onPointer = (e) => {
+            if (mode !== 'agar' || !socket.connected) return;
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left - canvas.width / 2;
+            const my = e.clientY - rect.top - canvas.height / 2;
+            socket.emit('0', { x: mx, y: my, screenWidth: canvas.width, screenHeight: canvas.height });
+        };
+        const onSplit = (e) => { if (e.code === 'Space' && mode === 'agar') socket.emit('1'); };
+        canvas.addEventListener('pointermove', onPointer);
+        canvas.addEventListener('pointerdown', onPointer);
+        window.addEventListener('keydown', onSplit);
+
+        // Static worm drag (slither edit mode)
+        const onCanvasClick = (e) => {
+            if (mode !== 'slither' || !editMode || !selectedWorm || !rendererRef.current) return;
+            const rect = canvas.getBoundingClientRect();
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
+            const cam = rendererRef.current.camera || { x: 0, y: 0 };
+            const zoom = rendererRef.current.zoom || 1;
+            const worldX = (screenX - canvas.width / 2) / zoom + cam.x;
+            const worldY = (screenY - canvas.height / 2) / zoom + cam.y;
+            socket.emit('sandboxMoveStatic', { token, id: selectedWorm, x: worldX, y: worldY });
+            sendControl('moveStaticWorm', { id: selectedWorm, x: worldX, y: worldY });
+            setWormX(Math.round(worldX));
+            setWormY(Math.round(worldY));
+        };
+        canvas.addEventListener('click', onCanvasClick);
+
+        return () => {
+            window.removeEventListener('resize', resize);
+            canvas.removeEventListener('pointermove', onPointer);
+            canvas.removeEventListener('pointerdown', onPointer);
+            canvas.removeEventListener('click', onCanvasClick);
+            window.removeEventListener('keydown', onSplit);
+            disconnectSocket();
+        };
+    }, [user, token, mode, disconnectSocket, startAgarLoop, editMode, selectedWorm, sendControl]);
+
+    const switchMode = (newMode) => {
+        if (newMode === mode) return;
+        disconnectSocket();
+        setMode(newMode);
+        setWorldHalf(newMode === 'slither' ? 3000 : 3000);
+        setGameReady(false);
+    };
+
+    if (!user?.isAdmin) {
+        return (
+            <div className="admin-page">
+                <Background />
+                <p style={{ padding: 40, color: '#fff' }}>Admin access required.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="admin-page sandbox-page">
+            <Background />
+            <AppTopbar />
+            <div className="sandbox-layout">
+                <aside className="sandbox-panel">
+                    <div className="sandbox-panel-header">
+                        <h2>Sandbox Studio</h2>
+                        <button type="button" className="ui-btn ui-btn-ghost" onClick={() => navigate('/admin')}>
+                            ← Dashboard
+                        </button>
+                    </div>
+
+                    <div className="sandbox-mode-tabs">
+                        <button
+                            type="button"
+                            className={`ui-btn ${mode === 'slither' ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                            onClick={() => switchMode('slither')}
+                        >
+                            Slither
+                        </button>
+                        <button
+                            type="button"
+                            className={`ui-btn ${mode === 'agar' ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                            onClick={() => switchMode('agar')}
+                        >
+                            Agar
+                        </button>
+                    </div>
+
+                    <p className="sandbox-status">
+                        {connected ? (gameReady ? '● Live' : '○ Connecting…') : '○ Disconnected'}
+                        {sandboxState?.paused && ' · Paused'}
+                    </p>
+
+                    <ControlSection title="Playback">
+                        <div className="sandbox-btn-row">
+                            <button
+                                type="button"
+                                className={`ui-btn ${paused ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                                onClick={() => { setPaused(true); sendControl('pause', { paused: true }); }}
+                            >
+                                Pause
+                            </button>
+                            <button
+                                type="button"
+                                className={`ui-btn ${!paused ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                                onClick={() => { setPaused(false); sendControl('pause', { paused: false }); }}
+                            >
+                                Play
+                            </button>
+                        </div>
+                        <Row label={`Speed: ${speed.toFixed(1)}×`}>
+                            <input
+                                type="range" min="0.2" max="3" step="0.1" value={speed}
+                                onChange={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    setSpeed(v);
+                                    sendControl('setSpeed', { multiplier: v });
+                                }}
+                            />
+                        </Row>
+                        <label className="sandbox-check">
+                            <input
+                                type="checkbox" checked={botAi}
+                                onChange={(e) => { setBotAi(e.target.checked); sendControl('setBotAi', { enabled: e.target.checked }); }}
+                            />
+                            Bot AI
+                        </label>
+                        <label className="sandbox-check">
+                            <input
+                                type="checkbox" checked={invincible}
+                                onChange={(e) => { setInvincible(e.target.checked); sendControl('setInvincible', { enabled: e.target.checked }); }}
+                            />
+                            Invincible (no deaths)
+                        </label>
+                    </ControlSection>
+
+                    <ControlSection title="Arena & Zone">
+                        <Row label={`World: ${worldHalf}`}>
+                            <input
+                                type="range" min="800" max="4000" step="100" value={worldHalf}
+                                onChange={(e) => {
+                                    const v = parseInt(e.target.value, 10);
+                                    setWorldHalf(v);
+                                    setZoneRadius(v);
+                                }}
+                                onMouseUp={() => sendControl('setWorldSize', { worldHalf })}
+                                onTouchEnd={() => sendControl('setWorldSize', { worldHalf })}
+                            />
+                        </Row>
+                        <Row label={`Zone radius: ${zoneRadius}`}>
+                            <input
+                                type="range" min="200" max={worldHalf} step="50" value={zoneRadius}
+                                onChange={(e) => setZoneRadius(parseInt(e.target.value, 10))}
+                                onMouseUp={() => sendControl('setZoneRadius', { radius: zoneRadius })}
+                                onTouchEnd={() => sendControl('setZoneRadius', { radius: zoneRadius })}
+                            />
+                        </Row>
+                        <Row label={`Shrink time: ${shrinkDuration}s`}>
+                            <input
+                                type="range" min="10" max="300" step="5" value={shrinkDuration}
+                                onChange={(e) => setShrinkDuration(parseInt(e.target.value, 10))}
+                            />
+                        </Row>
+                        <Row label={`End radius: ${shrinkEndRadius}`}>
+                            <input
+                                type="range" min="100" max={worldHalf} step="50" value={shrinkEndRadius}
+                                onChange={(e) => setShrinkEndRadius(parseInt(e.target.value, 10))}
+                            />
+                        </Row>
+                        <div className="sandbox-btn-row">
+                            <button
+                                type="button" className="ui-btn ui-btn-primary"
+                                onClick={() => sendControl('startZoneShrink', {
+                                    durationMs: shrinkDuration * 1000,
+                                    endRadius: shrinkEndRadius,
+                                })}
+                            >
+                                Start shrink
+                            </button>
+                            <button type="button" className="ui-btn ui-btn-ghost" onClick={() => sendControl('stopZoneShrink')}>
+                                Stop
+                            </button>
+                        </div>
+                    </ControlSection>
+
+                    <ControlSection title="Entities">
+                        <Row label="Your size">
+                            <input
+                                type="number" min="0.5" max="500" step="0.5" value={playerSize}
+                                onChange={(e) => setPlayerSize(parseFloat(e.target.value) || 5)}
+                            />
+                            <button
+                                type="button" className="ui-btn ui-btn-ghost sandbox-mini-btn"
+                                onClick={() => sendControl('setEntitySize', { balance: playerSize })}
+                            >
+                                Apply
+                            </button>
+                        </Row>
+                        <Row label={`Bots: ${botCount}`}>
+                            <input type="range" min="0" max="20" value={botCount} onChange={(e) => setBotCount(parseInt(e.target.value, 10))} />
+                        </Row>
+                        <Row label="Bot size">
+                            <input type="number" min="0.5" max="200" value={botSize} onChange={(e) => setBotSize(parseFloat(e.target.value) || 5)} />
+                        </Row>
+                        <button
+                            type="button" className="ui-btn ui-btn-primary sandbox-full-btn"
+                            onClick={() => sendControl('spawnBots', { count: botCount, balance: botSize })}
+                        >
+                            Spawn bots
+                        </button>
+                        <Row label={`Food: ${foodCount}`}>
+                            <input type="range" min="10" max="400" step="10" value={foodCount} onChange={(e) => setFoodCount(parseInt(e.target.value, 10))} />
+                        </Row>
+                        <button
+                            type="button" className="ui-btn ui-btn-primary sandbox-full-btn"
+                            onClick={() => sendControl('spawnFood', { count: foodCount })}
+                        >
+                            Spawn food
+                        </button>
+                    </ControlSection>
+
+                    {mode === 'slither' && (
+                        <ControlSection title="Static worms">
+                            <p className="sandbox-hint">Ormar som inte rör sig — perfekt för screenshots.</p>
+                            <button
+                                type="button" className="ui-btn ui-btn-primary sandbox-full-btn"
+                                onClick={() => {
+                                    sendControl('addStaticWorm', { x: wormX, y: wormY, balance: wormSize, angle: wormAngle });
+                                }}
+                            >
+                                + Add worm
+                            </button>
+                            <label className="sandbox-check">
+                                <input type="checkbox" checked={editMode} onChange={(e) => setEditMode(e.target.checked)} />
+                                Click canvas to move selected worm
+                            </label>
+                            {staticWorms.length > 0 && (
+                                <Row label="Selected worm">
+                                    <select
+                                        value={selectedWorm || ''}
+                                        onChange={(e) => setSelectedWorm(e.target.value)}
+                                        style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', borderRadius: 6, padding: 4 }}
+                                    >
+                                        {staticWorms.map(w => (
+                                            <option key={w.id} value={w.id}>{w.name || w.id} (${w.balance})</option>
+                                        ))}
+                                    </select>
+                                </Row>
+                            )}
+                            <Row label="X">
+                                <input type="number" value={wormX} onChange={(e) => setWormX(parseFloat(e.target.value) || 0)} />
+                            </Row>
+                            <Row label="Y">
+                                <input type="number" value={wormY} onChange={(e) => setWormY(parseFloat(e.target.value) || 0)} />
+                            </Row>
+                            <Row label="Size">
+                                <input type="number" min="1" max="200" value={wormSize} onChange={(e) => setWormSize(parseFloat(e.target.value) || 8)} />
+                            </Row>
+                            <Row label="Angle (rad)">
+                                <input type="number" step="0.1" value={wormAngle} onChange={(e) => setWormAngle(parseFloat(e.target.value) || 0)} />
+                            </Row>
+                            {selectedWorm && (
+                                <button
+                                    type="button" className="ui-btn ui-btn-ghost sandbox-full-btn"
+                                    onClick={() => {
+                                        sendControl('moveStaticWorm', { id: selectedWorm, x: wormX, y: wormY, angle: wormAngle });
+                                        sendControl('setEntitySize', { id: selectedWorm, balance: wormSize, angle: wormAngle });
+                                    }}
+                                >
+                                    Apply to selected
+                                </button>
+                            )}
+                            {(sandboxState?.staticWorms > 0 || staticWorms.length > 0) && (
+                                <p className="sandbox-hint">{sandboxState?.staticWorms ?? staticWorms.length} static worm(s) active</p>
+                            )}
+                        </ControlSection>
+                    )}
+
+                    <ControlSection title="Reset">
+                        <button
+                            type="button"
+                            className="ui-btn ui-btn-danger sandbox-full-btn"
+                            onClick={() => { if (window.confirm('Clear all entities?')) sendControl('clear'); }}
+                        >
+                            Clear sandbox
+                        </button>
+                    </ControlSection>
+                </aside>
+
+                <main className="sandbox-canvas-wrap">
+                    <canvas ref={canvasRef} className="sandbox-canvas" />
+                    {!gameReady && (
+                        <div className="sandbox-overlay">
+                            <p>Connecting to sandbox…</p>
+                        </div>
+                    )}
+                </main>
+            </div>
+
+            <style>{`
+                .sandbox-page { min-height: 100vh; }
+                .sandbox-layout {
+                    display: flex;
+                    height: calc(100vh - 56px);
+                    margin-top: 56px;
+                }
+                .sandbox-panel {
+                    width: 320px;
+                    flex-shrink: 0;
+                    overflow-y: auto;
+                    background: rgba(10, 10, 14, 0.92);
+                    border-right: 1px solid rgba(255,255,255,0.08);
+                    padding: 16px;
+                }
+                .sandbox-panel-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 12px;
+                }
+                .sandbox-panel-header h2 {
+                    font-family: var(--display);
+                    font-size: 1.1rem;
+                    color: var(--text-h);
+                    margin: 0;
+                }
+                .sandbox-mode-tabs {
+                    display: flex;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                }
+                .sandbox-status {
+                    font-size: 0.75rem;
+                    color: var(--text-m);
+                    margin: 0 0 12px;
+                }
+                .sandbox-section {
+                    margin-bottom: 16px;
+                    padding-bottom: 12px;
+                    border-bottom: 1px solid rgba(255,255,255,0.06);
+                }
+                .sandbox-section-title {
+                    font-size: 0.7rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                    color: var(--text-m);
+                    margin: 0 0 8px;
+                }
+                .sandbox-row {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    margin-bottom: 8px;
+                    font-size: 0.8rem;
+                    color: var(--text-b);
+                }
+                .sandbox-label { color: var(--text-m); }
+                .sandbox-row input[type="range"] { width: 100%; }
+                .sandbox-row input[type="number"] {
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 6px;
+                    color: #fff;
+                    padding: 4px 8px;
+                    width: 100%;
+                }
+                .sandbox-check {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 0.8rem;
+                    color: var(--text-b);
+                    margin-bottom: 6px;
+                    cursor: pointer;
+                }
+                .sandbox-btn-row {
+                    display: flex;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                }
+                .sandbox-btn-row .ui-btn { flex: 1; }
+                .sandbox-full-btn { width: 100%; margin-bottom: 8px; }
+                .sandbox-mini-btn { padding: 2px 8px !important; height: auto !important; }
+                .sandbox-hint {
+                    font-size: 0.72rem;
+                    color: var(--text-m);
+                    margin: 0 0 8px;
+                    line-height: 1.4;
+                }
+                .sandbox-canvas-wrap {
+                    flex: 1;
+                    position: relative;
+                    background: #0a0a0c;
+                }
+                .sandbox-canvas {
+                    width: 100%;
+                    height: 100%;
+                    display: block;
+                    cursor: crosshair;
+                }
+                .sandbox-overlay {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(0,0,0,0.5);
+                    color: #fff;
+                    pointer-events: none;
+                }
+                .ui-btn-danger {
+                    background: rgba(220, 50, 50, 0.2) !important;
+                    border-color: rgba(220, 50, 50, 0.4) !important;
+                    color: #ff6b6b !important;
+                }
+            `}</style>
+        </div>
+    );
+}

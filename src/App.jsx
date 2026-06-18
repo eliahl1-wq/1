@@ -11,6 +11,7 @@ import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
 import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminSandbox from './pages/AdminSandbox';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -114,6 +115,7 @@ function App() {
                 <Route path="/slither" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                <Route path="/admin/sandbox" element={<AdminRoute><AdminSandbox /></AdminRoute>} />
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>
             </AuthProvider>

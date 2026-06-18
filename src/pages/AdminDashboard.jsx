@@ -764,6 +764,9 @@ export default function AdminDashboard() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <LiveIndicator active={tab === 'live' || tab === 'overview'} />
+                        <button className="btn btn-primary" onClick={() => navigate('/admin/sandbox')} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
+                            Sandbox Studio
+                        </button>
                         <button className="btn btn-ghost" onClick={() => loadData()} disabled={loading} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
                             {loading ? 'Refreshing…' : 'Refresh'}
                         </button>

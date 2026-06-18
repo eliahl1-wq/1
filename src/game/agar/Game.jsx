@@ -26,28 +26,14 @@ import '../../styles/gameInGame.css';
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
 
-/** True when any cell overlaps this pellet (server already removed it). */
-function foodLikelyEaten(f, users) {
-    if (!users?.length) return false;
-    const fr = f.radius || 5;
-    for (const u of users) {
-        for (const c of u.cells || []) {
-            if (Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0) + fr * 0.5) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-/** True when the local player's cell overlaps this pellet. */
+/** True when the local player's cell overlaps this pellet (we ate it or are eating it). */
 function foodEatenByPlayer(f, myId, users) {
     if (!myId || !users?.length) return false;
     const me = users.find(u => u.id === myId);
     if (!me) return false;
     const fr = f.radius || 5;
     for (const c of me.cells || []) {
-        if (Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0) + fr * 0.5) {
+        if (Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0) + fr * 0.45) {
             return true;
         }
     }
@@ -56,19 +42,16 @@ function foodEatenByPlayer(f, myId, users) {
 
 /** Drop stale cached pellets; keep edge blobs briefly through spatial-filter gaps. */
 function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
-    const margin = 240;
+    const margin = 280;
     const halfW = screenW / 2 + margin;
     const halfH = screenH / 2 + margin;
-    // Keep in-view pellets much longer to avoid visible blinking from packet jitter.
-    const IN_VIEW_MISS_LIMIT = 24;
-    // Off-screen pellets can be pruned sooner to keep cache bounded.
-    const OFF_VIEW_MISS_LIMIT = 12;
+    const IN_VIEW_MISS_LIMIT = 48;
+    const OFF_VIEW_MISS_LIMIT = 18;
     for (const [id, f] of foodMap) {
         const miss = f._missStreak || 0;
         if (miss === 0) continue;
         const inView = Math.abs(f.x - px) <= halfW && Math.abs(f.y - py) <= halfH;
-        if (foodLikelyEaten(f, users)) {
-            if (foodEatenByPlayer(f, myId, users)) playFoodEatSound();
+        if (foodEatenByPlayer(f, myId, users)) {
             foodMap.delete(id);
         } else if (!inView) {
             if (miss >= OFF_VIEW_MISS_LIMIT) foodMap.delete(id);
@@ -392,6 +375,18 @@ export default function Game() {
             prevBalanceRef.current = startBal;
             prevKillsRef.current = playerSettings.kills ?? 0;
             setCurrentBalance(startBal);
+
+            const canvas = canvasRef.current;
+            if (canvas && socketRef.current?.connected) {
+                const { width, height } = getGameScreenSize();
+                const viewZoom = getMobileViewZoom();
+                socketRef.current.emit('0', {
+                    x: playerSettings.x ?? playerSettings.cells?.[0]?.x ?? 0,
+                    y: playerSettings.y ?? playerSettings.cells?.[0]?.y ?? 0,
+                    screenWidth: width / viewZoom,
+                    screenHeight: height / viewZoom,
+                });
+            }
             
             // Återuppta cashout-timer om man refreashar mitt i
             if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
@@ -425,8 +420,8 @@ export default function Game() {
             for (const [id, f] of foodMap) {
                 if (seen.has(id)) continue;
                 const nextMiss = (f._missStreak || 0) + 1;
-                if (foodLikelyEaten(f, userData)) {
-                    if (foodEatenByPlayer(f, myIdRef.current, userData)) playFoodEatSound();
+                if (foodEatenByPlayer(f, myIdRef.current, userData)) {
+                    playFoodEatSound();
                     foodMap.delete(id);
                 } else {
                     foodMap.set(id, { ...f, _missStreak: nextMiss });
@@ -697,9 +692,13 @@ export default function Game() {
                 const myCells = users.find(u => u.id === myIdRef.current)?.cells || [];
                 for (const f of foodCacheRef.current.values()) {
                     if (Math.abs(f.x - camX) > halfW || Math.abs(f.y - camY) > halfH) continue;
-                    const underMe = myCells.some(c => Math.hypot(c.x - f.x, c.y - f.y) < (c.radius || 0));
+                    const fr = (f.radius || 5);
+                    const underMe = myCells.some((c) => {
+                        const d = Math.hypot(c.x - f.x, c.y - f.y);
+                        return d < Math.max((c.radius || 0) - fr * 0.15, fr * 0.25);
+                    });
                     if (underMe) continue;
-                    renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: (f.radius || 5) * viewZoom }, graph);
+                    renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: fr * viewZoom }, graph);
                 }
 
                 (ejected || []).forEach(m => {
