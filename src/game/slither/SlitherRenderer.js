@@ -911,10 +911,10 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.25, c, c, rPx);
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.28, c, c, rPx);
         baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
-        baseGrad.addColorStop(0.75, toHex(col));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-22 * k))));
+        baseGrad.addColorStop(0.78, toHex(col));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-16 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
@@ -922,13 +922,14 @@ export class SlitherRenderer {
         g.fill();
 
         const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -46), 0.26 * k));
-        tubeGrad.addColorStop(0.14, rgb(shadeColor(col, -32), 0.14 * k));
-        tubeGrad.addColorStop(0.3, rgb(shadeColor(col, -18), 0.05 * k));
-        tubeGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.7, rgb(shadeColor(col, -18), 0.05 * k));
-        tubeGrad.addColorStop(0.86, rgb(shadeColor(col, -32), 0.14 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -46), 0.26 * k));
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -38), 0.17 * k));
+        tubeGrad.addColorStop(0.1, rgb(shadeColor(col, -26), 0.1 * k));
+        tubeGrad.addColorStop(0.22, rgb(shadeColor(col, -14), 0.04 * k));
+        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.78, rgb(shadeColor(col, -14), 0.04 * k));
+        tubeGrad.addColorStop(0.9, rgb(shadeColor(col, -26), 0.1 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -38), 0.17 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
@@ -938,18 +939,16 @@ export class SlitherRenderer {
     _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1, opts = {}) {
         if (count < 2) return;
         const col = parseColor(cs);
-        const hi = shadeColor(col, 52);
+        const hi = shadeColor(col, 62);
         const k = alphaMul;
         const { isYou = false, cashoutPerf = false, quality = 1 } = opts;
 
         let blurR = 0;
-        if (isYou) blurR = cashoutPerf ? 5 : 7;
-        else if (quality >= 0.72) blurR = 5;
-        else if (quality >= 0.55) blurR = 3;
+        if (isYou) blurR = cashoutPerf ? 6 : 8;
+        else if (quality >= 0.72) blurR = 6;
+        else if (quality >= 0.55) blurR = 4;
 
-        const trace = (targetCtx, lineW, alpha) => {
-            targetCtx.strokeStyle = rgb(hi, alpha * k);
-            targetCtx.lineWidth = lineW;
+        const tracePath = (targetCtx) => {
             targetCtx.beginPath();
             let started = false;
             for (let i = count - 1; i >= 0; i--) {
@@ -961,7 +960,13 @@ export class SlitherRenderer {
                     targetCtx.lineTo(p.x, p.y);
                 }
             }
-            if (started) targetCtx.stroke();
+            return started;
+        };
+
+        const trace = (targetCtx, lineW, alpha) => {
+            targetCtx.strokeStyle = rgb(hi, alpha * k);
+            targetCtx.lineWidth = lineW;
+            if (tracePath(targetCtx)) targetCtx.stroke();
         };
 
         const drawStrokes = (targetCtx) => {
@@ -969,9 +974,9 @@ export class SlitherRenderer {
             targetCtx.globalCompositeOperation = 'source-over';
             targetCtx.lineCap = 'round';
             targetCtx.lineJoin = 'round';
-            trace(targetCtx, radius * 0.55, 0.035);
-            trace(targetCtx, radius * 0.28, 0.06);
-            trace(targetCtx, radius * 0.12, 0.085);
+            trace(targetCtx, radius * 0.65, 0.05);
+            trace(targetCtx, radius * 0.38, 0.08);
+            trace(targetCtx, radius * 0.16, 0.11);
             targetCtx.restore();
         };
 
@@ -979,6 +984,7 @@ export class SlitherRenderer {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             drawStrokes(ctx);
+            trace(ctx, radius * 0.055, 0.14);
             ctx.restore();
             return;
         }
@@ -1012,6 +1018,9 @@ export class SlitherRenderer {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.drawImage(cv, 0, 0, w, h, ox, oy, w, h);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        trace(ctx, radius * 0.055, 0.14);
         ctx.restore();
     }
 
@@ -1092,10 +1101,10 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v33|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v34|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v33|${key}|boost`, ssSize, (g, sz) => {
+            pair.boostBody = this._getSprite(`pr_norm_v34|${key}|boost`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
             });
         }
