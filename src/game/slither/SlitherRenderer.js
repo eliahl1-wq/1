@@ -327,33 +327,34 @@ export class SlitherRenderer {
             }
 
             const ghostStart = performance.now();
-            for (const id of this._foodAnimCache.keys()) {
+            let ghostSpawned = 0;
+            for (const [id, prev] of prevById) {
                 if (seenFood.has(id)) continue;
-                const prev = prevById.get(id);
                 const anim = this._foodAnimCache.get(id);
-                if (prev && this._mouthValid) {
+                if (prev && this._mouthValid && ghostSpawned < 4) {
                     const foodR = prev.radius || 3;
-                    const eatReach = (this._mouthR + foodR) * 1.55 + 14;
-                    const visualReach = eatReach + this._mouthR * 0.55;
+                    const visualReach = (this._mouthR + foodR) * 1.55 + 14 + this._mouthR * 0.55;
                     const dx = this._mouthX - prev.x;
                     const dy = this._mouthY - prev.y;
                     const slurp = anim?.slurp ?? 0;
                     const pull = slurp * slurp;
-                    if (dx * dx + dy * dy <= visualReach * visualReach || slurp > 0.1) {
-                        if (!anim?.ghosting) {
-                            this._spawnSlurpGhost({
-                                x: prev.x + dx * Math.max(pull, slurp * 0.65) * 0.95,
-                                y: prev.y + dy * Math.max(pull, slurp * 0.65) * 0.95,
-                                hue: prev.hue ?? 120,
-                                radius: prev.radius || 3,
-                                phase: anim?.phase ?? 0,
-                                sizeMul: anim?.sizeMul ?? 1,
-                                start: ghostStart,
-                            });
-                        }
+                    if (dx * dx + dy * dy <= visualReach * visualReach || slurp > 0.12) {
+                        this._spawnSlurpGhost({
+                            x: prev.x + dx * Math.max(pull, slurp * 0.65) * 0.95,
+                            y: prev.y + dy * Math.max(pull, slurp * 0.65) * 0.95,
+                            hue: prev.hue ?? 120,
+                            radius: prev.radius || 3,
+                            phase: anim?.phase ?? 0,
+                            sizeMul: anim?.sizeMul ?? 1,
+                            start: ghostStart,
+                        });
+                        ghostSpawned++;
                     }
                 }
                 this._foodAnimCache.delete(id);
+            }
+            for (const id of this._foodAnimCache.keys()) {
+                if (!seenFood.has(id)) this._foodAnimCache.delete(id);
             }
         }
         const isCompetitive = tick.competitiveSlither ?? this.state.competitiveSlither;
@@ -851,7 +852,9 @@ export class SlitherRenderer {
     }
 
     _spawnSlurpGhost({ x, y, hue, radius, phase, sizeMul, start }) {
-        this._slurpGhosts.push({
+        const ghosts = this._slurpGhosts;
+        if (ghosts.length >= 10) ghosts.shift();
+        ghosts.push({
             x,
             y,
             hue: hue ?? 120,
@@ -859,7 +862,7 @@ export class SlitherRenderer {
             phase: phase ?? 0,
             sizeMul: sizeMul ?? 1,
             start: start ?? performance.now(),
-            duration: 300,
+            duration: 260,
         });
     }
 
@@ -880,6 +883,9 @@ export class SlitherRenderer {
         const mouthX = this._mouthX;
         const mouthY = this._mouthY;
         const mouthR = this._mouthR || 6;
+        const slurpK = 1 - Math.exp(-dt / 0.11);
+        const maxSlurpReach = (mouthR + 4) * 1.55 + 14 + mouthR * 0.55;
+        const maxSlurpReach2 = maxSlurpReach * maxSlurpReach;
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
@@ -904,12 +910,10 @@ export class SlitherRenderer {
                     phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
                     sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
                     slurp: 0,
-                    ghosting: false,
                 };
                 if (f.id != null) this._foodAnimCache.set(f.id, anim);
             }
             if (anim.slurp == null) anim.slurp = 0;
-            if (anim.ghosting == null) anim.ghosting = false;
 
             let wx = f.x;
             let wy = f.y;
@@ -934,23 +938,28 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 2.2;
             }
 
-            // Slurp when within eat range — smoothed pull (no per-frame snap).
-            if (mouthValid && !f.deathDrop && !isGolden && !anim.ghosting) {
-                const foodR = f.radius || 3;
-                const eatReach = (mouthR + foodR) * 1.55 + 14;
-                const visualReach = eatReach + mouthR * 0.55;
+            // Slurp only for food near the mouth — smoothed pull, cheap bbox reject for the rest.
+            if (mouthValid && !f.deathDrop && !isGolden) {
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
-                const dist = Math.hypot(dxm, dym);
+                const nearMouth = Math.abs(dxm) < maxSlurpReach && Math.abs(dym) < maxSlurpReach;
 
-                let targetSlurp = 0;
-                if (dist < visualReach) {
-                    const t = 1 - dist / visualReach;
-                    targetSlurp = t * t;
+                if (nearMouth) {
+                    const foodR = f.radius || 3;
+                    const visualReach = (mouthR + foodR) * 1.55 + 14 + mouthR * 0.55;
+                    const visualReach2 = visualReach * visualReach;
+                    const dist2 = dxm * dxm + dym * dym;
+
+                    let targetSlurp = 0;
+                    if (dist2 < visualReach2) {
+                        const dist = Math.sqrt(dist2);
+                        const t = 1 - dist / visualReach;
+                        targetSlurp = t * t;
+                    }
+                    anim.slurp += (targetSlurp - anim.slurp) * slurpK;
+                } else if (anim.slurp > 0.001) {
+                    anim.slurp += (0 - anim.slurp) * slurpK;
                 }
-
-                const slurpK = 1 - Math.exp(-dt / 0.11);
-                anim.slurp += (targetSlurp - anim.slurp) * slurpK;
 
                 if (anim.slurp > 0.004) {
                     const pull = anim.slurp * anim.slurp;
@@ -959,23 +968,7 @@ export class SlitherRenderer {
                     sizeMul *= Math.max(0.12, 1 - pull * 0.88);
                     alpha = Math.max(0.2, 1 - pull * 0.65);
                 }
-
-                if (anim.slurp > 0.88 && f.id != null) {
-                    anim.ghosting = true;
-                    this._spawnSlurpGhost({
-                        x: wx,
-                        y: wy,
-                        hue,
-                        radius: f.radius || 3,
-                        phase: anim.phase,
-                        sizeMul: anim.sizeMul,
-                        start: now,
-                    });
-                    continue;
-                }
             }
-
-            if (anim.ghosting) continue;
 
             const { x: fx, y: fy } = toScreen(wx, wy);
 
