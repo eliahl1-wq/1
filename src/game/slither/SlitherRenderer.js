@@ -9,7 +9,6 @@ import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandsca
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import { canvasRGBA as stackBlurCanvas } from 'stackblur-canvas';
-import { normalizeSlitherColor } from '../../constants/slitherColors.js';
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
@@ -43,9 +42,55 @@ function toHex({ r, g, b }) {
     return `#${[r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** Official slither.io default skin palette (rcv 0–8). */
+/**
+ * Server colors come from util.randomColor() (same as agar) — any random hex,
+ * sometimes as a { fill, border } object. Keep the random hue but remap it to
+ * the vivid pastel range slither.io snakes use, so dark/muddy randoms still
+ * look like the real game.
+ */
+function normalizeSnakeColor(color) {
+    const raw = typeof color === 'object' && color !== null ? color.fill : color;
+    const { r, g, b } = parseColor(raw);
+
+    // RGB → hue
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    const d = max - min;
+    let h = 0;
+    if (d > 0.0001) {
+        if (max === rn) h = ((gn - bn) / d) % 6;
+        else if (max === gn) h = (bn - rn) / d + 2;
+        else h = (rn - gn) / d + 4;
+        h *= 60;
+        if (h < 0) h += 360;
+    }
+
+    // HSL(h, 62%, 51%) — muted slither pastels
+    const s = 0.62, l = 0.51;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let rr = 0, gg = 0, bb = 0;
+    if (h < 60) [rr, gg, bb] = [c, x, 0];
+    else if (h < 120) [rr, gg, bb] = [x, c, 0];
+    else if (h < 180) [rr, gg, bb] = [0, c, x];
+    else if (h < 240) [rr, gg, bb] = [0, x, c];
+    else if (h < 300) [rr, gg, bb] = [x, 0, c];
+    else [rr, gg, bb] = [c, 0, x];
+    return toHex({ r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 });
+}
+
+/** Bucket colors so sprite cache stays small across many snakes. */
 function bucketSnakeColor(color) {
-    return normalizeSlitherColor(color);
+    const cs = normalizeSnakeColor(color);
+    const { r, g, b } = parseColor(cs);
+    const step = 24;
+    return toHex({
+        r: Math.min(255, Math.round(r / step) * step),
+        g: Math.min(255, Math.round(g / step) * step),
+        b: Math.min(255, Math.round(b / step) * step),
+    });
 }
 
 function shadeColor({ r, g, b }, amount) {
@@ -732,16 +777,15 @@ export class SlitherRenderer {
         const attractR2 = attractR * attractR;
         const maxPull = attractR * 0.42;
 
-        // Cache resolved food sprites during the frame to avoid Map lookup for every item
-        const spriteCache = {};
-
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
             if (Math.abs(f.x - cx) > halfW || Math.abs(f.y - cy) > halfH) continue;
 
-            // Per-food random phase: optimized to avoid string hashing
+            // Per-food random phase so pulse/jiggle isn't synchronized across the field.
             if (f._phase == null) {
-                const h = typeof f.id === 'number' ? f.id : (typeof f.id === 'string' ? f.id.length : (f.x * 73 + f.y * 31));
+                let h = 0;
+                const id = String(f.id ?? `${f.x},${f.y}`);
+                for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
                 f._phase = (Math.abs(h) % 1000) / 1000 * Math.PI * 2;
                 f._sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
             }
@@ -811,12 +855,7 @@ export class SlitherRenderer {
             }
 
             const spriteR = 4;
-            const cacheKey = `${hue}_${isGolden}_${!!f.deathDrop}`;
-            let sprite = spriteCache[cacheKey];
-            if (!sprite) {
-                sprite = this._foodSprite(hue, spriteR, isGolden, !!f.deathDrop);
-                spriteCache[cacheKey] = sprite;
-            }
+            const sprite = this._foodSprite(hue, spriteR, isGolden, !!f.deathDrop);
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
 
@@ -824,10 +863,10 @@ export class SlitherRenderer {
                 ctx.save();
                 ctx.globalAlpha = alpha;
                 ctx.globalCompositeOperation = 'lighter';
-                ctx.drawImage(sprite, (fx - half) | 0, (fy - half) | 0, size | 0, size | 0);
+                ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
                 ctx.restore();
             } else {
-                ctx.drawImage(sprite, (fx - half) | 0, (fy - half) | 0, size | 0, size | 0);
+                ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
             }
         }
     }
@@ -869,53 +908,45 @@ export class SlitherRenderer {
      * Body-local tube — soft lateral shade + feathered rim. Dorsal highlight is spine-only.
      */
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
-        // Parse and darken the base color only slightly to keep it rich but not too dark
-        let col = parseColor(cs);
-        col = shadeColor(col, -15);
+        const col = parseColor(cs);
         const k = contrast;
 
-        // Radial gradient for the base color
-        // Keep the outer edge very close to the base color so overlapping circles blend seamlessly
-        const highlightX = c;
-        const highlightY = c - rPx * 0.08;
-
-        const baseGrad = g.createRadialGradient(
-            highlightX, highlightY, rPx * 0.02,
-            c, c, rPx * 1.05
-        );
-
-        const brightColor = toHex(shadeColor(col, Math.round(135 * k)));
-        const lightColor = toHex(shadeColor(col, Math.round(65 * k)));
-        const softEdgeColor = toHex(shadeColor(col, Math.round(-8 * k)));
-
-        baseGrad.addColorStop(0, '#ffffff'); // Shiny highlight core
-        baseGrad.addColorStop(0.12, brightColor); // Strong shiny highlight
-        baseGrad.addColorStop(0.38, lightColor); // Soft transition
-        baseGrad.addColorStop(0.72, toHex(col)); // Base body color
-        baseGrad.addColorStop(1, softEdgeColor); // Muted edge to let segments blend smoothly
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.28, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
+        baseGrad.addColorStop(0.78, toHex(col));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-16 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Linear gradient (tube shader) with black shadows to shade the left and right sides of the snake body
         const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)'); // Strong dark shadow on side
-        tubeGrad.addColorStop(0.2, 'rgba(0, 0, 0, 0.28)');
-        tubeGrad.addColorStop(0.45, 'rgba(0, 0, 0, 0)');
-        tubeGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0)');
-        tubeGrad.addColorStop(0.8, 'rgba(0, 0, 0, 0.28)');
-        tubeGrad.addColorStop(1, 'rgba(0, 0, 0, 0.65)'); // Strong dark shadow on other side
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -38), 0.17 * k));
+        tubeGrad.addColorStop(0.1, rgb(shadeColor(col, -26), 0.1 * k));
+        tubeGrad.addColorStop(0.22, rgb(shadeColor(col, -14), 0.04 * k));
+        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.78, rgb(shadeColor(col, -14), 0.04 * k));
+        tubeGrad.addColorStop(0.9, rgb(shadeColor(col, -26), 0.1 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -38), 0.17 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
     }
 
-    /** Soft dorsal highlight — wide, smeared-out reflection. */
+    /** Thin dorsal highlight — drawn to offscreen buffer + StackBlur for soft matte falloff. */
     _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1, opts = {}) {
         if (count < 2) return;
+        const col = parseColor(cs);
+        const hi = shadeColor(col, 62);
         const k = alphaMul;
+        const { isYou = false, cashoutPerf = false, quality = 1 } = opts;
+
+        let blurR = 0;
+        if (isYou) blurR = cashoutPerf ? 6 : 8;
+        else if (quality >= 0.72) blurR = 6;
+        else if (quality >= 0.55) blurR = 4;
 
         const tracePath = (targetCtx) => {
             targetCtx.beginPath();
@@ -932,26 +963,66 @@ export class SlitherRenderer {
             return started;
         };
 
+        const trace = (targetCtx, lineW, alpha) => {
+            targetCtx.strokeStyle = rgb(hi, alpha * k);
+            targetCtx.lineWidth = lineW;
+            if (tracePath(targetCtx)) targetCtx.stroke();
+        };
+
+        const drawStrokes = (targetCtx) => {
+            targetCtx.save();
+            targetCtx.globalCompositeOperation = 'source-over';
+            targetCtx.lineCap = 'round';
+            targetCtx.lineJoin = 'round';
+            trace(targetCtx, radius * 0.65, 0.05);
+            trace(targetCtx, radius * 0.38, 0.08);
+            trace(targetCtx, radius * 0.16, 0.11);
+            targetCtx.restore();
+        };
+
+        if (blurR <= 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            drawStrokes(ctx);
+            trace(ctx, radius * 0.055, 0.14);
+            ctx.restore();
+            return;
+        }
+
+        const pad = radius * 0.85;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (let i = 0; i < count; i++) {
+            const p = bumps[i];
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+        }
+        const bw = maxX - minX + pad * 2;
+        const bh = maxY - minY + pad * 2;
+        const ox = minX - pad;
+        const oy = minY - pad;
+        const { cv, ctx: hc, w, h } = this._ensureHlBlurCanvas(bw, bh);
+
+        hc.clearRect(0, 0, w, h);
+        hc.save();
+        hc.translate(-ox, -oy);
+        drawStrokes(hc);
+        hc.restore();
+
+        stackBlurCanvas(cv, 0, 0, w, h, blurR);
+
         ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(cv, 0, 0, w, h, ox, oy, w, h);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-
-        // 1. Draw wide, smeared-out warm glow (softer reflection)
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = 'rgba(255, 253, 225, 0.24)';
-        ctx.lineWidth = radius * 0.44;
-        ctx.filter = 'blur(9px)';
-        if (tracePath(ctx)) ctx.stroke();
-
-        // 2. Draw slightly tighter, soft white reflection (still blurred, no hard core)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
-        ctx.lineWidth = radius * 0.22;
-        ctx.filter = 'blur(3.5px)';
-        if (tracePath(ctx)) ctx.stroke();
-
+        trace(ctx, radius * 0.055, 0.14);
         ctx.restore();
     }
-
 
     /** Turn strength [0,1] and sign (+1 left, -1 right) at bump — for crease shading in bends. */
     _bumpTurn(bumps, i) {
@@ -1030,10 +1101,10 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v35|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v34|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v35|${key}|boost`, ssSize, (g, sz) => {
+            pair.boostBody = this._getSprite(`pr_norm_v34|${key}|boost`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
             });
         }
@@ -1221,7 +1292,6 @@ export class SlitherRenderer {
             const isHead = i === 0;
             const sprite = (boosting && isHead) ? boostBody : normal;
             const tangent = this._bumpTangent(bumps, i);
-            // Draw segment sprite at tangent angle to allow local rotation of the matte highlight
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
             this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
@@ -1294,8 +1364,8 @@ export class SlitherRenderer {
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
 
-                const px = ex + fwdX * eyeR * 0.35;
-                const py = ey + fwdY * eyeR * 0.35;
+                const px = ex + fwdX * eyeR * 0.4;
+                const py = ey + fwdY * eyeR * 0.4;
                 ctx.beginPath();
                 ctx.arc(px, py, pupilR, 0, Math.PI * 2);
                 ctx.fillStyle = '#000000';
