@@ -65,8 +65,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 68%, 60%) — glossy slither pastels, slightly darker than before
-    const s = 0.68, l = 0.60;
+    // HSL(h, 68%, 56%) — glossy slither pastels, darker body
+    const s = 0.68, l = 0.56;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -881,16 +881,6 @@ export class SlitherRenderer {
         return Math.atan2(prev.y - next.y, prev.x - next.x);
     }
 
-    // Slight oval — wider perpendicular to body reads smoother / more tubular (slither.io).
-    _paintSnakeSegmentOval(g, c, rPx, cs, phase = 0, contrast = 1) {
-        g.save();
-        g.translate(c, c);
-        g.scale(1.05, 0.96);
-        g.translate(-c, -c);
-        this._paintSnakeSegment(g, c, rPx, cs, phase, contrast);
-        g.restore();
-    }
-
     /**
      * Glossy gel-like segment — radial body, top specular, bottom depth.
      * Slightly darker base + stronger rim shadow vs original v21.
@@ -900,9 +890,9 @@ export class SlitherRenderer {
         const k = contrast;
 
         const baseGrad = g.createRadialGradient(c, c - rPx * 0.16, rPx * 0.12, c, c, rPx);
-        const centerCol = shadeColor(col, Math.round(8 * k));
+        const centerCol = shadeColor(col, Math.round(6 * k));
         const midCol = col;
-        const edgeCol = shadeColor(col, Math.round(-38 * k));
+        const edgeCol = shadeColor(col, Math.round(-42 * k));
 
         baseGrad.addColorStop(0, toHex(centerCol));
         baseGrad.addColorStop(0.58, toHex(midCol));
@@ -935,10 +925,20 @@ export class SlitherRenderer {
         g.fillStyle = shGrad;
         g.fill();
 
+        const sideCol = shadeColor(col, Math.round(-48 * k));
+        const sideGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
+        sideGrad.addColorStop(0, rgb(sideCol, 0.32 * k));
+        sideGrad.addColorStop(0.2, 'rgba(0,0,0,0)');
+        sideGrad.addColorStop(0.8, 'rgba(0,0,0,0)');
+        sideGrad.addColorStop(1, rgb(sideCol, 0.32 * k));
+
+        g.fillStyle = sideGrad;
+        g.fill();
+
         const edgeShadow = g.createRadialGradient(c, c, rPx * 0.7, c, c, rPx * 1.03);
         edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
         edgeShadow.addColorStop(0.86, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -34), 0.22 * k));
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -38), 0.26 * k));
         g.fillStyle = edgeShadow;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -979,14 +979,14 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v23|${key}|0`, ssSize, (g, sz) => {
-                this._paintSnakeSegmentOval(g, sz / 2, ssR, cs, 0, 1);
+            pair.normal = this._getSprite(`pr_norm_v25|${key}|0`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
             });
-            pair.alt = this._getSprite(`pr_norm_v23|${key}|1`, ssSize, (g, sz) => {
-                this._paintSnakeSegmentOval(g, sz / 2, ssR, cs, 1, 1);
+            pair.alt = this._getSprite(`pr_norm_v25|${key}|1`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v23|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegmentOval(g, sz / 2, ssR, cs, 0, 1.25);
+            pair.boostBody = this._getSprite(`pr_norm_v25|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
             });
         }
 
@@ -1222,10 +1222,10 @@ export class SlitherRenderer {
         const headEyeRadius = headRadius;
         
         // Eye positioning
-        const eyeSide = headEyeRadius * 0.35;
-        const eyeFwd = headEyeRadius * 0.35;
-        const eyeR = Math.max(2.5, headEyeRadius * 0.32);
-        const pupilR = eyeR * 0.45;
+        const eyeSide = headEyeRadius * 0.34;
+        const eyeFwd = headEyeRadius * 0.33;
+        const eyeR = Math.max(2.8, headEyeRadius * 0.38);
+        const pupilR = eyeR * 0.48;
 
         if (boosting && boostOverlay) {
             ctx.save();
