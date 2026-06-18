@@ -34,5 +34,6 @@ export default {
     cashOutTotal: 10,
     cashOutEndAt: 0,
     holdCashoutProgress: 0,
+    holdStartAt: 0,
     battleRoyale: false,
 };

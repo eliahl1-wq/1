@@ -304,18 +304,24 @@ export default function SlitherGame() {
         if (!canCashOutRef.current) return;
         if (!socketRef.current?.connected) return;
         if (cashoutActiveRef.current) return;
+        rendererRef.current?.setHoldStart(0);
         startCashoutCountdown(CASHOUT_SECONDS);
         socketRef.current.emit('cashOut');
     }, [startCashoutCountdown]);
 
-    const handleHoldProgress = useCallback((progress) => {
-        rendererRef.current?.setHud({ holdProgress: progress });
+    const handleHoldStart = useCallback((atMs) => {
+        rendererRef.current?.setHoldStart(atMs);
+    }, []);
+
+    const handleHoldEnd = useCallback(() => {
+        rendererRef.current?.setHoldStart(0);
     }, []);
 
     const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
         onComplete: handleCashOut,
-        onProgress: handleHoldProgress,
+        onHoldStart: handleHoldStart,
+        onHoldEnd: handleHoldEnd,
     });
 
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
@@ -995,6 +1001,7 @@ export default function SlitherGame() {
                 <GameCashoutBar
                     disabled={!cashoutReady}
                     holdProgress={holdProgress}
+                    canvasHoldRing
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}

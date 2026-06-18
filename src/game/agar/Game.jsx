@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 import global from './global.js';
@@ -241,18 +241,25 @@ export default function Game() {
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
         if (cashoutActiveRef.current) return;
+        global.holdStartAt = 0;
         startCashoutCountdown(CASHOUT_SECONDS);
         socketRef.current?.emit('cashOut');
     }, [startCashoutCountdown]);
 
+    const handleHoldStart = useCallback((atMs) => {
+        global.holdStartAt = atMs;
+    }, []);
+
+    const handleHoldEnd = useCallback(() => {
+        global.holdStartAt = 0;
+    }, []);
+
     const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
         onComplete: handleCashOut,
+        onHoldStart: handleHoldStart,
+        onHoldEnd: handleHoldEnd,
     });
-
-    useLayoutEffect(() => {
-        global.holdCashoutProgress = holdProgress;
-    }, [holdProgress]);
 
     useEffect(() => {
         if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
@@ -1005,6 +1012,7 @@ export default function Game() {
                 <GameCashoutBar
                     disabled={localTimer > 0 || isDead || cashedAmount !== null}
                     holdProgress={holdProgress}
+                    canvasHoldRing
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}

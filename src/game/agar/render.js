@@ -1,5 +1,5 @@
 import global from './global.js';
-import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
+import { drawCashoutProgressRing, getCashoutRingProgress, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawBalanceBadge as drawBalanceBadgePill } from '../balanceBadge.js';
 
 const FULL_ANGLE = 2 * Math.PI;
@@ -163,10 +163,19 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
             drawBalanceBadge(graph, cell, nameY, fontSize);
         }
 
-        if (cell.isMe && global.holdCashoutProgress > 0 && global.cashOutTimer <= 0 && !global.battleRoyale) {
-            graph.shadowBlur = 0;
-            const ringR = cell.radius + 10;
-            drawCashoutProgressRing(graph, cell.x, cell.y, ringR, global.holdCashoutProgress, { counterClockwise: true });
+        if (cell.isMe && global.cashOutTimer <= 0 && !global.battleRoyale) {
+            const holdStart = global.holdStartAt;
+            const holdProgress = holdStart
+                ? Math.min(1, (performance.now() - holdStart) / CASHOUT_HOLD_MS)
+                : 0;
+            if (holdProgress > 0) {
+                graph.shadowBlur = 0;
+                const ringR = cell.radius + 10;
+                drawCashoutProgressRing(graph, cell.x, cell.y, ringR, holdProgress, {
+                    counterClockwise: true,
+                    softGlow: true,
+                });
+            }
         }
 
         if (cell.isMe && global.cashOutTimer > 0) {

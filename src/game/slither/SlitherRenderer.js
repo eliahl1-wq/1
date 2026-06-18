@@ -2,7 +2,7 @@
  * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
-import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
+import { drawCashoutProgressRing, getCashoutRingProgress, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
@@ -113,6 +113,7 @@ export class SlitherRenderer {
         this._mouthX = 0;
         this._mouthY = 0;
         this._mouthR = 6;
+        this._holdStartAt = 0;
         this._mouseRafQueued = false;
         this._lastMouseX = 0;
         this._lastMouseY = 0;
@@ -419,8 +420,18 @@ export class SlitherRenderer {
         }
     }
 
-    _isHoldActive() {
-        return (this.hud.holdProgress || 0) > 0;
+    /** Wall-clock hold start for Q / button hold ring (progress computed in draw loop). */
+    setHoldStart(atMs) {
+        this._holdStartAt = atMs ? atMs : 0;
+    }
+
+    _getHoldProgress(nowMs = performance.now()) {
+        if (!this._holdStartAt) return 0;
+        return Math.min(1, (nowMs - this._holdStartAt) / CASHOUT_HOLD_MS);
+    }
+
+    _isHoldActive(nowMs = performance.now()) {
+        return this._holdStartAt > 0 && this._getHoldProgress(nowMs) < 1;
     }
 
     _isCashoutActive(nowMs = Date.now()) {
@@ -1578,7 +1589,7 @@ export class SlitherRenderer {
         const frameMs = dt * 1000;
         this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
         const nowMs = Date.now();
-        this._holdActive = this._isHoldActive();
+        this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
         const qFloor = this.isMobile ? 0.88 : 0.76;
         if (this._perfEma > 24) this._quality = Math.max(qFloor, this.isMobile ? 0.78 : 0.72);
@@ -1711,11 +1722,15 @@ export class SlitherRenderer {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
-            const { holdProgress, cashoutEndAt, cashoutTotal } = this.hud;
+            const { cashoutEndAt, cashoutTotal } = this.hud;
             const ringR = headRadius + 10;
+            const holdProgress = this._getHoldProgress(nowMs);
 
             if (holdProgress > 0 && (!cashoutEndAt || cashoutEndAt <= Date.now())) {
-                drawCashoutProgressRing(ctx, hx, hy, ringR, holdProgress, { counterClockwise: true });
+                drawCashoutProgressRing(ctx, hx, hy, ringR, holdProgress, {
+                    counterClockwise: true,
+                    softGlow: true,
+                });
             }
             if (cashoutEndAt && cashoutEndAt > Date.now()) {
                 const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
@@ -1734,7 +1749,7 @@ export class SlitherRenderer {
         if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
-            if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive) {
+            if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive && !this._holdActive) {
                 const fbPlayers = this._minimapFallback.players;
                 fbPlayers.length = 0;
                 for (let i = 0; i < renderSnakes.length; i++) {
@@ -1787,6 +1802,7 @@ export class SlitherRenderer {
         this._slurpGhosts.length = 0;
         this._renderPool.clear();
         this.smooth.clear();
+        this._holdStartAt = 0;
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
         document.removeEventListener('mousemove', this._onMouseMove);

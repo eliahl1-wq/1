@@ -1,67 +1,77 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CASHOUT_HOLD_MS } from '../game/cashoutRing.js';
 
-export const CASHOUT_HOLD_MS = 1000;
+export { CASHOUT_HOLD_MS };
+
+const UI_TICK_MS = 50;
 
 /**
  * Hold Q (or press-and-hold the cashout button) before starting the cashout timer.
- * Progress is pushed to `onProgress` every frame; React state is throttled for UI only.
+ * Canvas progress should read wall-clock from the renderer; this hook only drives UI + completion.
  */
-export function useHoldKeyCashout({ canStart, onComplete, onProgress }) {
+export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStart, onHoldEnd }) {
     const [holdProgress, setHoldProgress] = useState(0);
     const startTimeRef = useRef(null);
-    const rafRef = useRef(null);
-    const lastUiUpdateRef = useRef(0);
+    const uiIntervalRef = useRef(null);
+    const completeTimeoutRef = useRef(null);
     const canStartRef = useRef(canStart);
     const onCompleteRef = useRef(onComplete);
     const onProgressRef = useRef(onProgress);
+    const onHoldStartRef = useRef(onHoldStart);
+    const onHoldEndRef = useRef(onHoldEnd);
     canStartRef.current = canStart;
     onCompleteRef.current = onComplete;
     onProgressRef.current = onProgress;
+    onHoldStartRef.current = onHoldStart;
+    onHoldEndRef.current = onHoldEnd;
 
     const pushProgress = useCallback((progress) => {
         onProgressRef.current?.(progress);
-        const now = Date.now();
-        if (progress === 0 || progress >= 1 || now - lastUiUpdateRef.current >= 32) {
-            lastUiUpdateRef.current = now;
-            setHoldProgress(progress);
+        setHoldProgress(progress);
+    }, []);
+
+    const clearTimers = useCallback(() => {
+        if (uiIntervalRef.current) {
+            clearInterval(uiIntervalRef.current);
+            uiIntervalRef.current = null;
+        }
+        if (completeTimeoutRef.current) {
+            clearTimeout(completeTimeoutRef.current);
+            completeTimeoutRef.current = null;
         }
     }, []);
 
     const cancelHold = useCallback(() => {
         if (startTimeRef.current == null) return;
         startTimeRef.current = null;
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+        clearTimers();
+        onHoldEndRef.current?.();
         pushProgress(0);
-    }, [pushProgress]);
+    }, [clearTimers, pushProgress]);
 
-    const tick = useCallback(() => {
+    const tickUi = useCallback(() => {
         const start = startTimeRef.current;
         if (start == null) return;
-
-        const elapsed = Date.now() - start;
-        const progress = Math.min(1, elapsed / CASHOUT_HOLD_MS);
+        const progress = Math.min(1, (performance.now() - start) / CASHOUT_HOLD_MS);
         pushProgress(progress);
-
-        if (progress >= 1) {
-            startTimeRef.current = null;
-            rafRef.current = null;
-            pushProgress(0);
-            onCompleteRef.current?.();
-            return;
-        }
-
-        rafRef.current = requestAnimationFrame(tick);
     }, [pushProgress]);
 
     const startHold = useCallback(() => {
         if (startTimeRef.current != null) return;
         if (typeof canStartRef.current === 'function' && !canStartRef.current()) return;
-        startTimeRef.current = Date.now();
-        lastUiUpdateRef.current = 0;
+        const now = performance.now();
+        startTimeRef.current = now;
+        onHoldStartRef.current?.(now);
         pushProgress(0.001);
-        rafRef.current = requestAnimationFrame(tick);
-    }, [tick, pushProgress]);
+        uiIntervalRef.current = setInterval(tickUi, UI_TICK_MS);
+        completeTimeoutRef.current = setTimeout(() => {
+            startTimeRef.current = null;
+            clearTimers();
+            onHoldEndRef.current?.();
+            pushProgress(0);
+            onCompleteRef.current?.();
+        }, CASHOUT_HOLD_MS);
+    }, [clearTimers, pushProgress, tickUi]);
 
     useEffect(() => {
         const onKeyDown = (e) => {
