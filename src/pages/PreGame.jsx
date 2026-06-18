@@ -693,7 +693,7 @@ export default function PreGame() {
         ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding match…' : 'Joining…'}</>
         : !isAuthenticated ? 'Play Now'
             : (isAlreadyInGame && canRejoinThisMode)
-                ? `Rejoin ${currentGameMode?.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}`
+                ? 'Rejoin'
                 : (isAlreadyInGame && !canRejoinThisMode)
                     ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')} — switch mode`
                     : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')

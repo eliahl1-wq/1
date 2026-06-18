@@ -120,7 +120,8 @@ export class SlitherRenderer {
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
-        this._lastFrameTime = 0;
+        this._holdActive = false;
+        this._cashoutActive = false;
         this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         this.baseZoom = this.isMobile ? 2.05 : 2.65;
         this.zoom = this.baseZoom;
@@ -345,6 +346,10 @@ export class SlitherRenderer {
         }
     }
 
+    _isHoldActive() {
+        return (this.hud.holdProgress || 0) > 0;
+    }
+
     _isCashoutActive(nowMs = Date.now()) {
         const end = this.hud.cashoutEndAt;
         return end > 0 && end > nowMs;
@@ -546,7 +551,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, zoom) {
-        ctx.fillStyle = '#1e1e24';
+        ctx.fillStyle = '#32323c';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getBgPattern(ctx);
@@ -560,6 +565,9 @@ export class SlitherRenderer {
             const vh = H / zoom;
             const margin = 240;
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
+            ctx.globalAlpha = 0.92;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+            ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
 
@@ -572,7 +580,7 @@ export class SlitherRenderer {
         const playW = brX - tlX;
         const playH = brY - tlY;
         ctx.save();
-        ctx.fillStyle = 'rgba(72, 4, 9, 0.96)';
+        ctx.fillStyle = 'rgba(48, 12, 16, 0.74)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.rect(tlX, tlY, playW, playH);
@@ -587,7 +595,7 @@ export class SlitherRenderer {
     }
 
     _drawCircularBackground(ctx, W, H, cx, cy, worldHalf, zoom, zone) {
-        ctx.fillStyle = '#1e1e24';
+        ctx.fillStyle = '#32323c';
         ctx.fillRect(0, 0, W, H);
 
         const radius = zone?.radius ?? worldHalf;
@@ -608,11 +616,14 @@ export class SlitherRenderer {
             const vh = H / zoom;
             const margin = 240;
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
+            ctx.globalAlpha = 0.92;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+            ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
 
         ctx.save();
-        ctx.fillStyle = 'rgba(72, 4, 9, 0.96)';
+        ctx.fillStyle = 'rgba(48, 12, 16, 0.74)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2, true);
@@ -752,18 +763,32 @@ export class SlitherRenderer {
         const halfH = H / 2 / zoom + 160 / zoom;
         const simpleFood = this._quality < 0.50;
         const foodStride = this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
-        const skipMagnet = this._quality < 0.55;
+        const heavyArena = foodList.length > 450;
+        const crowdedArena = foodList.length > 220;
+        const farCullR = Math.min(halfW, halfH) * 0.58;
+        const farCullR2 = farCullR * farCullR;
 
-        const mouthValid = !skipMagnet && this._mouthValid;
+        const mouthValid = this._mouthValid && this._quality >= 0.40;
         const mouthX = this._mouthX;
         const mouthY = this._mouthY;
         const attractR = ((this._mouthR || 6) * 3.6) + 54;
         const attractR2 = attractR * attractR;
         const maxPull = attractR * 0.42;
+        let magnetBudget = heavyArena ? 72 : crowdedArena ? 110 : 180;
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
-            if (Math.abs(f.x - cx) > halfW || Math.abs(f.y - cy) > halfH) continue;
+            const dxCam = f.x - cx;
+            const dyCam = f.y - cy;
+            if (Math.abs(dxCam) > halfW || Math.abs(dyCam) > halfH) continue;
+
+            if (f.deathDrop && heavyArena) {
+                const d2cam = dxCam * dxCam + dyCam * dyCam;
+                if (d2cam > farCullR2 && (fi & 1) === 1) continue;
+            } else if (f.deathDrop && crowdedArena) {
+                const d2cam = dxCam * dxCam + dyCam * dyCam;
+                if (d2cam > farCullR2 * 1.35 && (fi & 3) === 3) continue;
+            }
 
             if (f._phase == null) {
                 let h = 0;
@@ -789,7 +814,7 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0035 + f.x) * 6;
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
-                // Death pellets: fixed position + original glow sprite (no wobble, no magnet).
+                // Death pellets: fixed position + glow sprite (no wobble).
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
             } else {
                 sizeMul = f._sizeMul * (1 + Math.sin(now * 0.004 + f._phase) * 0.09);
@@ -797,16 +822,22 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0028 + f._phase * 1.3) * 1.5;
             }
 
-            if (mouthValid && !f.deathDrop) {
+            if (mouthValid && !f.deathDrop && magnetBudget > 0) {
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
-                const dist2 = dxm * dxm + dym * dym;
-                if (dist2 < attractR2 && dist2 > 0.01) {
-                    const dist = Math.sqrt(dist2);
-                    const t = 1 - dist / attractR;
-                    const pull = Math.min(t * t * maxPull, dist);
-                    wx += (dxm / dist) * pull;
-                    wy += (dym / dist) * pull;
+                const adxm = Math.abs(dxm);
+                const adym = Math.abs(dym);
+                if (adxm < attractR && adym < attractR) {
+                    const dist2 = dxm * dxm + dym * dym;
+                    if (dist2 < attractR2 && dist2 > 0.01) {
+                        magnetBudget--;
+                        const invDist = 1 / Math.sqrt(dist2);
+                        const dist = 1 / invDist;
+                        const t = 1 - dist / attractR;
+                        const pull = Math.min(t * t * maxPull, dist);
+                        wx += dxm * invDist * pull;
+                        wy += dym * invDist * pull;
+                    }
                 }
             }
 
@@ -958,7 +989,7 @@ export class SlitherRenderer {
 
     /** Blurred flank + ventral shadow along the body — offset from spine, not on segments. */
     _blitBodySideShadow(ctx, bumps, count, radius, opts = {}) {
-        if (count < 3 || opts.cashoutPerf) return;
+        if (count < 3) return;
         const q = opts.quality ?? 1;
         const isYou = !!opts.isYou;
         if (!isYou && q < 0.50) return;
@@ -1231,10 +1262,10 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.35);
+        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * (isYou ? 0.35 : 0.40));
         const q = this._quality;
-        const cashoutPerf = isYou && this._cashoutPerf;
-        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.9 : 1);
+        const holdActive = isYou && this._holdActive;
+        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
         let arcLen = 0;
         for (let i = 1; i < segs.length; i++) {
             const dx = segs[i].x - segs[i - 1].x;
@@ -1264,9 +1295,9 @@ export class SlitherRenderer {
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
-            glow: isYou && !cashoutPerf && q >= 0.55,
-            boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.6,
-            trailGlow: isYou && boosting && !cashoutPerf,
+            glow: isYou && !holdActive && q >= 0.55,
+            boostOverlay: isYou && boosting && q >= 0.6,
+            trailGlow: isYou && boosting,
         };
         const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
         const stampScale = bodySS * (cacheR / bodyRadius);
@@ -1288,7 +1319,7 @@ export class SlitherRenderer {
             trail.length = 0;
         }
 
-        if (isYou && boosting && !cashoutPerf && trailGlow && trail.length > 1) {
+        if (isYou && boosting && trailGlow && trail.length > 1) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             for (let t = 1; t < trail.length; t++) {
@@ -1301,7 +1332,7 @@ export class SlitherRenderer {
 
         const stampRadius = bodyRadius;
 
-        const hlOpts = { isYou, cashoutPerf, quality: this._quality };
+        const hlOpts = { isYou, quality: this._quality };
 
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
@@ -1311,7 +1342,6 @@ export class SlitherRenderer {
             const sprite = (boosting && isHead) ? boostBody : normal;
             const tangent = this._bumpTangent(bumps, i);
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
-            this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
 
         this._blitBodySideShadow(ctx, bumps, bumpCount, stampRadius, hlOpts);
@@ -1321,7 +1351,7 @@ export class SlitherRenderer {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
-            const glowStride = cashoutPerf ? 4 : (boosting ? 2 : 3);
+            const glowStride = boosting ? 2 : 3;
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -1451,15 +1481,13 @@ export class SlitherRenderer {
         const frameMs = dt * 1000;
         this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
         const nowMs = Date.now();
-        this._cashoutPerf = this._isCashoutActive(nowMs);
+        this._holdActive = this._isHoldActive();
+        this._cashoutActive = this._isCashoutActive(nowMs);
         const qFloor = this.isMobile ? 0.88 : 0.68;
         if (this._perfEma > 28) this._quality = Math.max(qFloor, 0.78);
         else if (this._perfEma > 22) this._quality = Math.min(this._quality, Math.max(qFloor, 0.88));
         else if (this._perfEma > 18) this._quality = Math.min(this._quality, Math.max(qFloor, 0.94));
         else if (this._perfEma < 14) this._quality = Math.min(1, this._quality + 0.02);
-        if (this._cashoutPerf) {
-            this._quality = Math.min(this._quality, this.isMobile ? 0.92 : 0.86);
-        }
 
         ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
         ctx.globalAlpha = 1;
@@ -1618,7 +1646,7 @@ export class SlitherRenderer {
         if (me?.segments?.[0] || this.spectatorMode) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
-            if ((this._minimapFrame++ & 3) === 0 && !this._cashoutPerf) {
+            if ((this._minimapFrame++ & 3) === 0 && !this._cashoutActive) {
                 const fbPlayers = this._minimapFallback.players;
                 fbPlayers.length = 0;
                 for (let i = 0; i < renderSnakes.length; i++) {
