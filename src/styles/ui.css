@@ -2291,43 +2291,24 @@
 
   .gm-card {
     padding: 18px 20px;
-    --gm-preview-w: 100%;
-    --gm-preview-h: 112px;
-  }
-
-  .gm-card-body {
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .gm-card-right {
-    width: 100%;
-    flex-direction: row;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .gm-card-preview-wrap {
-    flex: 1;
-    min-width: 0;
-    height: var(--gm-preview-h);
-  }
-
-  .gm-card-right .gm-play-btn {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 92px;
-    align-self: stretch;
-    margin-top: 0;
-  }
-
-  .gm-card-preview {
-    object-fit: fill;
-    object-position: center;
   }
 
   .profile-stat-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .profile-stat-grid > div {
+    padding: 12px 10px !important;
+  }
+
+  .profile-stat-grid .mono {
+    font-size: 1.05rem !important;
+  }
+
+  .profile-stat-grid .label {
+    font-size: 0.58rem;
+    margin-bottom: 6px !important;
   }
 
   .tx-table-wrap {
@@ -2379,23 +2360,33 @@
     padding: 16px;
   }
 
-  .profile-stat-grid {
-    grid-template-columns: 1fr;
-  }
-
   .gm-tab {
     margin-right: 20px;
     font-size: 0.78rem;
   }
 
+  .gm-card {
+    padding: 16px 18px;
+    --gm-preview-w: 108px;
+    --gm-preview-h: 81px;
+    --gm-preview-gap: 12px;
+  }
+
+  .gm-card-title {
+    font-size: 1rem;
+  }
+
+  .gm-card-desc {
+    font-size: 0.75rem;
+  }
+
+  .gm-card-right .gm-play-btn {
+    font-size: 0.62rem;
+    padding: 8px 8px;
+  }
+
   .page-content {
     padding: 72px 12px 40px;
-  }
-}
-
-@media (min-width: 481px) and (max-width: 768px) {
-  .profile-stat-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -2422,10 +2413,44 @@
 
   .profile-stat-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .profile-stat-grid > div {
+    padding: 16px !important;
+  }
+
+  .profile-stat-grid .mono {
+    font-size: 1.4rem !important;
+  }
+
+  .profile-stat-grid .label {
+    font-size: inherit;
+    margin-bottom: 8px !important;
   }
 
   .gm-grid {
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+
+  .gm-card {
+    padding: 20px 22px;
+    --gm-preview-w: 128px;
+    --gm-preview-h: 96px;
+    --gm-preview-gap: 14px;
+  }
+
+  .gm-card-title {
+    font-size: 1.1rem;
+  }
+
+  .gm-card-desc {
+    font-size: 0.8rem;
+  }
+
+  .gm-card-right .gm-play-btn {
+    font-size: 0.68rem;
+    padding: 8px 10px;
   }
 
   .gm-play-btn {
