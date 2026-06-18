@@ -896,92 +896,9 @@ export class SlitherRenderer {
 
     /** Thin dorsal highlight — drawn to offscreen buffer + StackBlur for soft matte falloff. */
     _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1, opts = {}) {
-        if (count < 2) return;
-        const col = parseColor(cs);
-        const hi = shadeColor(col, 62);
-        const k = alphaMul;
-        const { isYou = false, cashoutPerf = false, quality = 1 } = opts;
-
-        let blurR = 0;
-        if (isYou) blurR = cashoutPerf ? 6 : 8;
-        else if (quality >= 0.72) blurR = 6;
-        else if (quality >= 0.55) blurR = 4;
-
-        const tracePath = (targetCtx) => {
-            targetCtx.beginPath();
-            let started = false;
-            for (let i = count - 1; i >= 0; i--) {
-                const p = bumps[i];
-                if (!started) {
-                    targetCtx.moveTo(p.x, p.y);
-                    started = true;
-                } else {
-                    targetCtx.lineTo(p.x, p.y);
-                }
-            }
-            return started;
-        };
-
-        const trace = (targetCtx, lineW, alpha) => {
-            targetCtx.strokeStyle = rgb(hi, alpha * k);
-            targetCtx.lineWidth = lineW;
-            if (tracePath(targetCtx)) targetCtx.stroke();
-        };
-
-        const drawStrokes = (targetCtx) => {
-            targetCtx.save();
-            targetCtx.globalCompositeOperation = 'source-over';
-            targetCtx.lineCap = 'round';
-            targetCtx.lineJoin = 'round';
-            trace(targetCtx, radius * 0.65, 0.05);
-            trace(targetCtx, radius * 0.38, 0.08);
-            trace(targetCtx, radius * 0.16, 0.11);
-            targetCtx.restore();
-        };
-
-        if (blurR <= 0) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            drawStrokes(ctx);
-            trace(ctx, radius * 0.055, 0.14);
-            ctx.restore();
-            return;
-        }
-
-        const pad = radius * 0.85;
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        for (let i = 0; i < count; i++) {
-            const p = bumps[i];
-            if (p.x < minX) minX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y > maxY) maxY = p.y;
-        }
-        const bw = maxX - minX + pad * 2;
-        const bh = maxY - minY + pad * 2;
-        const ox = minX - pad;
-        const oy = minY - pad;
-        const { cv, ctx: hc, w, h } = this._ensureHlBlurCanvas(bw, bh);
-
-        hc.clearRect(0, 0, w, h);
-        hc.save();
-        hc.translate(-ox, -oy);
-        drawStrokes(hc);
-        hc.restore();
-
-        stackBlurCanvas(cv, 0, 0, w, h, blurR);
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.drawImage(cv, 0, 0, w, h, ox, oy, w, h);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        trace(ctx, radius * 0.055, 0.14);
-        ctx.restore();
+        return; // Disable spine highlight for a clean 3D overlapping sphere look matching the image
     }
+
 
     /** Turn strength [0,1] and sign (+1 left, -1 right) at bump — for crease shading in bends. */
     _bumpTurn(bumps, i) {
