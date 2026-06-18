@@ -192,6 +192,10 @@ export function rebuildPathFromSegments(state, segments) {
 }
 
 /** Slither.io continuous scale from segment count + fractional fullness. */
+export function wsepForSc(sc) {
+    return SEG_SEP * (sc || 1);
+}
+
 export function continuousSc(sct, fam = 0) {
     return Math.min(MAX_SC, 1 + (Math.max(2, sct) - 2 + Math.max(0, fam)) / SC_DIV);
 }

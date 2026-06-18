@@ -1,6 +1,5 @@
 /**
- * Server-authoritative slither renderer — slither.io-authentic visuals.
- * Proportions from ClitherProject Protocol v11: sc, wsep=6*sc (→3.6*sc in our arena).
+ * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
 import { drawCashoutProgressRing, getCashoutRingProgress } from '../cashoutRing.js';
@@ -8,13 +7,12 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
+import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, wsepForSc } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
 const SLITHER_BASE_R = 6.2;
-/** wsep = 6×sc in slither coords; our arena uses half-scale spacing. */
-const SLITHER_WSEP = 3.6;
+
 function parseColor(hex) {
     if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
     const h = hex.replace('#', '');
@@ -884,66 +882,81 @@ export class SlitherRenderer {
     }
 
     /**
-     * Slither.io body disc — flat pastel fill, alternating top bump, soft rim.
-     * Matches original client: one circle per wsep, not heavy 3D gel.
+     * Glossy gel-like segment — radial body, top-left specular, bottom-right depth.
+     * Designed to overlap heavily to form a continuous rubber-like tube.
      */
-    _paintSnakeSegment(g, c, rPx, cs, phase = 0, boosting = false) {
+    _paintSnakeSegment(g, c, rPx, cs, phase = 0, contrast = 1) {
         const col = parseColor(cs);
-        const lift = boosting ? 14 : 0;
+        const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c - rPx * 0.12, rPx * 0.05, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, 10 + lift)));
-        baseGrad.addColorStop(0.55, toHex(shadeColor(col, 2 + lift)));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, -22)));
+        const baseGrad = g.createRadialGradient(c, c - rPx * 0.16, rPx * 0.12, c, c, rPx);
+        const centerCol = shadeColor(col, Math.round(12 * k));
+        const midCol = col;
+        const edgeCol = shadeColor(col, Math.round(-34 * k));
+
+        baseGrad.addColorStop(0, toHex(centerCol));
+        baseGrad.addColorStop(0.6, toHex(midCol));
+        baseGrad.addColorStop(1, toHex(edgeCol));
+
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hiCol = shadeColor(col, 42 + lift);
-        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx * 0.35);
-        const y0 = phase ? 0.08 : 0.04;
-        const y1 = phase ? 0.22 : 0.18;
-        const y2 = phase ? 0.34 : 0.30;
-        hiGrad.addColorStop(0, 'rgba(255,255,255,0)');
-        hiGrad.addColorStop(y0, rgb(hiCol, 0.22));
-        hiGrad.addColorStop(y1, rgb(hiCol, 0.14));
-        hiGrad.addColorStop(y2, 'rgba(255,255,255,0)');
+        const hiCol = shadeColor(col, Math.round(58 * k));
+        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        const hiStart = phase ? 0.07 : 0.05;
+        const hiPeak = phase ? 0.16 : 0.13;
+        const hiEnd = phase ? 0.28 : 0.25;
+        hiGrad.addColorStop(hiStart, 'rgba(255,255,255,0)');
+        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.26 * k));
+        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.045 * k));
+        hiGrad.addColorStop(hiEnd + 0.06, 'rgba(255,255,255,0)');
+
         g.fillStyle = hiGrad;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const rimGrad = g.createRadialGradient(c, c, rPx * 0.78, c, c, rPx);
-        rimGrad.addColorStop(0, 'rgba(0,0,0,0)');
-        rimGrad.addColorStop(1, rgb(shadeColor(col, -38), 0.22));
-        g.fillStyle = rimGrad;
+        const shCol = shadeColor(col, Math.round(-52 * k));
+        const shGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        shGrad.addColorStop(0.68, 'rgba(0,0,0,0)');
+        shGrad.addColorStop(0.94, rgb(shCol, 0.4 * k));
+        shGrad.addColorStop(1.0, rgb(shCol, 0.56 * k));
+
+        g.fillStyle = shGrad;
+        g.fill();
+
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.72, c, c, rPx * 1.03);
+        edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(0.88, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -30), 0.16 * k));
+        g.fillStyle = edgeShadow;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
     }
 
-    /** Subtle boost bloom — slither uses light shimmer, not heavy neon. */
-    _paintSnakeBoostShine(g, c, rPx, cs) {
+    /** Soft outer glow for additive body pass. */
+    _paintSnakeGlow(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const grad = g.createRadialGradient(c, c, rPx * 0.2, c, c, rPx * 1.15);
-        grad.addColorStop(0, rgb(shadeColor(col, 40), 0.18));
-        grad.addColorStop(0.55, rgb(shadeColor(col, 20), 0.06));
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        const bright = shadeColor(col, 20);
+        const glowR = rPx * 1.35;
+        const grad = g.createRadialGradient(c, c, rPx * 0.4, c, c, glowR);
+        grad.addColorStop(0, rgb(bright, 0.1));
+        grad.addColorStop(0.5, rgb(col, 0.04));
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = grad;
         g.beginPath();
-        g.arc(c, c, rPx * 1.12, 0, Math.PI * 2);
+        g.arc(c, c, glowR, 0, Math.PI * 2);
         g.fill();
     }
 
     /**
      * Pre-render normal segment + optional glow/boost overlays into o.pr_imgs cache.
-     * Heavy overlays are built lazily — remote snakes only need normal/alt/boostBody.
      */
     _getSnakePrImgs(cs, rPx, needs = {}) {
-        const key = `sio|${cs}|${rPx}`;
+        const key = `${cs}|${rPx}`;
         let pair = this._prImgs.get(key);
-        const bodySS = rPx <= 40 ? this._bodySS : 1.5;
+        const bodySS = rPx <= 44 ? this._bodySS : rPx <= 84 ? 1.5 : 1.25;
 
         if (!pair) {
             pair = { bodySS };
@@ -953,23 +966,60 @@ export class SlitherRenderer {
         }
 
         const ssR = rPx * bodySS;
-        const ssSize = Math.ceil(ssR * 2 + 6);
+        const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`sio_norm|${key}|0`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, false);
+            pair.normal = this._getSprite(`pr_norm_v21|${key}|0`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
             });
-            pair.alt = this._getSprite(`sio_norm|${key}|1`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, false);
+            pair.alt = this._getSprite(`pr_norm_v21|${key}|1`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
             });
-            pair.boostBody = this._getSprite(`sio_norm|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, true);
+            pair.boostBody = this._getSprite(`pr_norm_v21|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
             });
         }
 
-        if (needs.boostShine && !pair.boostShine) {
-            pair.boostShine = this._getSprite(`sio_shine|${key}`, ssSize, (g, sz) => {
-                this._paintSnakeBoostShine(g, sz / 2, ssR, cs);
+        if (needs.glow && !pair.glow) {
+            const glowPad = Math.ceil(rPx * 0.45);
+            pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+                this._paintSnakeGlow(g, sz / 2, rPx, cs);
+            });
+        }
+
+        if (needs.boostOverlay && !pair.boostOverlay) {
+            const col = parseColor(cs);
+            const bright = shadeColor(col, 35);
+            const pad = Math.max(3, Math.ceil(rPx * 0.2));
+            pair.boostOverlay = this._getSprite(`pr_boost_v20|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
+                const c = sz / 2;
+                const glowR = rPx * 1.4 + pad;
+                const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
+                aura.addColorStop(0, rgb(bright, 0.05));
+                aura.addColorStop(0.4, rgb(bright, 0.15));
+                aura.addColorStop(0.7, rgb(bright, 0.08));
+                aura.addColorStop(1, 'rgba(255,255,255,0)');
+                g.fillStyle = aura;
+                g.beginPath();
+                g.arc(c, c, glowR, 0, Math.PI * 2);
+                g.fill();
+            });
+        }
+
+        if (needs.trailGlow && !pair.trailGlow) {
+            const col = parseColor(cs);
+            const bright = shadeColor(col, 35);
+            pair.trailGlow = this._getSprite(`pr_trail_v20|${key}`, rPx * 3 + 8, (g, sz) => {
+                const c = sz / 2;
+                const glowR = rPx * 1.7;
+                const grad = g.createRadialGradient(c, c, 0, c, c, glowR);
+                grad.addColorStop(0, rgb(bright, 0.12));
+                grad.addColorStop(0.40, rgb(col, 0.06));
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                g.fillStyle = grad;
+                g.beginPath();
+                g.arc(c, c, glowR, 0, Math.PI * 2);
+                g.fill();
             });
         }
 
@@ -1033,26 +1083,37 @@ export class SlitherRenderer {
         }
 
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
-        const wsep = SLITHER_WSEP * sc;
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        // Slither.io: one body disc per wsep along the trail (heavy overlap → smooth tube).
-        const stampStepWorld = Math.max(0.8, wsep);
+        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.26);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
-        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.92 : 1);
+        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.9 : 1);
         let arcLen = 0;
         for (let i = 1; i < segs.length; i++) {
             const dx = segs[i].x - segs[i - 1].x;
             const dy = segs[i].y - segs[i - 1].y;
             arcLen += Math.sqrt(dx * dx + dy * dy);
         }
-        const neededStamps = Math.ceil(arcLen / stampStepWorld) + 2;
-        const stampCap = Math.round((isYou ? 220 : 96) * qMul);
-        const maxStamps = Math.min(Math.max(neededStamps, 10), stampCap);
+        const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
+        const stampCap = Math.round((isYou ? (boosting ? 150 : 130) : (boosting ? 64 : 52)) * qMul);
+        const maxStamps = Math.min(Math.max(neededStamps, 8), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
             ctx.restore();
             return;
+        }
+
+        // Slither.io bump phase (fchls): alternates every wsep along the body, not per stamp index.
+        const wsepWorld = snake.wsep ?? wsepForSc(sc);
+        let arcAlong = 0;
+        for (let bi = 0; bi < bumps.length; bi++) {
+            if (bi > 0) {
+                arcAlong += Math.hypot(
+                    bumps[bi].x - bumps[bi - 1].x,
+                    bumps[bi].y - bumps[bi - 1].y,
+                );
+            }
+            bumps[bi].phase = Math.floor(arcAlong / Math.max(0.5, wsepWorld)) & 1;
         }
 
         // Project bumps to screen once — stable world spacing, single projection.
@@ -1067,31 +1128,78 @@ export class SlitherRenderer {
         const hx = bumps[0].x;
         const hy = bumps[0].y;
 
-        const cacheR = Math.max(6, Math.round(bodyRadius / 6) * 6);
-        const prNeeds = { boostShine: boosting && !cashoutPerf };
-        const { normal, alt, boostBody, boostShine, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
+        const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
+        const prNeeds = {
+            glow: isYou && !cashoutPerf && q >= 0.5,
+            boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
+            trailGlow: isYou && boosting && !cashoutPerf,
+        };
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
         const stampScale = bodySS * (cacheR / bodyRadius);
+        const halfT = trailGlow ? trailGlow.width / 2 : 0;
+        const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
         const bumpCount = bumps.length;
 
         const headBump = bumps[0];
 
-        // Draw body discs tail → head (one per wsep, alternating bump phase).
+        let trail = this._boostTrailPool.get(snake.id);
+        if (!trail) {
+            trail = [];
+            this._boostTrailPool.set(snake.id, trail);
+        }
+        if (isYou && boosting) {
+            trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
+            if (trail.length > 6) trail.length = 6;
+        } else if (trail.length > 0) {
+            trail.length = 0;
+        }
+
+        if (isYou && boosting && !cashoutPerf && trailGlow && trail.length > 1) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let t = 1; t < trail.length; t++) {
+                const tr = trail[t];
+                ctx.globalAlpha = (1 - t / trail.length) * 0.12 * pulse;
+                ctx.drawImage(trailGlow, tr.x - halfT, tr.y - halfT);
+            }
+            ctx.restore();
+        }
+
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const isHead = i === 0;
-            const phase = (bumpCount - 1 - i) & 1;
-            const sprite = (boosting && (isHead || phase === 0)) ? boostBody : (phase ? alt : normal);
+            const phase = bumps[i].phase ?? (i & 1);
+            const sprite = (boosting && isHead) ? boostBody : (phase ? alt : normal);
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale);
+        }
 
-            if (boosting && boostShine && (isHead || i % 2 === 0)) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.globalAlpha = isHead ? 0.35 * pulse : 0.18 * pulse;
-                this._blitSprite(ctx, boostShine, p.x, p.y, stampScale);
-                ctx.restore();
+        if (isYou && prNeeds.glow && glow) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
+            const glowStride = cashoutPerf ? 4 : (boosting ? 2 : 3);
+            for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                this._blitSprite(ctx, glow, p.x, p.y);
             }
+            ctx.restore();
+        }
+
+        if (isYou && boosting && prNeeds.boostOverlay && boostOverlay) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = bumpCount - 1; i >= 0; i -= 2) {
+                const p = bumps[i];
+                if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+                const along = i / Math.max(1, bumpCount - 1);
+                const headProx = 1 - along;
+                ctx.globalAlpha = (0.22 + headProx * 0.22) * pulse;
+                this._blitSprite(ctx, boostOverlay, p.x, p.y);
+            }
+            ctx.restore();
         }
 
         // Head and Eyes
@@ -1109,12 +1217,14 @@ export class SlitherRenderer {
         const eyeR = Math.max(2.5, headEyeRadius * 0.32);
         const pupilR = eyeR * 0.45;
 
-        // Head boost shine (slither.io head glint when boosting)
-        if (boosting && boostShine) {
+        if (boosting && boostOverlay) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.3 * pulse;
-            this._blitSprite(ctx, boostShine, hx, hy, stampScale);
+            ctx.globalAlpha = 0.25 * pulse;
+            ctx.translate(hx + fwdX * headRadius * 0.08, hy + fwdY * headRadius * 0.08);
+            ctx.rotate(angle);
+            ctx.scale(1.12, 0.95);
+            ctx.drawImage(boostOverlay, -halfB, -halfB);
             ctx.restore();
         }
 
