@@ -633,7 +633,8 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = 0.08;
+            const headDist = Math.hypot(head.x - cx, head.y - cy);
+            const tau = headDist < 900 ? 0.06 : 0.11;
             const a = 1 - Math.exp(-dt / tau);
             for (let i = 0; i < spineLen; i++) {
                 if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
@@ -1686,14 +1687,27 @@ export class SlitherRenderer {
             }
         }
 
-        if (snake.name && isYou && !this.hideOverlays) {
-            ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
+        if (snake.name && !this.hideOverlays && headEyeRadius >= 8) {
+            let fontSize = headEyeRadius * 0.85;
+            const nameLen = snake.name.length;
+            if (nameLen > 3) fontSize *= 0.7;
+            if (nameLen > 7) fontSize *= 0.5;
+            if (nameLen > 12) fontSize *= 0.35;
+            fontSize = Math.max(11, Math.min(16, fontSize));
+            const nameY = hy - headEyeRadius - 12;
+            ctx.fillStyle = isYou ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)';
+            ctx.font = `bold ${fontSize}px Arial, sans-serif`;
             ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             ctx.strokeStyle = 'rgba(0,0,0,0.55)';
             ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
-            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
+            ctx.strokeText(snake.name, hx, nameY);
+            ctx.fillText(snake.name, hx, nameY);
+
+            const displayBalance = isYou
+                ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance ?? 0)
+                : (snake.dollarBalance ?? snake.balance ?? 0);
+            this._drawBalanceBadge(ctx, hx, nameY + fontSize * 0.9, displayBalance, isYou);
         }
 
         // Mobile steering arrow — only while finger is on screen, further ahead of the head.
@@ -1787,6 +1801,7 @@ export class SlitherRenderer {
             rs.isYou = snake.isYou;
             rs.name = snake.name;
             rs.balance = snake.balance;
+            rs.dollarBalance = snake.dollarBalance ?? snake.balance;
             rs.segments = s ? s.segments : snake.segments;
             rs.drawSpine = rs.segments;
             rs.angle = s ? s.angle : snake.angle;
@@ -1877,7 +1892,7 @@ export class SlitherRenderer {
             this._drawSnake(snake, toScreen, zoom);
         }
 
-        // Balance badge + cashout rings on your snake head
+        // Cashout ring on your snake head (balance badge drawn in _drawSnake with name)
         if (me?.segments?.[0] && !this.hideOverlays) {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
@@ -1889,17 +1904,9 @@ export class SlitherRenderer {
                 const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
                 drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
             }
-
-            this._drawBalanceBadge(
-                ctx,
-                hx,
-                hy + headRadius + 14,
-                this.hud.balance ?? me.dollarBalance ?? me.balance ?? 1,
-                true,
-            );
         }
 
-        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
+        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode) && (this._frame & 1) === 0) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
             if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive && !this._holdActive) {
