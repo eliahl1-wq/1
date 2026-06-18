@@ -120,7 +120,7 @@ export class SlitherRenderer {
         this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         this.baseZoom = this.isMobile ? 2.05 : 2.65;
         this.zoom = this.baseZoom;
-        this.snakeThickness = this.isMobile ? 1.0 : 1.05;
+        this.snakeThickness = this.isMobile ? 1.0 : 0.9;
         this._dpr = 1;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
         this._sprites = new Map();
@@ -392,15 +392,13 @@ export class SlitherRenderer {
                 s.angle = snake.angle || 0;
                 if (snake.isYou) {
                     rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, snake.radius, snake.fam ?? 0, segCount);
+                    resetVisualGrowth(s, null, snake.fam ?? 0, segCount);
                 }
                 continue;
             }
 
             const meta = {
                 segmentCount: segCount,
-                sc: snake.sc,
-                radius: snake.radius,
                 fam: snake.fam ?? 0,
             };
 
@@ -411,7 +409,7 @@ export class SlitherRenderer {
                     for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                     s.angle = snake.angle || 0;
                     rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, snake.radius, snake.fam ?? 0, segCount);
+                    resetVisualGrowth(s, null, snake.fam ?? 0, segCount);
                     resetSnakeBodyTick(s);
                     delete s._prevSrvHead;
                     delete s._extrapX;
@@ -1089,7 +1087,6 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || 6.2) / 6.2);
         const bodyRadiusWorld = snake.radius || (6.2 * sc);
-        // Overlapping stamps — step tied to body width so circles never gap (slither.io style).
         const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.28);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
@@ -1121,20 +1118,14 @@ export class SlitherRenderer {
         const hx = bumps[0].x;
         const hy = bumps[0].y;
 
-        // Coarse radius buckets with hysteresis so sprite set doesn't swap every frame.
-        const rawR = Math.max(4, Math.round(bodyRadius / 4) * 4);
-        let r = rawR;
-        if (snake._lastSpriteR != null && Math.abs(rawR - snake._lastSpriteR) < 8) {
-            r = snake._lastSpriteR;
-        } else {
-            snake._lastSpriteR = rawR;
-        }
+        const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
             glow: isYou && !cashoutPerf && q >= 0.5,
             boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
             trailGlow: isYou && boosting && !cashoutPerf,
         };
-        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, r, prNeeds);
+        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
+        const stampScale = bodySS * (cacheR / bodyRadius);
         const halfT = trailGlow ? trailGlow.width / 2 : 0;
         const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
         const bumpCount = bumps.length;
@@ -1172,7 +1163,7 @@ export class SlitherRenderer {
 
             const isHead = i === 0;
             const sprite = (boosting && isHead) ? boostBody : ((i & 1) ? alt : normal);
-            this._blitSprite(ctx, sprite, p.x, p.y, bodySS);
+            this._blitSprite(ctx, sprite, p.x, p.y, stampScale);
         }
 
         // Ambient glow — local snake only (doubles draw calls otherwise). The glow

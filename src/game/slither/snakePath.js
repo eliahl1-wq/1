@@ -2,6 +2,8 @@
 
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
+const MAX_SC = 6;
+const SC_DIV = 106;
 const MAX_PATH_POINTS = 560;
 const MIN_HEAD_RECORD = 0.14;
 
@@ -189,36 +191,37 @@ export function rebuildPathFromSegments(state, segments) {
     state.path = path;
 }
 
+/** Slither.io continuous scale from segment count + fractional fullness. */
+export function continuousSc(sct, fam = 0) {
+    return Math.min(MAX_SC, 1 + (Math.max(2, sct) - 2 + Math.max(0, fam)) / SC_DIV);
+}
+
 /** Snap visual thickness to server after teleport or respawn. */
 export function resetVisualGrowth(state, radius, fam = 0, sct = 1) {
-    state.visualRadius = radius ?? BASE_RADIUS;
+    state.visualRadius = radius ?? BASE_RADIUS * continuousSc(sct, fam);
     state.visualFam = fam;
     state._prevTargetSct = sct;
 }
 
 /** Ease display thickness and tail fullness toward server values. */
 function stepVisualGrowth(state, meta, dt) {
-    const targetRadius = meta.radius || BASE_RADIUS;
     const targetFam = meta.fam ?? 0;
     const targetSct = meta.segmentCount || 1;
+    const targetRadius = BASE_RADIUS * continuousSc(targetSct, targetFam);
     if (state.visualRadius == null) state.visualRadius = targetRadius;
     if (state.visualFam == null) state.visualFam = targetFam;
     if (state._prevTargetSct == null) state._prevTargetSct = targetSct;
-
-    // New segment just landed — keep tail visually continuous (fam was ~1, server resets low).
-    if (targetSct > state._prevTargetSct) {
-        state.visualFam = 1;
-    }
     state._prevTargetSct = targetSct;
 
-    const radiusA = 1 - Math.exp(-dt / 0.5);
-    const famA = 1 - Math.exp(-dt / 0.65);
+    const radiusA = 1 - Math.exp(-dt / 1.4);
+    const famA = 1 - Math.exp(-dt / 1.1);
     state.visualRadius += (targetRadius - state.visualRadius) * radiusA;
     state.visualFam += (targetFam - state.visualFam) * famA;
 
+    const visSc = state.visualRadius / BASE_RADIUS;
     return {
         radius: state.visualRadius,
-        sc: state.visualRadius / BASE_RADIUS,
+        sc: visSc,
         fam: state.visualFam,
     };
 }
