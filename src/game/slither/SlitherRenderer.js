@@ -884,28 +884,30 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        // Base fill — radial gradient; rim shadow fades in gently over a wider band
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.12, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(8 * k))));
-        baseGrad.addColorStop(0.48, toHex(col));
-        baseGrad.addColorStop(0.72, toHex(shadeColor(col, Math.round(-6 * k))));
-        baseGrad.addColorStop(0.88, toHex(shadeColor(col, Math.round(-14 * k))));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-22 * k))));
+        // Base fill — soft radial; lighter center band, rim darkens only at the edge
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.08, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(6 * k))));
+        baseGrad.addColorStop(0.55, toHex(col));
+        baseGrad.addColorStop(0.78, toHex(shadeColor(col, Math.round(-4 * k))));
+        baseGrad.addColorStop(0.92, toHex(shadeColor(col, Math.round(-10 * k))));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-18 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Tube lateral shading — softer, smeared further toward the center
+        // Symmetric tube shading — clear center, gradual darkening toward both edges
         const tubeGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -42), 0.17 * k));
-        tubeGrad.addColorStop(0.18, rgb(shadeColor(col, -24), 0.09 * k));
-        tubeGrad.addColorStop(0.36, rgb(shadeColor(col, -8), 0.025 * k));
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -34), 0.11 * k));
+        tubeGrad.addColorStop(0.10, rgb(shadeColor(col, -18), 0.055 * k));
+        tubeGrad.addColorStop(0.24, rgb(shadeColor(col, -5), 0.012 * k));
+        tubeGrad.addColorStop(0.42, 'rgba(0,0,0,0)');
         tubeGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.64, rgb(shadeColor(col, -8), 0.025 * k));
-        tubeGrad.addColorStop(0.82, rgb(shadeColor(col, -24), 0.09 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -42), 0.17 * k));
+        tubeGrad.addColorStop(0.58, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.76, rgb(shadeColor(col, -5), 0.012 * k));
+        tubeGrad.addColorStop(0.90, rgb(shadeColor(col, -18), 0.055 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -34), 0.11 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
@@ -939,52 +941,6 @@ export class SlitherRenderer {
             g.arc(c, c, dotR, 0, Math.PI * 2);
             g.fill();
         }, Math.max(1, Math.round(dotR * 0.4)));
-    }
-
-    /** Pre-blurred soft shadow for the ventral flank — stamped along the spine, not per-segment. */
-    _getBodyFlankShadowDot(radius) {
-        const dotR = Math.max(4, Math.ceil(radius * 0.78));
-        const key = `flank_sh_v1|${dotR}`;
-        return this._getSprite(key, dotR * 2 + 16, (g, sz) => {
-            const c = sz / 2;
-            const grad = g.createRadialGradient(c, c, 0, c, c, dotR);
-            grad.addColorStop(0, 'rgba(0,0,0,0.38)');
-            grad.addColorStop(0.32, 'rgba(0,0,0,0.20)');
-            grad.addColorStop(0.62, 'rgba(0,0,0,0.07)');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            g.fillStyle = grad;
-            g.beginPath();
-            g.arc(c, c, dotR, 0, Math.PI * 2);
-            g.fill();
-        }, Math.max(2, Math.round(dotR * 0.62)));
-    }
-
-    /** Blurred underside flank shadow — continuous along the body for rounder 3D read. */
-    _blitBodyFlankShadow(ctx, bumps, count, radius, opts = {}) {
-        if (count < 3 || opts.cashoutPerf) return;
-        const q = opts.quality ?? 1;
-        const isYou = !!opts.isYou;
-        if (!isYou && q < 0.52) return;
-
-        const dot = this._getBodyFlankShadowDot(radius);
-        const half = dot.width / 2;
-        const stride = Math.max(1, Math.round(count / (isYou ? 34 : 20)));
-        const off = radius * 0.41;
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = isYou ? 0.30 : 0.22;
-        for (let i = count - 1; i >= 0; i -= stride) {
-            const p = bumps[i];
-            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-            const tangent = this._bumpTangent(bumps, i);
-            const perpX = Math.sin(tangent);
-            const perpY = -Math.cos(tangent);
-            const sx = p.x - perpX * off;
-            const sy = p.y - perpY * off;
-            ctx.drawImage(dot, (sx - half) | 0, (sy - half) | 0);
-        }
-        ctx.restore();
     }
 
     /** Stamp pre-blurred highlight dots along the spine — cheap, no per-frame blur. */
@@ -1081,10 +1037,10 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v36|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v37|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v36|${key}|boost`, ssSize, (g, sz) => {
+            pair.boostBody = this._getSprite(`pr_norm_v37|${key}|boost`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
             });
         }
@@ -1276,7 +1232,6 @@ export class SlitherRenderer {
             this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
 
-        this._blitBodyFlankShadow(ctx, bumps, bumpCount, stampRadius, hlOpts);
         this._blitSpineHighlight(ctx, bumps, bumpCount, stampRadius, cs, boosting ? 1.08 : 1, hlOpts);
 
         if (isYou && prNeeds.glow && glow) {
