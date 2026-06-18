@@ -9,6 +9,7 @@ import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandsca
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import { canvasRGBA as stackBlurCanvas } from 'stackblur-canvas';
+import { normalizeSlitherColor } from '../../constants/slitherColors.js';
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
@@ -42,55 +43,9 @@ function toHex({ r, g, b }) {
     return `#${[r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/**
- * Server colors come from util.randomColor() (same as agar) — any random hex,
- * sometimes as a { fill, border } object. Keep the random hue but remap it to
- * the vivid pastel range slither.io snakes use, so dark/muddy randoms still
- * look like the real game.
- */
-function normalizeSnakeColor(color) {
-    const raw = typeof color === 'object' && color !== null ? color.fill : color;
-    const { r, g, b } = parseColor(raw);
-
-    // RGB → hue
-    const rn = r / 255, gn = g / 255, bn = b / 255;
-    const max = Math.max(rn, gn, bn);
-    const min = Math.min(rn, gn, bn);
-    const d = max - min;
-    let h = 0;
-    if (d > 0.0001) {
-        if (max === rn) h = ((gn - bn) / d) % 6;
-        else if (max === gn) h = (bn - rn) / d + 2;
-        else h = (rn - gn) / d + 4;
-        h *= 60;
-        if (h < 0) h += 360;
-    }
-
-    // HSL(h, 62%, 51%) — muted slither pastels
-    const s = 0.62, l = 0.51;
-    const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-    const m = l - c / 2;
-    let rr = 0, gg = 0, bb = 0;
-    if (h < 60) [rr, gg, bb] = [c, x, 0];
-    else if (h < 120) [rr, gg, bb] = [x, c, 0];
-    else if (h < 180) [rr, gg, bb] = [0, c, x];
-    else if (h < 240) [rr, gg, bb] = [0, x, c];
-    else if (h < 300) [rr, gg, bb] = [x, 0, c];
-    else [rr, gg, bb] = [c, 0, x];
-    return toHex({ r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 });
-}
-
-/** Bucket colors so sprite cache stays small across many snakes. */
+/** Official slither.io default skin palette (rcv 0–8). */
 function bucketSnakeColor(color) {
-    const cs = normalizeSnakeColor(color);
-    const { r, g, b } = parseColor(cs);
-    const step = 24;
-    return toHex({
-        r: Math.min(255, Math.round(r / step) * step),
-        g: Math.min(255, Math.round(g / step) * step),
-        b: Math.min(255, Math.round(b / step) * step),
-    });
+    return normalizeSlitherColor(color);
 }
 
 function shadeColor({ r, g, b }, amount) {
@@ -911,27 +866,31 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.28, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
-        baseGrad.addColorStop(0.78, toHex(col));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-16 * k))));
+        // Shift light source to top-left to simulate a global light direction
+        const highlightX = c - rPx * 0.22;
+        const highlightY = c - rPx * 0.22;
+
+        const baseGrad = g.createRadialGradient(
+            highlightX, highlightY, rPx * 0.05,
+            c - rPx * 0.05, c - rPx * 0.05, rPx * 1.05
+        );
+
+        // Generate dynamic highlight, light, shadow, and deep outline colors
+        const brightColor = toHex(shadeColor(col, Math.round(130 * k)));
+        const lightColor = toHex(shadeColor(col, Math.round(60 * k)));
+        const shadowColor = toHex(shadeColor(col, Math.round(-35 * k)));
+        const darkColor = toHex(shadeColor(col, Math.round(-65 * k)));
+
+        baseGrad.addColorStop(0, '#ffffff'); // Pure white center reflection
+        baseGrad.addColorStop(0.12, brightColor); // Pale shiny tone
+        baseGrad.addColorStop(0.32, lightColor); // Midtone shading transition
+        baseGrad.addColorStop(0.68, toHex(col)); // Base snake skin color
+        baseGrad.addColorStop(0.90, shadowColor); // Spherical shadow falloff
+        baseGrad.addColorStop(1, darkColor); // Rich edge border silhouette
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-
-        const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -38), 0.17 * k));
-        tubeGrad.addColorStop(0.1, rgb(shadeColor(col, -26), 0.1 * k));
-        tubeGrad.addColorStop(0.22, rgb(shadeColor(col, -14), 0.04 * k));
-        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.78, rgb(shadeColor(col, -14), 0.04 * k));
-        tubeGrad.addColorStop(0.9, rgb(shadeColor(col, -26), 0.1 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -38), 0.17 * k));
-
-        g.fillStyle = tubeGrad;
         g.fill();
     }
 
@@ -1101,10 +1060,10 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v34|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v35|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v34|${key}|boost`, ssSize, (g, sz) => {
+            pair.boostBody = this._getSprite(`pr_norm_v35|${key}|boost`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
             });
         }
@@ -1292,7 +1251,8 @@ export class SlitherRenderer {
             const isHead = i === 0;
             const sprite = (boosting && isHead) ? boostBody : normal;
             const tangent = this._bumpTangent(bumps, i);
-            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
+            // Draw segment sprite at angle 0 so highlight is consistently top-left on screen
+            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, 0);
             this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
 
@@ -1363,9 +1323,12 @@ export class SlitherRenderer {
                 ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
+                ctx.lineWidth = Math.max(1.5, headEyeRadius * 0.05);
+                ctx.strokeStyle = '#000000';
+                ctx.stroke();
 
-                const px = ex + fwdX * eyeR * 0.4;
-                const py = ey + fwdY * eyeR * 0.4;
+                const px = ex + fwdX * eyeR * 0.35;
+                const py = ey + fwdY * eyeR * 0.35;
                 ctx.beginPath();
                 ctx.arc(px, py, pupilR, 0, Math.PI * 2);
                 ctx.fillStyle = '#000000';
