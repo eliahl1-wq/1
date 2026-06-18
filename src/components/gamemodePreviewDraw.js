@@ -461,10 +461,11 @@ const DRAWERS = {
     'br-slither': (ctx, W, H) => drawBRSlitherPreview(ctx, W, H),
 };
 
-export function drawGamemodePreview(ctx, W, H, mode) {
+export function drawGamemodePreview(ctx, W, H, mode, { fit = false } = {}) {
     const draw = DRAWERS[mode] || DRAWERS.agar;
-    const ref = 360;
-    const zoom = Math.min(1.32, 1.32 * (Math.min(W, H) / ref));
+    const zoom = fit
+        ? Math.min(1.32, 1.32 * (Math.min(W, H) / 360))
+        : 1.32;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);

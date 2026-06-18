@@ -557,7 +557,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, zoom) {
-        ctx.fillStyle = '#202026';
+        ctx.fillStyle = '#1f1f25';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getBgPattern(ctx);
@@ -571,9 +571,6 @@ export class SlitherRenderer {
             const vh = H / zoom;
             const margin = 240;
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
-            ctx.globalAlpha = 0.92;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-            ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
 
@@ -586,7 +583,7 @@ export class SlitherRenderer {
         const playW = brX - tlX;
         const playH = brY - tlY;
         ctx.save();
-        ctx.fillStyle = 'rgba(56, 10, 14, 0.86)';
+        ctx.fillStyle = 'rgba(56, 10, 14, 0.88)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.rect(tlX, tlY, playW, playH);
@@ -601,7 +598,7 @@ export class SlitherRenderer {
     }
 
     _drawCircularBackground(ctx, W, H, cx, cy, worldHalf, zoom, zone) {
-        ctx.fillStyle = '#202026';
+        ctx.fillStyle = '#1f1f25';
         ctx.fillRect(0, 0, W, H);
 
         const radius = zone?.radius ?? worldHalf;
@@ -622,14 +619,11 @@ export class SlitherRenderer {
             const vh = H / zoom;
             const margin = 240;
             ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
-            ctx.globalAlpha = 0.92;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-            ctx.fillRect(cx - vw / 2 - margin, cy - vh / 2 - margin, vw + margin * 2, vh + margin * 2);
             ctx.restore();
         }
 
         ctx.save();
-        ctx.fillStyle = 'rgba(56, 10, 14, 0.86)';
+        ctx.fillStyle = 'rgba(56, 10, 14, 0.88)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.arc(zx, zy, screenRadius, 0, Math.PI * 2, true);
