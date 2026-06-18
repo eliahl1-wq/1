@@ -65,8 +65,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 66%, 52%) — darker slither pastels
-    const s = 0.66, l = 0.52;
+    // HSL(h, 62%, 51%) — muted slither pastels
+    const s = 0.62, l = 0.51;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -892,33 +892,34 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.14, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(2 * k))));
-        baseGrad.addColorStop(0.58, toHex(col));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-42 * k))));
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.18, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
+        baseGrad.addColorStop(0.62, toHex(col));
+        baseGrad.addColorStop(0.9, toHex(shadeColor(col, Math.round(-22 * k))));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-30 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hiCol = shadeColor(col, Math.round(34 * k));
+        const hiCol = shadeColor(col, Math.round(24 * k));
         const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -48), 0.30 * k));
-        tubeGrad.addColorStop(0.22, rgb(shadeColor(col, -32), 0.10 * k));
-        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.5, rgb(hiCol, 0.13 * k));
-        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.78, rgb(shadeColor(col, -32), 0.10 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -48), 0.30 * k));
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -52), 0.42 * k));
+        tubeGrad.addColorStop(0.18, rgb(shadeColor(col, -36), 0.18 * k));
+        tubeGrad.addColorStop(0.32, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.5, rgb(hiCol, 0.09 * k));
+        tubeGrad.addColorStop(0.68, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.82, rgb(shadeColor(col, -36), 0.18 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -52), 0.42 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
 
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.58, c, c, rPx * 1.02);
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.72, c, c, rPx * 1.0);
         edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.88, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -38), 0.22 * k));
+        edgeShadow.addColorStop(0.82, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -28), 0.08 * k));
         g.fillStyle = edgeShadow;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -1000,11 +1001,11 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v27|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v28|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v27|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.1);
+            pair.boostBody = this._getSprite(`pr_norm_v28|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.08);
             });
         }
 
