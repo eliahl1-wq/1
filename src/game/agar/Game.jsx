@@ -254,7 +254,7 @@ export default function Game() {
         global.holdStartAt = 0;
     }, []);
 
-    const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
+    const { isHolding, startHold, cancelHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
         onComplete: handleCashOut,
         onHoldStart: handleHoldStart,
@@ -1011,7 +1011,7 @@ export default function Game() {
             {!isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={localTimer > 0 || isDead || cashedAmount !== null}
-                    holdProgress={holdProgress}
+                    isHolding={isHolding}
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}

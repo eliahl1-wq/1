@@ -938,8 +938,8 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 2.2;
             }
 
-            // Slurp only for food near the mouth — smoothed pull, cheap bbox reject for the rest.
-            if (mouthValid && !f.deathDrop && !isGolden) {
+            // Slurp only for food near the mouth — skip while holding cashout (Q).
+            if (mouthValid && !this._holdActive && !f.deathDrop && !isGolden) {
                 const dxm = mouthX - wx;
                 const dym = mouthY - wy;
                 const nearMouth = Math.abs(dxm) < maxSlurpReach && Math.abs(dym) < maxSlurpReach;

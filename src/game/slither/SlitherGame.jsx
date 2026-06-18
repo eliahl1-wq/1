@@ -317,7 +317,7 @@ export default function SlitherGame() {
         rendererRef.current?.setHoldStart(0);
     }, []);
 
-    const { holdProgress, startHold, cancelHold } = useHoldKeyCashout({
+    const { isHolding, startHold, cancelHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
         onComplete: handleCashOut,
         onHoldStart: handleHoldStart,
@@ -1000,7 +1000,7 @@ export default function SlitherGame() {
             {!isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={!cashoutReady}
-                    holdProgress={holdProgress}
+                    isHolding={isHolding}
                     onHoldStart={startHold}
                     onHoldEnd={cancelHold}
                     localTimer={localTimer}

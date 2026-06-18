@@ -3,16 +3,13 @@ import { CASHOUT_HOLD_MS } from '../game/cashoutRing.js';
 
 export { CASHOUT_HOLD_MS };
 
-const UI_TICK_MS = 50;
-
 /**
  * Hold Q (or press-and-hold the cashout button) before starting the cashout timer.
- * Canvas progress should read wall-clock from the renderer; this hook only drives UI + completion.
+ * Canvas ring uses renderer.setHoldStart — no per-tick React state here (keeps game smooth).
  */
 export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStart, onHoldEnd }) {
-    const [holdProgress, setHoldProgress] = useState(0);
+    const [isHolding, setIsHolding] = useState(false);
     const startTimeRef = useRef(null);
-    const uiIntervalRef = useRef(null);
     const completeTimeoutRef = useRef(null);
     const canStartRef = useRef(canStart);
     const onCompleteRef = useRef(onComplete);
@@ -25,16 +22,7 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
     onHoldStartRef.current = onHoldStart;
     onHoldEndRef.current = onHoldEnd;
 
-    const pushProgress = useCallback((progress) => {
-        onProgressRef.current?.(progress);
-        setHoldProgress(progress);
-    }, []);
-
-    const clearTimers = useCallback(() => {
-        if (uiIntervalRef.current) {
-            clearInterval(uiIntervalRef.current);
-            uiIntervalRef.current = null;
-        }
+    const clearCompleteTimer = useCallback(() => {
         if (completeTimeoutRef.current) {
             clearTimeout(completeTimeoutRef.current);
             completeTimeoutRef.current = null;
@@ -44,43 +32,46 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
     const cancelHold = useCallback(() => {
         if (startTimeRef.current == null) return;
         startTimeRef.current = null;
-        clearTimers();
+        clearCompleteTimer();
+        setIsHolding(false);
         onHoldEndRef.current?.();
-        pushProgress(0);
-    }, [clearTimers, pushProgress]);
-
-    const tickUi = useCallback(() => {
-        const start = startTimeRef.current;
-        if (start == null) return;
-        const progress = Math.min(1, (performance.now() - start) / CASHOUT_HOLD_MS);
-        pushProgress(progress);
-    }, [pushProgress]);
+        onProgressRef.current?.(0);
+    }, [clearCompleteTimer]);
 
     const startHold = useCallback(() => {
         if (startTimeRef.current != null) return;
         if (typeof canStartRef.current === 'function' && !canStartRef.current()) return;
         const now = performance.now();
         startTimeRef.current = now;
+        setIsHolding(true);
         onHoldStartRef.current?.(now);
-        pushProgress(0.001);
-        uiIntervalRef.current = setInterval(tickUi, UI_TICK_MS);
+        onProgressRef.current?.(0.001);
+
         completeTimeoutRef.current = setTimeout(() => {
             startTimeRef.current = null;
-            clearTimers();
+            clearCompleteTimer();
+            setIsHolding(false);
             onHoldEndRef.current?.();
-            pushProgress(0);
+            onProgressRef.current?.(0);
             onCompleteRef.current?.();
         }, CASHOUT_HOLD_MS);
-    }, [clearTimers, pushProgress, tickUi]);
+    }, [clearCompleteTimer]);
+
+    const startHoldRef = useRef(startHold);
+    const cancelHoldRef = useRef(cancelHold);
+    startHoldRef.current = startHold;
+    cancelHoldRef.current = cancelHold;
 
     useEffect(() => {
         const onKeyDown = (e) => {
             if (e.code !== 'KeyQ' || e.repeat) return;
-            startHold();
+            e.preventDefault();
+            startHoldRef.current();
         };
         const onKeyUp = (e) => {
             if (e.code !== 'KeyQ') return;
-            cancelHold();
+            e.preventDefault();
+            cancelHoldRef.current();
         };
 
         window.addEventListener('keydown', onKeyDown);
@@ -88,9 +79,8 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
         return () => {
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
-            cancelHold();
         };
-    }, [startHold, cancelHold]);
+    }, []);
 
-    return { holdProgress, startHold, cancelHold, isHolding: holdProgress > 0 };
+    return { isHolding, startHold, cancelHold };
 }
