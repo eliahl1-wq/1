@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import AppFooter from '../components/AppFooter';
 import GamemodePreview from '../components/GamemodePreview';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
@@ -87,7 +88,12 @@ export default function Gamemodes() {
                 {/* Header */}
                 <div style={{ marginBottom: '36px' }}>
                     <h1 className="gm-heading">Select Gamemode</h1>
-                    <p className="gm-sub">Choose your arena and start competing for real rewards.</p>
+                    <p className="gm-sub">
+                        Choose your arena and start competing for real rewards.{' '}
+                        <button type="button" className="gm-sub-link" onClick={() => navigate('/how-it-works')}>
+                            How it works →
+                        </button>
+                    </p>
                 </div>
 
                 {/* Tabs */}
@@ -165,6 +171,8 @@ export default function Gamemodes() {
                     )}
                 </div>
             </div>
+
+            <AppFooter />
         </div>
     );
 }

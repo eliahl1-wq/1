@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import Background from '../components/Background';
 import { setPageSeo, SEO } from '../utils/seo';
+import '../styles/ui.css';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -162,6 +163,9 @@ export default function LoginPage() {
                     <Link to="/register" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 700 }}>
                         Register here
                     </Link>
+                </p>
+                <p style={{ marginTop: '10px', textAlign: 'center', fontSize: '0.72rem' }}>
+                    <Link to="/pre-game" className="auth-back-link">← Back to lobby</Link>
                 </p>
             </div>
         </div>

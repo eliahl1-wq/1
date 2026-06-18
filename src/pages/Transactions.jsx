@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Background from '../components/Background';
+import AppTopbar from '../components/AppTopbar';
+import AppFooter from '../components/AppFooter';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
 
@@ -44,8 +46,9 @@ export default function Transactions() {
     }, [token]);
 
     return (
-        <div className="page-shell page-shell--scroll">
+        <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
+            <AppTopbar />
 
             <div className="page-content" style={{ maxWidth: '860px' }}>
 
@@ -255,6 +258,8 @@ export default function Transactions() {
                     Secure Terminal · AgarStake
                 </div>
             </div>
+
+            <AppFooter showStatus={false} />
         </div>
     );
 }

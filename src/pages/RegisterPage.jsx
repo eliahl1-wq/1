@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Background from '../components/Background';
 import { identifyMixpanelUser, trackMixpanelEvent } from '../utils/mixpanel';
 import { setPageSeo, SEO } from '../utils/seo';
+import '../styles/ui.css';
 
 export default function RegisterPage() {
     const [email, setEmail]       = useState('');
@@ -184,6 +185,9 @@ export default function RegisterPage() {
                     <Link to="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 700 }}>
                         Login here
                     </Link>
+                </p>
+                <p style={{ marginTop: '10px', textAlign: 'center', fontSize: '0.72rem' }}>
+                    <Link to="/pre-game" className="auth-back-link">← Back to lobby</Link>
                 </p>
             </div>
         </div>

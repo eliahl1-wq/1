@@ -9,6 +9,9 @@ import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import AppFooter from '../components/AppFooter';
+import LiveStatsStrip from '../components/LiveStatsStrip';
+import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, tierEconomy, competitiveTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
@@ -236,6 +239,9 @@ export default function PreGame() {
 
 
     const siteUsersOnline = liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0;
+    const playersInArena = (liveStats.playersByGamemode?.agar || 0)
+        + (liveStats.playersByGamemode?.slither || 0)
+        + (liveStats.playersByGamemode?.competitiveSlither || 0);
     const globalCashoutTotalUsd =
         liveStats.globalPlayerEarningsUsd
         ?? liveStats.totalUserBalanceUsd
@@ -1101,6 +1107,16 @@ export default function PreGame() {
                     TEST MODE — Free play, no real SOL used
                 </div>
             )}
+
+            {!isAuthenticated && <GuestWelcomeBanner />}
+
+            <LiveStatsStrip
+                playersOnline={siteUsersOnline}
+                inArena={playersInArena}
+                totalEarnings={globalCashoutTotalUsd}
+                biggestWin={liveStats.biggestPayout}
+            />
+
             <div className="pre-game-grid">
                 <div className="mode-card">
                     <span className="mode-card-label">Gamemode</span>
@@ -1272,7 +1288,11 @@ export default function PreGame() {
                         </div>
 
                         {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>No data yet</div>
+                            <div className="empty-state">
+                                <div className="empty-state-icon" aria-hidden="true">🏆</div>
+                                <p className="empty-state-title">No champions yet</p>
+                                <p className="empty-state-sub">Be the first to cash out big — your name goes here.</p>
+                            </div>
                         ) : (
                             <div
                                 ref={leaderboardListRef}
@@ -1336,21 +1356,13 @@ export default function PreGame() {
 
             {/* SOL price + footer */}
             <div className="pregame-bottom-bar">
-            {/* SOL Price pill */}
-            <div className="sol-price-pill">
-                <SolLogo size={14} />
-                <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
-                    ${solPrice.toFixed(2)}
-                </span>
-            </div>
-
-            {/* ── Footer ── */}
-            <div className="footer-links">
-                <span>Terms</span>
-                <span>Provably Fair</span>
-                <span>Support</span>
-                <span style={{ opacity: 0.5 }}>EU-West · Online</span>
-            </div>
+                <div className="sol-price-pill">
+                    <SolLogo size={14} />
+                    <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
+                        ${solPrice.toFixed(2)}
+                    </span>
+                </div>
+                <AppFooter />
             </div>
         </div>
     );

@@ -123,4 +123,16 @@ export const SEO = {
         keywords: `${BASE_KEYWORDS}, agarstake transactions`,
         path: '/transactions',
     },
+    howItWorks: {
+        tabTitle: 'AgarStake | How it Works',
+        description: 'Learn how to play Agar and Slither for real money on AgarStake. Deposit SOL, compete, and cash out instantly.',
+        keywords: `${BASE_KEYWORDS}, how to play, cash out`,
+        path: '/how-it-works',
+    },
+    faq: {
+        tabTitle: 'AgarStake | FAQ',
+        description: 'Frequently asked questions about AgarStake — deposits, cashouts, game modes, and Solana wagering.',
+        keywords: `${BASE_KEYWORDS}, faq, help`,
+        path: '/faq',
+    },
 };

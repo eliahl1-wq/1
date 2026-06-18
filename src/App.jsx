@@ -12,6 +12,9 @@ import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSandbox from './pages/AdminSandbox';
+import HowItWorks from './pages/HowItWorks';
+import Faq from './pages/Faq';
+import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -63,7 +66,7 @@ function isBattleRoyaleSession(isAdmin = false) {
 
 function ArenaRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <AppLoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
   if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
@@ -73,7 +76,7 @@ function ArenaRoute({ children }) {
 
 function PublicRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <AppLoadingScreen />;
   if (isAuthenticated) {
     const balanceUsd = user?.balanceUsd || (user?.balanceSol * (user?.solPrice || 57)) || 0;
     if (user?.freePlay || balanceUsd >= MIN_ENTRY_FEE) return <Navigate to="/pre-game" />;
@@ -84,7 +87,7 @@ function PublicRoute({ children }) {
 
 function AdminRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <AppLoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (!user?.isAdmin) return <Navigate to="/pre-game" />;
   return children;
@@ -118,6 +121,8 @@ function App() {
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 <Route path="/admin/sandbox" element={<AdminRoute><AdminSandbox /></AdminRoute>} />
+                <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="/faq" element={<Faq />} />
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>
             </AuthProvider>

@@ -18,15 +18,30 @@ export default function AppTopbar({ children }) {
 
     const navItems = (
         <>
+            <button type="button" className={linkClass('/pre-game')} onClick={() => navigate('/pre-game')}>
+                Play
+            </button>
             <button type="button" className={linkClass('/gamemodes')} onClick={() => navigate('/gamemodes')}>
-                Gamemode
+                Modes
             </button>
-            <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
-                Profile
-            </button>
+            {user && (
+                <button type="button" className={linkClass('/transactions')} onClick={() => navigate('/transactions')}>
+                    History
+                </button>
+            )}
+            {user && (
+                <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
+                    Profile
+                </button>
+            )}
             {user?.isAdmin && (
                 <button type="button" className={linkClass('/admin')} onClick={() => navigate('/admin')}>
                     Admin
+                </button>
+            )}
+            {!user && (
+                <button type="button" className={linkClass('/login')} onClick={() => navigate('/login')}>
+                    Login
                 </button>
             )}
         </>

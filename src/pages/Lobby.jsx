@@ -9,6 +9,7 @@ import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import AppFooter from '../components/AppFooter';
 import { MIN_ENTRY_FEE } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 
@@ -417,11 +418,7 @@ export default function Lobby() {
             </div>
 
             {/* ── Footer ── */}
-            <div className="footer-links">
-                <span>Terms</span>
-                <span>Provably Fair</span>
-                <span>Support</span>
-            </div>
+            <AppFooter />
         </div>
     );
 }
