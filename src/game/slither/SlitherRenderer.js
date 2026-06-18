@@ -1027,27 +1027,28 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        // Base fill — radial gradient from slightly lighter center to darker rim
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.15, c, c, rPx);
+        // Base fill — radial gradient; rim shadow fades in gently over a wider band
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.12, c, c, rPx);
         baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(8 * k))));
-        baseGrad.addColorStop(0.55, toHex(col));
-        baseGrad.addColorStop(0.82, toHex(shadeColor(col, Math.round(-12 * k))));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-28 * k))));
+        baseGrad.addColorStop(0.48, toHex(col));
+        baseGrad.addColorStop(0.72, toHex(shadeColor(col, Math.round(-6 * k))));
+        baseGrad.addColorStop(0.88, toHex(shadeColor(col, Math.round(-14 * k))));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-22 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        // Tube lateral shading — stronger shadows on sides for 3D depth
+        // Tube lateral shading — softer, smeared further toward the center
         const tubeGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -52), 0.28 * k));
-        tubeGrad.addColorStop(0.12, rgb(shadeColor(col, -32), 0.14 * k));
-        tubeGrad.addColorStop(0.28, rgb(shadeColor(col, -12), 0.04 * k));
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -42), 0.17 * k));
+        tubeGrad.addColorStop(0.18, rgb(shadeColor(col, -24), 0.09 * k));
+        tubeGrad.addColorStop(0.36, rgb(shadeColor(col, -8), 0.025 * k));
         tubeGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.72, rgb(shadeColor(col, -12), 0.04 * k));
-        tubeGrad.addColorStop(0.88, rgb(shadeColor(col, -32), 0.14 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -52), 0.28 * k));
+        tubeGrad.addColorStop(0.64, rgb(shadeColor(col, -8), 0.025 * k));
+        tubeGrad.addColorStop(0.82, rgb(shadeColor(col, -24), 0.09 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -42), 0.17 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
@@ -1177,10 +1178,10 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v34|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v36|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v34|${key}|boost`, ssSize, (g, sz) => {
+            pair.boostBody = this._getSprite(`pr_norm_v36|${key}|boost`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
             });
         }
