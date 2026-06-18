@@ -504,10 +504,19 @@ export default function SlitherGame() {
         });
 
         socket.on('slitherTick', (tick) => {
-            renderer.updateState(tick);
+            const mergedTick = tick.competitiveSlither && tick.zone
+                ? { ...tick, competitiveSlither: true, circularMap: true }
+                : tick;
+            renderer.updateState(mergedTick);
 
             if (tick.snakes && tick.you) {
-                const me = tick.snakes.find(s => s.id === tick.you);
+                let me = null;
+                for (let i = 0; i < tick.snakes.length; i++) {
+                    if (tick.snakes[i].id === tick.you) {
+                        me = tick.snakes[i];
+                        break;
+                    }
+                }
                 if (me?.kills != null) {
                     prevKillsRef.current = me.kills;
                 }
@@ -528,13 +537,6 @@ export default function SlitherGame() {
                     setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
                     rendererRef.current?.setHud({ balance: tick.balance });
                 }
-            }
-            if (tick.competitiveSlither && tick.zone) {
-                renderer.updateState({
-                    zone: tick.zone,
-                    competitiveSlither: true,
-                    circularMap: true,
-                });
             }
             if (tick.battleRoyale) {
                 const now = Date.now();

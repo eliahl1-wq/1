@@ -106,6 +106,10 @@ export class SlitherRenderer {
         this.canvas = canvas;
         this._resizeToCanvas = options.resizeToCanvas === true;
         this._externalCameraGetter = null;
+        this._sortDirty = true;
+        this._pendingTick = null;
+        this._tickApplyScheduled = false;
+        this._foodAnimCache = new Map();
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
         this.ctx = canvas.getContext('2d', { alpha: false });
@@ -289,14 +293,48 @@ export class SlitherRenderer {
     }
 
     updateState(tick) {
+        if (!this._pendingTick) {
+            this._pendingTick = tick;
+        } else {
+            const prev = this._pendingTick;
+            this._pendingTick = {
+                ...prev,
+                ...tick,
+                snakes: tick.snakes ?? prev.snakes,
+                food: tick.food ?? prev.food,
+                minimap: tick.minimap ?? prev.minimap,
+                zone: tick.zone !== undefined ? tick.zone : prev.zone,
+                you: tick.you !== undefined ? tick.you : prev.you,
+                worldHalf: tick.worldHalf ?? prev.worldHalf,
+                balance: tick.balance ?? prev.balance,
+                dollarBalance: tick.dollarBalance ?? prev.dollarBalance,
+            };
+        }
+        if (this._tickApplyScheduled) return;
+        this._tickApplyScheduled = true;
+        queueMicrotask(() => {
+            this._tickApplyScheduled = false;
+            const merged = this._pendingTick;
+            this._pendingTick = null;
+            if (merged) this._commitTickState(merged);
+        });
+    }
+
+    _commitTickState(tick) {
         if (tick.snakes) {
             this.targetSnakes = tick.snakes;
+            this._sortDirty = true;
         }
         if (tick.food) {
             const list = this._foodDrawList;
             list.length = tick.food.length;
+            const seenFood = new Set();
             for (let i = 0; i < tick.food.length; i++) {
                 list[i] = tick.food[i];
+                if (tick.food[i]?.id) seenFood.add(tick.food[i].id);
+            }
+            for (const id of this._foodAnimCache.keys()) {
+                if (!seenFood.has(id)) this._foodAnimCache.delete(id);
             }
         }
         const isCompetitive = tick.competitiveSlither ?? this.state.competitiveSlither;
@@ -818,12 +856,16 @@ export class SlitherRenderer {
                 if (d2cam > farCullR2 * 1.35 && (fi & 3) === 3) continue;
             }
 
-            if (f._phase == null) {
+            let anim = f.id != null ? this._foodAnimCache.get(f.id) : null;
+            if (!anim) {
                 let h = 0;
                 const id = String(f.id ?? `${f.x},${f.y}`);
                 for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-                f._phase = (Math.abs(h) % 1000) / 1000 * Math.PI * 2;
-                f._sizeMul = 0.72 + (Math.abs(h) % 100) / 100 * 0.65;
+                anim = {
+                    phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
+                    sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
+                };
+                if (f.id != null) this._foodAnimCache.set(f.id, anim);
             }
 
             let wx = f.x;
@@ -842,12 +884,11 @@ export class SlitherRenderer {
                 wy += Math.cos(now * 0.0035 + f.x) * 6;
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
-                // Death pellets: fixed position + glow sprite (no wobble).
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
             } else {
-                sizeMul = f._sizeMul * (1 + Math.sin(now * 0.004 + f._phase) * 0.09);
-                wx += Math.sin(now * 0.0024 + f._phase) * 1.5;
-                wy += Math.cos(now * 0.0028 + f._phase * 1.3) * 1.5;
+                sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.09);
+                wx += Math.sin(now * 0.0024 + anim.phase) * 1.5;
+                wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 1.5;
             }
 
             if (mouthValid && !f.deathDrop && magnetBudget > 0) {
@@ -1486,13 +1527,6 @@ export class SlitherRenderer {
         else if (this._perfEma > 16) this._quality = Math.min(this._quality, Math.max(qFloor, this.isMobile ? 0.94 : 0.88));
         else if (this._perfEma < 14) this._quality = Math.min(1, this._quality + 0.02);
 
-        const snakeCount = this.targetSnakes.length;
-        if (snakeCount > 10) this._quality = Math.min(this._quality, 0.72);
-        else if (snakeCount > 6) this._quality = Math.min(this._quality, 0.82);
-        if (this.hideOverlays || this.spectatorMode) {
-            this._quality = Math.min(this._quality, 0.65);
-        }
-
         if (!this.isMobile && this._quality < 0.88) {
             this.ctx.imageSmoothingQuality = 'low';
         } else {
@@ -1532,9 +1566,8 @@ export class SlitherRenderer {
             if (snake.isYou) {
                 rs.drawSpine = spineBase;
             } else {
-                // Cache densified spine — only recompute when spine actually changes
-                const head = spineBase[0];
-                const spineKey = head ? `${head.x | 0},${head.y | 0},${spineBase.length}` : '';
+                const headPt = spineBase[0];
+                const spineKey = headPt ? `${headPt.x | 0},${headPt.y | 0},${spineBase.length}` : '';
                 if (rs._denseKey !== spineKey) {
                     rs._denseKey = spineKey;
                     const dense = densifySpine(spineBase, spacing * 0.45);
@@ -1613,9 +1646,12 @@ export class SlitherRenderer {
         this._drawFood(ctx, this._foodDrawList, toScreen, W, H, zoom);
 
         const sorted = this._sortedRenderSnakes;
-        sorted.length = 0;
-        for (let i = 0; i < renderSnakes.length; i++) sorted.push(renderSnakes[i]);
-        sorted.sort((a, b) => (a.radius || 6) - (b.radius || 6));
+        if (this._sortDirty || sorted.length !== renderSnakes.length) {
+            sorted.length = 0;
+            for (let i = 0; i < renderSnakes.length; i++) sorted.push(renderSnakes[i]);
+            sorted.sort((a, b) => (a.radius || 6) - (b.radius || 6));
+            this._sortDirty = false;
+        }
 
         const viewPad = 900;
         for (const snake of sorted) {
@@ -1653,7 +1689,7 @@ export class SlitherRenderer {
             );
         }
 
-        if (!this.hideOverlays && !this.spectatorMode && (me?.segments?.[0] || this.spectatorMode)) {
+        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
             if ((this._minimapFrame++ & 3) === 0 && !this._cashoutActive) {

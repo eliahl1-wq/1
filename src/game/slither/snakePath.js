@@ -372,7 +372,7 @@ export function resetSnakeBodyTick(state) {
  * Interpolate between the previous and current server spine snapshots.
  * Avoids backward head jumps and path re-simulation fighting server data.
  */
-export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowMs = performance.now()) {
+export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowMs = performance.now(), options = {}) {
     const spineLen = serverSegments?.length || 0;
     if (spineLen === 0 || !serverSegments[0]) return;
 
@@ -423,6 +423,8 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
         seg.y = a.y + (b.y - a.y) * t;
     }
     state.angle = lerpAngle(state._snapAAngle ?? state._snapBAngle, state._snapBAngle, t);
+
+    if (options.skipDensify) return;
 
     const visSpacing = growth.spacing ?? segmentSpacingForSnake({ sc: growth.sc, radius: growth.radius });
     const dense = densifySpine(state.segments, visSpacing * 0.45);
