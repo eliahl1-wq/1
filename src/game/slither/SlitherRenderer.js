@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, wsepForSc } from './snakePath.js';
+import { continuousArcLength, densifySpine, fitSpineToArcLength, rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
@@ -65,8 +65,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 68%, 56%) — glossy slither pastels, darker body
-    const s = 0.68, l = 0.56;
+    // HSL(h, 66%, 52%) — darker slither pastels
+    const s = 0.66, l = 0.52;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -851,16 +851,19 @@ export class SlitherRenderer {
         }
     }
 
-    _blitSprite(ctx, sprite, x, y, scale = 1) {
-        if (scale === 1) {
-            const half = sprite.width >> 1;
+    _blitSprite(ctx, sprite, x, y, scale = 1, angle = 0) {
+        const half = sprite.width / scale / 2;
+        const dw = sprite.width / scale;
+        const dh = sprite.height / scale;
+        if (angle === 0 && scale === 1) {
             ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0);
             return;
         }
-        // Supersampled sprite — draw at its intended display size (downscale = crisp AA edges).
-        const dw = sprite.width / scale;
-        const dh = sprite.height / scale;
-        ctx.drawImage(sprite, x - dw / 2, y - dh / 2, dw, dh);
+        ctx.save();
+        ctx.translate(x, y);
+        if (angle !== 0) ctx.rotate(angle);
+        ctx.drawImage(sprite, -dw / 2, -dh / 2, dw, dh);
+        ctx.restore();
     }
 
     /** Tangent angle at bump index (radians, toward head). */
@@ -882,63 +885,38 @@ export class SlitherRenderer {
     }
 
     /**
-     * Glossy gel-like segment — radial body, top specular, bottom depth.
-     * Slightly darker base + stronger rim shadow vs original v21.
+     * Body-local tube segment — dorsal highlight + lateral shade (sprite X = along body).
+     * Drawn rotated per stamp so lighting stays on the snake, not the map.
      */
-    _paintSnakeSegment(g, c, rPx, cs, phase = 0, contrast = 1) {
+    _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c - rPx * 0.16, rPx * 0.12, c, c, rPx);
-        const centerCol = shadeColor(col, Math.round(6 * k));
-        const midCol = col;
-        const edgeCol = shadeColor(col, Math.round(-42 * k));
-
-        baseGrad.addColorStop(0, toHex(centerCol));
-        baseGrad.addColorStop(0.58, toHex(midCol));
-        baseGrad.addColorStop(1, toHex(edgeCol));
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.12, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(4 * k))));
+        baseGrad.addColorStop(0.55, toHex(col));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-40 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hiCol = shadeColor(col, Math.round(58 * k));
-        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        const hiStart = phase ? 0.07 : 0.05;
-        const hiPeak = phase ? 0.16 : 0.13;
-        const hiEnd = phase ? 0.28 : 0.25;
-        hiGrad.addColorStop(hiStart, 'rgba(255,255,255,0)');
-        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.26 * k));
-        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.045 * k));
-        hiGrad.addColorStop(hiEnd + 0.06, 'rgba(255,255,255,0)');
+        const hiCol = shadeColor(col, Math.round(42 * k));
+        const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -44), 0.22 * k));
+        tubeGrad.addColorStop(0.28, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.5, rgb(hiCol, 0.17 * k));
+        tubeGrad.addColorStop(0.72, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -44), 0.22 * k));
 
-        g.fillStyle = hiGrad;
+        g.fillStyle = tubeGrad;
         g.fill();
 
-        const shCol = shadeColor(col, Math.round(-52 * k));
-        const shGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        shGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
-        shGrad.addColorStop(0.92, rgb(shCol, 0.46 * k));
-        shGrad.addColorStop(1.0, rgb(shCol, 0.62 * k));
-
-        g.fillStyle = shGrad;
-        g.fill();
-
-        const sideCol = shadeColor(col, Math.round(-48 * k));
-        const sideGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
-        sideGrad.addColorStop(0, rgb(sideCol, 0.32 * k));
-        sideGrad.addColorStop(0.2, 'rgba(0,0,0,0)');
-        sideGrad.addColorStop(0.8, 'rgba(0,0,0,0)');
-        sideGrad.addColorStop(1, rgb(sideCol, 0.32 * k));
-
-        g.fillStyle = sideGrad;
-        g.fill();
-
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.7, c, c, rPx * 1.03);
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.62, c, c, rPx * 1.02);
         edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.86, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -38), 0.26 * k));
+        edgeShadow.addColorStop(0.9, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -36), 0.18 * k));
         g.fillStyle = edgeShadow;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
@@ -979,14 +957,11 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v25|${key}|0`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
+            pair.normal = this._getSprite(`pr_norm_v26|${key}`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.alt = this._getSprite(`pr_norm_v25|${key}|1`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
-            });
-            pair.boostBody = this._getSprite(`pr_norm_v25|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
+            pair.boostBody = this._getSprite(`pr_norm_v26|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.12);
             });
         }
 
@@ -1113,19 +1088,6 @@ export class SlitherRenderer {
             return;
         }
 
-        // Slither.io bump phase (fchls): alternates every wsep along the body, not per stamp index.
-        const wsepWorld = snake.wsep ?? wsepForSc(sc);
-        let arcAlong = 0;
-        for (let bi = 0; bi < bumps.length; bi++) {
-            if (bi > 0) {
-                arcAlong += Math.hypot(
-                    bumps[bi].x - bumps[bi - 1].x,
-                    bumps[bi].y - bumps[bi - 1].y,
-                );
-            }
-            bumps[bi].phase = Math.floor(arcAlong / Math.max(0.5, wsepWorld)) & 1;
-        }
-
         // Project bumps to screen once — stable world spacing, single projection.
         for (let i = 0; i < bumps.length; i++) {
             const b = bumps[i];
@@ -1144,7 +1106,7 @@ export class SlitherRenderer {
             boostOverlay: isYou && boosting && !cashoutPerf && q >= 0.55,
             trailGlow: isYou && boosting && !cashoutPerf,
         };
-        const { normal, alt, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
+        const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
         const stampScale = bodySS * (cacheR / bodyRadius);
         const halfT = trailGlow ? trailGlow.width / 2 : 0;
         const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
@@ -1180,9 +1142,9 @@ export class SlitherRenderer {
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const isHead = i === 0;
-            const phase = bumps[i].phase ?? (i & 1);
-            const sprite = (boosting && isHead) ? boostBody : (phase ? alt : normal);
-            this._blitSprite(ctx, sprite, p.x, p.y, stampScale);
+            const sprite = (boosting && isHead) ? boostBody : normal;
+            const tangent = this._bumpTangent(bumps, i);
+            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
         }
 
         if (isYou && prNeeds.glow && glow) {

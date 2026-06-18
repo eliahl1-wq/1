@@ -110,7 +110,8 @@ function drawOrganicCell(cell, borders, graph) {
 
 function drawBalanceBadge(graph, cell, nameY, fontSize) {
     const pillY = nameY + fontSize / 1.35;
-    drawBalanceBadgePill(graph, cell.x, pillY, cell.balance, cell.isMe);
+    const displayBalance = cell.dollarBalance ?? cell.balance;
+    drawBalanceBadgePill(graph, cell.x, pillY, displayBalance, cell.isMe);
 }
 
 function drawPlayerCashoutRing(graph, cell) {

@@ -683,6 +683,7 @@ export default function Game() {
                     name: u.username, 
                     isMe: u.id === myIdRef.current,
                     isCashingOut: u.isCashingOut,
+                    dollarBalance: u.balance ?? u.dollarBalance ?? 0,
                     color: u.color.fill || u.color, 
                     borderColor: u.color.border || '#000',
                     radius: (c.radius || 0) * viewZoom,
