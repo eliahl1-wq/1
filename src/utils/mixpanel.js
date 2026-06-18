@@ -2,15 +2,10 @@ import mixpanel from 'mixpanel-browser';
 
 const TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN?.trim() || '';
 const API_HOST = import.meta.env.VITE_MIXPANEL_API_HOST?.trim() || '';
-const RECORD_SESSIONS_PERCENT = (() => {
-    const raw = import.meta.env.VITE_MIXPANEL_RECORD_SESSIONS_PERCENT;
-    if (raw === undefined || raw === '') return 0;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
-})();
 const DEBUG = import.meta.env.DEV || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('mp_debug'));
 
 let initialized = false;
+let disabled = false;
 
 function logStatus(message, ...args) {
     if (DEBUG || !TOKEN) {
@@ -19,11 +14,17 @@ function logStatus(message, ...args) {
 }
 
 export function isMixpanelConfigured() {
-    return Boolean(TOKEN);
+    return Boolean(TOKEN) && !disabled;
+}
+
+function disableMixpanel(reason) {
+    if (disabled) return;
+    disabled = true;
+    logStatus('disabled', reason);
 }
 
 export function initMixpanel() {
-    if (initialized) return;
+    if (initialized || disabled) return;
     if (!TOKEN) {
         console.warn('[Mixpanel] VITE_MIXPANEL_TOKEN saknas — events skickas inte. Sätt variabeln i Cloudflare (Production) och redeploya.');
         return;
@@ -35,43 +36,58 @@ export function initMixpanel() {
         persistence: 'localStorage',
         ignore_dnt: true,
         batch_requests: true,
-        // Session Replay — required for Mixpanel onboarding "replays" check (0 = off by default in SDK)
-        record_sessions_percent: RECORD_SESSIONS_PERCENT,
+        // Session replay is expensive in canvas games — never auto-start (see startSessionRecording).
+        record_sessions_percent: 0,
     };
     if (API_HOST) {
         config.api_host = API_HOST;
     }
 
-    mixpanel.init(TOKEN, config);
-    mixpanel.register({ platform: 'web' });
-    initialized = true;
+    try {
+        mixpanel.init(TOKEN, config);
+        mixpanel.register({ platform: 'web' });
+        initialized = true;
 
-    logStatus('init OK', API_HOST ? `(api_host: ${API_HOST})` : '(US default)', `replay: ${RECORD_SESSIONS_PERCENT}%`);
+        logStatus('init OK', API_HOST ? `(api_host: ${API_HOST})` : '(US default)');
 
-    mixpanel.track('app_opened', {
-        platform: 'web',
-        path: typeof window !== 'undefined' ? window.location.pathname : undefined,
-    });
+        mixpanel.track('app_opened', {
+            platform: 'web',
+            path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        });
+    } catch (err) {
+        disableMixpanel(err?.message || 'init failed');
+    }
 }
 
 export function trackMixpanelEvent(eventName, properties = {}) {
-    if (!TOKEN) return;
+    if (!TOKEN || disabled) return;
     if (!initialized) initMixpanel();
+    if (disabled) return;
     logStatus('track', eventName, properties);
-    mixpanel.track(eventName, { platform: 'web', ...properties });
+    try {
+        mixpanel.track(eventName, { platform: 'web', ...properties });
+    } catch {
+        disableMixpanel('track failed');
+    }
 }
 
 export function identifyMixpanelUser(userId, traits = {}) {
-    if (!TOKEN || !userId) return;
+    if (!TOKEN || !userId || disabled) return;
     if (!initialized) initMixpanel();
-    mixpanel.identify(String(userId));
-    if (Object.keys(traits).length > 0) {
-        mixpanel.people.set({ platform: 'web', ...traits });
+    if (disabled) return;
+    try {
+        mixpanel.identify(String(userId));
+        if (Object.keys(traits).length > 0) {
+            mixpanel.people.set({ platform: 'web', ...traits });
+        }
+        logStatus('identify', userId);
+    } catch {
+        disableMixpanel('identify failed');
     }
-    logStatus('identify', userId);
 }
 
 export function syncMixpanelUser(user) {
+    if (disabled) return;
     if (!user) return;
     const userId = user.id || user._id;
     if (!userId) return;
@@ -83,8 +99,9 @@ export function syncMixpanelUser(user) {
 }
 
 export function startSessionRecording() {
-    if (!TOKEN) return;
+    if (!TOKEN || disabled) return;
     if (!initialized) initMixpanel();
+    if (disabled) return;
     if (typeof mixpanel.start_session_recording === 'function') {
         mixpanel.start_session_recording();
         logStatus('session recording started manually');
@@ -92,7 +109,7 @@ export function startSessionRecording() {
 }
 
 export function stopSessionRecording() {
-    if (!TOKEN) return;
+    if (!TOKEN || disabled) return;
     if (!initialized) return;
     if (typeof mixpanel.stop_session_recording === 'function') {
         mixpanel.stop_session_recording();
@@ -101,8 +118,9 @@ export function stopSessionRecording() {
 }
 
 export function resetMixpanel() {
-    if (!TOKEN) return;
+    if (!TOKEN || disabled) return;
     if (!initialized) initMixpanel();
+    if (disabled) return;
     mixpanel.reset();
     logStatus('reset');
 }
