@@ -938,33 +938,70 @@ export class SlitherRenderer {
         }, Math.max(2, Math.round(dotR * 0.48)));
     }
 
-    /** Symmetric blurred flank shadow along the body — offset from spine, not per-segment squares. */
+    /** Larger/darker ventral blob — belly shadow further below the spine. */
+    _getBodyVentralShadowDot(radius) {
+        const dotR = Math.max(5, Math.ceil(radius * 0.72));
+        const key = `vent_sh_v1|${dotR}`;
+        return this._getSprite(key, dotR * 2 + 24, (g, sz) => {
+            const c = sz / 2;
+            const grad = g.createRadialGradient(c, c, 0, c, c, dotR);
+            grad.addColorStop(0, 'rgba(0,0,0,0.58)');
+            grad.addColorStop(0.32, 'rgba(0,0,0,0.34)');
+            grad.addColorStop(0.62, 'rgba(0,0,0,0.12)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = grad;
+            g.beginPath();
+            g.arc(c, c, dotR, 0, Math.PI * 2);
+            g.fill();
+        }, Math.max(3, Math.round(dotR * 0.55)));
+    }
+
+    /** Blurred flank + ventral shadow along the body — offset from spine, not on segments. */
     _blitBodySideShadow(ctx, bumps, count, radius, opts = {}) {
         if (count < 3 || opts.cashoutPerf) return;
         const q = opts.quality ?? 1;
         const isYou = !!opts.isYou;
         if (!isYou && q < 0.50) return;
 
-        const dot = this._getBodySideShadowDot(radius);
-        const half = dot.width / 2;
-        const off = radius * 0.88;
-        const stride = Math.max(1, Math.round(count / (isYou ? 30 : 18)));
+        const sideDot = this._getBodySideShadowDot(radius);
+        const ventDot = this._getBodyVentralShadowDot(radius);
+        const sideHalf = sideDot.width / 2;
+        const ventHalf = ventDot.width / 2;
+        const sideOff = radius * 0.88;
+        const ventOff = radius * 1.02;
+        const sideStride = Math.max(1, Math.round(count / (isYou ? 30 : 18)));
+        const ventStride = Math.max(1, Math.round(count / (isYou ? 26 : 15)));
 
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = isYou ? 0.24 : 0.17;
-        for (let i = count - 1; i >= 0; i -= stride) {
+
+        ctx.globalAlpha = isYou ? 0.26 : 0.18;
+        for (let i = count - 1; i >= 0; i -= sideStride) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
             const tangent = this._bumpTangent(bumps, i);
             const perpX = Math.sin(tangent);
             const perpY = -Math.cos(tangent);
             for (const sign of [-1, 1]) {
-                const sx = p.x + sign * perpX * off;
-                const sy = p.y + sign * perpY * off;
-                ctx.drawImage(dot, (sx - half) | 0, (sy - half) | 0);
+                const sx = p.x + sign * perpX * sideOff;
+                const sy = p.y + sign * perpY * sideOff;
+                ctx.drawImage(sideDot, (sx - sideHalf) | 0, (sy - sideHalf) | 0);
             }
         }
+
+        // Ventral (underside) — darker band further below the dorsal/top side
+        ctx.globalAlpha = isYou ? 0.36 : 0.26;
+        for (let i = count - 1; i >= 0; i -= ventStride) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+            const tangent = this._bumpTangent(bumps, i);
+            const perpX = Math.sin(tangent);
+            const perpY = -Math.cos(tangent);
+            const sx = p.x - perpX * ventOff;
+            const sy = p.y - perpY * ventOff;
+            ctx.drawImage(ventDot, (sx - ventHalf) | 0, (sy - ventHalf) | 0);
+        }
+
         ctx.restore();
     }
 
