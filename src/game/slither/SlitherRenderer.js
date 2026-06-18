@@ -123,7 +123,7 @@ export class SlitherRenderer {
         this._holdActive = false;
         this._cashoutActive = false;
         this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
-        this.baseZoom = this.isMobile ? 2.05 : 2.65;
+        this.baseZoom = this.isMobile ? 2.05 : 2.88;
         this.zoom = this.baseZoom;
         this.snakeThickness = this.isMobile ? 1.0 : 0.9;
         this._dpr = 1;
@@ -1543,7 +1543,7 @@ export class SlitherRenderer {
             // slither.io gsc zoom — snake shrinks on screen as sc grows
             const meR = me.radius || SLITHER_BASE_R;
             const meSc = me.sc ?? (meR / SLITHER_BASE_R);
-            const minZoom = this.isMobile ? 0.85 : 1.2;
+            const minZoom = this.isMobile ? 0.85 : 1.32;
             const slitherGsc = Math.pow(1.094 / Math.max(1.05, meSc), 0.52);
             const targetZoom = Math.min(this.baseZoom, Math.max(minZoom, this.baseZoom * slitherGsc));
             const za = 1 - Math.exp(-dt / 0.6);
