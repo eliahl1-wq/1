@@ -542,7 +542,7 @@ export default function SlitherGame() {
                 }
                 prevBalanceRef.current = tick.balance;
                 const nowB = Date.now();
-                if (nowB - lastBalanceUiAtRef.current >= 120) {
+                if (nowB - lastBalanceUiAtRef.current >= 400) {
                     lastBalanceUiAtRef.current = nowB;
                     setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
                     rendererRef.current?.setHud({ balance: tick.balance });
@@ -817,7 +817,7 @@ export default function SlitherGame() {
 
         }}>
 
-            <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
+            <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none', contain: 'strict' }} />
 
             <MobileGameSession containerRef={viewportRef} />
 
