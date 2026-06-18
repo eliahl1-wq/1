@@ -1724,11 +1724,7 @@ export class SlitherRenderer {
             const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
             const { cashoutEndAt, cashoutTotal } = this.hud;
             const ringR = headRadius + 10;
-            const holdProgress = this._getHoldProgress(nowMs);
 
-            if (holdProgress > 0 && (!cashoutEndAt || cashoutEndAt <= Date.now())) {
-                drawCashoutProgressRing(ctx, hx, hy, ringR, holdProgress, { counterClockwise: true });
-            }
             if (cashoutEndAt && cashoutEndAt > Date.now()) {
                 const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
                 drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
