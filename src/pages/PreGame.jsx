@@ -11,7 +11,9 @@ import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import LiveStatsStrip from '../components/LiveStatsStrip';
-import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
+import GamemodeDiscoveryPrompt from '../components/GamemodeDiscoveryPrompt';
+import GamemodeBadge from '../components/GamemodeBadge';
+import { markGamemodePlayed, shouldShowDiscoveryPrompt, getGamemodeConfig } from '../constants/gamemodes';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, tierEconomy, competitiveTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
@@ -133,6 +135,7 @@ export default function PreGame() {
     });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
+    const [showDiscovery, setShowDiscovery] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
     const [statusMsg, setStatusMsg] = useState(''); // Moved here to avoid conflicts
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [], globalEarningsUsd: 0 });
@@ -221,6 +224,12 @@ export default function PreGame() {
             setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
         }
     }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, selectedEntryFee]);
+
+    useEffect(() => {
+        setShowDiscovery(shouldShowDiscoveryPrompt(selectedMode, brAvailable));
+    }, [selectedMode, brAvailable]);
+
+    const currentModeConfig = getGamemodeConfig(selectedMode);
 
     useEffect(() => {
         const raw = localStorage.getItem('selected_gamemode');
@@ -578,6 +587,7 @@ export default function PreGame() {
         localStorage.setItem('selected_entry_fee', String(entryFeeForSession));
 
         const activeMode = (isAlreadyInGame && currentGameMode) ? currentGameMode : selectedMode;
+        markGamemodePlayed(activeMode);
         setCurrentGameMode(activeMode);
         localStorage.setItem('current_game_mode', activeMode);
         localStorage.setItem('selected_gamemode', activeMode);
@@ -1108,8 +1118,6 @@ export default function PreGame() {
                 </div>
             )}
 
-            {!isAuthenticated && <GuestWelcomeBanner />}
-
             <LiveStatsStrip
                 playersOnline={siteUsersOnline}
                 inArena={playersInArena}
@@ -1117,13 +1125,31 @@ export default function PreGame() {
                 biggestWin={liveStats.biggestPayout}
             />
 
+            {showDiscovery && (
+                <GamemodeDiscoveryPrompt
+                    currentMode={selectedMode}
+                    brAvailable={brAvailable}
+                    playersByGamemode={liveStats.playersByGamemode}
+                    onSelectMode={(modeId) => {
+                        setSelectedMode(normalizeGamemodeForLobby(modeId, !!user?.isAdmin));
+                        setShowDiscovery(false);
+                    }}
+                    onDismiss={() => setShowDiscovery(false)}
+                />
+            )}
+
             <div className="pre-game-grid">
                 <div className="mode-card">
                     <span className="mode-card-label">Gamemode</span>
                     <div className="mode-card-title mode-card-title--stacked">
                         {modeCardTitle.toUpperCase()}
                     </div>
-                    <div className="mode-card-subtitle">{modeSubtitle}</div>
+                    <div className="mode-card-subtitle-row">
+                        <span className="mode-card-subtitle">{modeSubtitle}</span>
+                        {currentModeConfig?.badge && (
+                            <GamemodeBadge type={currentModeConfig.badge} />
+                        )}
+                    </div>
                     <button
                         type="button"
                         className="mode-card-action"

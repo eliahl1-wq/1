@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { syncMixpanelUser, resetMixpanel } from '../utils/mixpanel';
+import { flagDiscoveryForSession } from '../constants/gamemodes';
 
 const AuthContext = createContext();
 
@@ -126,6 +127,7 @@ export const AuthProvider = ({ children }) => {
         setUser(formattedUser);
         setToken(newToken);
         syncMixpanelUser(formattedUser);
+        flagDiscoveryForSession();
         console.log('AuthContext: Användare inloggad, token sparad, user-state uppdaterad:', formattedUser);
     };
 

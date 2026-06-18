@@ -1383,87 +1383,214 @@
   flex-shrink: 0;
 }
 
-/* ─── Guest welcome banner ─── */
-.guest-banner {
-  width: min(100%, 1220px);
-  margin: 72px auto 12px;
-  padding: 24px 28px;
-  background: linear-gradient(135deg, rgba(124, 58, 255, 0.08), rgba(77, 140, 255, 0.06));
-  border: 1px solid var(--accent-border);
-  border-radius: var(--r-2xl);
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 20px;
+/* ─── Gamemode badges (Popular / New) ─── */
+.gm-mode-badge {
+  display: inline-flex;
   align-items: center;
-  animation: fadeUp 0.35s ease-out;
-  box-sizing: border-box;
-}
-
-.guest-banner-content {
-  min-width: 0;
-}
-
-.guest-banner-tag {
-  margin: 0 0 6px;
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--accent);
-}
-
-.guest-banner-title {
-  margin: 0 0 6px;
-  font-family: var(--display);
-  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-family: var(--ui);
+  font-size: 0.52rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--text-h);
-  line-height: 1.15;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.4;
 }
 
-.guest-banner-sub {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--text-2);
-  line-height: 1.45;
+.gm-mode-badge--popular {
+  color: var(--green);
+  background: var(--green-dim);
+  border: 1px solid var(--green-border);
 }
 
-.guest-banner-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.gm-mode-badge--new {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
 }
 
-.guest-step {
+.gm-card-title-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text);
+  flex-wrap: wrap;
 }
 
-.guest-step-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--accent-dim);
-  border: 1px solid var(--accent-border);
-  color: var(--accent);
-  font-size: 0.65rem;
-  font-weight: 800;
+.mode-card-subtitle-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: -6px;
 }
 
-.guest-banner-cta {
-  grid-column: 1 / -1;
-  width: fit-content;
-  padding: 11px 24px;
-  border-radius: var(--r-full);
+/* ─── Gamemode discovery prompt (pregame) ─── */
+.gm-discovery {
+  position: fixed;
+  left: 16px;
+  bottom: 52px;
+  z-index: 1040;
+  width: min(340px, calc(100vw - 32px));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-xl);
+  padding: 12px 14px 14px;
+  box-shadow: var(--shadow-xl);
+  animation: gmDiscoveryIn 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@keyframes gmDiscoveryIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.gm-discovery-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.gm-discovery-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gm-discovery-label {
+  font-family: var(--display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-h);
+  letter-spacing: -0.02em;
+}
+
+.gm-discovery-modes-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--ui);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s ease;
+}
+
+.gm-discovery-modes-link:hover {
+  opacity: 0.8;
+}
+
+.gm-discovery-close {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-3);
+  font-size: 0.7rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gm-discovery-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-h);
+}
+
+.gm-discovery-grid {
+  display: flex;
+  gap: 8px;
+}
+
+.gm-discovery-tile {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  text-align: left;
+}
+
+.gm-discovery-tile:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 58, 255, 0.15);
+}
+
+.gm-discovery-preview {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #0a0a0f;
+}
+
+.gm-discovery-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gm-discovery-preview canvas.gm-discovery-preview-img {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.gm-discovery-badge-wrap {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+}
+
+.gm-discovery-tile-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.gm-discovery-tile-title {
+  font-family: var(--display);
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--text-h);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gm-discovery-tile-playing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--text-3);
+  flex-shrink: 0;
 }
 
 /* ─── Empty state ─── */
@@ -2720,21 +2847,17 @@
     position: static;
   }
 
-  .guest-banner {
-    margin: 60px 16px 12px;
-    padding: 20px;
-    grid-template-columns: 1fr;
+  .gm-discovery {
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0));
+    width: min(360px, calc(100vw - 24px));
   }
 
-  .guest-banner-steps {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 10px 16px;
-  }
-
-  .guest-banner-cta {
-    width: 100%;
-    text-align: center;
+  .gm-discovery-grid {
+    gap: 6px;
   }
 
   .stats-strip {
