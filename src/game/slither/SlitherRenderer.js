@@ -869,9 +869,9 @@ export class SlitherRenderer {
      * Body-local tube — soft lateral shade + feathered rim. Dorsal highlight is spine-only.
      */
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
-        // Parse and darken the base color overall
+        // Parse and darken the base color only slightly to keep it rich but not too dark
         let col = parseColor(cs);
-        col = shadeColor(col, -32);
+        col = shadeColor(col, -15);
         const k = contrast;
 
         // Radial gradient for the base color
@@ -912,7 +912,7 @@ export class SlitherRenderer {
         g.fill();
     }
 
-    /** Thin dorsal highlight — narrow, glowing neon streak. */
+    /** Soft dorsal highlight — wide, smeared-out reflection. */
     _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1, opts = {}) {
         if (count < 2) return;
         const k = alphaMul;
@@ -936,24 +936,17 @@ export class SlitherRenderer {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // 1. Draw soft, wide outer glow (warm gold)
+        // 1. Draw wide, smeared-out warm glow (softer reflection)
         ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = 'rgba(255, 235, 130, 0.38)';
-        ctx.lineWidth = radius * 0.28;
-        ctx.filter = 'blur(6px)';
+        ctx.strokeStyle = 'rgba(255, 253, 225, 0.24)';
+        ctx.lineWidth = radius * 0.44;
+        ctx.filter = 'blur(9px)';
         if (tracePath(ctx)) ctx.stroke();
 
-        // 2. Draw tighter, brighter mid-glow
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.lineWidth = radius * 0.12;
-        ctx.filter = 'blur(2px)';
-        if (tracePath(ctx)) ctx.stroke();
-
-        // 3. Draw the very sharp, narrow white core
-        ctx.filter = 'none';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = radius * 0.045; // Very thin
-        ctx.globalAlpha = 0.95 * k;
+        // 2. Draw slightly tighter, soft white reflection (still blurred, no hard core)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
+        ctx.lineWidth = radius * 0.22;
+        ctx.filter = 'blur(3.5px)';
         if (tracePath(ctx)) ctx.stroke();
 
         ctx.restore();
