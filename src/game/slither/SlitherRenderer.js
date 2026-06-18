@@ -885,45 +885,75 @@ export class SlitherRenderer {
     }
 
     /**
-     * Body-local tube segment — dorsal highlight + lateral shade (sprite X = along body).
-     * Drawn rotated per stamp so lighting stays on the snake, not the map.
+     * Body-local tube segment — lateral shade only (no per-stamp highlight).
+     * One dorsal highlight is drawn along the full spine after stamping.
      */
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.18, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-2 * k))));
-        baseGrad.addColorStop(0.62, toHex(col));
-        baseGrad.addColorStop(0.9, toHex(shadeColor(col, Math.round(-22 * k))));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-30 * k))));
+        const baseGrad = g.createRadialGradient(c, c, rPx * 0.2, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(-4 * k))));
+        baseGrad.addColorStop(0.68, toHex(col));
+        baseGrad.addColorStop(0.92, toHex(shadeColor(col, Math.round(-20 * k))));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-28 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hiCol = shadeColor(col, Math.round(24 * k));
         const tubeGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -52), 0.42 * k));
-        tubeGrad.addColorStop(0.18, rgb(shadeColor(col, -36), 0.18 * k));
-        tubeGrad.addColorStop(0.32, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.5, rgb(hiCol, 0.09 * k));
-        tubeGrad.addColorStop(0.68, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.82, rgb(shadeColor(col, -36), 0.18 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -52), 0.42 * k));
+        tubeGrad.addColorStop(0, rgb(shadeColor(col, -54), 0.48 * k));
+        tubeGrad.addColorStop(0.2, rgb(shadeColor(col, -38), 0.22 * k));
+        tubeGrad.addColorStop(0.38, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
+        tubeGrad.addColorStop(0.8, rgb(shadeColor(col, -38), 0.22 * k));
+        tubeGrad.addColorStop(1, rgb(shadeColor(col, -54), 0.48 * k));
 
         g.fillStyle = tubeGrad;
         g.fill();
 
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.72, c, c, rPx * 1.0);
+        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.64, c, c, rPx * 1.0);
         edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.82, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -28), 0.08 * k));
+        edgeShadow.addColorStop(0.72, 'rgba(0,0,0,0)');
+        edgeShadow.addColorStop(1, rgb(shadeColor(col, -32), 0.11 * k));
         g.fillStyle = edgeShadow;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
+    }
+
+    /** Single matte dorsal highlight along the whole body — avoids per-segment glossy bands. */
+    _blitSpineHighlight(ctx, bumps, count, radius, cs, alphaMul = 1) {
+        if (count < 2) return;
+        const col = parseColor(cs);
+        const k = alphaMul;
+
+        const trace = (lineW, color) => {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineW;
+            ctx.beginPath();
+            let started = false;
+            for (let i = count - 1; i >= 0; i--) {
+                const p = bumps[i];
+                if (!started) {
+                    ctx.moveTo(p.x, p.y);
+                    started = true;
+                } else {
+                    ctx.lineTo(p.x, p.y);
+                }
+            }
+            if (started) ctx.stroke();
+        };
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        trace(radius * 0.58, rgb(shadeColor(col, 26), 0.06 * k));
+        trace(radius * 0.34, rgb(shadeColor(col, 16), 0.1 * k));
+        ctx.restore();
     }
 
     /** Turn strength [0,1] and sign (+1 left, -1 right) at bump — for crease shading in bends. */
@@ -1001,11 +1031,11 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v28|${key}`, ssSize, (g, sz) => {
+            pair.normal = this._getSprite(`pr_norm_v29|${key}`, ssSize, (g, sz) => {
                 this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v28|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.08);
+            pair.boostBody = this._getSprite(`pr_norm_v29|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.06);
             });
         }
 
@@ -1113,7 +1143,7 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.26);
+        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.30);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.9 : 1);
@@ -1193,6 +1223,8 @@ export class SlitherRenderer {
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
             this._blitBendCrease(ctx, p.x, p.y, tangent, stampRadius, this._bumpTurn(bumps, i));
         }
+
+        this._blitSpineHighlight(ctx, bumps, bumpCount, stampRadius, cs, boosting ? 1.15 : 1);
 
         if (isYou && prNeeds.glow && glow) {
             ctx.save();
