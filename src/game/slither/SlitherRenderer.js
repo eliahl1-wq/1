@@ -65,8 +65,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 68%, 66%) → RGB — slightly lighter slither.io pastels
-    const s = 0.68, l = 0.66;
+    // HSL(h, 64%, 64%) — muted slither.io pastels
+    const s = 0.64, l = 0.64;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -881,57 +881,55 @@ export class SlitherRenderer {
         return Math.atan2(prev.y - next.y, prev.x - next.x);
     }
 
+    // Slight oval — wider perpendicular to body reads smoother / more tubular (slither.io).
+    _paintSnakeSegmentOval(g, c, rPx, cs, phase = 0, contrast = 1) {
+        g.save();
+        g.translate(c, c);
+        g.scale(1.05, 0.96);
+        g.translate(-c, -c);
+        this._paintSnakeSegment(g, c, rPx, cs, phase, contrast);
+        g.restore();
+    }
+
     /**
-     * Glossy gel-like segment — radial body, top-left specular, bottom-right depth.
-     * Designed to overlap heavily to form a continuous rubber-like tube.
+     * Soft matte tube segment — wide diffuse highlight, gentle rim (slither.io-like).
      */
     _paintSnakeSegment(g, c, rPx, cs, phase = 0, contrast = 1) {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c - rPx * 0.16, rPx * 0.12, c, c, rPx);
-        const centerCol = shadeColor(col, Math.round(12 * k));
-        const midCol = col;
-        const edgeCol = shadeColor(col, Math.round(-34 * k));
-
-        baseGrad.addColorStop(0, toHex(centerCol));
-        baseGrad.addColorStop(0.6, toHex(midCol));
-        baseGrad.addColorStop(1, toHex(edgeCol));
+        const baseGrad = g.createRadialGradient(c, c - rPx * 0.08, rPx * 0.2, c, c, rPx);
+        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(6 * k))));
+        baseGrad.addColorStop(0.45, toHex(col));
+        baseGrad.addColorStop(0.88, toHex(shadeColor(col, Math.round(-14 * k))));
+        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-22 * k))));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
 
-        const hiCol = shadeColor(col, Math.round(58 * k));
-        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        const hiStart = phase ? 0.07 : 0.05;
-        const hiPeak = phase ? 0.16 : 0.13;
-        const hiEnd = phase ? 0.28 : 0.25;
-        hiGrad.addColorStop(hiStart, 'rgba(255,255,255,0)');
-        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.26 * k));
-        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.045 * k));
-        hiGrad.addColorStop(hiEnd + 0.06, 'rgba(255,255,255,0)');
+        const hiCol = shadeColor(col, Math.round(32 * k));
+        const hiGrad = g.createLinearGradient(c, c - rPx, c, c + rPx * 0.55);
+        const hiStart = phase ? 0.04 : 0.02;
+        const hiPeak = phase ? 0.20 : 0.17;
+        const hiEnd = phase ? 0.38 : 0.34;
+        hiGrad.addColorStop(0, 'rgba(255,255,255,0)');
+        hiGrad.addColorStop(hiStart, rgb(hiCol, 0.08 * k));
+        hiGrad.addColorStop(hiPeak, rgb(hiCol, 0.13 * k));
+        hiGrad.addColorStop(hiEnd, rgb(hiCol, 0.03 * k));
+        hiGrad.addColorStop(Math.min(1, hiEnd + 0.12), 'rgba(255,255,255,0)');
 
         g.fillStyle = hiGrad;
         g.fill();
 
-        const shCol = shadeColor(col, Math.round(-52 * k));
-        const shGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        shGrad.addColorStop(0.68, 'rgba(0,0,0,0)');
-        shGrad.addColorStop(0.94, rgb(shCol, 0.4 * k));
-        shGrad.addColorStop(1.0, rgb(shCol, 0.56 * k));
+        const shCol = shadeColor(col, Math.round(-28 * k));
+        const shGrad = g.createLinearGradient(c, c - rPx * 0.2, c, c + rPx);
+        shGrad.addColorStop(0.55, 'rgba(0,0,0,0)');
+        shGrad.addColorStop(0.88, rgb(shCol, 0.12 * k));
+        shGrad.addColorStop(1.0, rgb(shCol, 0.22 * k));
 
         g.fillStyle = shGrad;
-        g.fill();
-
-        const edgeShadow = g.createRadialGradient(c, c, rPx * 0.72, c, c, rPx * 1.03);
-        edgeShadow.addColorStop(0, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(0.88, 'rgba(0,0,0,0)');
-        edgeShadow.addColorStop(1, rgb(shadeColor(col, -30), 0.16 * k));
-        g.fillStyle = edgeShadow;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
         g.fill();
     }
 
@@ -969,14 +967,14 @@ export class SlitherRenderer {
         const ssSize = ssR * 2 + 4;
 
         if (!pair.normal) {
-            pair.normal = this._getSprite(`pr_norm_v21|${key}|0`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1);
+            pair.normal = this._getSprite(`pr_norm_v22|${key}|0`, ssSize, (g, sz) => {
+                this._paintSnakeSegmentOval(g, sz / 2, ssR, cs, 0, 1);
             });
-            pair.alt = this._getSprite(`pr_norm_v21|${key}|1`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, 1);
+            pair.alt = this._getSprite(`pr_norm_v22|${key}|1`, ssSize, (g, sz) => {
+                this._paintSnakeSegmentOval(g, sz / 2, ssR, cs, 1, 1);
             });
-            pair.boostBody = this._getSprite(`pr_norm_v21|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 0, 1.25);
+            pair.boostBody = this._getSprite(`pr_norm_v22|${key}|boost`, ssSize, (g, sz) => {
+                this._paintSnakeSegmentOval(g, sz / 2, ssR, cs, 0, 1.1);
             });
         }
 
@@ -1084,7 +1082,7 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        const stampStepWorld = Math.max(1.1, bodyRadiusWorld * 0.26);
+        const stampStepWorld = Math.max(1.0, bodyRadiusWorld * 0.21);
         const q = this._quality;
         const cashoutPerf = isYou && this._cashoutPerf;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q) * (cashoutPerf ? 0.9 : 1);
@@ -1159,11 +1157,23 @@ export class SlitherRenderer {
             ctx.globalCompositeOperation = 'lighter';
             for (let t = 1; t < trail.length; t++) {
                 const tr = trail[t];
-                ctx.globalAlpha = (1 - t / trail.length) * 0.12 * pulse;
+                ctx.globalAlpha = (1 - t / trail.length) * 0.08 * pulse;
                 ctx.drawImage(trailGlow, tr.x - halfT, tr.y - halfT);
             }
             ctx.restore();
         }
+
+        // Soft ground shadow — subtle depth like slither.io
+        ctx.save();
+        ctx.filter = 'brightness(0)';
+        ctx.globalAlpha = 0.11;
+        const shadowStride = cashoutPerf ? 4 : 3;
+        for (let i = bumpCount - 1; i >= 0; i -= shadowStride) {
+            const p = bumps[i];
+            if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+            this._blitSprite(ctx, normal, p.x + 1.5, p.y + 2.5, stampScale * 0.97);
+        }
+        ctx.restore();
 
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
@@ -1178,7 +1188,7 @@ export class SlitherRenderer {
         if (isYou && prNeeds.glow && glow) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
+            ctx.globalAlpha = boosting ? 0.14 * pulse : 0.07;
             const glowStride = cashoutPerf ? 4 : (boosting ? 2 : 3);
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
@@ -1196,7 +1206,7 @@ export class SlitherRenderer {
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
                 const headProx = 1 - along;
-                ctx.globalAlpha = (0.22 + headProx * 0.22) * pulse;
+                ctx.globalAlpha = (0.16 + headProx * 0.14) * pulse;
                 this._blitSprite(ctx, boostOverlay, p.x, p.y);
             }
             ctx.restore();
