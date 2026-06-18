@@ -8,7 +8,7 @@ import { io } from 'socket.io-client';
 
 import { SlitherRenderer } from './SlitherRenderer.js';
 
-import { normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
+import { normalizeEntryFee, normalizeBREntryFee, normalizeCompetitiveEntryFee, formatUsd } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
@@ -143,7 +143,9 @@ export default function SlitherGame() {
     const isCompetitiveMode = gameModeStored === 'competitive-slither' || location.state?.selectedMode === 'competitive-slither';
     const entryFeeUsd = isBRMode
         ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
-        : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
+        : isCompetitiveMode
+            ? normalizeCompetitiveEntryFee(localStorage.getItem('selected_entry_fee'))
+            : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
     joinParamsRef.current = {
         nickname: matchNickname,
