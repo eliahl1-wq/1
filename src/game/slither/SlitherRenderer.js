@@ -225,7 +225,8 @@ export class SlitherRenderer {
     resize() {
         const { width, height } = getGameScreenSize();
         const rawDpr = window.devicePixelRatio || 1;
-        this._dpr = this.isMobile ? Math.min(1.75, rawDpr) : Math.min(1.5, rawDpr);
+        // Cap at 1× CSS pixels — avoids 1.5×/2× internal buffers on HiDPI (major CPU win for canvas).
+        this._dpr = this.isMobile ? Math.min(1.25, rawDpr) : 1;
         if (this._dpr < 1) this._dpr = 1;
         this.canvas.width = Math.round(width * this._dpr);
         this.canvas.height = Math.round(height * this._dpr);

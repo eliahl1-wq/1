@@ -7,9 +7,13 @@ import AppTopbar from '../components/AppTopbar';
 import { SlitherRenderer } from '../game/slither/SlitherRenderer.js';
 import global from '../game/agar/global.js';
 import * as renderUtils from '../game/agar/render.js';
+import { useSpectatorCamera } from '../hooks/useSpectatorCamera';
 import '../styles/ui.css';
 
 const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
+/** Same as competitive Slither arena (SLITHER.worldHalf × 0.3). */
+const SANDBOX_SLITHER_HALF = 900;
+const AGAR_WORLD_SIZE = 6000;
 
 function ControlSection({ title, children }) {
     return (
@@ -39,6 +43,7 @@ export default function AdminSandbox() {
     const animRef = useRef(null);
     const hasJoinedRef = useRef(false);
     const hideOverlaysRef = useRef(false);
+    const pausedRef = useRef(false);
 
     const [mode, setMode] = useState('slither');
     const [connected, setConnected] = useState(false);
@@ -48,8 +53,8 @@ export default function AdminSandbox() {
     const [speed, setSpeed] = useState(1);
     const [botAi, setBotAi] = useState(true);
     const [invincible, setInvincible] = useState(true);
-    const [worldHalf, setWorldHalf] = useState(3000);
-    const [zoneRadius, setZoneRadius] = useState(3000);
+    const [worldHalf, setWorldHalf] = useState(SANDBOX_SLITHER_HALF);
+    const [zoneRadius, setZoneRadius] = useState(SANDBOX_SLITHER_HALF);
     const [shrinkDuration, setShrinkDuration] = useState(120);
     const [shrinkEndRadius, setShrinkEndRadius] = useState(400);
     const [botCount, setBotCount] = useState(3);
@@ -68,6 +73,34 @@ export default function AdminSandbox() {
     const [sessionEpoch, setSessionEpoch] = useState(0);
     const [restarting, setRestarting] = useState(false);
 
+    const spectatorBounds = mode === 'slither'
+        ? {
+            minX: -worldHalf + 80,
+            maxX: worldHalf - 80,
+            minY: -worldHalf + 80,
+            maxY: worldHalf - 80,
+        }
+        : {
+            minX: 120,
+            maxX: AGAR_WORLD_SIZE - 120,
+            minY: 120,
+            maxY: AGAR_WORLD_SIZE - 120,
+        };
+
+    const { camRef: specCamRef, seed: seedSpecCam } = useSpectatorCamera({
+        active: paused && gameReady,
+        canvasRef,
+        worldBounds: spectatorBounds,
+        baseViewZoom: 1,
+        minZoom: mode === 'slither' ? 0.5 : 0.35,
+        maxZoom: mode === 'slither' ? 4.2 : 2,
+        initialZoom: mode === 'slither' ? 2.5 : 1,
+    });
+
+    useEffect(() => {
+        pausedRef.current = paused;
+    }, [paused]);
+
     const sendControl = useCallback((action, params = {}) => {
         socketRef.current?.emit('sandboxControl', { token, mode, action, params });
     }, [token, mode]);
@@ -84,7 +117,7 @@ export default function AdminSandbox() {
     const disconnectSocket = useCallback(() => {
         if (animRef.current) cancelAnimationFrame(animRef.current);
         if (rendererRef.current) {
-            rendererRef.current.stop?.();
+            rendererRef.current.destroy();
             rendererRef.current = null;
         }
         if (socketRef.current) {
@@ -126,9 +159,9 @@ export default function AdminSandbox() {
             const { player, users, food, viruses, ejected, zone } = agarDataRef.current;
             const W = canvas.width;
             const H = canvas.height;
-            const camX = player?.x ?? 3000;
-            const camY = player?.y ?? 3000;
-            const zoom = 1;
+            const camX = pausedRef.current ? specCamRef.current.x : (player?.x ?? AGAR_WORLD_SIZE / 2);
+            const camY = pausedRef.current ? specCamRef.current.y : (player?.y ?? AGAR_WORLD_SIZE / 2);
+            const zoom = pausedRef.current ? specCamRef.current.zoom : 1;
 
             graph.fillStyle = global.backgroundColor;
             graph.fillRect(0, 0, W, H);
@@ -200,6 +233,42 @@ export default function AdminSandbox() {
     }, [hideOverlays]);
 
     useEffect(() => {
+        if (!paused || !gameReady) return;
+        if (mode === 'slither' && rendererRef.current) {
+            const r = rendererRef.current;
+            seedSpecCam(r.camera.x, r.camera.y, r.zoom);
+            r.setInputEnabled(false);
+        } else if (mode === 'agar') {
+            const p = agarDataRef.current.player;
+            seedSpecCam(p?.x ?? AGAR_WORLD_SIZE / 2, p?.y ?? AGAR_WORLD_SIZE / 2, specCamRef.current.zoom || 1);
+        }
+    }, [paused, gameReady, mode, seedSpecCam, specCamRef]);
+
+    useEffect(() => {
+        const renderer = rendererRef.current;
+        if (!paused || mode !== 'slither' || !renderer) {
+            if (renderer && mode === 'slither' && !paused) {
+                renderer.setSpectatorMode(false);
+                renderer.setInputEnabled(true);
+            }
+            return undefined;
+        }
+        renderer.setInputEnabled(false);
+        let rafId = 0;
+        const sync = () => {
+            const cam = specCamRef.current;
+            renderer.setSpectatorMode(true, { x: cam.x, y: cam.y, zoom: cam.zoom });
+            rafId = requestAnimationFrame(sync);
+        };
+        sync();
+        return () => {
+            cancelAnimationFrame(rafId);
+            renderer.setSpectatorMode(false);
+            renderer.setInputEnabled(true);
+        };
+    }, [paused, mode, specCamRef]);
+
+    useEffect(() => {
         if (!user?.isAdmin || !token) return undefined;
 
         disconnectSocket();
@@ -229,6 +298,7 @@ export default function AdminSandbox() {
             renderer.setHideOverlays(hideOverlaysRef.current);
             renderer.start();
             renderer.setInputEmitter(() => {
+                if (pausedRef.current) return;
                 if (socketRef.current?.connected && rendererRef.current) {
                     socketRef.current.emit('slitherInput', rendererRef.current.getInput());
                 }
@@ -307,6 +377,13 @@ export default function AdminSandbox() {
                     setSelectedWorm(state.staticWormIds[0].id);
                 }
             }
+            if (state?.lastAction === 'addStaticWorm' && state?.result) {
+                const { id, x, y, angle } = state.result;
+                if (id) setSelectedWorm(id);
+                if (x != null) setWormX(Math.round(x));
+                if (y != null) setWormY(Math.round(y));
+                if (angle != null) setWormAngle(angle);
+            }
         });
 
         socket.on('sandboxStaticWorms', (worms) => setStaticWorms(worms || []));
@@ -324,7 +401,7 @@ export default function AdminSandbox() {
 
         // Agar mouse input
         const onPointer = (e) => {
-            if (mode !== 'agar' || !socket.connected) return;
+            if (mode !== 'agar' || !socket.connected || pausedRef.current) return;
             const rect = canvas.getBoundingClientRect();
             const mx = e.clientX - rect.left - canvas.width / 2;
             const my = e.clientY - rect.top - canvas.height / 2;
@@ -337,7 +414,7 @@ export default function AdminSandbox() {
 
         // Static worm drag (slither edit mode)
         const onCanvasClick = (e) => {
-            if (mode !== 'slither' || !editMode || !selectedWorm || !rendererRef.current) return;
+            if (mode !== 'slither' || pausedRef.current || !editMode || !selectedWorm || !rendererRef.current) return;
             const rect = canvas.getBoundingClientRect();
             const screenX = e.clientX - rect.left;
             const screenY = e.clientY - rect.top;
@@ -366,7 +443,8 @@ export default function AdminSandbox() {
         if (newMode === mode) return;
         disconnectSocket();
         setMode(newMode);
-        setWorldHalf(newMode === 'slither' ? 3000 : 3000);
+        setWorldHalf(newMode === 'slither' ? SANDBOX_SLITHER_HALF : 3000);
+        setZoneRadius(newMode === 'slither' ? SANDBOX_SLITHER_HALF : 3000);
         setGameReady(false);
     };
 
@@ -411,7 +489,7 @@ export default function AdminSandbox() {
 
                     <p className="sandbox-status">
                         {connected ? (gameReady ? '● Live' : '○ Connecting…') : '○ Disconnected'}
-                        {sandboxState?.paused && ' · Paused'}
+                        {sandboxState?.paused && ' · Paused · drag camera'}
                     </p>
 
                     <ControlSection title="Playback">
@@ -439,6 +517,7 @@ export default function AdminSandbox() {
                                 Play
                             </button>
                         </div>
+                        <p className="sandbox-hint">Pause = spectator: dra kameran med musen, scrolla för zoom.</p>
                         <Row label={`Speed: ${speed.toFixed(1)}×`}>
                             <input
                                 type="range" min="0.2" max="3" step="0.1" value={speed}
@@ -556,10 +635,10 @@ export default function AdminSandbox() {
                             <button
                                 type="button" className="ui-btn ui-btn-primary sandbox-full-btn"
                                 onClick={() => {
-                                    sendControl('addStaticWorm', { x: wormX, y: wormY, balance: wormSize, angle: wormAngle });
+                                    sendControl('addStaticWorm', { balance: wormSize, angle: wormAngle });
                                 }}
                             >
-                                + Add worm
+                                + Add worm (beside you)
                             </button>
                             <label className="sandbox-check">
                                 <input type="checkbox" checked={editMode} onChange={(e) => setEditMode(e.target.checked)} />
@@ -594,7 +673,7 @@ export default function AdminSandbox() {
                                 <button
                                     type="button" className="ui-btn ui-btn-ghost sandbox-full-btn"
                                     onClick={() => {
-                                        sendControl('moveStaticWorm', { id: selectedWorm, x: wormX, y: wormY, angle: wormAngle });
+                                        sendControl('moveStaticWorm', { id: selectedWorm, x: wormX, y: wormY, angle: wormAngle, useCustomPosition: true });
                                         sendControl('setEntitySize', { id: selectedWorm, balance: wormSize, angle: wormAngle });
                                     }}
                                 >
