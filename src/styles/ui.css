@@ -1332,55 +1332,87 @@
   border-width: 2px;
 }
 
-/* ─── Live stats strip ─── */
-.stats-strip {
+/* ─── Guest welcome banner ─── */
+.guest-banner {
+  width: min(100%, 1220px);
+  margin: 72px auto 12px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(124, 58, 255, 0.08), rgba(77, 140, 255, 0.06));
+  border: 1px solid var(--accent-border);
+  border-radius: var(--r-2xl);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: center;
+  animation: fadeUp 0.35s ease-out;
+  box-sizing: border-box;
+}
+
+.guest-banner-content {
+  min-width: 0;
+}
+
+.guest-banner-tag {
+  margin: 0 0 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.guest-banner-title {
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-h);
+  line-height: 1.15;
+}
+
+.guest-banner-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.guest-banner-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guest-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.guest-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 0;
-  width: min(100%, 1220px);
-  margin: 0 auto 16px;
-  padding: 10px 20px;
-  background: rgba(18, 19, 25, 0.6);
-  border: 1px solid var(--border);
-  border-radius: var(--r-full);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  animation: fadeUp 0.4s ease-out;
-}
-
-.stats-strip-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 0 20px;
-}
-
-.stats-strip-label {
-  font-size: 0.55rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-3);
-}
-
-.stats-strip-value {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text-h);
-}
-
-.stats-strip-value--accent { color: var(--accent); }
-.stats-strip-value--green { color: var(--green); }
-.stats-strip-value--yellow { color: var(--yellow); }
-
-.stats-strip-divider {
-  width: 1px;
-  height: 28px;
-  background: var(--border);
   flex-shrink: 0;
+}
+
+.guest-banner-cta {
+  grid-column: 1 / -1;
+  width: fit-content;
+  padding: 11px 24px;
+  border-radius: var(--r-full);
 }
 
 /* ─── Gamemode badges (Popular / New) ─── */
@@ -2860,22 +2892,21 @@
     gap: 6px;
   }
 
-  .stats-strip {
-    margin: 0 16px 14px;
-    border-radius: var(--r-xl);
-    padding: 12px 8px;
+  .guest-banner {
+    margin: 60px 16px 12px;
+    padding: 20px;
+    grid-template-columns: 1fr;
   }
 
-  .stats-strip-item {
-    padding: 4px 12px;
+  .guest-banner-steps {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px 16px;
   }
 
-  .stats-strip-divider {
-    display: none;
-  }
-
-  .stats-strip-value {
-    font-size: 0.82rem;
+  .guest-banner-cta {
+    width: 100%;
+    text-align: center;
   }
 
   .game-card {

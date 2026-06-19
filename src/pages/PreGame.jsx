@@ -10,7 +10,7 @@ import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
-import LiveStatsStrip from '../components/LiveStatsStrip';
+import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import GamemodeDiscoveryPrompt from '../components/GamemodeDiscoveryPrompt';
 import GamemodeBadge from '../components/GamemodeBadge';
 import { markGamemodePlayed, shouldShowDiscoveryPrompt, getGamemodeConfig } from '../constants/gamemodes';
@@ -248,9 +248,6 @@ export default function PreGame() {
 
 
     const siteUsersOnline = liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0;
-    const playersInArena = (liveStats.playersByGamemode?.agar || 0)
-        + (liveStats.playersByGamemode?.slither || 0)
-        + (liveStats.playersByGamemode?.competitiveSlither || 0);
     const globalCashoutTotalUsd =
         liveStats.globalPlayerEarningsUsd
         ?? liveStats.totalUserBalanceUsd
@@ -1118,12 +1115,7 @@ export default function PreGame() {
                 </div>
             )}
 
-            <LiveStatsStrip
-                playersOnline={siteUsersOnline}
-                inArena={playersInArena}
-                totalEarnings={globalCashoutTotalUsd}
-                biggestWin={liveStats.biggestPayout}
-            />
+            {!isAuthenticated && <GuestWelcomeBanner />}
 
             {showDiscovery && (
                 <GamemodeDiscoveryPrompt
