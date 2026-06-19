@@ -1,66 +1,50 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { CASHOUT_HOLD_MS } from '../game/cashoutRing.js';
 
 export { CASHOUT_HOLD_MS };
 
 /**
  * Hold Q (or press-and-hold the cashout button) before starting the cashout timer.
- * Canvas ring uses renderer.setHoldStart — no per-tick React state here (keeps game smooth).
+ * Completion is detected on the canvas rAF loop (see renderer.setHoldCompleteCallback)
+ * so a lag spike cannot stall setTimeout and cancel the hold via keyup.
  */
-export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStart, onHoldEnd }) {
-    const [isHolding, setIsHolding] = useState(false);
-    const startTimeRef = useRef(null);
-    const completeTimeoutRef = useRef(null);
+export function useHoldKeyCashout({ canStart, onComplete, onHoldStart, onHoldEnd }) {
+    const holdingRef = useRef(false);
     const canStartRef = useRef(canStart);
     const onCompleteRef = useRef(onComplete);
-    const onProgressRef = useRef(onProgress);
     const onHoldStartRef = useRef(onHoldStart);
     const onHoldEndRef = useRef(onHoldEnd);
     canStartRef.current = canStart;
     onCompleteRef.current = onComplete;
-    onProgressRef.current = onProgress;
     onHoldStartRef.current = onHoldStart;
     onHoldEndRef.current = onHoldEnd;
 
-    const clearCompleteTimer = useCallback(() => {
-        if (completeTimeoutRef.current) {
-            clearTimeout(completeTimeoutRef.current);
-            completeTimeoutRef.current = null;
-        }
+    const cancelHold = useCallback(() => {
+        if (!holdingRef.current) return;
+        holdingRef.current = false;
+        onHoldEndRef.current?.();
     }, []);
 
-    const cancelHold = useCallback(() => {
-        if (startTimeRef.current == null) return;
-        startTimeRef.current = null;
-        clearCompleteTimer();
-        setIsHolding(false);
-        onHoldEndRef.current?.();
-        onProgressRef.current?.(0);
-    }, [clearCompleteTimer]);
-
     const startHold = useCallback(() => {
-        if (startTimeRef.current != null) return;
+        if (holdingRef.current) return;
         if (typeof canStartRef.current === 'function' && !canStartRef.current()) return;
-        const now = performance.now();
-        startTimeRef.current = now;
-        setIsHolding(true);
-        onHoldStartRef.current?.(now);
-        onProgressRef.current?.(0.001);
+        holdingRef.current = true;
+        onHoldStartRef.current?.(performance.now());
+    }, []);
 
-        completeTimeoutRef.current = setTimeout(() => {
-            startTimeRef.current = null;
-            clearCompleteTimer();
-            setIsHolding(false);
-            onHoldEndRef.current?.();
-            onProgressRef.current?.(0);
-            onCompleteRef.current?.();
-        }, CASHOUT_HOLD_MS);
-    }, [clearCompleteTimer]);
+    const completeHold = useCallback(() => {
+        if (!holdingRef.current) return;
+        holdingRef.current = false;
+        onHoldEndRef.current?.();
+        onCompleteRef.current?.();
+    }, []);
 
     const startHoldRef = useRef(startHold);
     const cancelHoldRef = useRef(cancelHold);
+    const completeHoldRef = useRef(completeHold);
     startHoldRef.current = startHold;
     cancelHoldRef.current = cancelHold;
+    completeHoldRef.current = completeHold;
 
     useEffect(() => {
         const onKeyDown = (e) => {
@@ -82,5 +66,5 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
         };
     }, []);
 
-    return { isHolding, startHold, cancelHold };
+    return { startHold, cancelHold, completeHold, isHoldingRef: holdingRef };
 }
