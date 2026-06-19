@@ -1733,20 +1733,20 @@ export class SlitherRenderer {
         if (nameLen > 12) fontSize *= 0.35;
         fontSize = Math.max(11, Math.min(16, fontSize));
 
-        const labelBaseY = Math.round(hy - headRadius - 10);
+        const nameY = hy - headRadius - 12;
         ctx.fillStyle = isYou ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)';
         ctx.font = `bold ${fontSize}px Arial, sans-serif`;
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
+        ctx.textBaseline = 'middle';
         ctx.strokeStyle = 'rgba(0,0,0,0.55)';
         ctx.lineWidth = 3;
-        ctx.strokeText(snake.name, hx, labelBaseY);
-        ctx.fillText(snake.name, hx, labelBaseY);
+        ctx.strokeText(snake.name, hx, nameY);
+        ctx.fillText(snake.name, hx, nameY);
 
         const displayBalance = isYou
             ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance ?? 0)
             : (snake.dollarBalance ?? snake.balance ?? 0);
-        this._drawBalanceBadge(ctx, hx, labelBaseY + 5, displayBalance, isYou);
+        this._drawBalanceBadge(ctx, hx, nameY + fontSize * 0.9, displayBalance, isYou);
     }
 
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
