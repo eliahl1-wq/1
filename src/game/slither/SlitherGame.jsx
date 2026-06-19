@@ -311,6 +311,8 @@ export default function SlitherGame() {
         socketRef.current.emit('cashOut');
     }, [startCashoutCountdown]);
 
+    const finishHoldRef = useRef(null);
+
     const handleHoldStart = useCallback((atMs) => {
         rendererRef.current?.setHoldStart(atMs);
     }, []);
@@ -319,12 +321,13 @@ export default function SlitherGame() {
         rendererRef.current?.setHoldStart(0);
     }, []);
 
-    const { isHolding, startHold, cancelHold } = useHoldKeyCashout({
+    const { isHolding, startHold, cancelHold, finishHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
         onComplete: handleCashOut,
         onHoldStart: handleHoldStart,
         onHoldEnd: handleHoldEnd,
     });
+    finishHoldRef.current = finishHold;
 
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
         && localTimer <= 0 && cashedAmount === null && !isDead;
@@ -434,6 +437,7 @@ export default function SlitherGame() {
         };
 
         renderer.setInputEmitter(emitInput);
+        renderer.setHoldCompleteHandler(() => finishHoldRef.current?.());
 
 
 
