@@ -1041,7 +1041,7 @@ export default function Game() {
             )}
 
             {user?.isAdmin && (
-                <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 10000 }}>
+                <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 10000, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <button 
                         className="ui-btn ui-btn-primary" 
                         style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF3B30', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
@@ -1052,6 +1052,16 @@ export default function Game() {
                         }}
                     >
                         [Admin] Spawn Bot
+                    </button>
+                    <button 
+                        style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF9500', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => {
+                            if (socketRef.current && token) {
+                                socketRef.current.emit('adminClearBots', { token });
+                            }
+                        }}
+                    >
+                        [Admin] Clear Bots
                     </button>
                 </div>
             )}
