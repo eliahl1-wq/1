@@ -1027,8 +1027,8 @@ export default function SlitherGame() {
                         className="ui-btn ui-btn-primary" 
                         style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF3B30', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                         onClick={() => {
-                            if (socketRef.current && token) {
-                                socketRef.current.emit('adminSpawnBotNearMe', { token });
+                            if (socketRef.current && authToken) {
+                                socketRef.current.emit('adminSpawnBotNearMe', { token: authToken });
                             }
                         }}
                     >
