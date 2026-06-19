@@ -819,39 +819,101 @@ export default function AdminDashboard() {
                 </div>
 
                 {tab === 'overview' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                            <StatCard
-                                label="Your earnings (→ Owner Vault)"
-                                value={formatUsd(overview?.ownerEarningsUsd)}
-                                sub={overview ? `${overview.ownerEarningsSol?.toFixed(4)} SOL · ${overview.ownerSweepCount ?? 0} sweeps (arena + BR)` : 'All house wallet → owner vault transfers'}
-                            />
-                            <StatCard
-                                label="Registered accounts"
-                                value={overview?.totalAccounts ?? '—'}
-                                sub={`Total balance held: ${formatUsd(overview?.totalUserBalanceUsd)} (${overview?.totalUserBalanceSol?.toFixed(4) ?? '0'} SOL)`}
-                            />
-                            <StatCard
-                                label="Owner Vault balance"
-                                value={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'}
-                                sub={wallets?.ownerVault ? `${formatUsd(wallets.ownerVault.balanceUsd)} on-chain now` : 'Sweep destination'}
-                            />
-                            <StatCard
-                                label="Arena Reset Timer"
-                                value={serverStatus?.isResetting ? 'Resetting…' : formatCountdown(serverStatus?.msUntilReset)}
-                                sub={serverStatus ? `Cycle: ${formatDuration(serverStatus.arenaDurationMs)} · ${serverStatus.isResetting ? 'In progress' : `Next reset ${formatDate(serverStatus.arenaResetAt)}`}` : ''}
-                            />
-                            <StatCard label="Total Deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} txs` : ''} />
-                            <StatCard label="Player Withdrawals" value={formatUsd(overview?.totalWithdrawalsUsd)} sub={overview ? `${overview.withdrawalCount} txs (excludes owner sweeps)` : ''} />
-                            <StatCard label="Currently In Game" value={activeUsers?.currentlyInGame ?? '—'} sub={`${activeUsers?.activeLast24h ?? 0} active in last 24h`} />
-                            <StatCard label="Main House Wallet" value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'} />
-                            {(overview?.excludedTxCount ?? 0) > 0 && (
-                                <StatCard label="Excluded txs" value={overview.excludedTxCount} sub="Hidden individually — not deleted" />
-                            )}
-                            {(overview?.excludedUsersCount ?? 0) > 0 && (
-                                <StatCard label="Excluded accounts" value={overview.excludedUsersCount} sub="All their txs hidden from stats" />
-                            )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        {/* Section: Realtime Presence */}
+                        <div>
+                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Realtime Presence
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                <StatCard
+                                    label="Website Visitors"
+                                    value={activeUsers?.sitePresence?.length ?? 0}
+                                    sub="Browsing or in lobbies"
+                                />
+                                <StatCard
+                                    label="Active Players (Humans)"
+                                    value={activeUsers?.currentlyInGame ?? 0}
+                                    sub="Playing in arenas & BR"
+                                />
+                                <StatCard
+                                    label="Active Bots"
+                                    value={activeUsers?.currentlyBots ?? 0}
+                                    sub="Simulating players in arenas"
+                                />
+                            </div>
                         </div>
+
+                        {/* Section: Platform Finances */}
+                        <div>
+                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Financial Health
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                <StatCard
+                                    label="Total Platform Earnings"
+                                    value={formatUsd(overview?.ownerEarningsUsd)}
+                                    sub={overview ? `${overview.ownerEarningsSol?.toFixed(4)} SOL · ${overview.ownerSweepCount ?? 0} sweeps` : ''}
+                                />
+                                <StatCard
+                                    label="Owner Vault (On-Chain)"
+                                    value={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'}
+                                    sub={wallets?.ownerVault ? `${formatUsd(wallets.ownerVault.balanceUsd)} current balance` : 'Sweep destination'}
+                                />
+                                <StatCard
+                                    label="Main House Wallet"
+                                    value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'}
+                                    sub={wallets?.mainHouse ? `${formatUsd(wallets.mainHouse.balanceUsd)} float balance` : 'Arena deposit pool'}
+                                />
+                                <StatCard
+                                    label="Total Deposits"
+                                    value={formatUsd(overview?.totalDepositsUsd)}
+                                    sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} deposits` : ''}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Section: General Operations */}
+                        <div>
+                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Operations & Status
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                <StatCard
+                                    label="Arena Reset Timer"
+                                    value={serverStatus?.isResetting ? 'Resetting…' : formatCountdown(serverStatus?.msUntilReset)}
+                                    sub={serverStatus ? `Cycle: ${formatDuration(serverStatus.arenaDurationMs)} · Next: ${formatDate(serverStatus.arenaResetAt)}` : ''}
+                                />
+                                <StatCard
+                                    label="Registered Accounts"
+                                    value={overview?.totalAccounts ?? '—'}
+                                    sub={`Total balance held: ${formatUsd(overview?.totalUserBalanceUsd)}`}
+                                />
+                                <StatCard
+                                    label="Withdrawals (Users)"
+                                    value={formatUsd(overview?.totalWithdrawalsUsd)}
+                                    sub={overview ? `${overview.withdrawalCount} txs (excluding sweeps)` : ''}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Excluded Stats (only if present) */}
+                        {((overview?.excludedTxCount ?? 0) > 0 || (overview?.excludedUsersCount ?? 0) > 0) && (
+                            <div>
+                                <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Excluded Reports
+                                </h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                    {(overview?.excludedTxCount ?? 0) > 0 && (
+                                        <StatCard label="Excluded Transactions" value={overview.excludedTxCount} sub="Filtered out from earnings totals" />
+                                    )}
+                                    {(overview?.excludedUsersCount ?? 0) > 0 && (
+                                        <StatCard label="Excluded Accounts" value={overview.excludedUsersCount} sub="All transactions hidden from reports" />
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {overview && (
                             <Panel
                                 title="Earnings breakdown"
@@ -901,22 +963,32 @@ export default function AdminDashboard() {
 
                 {tab === 'live' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                             <StatCard
-                                label="In game right now"
-                                value={livePlayers.length}
-                                sub={liveUpdatedAt ? `Updated ${formatRelativeTime(liveUpdatedAt)} · auto every 3s` : 'Loading…'}
+                                label="Website Visitors"
+                                value={activeUsers?.sitePresence?.length ?? 0}
+                                sub="Browsing or in lobbies"
+                            />
+                            <StatCard
+                                label="Active Players"
+                                value={activeUsers?.currentlyInGame ?? 0}
+                                sub="Human players in matches"
+                            />
+                            <StatCard
+                                label="Active Bots"
+                                value={activeUsers?.currentlyBots ?? 0}
+                                sub="Total bots simulated in arenas"
                             />
                             <StatCard
                                 label="Active last 24h"
                                 value={activeUsers?.activeLast24h ?? '—'}
-                                sub="Unique users with any activity"
+                                sub="Unique users active today"
                             />
                         </div>
 
                         <Panel
-                            title="Players in arena"
-                            sub={livePlayers.length ? 'Currently staking in arena tiers' : 'Nobody in arena right now'}
+                            title={`Players in arenas (${activeUsers?.currentlyInGame ?? 0} total)`}
+                            sub={livePlayers.length ? 'Currently staking in arena tiers' : 'No human players in matches right now'}
                         >
                             <DataTable
                                 columns={[
@@ -933,7 +1005,23 @@ export default function AdminDashboard() {
                         </Panel>
 
                         <Panel
-                            title="Site Visitors"
+                            title={`Bots in arenas (${activeUsers?.currentlyBots ?? 0} total)`}
+                            sub={activeUsers?.inGameBots?.length ? 'Currently simulated bots in arenas' : 'No bots in matches right now'}
+                        >
+                            <DataTable
+                                columns={[
+                                    { key: 'username', label: 'Bot Name' },
+                                    { key: 'mode', label: 'Game Mode', render: r => r.mode?.charAt(0).toUpperCase() + r.mode?.slice(1) },
+                                    { key: 'entryFeeUsd', label: 'Entry Tier', render: r => formatUsd(r.entryFeeUsd) },
+                                ]}
+                                rows={activeUsers?.inGameBots || []}
+                                loading={false}
+                                emptyMessage="No active bots"
+                            />
+                        </Panel>
+
+                        <Panel
+                            title={`Site Visitors (${activeUsers?.sitePresence?.length ?? 0} total)`}
                             sub={activeUsers?.sitePresence?.length ? 'Users currently active on the website' : 'No recent visitors'}
                         >
                             <DataTable
