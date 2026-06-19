@@ -1738,11 +1738,10 @@ export class SlitherRenderer {
         if (nameLen > 12) fontSize *= 0.35;
         fontSize = Math.max(11, Math.min(16, fontSize));
 
-        const pillH = 23;
-        const gapAboveHead = 6;
         const headTop = hy - headRadius;
-        const pillTop = Math.round(headTop - gapAboveHead - pillH);
-        const nameY = Math.round(pillTop - 4 - fontSize * 0.5);
+        const headBottom = hy + headRadius;
+        const nameY = Math.round(headTop - 12);
+        const pillTop = Math.round(headBottom + 6);
 
         ctx.fillStyle = isYou ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)';
         ctx.font = `bold ${fontSize}px Arial, sans-serif`;
