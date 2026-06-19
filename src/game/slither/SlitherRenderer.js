@@ -176,6 +176,8 @@ export class SlitherRenderer {
         this._perfEma = 16.7;
         this._quality = 1;
         this._minimapFallback = { players: [], food: [] };
+        this._minimapFrame = 0;
+        this._youLabelAnchor = null;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
 
@@ -1687,8 +1689,11 @@ export class SlitherRenderer {
         }
 
         if (snake.name && !this.hideOverlays && headEyeRadius >= 8 && !isYou) {
-            const headPt = toScreen(segs[0].x, segs[0].y);
-            this._drawSnakeLabels(ctx, snake, headPt.x, headPt.y, headEyeRadius, false);
+            this._drawSnakeLabels(ctx, snake, hx, hy, headEyeRadius, false);
+        }
+
+        if (isYou) {
+            this._youLabelAnchor = { hx, hy, headRadius: headEyeRadius };
         }
 
         // Mobile steering arrow — only while finger is on screen, further ahead of the head.
@@ -1733,7 +1738,12 @@ export class SlitherRenderer {
         if (nameLen > 12) fontSize *= 0.35;
         fontSize = Math.max(11, Math.min(16, fontSize));
 
-        const nameY = hy - headRadius - 12;
+        const pillH = 23;
+        const gapAboveHead = 6;
+        const headTop = hy - headRadius;
+        const pillTop = Math.round(headTop - gapAboveHead - pillH);
+        const nameY = Math.round(pillTop - 4 - fontSize * 0.5);
+
         ctx.fillStyle = isYou ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)';
         ctx.font = `bold ${fontSize}px Arial, sans-serif`;
         ctx.textAlign = 'center';
@@ -1746,7 +1756,7 @@ export class SlitherRenderer {
         const displayBalance = isYou
             ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance ?? 0)
             : (snake.dollarBalance ?? snake.balance ?? 0);
-        this._drawBalanceBadge(ctx, hx, nameY + fontSize * 0.9, displayBalance, isYou);
+        this._drawBalanceBadge(ctx, hx, pillTop, displayBalance, isYou);
     }
 
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
@@ -1786,6 +1796,8 @@ export class SlitherRenderer {
         ctx.globalCompositeOperation = 'source-over';
 
         this._updateSmoothing(dt);
+
+        this._youLabelAnchor = null;
 
         // Build render snakes without per-frame object spreads
         const renderSnakes = this._renderSnakeBuf;
@@ -1903,11 +1915,10 @@ export class SlitherRenderer {
             this._drawSnake(snake, toScreen, zoom);
         }
 
-        // Cashout ring + your name/balance on top (uses true head segment, not resampled bumps)
-        if (me?.segments?.[0] && !this.hideOverlays) {
-            const head = me.segments[0];
-            const { x: hx, y: hy } = toScreen(head.x, head.y);
-            const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
+        // Cashout ring + your name/balance on top (uses drawn head anchor, not raw segment)
+        const youAnchor = this._youLabelAnchor;
+        if (youAnchor && me?.segments?.[0] && !this.hideOverlays) {
+            const { hx, hy, headRadius } = youAnchor;
             const { cashoutEndAt, cashoutTotal } = this.hud;
             const ringR = headRadius + 10;
 
@@ -1921,19 +1932,21 @@ export class SlitherRenderer {
             }
         }
 
-        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
+        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode) && (this._frame & 1) === 0) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
-            const fbPlayers = this._minimapFallback.players;
-            fbPlayers.length = 0;
-            for (let i = 0; i < renderSnakes.length; i++) {
-                const s = renderSnakes[i];
-                if (!s.segments?.[0]) continue;
-                fbPlayers.push({
-                    x: s.segments[0].x,
-                    y: s.segments[0].y,
-                    isYou: s.isYou,
-                });
+            if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive && !this._holdActive) {
+                const fbPlayers = this._minimapFallback.players;
+                fbPlayers.length = 0;
+                for (let i = 0; i < renderSnakes.length; i++) {
+                    const s = renderSnakes[i];
+                    if (!s.segments?.[0]) continue;
+                    fbPlayers.push({
+                        x: s.segments[0].x,
+                        y: s.segments[0].y,
+                        isYou: s.isYou,
+                    });
+                }
             }
             const skipMinimapFood = this._foodDrawList.length > 180 || renderSnakes.length > 16;
             const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
