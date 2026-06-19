@@ -25,6 +25,12 @@ import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { MIN_ENTRY_FEE } from './constants/economy';
 import { isBattleRoyaleAvailable } from './constants/features';
+import useSitePresence from './hooks/useSitePresence';
+
+function SitePresenceRunner() {
+  useSitePresence();
+  return null;
+}
 
 function buildWalletAdapters() {
   const adapters = [
@@ -106,6 +112,7 @@ function App() {
         <WalletModalProvider>
           <Router>
             <AuthProvider>
+              <SitePresenceRunner />
               <Routes>
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/register" element={<RegisterPage />} />

@@ -484,6 +484,8 @@ export default function AdminDashboard() {
     const [userSearch, setUserSearch] = useState('');
     const [serverStatus, setServerStatus] = useState(null);
     const [publicStats, setPublicStats] = useState(null);
+    const [siteVisitors, setSiteVisitors] = useState([]);
+    const [siteVisitorsUpdatedAt, setSiteVisitorsUpdatedAt] = useState(null);
     const [actionMsg, setActionMsg] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
     const [showExcluded, setShowExcluded] = useState(false);
@@ -518,6 +520,16 @@ export default function AdminDashboard() {
             if (stats && !stats.error) setPublicStats(stats);
         } catch {
             /* keep last known status */
+        }
+    }, [fetchAdmin]);
+
+    const fetchSitePresence = useCallback(async () => {
+        try {
+            const data = await fetchAdmin('/api/admin/dashboard/site-presence');
+            setSiteVisitors(data.visitors ?? []);
+            setSiteVisitorsUpdatedAt(data.serverTime ?? Date.now());
+        } catch {
+            /* keep last list */
         }
     }, [fetchAdmin]);
 
@@ -603,6 +615,13 @@ export default function AdminDashboard() {
         const id = setInterval(() => fetchLiveFeed(true), 3000);
         return () => clearInterval(id);
     }, [tab, fetchLiveFeed]);
+
+    useEffect(() => {
+        if (tab !== 'live') return undefined;
+        fetchSitePresence();
+        const id = setInterval(fetchSitePresence, 5000);
+        return () => clearInterval(id);
+    }, [tab, fetchSitePresence]);
 
     useEffect(() => {
         if (tab !== 'transactions') return undefined;
@@ -973,6 +992,36 @@ export default function AdminDashboard() {
                                 ))}
                             </div>
                         )}
+
+                        <Panel
+                            title="Visitors on site"
+                            sub={siteVisitorsUpdatedAt
+                                ? `${siteVisitors.length} active · updated ${formatRelativeTime(siteVisitorsUpdatedAt)} · refreshes every 5s`
+                                : 'Who is on the site right now'}
+                        >
+                            <DataTable
+                                columns={[
+                                    {
+                                        key: 'who',
+                                        label: 'Who',
+                                        render: r => r.username || `Guest ${r.id}`,
+                                    },
+                                    { key: 'page', label: 'Page', render: r => r.page || '—' },
+                                    { key: 'gamemode', label: 'Gamemode', render: r => r.gamemode || r.gameMode || '—' },
+                                    {
+                                        key: 'status',
+                                        label: 'Status',
+                                        render: r => (r.inGame ? 'In game' : 'On site'),
+                                    },
+                                    { key: 'location', label: 'From', render: r => r.location || '—' },
+                                    { key: 'ip', label: 'IP', render: r => <span className="mono" style={{ fontSize: '0.72rem' }}>{r.ip || '—'}</span> },
+                                    { key: 'seenAt', label: 'Last seen', render: r => formatRelativeTime(r.seenAt) },
+                                ]}
+                                rows={siteVisitors}
+                                loading={false}
+                                emptyMessage="Nobody on site right now"
+                            />
+                        </Panel>
 
                         <Panel
                             title="Players in arena"

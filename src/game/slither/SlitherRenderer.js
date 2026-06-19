@@ -9,6 +9,9 @@ import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandsca
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import { canvasRGBA as stackBlurCanvas } from 'stackblur-canvas';
+
+/** Disable stackblur on body highlights — it stalls the main thread on first cache miss. */
+const USE_BODY_SPRITE_BLUR = false;
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
@@ -135,7 +138,9 @@ export class SlitherRenderer {
         this._visibleFoodBuf = [];
         this._foodSpatialGrid = new Map();
         this._foodGridDirty = true;
-        this._maxFoodDraw = 120;
+        this._maxFoodDraw = 70;
+        this._simpleFood = false;
+        this._foodDrawStride = 1;
         this._FOOD_CELL = 64;
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
@@ -184,7 +189,8 @@ export class SlitherRenderer {
         this._minimapCacheW = 0;
         this._minimapCacheH = 0;
         this._minimapCacheAt = -1;
-        this._skipMinimapFood = false;
+        this._minimapFoodCap = this.isMobile ? 24 : 36;
+        this._simpleSnakeBuf = [];
         this._youLabelAnchor = null;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
@@ -397,6 +403,16 @@ export class SlitherRenderer {
         }
     }
 
+    _capMinimapFoodList(food, cx, cy, maxCount) {
+        if (!food?.length || food.length <= maxCount) return food ?? [];
+        const sorted = food.slice().sort((a, b) => {
+            const da = (a.x - cx) ** 2 + (a.y - cy) ** 2;
+            const db = (b.x - cx) ** 2 + (b.y - cy) ** 2;
+            return da - db;
+        });
+        return sorted.slice(0, maxCount);
+    }
+
     _ensureFoodGrid() {
         if (!this._foodGridDirty) return;
         const grid = this._foodSpatialGrid;
@@ -595,6 +611,7 @@ export class SlitherRenderer {
         const cx = this.camera.x;
         const cy = this.camera.y;
         const viewR = 3200;
+        const crowd = this.targetSnakes.length > 8;
 
         for (const snake of this.targetSnakes) {
             seen.add(snake.id);
@@ -638,6 +655,12 @@ export class SlitherRenderer {
                     delete s._extrapY;
                 }
                 stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: true });
+                continue;
+            }
+
+            if (!snake.isYou && crowd) {
+                for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                s.angle = snake.angle || 0;
                 continue;
             }
 
@@ -727,7 +750,7 @@ export class SlitherRenderer {
         cv.width = sz;
         cv.height = sz;
         painter(cv.getContext('2d'), sz);
-        if (blurRadius > 0) {
+        if (blurRadius > 0 && USE_BODY_SPRITE_BLUR) {
             stackBlurCanvas(cv, 0, 0, sz, sz, blurRadius);
         }
         cv._lastUsed = this._frame;
@@ -990,11 +1013,20 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const simpleFood = this._quality < 0.55;
-        const foodStride = this._perfEma > 26 ? 3 : this._perfEma > 20 ? 2 : this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
-        const crowdedView = foodList.length > 110;
+        const crowdedView = foodList.length > 60 || this.targetSnakes.length > 8;
+        if (!this._simpleFood && (crowdedView || this._quality < 0.68 || this._perfEma > 19 || this._holdActive)) {
+            this._simpleFood = true;
+        } else if (this._simpleFood && !crowdedView && this._quality >= 0.76 && this._perfEma < 14 && !this._holdActive) {
+            this._simpleFood = false;
+        }
+        const simpleFood = this._simpleFood;
+        if (!simpleFood && this._perfEma > 18) this._foodDrawStride = 3;
+        else if (!simpleFood && (crowdedView || this._perfEma > 15)) this._foodDrawStride = 2;
+        else this._foodDrawStride = 1;
+        const foodStride = this._foodDrawStride;
         const farCullR = Math.min(halfW, halfH) * 0.58;
         const farCullR2 = farCullR * farCullR;
+        const skipSlurp = simpleFood || crowdedView || this._perfEma > 18;
 
         const mouthValid = this._mouthValid;
         const mouthX = this._mouthX;
@@ -1007,7 +1039,7 @@ export class SlitherRenderer {
         this._ensureFoodGrid();
         const foodGrid = this._foodSpatialGrid;
         let slurpSet = null;
-        if (mouthValid && !this._holdActive && !crowdedView && this._perfEma < 22) {
+        if (mouthValid && !skipSlurp) {
             slurpSet = new Set(this._foodNearPoint(foodGrid, mouthX, mouthY, maxSlurpReach));
         }
 
@@ -1017,27 +1049,23 @@ export class SlitherRenderer {
             const dyCam = f.y - cy;
             if (Math.abs(dxCam) > halfW || Math.abs(dyCam) > halfH) continue;
 
-            if (f.deathDrop && crowdedView) {
-                const d2cam = dxCam * dxCam + dyCam * dyCam;
-                if (d2cam > farCullR2 && (fi & 1) === 1) continue;
-            } else if (f.deathDrop && foodList.length > 90) {
-                const d2cam = dxCam * dxCam + dyCam * dyCam;
-                if (d2cam > farCullR2 * 1.35 && (fi & 3) === 3) continue;
-            }
+            if (f.deathDrop && simpleFood && !f.golden) continue;
 
             let anim = f.id != null ? this._foodAnimCache.get(f.id) : null;
-            if (!anim) {
-                let h = 0;
-                const id = String(f.id ?? `${f.x},${f.y}`);
-                for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-                anim = {
-                    phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
-                    sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
-                    slurp: 0,
-                };
-                if (f.id != null) this._foodAnimCache.set(f.id, anim);
+            if (!simpleFood) {
+                if (!anim) {
+                    let h = 0;
+                    const id = String(f.id ?? `${f.x},${f.y}`);
+                    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+                    anim = {
+                        phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
+                        sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
+                        slurp: 0,
+                    };
+                    if (f.id != null) this._foodAnimCache.set(f.id, anim);
+                }
+                if (anim.slurp == null) anim.slurp = 0;
             }
-            if (anim.slurp == null) anim.slurp = 0;
 
             let wx = f.x;
             let wy = f.y;
@@ -1048,7 +1076,7 @@ export class SlitherRenderer {
             let sizeMul = 1;
             let alpha = 1;
 
-            if (isGolden) {
+            if (isGolden && !simpleFood) {
                 const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
                 sizeMul = 0.85 + pulse;
                 wx += Math.sin(now * 0.003 + f.y) * 6;
@@ -1056,13 +1084,13 @@ export class SlitherRenderer {
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
-            } else {
+            } else if (!simpleFood && anim) {
                 sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.12);
                 wx += Math.sin(now * 0.0024 + anim.phase) * 2.2;
                 wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 2.2;
             }
 
-            const runSlurp = mouthValid && !this._holdActive && !f.deathDrop && !isGolden
+            const runSlurp = !skipSlurp && mouthValid && anim && !f.deathDrop && !isGolden
                 && (!crowdedView || ((wx - mouthX) ** 2 + (wy - mouthY) ** 2) < maxSlurpReach2 * 0.35)
                 && (slurpSet?.has(f) || anim.slurp > 0.001);
 
@@ -1102,11 +1130,11 @@ export class SlitherRenderer {
             const baseR = (f.radius || 3) * sizeMul;
             const screenR = Math.max(4.5, baseR * zoom * 1.65);
 
-            if (simpleFood && !isGolden && !f.deathDrop) {
-                ctx.globalAlpha = 0.55;
-                ctx.fillStyle = `hsla(${hue}, 82%, 58%, 0.5)`;
+            if (simpleFood && !isGolden) {
+                ctx.globalAlpha = isGolden ? alpha : 0.58;
+                ctx.fillStyle = `hsla(${hue}, 82%, 58%, 0.52)`;
                 ctx.beginPath();
-                ctx.arc(fx, fy, screenR * 0.55, 0, Math.PI * 2);
+                ctx.arc(fx, fy, screenR * 0.52, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalAlpha = 1;
                 continue;
@@ -1141,7 +1169,9 @@ export class SlitherRenderer {
             }
         }
 
-        this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
+        if (!skipSlurp) {
+            this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
+        }
     }
 
     _drawSlurpGhosts(ctx, toScreen, zoom, now, mouthX, mouthY) {
@@ -1482,6 +1512,40 @@ export class SlitherRenderer {
         return this._getSnakePrImgs(cs, rPx, needs);
     }
 
+    /** Fast remote snake — sampled spine, no stamp sprites. */
+    _drawSnakeSimple(ctx, segs, cx, cy, zoom, color, headRadius, bodyRadius) {
+        const n = segs.length;
+        if (n < 1) return;
+        const stride = n > 48 ? 3 : n > 24 ? 2 : 1;
+        const pts = this._simpleSnakeBuf;
+        pts.length = 0;
+        for (let i = 0; i < n; i += stride) {
+            const s = segs[i];
+            pts.push({
+                x: (s.x - cx) * zoom + this.W / 2,
+                y: (s.y - cy) * zoom + this.H / 2,
+            });
+        }
+        const last = segs[n - 1];
+        const lx = (last.x - cx) * zoom + this.W / 2;
+        const ly = (last.y - cy) * zoom + this.H / 2;
+        const tail = pts[pts.length - 1];
+        if (!tail || tail.x !== lx || tail.y !== ly) pts.push({ x: lx, y: ly });
+
+        ctx.strokeStyle = color || '#88cc88';
+        ctx.lineWidth = Math.max(3, bodyRadius * 0.8);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pts[0].x, pts[0].y, headRadius, 0, Math.PI * 2);
+        ctx.fillStyle = color || '#88cc88';
+        ctx.fill();
+    }
+
     _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
         ctx.save();
@@ -1533,13 +1597,21 @@ export class SlitherRenderer {
             return;
         }
 
+        const snakeCount = this.targetSnakes.length;
+        const crowd = snakeCount > 8;
+        if (!isYou && snakeCount > 6) {
+            this._drawSnakeSimple(ctx, segs, cx, cy, zoom, snake.color, headRadius, bodyRadius);
+            ctx.restore();
+            return;
+        }
+
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * (isYou ? 0.35 : 0.48));
         const q = this._quality;
         const holdActive = isYou && this._holdActive;
-        const perfTight = this._holdActive || q < 0.82 || this.targetSnakes.length > 12;
-        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
+        const perfTight = this._holdActive || crowd || q < 0.88 || this._perfEma > 18;
+        const qMul = Math.max(this.isMobile ? 0.85 : 0.72, q);
         let arcLen = 0;
         for (let i = 1; i < segs.length; i++) {
             const dx = segs[i].x - segs[i - 1].x;
@@ -1550,11 +1622,12 @@ export class SlitherRenderer {
         const stampCap = Math.round((
             isYou
                 ? (holdActive
-                    ? (this.isMobile ? 72 : 58)
-                    : (boosting ? (this.isMobile ? 150 : 118) : (this.isMobile ? 130 : 105)))
-                : (boosting ? (this.isMobile ? 40 : 32) : (this.isMobile ? 30 : 24))
-        ) * qMul * (this.targetSnakes.length > 14 && !isYou ? 0.75 : 1)
-          * (!isYou && perfTight ? 0.62 : 1));
+                    ? (this.isMobile ? 64 : 52)
+                    : (crowd
+                        ? (boosting ? (this.isMobile ? 100 : 82) : (this.isMobile ? 90 : 72))
+                        : (boosting ? (this.isMobile ? 130 : 100) : (this.isMobile ? 115 : 88))))
+                : (boosting ? (this.isMobile ? 32 : 24) : (this.isMobile ? 24 : 18))
+        ) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
@@ -1572,24 +1645,7 @@ export class SlitherRenderer {
         }
 
         if (!isYou && perfTight && bumps.length > 4) {
-            ctx.strokeStyle = snake.color || '#88cc88';
-            ctx.lineWidth = Math.max(4, bodyRadius * 0.85);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(bumps[0].x, bumps[0].y);
-            const simpleStride = bumps.length > 24 ? 2 : 1;
-            for (let i = simpleStride; i < bumps.length; i += simpleStride) {
-                ctx.lineTo(bumps[i].x, bumps[i].y);
-            }
-            ctx.stroke();
-            const hx = bumps[0].x;
-            const hy = bumps[0].y;
-            const headEyeRadius = headRadius;
-            ctx.beginPath();
-            ctx.arc(hx, hy, headEyeRadius, 0, Math.PI * 2);
-            ctx.fillStyle = snake.color || '#88cc88';
-            ctx.fill();
+            this._drawSnakeSimple(ctx, segs, cx, cy, zoom, snake.color, headRadius, bodyRadius);
             ctx.restore();
             return;
         }
@@ -1599,9 +1655,9 @@ export class SlitherRenderer {
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
-            glow: isYou && !holdActive && !perfTight && q >= 0.55,
-            boostOverlay: isYou && boosting && !perfTight && q >= 0.6,
-            trailGlow: isYou && boosting && !perfTight,
+            glow: isYou && !holdActive && !crowd && q >= 0.72,
+            boostOverlay: isYou && boosting && !crowd && q >= 0.78,
+            trailGlow: isYou && boosting && !crowd && q >= 0.78,
         };
         const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
         const stampScale = bodySS * (cacheR / bodyRadius);
@@ -1638,7 +1694,8 @@ export class SlitherRenderer {
 
         const hlOpts = { isYou, quality: this._quality };
 
-        for (let i = bumpCount - 1; i >= 0; i--) {
+        const stampStride = (isYou && (crowd || holdActive)) ? 2 : 1;
+        for (let i = bumpCount - 1; i >= 0; i -= stampStride) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
@@ -1648,7 +1705,7 @@ export class SlitherRenderer {
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
         }
 
-        if (isYou && !holdActive && q >= 0.68) {
+        if (isYou && !holdActive && !crowd && q >= 0.82) {
             this._blitBodySideShadow(ctx, bumps, bumpCount, stampRadius, hlOpts);
             this._blitSpineHighlight(ctx, bumps, bumpCount, stampRadius, cs, boosting ? 1.08 : 1, hlOpts);
         }
@@ -1842,15 +1899,16 @@ export class SlitherRenderer {
 
         const foodCount = this._foodDrawList.length;
         const snakeCount = renderSnakes.length;
-        if (this._skipMinimapFood) {
-            if (foodCount < 150 && snakeCount < 14) this._skipMinimapFood = false;
-        } else if (foodCount > 200 || snakeCount > 18) {
-            this._skipMinimapFood = true;
+        if (this.state.competitiveSlither || snakeCount > 10 || foodCount > 90) {
+            this._minimapFoodCap = this.isMobile ? 18 : 28;
+        } else {
+            this._minimapFoodCap = this.isMobile ? 24 : 36;
         }
 
         const viewHalfW = W / (2 * zoom);
         const viewHalfH = H / (2 * zoom);
         const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
+        const minimapFood = this._capMinimapFoodList(minimap.food, cx, cy, this._minimapFoodCap);
         drawGameMinimap(mctx, {
             screenW: cw,
             screenH: ch,
@@ -1860,14 +1918,14 @@ export class SlitherRenderer {
             viewHalfW,
             viewHalfH,
             players: minimap.players,
-            food: this._skipMinimapFood ? [] : minimap.food,
+            food: minimapFood,
             zone: this.state.zone,
         });
         this._minimapCacheAt = this._frame;
     }
 
     _drawMinimapOverlay(ctx, renderSnakes, cx, cy, zoom, W, H) {
-        if (this._frame - this._minimapCacheAt >= 3 || this._minimapCacheAt < 0) {
+        if (this._frame - this._minimapCacheAt >= (this._perfEma > 20 ? 6 : 4) || this._minimapCacheAt < 0) {
             this._refreshMinimapCache(renderSnakes, cx, cy, zoom, W, H);
         }
         if (this._minimapCache) {
@@ -2011,8 +2069,8 @@ export class SlitherRenderer {
         const foodHalfW = W / 2 / zoom + 160 / zoom;
         const foodHalfH = H / 2 / zoom + 160 / zoom;
         this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
-        const crowd = renderSnakes.length > 14;
-        const holdFoodCap = this._holdActive ? 80 : (crowd ? 120 : 140);
+        const crowd = renderSnakes.length > 8;
+        const holdFoodCap = this._holdActive ? 48 : (crowd || this.state.competitiveSlither ? 58 : 70);
         if (this._visibleFoodBuf.length > holdFoodCap) {
             this._capVisibleFoodBuf(this._visibleFoodBuf, cx, cy, holdFoodCap);
         }

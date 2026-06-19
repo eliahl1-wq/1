@@ -16,6 +16,7 @@ import GameCashoutBar from '../../components/GameCashoutBar';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
+import { getOrCreatePresenceId } from '../../utils/sitePresence';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
@@ -447,7 +448,7 @@ export default function SlitherGame() {
         if (isBR) setIsBattleRoyale(true);
 
         const socket = io(API_URL, {
-            auth: { token: authToken },
+            auth: { token: authToken, presenceId: getOrCreatePresenceId() },
             // Polling first — more reliable on Railway; upgrades to websocket when ready
             transports: ['polling', 'websocket'],
             upgrade: true,
