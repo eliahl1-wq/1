@@ -1419,6 +1419,7 @@
 .gm-mode-badge {
   display: inline-flex;
   align-items: center;
+  gap: 3px;
   padding: 2px 8px;
   border-radius: var(--r-full);
   font-family: var(--ui);
@@ -1430,9 +1431,14 @@
 }
 
 .gm-mode-badge--popular {
-  color: var(--green);
-  background: var(--green-dim);
-  border: 1px solid var(--green-border);
+  padding: 4px 7px;
+  background: rgba(255, 80, 40, 0.1);
+  border: 1px solid rgba(255, 90, 50, 0.3);
+}
+
+.gm-mode-badge-flame {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(255, 80, 40, 0.45));
 }
 
 .gm-mode-badge--new {

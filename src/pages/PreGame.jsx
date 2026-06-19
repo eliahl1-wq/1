@@ -12,8 +12,7 @@ import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import GamemodeDiscoveryPrompt from '../components/GamemodeDiscoveryPrompt';
-import GamemodeBadge from '../components/GamemodeBadge';
-import { markGamemodePlayed, shouldShowDiscoveryPrompt, getGamemodeConfig } from '../constants/gamemodes';
+import { markGamemodePlayed, shouldShowDiscoveryPrompt } from '../constants/gamemodes';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, tierEconomy, competitiveTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
@@ -228,8 +227,6 @@ export default function PreGame() {
     useEffect(() => {
         setShowDiscovery(shouldShowDiscoveryPrompt(selectedMode, brAvailable));
     }, [selectedMode, brAvailable]);
-
-    const currentModeConfig = getGamemodeConfig(selectedMode);
 
     useEffect(() => {
         const raw = localStorage.getItem('selected_gamemode');
@@ -1136,12 +1133,7 @@ export default function PreGame() {
                     <div className="mode-card-title mode-card-title--stacked">
                         {modeCardTitle.toUpperCase()}
                     </div>
-                    <div className="mode-card-subtitle-row">
-                        <span className="mode-card-subtitle">{modeSubtitle}</span>
-                        {currentModeConfig?.badge && (
-                            <GamemodeBadge type={currentModeConfig.badge} />
-                        )}
-                    </div>
+                    <div className="mode-card-subtitle">{modeSubtitle}</div>
                     <button
                         type="button"
                         className="mode-card-action"
