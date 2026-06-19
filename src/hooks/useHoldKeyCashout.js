@@ -65,7 +65,6 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
     useEffect(() => {
         const onKeyDown = (e) => {
             if (e.code !== 'KeyQ' || e.repeat) return;
-            e.preventDefault();
             startHoldRef.current();
         };
         const onKeyUp = (e) => {
