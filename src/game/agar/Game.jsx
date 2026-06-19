@@ -1040,6 +1040,22 @@ export default function Game() {
             </div>
             )}
 
+            {user?.isAdmin && (
+                <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 10000 }}>
+                    <button 
+                        className="ui-btn ui-btn-primary" 
+                        style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF3B30', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => {
+                            if (socketRef.current && token) {
+                                socketRef.current.emit('adminSpawnBotNearMe', { token });
+                            }
+                        }}
+                    >
+                        [Admin] Spawn Bot
+                    </button>
+                </div>
+            )}
+
             {/* Logo/Name */}
             <div className="game-logo-wrap" style={{ 
                 position: 'absolute', 
