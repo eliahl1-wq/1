@@ -16,7 +16,6 @@ import GameCashoutBar from '../../components/GameCashoutBar';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
-import { getOrCreatePresenceId } from '../../utils/sitePresence';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
@@ -312,8 +311,6 @@ export default function SlitherGame() {
         socketRef.current.emit('cashOut');
     }, [startCashoutCountdown]);
 
-    const finishHoldRef = useRef(null);
-
     const handleHoldStart = useCallback((atMs) => {
         rendererRef.current?.setHoldStart(atMs);
     }, []);
@@ -322,13 +319,12 @@ export default function SlitherGame() {
         rendererRef.current?.setHoldStart(0);
     }, []);
 
-    const { isHolding, startHold, cancelHold, finishHold } = useHoldKeyCashout({
+    const { isHolding, startHold, cancelHold } = useHoldKeyCashout({
         canStart: () => canCashOutRef.current,
         onComplete: handleCashOut,
         onHoldStart: handleHoldStart,
         onHoldEnd: handleHoldEnd,
     });
-    finishHoldRef.current = finishHold;
 
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
         && localTimer <= 0 && cashedAmount === null && !isDead;
@@ -438,7 +434,6 @@ export default function SlitherGame() {
         };
 
         renderer.setInputEmitter(emitInput);
-        renderer.setHoldCompleteHandler(() => finishHoldRef.current?.());
 
 
 
@@ -448,7 +443,7 @@ export default function SlitherGame() {
         if (isBR) setIsBattleRoyale(true);
 
         const socket = io(API_URL, {
-            auth: { token: authToken, presenceId: getOrCreatePresenceId() },
+            auth: { token: authToken },
             // Polling first — more reliable on Railway; upgrades to websocket when ready
             transports: ['polling', 'websocket'],
             upgrade: true,

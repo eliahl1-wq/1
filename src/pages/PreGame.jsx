@@ -17,7 +17,6 @@ import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, DEFAULT_ENTRY_FEE
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
 import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeGamemodeForLobby } from '../constants/features';
-import { buildPresenceHeaders } from '../utils/sitePresence';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -63,6 +62,18 @@ const CUR_OPTIONS = [
     { label: 'USD', value: 'USD' },
     { label: 'SOL', value: 'SOL' },
 ];
+
+const getOrCreatePresenceId = () => {
+    const key = 'site_presence_id';
+    let id = localStorage.getItem(key);
+    if (!id) {
+        id = typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `p-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem(key, id);
+    }
+    return id;
+};
 
 function readStoredGameMode() {
     return localStorage.getItem('selected_gamemode') || localStorage.getItem('current_game_mode') || null;
@@ -371,16 +382,14 @@ export default function PreGame() {
     // Live stats poll — gamemode counts + site presence
     useEffect(() => {
         let alive = true;
+        const presenceId = getOrCreatePresenceId();
         const fetchStats = async () => {
             try {
                 const r = await fetch(`${API_URL}/api/stats?t=${Date.now()}`, {
                     headers: {
                         'bypass-tunnel-reminders': 'true',
                         'Cache-Control': 'no-cache',
-                        ...buildPresenceHeaders({
-                            page: location.pathname,
-                            gamemode: selectedMode,
-                        }),
+                        'X-Presence-Id': presenceId,
                     },
                 });
                 if (r.ok && alive) setLiveStats(await r.json());
@@ -389,7 +398,7 @@ export default function PreGame() {
         fetchStats();
         const id = setInterval(fetchStats, 5000);
         return () => { alive = false; clearInterval(id); };
-    }, [API_URL, location.pathname, selectedMode]);
+    }, [API_URL]);
 
     // Leaderboard poll
     useEffect(() => {

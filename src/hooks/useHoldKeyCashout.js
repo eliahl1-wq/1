@@ -5,14 +5,12 @@ export { CASHOUT_HOLD_MS };
 
 /**
  * Hold Q (or press-and-hold the cashout button) before starting the cashout timer.
- * Completion uses wall-clock time so it still works when the game thread is busy.
+ * Canvas ring uses renderer.setHoldStart — no per-tick React state here (keeps game smooth).
  */
 export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStart, onHoldEnd }) {
     const [isHolding, setIsHolding] = useState(false);
     const startTimeRef = useRef(null);
-    const completedRef = useRef(false);
-    const pollRafRef = useRef(null);
-    const pollIntervalRef = useRef(null);
+    const completeTimeoutRef = useRef(null);
     const canStartRef = useRef(canStart);
     const onCompleteRef = useRef(onComplete);
     const onProgressRef = useRef(onProgress);
@@ -24,77 +22,45 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
     onHoldStartRef.current = onHoldStart;
     onHoldEndRef.current = onHoldEnd;
 
-    const stopPoll = useCallback(() => {
-        if (pollRafRef.current) {
-            cancelAnimationFrame(pollRafRef.current);
-            pollRafRef.current = null;
-        }
-        if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
+    const clearCompleteTimer = useCallback(() => {
+        if (completeTimeoutRef.current) {
+            clearTimeout(completeTimeoutRef.current);
+            completeTimeoutRef.current = null;
         }
     }, []);
 
-    const finishHold = useCallback(() => {
-        if (completedRef.current) return;
-        completedRef.current = true;
-        startTimeRef.current = null;
-        stopPoll();
-        setIsHolding(false);
-        onHoldEndRef.current?.();
-        onProgressRef.current?.(0);
-        onCompleteRef.current?.();
-    }, [stopPoll]);
-
     const cancelHold = useCallback(() => {
-        if (startTimeRef.current == null || completedRef.current) return;
+        if (startTimeRef.current == null) return;
         startTimeRef.current = null;
-        stopPoll();
+        clearCompleteTimer();
         setIsHolding(false);
         onHoldEndRef.current?.();
         onProgressRef.current?.(0);
-    }, [stopPoll]);
+    }, [clearCompleteTimer]);
 
     const startHold = useCallback(() => {
         if (startTimeRef.current != null) return;
         if (typeof canStartRef.current === 'function' && !canStartRef.current()) return;
         const now = performance.now();
-        completedRef.current = false;
         startTimeRef.current = now;
         setIsHolding(true);
         onHoldStartRef.current?.(now);
         onProgressRef.current?.(0.001);
 
-        const poll = () => {
-            const started = startTimeRef.current;
-            if (started == null || completedRef.current) {
-                pollRafRef.current = null;
-                return;
-            }
-            const progress = Math.min(1, (performance.now() - started) / CASHOUT_HOLD_MS);
-            onProgressRef.current?.(progress);
-            if (progress >= 1) {
-                finishHold();
-                return;
-            }
-            pollRafRef.current = requestAnimationFrame(poll);
-        };
-        pollRafRef.current = requestAnimationFrame(poll);
-
-        pollIntervalRef.current = setInterval(() => {
-            const started = startTimeRef.current;
-            if (started == null || completedRef.current) return;
-            const progress = Math.min(1, (performance.now() - started) / CASHOUT_HOLD_MS);
-            if (progress >= 1) finishHold();
-        }, 64);
-    }, [finishHold]);
+        completeTimeoutRef.current = setTimeout(() => {
+            startTimeRef.current = null;
+            clearCompleteTimer();
+            setIsHolding(false);
+            onHoldEndRef.current?.();
+            onProgressRef.current?.(0);
+            onCompleteRef.current?.();
+        }, CASHOUT_HOLD_MS);
+    }, [clearCompleteTimer]);
 
     const startHoldRef = useRef(startHold);
     const cancelHoldRef = useRef(cancelHold);
     startHoldRef.current = startHold;
     cancelHoldRef.current = cancelHold;
-
-    useEffect(() => () => stopPoll(), [stopPoll]);
 
     useEffect(() => {
         const onKeyDown = (e) => {
@@ -105,12 +71,7 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
         const onKeyUp = (e) => {
             if (e.code !== 'KeyQ') return;
             e.preventDefault();
-            const started = startTimeRef.current;
-            if (started != null && !completedRef.current) {
-                const progress = (performance.now() - started) / CASHOUT_HOLD_MS;
-                if (progress < 0.98) cancelHoldRef.current();
-                else finishHold();
-            }
+            cancelHoldRef.current();
         };
 
         window.addEventListener('keydown', onKeyDown);
@@ -119,7 +80,7 @@ export function useHoldKeyCashout({ canStart, onComplete, onProgress, onHoldStar
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
         };
-    }, [finishHold]);
+    }, []);
 
-    return { isHolding, startHold, cancelHold, finishHold };
+    return { isHolding, startHold, cancelHold };
 }

@@ -4,14 +4,11 @@
 
 import { drawCashoutProgressRing, getCashoutRingProgress, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawBalanceBadge } from '../balanceBadge.js';
-import { drawGameMinimap, normalizeMinimapData, getMinimapLayout } from '../minimap.js';
+import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
 import { canvasRGBA as stackBlurCanvas } from 'stackblur-canvas';
-
-/** Disable stackblur on body highlights — it stalls the main thread on first cache miss. */
-const USE_BODY_SPRITE_BLUR = false;
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
@@ -117,8 +114,6 @@ export class SlitherRenderer {
         this._mouthY = 0;
         this._mouthR = 6;
         this._holdStartAt = 0;
-        this._holdCompleteFired = false;
-        this._onHoldComplete = null;
         this._mouseRafQueued = false;
         this._lastMouseX = 0;
         this._lastMouseY = 0;
@@ -138,9 +133,7 @@ export class SlitherRenderer {
         this._visibleFoodBuf = [];
         this._foodSpatialGrid = new Map();
         this._foodGridDirty = true;
-        this._maxFoodDraw = 70;
-        this._simpleFood = false;
-        this._foodDrawStride = 1;
+        this._maxFoodDraw = 180;
         this._FOOD_CELL = 64;
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
@@ -184,14 +177,6 @@ export class SlitherRenderer {
         this._quality = 1;
         this._minimapFallback = { players: [], food: [] };
         this._minimapFrame = 0;
-        this._minimapCache = null;
-        this._minimapCacheCtx = null;
-        this._minimapCacheW = 0;
-        this._minimapCacheH = 0;
-        this._minimapCacheAt = -1;
-        this._minimapFoodCap = this.isMobile ? 24 : 36;
-        this._simpleSnakeBuf = [];
-        this._youLabelAnchor = null;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
 
@@ -403,16 +388,6 @@ export class SlitherRenderer {
         }
     }
 
-    _capMinimapFoodList(food, cx, cy, maxCount) {
-        if (!food?.length || food.length <= maxCount) return food ?? [];
-        const sorted = food.slice().sort((a, b) => {
-            const da = (a.x - cx) ** 2 + (a.y - cy) ** 2;
-            const db = (b.x - cx) ** 2 + (b.y - cy) ** 2;
-            return da - db;
-        });
-        return sorted.slice(0, maxCount);
-    }
-
     _ensureFoodGrid() {
         if (!this._foodGridDirty) return;
         const grid = this._foodSpatialGrid;
@@ -553,11 +528,6 @@ export class SlitherRenderer {
     /** Wall-clock hold start for Q / button hold ring (progress computed in draw loop). */
     setHoldStart(atMs) {
         this._holdStartAt = atMs ? atMs : 0;
-        this._holdCompleteFired = false;
-    }
-
-    setHoldCompleteHandler(handler) {
-        this._onHoldComplete = typeof handler === 'function' ? handler : null;
     }
 
     _getHoldProgress(nowMs = performance.now()) {
@@ -611,7 +581,6 @@ export class SlitherRenderer {
         const cx = this.camera.x;
         const cy = this.camera.y;
         const viewR = 3200;
-        const crowd = this.targetSnakes.length > 8;
 
         for (const snake of this.targetSnakes) {
             seen.add(snake.id);
@@ -658,20 +627,13 @@ export class SlitherRenderer {
                 continue;
             }
 
-            if (!snake.isYou && crowd) {
-                for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-                s.angle = snake.angle || 0;
-                continue;
-            }
-
             if (offScreen) {
                 for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
                 continue;
             }
 
-            const headDist = Math.hypot(head.x - cx, head.y - cy);
-            const tau = headDist < 900 ? 0.06 : 0.11;
+            const tau = 0.08;
             const a = 1 - Math.exp(-dt / tau);
             for (let i = 0; i < spineLen; i++) {
                 if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
@@ -750,7 +712,7 @@ export class SlitherRenderer {
         cv.width = sz;
         cv.height = sz;
         painter(cv.getContext('2d'), sz);
-        if (blurRadius > 0 && USE_BODY_SPRITE_BLUR) {
+        if (blurRadius > 0) {
             stackBlurCanvas(cv, 0, 0, sz, sz, blurRadius);
         }
         cv._lastUsed = this._frame;
@@ -1013,20 +975,11 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const crowdedView = foodList.length > 60 || this.targetSnakes.length > 8;
-        if (!this._simpleFood && (crowdedView || this._quality < 0.68 || this._perfEma > 19 || this._holdActive)) {
-            this._simpleFood = true;
-        } else if (this._simpleFood && !crowdedView && this._quality >= 0.76 && this._perfEma < 14 && !this._holdActive) {
-            this._simpleFood = false;
-        }
-        const simpleFood = this._simpleFood;
-        if (!simpleFood && this._perfEma > 18) this._foodDrawStride = 3;
-        else if (!simpleFood && (crowdedView || this._perfEma > 15)) this._foodDrawStride = 2;
-        else this._foodDrawStride = 1;
-        const foodStride = this._foodDrawStride;
+        const simpleFood = this._quality < 0.50;
+        const foodStride = this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
+        const crowdedView = foodList.length > 140;
         const farCullR = Math.min(halfW, halfH) * 0.58;
         const farCullR2 = farCullR * farCullR;
-        const skipSlurp = simpleFood || crowdedView || this._perfEma > 18;
 
         const mouthValid = this._mouthValid;
         const mouthX = this._mouthX;
@@ -1039,7 +992,7 @@ export class SlitherRenderer {
         this._ensureFoodGrid();
         const foodGrid = this._foodSpatialGrid;
         let slurpSet = null;
-        if (mouthValid && !skipSlurp) {
+        if (mouthValid && !this._holdActive && !crowdedView) {
             slurpSet = new Set(this._foodNearPoint(foodGrid, mouthX, mouthY, maxSlurpReach));
         }
 
@@ -1049,23 +1002,27 @@ export class SlitherRenderer {
             const dyCam = f.y - cy;
             if (Math.abs(dxCam) > halfW || Math.abs(dyCam) > halfH) continue;
 
-            if (f.deathDrop && simpleFood && !f.golden) continue;
+            if (f.deathDrop && crowdedView) {
+                const d2cam = dxCam * dxCam + dyCam * dyCam;
+                if (d2cam > farCullR2 && (fi & 1) === 1) continue;
+            } else if (f.deathDrop && foodList.length > 90) {
+                const d2cam = dxCam * dxCam + dyCam * dyCam;
+                if (d2cam > farCullR2 * 1.35 && (fi & 3) === 3) continue;
+            }
 
             let anim = f.id != null ? this._foodAnimCache.get(f.id) : null;
-            if (!simpleFood) {
-                if (!anim) {
-                    let h = 0;
-                    const id = String(f.id ?? `${f.x},${f.y}`);
-                    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
-                    anim = {
-                        phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
-                        sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
-                        slurp: 0,
-                    };
-                    if (f.id != null) this._foodAnimCache.set(f.id, anim);
-                }
-                if (anim.slurp == null) anim.slurp = 0;
+            if (!anim) {
+                let h = 0;
+                const id = String(f.id ?? `${f.x},${f.y}`);
+                for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+                anim = {
+                    phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
+                    sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
+                    slurp: 0,
+                };
+                if (f.id != null) this._foodAnimCache.set(f.id, anim);
             }
+            if (anim.slurp == null) anim.slurp = 0;
 
             let wx = f.x;
             let wy = f.y;
@@ -1076,7 +1033,7 @@ export class SlitherRenderer {
             let sizeMul = 1;
             let alpha = 1;
 
-            if (isGolden && !simpleFood) {
+            if (isGolden) {
                 const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
                 sizeMul = 0.85 + pulse;
                 wx += Math.sin(now * 0.003 + f.y) * 6;
@@ -1084,13 +1041,13 @@ export class SlitherRenderer {
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
-            } else if (!simpleFood && anim) {
+            } else {
                 sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.12);
                 wx += Math.sin(now * 0.0024 + anim.phase) * 2.2;
                 wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 2.2;
             }
 
-            const runSlurp = !skipSlurp && mouthValid && anim && !f.deathDrop && !isGolden
+            const runSlurp = mouthValid && !this._holdActive && !f.deathDrop && !isGolden
                 && (!crowdedView || ((wx - mouthX) ** 2 + (wy - mouthY) ** 2) < maxSlurpReach2 * 0.35)
                 && (slurpSet?.has(f) || anim.slurp > 0.001);
 
@@ -1130,11 +1087,11 @@ export class SlitherRenderer {
             const baseR = (f.radius || 3) * sizeMul;
             const screenR = Math.max(4.5, baseR * zoom * 1.65);
 
-            if (simpleFood && !isGolden) {
-                ctx.globalAlpha = isGolden ? alpha : 0.58;
-                ctx.fillStyle = `hsla(${hue}, 82%, 58%, 0.52)`;
+            if (simpleFood && !isGolden && !f.deathDrop) {
+                ctx.globalAlpha = 0.55;
+                ctx.fillStyle = `hsla(${hue}, 82%, 58%, 0.5)`;
                 ctx.beginPath();
-                ctx.arc(fx, fy, screenR * 0.52, 0, Math.PI * 2);
+                ctx.arc(fx, fy, screenR * 0.55, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalAlpha = 1;
                 continue;
@@ -1169,9 +1126,7 @@ export class SlitherRenderer {
             }
         }
 
-        if (!skipSlurp) {
-            this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
-        }
+        this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
     }
 
     _drawSlurpGhosts(ctx, toScreen, zoom, now, mouthX, mouthY) {
@@ -1512,40 +1467,6 @@ export class SlitherRenderer {
         return this._getSnakePrImgs(cs, rPx, needs);
     }
 
-    /** Fast remote snake — sampled spine, no stamp sprites. */
-    _drawSnakeSimple(ctx, segs, cx, cy, zoom, color, headRadius, bodyRadius) {
-        const n = segs.length;
-        if (n < 1) return;
-        const stride = n > 48 ? 3 : n > 24 ? 2 : 1;
-        const pts = this._simpleSnakeBuf;
-        pts.length = 0;
-        for (let i = 0; i < n; i += stride) {
-            const s = segs[i];
-            pts.push({
-                x: (s.x - cx) * zoom + this.W / 2,
-                y: (s.y - cy) * zoom + this.H / 2,
-            });
-        }
-        const last = segs[n - 1];
-        const lx = (last.x - cx) * zoom + this.W / 2;
-        const ly = (last.y - cy) * zoom + this.H / 2;
-        const tail = pts[pts.length - 1];
-        if (!tail || tail.x !== lx || tail.y !== ly) pts.push({ x: lx, y: ly });
-
-        ctx.strokeStyle = color || '#88cc88';
-        ctx.lineWidth = Math.max(3, bodyRadius * 0.8);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(pts[0].x, pts[0].y, headRadius, 0, Math.PI * 2);
-        ctx.fillStyle = color || '#88cc88';
-        ctx.fill();
-    }
-
     _drawSnake(snake, toScreen, zoom) {
         const ctx = this.ctx;
         ctx.save();
@@ -1597,21 +1518,12 @@ export class SlitherRenderer {
             return;
         }
 
-        const snakeCount = this.targetSnakes.length;
-        const crowd = snakeCount > 8;
-        if (!isYou && snakeCount > 6) {
-            this._drawSnakeSimple(ctx, segs, cx, cy, zoom, snake.color, headRadius, bodyRadius);
-            ctx.restore();
-            return;
-        }
-
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * (isYou ? 0.35 : 0.48));
         const q = this._quality;
         const holdActive = isYou && this._holdActive;
-        const perfTight = this._holdActive || crowd || q < 0.88 || this._perfEma > 18;
-        const qMul = Math.max(this.isMobile ? 0.85 : 0.72, q);
+        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
         let arcLen = 0;
         for (let i = 1; i < segs.length; i++) {
             const dx = segs[i].x - segs[i - 1].x;
@@ -1621,12 +1533,8 @@ export class SlitherRenderer {
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const stampCap = Math.round((
             isYou
-                ? (holdActive
-                    ? (this.isMobile ? 64 : 52)
-                    : (crowd
-                        ? (boosting ? (this.isMobile ? 100 : 82) : (this.isMobile ? 90 : 72))
-                        : (boosting ? (this.isMobile ? 130 : 100) : (this.isMobile ? 115 : 88))))
-                : (boosting ? (this.isMobile ? 32 : 24) : (this.isMobile ? 24 : 18))
+                ? (boosting ? (this.isMobile ? 150 : 118) : (this.isMobile ? 130 : 105))
+                : (boosting ? (this.isMobile ? 48 : 40) : (this.isMobile ? 38 : 32))
         ) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1644,20 +1552,14 @@ export class SlitherRenderer {
             b.y = (wy - cy) * zoom + this.H / 2;
         }
 
-        if (!isYou && perfTight && bumps.length > 4) {
-            this._drawSnakeSimple(ctx, segs, cx, cy, zoom, snake.color, headRadius, bodyRadius);
-            ctx.restore();
-            return;
-        }
-
         const hx = bumps[0].x;
         const hy = bumps[0].y;
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
-            glow: isYou && !holdActive && !crowd && q >= 0.72,
-            boostOverlay: isYou && boosting && !crowd && q >= 0.78,
-            trailGlow: isYou && boosting && !crowd && q >= 0.78,
+            glow: isYou && !holdActive && q >= 0.55,
+            boostOverlay: isYou && boosting && q >= 0.6,
+            trailGlow: isYou && boosting,
         };
         const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
         const stampScale = bodySS * (cacheR / bodyRadius);
@@ -1694,8 +1596,7 @@ export class SlitherRenderer {
 
         const hlOpts = { isYou, quality: this._quality };
 
-        const stampStride = (isYou && (crowd || holdActive)) ? 2 : 1;
-        for (let i = bumpCount - 1; i >= 0; i -= stampStride) {
+        for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
@@ -1705,7 +1606,7 @@ export class SlitherRenderer {
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
         }
 
-        if (isYou && !holdActive && !crowd && q >= 0.82) {
+        if (isYou) {
             this._blitBodySideShadow(ctx, bumps, bumpCount, stampRadius, hlOpts);
             this._blitSpineHighlight(ctx, bumps, bumpCount, stampRadius, cs, boosting ? 1.08 : 1, hlOpts);
         }
@@ -1785,18 +1686,14 @@ export class SlitherRenderer {
             }
         }
 
-        if (snake.name && !this.hideOverlays && headEyeRadius >= 8 && !isYou && !this._holdActive && !perfTight) {
-            if ((this._frame & 1) === 0) {
-                const whx = segs[0].x - cx;
-                const why = segs[0].y - cy;
-                if (whx * whx + why * why <= 520 * 520) {
-                    this._drawSnakeLabels(ctx, snake, hx, hy, headEyeRadius, false);
-                }
-            }
-        }
-
-        if (isYou) {
-            this._youLabelAnchor = { hx, hy, headRadius: headEyeRadius };
+        if (snake.name && isYou && !this.hideOverlays) {
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+            ctx.lineWidth = 3;
+            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
+            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
         }
 
         // Mobile steering arrow — only while finger is on screen, further ahead of the head.
@@ -1831,106 +1728,8 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    _drawSnakeLabels(ctx, snake, hx, hy, headRadius, isYou) {
-        if (!snake.name) return;
-
-        let fontSize = headRadius * 0.85;
-        const nameLen = snake.name.length;
-        if (nameLen > 3) fontSize *= 0.7;
-        if (nameLen > 7) fontSize *= 0.5;
-        if (nameLen > 12) fontSize *= 0.35;
-        fontSize = Math.max(11, Math.min(16, fontSize));
-
-        const headTop = hy - headRadius;
-        const headBottom = hy + headRadius;
-        const nameY = Math.round(headTop - 12);
-        const pillTop = Math.round(headBottom + 6);
-
-        ctx.fillStyle = isYou ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)';
-        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-        ctx.lineWidth = 3;
-        ctx.strokeText(snake.name, hx, nameY);
-        ctx.fillText(snake.name, hx, nameY);
-
-        const displayBalance = isYou
-            ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance ?? 0)
-            : (snake.dollarBalance ?? snake.balance ?? 0);
-        this._drawBalanceBadge(ctx, hx, pillTop, displayBalance, isYou);
-    }
-
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
         drawBalanceBadge(ctx, screenX, screenY, balance, isMe);
-    }
-
-    _ensureMinimapCache() {
-        const { width, height } = getMinimapLayout(this.isMobile);
-        if (!this._minimapCache || this._minimapCacheW !== width || this._minimapCacheH !== height) {
-            this._minimapCache = document.createElement('canvas');
-            this._minimapCache.width = width;
-            this._minimapCache.height = height;
-            this._minimapCacheCtx = this._minimapCache.getContext('2d');
-            this._minimapCacheW = width;
-            this._minimapCacheH = height;
-            this._minimapCacheAt = -1;
-        }
-    }
-
-    _refreshMinimapCache(renderSnakes, cx, cy, zoom, W, H) {
-        this._ensureMinimapCache();
-        const mctx = this._minimapCacheCtx;
-        const cw = this._minimapCacheW;
-        const ch = this._minimapCacheH;
-        mctx.clearRect(0, 0, cw, ch);
-
-        const fbPlayers = this._minimapFallback.players;
-        fbPlayers.length = 0;
-        for (let i = 0; i < renderSnakes.length; i++) {
-            const s = renderSnakes[i];
-            if (!s.segments?.[0]) continue;
-            fbPlayers.push({
-                x: s.segments[0].x,
-                y: s.segments[0].y,
-                isYou: s.isYou,
-            });
-        }
-
-        const foodCount = this._foodDrawList.length;
-        const snakeCount = renderSnakes.length;
-        if (this.state.competitiveSlither || snakeCount > 10 || foodCount > 90) {
-            this._minimapFoodCap = this.isMobile ? 18 : 28;
-        } else {
-            this._minimapFoodCap = this.isMobile ? 24 : 36;
-        }
-
-        const viewHalfW = W / (2 * zoom);
-        const viewHalfH = H / (2 * zoom);
-        const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
-        const minimapFood = this._capMinimapFoodList(minimap.food, cx, cy, this._minimapFoodCap);
-        drawGameMinimap(mctx, {
-            screenW: cw,
-            screenH: ch,
-            isMobile: this.isMobile,
-            centerX: cx,
-            centerY: cy,
-            viewHalfW,
-            viewHalfH,
-            players: minimap.players,
-            food: minimapFood,
-            zone: this.state.zone,
-        });
-        this._minimapCacheAt = this._frame;
-    }
-
-    _drawMinimapOverlay(ctx, renderSnakes, cx, cy, zoom, W, H) {
-        if (this._frame - this._minimapCacheAt >= (this._perfEma > 20 ? 6 : 4) || this._minimapCacheAt < 0) {
-            this._refreshMinimapCache(renderSnakes, cx, cy, zoom, W, H);
-        }
-        if (this._minimapCache) {
-            ctx.drawImage(this._minimapCache, 0, 0);
-        }
     }
 
     draw() {
@@ -1946,18 +1745,9 @@ export class SlitherRenderer {
 
         const frameMs = dt * 1000;
         this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
-        const nowPerf = performance.now();
-        const nowWall = Date.now();
-        this._holdActive = this._isHoldActive(nowPerf);
-        this._cashoutActive = this._isCashoutActive(nowWall);
-        if (this._holdStartAt > 0 && !this._holdCompleteFired) {
-            const holdProgress = this._getHoldProgress(nowPerf);
-            if (holdProgress >= 1) {
-                this._holdCompleteFired = true;
-                this._holdStartAt = 0;
-                this._onHoldComplete?.();
-            }
-        }
+        const nowMs = Date.now();
+        this._holdActive = this._isHoldActive(nowMs);
+        this._cashoutActive = this._isCashoutActive(nowMs);
         const qFloor = this.isMobile ? 0.88 : 0.76;
         if (this._perfEma > 24) this._quality = Math.max(qFloor, this.isMobile ? 0.78 : 0.72);
         else if (this._perfEma > 20) this._quality = Math.min(this._quality, Math.max(qFloor, this.isMobile ? 0.88 : 0.82));
@@ -1975,8 +1765,6 @@ export class SlitherRenderer {
         ctx.globalCompositeOperation = 'source-over';
 
         this._updateSmoothing(dt);
-
-        this._youLabelAnchor = null;
 
         // Build render snakes without per-frame object spreads
         const renderSnakes = this._renderSnakeBuf;
@@ -1999,7 +1787,6 @@ export class SlitherRenderer {
             rs.isYou = snake.isYou;
             rs.name = snake.name;
             rs.balance = snake.balance;
-            rs.dollarBalance = snake.dollarBalance ?? snake.balance;
             rs.segments = s ? s.segments : snake.segments;
             rs.drawSpine = rs.segments;
             rs.angle = s ? s.angle : snake.angle;
@@ -2069,11 +1856,6 @@ export class SlitherRenderer {
         const foodHalfW = W / 2 / zoom + 160 / zoom;
         const foodHalfH = H / 2 / zoom + 160 / zoom;
         this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
-        const crowd = renderSnakes.length > 8;
-        const holdFoodCap = this._holdActive ? 48 : (crowd || this.state.competitiveSlither ? 58 : 70);
-        if (this._visibleFoodBuf.length > holdFoodCap) {
-            this._capVisibleFoodBuf(this._visibleFoodBuf, cx, cy, holdFoodCap);
-        }
         this._drawFood(ctx, this._visibleFoodBuf, toScreen, W, H, zoom, dt);
 
         const sorted = this._sortedRenderSnakes;
@@ -2095,29 +1877,58 @@ export class SlitherRenderer {
             this._drawSnake(snake, toScreen, zoom);
         }
 
-        // Cashout ring + your name/balance on top (uses drawn head anchor, not raw segment)
-        const youAnchor = this._youLabelAnchor;
-        if (youAnchor && me?.segments?.[0] && !this.hideOverlays) {
-            const { hx, hy, headRadius } = youAnchor;
+        // Balance badge + cashout rings on your snake head
+        if (me?.segments?.[0] && !this.hideOverlays) {
+            const head = me.segments[0];
+            const { x: hx, y: hy } = toScreen(head.x, head.y);
+            const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
             const { cashoutEndAt, cashoutTotal } = this.hud;
             const ringR = headRadius + 10;
 
             if (cashoutEndAt && cashoutEndAt > Date.now()) {
                 const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
                 drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
-            } else if (this._holdActive) {
-                drawCashoutProgressRing(ctx, hx, hy, ringR, this._getHoldProgress(nowPerf), {
-                    counterClockwise: true,
-                });
             }
 
-            if (me.name && headRadius >= 8) {
-                this._drawSnakeLabels(ctx, me, hx, hy, headRadius, true);
-            }
+            this._drawBalanceBadge(
+                ctx,
+                hx,
+                hy + headRadius + 14,
+                this.hud.balance ?? me.dollarBalance ?? me.balance ?? 1,
+                true,
+            );
         }
 
-        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode) && !this._holdActive) {
-            this._drawMinimapOverlay(ctx, renderSnakes, cx, cy, zoom, W, H);
+        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
+            const viewHalfW = W / (2 * zoom);
+            const viewHalfH = H / (2 * zoom);
+            if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive && !this._holdActive) {
+                const fbPlayers = this._minimapFallback.players;
+                fbPlayers.length = 0;
+                for (let i = 0; i < renderSnakes.length; i++) {
+                    const s = renderSnakes[i];
+                    if (!s.segments?.[0]) continue;
+                    fbPlayers.push({
+                        x: s.segments[0].x,
+                        y: s.segments[0].y,
+                        isYou: s.isYou,
+                    });
+                }
+            }
+            const skipMinimapFood = this._foodDrawList.length > 180;
+            const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
+            drawGameMinimap(ctx, {
+                screenW: W,
+                screenH: H,
+                isMobile: this.isMobile,
+                centerX: cx,
+                centerY: cy,
+                viewHalfW,
+                viewHalfH,
+                players: minimap.players,
+                food: skipMinimapFood ? [] : minimap.food,
+                zone: this.state.zone,
+            });
         }
     }
 
@@ -2134,8 +1945,6 @@ export class SlitherRenderer {
         this._renderPool.clear();
         this.smooth.clear();
         this._holdStartAt = 0;
-        this._holdCompleteFired = false;
-        this._onHoldComplete = null;
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
         document.removeEventListener('mousemove', this._onMouseMove);

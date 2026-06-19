@@ -19,12 +19,6 @@ export function getMinimapHalfRange(viewHalfW, viewHalfH, isMobile) {
     return Math.max(viewHalfW, viewHalfH) * mult;
 }
 
-export function getMinimapLayout(isMobile) {
-    const size = isMobile ? MOBILE_SIZE : DESKTOP_SIZE;
-    const margin = isMobile ? MARGIN_MOBILE : MARGIN_DESKTOP;
-    return { size, margin, width: size + margin * 2, height: size + margin * 2 };
-}
-
 function inRange(x, y, cx, cy, range) {
     const dx = x - cx;
     const dy = y - cy;
@@ -71,6 +65,7 @@ export function drawGameMinimap(ctx, opts) {
         y: cy + (wy - centerY) * scale,
     });
 
+    const blink = 0.5 + 0.5 * Math.sin(time * 0.009);
     const enemyList = players.filter(p => !(p.isYou || p.you) && p.x != null && p.y != null);
     const enemies = enemyList.length > 48
         ? enemyList
@@ -122,14 +117,14 @@ export function drawGameMinimap(ctx, opts) {
     // food pellets
     const foodR = isMobile ? 0.9 : 1.1;
     let foodDrawn = 0;
-    const maxFoodDots = isMobile ? 24 : 36;
+    const maxFoodDots = isMobile ? 50 : 80;
     for (const f of food) {
         if (foodDrawn >= maxFoodDots) break;
         if (f.x == null || f.y == null) continue;
         if (!inRange(f.x, f.y, centerX, centerY, halfRange)) continue;
         const p = toMini(f.x, f.y);
         if (f.golden || f.g) {
-            ctx.fillStyle = 'rgba(255, 210, 60, 0.88)';
+            ctx.fillStyle = `rgba(255, 210, 60, ${0.75 + blink * 0.2})`;
         } else if (f.hue != null || f.h != null) {
             const hue = f.hue ?? f.h;
             ctx.fillStyle = `hsla(${hue}, 70%, 58%, 0.55)`;
