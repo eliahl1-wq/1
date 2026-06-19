@@ -1047,7 +1047,7 @@ export default function Game() {
                         style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF3B30', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                         onClick={() => {
                             if (socketRef.current && token) {
-                                socketRef.current.emit('adminSpawnBotNearMe', { token });
+                                socketRef.current.emit('adminSpawnBotNearMe', { token, mode: 'agar' });
                             }
                         }}
                     >
