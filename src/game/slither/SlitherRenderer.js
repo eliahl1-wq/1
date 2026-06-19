@@ -1686,14 +1686,22 @@ export class SlitherRenderer {
             }
         }
 
-        if (snake.name && isYou && !this.hideOverlays) {
+        if (snake.name && !this.hideOverlays) {
             ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            ctx.font = `bold ${Math.max(12, headEyeRadius * 0.85)}px Arial, sans-serif`;
+            const fontSize = Math.max(12, headEyeRadius * 0.85);
+            ctx.font = `bold ${fontSize}px Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.strokeStyle = 'rgba(0,0,0,0.55)';
             ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, hy - headEyeRadius - 12);
-            ctx.fillText(snake.name, hx, hy - headEyeRadius - 12);
+            const nameY = hy - headEyeRadius - 12;
+            ctx.strokeText(snake.name, hx, nameY);
+            ctx.fillText(snake.name, hx, nameY);
+
+            if (!this.isBattleRoyale) {
+                const pillY = nameY + fontSize / 1.35;
+                const displayBalance = snake.dollarBalance ?? snake.balance;
+                drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
+            }
         }
 
         // Mobile steering arrow — only while finger is on screen, further ahead of the head.
