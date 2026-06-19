@@ -483,6 +483,7 @@ export default function AdminDashboard() {
     const [liveRefreshing, setLiveRefreshing] = useState(false);
     const [userSearch, setUserSearch] = useState('');
     const [serverStatus, setServerStatus] = useState(null);
+    const [publicStats, setPublicStats] = useState(null);
     const [actionMsg, setActionMsg] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
     const [showExcluded, setShowExcluded] = useState(false);
@@ -509,8 +510,12 @@ export default function AdminDashboard() {
 
     const fetchServerStatus = useCallback(async () => {
         try {
-            const status = await fetchAdmin('/api/admin/dashboard/server-status');
+            const [status, stats] = await Promise.all([
+                fetchAdmin('/api/admin/dashboard/server-status'),
+                fetch(`${API_BASE}/api/stats?t=${Date.now()}`).then(r => r.json()).catch(() => null),
+            ]);
             setServerStatus(status);
+            if (stats && !stats.error) setPublicStats(stats);
         } catch {
             /* keep last known status */
         }
@@ -843,7 +848,7 @@ export default function AdminDashboard() {
                             />
                             <StatCard label="Total Deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} txs` : ''} />
                             <StatCard label="Player Withdrawals" value={formatUsd(overview?.totalWithdrawalsUsd)} sub={overview ? `${overview.withdrawalCount} txs (excludes owner sweeps)` : ''} />
-                            <StatCard label="Currently In Game" value={activeUsers?.currentlyInGame ?? '—'} sub={`${activeUsers?.activeLast24h ?? 0} active in last 24h`} />
+                            <StatCard label="Currently In Game" value={serverStatus?.totalHumansInGame ?? activeUsers?.currentlyInGame ?? '—'} sub={`${serverStatus?.totalBotsInGame ?? 0} bots · ${serverStatus?.siteUsersOnline ?? '—'} on site`} />
                             <StatCard label="Main House Wallet" value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'} />
                             {(overview?.excludedTxCount ?? 0) > 0 && (
                                 <StatCard label="Excluded txs" value={overview.excludedTxCount} sub="Hidden individually — not deleted" />
@@ -903,6 +908,16 @@ export default function AdminDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                             <StatCard
+                                label="Humans in game"
+                                value={serverStatus?.totalHumansInGame ?? livePlayers.length}
+                                sub={`${serverStatus?.totalBotsInGame ?? 0} bots in arena · ${publicStats?.totalPlayersOnline ?? '—'} total (incl. bots)`}
+                            />
+                            <StatCard
+                                label="On site (lobby)"
+                                value={serverStatus?.siteUsersOnline ?? publicStats?.siteUsersOnline ?? '—'}
+                                sub={`Presence TTL ${Math.round((serverStatus?.presenceTtlMs ?? 90000) / 1000)}s · lobby poll`}
+                            />
+                            <StatCard
                                 label="In game right now"
                                 value={livePlayers.length}
                                 sub={liveUpdatedAt ? `Updated ${formatRelativeTime(liveUpdatedAt)} · auto every 3s` : 'Loading…'}
@@ -910,9 +925,54 @@ export default function AdminDashboard() {
                             <StatCard
                                 label="Active last 24h"
                                 value={activeUsers?.activeLast24h ?? '—'}
-                                sub="Unique users with any activity"
+                                sub="Unique accounts with any activity"
+                            />
+                            <StatCard
+                                label="Registered accounts"
+                                value={overview?.totalAccounts ?? '—'}
+                                sub="All users in database"
                             />
                         </div>
+
+                        {publicStats?.playersByGamemode && (
+                            <Panel title="Players by gamemode" sub="Humans only in arena modes · BR queue included">
+                                <DataTable
+                                    columns={[
+                                        { key: 'mode', label: 'Mode' },
+                                        { key: 'humans', label: 'Humans' },
+                                        { key: 'bots', label: 'Bots' },
+                                        { key: 'total', label: 'Total shown' },
+                                    ]}
+                                    rows={[
+                                        { mode: 'Agar', humans: publicStats.playersByGamemodeHumans?.agar ?? 0, bots: publicStats.playersByGamemodeBots?.agar ?? 0, total: publicStats.playersByGamemode?.agar ?? 0 },
+                                        { mode: 'Slither', humans: publicStats.playersByGamemodeHumans?.slither ?? 0, bots: publicStats.playersByGamemodeBots?.slither ?? 0, total: publicStats.playersByGamemode?.slither ?? 0 },
+                                        { mode: 'BR Agar', humans: publicStats.playersByGamemodeHumans?.brAgar ?? 0, bots: '—', total: publicStats.playersByGamemode?.brAgar ?? 0 },
+                                        { mode: 'BR Slither', humans: publicStats.playersByGamemodeHumans?.brSlither ?? 0, bots: '—', total: publicStats.playersByGamemode?.brSlither ?? 0 },
+                                        { mode: 'Competitive Slither', humans: publicStats.playersByGamemodeHumans?.competitiveSlither ?? 0, bots: '—', total: publicStats.playersByGamemode?.competitiveSlither ?? 0 },
+                                    ]}
+                                    loading={false}
+                                    emptyMessage="No stats"
+                                />
+                            </Panel>
+                        )}
+
+                        {(publicStats?.topPlayersByGamemode?.agar?.length > 0 || publicStats?.topPlayersByGamemode?.slither?.length > 0) && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                                {['agar', 'slither'].map((mode) => (
+                                    <Panel key={mode} title={`Live ${mode} leaderboard`} sub="Top balances in arena right now">
+                                        <DataTable
+                                            columns={[
+                                                { key: 'username', label: 'Player' },
+                                                { key: 'balance', label: 'Balance', render: r => formatUsd(r.balance) },
+                                            ]}
+                                            rows={publicStats.topPlayersByGamemode?.[mode] ?? []}
+                                            loading={false}
+                                            emptyMessage="Nobody playing"
+                                        />
+                                    </Panel>
+                                ))}
+                            </div>
+                        )}
 
                         <Panel
                             title="Players in arena"
@@ -1073,17 +1133,42 @@ export default function AdminDashboard() {
                         )}
 
                         {serverStatus?.arenaRooms?.length > 0 && (
-                            <Panel title="Arena rooms (reset together)" sub="Normal Agar/Slither stake tiers">
+                            <Panel title="Arena rooms (reset together)" sub="Normal Agar/Slither stake tiers · humans + bots">
                                 <DataTable
                                     columns={[
                                         { key: 'entryFeeUsd', label: 'Tier', render: r => formatUsd(r.entryFeeUsd) },
-                                        { key: 'playerCount', label: 'Players' },
+                                        { key: 'agarHumans', label: 'Agar 👤' },
+                                        { key: 'slitherHumans', label: 'Slither 👤' },
+                                        { key: 'agarBots', label: 'Agar 🤖' },
+                                        { key: 'slitherBots', label: 'Slither 🤖' },
+                                        { key: 'playerCount', label: 'Humans Σ' },
                                         { key: 'foodPoolBalance', label: 'Food pool', render: r => formatUsd(r.foodPoolBalance) },
                                         { key: 'isResetting', label: 'Status', render: r => r.isResetting ? 'Resetting' : 'Live' },
                                     ]}
                                     rows={serverStatus.arenaRooms}
                                     loading={false}
                                     emptyMessage="No arena rooms"
+                                />
+                            </Panel>
+                        )}
+
+                        {serverStatus?.arenaRooms?.some(r => r.inGame?.length > 0) && (
+                            <Panel title="Humans in arena (detail)" sub="Per player · balance at cashout value">
+                                <DataTable
+                                    columns={[
+                                        { key: 'tier', label: 'Tier' },
+                                        { key: 'username', label: 'Player' },
+                                        { key: 'mode', label: 'Mode' },
+                                        { key: 'balanceUsd', label: 'Balance', render: r => formatUsd(r.balanceUsd) },
+                                    ]}
+                                    rows={serverStatus.arenaRooms.flatMap(room => (room.inGame ?? []).map(p => ({
+                                        tier: formatUsd(room.entryFeeUsd),
+                                        username: p.username,
+                                        mode: p.mode || 'agar',
+                                        balanceUsd: p.balanceUsd,
+                                    })))}
+                                    loading={false}
+                                    emptyMessage="No humans in arena"
                                 />
                             </Panel>
                         )}

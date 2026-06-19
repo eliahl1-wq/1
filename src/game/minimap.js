@@ -19,6 +19,12 @@ export function getMinimapHalfRange(viewHalfW, viewHalfH, isMobile) {
     return Math.max(viewHalfW, viewHalfH) * mult;
 }
 
+export function getMinimapLayout(isMobile) {
+    const size = isMobile ? MOBILE_SIZE : DESKTOP_SIZE;
+    const margin = isMobile ? MARGIN_MOBILE : MARGIN_DESKTOP;
+    return { size, margin, width: size + margin * 2, height: size + margin * 2 };
+}
+
 function inRange(x, y, cx, cy, range) {
     const dx = x - cx;
     const dy = y - cy;

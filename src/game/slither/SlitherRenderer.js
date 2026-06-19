@@ -4,7 +4,7 @@
 
 import { drawCashoutProgressRing, getCashoutRingProgress, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawBalanceBadge } from '../balanceBadge.js';
-import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
+import { drawGameMinimap, normalizeMinimapData, getMinimapLayout } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
@@ -135,7 +135,7 @@ export class SlitherRenderer {
         this._visibleFoodBuf = [];
         this._foodSpatialGrid = new Map();
         this._foodGridDirty = true;
-        this._maxFoodDraw = 140;
+        this._maxFoodDraw = 120;
         this._FOOD_CELL = 64;
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
@@ -179,6 +179,12 @@ export class SlitherRenderer {
         this._quality = 1;
         this._minimapFallback = { players: [], food: [] };
         this._minimapFrame = 0;
+        this._minimapCache = null;
+        this._minimapCacheCtx = null;
+        this._minimapCacheW = 0;
+        this._minimapCacheH = 0;
+        this._minimapCacheAt = -1;
+        this._skipMinimapFood = false;
         this._youLabelAnchor = null;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
@@ -984,9 +990,9 @@ export class SlitherRenderer {
         const cy = this.camera.y;
         const halfW = W / 2 / zoom + 160 / zoom;
         const halfH = H / 2 / zoom + 160 / zoom;
-        const simpleFood = this._quality < 0.50;
-        const foodStride = this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
-        const crowdedView = foodList.length > 140;
+        const simpleFood = this._quality < 0.55;
+        const foodStride = this._perfEma > 26 ? 3 : this._perfEma > 20 ? 2 : this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
+        const crowdedView = foodList.length > 110;
         const farCullR = Math.min(halfW, halfH) * 0.58;
         const farCullR2 = farCullR * farCullR;
 
@@ -1001,7 +1007,7 @@ export class SlitherRenderer {
         this._ensureFoodGrid();
         const foodGrid = this._foodSpatialGrid;
         let slurpSet = null;
-        if (mouthValid && !this._holdActive && !crowdedView) {
+        if (mouthValid && !this._holdActive && !crowdedView && this._perfEma < 22) {
             slurpSet = new Set(this._foodNearPoint(foodGrid, mouthX, mouthY, maxSlurpReach));
         }
 
@@ -1565,6 +1571,29 @@ export class SlitherRenderer {
             b.y = (wy - cy) * zoom + this.H / 2;
         }
 
+        if (!isYou && perfTight && bumps.length > 4) {
+            ctx.strokeStyle = snake.color || '#88cc88';
+            ctx.lineWidth = Math.max(4, bodyRadius * 0.85);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(bumps[0].x, bumps[0].y);
+            const simpleStride = bumps.length > 24 ? 2 : 1;
+            for (let i = simpleStride; i < bumps.length; i += simpleStride) {
+                ctx.lineTo(bumps[i].x, bumps[i].y);
+            }
+            ctx.stroke();
+            const hx = bumps[0].x;
+            const hy = bumps[0].y;
+            const headEyeRadius = headRadius;
+            ctx.beginPath();
+            ctx.arc(hx, hy, headEyeRadius, 0, Math.PI * 2);
+            ctx.fillStyle = snake.color || '#88cc88';
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
+
         const hx = bumps[0].x;
         const hy = bumps[0].y;
 
@@ -1779,6 +1808,73 @@ export class SlitherRenderer {
         drawBalanceBadge(ctx, screenX, screenY, balance, isMe);
     }
 
+    _ensureMinimapCache() {
+        const { width, height } = getMinimapLayout(this.isMobile);
+        if (!this._minimapCache || this._minimapCacheW !== width || this._minimapCacheH !== height) {
+            this._minimapCache = document.createElement('canvas');
+            this._minimapCache.width = width;
+            this._minimapCache.height = height;
+            this._minimapCacheCtx = this._minimapCache.getContext('2d');
+            this._minimapCacheW = width;
+            this._minimapCacheH = height;
+            this._minimapCacheAt = -1;
+        }
+    }
+
+    _refreshMinimapCache(renderSnakes, cx, cy, zoom, W, H) {
+        this._ensureMinimapCache();
+        const mctx = this._minimapCacheCtx;
+        const cw = this._minimapCacheW;
+        const ch = this._minimapCacheH;
+        mctx.clearRect(0, 0, cw, ch);
+
+        const fbPlayers = this._minimapFallback.players;
+        fbPlayers.length = 0;
+        for (let i = 0; i < renderSnakes.length; i++) {
+            const s = renderSnakes[i];
+            if (!s.segments?.[0]) continue;
+            fbPlayers.push({
+                x: s.segments[0].x,
+                y: s.segments[0].y,
+                isYou: s.isYou,
+            });
+        }
+
+        const foodCount = this._foodDrawList.length;
+        const snakeCount = renderSnakes.length;
+        if (this._skipMinimapFood) {
+            if (foodCount < 150 && snakeCount < 14) this._skipMinimapFood = false;
+        } else if (foodCount > 200 || snakeCount > 18) {
+            this._skipMinimapFood = true;
+        }
+
+        const viewHalfW = W / (2 * zoom);
+        const viewHalfH = H / (2 * zoom);
+        const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
+        drawGameMinimap(mctx, {
+            screenW: cw,
+            screenH: ch,
+            isMobile: this.isMobile,
+            centerX: cx,
+            centerY: cy,
+            viewHalfW,
+            viewHalfH,
+            players: minimap.players,
+            food: this._skipMinimapFood ? [] : minimap.food,
+            zone: this.state.zone,
+        });
+        this._minimapCacheAt = this._frame;
+    }
+
+    _drawMinimapOverlay(ctx, renderSnakes, cx, cy, zoom, W, H) {
+        if (this._frame - this._minimapCacheAt >= 3 || this._minimapCacheAt < 0) {
+            this._refreshMinimapCache(renderSnakes, cx, cy, zoom, W, H);
+        }
+        if (this._minimapCache) {
+            ctx.drawImage(this._minimapCache, 0, 0);
+        }
+    }
+
     draw() {
         const { worldHalf } = this.state;
         const ctx = this.ctx;
@@ -1962,37 +2058,8 @@ export class SlitherRenderer {
             }
         }
 
-        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode) && (this._frame & 1) === 0
-            && !this._holdActive) {
-            const viewHalfW = W / (2 * zoom);
-            const viewHalfH = H / (2 * zoom);
-            if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive && !this._holdActive) {
-                const fbPlayers = this._minimapFallback.players;
-                fbPlayers.length = 0;
-                for (let i = 0; i < renderSnakes.length; i++) {
-                    const s = renderSnakes[i];
-                    if (!s.segments?.[0]) continue;
-                    fbPlayers.push({
-                        x: s.segments[0].x,
-                        y: s.segments[0].y,
-                        isYou: s.isYou,
-                    });
-                }
-            }
-            const skipMinimapFood = this._foodDrawList.length > 180 || renderSnakes.length > 16;
-            const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
-            drawGameMinimap(ctx, {
-                screenW: W,
-                screenH: H,
-                isMobile: this.isMobile,
-                centerX: cx,
-                centerY: cy,
-                viewHalfW,
-                viewHalfH,
-                players: minimap.players,
-                food: skipMinimapFood ? [] : minimap.food,
-                zone: this.state.zone,
-            });
+        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode) && !this._holdActive) {
+            this._drawMinimapOverlay(ctx, renderSnakes, cx, cy, zoom, W, H);
         }
     }
 
