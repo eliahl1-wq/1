@@ -22,6 +22,42 @@ const OTHER = {
     radius: 7,
 };
 
+const badgeLayoutCache = new Map();
+const BADGE_CACHE_MAX = 48;
+
+function getBadgeLayout(ctx, amount, isMe) {
+    const key = `${isMe ? 'm' : 'o'}:${amount}`;
+    let layout = badgeLayoutCache.get(key);
+    if (layout) return layout;
+
+    const amountFont = 13;
+    const unitFont = 10;
+    const gap = 3;
+    const padX = 10;
+
+    ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+    const amountW = ctx.measureText(amount).width;
+    ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+    const unitW = ctx.measureText('$').width;
+
+    layout = {
+        amountFont,
+        unitFont,
+        gap,
+        padX,
+        amountW,
+        unitW,
+        pillW: Math.ceil(unitW + gap + amountW + padX * 2),
+        pillH: amountFont + 10,
+    };
+
+    if (badgeLayoutCache.size >= BADGE_CACHE_MAX) {
+        badgeLayoutCache.clear();
+    }
+    badgeLayoutCache.set(key, layout);
+    return layout;
+}
+
 /**
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} centerX
@@ -32,19 +68,10 @@ const OTHER = {
 export function drawBalanceBadge(ctx, centerX, topY, balance, isMe) {
     const theme = isMe ? ME : OTHER;
     const amount = (balance || 0).toFixed(2);
-    const amountFont = 13;
-    const unitFont = 10;
-    const gap = 3;
+    const layout = getBadgeLayout(ctx, amount, isMe);
+    const { amountFont, unitFont, gap, padX, unitW, pillW, pillH } = layout;
 
     ctx.save();
-    ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    const amountW = ctx.measureText(amount).width;
-    ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    const unitW = ctx.measureText('$').width;
-
-    const padX = 10;
-    const pillW = Math.ceil(unitW + gap + amountW + padX * 2);
-    const pillH = amountFont + 10;
     const pillX = Math.round(centerX - pillW / 2);
     const pillY = Math.round(topY);
     const r = theme.radius;

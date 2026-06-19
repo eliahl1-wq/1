@@ -1431,15 +1431,9 @@
 }
 
 .gm-mode-badge--popular {
-  padding: 4px 7px;
   color: #ff6b35;
   background: rgba(255, 80, 40, 0.1);
   border: 1px solid rgba(255, 90, 50, 0.28);
-}
-
-.gm-mode-badge-flame {
-  flex-shrink: 0;
-  display: block;
 }
 
 .gm-mode-badge--new {

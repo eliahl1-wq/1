@@ -1689,7 +1689,11 @@ export class SlitherRenderer {
         }
 
         if (snake.name && !this.hideOverlays && headEyeRadius >= 8 && !isYou) {
-            this._drawSnakeLabels(ctx, snake, hx, hy, headEyeRadius, false);
+            const whx = segs[0].x - cx;
+            const why = segs[0].y - cy;
+            if (whx * whx + why * why <= 650 * 650) {
+                this._drawSnakeLabels(ctx, snake, hx, hy, headEyeRadius, false);
+            }
         }
 
         if (isYou) {
