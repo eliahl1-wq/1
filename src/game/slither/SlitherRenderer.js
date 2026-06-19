@@ -1699,7 +1699,7 @@ export class SlitherRenderer {
 
             if (!this.isBattleRoyale) {
                 const pillY = nameY + fontSize / 1.35;
-                const displayBalance = snake.dollarBalance ?? snake.balance;
+                const displayBalance = isYou ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance) : (snake.dollarBalance ?? snake.balance);
                 drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
             }
         }
@@ -1795,6 +1795,7 @@ export class SlitherRenderer {
             rs.isYou = snake.isYou;
             rs.name = snake.name;
             rs.balance = snake.balance;
+            rs.dollarBalance = snake.dollarBalance;
             rs.segments = s ? s.segments : snake.segments;
             rs.drawSpine = rs.segments;
             rs.angle = s ? s.angle : snake.angle;
@@ -1897,14 +1898,6 @@ export class SlitherRenderer {
                 const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
                 drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
             }
-
-            this._drawBalanceBadge(
-                ctx,
-                hx,
-                hy + headRadius + 14,
-                this.hud.balance ?? me.dollarBalance ?? me.balance ?? 1,
-                true,
-            );
         }
 
         if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
