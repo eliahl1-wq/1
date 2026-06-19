@@ -35,7 +35,7 @@ export default function Transactions() {
                 });
                 if (!res.ok) throw new Error();
                 const data = await res.json();
-                setTxs(data.filter(tx => tx.type !== 'game' && tx.meta?.reason !== 'Arena Cashout'));
+                setTxs(data.filter(tx => tx.type === 'deposit' || (tx.type === 'withdraw' && tx.meta?.destination)));
             } catch {
                 setTxs([]);
             } finally {

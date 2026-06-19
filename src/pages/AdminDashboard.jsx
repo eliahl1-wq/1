@@ -933,6 +933,25 @@ export default function AdminDashboard() {
                         </Panel>
 
                         <Panel
+                            title="Site Visitors"
+                            sub={activeUsers?.sitePresence?.length ? 'Users currently active on the website' : 'No recent visitors'}
+                        >
+                            <DataTable
+                                columns={[
+                                    { key: 'ip', label: 'IP', render: r => <span className="mono">{r.ip}</span> },
+                                    { key: 'country', label: 'Country', render: r => r.country },
+                                    { key: 'page', label: 'Page', render: r => <span className="mono">{r.page}</span> },
+                                    { key: 'gamemode', label: 'Game Mode', render: r => r.gamemode },
+                                    { key: 'userAgent', label: 'Device / Browser', render: r => <span style={{ fontSize: '0.65rem', color: 'var(--text-3)', display: 'block', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.userAgent}>{r.userAgent}</span> },
+                                    { key: 'lastSeen', label: 'Last Seen', render: r => formatRelativeTime(r.lastSeen) },
+                                ]}
+                                rows={activeUsers?.sitePresence || []}
+                                loading={false}
+                                emptyMessage="No site visitors"
+                            />
+                        </Panel>
+
+                        <Panel
                             title="Live activity feed"
                             sub="Deposits, entries, cashouts, deaths, withdrawals — newest first"
                         >

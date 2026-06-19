@@ -31,7 +31,7 @@ export default function AppTopbar({ children }) {
             )}
             {user && (
                 <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
-                    Profile
+                    Performance
                 </button>
             )}
             {user?.isAdmin && (
