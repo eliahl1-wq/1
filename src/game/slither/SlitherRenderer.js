@@ -1686,19 +1686,21 @@ export class SlitherRenderer {
             }
         }
 
-        if (snake.name && !this.hideOverlays) {
-            ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            const fontSize = Math.max(12, headEyeRadius * 0.85);
-            ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-            ctx.lineWidth = 3;
-            const nameY = hy - headEyeRadius - 12;
-            ctx.strokeText(snake.name, hx, nameY);
-            ctx.fillText(snake.name, hx, nameY);
+        if (!this.hideOverlays) {
+            if (snake.name) {
+                ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                const fontSize = Math.max(12, headEyeRadius * 0.85);
+                ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+                ctx.lineWidth = 3;
+                const nameY = hy - headEyeRadius - 12;
+                ctx.strokeText(snake.name, hx, nameY);
+                ctx.fillText(snake.name, hx, nameY);
+            }
 
             if (!this.isBattleRoyale) {
-                const pillY = nameY + fontSize / 1.35;
+                const pillY = hy + headRadius + 14;
                 const displayBalance = isYou ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance) : (snake.dollarBalance ?? snake.balance);
                 drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
             }

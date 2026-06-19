@@ -52,7 +52,7 @@ export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
 
 export const SEO = {
     home: {
-        tabTitle: 'AgarStake | High-Stakes Web3 PvP Gaming',
+        tabTitle: 'AgarStake | Competitive PvP Games with Real Cash & Crypto Wagers',
         description: 'Welcome to the premier platform for competitive Web3 gaming. Wager Solana (SOL) in skill-based Agar and Slither arenas, outplay opponents, and withdraw your winnings instantly.',
         keywords: BASE_KEYWORDS,
         path: '/',
