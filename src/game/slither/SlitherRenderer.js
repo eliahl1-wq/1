@@ -176,7 +176,6 @@ export class SlitherRenderer {
         this._perfEma = 16.7;
         this._quality = 1;
         this._minimapFallback = { players: [], food: [] };
-        this._minimapFrame = 0;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
 
@@ -1536,7 +1535,7 @@ export class SlitherRenderer {
             isYou
                 ? (boosting ? (this.isMobile ? 150 : 118) : (this.isMobile ? 130 : 105))
                 : (boosting ? (this.isMobile ? 48 : 40) : (this.isMobile ? 38 : 32))
-        ) * qMul);
+        ) * qMul * (this.targetSnakes.length > 14 && !isYou ? 0.75 : 1));
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
@@ -1687,27 +1686,9 @@ export class SlitherRenderer {
             }
         }
 
-        if (snake.name && !this.hideOverlays && headEyeRadius >= 8) {
-            let fontSize = headEyeRadius * 0.85;
-            const nameLen = snake.name.length;
-            if (nameLen > 3) fontSize *= 0.7;
-            if (nameLen > 7) fontSize *= 0.5;
-            if (nameLen > 12) fontSize *= 0.35;
-            fontSize = Math.max(11, Math.min(16, fontSize));
-            const nameY = hy - headEyeRadius - 12;
-            ctx.fillStyle = isYou ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)';
-            ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-            ctx.lineWidth = 3;
-            ctx.strokeText(snake.name, hx, nameY);
-            ctx.fillText(snake.name, hx, nameY);
-
-            const displayBalance = isYou
-                ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance ?? 0)
-                : (snake.dollarBalance ?? snake.balance ?? 0);
-            this._drawBalanceBadge(ctx, hx, nameY + fontSize * 0.9, displayBalance, isYou);
+        if (snake.name && !this.hideOverlays && headEyeRadius >= 8 && !isYou) {
+            const headPt = toScreen(segs[0].x, segs[0].y);
+            this._drawSnakeLabels(ctx, snake, headPt.x, headPt.y, headEyeRadius, false);
         }
 
         // Mobile steering arrow — only while finger is on screen, further ahead of the head.
@@ -1740,6 +1721,32 @@ export class SlitherRenderer {
         }
 
         ctx.restore();
+    }
+
+    _drawSnakeLabels(ctx, snake, hx, hy, headRadius, isYou) {
+        if (!snake.name) return;
+
+        let fontSize = headRadius * 0.85;
+        const nameLen = snake.name.length;
+        if (nameLen > 3) fontSize *= 0.7;
+        if (nameLen > 7) fontSize *= 0.5;
+        if (nameLen > 12) fontSize *= 0.35;
+        fontSize = Math.max(11, Math.min(16, fontSize));
+
+        const labelBaseY = Math.round(hy - headRadius - 10);
+        ctx.fillStyle = isYou ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)';
+        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(snake.name, hx, labelBaseY);
+        ctx.fillText(snake.name, hx, labelBaseY);
+
+        const displayBalance = isYou
+            ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance ?? 0)
+            : (snake.dollarBalance ?? snake.balance ?? 0);
+        this._drawBalanceBadge(ctx, hx, labelBaseY + 5, displayBalance, isYou);
     }
 
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
@@ -1871,6 +1878,10 @@ export class SlitherRenderer {
         const foodHalfW = W / 2 / zoom + 160 / zoom;
         const foodHalfH = H / 2 / zoom + 160 / zoom;
         this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
+        const crowd = renderSnakes.length > 14;
+        if (crowd && this._visibleFoodBuf.length > 140) {
+            this._capVisibleFoodBuf(this._visibleFoodBuf, cx, cy, 140);
+        }
         this._drawFood(ctx, this._visibleFoodBuf, toScreen, W, H, zoom, dt);
 
         const sorted = this._sortedRenderSnakes;
@@ -1892,7 +1903,7 @@ export class SlitherRenderer {
             this._drawSnake(snake, toScreen, zoom);
         }
 
-        // Cashout ring on your snake head (balance badge drawn in _drawSnake with name)
+        // Cashout ring + your name/balance on top (uses true head segment, not resampled bumps)
         if (me?.segments?.[0] && !this.hideOverlays) {
             const head = me.segments[0];
             const { x: hx, y: hy } = toScreen(head.x, head.y);
@@ -1904,25 +1915,27 @@ export class SlitherRenderer {
                 const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
                 drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
             }
+
+            if (me.name && headRadius >= 8) {
+                this._drawSnakeLabels(ctx, me, hx, hy, headRadius, true);
+            }
         }
 
-        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode) && (this._frame & 1) === 0) {
+        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
-            if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive && !this._holdActive) {
-                const fbPlayers = this._minimapFallback.players;
-                fbPlayers.length = 0;
-                for (let i = 0; i < renderSnakes.length; i++) {
-                    const s = renderSnakes[i];
-                    if (!s.segments?.[0]) continue;
-                    fbPlayers.push({
-                        x: s.segments[0].x,
-                        y: s.segments[0].y,
-                        isYou: s.isYou,
-                    });
-                }
+            const fbPlayers = this._minimapFallback.players;
+            fbPlayers.length = 0;
+            for (let i = 0; i < renderSnakes.length; i++) {
+                const s = renderSnakes[i];
+                if (!s.segments?.[0]) continue;
+                fbPlayers.push({
+                    x: s.segments[0].x,
+                    y: s.segments[0].y,
+                    isYou: s.isYou,
+                });
             }
-            const skipMinimapFood = this._foodDrawList.length > 180;
+            const skipMinimapFood = this._foodDrawList.length > 180 || renderSnakes.length > 16;
             const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
             drawGameMinimap(ctx, {
                 screenW: W,

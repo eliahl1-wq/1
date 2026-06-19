@@ -225,8 +225,8 @@ export default function PreGame() {
     }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, selectedEntryFee]);
 
     useEffect(() => {
-        setShowDiscovery(shouldShowDiscoveryPrompt(selectedMode, brAvailable));
-    }, [selectedMode, brAvailable]);
+        setShowDiscovery(isAuthenticated && shouldShowDiscoveryPrompt(selectedMode, brAvailable));
+    }, [selectedMode, brAvailable, isAuthenticated]);
 
     useEffect(() => {
         const raw = localStorage.getItem('selected_gamemode');
@@ -1114,7 +1114,7 @@ export default function PreGame() {
 
             {!isAuthenticated && <GuestWelcomeBanner />}
 
-            {showDiscovery && (
+            {isAuthenticated && showDiscovery && (
                 <GamemodeDiscoveryPrompt
                     currentMode={selectedMode}
                     brAvailable={brAvailable}

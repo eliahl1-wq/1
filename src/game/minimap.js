@@ -66,7 +66,17 @@ export function drawGameMinimap(ctx, opts) {
     });
 
     const blink = 0.5 + 0.5 * Math.sin(time * 0.009);
-    const enemies = players.filter(p => !(p.isYou || p.you) && p.x != null && p.y != null);
+    const enemyList = players.filter(p => !(p.isYou || p.you) && p.x != null && p.y != null);
+    const enemies = enemyList.length > 48
+        ? enemyList
+            .map(e => ({
+                e,
+                d: (e.x - centerX) ** 2 + (e.y - centerY) ** 2,
+            }))
+            .sort((a, b) => a.d - b.d)
+            .slice(0, 48)
+            .map(({ e }) => e)
+        : enemyList;
 
     ctx.save();
     ctx.beginPath();
@@ -106,7 +116,10 @@ export function drawGameMinimap(ctx, opts) {
 
     // food pellets
     const foodR = isMobile ? 0.9 : 1.1;
+    let foodDrawn = 0;
+    const maxFoodDots = isMobile ? 50 : 80;
     for (const f of food) {
+        if (foodDrawn >= maxFoodDots) break;
         if (f.x == null || f.y == null) continue;
         if (!inRange(f.x, f.y, centerX, centerY, halfRange)) continue;
         const p = toMini(f.x, f.y);
@@ -121,6 +134,7 @@ export function drawGameMinimap(ctx, opts) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, foodR, 0, Math.PI * 2);
         ctx.fill();
+        foodDrawn++;
     }
 
     // ejected mass
@@ -147,19 +161,16 @@ export function drawGameMinimap(ctx, opts) {
         ctx.fill();
     }
 
-    // enemies on radar — red blinking
+    // enemies on radar — steady red dots (no pulse; pulse on many players looked like minimap flicker)
     const enemyR = isMobile ? 2 : 2.6;
     for (const e of enemies) {
         if (!inRange(e.x, e.y, centerX, centerY, halfRange)) continue;
         const p = toMini(e.x, e.y);
-        ctx.globalAlpha = blink;
-        ctx.fillStyle = '#ff2a2a';
-        ctx.shadowColor = 'rgba(255, 40, 40, 0.9)';
-        ctx.shadowBlur = isMobile ? 3 : 5;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = '#ff3b30';
         ctx.beginPath();
         ctx.arc(p.x, p.y, enemyR, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
     }
 
@@ -203,7 +214,7 @@ export function drawGameMinimap(ctx, opts) {
         if (t <= 0.02) continue;
         const a0 = (i / EDGE_BUCKETS) * Math.PI * 2 - Math.PI;
         const a1 = ((i + 1) / EDGE_BUCKETS) * Math.PI * 2 - Math.PI;
-        const alpha = (0.35 + t * 0.65) * (0.65 + blink * 0.35);
+        const alpha = (0.35 + t * 0.65) * 0.85;
         ctx.beginPath();
         ctx.arc(cx, cy, ringR - 1, a0, a1);
         ctx.strokeStyle = `rgba(255, 35, 35, ${alpha})`;
@@ -215,7 +226,7 @@ export function drawGameMinimap(ctx, opts) {
     if (maxThreat > 0.05) {
         ctx.beginPath();
         ctx.arc(cx, cy, radius - 1.5, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 50, 50, ${(0.12 + maxThreat * 0.35) * (0.7 + blink * 0.3)})`;
+        ctx.strokeStyle = `rgba(255, 50, 50, ${0.12 + maxThreat * 0.35})`;
         ctx.lineWidth = isMobile ? 2 : 2.5;
         ctx.stroke();
     }

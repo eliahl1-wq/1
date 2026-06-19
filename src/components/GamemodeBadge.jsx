@@ -1,26 +1,20 @@
-import React, { useId } from 'react';
+import React from 'react';
 
 function FlameIcon() {
-    const gradId = useId();
-
     return (
-        <svg className="gm-mode-badge-flame" width="11" height="13" viewBox="0 0 12 14" fill="none" aria-hidden="true">
+        <svg className="gm-mode-badge-flame" width="12" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
-                d="M6 13c2.5-1.8 4-3.8 4-6.5C10 3.2 8.2 1.5 6 0 3.8 1.5 2 3.2 2 6.5 2 9.2 3.5 11.2 6 13Z"
-                fill={`url(#${gradId})`}
+                d="M12 22c4.2-3.1 7-7.2 7-11.8C19 5.4 15.8 2 12 1 8.2 2 5 5.4 5 10.2 5 14.8 7.8 18.9 12 22z"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinejoin="round"
             />
             <path
-                d="M6 10.5c1.2-.9 2-2 2-3.4 0-1.5-.9-2.6-2-3.4-1.1.8-2 1.9-2 3.4 0 1.4.8 2.5 2 3.4Z"
-                fill="#FFD080"
-                opacity="0.9"
+                d="M12 17.5c1.9-1.4 3.2-3.2 3.2-5.2 0-1.6-.9-3-2.2-3.8-1.3.8-2.2 2.2-2.2 3.8 0 2 1.3 3.8 3.2 5.2z"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
             />
-            <defs>
-                <linearGradient id={gradId} x1="6" y1="0" x2="6" y2="13" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#FF6B35" />
-                    <stop offset="0.55" stopColor="#FF3B30" />
-                    <stop offset="1" stopColor="#E62E00" />
-                </linearGradient>
-            </defs>
         </svg>
     );
 }
