@@ -35,7 +35,7 @@ export default function Transactions() {
                 });
                 if (!res.ok) throw new Error();
                 const data = await res.json();
-                setTxs(data.filter(tx => tx.type === 'deposit' || (tx.type === 'withdraw' && tx.meta?.destination)));
+                setTxs(data.filter(tx => tx.type === 'deposit' || tx.type === 'withdraw'));
             } catch {
                 setTxs([]);
             } finally {
@@ -142,7 +142,7 @@ export default function Transactions() {
                                             {/* Amount */}
                                             <td style={{ padding: '14px 16px' }}>
                                                 <span className="mono" style={{ fontWeight: 700, fontSize: '0.85rem', color: isDeposit ? 'var(--green)' : 'var(--text-h)' }}>
-                                                    {isDeposit ? '+' : ''} ${tx.amount.toFixed(2)}
+                                                    {isDeposit ? '+' : '-'}${(tx.meta?.amountUsd ?? tx.amount).toFixed(2)}
                                                 </span>
                                             </td>
 
@@ -216,7 +216,7 @@ export default function Transactions() {
                                         <div className="tx-card-row">
                                             <span className="tx-card-label">Amount</span>
                                             <span className="mono" style={{ fontWeight: 700, color: isDeposit ? 'var(--green)' : 'var(--text-h)' }}>
-                                                {isDeposit ? '+' : ''} ${tx.amount.toFixed(2)}
+                                                {isDeposit ? '+' : '-'}${(tx.meta?.amountUsd ?? tx.amount).toFixed(2)}
                                             </span>
                                         </div>
                                         <div className="tx-card-row">

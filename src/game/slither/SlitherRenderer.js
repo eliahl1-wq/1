@@ -1036,15 +1036,11 @@ export class SlitherRenderer {
             if (isGolden) {
                 const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
                 sizeMul = 0.85 + pulse;
-                wx += Math.sin(now * 0.003 + f.y) * 6;
-                wy += Math.cos(now * 0.0035 + f.x) * 6;
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
                 sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
             } else {
                 sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.12);
-                wx += Math.sin(now * 0.0024 + anim.phase) * 2.2;
-                wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * 2.2;
             }
 
             const runSlurp = mouthValid && !this._holdActive && !f.deathDrop && !isGolden
