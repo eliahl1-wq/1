@@ -280,7 +280,7 @@
 
 .game-br-hud-meta {
     font-size: 0.72rem;
-    color: #FF6B6B;
+    color: var(--orange, #f97316);
     font-weight: 700;
     margin-top: 4px;
 }
@@ -524,7 +524,7 @@
     width: 100%;
     max-width: 420px;
     padding: 28px 24px 22px;
-    border-radius: 20px;
+    border-radius: 12px;
     border: 1px solid rgba(120, 94, 255, 0.22);
     background: rgba(14, 14, 20, 0.88);
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 48px rgba(120, 94, 255, 0.08);
@@ -544,7 +544,7 @@
     width: 28px;
     height: 28px;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--r-sm);
     background: transparent;
     color: rgba(255, 255, 255, 0.35);
     font-size: 1.35rem;
@@ -578,7 +578,7 @@
 .game-result-badge {
     display: inline-block;
     padding: 5px 12px;
-    border-radius: 100px;
+    border-radius: var(--r-sm);
     font-size: 0.62rem;
     font-weight: 800;
     letter-spacing: 1.2px;
@@ -587,8 +587,9 @@
 }
 
 .game-result-badge--loss {
-    background: rgba(255, 59, 48, 0.12);
-    color: #FF6B6B;
+    background: rgba(249, 115, 22, 0.12);
+    color: var(--orange, #f97316);
+    border: 1px solid rgba(249, 115, 22, 0.25);
 }
 
 .game-result-title {
@@ -667,8 +668,8 @@
 }
 
 .game-result-stat-icon--kills {
-    background: rgba(255, 59, 48, 0.14);
-    color: #ff6b6b;
+    background: rgba(249, 115, 22, 0.14);
+    color: var(--orange, #f97316);
 }
 
 .game-result-stat-value {
@@ -682,7 +683,7 @@
 }
 
 .game-result-stat-value--kills {
-    color: #ff6b6b;
+    color: var(--orange, #f97316);
 }
 
 .game-result-stat-label {
@@ -697,7 +698,7 @@
     gap: 8px;
     margin-bottom: 18px;
     padding: 10px 14px;
-    border-radius: 12px;
+    border-radius: var(--r-md);
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.07);
     color: rgba(255, 255, 255, 0.72);
@@ -729,7 +730,7 @@
     justify-content: center;
     gap: 6px;
     padding: 11px 8px;
-    border-radius: 12px;
+    border-radius: var(--r-md);
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.2px;

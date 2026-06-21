@@ -35,6 +35,16 @@
   --green-dim: rgba(20, 241, 149, 0.1);
   --green-border: rgba(20, 241, 149, 0.2);
 
+  /* Orange — risk / money-going-in / entry fees / kills */
+  --orange: #f97316;
+  --orange-dim: rgba(249, 115, 22, 0.1);
+  --orange-border: rgba(249, 115, 22, 0.25);
+
+  /* Cyan — live counts / wallet balance / info stats */
+  --cyan: #06b6d4;
+  --cyan-dim: rgba(6, 182, 212, 0.1);
+  --cyan-border: rgba(6, 182, 212, 0.22);
+
   /* Action blue */
   --blue: #4D8CFF;
   --blue-dark: #1B62FF;
@@ -58,13 +68,13 @@
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
   --shadow-xl: 0 32px 80px rgba(0, 0, 0, 0.7);
 
-  /* Radius */
-  --r-xs: 4px;
-  --r-sm: 6px;
-  --r-md: 8px;
-  --r-lg: 12px;
-  --r-xl: 16px;
-  --r-2xl: 20px;
+  /* Radius — sharp trading-platform aesthetic */
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 10px;
+  --r-2xl: 12px;
   --r-full: 999px;
 
   font: 14px/1.5 var(--ui);
@@ -117,7 +127,7 @@ h2 {
 .panel {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-md);
 }
 
 /* ─── Scrollbar ─── */
@@ -238,6 +248,14 @@ h2 {
   color: var(--accent) !important;
 }
 
+.text-orange {
+  color: var(--orange) !important;
+}
+
+.text-cyan {
+  color: var(--cyan) !important;
+}
+
 .text-dim {
   color: var(--text-2) !important;
 }
@@ -256,6 +274,14 @@ h2 {
 
 .bg-accent-dim {
   background: var(--accent-dim);
+}
+
+.bg-orange-dim {
+  background: var(--orange-dim);
+}
+
+.bg-cyan-dim {
+  background: var(--cyan-dim);
 }
 
 .label {
