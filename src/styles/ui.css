@@ -225,12 +225,12 @@
   font-family: var(--ui);
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--cyan);
+  color: var(--text-h);
   white-space: nowrap;
 }
 .balance-pill:hover {
-  background: rgba(6, 182, 212, 0.06);
-  border-color: var(--cyan-border);
+  background: rgba(255,255,255,0.06);
+  border-color: var(--border-2);
 }
 
 /* ─── Deposit button in nav ─── */
@@ -448,13 +448,13 @@
   gap: 8px;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--cyan);
+  color: #fff;
   text-align: center;
   letter-spacing: -0.2px;
 }
 
 .mode-playing-count .mono {
-  color: var(--cyan);
+  color: #fff;
   font-size: inherit;
   font-weight: inherit;
 }
@@ -496,7 +496,7 @@
   font-family: var(--mono);
   font-size: 1.6rem;
   font-weight: 700;
-  color: var(--cyan);
+  color: var(--text-bright);
   letter-spacing: -0.05em;
   line-height: 1;
   display: flex;
@@ -1034,7 +1034,7 @@
 .leaderboard-total-value {
   font-size: 1.05rem;
   font-weight: 800;
-  color: var(--cyan);
+  color: var(--green);
   letter-spacing: -0.03em;
   line-height: 1;
 }
