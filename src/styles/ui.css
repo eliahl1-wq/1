@@ -31,7 +31,7 @@
 .wallet-adapter-button-trigger:hover {
   filter: brightness(1.08) !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 6px 20px rgba(124, 58, 255, 0.35) !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.18) !important;
 }
 .wallet-adapter-modal-wrapper {
   background: var(--bg-2) !important;
@@ -175,7 +175,7 @@
   height: 9px;
   background: var(--accent);
   border-radius: 50%;
-  box-shadow: 0 0 10px var(--accent);
+  box-shadow: 0 0 6px var(--accent);
 }
 
 /* ─── User pill in topbar ─── */
@@ -189,10 +189,10 @@
 }
 .user-pill:hover .avatar {
   transform: scale(1.05);
-  box-shadow: 0 0 12px rgba(124, 58, 255, 0.4);
+  box-shadow: 0 0 8px rgba(124, 58, 255, 0.2);
 }
 .user-pill.active .avatar {
-  box-shadow: 0 0 12px rgba(124, 58, 255, 0.6);
+  box-shadow: 0 0 8px rgba(124, 58, 255, 0.3);
 }
 
 .avatar {
@@ -255,7 +255,7 @@
 }
 .nav-deposit-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(124, 58, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.18);
   filter: brightness(1.06);
 }
 .nav-deposit-btn:active { transform: scale(0.97); }
@@ -392,7 +392,7 @@
 }
 .mode-card-action:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(124, 58, 255, 0.22);
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.12);
 }
 
 .entry-tier-row {
@@ -766,7 +766,7 @@
 }
 .play-btn-ready:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(20, 241, 149, 0.3);
+  box-shadow: 0 4px 14px rgba(20, 241, 149, 0.15);
   filter: brightness(1.04);
 }
 
@@ -777,7 +777,7 @@
 }
 .play-btn-login:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(124, 58, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.18);
 }
 
 .play-btn-rejoin {
@@ -787,7 +787,7 @@
 }
 .play-btn-rejoin:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(124, 58, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.18);
   filter: brightness(1.04);
 }
 
@@ -796,7 +796,7 @@
   height: 7px;
   border-radius: 50%;
   background: #14F195;
-  box-shadow: 0 0 8px rgba(20, 241, 149, 0.6);
+  box-shadow: 0 0 5px rgba(20, 241, 149, 0.3);
   animation: livePulse 2s ease-in-out infinite;
 }
 
@@ -1569,7 +1569,7 @@
 .gm-discovery-tile:hover {
   border-color: var(--accent-border);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(124, 58, 255, 0.15);
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.1);
 }
 
 .gm-discovery-preview {
@@ -2299,7 +2299,7 @@
 
 .gm-card--active:hover {
   border-color: rgba(124, 58, 255, 0.45);
-  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(124, 58, 255, 0.1);
+  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(124, 58, 255, 0.06);
 }
 
 .gm-card--disabled {
@@ -2358,7 +2358,7 @@
 
 .gm-play-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(124, 58, 255, 0.35);
+  box-shadow: 0 4px 16px rgba(124, 58, 255, 0.18);
   filter: brightness(1.06);
 }
 

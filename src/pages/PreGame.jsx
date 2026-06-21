@@ -305,7 +305,7 @@ export default function PreGame() {
     }, [isWithdrawExpanded]);
 
     useEffect(() => {
-        if (qrRef.current && depositAddress && depositMethod === 'manual') {
+        if (qrRef.current && depositAddress && depositMethod === 'manual' && isWalletExpanded) {
             qrRef.current.innerHTML = '';
             try {
                 const qr = createQR(
@@ -315,7 +315,7 @@ export default function PreGame() {
                 qr.append(qrRef.current);
             } catch (e) { }
         }
-    }, [depositAddress, depositMethod]);
+    }, [depositAddress, depositMethod, isWalletExpanded]);
 
     useEffect(() => {
         if ((depositMethod !== 'manual' || !isWalletExpanded) && qrRef.current) {

@@ -206,7 +206,7 @@ h2 {
   }
 
   50% {
-    box-shadow: 0 0 12px 2px rgba(153, 69, 255, 0.15);
+    box-shadow: 0 0 8px 1px rgba(153, 69, 255, 0.08);
   }
 }
 
@@ -370,7 +370,7 @@ input[type=number] {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(124, 58, 255, 0.4);
+  box-shadow: 0 4px 14px rgba(124, 58, 255, 0.2);
   filter: brightness(1.05);
 }
 
@@ -383,7 +383,7 @@ input[type=number] {
 
 .btn-green:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(20, 241, 149, 0.3);
+  box-shadow: 0 4px 14px rgba(20, 241, 149, 0.15);
   filter: brightness(1.05);
 }
 
