@@ -18,6 +18,7 @@ import MobileGameSession from '../../components/MobileGameSession';
 import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
+import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
@@ -325,7 +326,7 @@ export default function Game() {
         };
 
         const socket = io(apiUrl, {
-            auth: { token },
+            auth: { token, presenceId: getOrCreatePresenceId() },
             transports: ['polling', 'websocket'],
             upgrade: true,
             rememberUpgrade: true,

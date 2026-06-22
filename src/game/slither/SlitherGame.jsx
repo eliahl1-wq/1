@@ -21,6 +21,7 @@ import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
+import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
 import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
 
@@ -443,7 +444,7 @@ export default function SlitherGame() {
         if (isBR) setIsBattleRoyale(true);
 
         const socket = io(API_URL, {
-            auth: { token: authToken },
+            auth: { token: authToken, presenceId: getOrCreatePresenceId() },
             // Polling first — more reliable on Railway; upgrades to websocket when ready
             transports: ['polling', 'websocket'],
             upgrade: true,
