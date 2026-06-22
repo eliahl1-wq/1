@@ -8,7 +8,7 @@ import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
-import { canvasRGBA as stackBlurCanvas } from 'stackblur-canvas';
+// stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
 
 /** Slither.io base body radius factor (protocol sc × base). */
@@ -694,7 +694,7 @@ export class SlitherRenderer {
     }
 
     /** Get (or build once) a cached sprite canvas. LRU eviction avoids full-cache clear stutters. */
-    _getSprite(key, size, painter, blurRadius = 0) {
+    _getSprite(key, size, painter) {
         let s = this._sprites.get(key);
         if (s) {
             s._lastUsed = this._frame;
@@ -715,9 +715,6 @@ export class SlitherRenderer {
         cv.width = sz;
         cv.height = sz;
         painter(cv.getContext('2d'), sz);
-        if (blurRadius > 0) {
-            stackBlurCanvas(cv, 0, 0, sz, sz, blurRadius);
-        }
         cv._lastUsed = this._frame;
         this._sprites.set(key, cv);
         return cv;
@@ -1246,22 +1243,23 @@ export class SlitherRenderer {
         g.fill();
     }
 
-    /** Pre-blurred circular flank blob — stamped along the spine (not baked into segments). */
+    /** Soft circular flank blob — stamped along the spine. */
     _getBodySideShadowDot(radius) {
         const dotR = Math.max(4, Math.ceil(radius * 0.52));
-        const key = `side_sh_v2|${dotR}`;
+        const key = `side_sh_v3|${dotR}`;
         return this._getSprite(key, dotR * 2 + 20, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, dotR);
-            grad.addColorStop(0, 'rgba(0,0,0,0.42)');
-            grad.addColorStop(0.38, 'rgba(0,0,0,0.20)');
-            grad.addColorStop(0.72, 'rgba(0,0,0,0.05)');
+            grad.addColorStop(0, 'rgba(0,0,0,0.28)');
+            grad.addColorStop(0.20, 'rgba(0,0,0,0.18)');
+            grad.addColorStop(0.45, 'rgba(0,0,0,0.08)');
+            grad.addColorStop(0.70, 'rgba(0,0,0,0.02)');
             grad.addColorStop(1, 'rgba(0,0,0,0)');
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, dotR, 0, Math.PI * 2);
             g.fill();
-        }, Math.max(2, Math.round(dotR * 0.48)));
+        });
     }
 
     /** Blurred flank shadow along the body — offset from spine, not on segments. */
@@ -1295,24 +1293,25 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Cached pre-blurred spine highlight dot — stamped along spine (no per-frame blur). */
+    /** Soft spine highlight dot — stamped along spine. */
     _getSpineHighlightDot(radius, cs) {
         const dotR = Math.max(3, Math.ceil(radius * 0.38));
-        const key = `hl_dot_v3|${cs}|${dotR}`;
+        const key = `hl_dot_v4|${cs}|${dotR}`;
         return this._getSprite(key, dotR * 2 + 6, (g, sz) => {
             const c = sz / 2;
             const col = parseColor(cs);
             const hi = shadeColor(col, 62);
             const grad = g.createRadialGradient(c, c, 0, c, c, dotR);
-            grad.addColorStop(0, rgb(hi, 0.22));
-            grad.addColorStop(0.35, rgb(hi, 0.10));
-            grad.addColorStop(0.7, rgb(hi, 0.03));
+            grad.addColorStop(0, rgb(hi, 0.18));
+            grad.addColorStop(0.22, rgb(hi, 0.10));
+            grad.addColorStop(0.50, rgb(hi, 0.04));
+            grad.addColorStop(0.78, rgb(hi, 0.01));
             grad.addColorStop(1, 'rgba(255,255,255,0)');
             g.fillStyle = grad;
             g.beginPath();
             g.arc(c, c, dotR, 0, Math.PI * 2);
             g.fill();
-        }, Math.max(1, Math.round(dotR * 0.4)));
+        });
     }
 
     /** Stamp pre-blurred highlight dots along the spine — cheap, no per-frame blur. */
@@ -1468,7 +1467,142 @@ export class SlitherRenderer {
         return this._getSnakePrImgs(cs, rPx, needs);
     }
 
+    /**
+     * Fast-path renderer for remote (non-player) snakes.
+     * Uses a single thick stroked path instead of stamping individual sprites.
+     * This reduces ~24 drawImage calls per snake to 2 stroke() calls.
+     */
+    _drawSnakeFast(snake, zoom) {
+        const segs = snake.segments || [];
+        if (segs.length === 0) return;
+
+        const ctx = this.ctx;
+        const cx = this.camera.x;
+        const cy = this.camera.y;
+        const W = this.W;
+        const H = this.H;
+
+        // On-screen cull
+        const viewR = Math.hypot(W, H) / (2 * zoom) + 160;
+        const viewR2 = viewR * viewR;
+        let onScreen = false;
+        const checkStride = Math.max(1, Math.floor(segs.length / 8));
+        for (let i = 0; i < segs.length; i += checkStride) {
+            const dx = segs[i].x - cx;
+            const dy = segs[i].y - cy;
+            if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
+        }
+        if (!onScreen) return;
+
+        const thick = this.snakeThickness ?? 1;
+        const bodyRadius = (snake.radius || 6) * zoom * thick;
+        const angle = snake.angle || 0;
+
+        // Cache color
+        let cs = snake._csCache;
+        if (cs === undefined || snake._csColor !== snake.color) {
+            cs = bucketSnakeColor(snake.color);
+            snake._csCache = cs;
+            snake._csColor = snake.color;
+        }
+
+        ctx.save();
+
+        // Draw body as a single thick stroked path — massively cheaper than stamping sprites
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = bodyRadius * 2;
+        ctx.strokeStyle = cs;
+        ctx.beginPath();
+
+        let hx = 0, hy = 0;
+        for (let i = 0; i < segs.length; i++) {
+            const sx = (segs[i].x - cx) * zoom + W / 2;
+            const sy = (segs[i].y - cy) * zoom + H / 2;
+            if (i === 0) {
+                ctx.moveTo(sx, sy);
+                hx = sx;
+                hy = sy;
+            } else {
+                ctx.lineTo(sx, sy);
+            }
+        }
+        ctx.stroke();
+
+        // Subtle 3D tube highlight — one extra stroke, reuses path
+        const col = parseColor(cs);
+        const hlCol = shadeColor(col, 30);
+        ctx.lineWidth = bodyRadius * 0.55;
+        ctx.strokeStyle = rgb(hlCol, 0.13);
+        ctx.stroke();
+
+        // Eyes
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+
+        const fwdX = Math.cos(angle);
+        const fwdY = Math.sin(angle);
+        const perpX = Math.sin(angle);
+        const perpY = -Math.cos(angle);
+        const headEyeRadius = bodyRadius;
+
+        if (this._quality >= 0.68) {
+            const eyeSide = headEyeRadius * 0.39;
+            const eyeFwd = headEyeRadius * 0.31;
+            const eyeR = Math.max(3, headEyeRadius * 0.43);
+            const pupilR = eyeR * 0.48;
+
+            for (const side of [-1, 1]) {
+                const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
+                const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
+
+                ctx.beginPath();
+                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                const px = ex + fwdX * eyeR * 0.4;
+                const py = ey + fwdY * eyeR * 0.4;
+                ctx.beginPath();
+                ctx.arc(px, py, pupilR, 0, Math.PI * 2);
+                ctx.fillStyle = '#000000';
+                ctx.fill();
+            }
+        }
+
+        // Name + Balance overlays
+        if (!this.hideOverlays) {
+            if (snake.name) {
+                ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                const fontSize = Math.max(12, headEyeRadius * 0.85);
+                ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+                ctx.lineWidth = 3;
+                const nameY = hy - headEyeRadius - 12;
+                ctx.strokeText(snake.name, hx, nameY);
+                ctx.fillText(snake.name, hx, nameY);
+            }
+
+            if (!this.isBattleRoyale) {
+                const pillY = hy + bodyRadius + 14;
+                const displayBalance = snake.dollarBalance ?? snake.balance;
+                drawBalanceBadge(ctx, hx, pillY, displayBalance, false);
+            }
+        }
+
+        ctx.restore();
+    }
+
     _drawSnake(snake, toScreen, zoom) {
+        const isYou = !!snake.isYou;
+
+        // Fast path for remote snakes: stroke-based, not sprite-stamped
+        if (!isYou) {
+            this._drawSnakeFast(snake, zoom);
+            return;
+        }
+
         const ctx = this.ctx;
         ctx.save();
         ctx.globalAlpha = 1;
@@ -1493,7 +1627,6 @@ export class SlitherRenderer {
             snake._csColor = snake.color;
         }
         const boosting = !!snake.boost;
-        const isYou = !!snake.isYou;
         const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.16);
 
         // Cheap on-screen cull straight from the world-space spine before any resampling.
@@ -1521,9 +1654,9 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * (isYou ? 0.35 : 0.55));
+        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
-        const holdActive = isYou && this._holdActive;
+        const holdActive = this._holdActive;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
         let arcLen = 0;
         for (let i = 1; i < segs.length; i++) {
@@ -1533,9 +1666,7 @@ export class SlitherRenderer {
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const stampCap = Math.round((
-            isYou
-                ? (boosting ? (this.isMobile ? 150 : 118) : (this.isMobile ? 130 : 105))
-                : (boosting ? (this.isMobile ? 36 : 30) : (this.isMobile ? 28 : 24))
+            boosting ? (this.isMobile ? 110 : 90) : (this.isMobile ? 95 : 80)
         ) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1558,9 +1689,9 @@ export class SlitherRenderer {
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
-            glow: isYou && !holdActive && q >= 0.65,
-            boostOverlay: isYou && boosting && q >= 0.7,
-            trailGlow: isYou && boosting,
+            glow: !holdActive && q >= 0.75,
+            boostOverlay: boosting && q >= 0.8,
+            trailGlow: boosting,
         };
         const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
         const stampScale = bodySS * (cacheR / bodyRadius);
@@ -1575,14 +1706,14 @@ export class SlitherRenderer {
             trail = [];
             this._boostTrailPool.set(snake.id, trail);
         }
-        if (isYou && boosting) {
+        if (boosting) {
             trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
             if (trail.length > 6) trail.length = 6;
         } else if (trail.length > 0) {
             trail.length = 0;
         }
 
-        if (isYou && boosting && trailGlow && trail.length > 1) {
+        if (boosting && trailGlow && trail.length > 1) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             for (let t = 1; t < trail.length; t++) {
@@ -1593,29 +1724,24 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        const stampRadius = bodyRadius;
-
-        const hlOpts = { isYou, quality: this._quality };
-
+        // Body stamps — player only
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const sprite = (boosting && i === 0) ? boostBody : normal;
-            const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
+            const tangent = this._bumpTangent(bumps, i);
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
         }
 
-        if (isYou) {
-            this._blitBodySideShadow(ctx, bumps, bumpCount, stampRadius, hlOpts);
-            this._blitSpineHighlight(ctx, bumps, bumpCount, stampRadius, cs, boosting ? 1.08 : 1, hlOpts);
-        }
+        // Spine highlight only (side shadow removed for performance)
+        this._blitSpineHighlight(ctx, bumps, bumpCount, bodyRadius, cs, boosting ? 1.08 : 1, { isYou: true, quality: q });
 
-        if (isYou && prNeeds.glow && glow) {
+        if (prNeeds.glow && glow) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
-            const glowStride = boosting ? 3 : 4;
+            const glowStride = boosting ? 4 : 5;
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -1624,10 +1750,10 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        if (isYou && boosting && prNeeds.boostOverlay && boostOverlay) {
+        if (boosting && prNeeds.boostOverlay && boostOverlay) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            for (let i = bumpCount - 1; i >= 0; i -= 3) {
+            for (let i = bumpCount - 1; i >= 0; i -= 4) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
@@ -1667,23 +1793,21 @@ export class SlitherRenderer {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
-        if (isYou || this._quality >= 0.68) {
-            for (const side of [-1, 1]) {
-                const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
-                const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
+        for (const side of [-1, 1]) {
+            const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
+            const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
 
-                ctx.beginPath();
-                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
 
-                const px = ex + fwdX * eyeR * 0.4;
-                const py = ey + fwdY * eyeR * 0.4;
-                ctx.beginPath();
-                ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-                ctx.fillStyle = '#000000';
-                ctx.fill();
-            }
+            const px = ex + fwdX * eyeR * 0.4;
+            const py = ey + fwdY * eyeR * 0.4;
+            ctx.beginPath();
+            ctx.arc(px, py, pupilR, 0, Math.PI * 2);
+            ctx.fillStyle = '#000000';
+            ctx.fill();
         }
 
         if (!this.hideOverlays) {
@@ -1701,13 +1825,13 @@ export class SlitherRenderer {
 
             if (!this.isBattleRoyale) {
                 const pillY = hy + headRadius + 14;
-                const displayBalance = isYou ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance) : (snake.dollarBalance ?? snake.balance);
-                drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
+                const displayBalance = this.hud.balance ?? snake.dollarBalance ?? snake.balance;
+                drawBalanceBadge(ctx, hx, pillY, displayBalance, true);
             }
         }
 
         // Mobile steering arrow — only while finger is on screen, further ahead of the head.
-        if (isYou && this.isMobile && this._touchSteering) {
+        if (this.isMobile && this._touchSteering) {
             const am = Math.hypot(this.inputDx, this.inputDy);
             if (am > 0.001) {
                 const aang = Math.atan2(this.inputDy, this.inputDx);
