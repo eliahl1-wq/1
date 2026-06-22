@@ -1204,45 +1204,33 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        // 1. Base Radial Gradient for the 3D spherical feel and subtle ribbing
-        const baseGrad = g.createRadialGradient(c, c, 0, c, c, rPx);
-        const core = shadeColor(col, Math.round(20 * k));
-        const edge = shadeColor(col, Math.round(-15 * k));
-        baseGrad.addColorStop(0, rgb(core, 1));
-        baseGrad.addColorStop(0.7, rgb(col, 1));
-        baseGrad.addColorStop(1, rgb(edge, 1));
+        // Radial gradient with a slight offset highlight (towards top-left relative to local tangent)
+        // to create a gorgeous 3D glossy sphere.
+        const hOffset = rPx * 0.14;
+        const baseGrad = g.createRadialGradient(c - hOffset, c - hOffset, 0, c, c, rPx);
+        
+        // Color stops for a highly polished 3D look:
+        // 0: A vibrant white gloss highlight
+        // 0.08: Bright base color highlight
+        // 0.24: Transitioning midtone
+        // 0.68: Rich main body color
+        // 0.90: Deep shadow
+        // 1.0: Very dark rim shadow for clean overlapping ribbed borders
+        const hl = shadeColor(col, Math.round(75 * k));
+        const midBright = shadeColor(col, Math.round(30 * k));
+        const shadow = shadeColor(col, Math.round(-38 * k));
+        const rim = shadeColor(col, Math.round(-65 * k));
+
+        baseGrad.addColorStop(0, '#ffffff');
+        baseGrad.addColorStop(0.08, rgb(hl, 1));
+        baseGrad.addColorStop(0.24, rgb(midBright, 1));
+        baseGrad.addColorStop(0.68, rgb(col, 1));
+        baseGrad.addColorStop(0.90, rgb(shadow, 1));
+        baseGrad.addColorStop(1.0, rgb(rim, 1));
 
         g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-
-        // 2. Linear Gradient Overlay for the continuous light streak and side shadows
-        // This gradient goes from top (c - rPx) to bottom (c + rPx) across the segment.
-        // Because the sprite is rotated by the snake's tangent, this highlight always
-        // curves perfectly along the spine, creating a dynamic light effect!
-        const overlayGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        
-        // Deep shadow on the left side
-        overlayGrad.addColorStop(0, 'rgba(0,0,0,0.30)');
-        overlayGrad.addColorStop(0.15, 'rgba(0,0,0,0.05)');
-        
-        // Transparent body gap
-        overlayGrad.addColorStop(0.3, 'rgba(255,255,255,0)');
-        
-        // The bright continuous light streak
-        overlayGrad.addColorStop(0.45, 'rgba(255,255,255,0.4)');
-        overlayGrad.addColorStop(0.5, 'rgba(255,255,255,0.8)'); // Peak highlight
-        overlayGrad.addColorStop(0.55, 'rgba(255,255,255,0.2)');
-        
-        // Transparent body gap
-        overlayGrad.addColorStop(0.7, 'rgba(255,255,255,0)');
-        
-        // Deep shadow on the right side
-        overlayGrad.addColorStop(0.85, 'rgba(0,0,0,0.05)');
-        overlayGrad.addColorStop(1, 'rgba(0,0,0,0.30)');
-
-        g.fillStyle = overlayGrad;
         g.fill();
     }
 
