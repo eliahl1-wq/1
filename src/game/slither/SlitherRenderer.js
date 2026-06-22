@@ -66,8 +66,8 @@ function normalizeSnakeColor(color) {
         if (h < 0) h += 360;
     }
 
-    // HSL(h, 48%, 51%) — softer, less vivid slither pastels
-    const s = 0.48, l = 0.51;
+    // HSL(h, 60%, 58%) — brighter, more vivid slither pastels
+    const s = 0.60, l = 0.58;
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
     const m = l - c / 2;
@@ -756,7 +756,7 @@ export class SlitherRenderer {
     }
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, zoom) {
-        ctx.fillStyle = '#1f1f25';
+        ctx.fillStyle = '#2c2c36';
         ctx.fillRect(0, 0, W, H);
 
         const pattern = this._getBgPattern(ctx);
@@ -797,7 +797,7 @@ export class SlitherRenderer {
     }
 
     _drawCircularBackground(ctx, W, H, cx, cy, worldHalf, zoom, zone) {
-        ctx.fillStyle = '#1f1f25';
+        ctx.fillStyle = '#2c2c36';
         ctx.fillRect(0, 0, W, H);
 
         const radius = zone?.radius ?? worldHalf;
@@ -1204,23 +1204,45 @@ export class SlitherRenderer {
         const col = parseColor(cs);
         const k = contrast;
 
-        // A single, powerful off-center radial gradient that bakes a spine highlight
-        // and dark side edges. When stamped closely, overlapping spheres form a perfect 3D tube!
-        const grad = g.createRadialGradient(c, c, 0, c, c, rPx);
-        const core = shadeColor(col, Math.round(55 * k));
-        const inner = shadeColor(col, Math.round(15 * k));
-        const edge = shadeColor(col, Math.round(-35 * k));
-        const rim = shadeColor(col, Math.round(-65 * k));
+        // 1. Base Radial Gradient for the 3D spherical feel and subtle ribbing
+        const baseGrad = g.createRadialGradient(c, c, 0, c, c, rPx);
+        const core = shadeColor(col, Math.round(20 * k));
+        const edge = shadeColor(col, Math.round(-15 * k));
+        baseGrad.addColorStop(0, rgb(core, 1));
+        baseGrad.addColorStop(0.7, rgb(col, 1));
+        baseGrad.addColorStop(1, rgb(edge, 1));
 
-        grad.addColorStop(0, rgb(core, 1));
-        grad.addColorStop(0.25, rgb(inner, 1));
-        grad.addColorStop(0.65, rgb(col, 1));
-        grad.addColorStop(0.88, rgb(edge, 1));
-        grad.addColorStop(1, rgb(rim, 0)); // Soft edge to antialias
-
-        g.fillStyle = grad;
+        g.fillStyle = baseGrad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
+        g.fill();
+
+        // 2. Linear Gradient Overlay for the continuous light streak and side shadows
+        // This gradient goes from top (c - rPx) to bottom (c + rPx) across the segment.
+        // Because the sprite is rotated by the snake's tangent, this highlight always
+        // curves perfectly along the spine, creating a dynamic light effect!
+        const overlayGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
+        
+        // Deep shadow on the left side
+        overlayGrad.addColorStop(0, 'rgba(0,0,0,0.30)');
+        overlayGrad.addColorStop(0.15, 'rgba(0,0,0,0.05)');
+        
+        // Transparent body gap
+        overlayGrad.addColorStop(0.3, 'rgba(255,255,255,0)');
+        
+        // The bright continuous light streak
+        overlayGrad.addColorStop(0.45, 'rgba(255,255,255,0.4)');
+        overlayGrad.addColorStop(0.5, 'rgba(255,255,255,0.8)'); // Peak highlight
+        overlayGrad.addColorStop(0.55, 'rgba(255,255,255,0.2)');
+        
+        // Transparent body gap
+        overlayGrad.addColorStop(0.7, 'rgba(255,255,255,0)');
+        
+        // Deep shadow on the right side
+        overlayGrad.addColorStop(0.85, 'rgba(0,0,0,0.05)');
+        overlayGrad.addColorStop(1, 'rgba(0,0,0,0.30)');
+
+        g.fillStyle = overlayGrad;
         g.fill();
     }
 
@@ -1578,8 +1600,9 @@ export class SlitherRenderer {
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const sprite = (boosting && i === 0) ? boostBody : normal;
-            // Removed rotation for perfectly uniform spherical lighting
-            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, 0);
+            // Restore rotation so the linear light streak dynamically follows the snake's curves!
+            const tangent = this._bumpTangent(bumps, i);
+            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
         }
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
