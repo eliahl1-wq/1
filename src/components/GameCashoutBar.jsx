@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { isTouchDevice } from '../utils/mobile';
 import { CASHOUT_HOLD_MS } from '../hooks/useHoldKeyCashout';
 
