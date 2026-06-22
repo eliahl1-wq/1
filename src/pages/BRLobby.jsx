@@ -59,7 +59,14 @@ export default function BRLobby() {
             if (joinedRef.current) return;
             joinedRef.current = true;
             setJoining(true);
-            socket.emit('brJoinQueue', { variant, token, username: matchNickname, entryFeeUsd });
+            const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+            socket.emit('brJoinQueue', {
+                variant,
+                token,
+                username: matchNickname,
+                entryFeeUsd,
+                skinColor: preferredSkin !== 'random' ? preferredSkin : null
+            });
         });
 
         socket.on('brQueueStatus', (status) => {

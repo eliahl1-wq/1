@@ -228,11 +228,13 @@ export default function SlitherGame() {
         rendererRef.current?.start();
 
         if (socketRef.current?.connected) {
+            const preferredSkin = localStorage.getItem('selected_skin') || 'random';
             socketRef.current.emit('joinGame', {
                 username: nickname,
                 token: authToken,
                 mode: joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither',
                 entryFeeUsd: fee,
+                skinColor: preferredSkin !== 'random' ? preferredSkin : null,
             });
         }
     }, [authToken, liveSession]);
@@ -466,7 +468,14 @@ export default function SlitherGame() {
                     socket.emit('brRejoinMatch', { token: authToken });
                 } else {
                     const joinMode = joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither';
-                    socket.emit('joinGame', { username: nickname, token: authToken, mode: joinMode, entryFeeUsd: fee });
+                    const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+                    socket.emit('joinGame', {
+                        username: nickname,
+                        token: authToken,
+                        mode: joinMode,
+                        entryFeeUsd: fee,
+                        skinColor: preferredSkin !== 'random' ? preferredSkin : null,
+                    });
                 }
                 hasJoinedRef.current = true;
             }

@@ -136,6 +136,33 @@ export default function PreGame() {
         () => localStorage.getItem('match_nickname') || user?.username || ''
     );
 
+    const SKIN_COLORS = [
+        'random',
+        '#c080ff', // lavender-purple
+        '#9099ff', // indigo-blue
+        '#80d0d0', // turquoise-cyan
+        '#80ff80', // lime-green
+        '#eeee70', // tinted-yellow
+        '#ffa060', // orange
+        '#ff9050', // pink-red
+        '#ff4040', // dark-red
+        '#e030e0', // magenta
+    ];
+
+    const [selectedSkin, setSelectedSkin] = useState(
+        () => localStorage.getItem('selected_skin') || 'random'
+    );
+
+    useEffect(() => {
+        localStorage.setItem('selected_skin', selectedSkin);
+    }, [selectedSkin]);
+
+    const handleNextSkin = () => {
+        const idx = SKIN_COLORS.indexOf(selectedSkin);
+        const nextIdx = (idx + 1) % SKIN_COLORS.length;
+        setSelectedSkin(SKIN_COLORS[nextIdx]);
+    };
+
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
         () => resolvePreGameMode(location.pathname, location.state?.selectedMode)
@@ -1269,6 +1296,138 @@ export default function PreGame() {
                 </div>
 
                 <div className="right-panel-stack">
+                    {/* Wallet Inline Card */}
+                    {isAuthenticated && (
+                        <div className="leaderboard-card wallet-inline-card" style={{ padding: '16px', boxSizing: 'border-box' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+                                        <path d="M3 10h18"/>
+                                    </svg>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-h)' }}>Wallet</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (depositAddress) {
+                                                navigator.clipboard.writeText(depositAddress);
+                                                setStatusMsg('✅ Address copied!');
+                                            }
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                    >
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                        </svg>
+                                        Copy
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            setStatusMsg('Refreshing...');
+                                            await refreshUser();
+                                            setStatusMsg('✅ Balance updated');
+                                            setTimeout(() => setStatusMsg(''), 1500);
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                                    >
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                        </svg>
+                                        Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ textAlign: 'center', margin: '14px 0' }}>
+                                <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#FBBF24', fontFamily: 'var(--mono)', letterSpacing: '-1px', lineHeight: 1.1 }}>
+                                    ${fmt(balanceUsd)}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-2)', marginTop: '4px', fontFamily: 'var(--mono)' }}>
+                                    {fmt(balanceSol)} SOL
+                                </div>
+                            </div>
+
+                            <div className="wallet-card-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                                <button
+                                    type="button"
+                                    className="btn"
+                                    onClick={() => {
+                                        setIsWalletOpen(false);
+                                        setIsWithdrawExpanded(false);
+                                        setIsWalletExpanded(true);
+                                        setDepositMethod('manual');
+                                        setStatusMsg('');
+                                    }}
+                                    style={{ flex: 1, border: '1px solid #10B981', background: 'transparent', color: '#10B981', padding: '9px 0', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                                >
+                                    Add Funds
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn"
+                                    onClick={() => {
+                                        setIsWalletOpen(false);
+                                        setIsWalletExpanded(false);
+                                        setIsWithdrawExpanded(true);
+                                        setStatusMsg('');
+                                    }}
+                                    style={{ flex: 1, border: '1px solid #6366F1', background: 'transparent', color: '#6366F1', padding: '9px 0', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                                >
+                                    Cash Out
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Customize Card */}
+                    {isAuthenticated && isSlitherFamily && (
+                        <div className="leaderboard-card customize-card" style={{ padding: '16px', boxSizing: 'border-box' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M20.38 3.46L16 2.18c-.89-.26-1.84.14-2.29.96L12 6.5 10.29 3.14c-.45-.82-1.4-1.22-2.29-.96L3.62 3.46c-.95.28-1.56 1.25-1.37 2.22l1.5 7.5c.17.84.9 1.45 1.76 1.45H7v5.5c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-5.5h1.5c.86 0 1.59-.61 1.76-1.45l1.5-7.5c.19-.97-.42-1.94-1.38-2.22z"/>
+                                        <path d="M12 6.5a2.5 2.5 0 0 1 0-5"/>
+                                    </svg>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-h)' }}>Customize</span>
+                                </div>
+                                {selectedSkin !== 'random' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedSkin('random')}
+                                        style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', padding: '2px 0', letterSpacing: '0.04em', textTransform: 'uppercase' }}
+                                    >
+                                        No Skin
+                                    </button>
+                                )}
+                            </div>
+
+                            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid var(--border)', padding: '10px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px', position: 'relative' }}>
+                                <SnakeSkinPreview color={selectedSkin} />
+                                {selectedSkin === 'random' && (
+                                    <span style={{ position: 'absolute', bottom: '6px', fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Random Skin
+                                    </span>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={handleNextSkin}
+                                style={{ width: '100%', marginTop: '12px', padding: '9px 0', fontSize: '0.75rem', fontWeight: 700, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text-h)', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                                onMouseEnter={e => { e.target.style.background = 'rgba(255,255,255,0.05)'; }}
+                                onMouseLeave={e => { e.target.style.background = 'transparent'; }}
+                            >
+                                {selectedSkin === 'random' ? 'Choose Skin' : 'Change Appearance'}
+                            </button>
+                        </div>
+                    )}
+
                     <div className="leaderboard-card">
                         <div className="tab-bar leaderboard-tab-bar">
                             {[{ id: 'alltime', label: 'Leaderboard' }, { id: 'live', label: 'LIVE', dot: true }].map(tab => (
@@ -1367,4 +1526,190 @@ export default function PreGame() {
             </div>
         </div>
     );
+}
+
+function SnakeSkinPreview({ color }) {
+    const canvasRef = useRef(null);
+    const frameRef = useRef(0);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        let animationFrameId;
+        const segmentsCount = 18;
+        const spacing = 8;
+        const radius = 9;
+
+        const parseColorHex = (hex) => {
+            if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
+            const h = hex.replace('#', '');
+            if (h.length === 3) {
+                return {
+                    r: parseInt(h[0] + h[0], 16),
+                    g: parseInt(h[1] + h[1], 16),
+                    b: parseInt(h[2] + h[2], 16),
+                };
+            }
+            if (h.length >= 6) {
+                return {
+                    r: parseInt(h.slice(0, 2), 16),
+                    g: parseInt(h.slice(2, 4), 16),
+                    b: parseInt(h.slice(4, 6), 16),
+                };
+            }
+            return { r: 120, g: 120, b: 120 };
+        };
+
+        const shadeColorRGB = ({ r, g, b }, amount) => ({
+            r: Math.max(0, Math.min(255, r + amount)),
+            g: Math.max(0, Math.min(255, g + amount)),
+            b: Math.max(0, Math.min(255, b + amount)),
+        });
+
+        const rgbStr = ({ r, g, b }, a = 1) => `rgba(${r},${g},${b},${a})`;
+
+        const normalizeColor = (hex) => {
+            const { r, g, b } = parseColorHex(hex);
+            const rn = r / 255, gn = g / 255, bn = b / 255;
+            const max = Math.max(rn, gn, bn);
+            const min = Math.min(rn, gn, bn);
+            const d = max - min;
+            let h = 0;
+            if (d > 0.0001) {
+                if (max === rn) h = ((gn - bn) / d) % 6;
+                else if (max === gn) h = (bn - rn) / d + 2;
+                else h = (rn - gn) / d + 4;
+                h *= 60;
+                if (h < 0) h += 360;
+            }
+            const s = 0.60, l = 0.58;
+            const c = (1 - Math.abs(2 * l - 1)) * s;
+            const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+            const m = l - c / 2;
+            let rr = 0, gg = 0, bb = 0;
+            if (h < 60) [rr, gg, bb] = [c, x, 0];
+            else if (h < 120) [rr, gg, bb] = [x, c, 0];
+            else if (h < 180) [rr, gg, bb] = [0, c, x];
+            else if (h < 240) [rr, gg, bb] = [0, x, c];
+            else if (h < 300) [rr, gg, bb] = [x, 0, c];
+            else [rr, gg, bb] = [c, 0, x];
+            
+            return {
+                r: Math.round((rr + m) * 255),
+                g: Math.round((gg + m) * 255),
+                b: Math.round((bb + m) * 255),
+            };
+        };
+
+        const render = () => {
+            frameRef.current++;
+            const t = frameRef.current;
+            const W = canvas.width;
+            const H = canvas.height;
+
+            ctx.clearRect(0, 0, W, H);
+
+            const points = [];
+            const centerX = W / 2;
+            const centerY = H / 2 + 5;
+
+            for (let i = 0; i < segmentsCount; i++) {
+                const phase = t * 0.075 - i * 0.38;
+                const offsetFromCenter = (i - segmentsCount / 2) * spacing;
+                const px = centerX - offsetFromCenter;
+                const py = centerY + Math.sin(phase) * 12;
+                points.push({ x: px, y: py });
+            }
+
+            for (let i = segmentsCount - 1; i >= 0; i--) {
+                const pt = points[i];
+                let segColorHex = color;
+                if (color === 'random') {
+                    const colors = [
+                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
+                        '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
+                    ];
+                    const colorIndex = Math.floor((t * 0.01 + i * 0.35) % colors.length);
+                    segColorHex = colors[colorIndex];
+                }
+
+                const col = normalizeColor(segColorHex);
+                const hOffset = radius * 0.14;
+                
+                let angle = 0;
+                if (i > 0) {
+                    angle = Math.atan2(points[i - 1].y - pt.y, points[i - 1].x - pt.x);
+                } else if (points[i + 1]) {
+                    angle = Math.atan2(pt.y - points[i + 1].y, pt.x - points[i + 1].x);
+                }
+
+                ctx.save();
+                ctx.translate(pt.x, pt.y);
+                ctx.rotate(angle);
+
+                const grad = ctx.createRadialGradient(-hOffset, -hOffset, 0, 0, 0, radius);
+                const hl = shadeColorRGB(col, 75);
+                const midBright = shadeColorRGB(col, 30);
+                const shadow = shadeColorRGB(col, -38);
+                const rim = shadeColorRGB(col, -65);
+
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.08, rgbStr(hl, 1));
+                grad.addColorStop(0.24, rgbStr(midBright, 1));
+                grad.addColorStop(0.68, rgbStr(col, 1));
+                grad.addColorStop(0.90, rgbStr(shadow, 1));
+                grad.addColorStop(1.0, rgbStr(rim, 1));
+
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            const head = points[0];
+            const next = points[1];
+            if (head && next) {
+                const angle = Math.atan2(head.y - next.y, head.x - next.x);
+                const perpX = Math.sin(angle);
+                const perpY = -Math.cos(angle);
+                const fwdX = Math.cos(angle);
+                const fwdY = Math.sin(angle);
+
+                const eyeSide = radius * 0.39;
+                const eyeFwd = radius * 0.31;
+                const eyeR = Math.max(2.5, radius * 0.43);
+                const pupilR = eyeR * 0.48;
+
+                for (const side of [-1, 1]) {
+                    const ex = head.x + fwdX * eyeFwd + perpX * eyeSide * side;
+                    const ey = head.y + fwdY * eyeFwd + perpY * eyeSide * side;
+
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+
+                    const px = ex + fwdX * eyeR * 0.4;
+                    const py = ey + fwdY * eyeR * 0.4;
+                    ctx.beginPath();
+                    ctx.arc(px, py, pupilR, 0, Math.PI * 2);
+                    ctx.fillStyle = '#000000';
+                    ctx.fill();
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
+    }, [color]);
+
+    return <canvas ref={canvasRef} width="218" height="110" style={{ display: 'block' }} />;
 }
