@@ -18,6 +18,7 @@ import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
 import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeGamemodeForLobby } from '../constants/features';
 import { buildPresenceHeaders } from '../utils/sitePresence';
+import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -153,15 +154,11 @@ export default function PreGame() {
         () => localStorage.getItem('selected_skin') || 'random'
     );
 
+    const [showCustomizer, setShowCustomizer] = useState(false);
+
     useEffect(() => {
         localStorage.setItem('selected_skin', selectedSkin);
     }, [selectedSkin]);
-
-    const handleNextSkin = () => {
-        const idx = SKIN_COLORS.indexOf(selectedSkin);
-        const nextIdx = (idx + 1) % SKIN_COLORS.length;
-        setSelectedSkin(SKIN_COLORS[nextIdx]);
-    };
 
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
@@ -1190,243 +1187,148 @@ export default function PreGame() {
                     </div>
                 </div>
 
-                <div className="game-card main-card">
-                    {/* Nickname field */}
-                    <div style={{ marginBottom: '18px' }}>
-                        <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
-                            Nickname
-                        </label>
-                        <input
-                            type="text"
-                            value={nickname}
-                            onChange={e => setNickname(e.target.value)}
-                            maxLength={15}
-                            placeholder="Enter name…"
-                            className="nickname-input"
-                        />
-                    </div>
-
-                    <div className="divider" style={{ marginBottom: '14px' }} />
-
-                    <div className="entry-row" style={{ marginBottom: '18px' }}>
-                        <span className="label">Entry Fee</span>
-                        <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                            {freePlay ? 'FREE (Test)' : formatUsd(entryFeeForSession)}
-                        </span>
-                    </div>
-
-                    <button
-                        className={playBtnClass}
-                        onClick={handleStartMatch}
-                        disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode)}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                    >
-                        {playBtnLabel}
-                    </button>
-
-                    {isAlreadyInGame && currentGameMode && (
-                        <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
-                            Active session: {currentGameMode.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}
-                            {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} entry`}
-                            {activeGameBalance != null && !currentGameMode.startsWith('br-') && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
+                <div className="center-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+                    <div className="game-card main-card">
+                        {/* Nickname field */}
+                        <div style={{ marginBottom: '18px' }}>
+                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                                Nickname
+                            </label>
+                            <input
+                                type="text"
+                                value={nickname}
+                                onChange={e => setNickname(e.target.value)}
+                                maxLength={15}
+                                placeholder="Enter name…"
+                                className="nickname-input"
+                            />
                         </div>
-                    )}
 
-                    <div className="hiw-wrap">
-                        <div
-                            className="hiw-toggle"
-                            onClick={() => setShowHowItWorks(v => !v)}
+                        <div className="divider" style={{ marginBottom: '14px' }} />
+
+                        <div className="entry-row" style={{ marginBottom: '18px' }}>
+                            <span className="label">Entry Fee</span>
+                            <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
+                                {freePlay ? 'FREE (Test)' : formatUsd(entryFeeForSession)}
+                            </span>
+                        </div>
+
+                        <button
+                            className={playBtnClass}
+                            onClick={handleStartMatch}
+                            disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                         >
-                            <span>How it works</span>
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-                                style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
-                                <path d="M6 9l6 6 6-6" />
-                            </svg>
-                        </div>
-                        <div className={`hiw-dropdown${showHowItWorks ? ' hiw-dropdown--open' : ''}`}>
-                            <div className="hiw-content">
-                                {isCompetitiveSlitherMode ? (
-                                    <>
-                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                            <span>Entry fee</span>
-                                            <span className="mono">{formatUsd(entryFeeForSession)}</span>
-                                        </div>
-                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                            <span>Starting dollars</span>
-                                            <span className="mono">{formatUsd(economy.dollarStart)}</span>
-                                        </div>
-                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                            <span>Cashout fee</span>
-                                            <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
-                                        </div>
-                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                            <span>You keep on cashout</span>
-                                            <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
-                                        </div>
-                                        <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                            Real players only — ${entryFeeForSession} matches are a separate pool from other stakes.
-                                            Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
-                                            Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
-                                            Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                            <span>Entry fee</span>
-                                            <span className="mono">{formatUsd(entryFeeForSession)}</span>
-                                        </div>
-                                        <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                            <span>Starting balance</span>
-                                            <span className="mono">{formatUsd(economy.startBalance)}</span>
-                                        </div>
-                                        <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
-                                            Eat food & other players. Cash out anytime.
-                                        </div>
-                                        <div className="divider" style={{ margin: '6px 0' }} />
-                                        <div className="stat-row">
-                                            <span>Golden Blob value</span>
-                                            <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
-                                        </div>
-                                    </>
-                                )}
+                            {playBtnLabel}
+                        </button>
+
+                        {isAlreadyInGame && currentGameMode && (
+                            <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
+                                Active session: {currentGameMode.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}
+                                {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} entry`}
+                                {activeGameBalance != null && !currentGameMode.startsWith('br-') && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
+                            </div>
+                        )}
+
+                        <div className="hiw-wrap">
+                            <div
+                                className="hiw-toggle"
+                                onClick={() => setShowHowItWorks(v => !v)}
+                            >
+                                <span>How it works</span>
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                                    style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+                            <div className={`hiw-dropdown${showHowItWorks ? ' hiw-dropdown--open' : ''}`}>
+                                <div className="hiw-content">
+                                    {isCompetitiveSlitherMode ? (
+                                        <>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Entry fee</span>
+                                                <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                            </div>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Starting dollars</span>
+                                                <span className="mono">{formatUsd(economy.dollarStart)}</span>
+                                            </div>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Cashout fee</span>
+                                                <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
+                                            </div>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>You keep on cashout</span>
+                                                <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
+                                            </div>
+                                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
+                                                Real players only — ${entryFeeForSession} matches are a separate pool from other stakes.
+                                                Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
+                                                Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
+                                                Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Entry fee</span>
+                                                <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                            </div>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Starting balance</span>
+                                                <span className="mono">{formatUsd(economy.startBalance)}</span>
+                                            </div>
+                                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
+                                                Eat food & other players. Cash out anytime.
+                                            </div>
+                                            <div className="divider" style={{ margin: '6px 0' }} />
+                                            <div className="stat-row">
+                                                <span>Golden Blob value</span>
+                                                <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* Customize Lobby Card */}
+                    {isAuthenticated && isSlitherFamily && (
+                        <div
+                            className="leaderboard-card customize-lobby-card"
+                            onClick={() => setShowCustomizer(true)}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <div className="customize-lobby-card-header">
+                                <div className="customize-lobby-card-title-group">
+                                    <svg className="customize-lobby-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.94-.92 1.94-2 0-.49-.18-.95-.5-1.3-.32-.34-.5-.81-.5-1.3 0-1.03.87-1.9 1.9-1.9H17c3.31 0 6-2.69 6-6 0-4.97-4.92-9-11-9z"/>
+                                        <circle cx="6.5" cy="11.5" r="1.5" fill="currentColor"/>
+                                        <circle cx="10" cy="7" r="1.5" fill="currentColor"/>
+                                        <circle cx="15" cy="7" r="1.5" fill="currentColor"/>
+                                        <circle cx="18.5" cy="11.5" r="1.5" fill="currentColor"/>
+                                    </svg>
+                                    <span className="customize-lobby-title">Customize Appearance</span>
+                                </div>
+                                <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
+                                    {selectedSkin === 'random' ? 'Rainbow' : 'Active'}
+                                </span>
+                            </div>
+
+                            <div className="customize-lobby-preview-box">
+                                <SnakeSkinPreview color={selectedSkin} />
+                            </div>
+
+                            <div className="customize-lobby-footer">
+                                <span>Click to Customize Skin</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="right-panel-stack">
-                    {/* Wallet Inline Card */}
-                    {isAuthenticated && (
-                        <div className="leaderboard-card wallet-inline-card" style={{ padding: '16px', boxSizing: 'border-box' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
-                                        <path d="M3 10h18"/>
-                                    </svg>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-h)' }}>Wallet</span>
-                                </div>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (depositAddress) {
-                                                navigator.clipboard.writeText(depositAddress);
-                                                setStatusMsg('✅ Address copied!');
-                                            }
-                                        }}
-                                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                                    >
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                        </svg>
-                                        Copy
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={async () => {
-                                            setStatusMsg('Refreshing...');
-                                            await refreshUser();
-                                            setStatusMsg('✅ Balance updated');
-                                            setTimeout(() => setStatusMsg(''), 1500);
-                                        }}
-                                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                                    >
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                            <path d="M23 4v6h-6M1 20v-6h6"/>
-                                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                                        </svg>
-                                        Refresh
-                                    </button>
-                                </div>
-                            </div>
 
-                            <div style={{ textAlign: 'center', margin: '14px 0' }}>
-                                <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#FBBF24', fontFamily: 'var(--mono)', letterSpacing: '-1px', lineHeight: 1.1 }}>
-                                    ${fmt(balanceUsd)}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-2)', marginTop: '4px', fontFamily: 'var(--mono)' }}>
-                                    {fmt(balanceSol)} SOL
-                                </div>
-                            </div>
-
-                            <div className="wallet-card-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                                <button
-                                    type="button"
-                                    className="btn"
-                                    onClick={() => {
-                                        setIsWalletOpen(false);
-                                        setIsWithdrawExpanded(false);
-                                        setIsWalletExpanded(true);
-                                        setDepositMethod('manual');
-                                        setStatusMsg('');
-                                    }}
-                                    style={{ flex: 1, border: '1px solid #10B981', background: 'transparent', color: '#10B981', padding: '9px 0', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s ease' }}
-                                >
-                                    Add Funds
-                                </button>
-                                <button
-                                    type="button"
-                                    className="btn"
-                                    onClick={() => {
-                                        setIsWalletOpen(false);
-                                        setIsWalletExpanded(false);
-                                        setIsWithdrawExpanded(true);
-                                        setStatusMsg('');
-                                    }}
-                                    style={{ flex: 1, border: '1px solid #6366F1', background: 'transparent', color: '#6366F1', padding: '9px 0', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s ease' }}
-                                >
-                                    Cash Out
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Customize Card */}
-                    {isAuthenticated && isSlitherFamily && (
-                        <div className="leaderboard-card customize-card" style={{ padding: '16px', boxSizing: 'border-box' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M20.38 3.46L16 2.18c-.89-.26-1.84.14-2.29.96L12 6.5 10.29 3.14c-.45-.82-1.4-1.22-2.29-.96L3.62 3.46c-.95.28-1.56 1.25-1.37 2.22l1.5 7.5c.17.84.9 1.45 1.76 1.45H7v5.5c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-5.5h1.5c.86 0 1.59-.61 1.76-1.45l1.5-7.5c.19-.97-.42-1.94-1.38-2.22z"/>
-                                        <path d="M12 6.5a2.5 2.5 0 0 1 0-5"/>
-                                    </svg>
-                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-h)' }}>Customize</span>
-                                </div>
-                                {selectedSkin !== 'random' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedSkin('random')}
-                                        style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', padding: '2px 0', letterSpacing: '0.04em', textTransform: 'uppercase' }}
-                                    >
-                                        No Skin
-                                    </button>
-                                )}
-                            </div>
-
-                            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid var(--border)', padding: '10px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '110px', position: 'relative' }}>
-                                <SnakeSkinPreview color={selectedSkin} />
-                                {selectedSkin === 'random' && (
-                                    <span style={{ position: 'absolute', bottom: '6px', fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                        Random Skin
-                                    </span>
-                                )}
-                            </div>
-
-                            <button
-                                type="button"
-                                className="btn"
-                                onClick={handleNextSkin}
-                                style={{ width: '100%', marginTop: '12px', padding: '9px 0', fontSize: '0.75rem', fontWeight: 700, border: '1px solid var(--border-2)', background: 'transparent', color: 'var(--text-h)', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s ease' }}
-                                onMouseEnter={e => { e.target.style.background = 'rgba(255,255,255,0.05)'; }}
-                                onMouseLeave={e => { e.target.style.background = 'transparent'; }}
-                            >
-                                {selectedSkin === 'random' ? 'Choose Skin' : 'Change Appearance'}
-                            </button>
-                        </div>
-                    )}
 
                     <div className="leaderboard-card">
                         <div className="tab-bar leaderboard-tab-bar">
@@ -1524,11 +1426,115 @@ export default function PreGame() {
                 </div>
                 <AppFooter />
             </div>
+
+            {/* Customizer Modal Overlay */}
+            {showCustomizer && (
+                <div className="customizer-overlay-backdrop" onClick={() => setShowCustomizer(false)}>
+                    <div className="customizer-modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="customizer-modal-header">
+                            <div>
+                                <h2 className="customizer-modal-title">Customize Appearance</h2>
+                                <p className="customizer-modal-subtitle">Stand out on the battlefield with a custom color</p>
+                            </div>
+                            <button className="customizer-close-icon-btn" onClick={() => setShowCustomizer(false)}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div className="customizer-modal-body">
+                            <div className="customizer-preview-col">
+                                <div className="customizer-preview-wrapper">
+                                    <SnakeSkinPreview color={selectedSkin} isLarge={true} />
+                                    <div className="customizer-preview-glow" style={{ backgroundColor: selectedSkin === 'random' ? '#A78BFA' : selectedSkin }}></div>
+                                </div>
+                                <div className="customizer-preview-status">
+                                    <span className="skin-status-label">Current Skin:</span>
+                                    <span className="skin-status-badge" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
+                                        {selectedSkin === 'random' ? 'Rainbow Palette' : selectedSkin.toUpperCase()}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div className="customizer-controls-col">
+                                <div className="customizer-section-header">
+                                    <span className="customizer-section-title">Color Palette</span>
+                                </div>
+                            <div className="customizer-controls-col" style={{ width: '100%' }}>
+                                <span className="customizer-section-title" style={{ display: 'block', marginBottom: '16px', textAlign: 'center', color: 'var(--text-h)' }}>Select Skin Color</span>
+                                <div className="skin-swatch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '32px' }}>
+                                    {SKIN_COLORS.filter(c => c !== 'random').map(color => {
+                                        const isSelected = selectedSkin === color;
+                                        return (
+                                            <button
+                                                key={color}
+                                                type="button"
+                                                className={`skin-swatch-btn${isSelected ? ' active' : ''}`}
+                                                style={{ 
+                                                    backgroundColor: color, 
+                                                    height: '44px', 
+                                                    borderRadius: '8px', 
+                                                    border: isSelected ? '3px solid #fff' : '1px solid var(--border)',
+                                                    boxShadow: isSelected ? `0 0 12px ${color}` : 'none'
+                                                }}
+                                                onClick={() => setSelectedSkin(color)}
+                                            >
+                                                {isSelected && (
+                                                    <svg style={{ margin: '0 auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+                                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        className={`skin-swatch-btn${selectedSkin === 'random' ? ' active' : ''}`}
+                                        style={{ 
+                                            gridColumn: 'span 5', 
+                                            height: '48px', 
+                                            borderRadius: '8px', 
+                                            backgroundColor: 'var(--bg-hover)', 
+                                            border: selectedSkin === 'random' ? '2px solid var(--accent)' : '1px solid var(--border)', 
+                                            color: selectedSkin === 'random' ? '#fff' : 'var(--text-1)', 
+                                            fontWeight: 'bold',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onClick={() => setSelectedSkin('random')}
+                                    >
+                                        No Skin (Default)
+                                    </button>
+                                </div>
+                                
+                                <div className="customizer-modal-actions" style={{ display: 'flex', gap: '12px' }}>
+                                    <button
+                                        className="btn-secondary"
+                                        style={{ flex: 1, height: '48px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.95rem' }}
+                                        onClick={() => setShowCustomizer(false)}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className="btn-primary"
+                                        style={{ flex: 1, height: '48px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.95rem' }}
+                                        onClick={() => setShowCustomizer(false)}
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-function SnakeSkinPreview({ color }) {
+/* ── SnakeSkinPreview ── */
+function SnakeSkinPreview({ color, isLarge }) {
     const canvasRef = useRef(null);
     const frameRef = useRef(0);
 
@@ -1538,89 +1544,26 @@ function SnakeSkinPreview({ color }) {
         const ctx = canvas.getContext('2d');
 
         let animationFrameId;
-        const segmentsCount = 18;
-        const spacing = 8;
-        const radius = 9;
-
-        const parseColorHex = (hex) => {
-            if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
-            const h = hex.replace('#', '');
-            if (h.length === 3) {
-                return {
-                    r: parseInt(h[0] + h[0], 16),
-                    g: parseInt(h[1] + h[1], 16),
-                    b: parseInt(h[2] + h[2], 16),
-                };
-            }
-            if (h.length >= 6) {
-                return {
-                    r: parseInt(h.slice(0, 2), 16),
-                    g: parseInt(h.slice(2, 4), 16),
-                    b: parseInt(h.slice(4, 6), 16),
-                };
-            }
-            return { r: 120, g: 120, b: 120 };
-        };
-
-        const shadeColorRGB = ({ r, g, b }, amount) => ({
-            r: Math.max(0, Math.min(255, r + amount)),
-            g: Math.max(0, Math.min(255, g + amount)),
-            b: Math.max(0, Math.min(255, b + amount)),
-        });
-
-        const rgbStr = ({ r, g, b }, a = 1) => `rgba(${r},${g},${b},${a})`;
-
-        const normalizeColor = (hex) => {
-            const { r, g, b } = parseColorHex(hex);
-            const rn = r / 255, gn = g / 255, bn = b / 255;
-            const max = Math.max(rn, gn, bn);
-            const min = Math.min(rn, gn, bn);
-            const d = max - min;
-            let h = 0;
-            if (d > 0.0001) {
-                if (max === rn) h = ((gn - bn) / d) % 6;
-                else if (max === gn) h = (bn - rn) / d + 2;
-                else h = (rn - gn) / d + 4;
-                h *= 60;
-                if (h < 0) h += 360;
-            }
-            const s = 0.60, l = 0.58;
-            const c = (1 - Math.abs(2 * l - 1)) * s;
-            const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-            const m = l - c / 2;
-            let rr = 0, gg = 0, bb = 0;
-            if (h < 60) [rr, gg, bb] = [c, x, 0];
-            else if (h < 120) [rr, gg, bb] = [x, c, 0];
-            else if (h < 180) [rr, gg, bb] = [0, c, x];
-            else if (h < 240) [rr, gg, bb] = [0, x, c];
-            else if (h < 300) [rr, gg, bb] = [x, 0, c];
-            else [rr, gg, bb] = [c, 0, x];
-            
-            return {
-                r: Math.round((rr + m) * 255),
-                g: Math.round((gg + m) * 255),
-                b: Math.round((bb + m) * 255),
-            };
-        };
+        const segmentsCount = isLarge ? 40 : 25;
+        const radius = isLarge ? 18 : 12;
+        const spacing = isLarge ? 6 : 4;
 
         const render = () => {
-            frameRef.current++;
+            frameRef.current += 1;
             const t = frameRef.current;
-            const W = canvas.width;
-            const H = canvas.height;
 
-            ctx.clearRect(0, 0, W, H);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const points = [];
-            const centerX = W / 2;
-            const centerY = H / 2 + 5;
+            const startY = isLarge ? 30 : 20;
+            const amp = isLarge ? 20 : 12;
 
             for (let i = 0; i < segmentsCount; i++) {
-                const phase = t * 0.075 - i * 0.38;
-                const offsetFromCenter = (i - segmentsCount / 2) * spacing;
-                const px = centerX - offsetFromCenter;
-                const py = centerY + Math.sin(phase) * 12;
-                points.push({ x: px, y: py });
+                const segT = i * 0.12 - t * 0.03;
+                points.push({
+                    x: (isLarge ? 150 : 125) + Math.sin(segT) * amp,
+                    y: startY + i * spacing
+                });
             }
 
             for (let i = segmentsCount - 1; i >= 0; i--) {
@@ -1635,9 +1578,6 @@ function SnakeSkinPreview({ color }) {
                     segColorHex = colors[colorIndex];
                 }
 
-                const col = normalizeColor(segColorHex);
-                const hOffset = radius * 0.14;
-                
                 let angle = 0;
                 if (i > 0) {
                     angle = Math.atan2(points[i - 1].y - pt.y, points[i - 1].x - pt.x);
@@ -1645,27 +1585,26 @@ function SnakeSkinPreview({ color }) {
                     angle = Math.atan2(pt.y - points[i + 1].y, pt.x - points[i + 1].x);
                 }
 
+                const segmentCanvas = getSnakeSegmentCanvas(radius, segColorHex);
+                const shadowCanvas = getSnakeShadowCanvas(radius);
+
                 ctx.save();
                 ctx.translate(pt.x, pt.y);
+                
+                // Draw drop shadow
+                ctx.save();
+                ctx.translate(0, radius * 0.12);
+                ctx.scale(1, 0.75);
+                ctx.globalAlpha = 0.5;
+                const shadowHalf = shadowCanvas.width / 2;
+                ctx.drawImage(shadowCanvas, -shadowHalf, -shadowHalf);
+                ctx.restore();
+
+                // Draw segment
                 ctx.rotate(angle);
-
-                const grad = ctx.createRadialGradient(-hOffset, -hOffset, 0, 0, 0, radius);
-                const hl = shadeColorRGB(col, 75);
-                const midBright = shadeColorRGB(col, 30);
-                const shadow = shadeColorRGB(col, -38);
-                const rim = shadeColorRGB(col, -65);
-
-                grad.addColorStop(0, '#ffffff');
-                grad.addColorStop(0.08, rgbStr(hl, 1));
-                grad.addColorStop(0.24, rgbStr(midBright, 1));
-                grad.addColorStop(0.68, rgbStr(col, 1));
-                grad.addColorStop(0.90, rgbStr(shadow, 1));
-                grad.addColorStop(1.0, rgbStr(rim, 1));
-
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                ctx.arc(0, 0, radius, 0, Math.PI * 2);
-                ctx.fill();
+                const segHalf = segmentCanvas.width / 2;
+                ctx.drawImage(segmentCanvas, -segHalf, -segHalf);
+                
                 ctx.restore();
             }
 
@@ -1709,7 +1648,16 @@ function SnakeSkinPreview({ color }) {
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [color]);
+    }, [color, isLarge]);
 
-    return <canvas ref={canvasRef} width="218" height="110" style={{ display: 'block' }} />;
+    return (
+        <div className="snake-preview-wrapper" style={{ width: '100%', height: isLarge ? '260px' : '100px', display: 'flex', justifyContent: 'center' }}>
+            <canvas
+                ref={canvasRef}
+                width={isLarge ? 300 : 250}
+                height={isLarge ? 260 : 100}
+                style={{ height: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
+            />
+        </div>
+    );
 }

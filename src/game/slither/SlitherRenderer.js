@@ -8,6 +8,7 @@ import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
+import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
 
@@ -1201,37 +1202,13 @@ export class SlitherRenderer {
     }
 
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
-        const col = parseColor(cs);
-        const k = contrast;
-
-        // Radial gradient with a slight offset highlight (towards top-left relative to local tangent)
-        // to create a gorgeous 3D glossy sphere.
-        const hOffset = rPx * 0.14;
-        const baseGrad = g.createRadialGradient(c - hOffset, c - hOffset, 0, c, c, rPx);
-        
-        // Color stops for a highly polished 3D look:
-        // 0: A vibrant white gloss highlight
-        // 0.08: Bright base color highlight
-        // 0.24: Transitioning midtone
-        // 0.68: Rich main body color
-        // 0.90: Deep shadow
-        // 1.0: Very dark rim shadow for clean overlapping ribbed borders
-        const hl = shadeColor(col, Math.round(75 * k));
-        const midBright = shadeColor(col, Math.round(30 * k));
-        const shadow = shadeColor(col, Math.round(-38 * k));
-        const rim = shadeColor(col, Math.round(-65 * k));
-
-        baseGrad.addColorStop(0, '#ffffff');
-        baseGrad.addColorStop(0.08, rgb(hl, 1));
-        baseGrad.addColorStop(0.24, rgb(midBright, 1));
-        baseGrad.addColorStop(0.68, rgb(col, 1));
-        baseGrad.addColorStop(0.90, rgb(shadow, 1));
-        baseGrad.addColorStop(1.0, rgb(rim, 1));
-
-        g.fillStyle = baseGrad;
-        g.beginPath();
-        g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
+        const segmentCanvas = getSnakeSegmentCanvas(rPx, cs);
+        g.save();
+        g.translate(c, c);
+        g.rotate(-Math.PI / 2); // Or whatever default rotation is expected if needed, but since it's a circle it doesn't matter much. Actually getSnakeSegmentCanvas is a circle, no rotation needed.
+        const half = segmentCanvas.width / 2;
+        g.drawImage(segmentCanvas, -half, -half);
+        g.restore();
     }
 
     /** Soft circular flank blob — stamped along the spine. */
