@@ -184,6 +184,7 @@ export default function SlitherGame() {
         if (myIdRef.current) {
             renderer?.removeSnake(myIdRef.current);
         }
+        renderer?.start();
         seedSpecCam(startX, startY, startZoom);
         setIsSpectating(true);
         setShowResultModal(false);
@@ -191,6 +192,7 @@ export default function SlitherGame() {
     }, [seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
+        rendererRef.current?.pause();
         setIsSpectating(false);
         setShowResultModal(true);
     }, []);
@@ -348,19 +350,22 @@ export default function SlitherGame() {
         if (!renderer) return undefined;
         if (!isSpectating) {
             renderer.setSpectatorMode(false);
+            renderer.setExternalCameraGetter(null);
             renderer.setInputEnabled(!blockInputRef.current);
             return undefined;
         }
         renderer.setInputEnabled(false);
-        let rafId = 0;
-        const sync = () => {
+        renderer.setExternalCameraGetter(() => {
             const cam = specCamRef.current;
-            renderer.setSpectatorMode(true, { x: cam.x, y: cam.y, zoom: cam.zoom });
-            rafId = requestAnimationFrame(sync);
-        };
-        sync();
+            return { x: cam.x, y: cam.y, zoom: cam.zoom };
+        });
+        renderer.setSpectatorMode(true, {
+            x: specCamRef.current.x,
+            y: specCamRef.current.y,
+            zoom: specCamRef.current.zoom,
+        });
         return () => {
-            cancelAnimationFrame(rafId);
+            renderer.setExternalCameraGetter(null);
             renderer.setSpectatorMode(false);
             renderer.setInputEnabled(!blockInputRef.current);
         };
@@ -625,6 +630,7 @@ export default function SlitherGame() {
             setCashOutEndAt(0);
             setLocalTimer(0);
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
+            rendererRef.current?.pause();
             persistLobbyGameMode(joinParamsRef.current.isCompetitive);
             const startedAt = sessionStartAtRef.current || Date.now();
             const stats = {
@@ -678,6 +684,7 @@ export default function SlitherGame() {
             setCashOutEndAt(0);
             cashoutActiveRef.current = false;
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
+            rendererRef.current?.pause();
             const startedAt = sessionStartAtRef.current || Date.now();
             const stats = {
                 timeSurvivedMs: Date.now() - startedAt,

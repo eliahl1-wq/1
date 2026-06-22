@@ -134,6 +134,8 @@ export class SlitherRenderer {
         this._foodSpatialGrid = new Map();
         this._foodGridDirty = true;
         this._maxFoodDraw = 180;
+        this._slurpSetPool = new Set();
+        this._foodNearBuf = [];
         this._FOOD_CELL = 64;
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
@@ -468,13 +470,14 @@ export class SlitherRenderer {
         }
     }
 
-    _foodNearPoint(grid, wx, wy, reach) {
+    _foodNearPoint(grid, wx, wy, reach, out) {
+        if (!out) out = this._foodNearBuf;
+        out.length = 0;
         const cell = this._FOOD_CELL;
         const minCx = Math.floor((wx - reach) / cell);
         const maxCx = Math.floor((wx + reach) / cell);
         const minCy = Math.floor((wy - reach) / cell);
         const maxCy = Math.floor((wy + reach) / cell);
-        const out = [];
         for (let cx = minCx; cx <= maxCx; cx++) {
             for (let cy = minCy; cy <= maxCy; cy++) {
                 const bucket = grid.get(`${cx},${cy}`);
@@ -991,9 +994,11 @@ export class SlitherRenderer {
 
         this._ensureFoodGrid();
         const foodGrid = this._foodSpatialGrid;
-        let slurpSet = null;
+        const slurpSet = this._slurpSetPool;
+        slurpSet.clear();
         if (mouthValid && !this._holdActive && !crowdedView) {
-            slurpSet = new Set(this._foodNearPoint(foodGrid, mouthX, mouthY, maxSlurpReach));
+            const near = this._foodNearPoint(foodGrid, mouthX, mouthY, maxSlurpReach);
+            for (let ni = 0; ni < near.length; ni++) slurpSet.add(near[ni]);
         }
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
@@ -1045,7 +1050,7 @@ export class SlitherRenderer {
 
             const runSlurp = mouthValid && !this._holdActive && !f.deathDrop && !isGolden
                 && (!crowdedView || ((wx - mouthX) ** 2 + (wy - mouthY) ** 2) < maxSlurpReach2 * 0.35)
-                && (slurpSet?.has(f) || anim.slurp > 0.001);
+                && (slurpSet.has(f) || anim.slurp > 0.001);
 
             if (runSlurp) {
                 const dxm = mouthX - wx;
@@ -1516,7 +1521,7 @@ export class SlitherRenderer {
 
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * (isYou ? 0.35 : 0.48));
+        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * (isYou ? 0.35 : 0.55));
         const q = this._quality;
         const holdActive = isYou && this._holdActive;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
@@ -1530,7 +1535,7 @@ export class SlitherRenderer {
         const stampCap = Math.round((
             isYou
                 ? (boosting ? (this.isMobile ? 150 : 118) : (this.isMobile ? 130 : 105))
-                : (boosting ? (this.isMobile ? 48 : 40) : (this.isMobile ? 38 : 32))
+                : (boosting ? (this.isMobile ? 36 : 30) : (this.isMobile ? 28 : 24))
         ) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1553,8 +1558,8 @@ export class SlitherRenderer {
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
-            glow: isYou && !holdActive && q >= 0.55,
-            boostOverlay: isYou && boosting && q >= 0.6,
+            glow: isYou && !holdActive && q >= 0.65,
+            boostOverlay: isYou && boosting && q >= 0.7,
             trailGlow: isYou && boosting,
         };
         const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
@@ -1596,8 +1601,7 @@ export class SlitherRenderer {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
-            const isHead = i === 0;
-            const sprite = (boosting && isHead) ? boostBody : normal;
+            const sprite = (boosting && i === 0) ? boostBody : normal;
             const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
             this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
         }
@@ -1611,7 +1615,7 @@ export class SlitherRenderer {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
-            const glowStride = boosting ? 2 : 3;
+            const glowStride = boosting ? 3 : 4;
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -1623,7 +1627,7 @@ export class SlitherRenderer {
         if (isYou && boosting && prNeeds.boostOverlay && boostOverlay) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            for (let i = bumpCount - 1; i >= 0; i -= 2) {
+            for (let i = bumpCount - 1; i >= 0; i -= 3) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
