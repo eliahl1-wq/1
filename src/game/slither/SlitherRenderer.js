@@ -1200,46 +1200,27 @@ export class SlitherRenderer {
         return Math.atan2(prev.y - next.y, prev.x - next.x);
     }
 
-    /**
-     * Body-local tube — soft symmetric lateral shade + dorsal highlight. No baked blur shadow.
-     */
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
         const col = parseColor(cs);
         const k = contrast;
 
-        const baseGrad = g.createRadialGradient(c, c, rPx * 0.08, c, c, rPx);
-        baseGrad.addColorStop(0, toHex(shadeColor(col, Math.round(6 * k))));
-        baseGrad.addColorStop(0.55, toHex(col));
-        baseGrad.addColorStop(0.78, toHex(shadeColor(col, Math.round(-4 * k))));
-        baseGrad.addColorStop(0.92, toHex(shadeColor(col, Math.round(-10 * k))));
-        baseGrad.addColorStop(1, toHex(shadeColor(col, Math.round(-18 * k))));
+        // A single, powerful off-center radial gradient that bakes a spine highlight
+        // and dark side edges. When stamped closely, overlapping spheres form a perfect 3D tube!
+        const grad = g.createRadialGradient(c, c, 0, c, c, rPx);
+        const core = shadeColor(col, Math.round(55 * k));
+        const inner = shadeColor(col, Math.round(15 * k));
+        const edge = shadeColor(col, Math.round(-35 * k));
+        const rim = shadeColor(col, Math.round(-65 * k));
 
-        g.fillStyle = baseGrad;
+        grad.addColorStop(0, rgb(core, 1));
+        grad.addColorStop(0.25, rgb(inner, 1));
+        grad.addColorStop(0.65, rgb(col, 1));
+        grad.addColorStop(0.88, rgb(edge, 1));
+        grad.addColorStop(1, rgb(rim, 0)); // Soft edge to antialias
+
+        g.fillStyle = grad;
         g.beginPath();
         g.arc(c, c, rPx, 0, Math.PI * 2);
-        g.fill();
-
-        const tubeGrad = g.createLinearGradient(c - rPx, c, c + rPx, c);
-        tubeGrad.addColorStop(0, rgb(shadeColor(col, -34), 0.11 * k));
-        tubeGrad.addColorStop(0.10, rgb(shadeColor(col, -18), 0.055 * k));
-        tubeGrad.addColorStop(0.24, rgb(shadeColor(col, -5), 0.012 * k));
-        tubeGrad.addColorStop(0.42, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.5, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.58, 'rgba(0,0,0,0)');
-        tubeGrad.addColorStop(0.76, rgb(shadeColor(col, -5), 0.012 * k));
-        tubeGrad.addColorStop(0.90, rgb(shadeColor(col, -18), 0.055 * k));
-        tubeGrad.addColorStop(1, rgb(shadeColor(col, -34), 0.11 * k));
-
-        g.fillStyle = tubeGrad;
-        g.fill();
-
-        const hlGrad = g.createLinearGradient(c, c - rPx, c, c + rPx);
-        hlGrad.addColorStop(0, rgb(shadeColor(col, 55), 0.13 * k));
-        hlGrad.addColorStop(0.18, rgb(shadeColor(col, 40), 0.08 * k));
-        hlGrad.addColorStop(0.38, 'rgba(255,255,255,0)');
-        hlGrad.addColorStop(1, 'rgba(0,0,0,0)');
-
-        g.fillStyle = hlGrad;
         g.fill();
     }
 
@@ -1467,141 +1448,8 @@ export class SlitherRenderer {
         return this._getSnakePrImgs(cs, rPx, needs);
     }
 
-    /**
-     * Fast-path renderer for remote (non-player) snakes.
-     * Uses a single thick stroked path instead of stamping individual sprites.
-     * This reduces ~24 drawImage calls per snake to 2 stroke() calls.
-     */
-    _drawSnakeFast(snake, zoom) {
-        const segs = snake.segments || [];
-        if (segs.length === 0) return;
-
-        const ctx = this.ctx;
-        const cx = this.camera.x;
-        const cy = this.camera.y;
-        const W = this.W;
-        const H = this.H;
-
-        // On-screen cull
-        const viewR = Math.hypot(W, H) / (2 * zoom) + 160;
-        const viewR2 = viewR * viewR;
-        let onScreen = false;
-        const checkStride = Math.max(1, Math.floor(segs.length / 8));
-        for (let i = 0; i < segs.length; i += checkStride) {
-            const dx = segs[i].x - cx;
-            const dy = segs[i].y - cy;
-            if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
-        }
-        if (!onScreen) return;
-
-        const thick = this.snakeThickness ?? 1;
-        const bodyRadius = (snake.radius || 6) * zoom * thick;
-        const angle = snake.angle || 0;
-
-        // Cache color
-        let cs = snake._csCache;
-        if (cs === undefined || snake._csColor !== snake.color) {
-            cs = bucketSnakeColor(snake.color);
-            snake._csCache = cs;
-            snake._csColor = snake.color;
-        }
-
-        ctx.save();
-
-        // Draw body as a single thick stroked path — massively cheaper than stamping sprites
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = bodyRadius * 2;
-        ctx.strokeStyle = cs;
-        ctx.beginPath();
-
-        let hx = 0, hy = 0;
-        for (let i = 0; i < segs.length; i++) {
-            const sx = (segs[i].x - cx) * zoom + W / 2;
-            const sy = (segs[i].y - cy) * zoom + H / 2;
-            if (i === 0) {
-                ctx.moveTo(sx, sy);
-                hx = sx;
-                hy = sy;
-            } else {
-                ctx.lineTo(sx, sy);
-            }
-        }
-        ctx.stroke();
-
-        // Subtle 3D tube highlight — one extra stroke, reuses path
-        const col = parseColor(cs);
-        const hlCol = shadeColor(col, 30);
-        ctx.lineWidth = bodyRadius * 0.55;
-        ctx.strokeStyle = rgb(hlCol, 0.13);
-        ctx.stroke();
-
-        // Eyes
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
-
-        const fwdX = Math.cos(angle);
-        const fwdY = Math.sin(angle);
-        const perpX = Math.sin(angle);
-        const perpY = -Math.cos(angle);
-        const headEyeRadius = bodyRadius;
-
-        if (this._quality >= 0.68) {
-            const eyeSide = headEyeRadius * 0.39;
-            const eyeFwd = headEyeRadius * 0.31;
-            const eyeR = Math.max(3, headEyeRadius * 0.43);
-            const pupilR = eyeR * 0.48;
-
-            for (const side of [-1, 1]) {
-                const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
-                const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
-
-                ctx.beginPath();
-                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-
-                const px = ex + fwdX * eyeR * 0.4;
-                const py = ey + fwdY * eyeR * 0.4;
-                ctx.beginPath();
-                ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-                ctx.fillStyle = '#000000';
-                ctx.fill();
-            }
-        }
-
-        // Name + Balance overlays
-        if (!this.hideOverlays) {
-            if (snake.name) {
-                ctx.fillStyle = 'rgba(255,255,255,0.95)';
-                const fontSize = Math.max(12, headEyeRadius * 0.85);
-                ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-                ctx.lineWidth = 3;
-                const nameY = hy - headEyeRadius - 12;
-                ctx.strokeText(snake.name, hx, nameY);
-                ctx.fillText(snake.name, hx, nameY);
-            }
-
-            if (!this.isBattleRoyale) {
-                const pillY = hy + bodyRadius + 14;
-                const displayBalance = snake.dollarBalance ?? snake.balance;
-                drawBalanceBadge(ctx, hx, pillY, displayBalance, false);
-            }
-        }
-
-        ctx.restore();
-    }
-
     _drawSnake(snake, toScreen, zoom) {
         const isYou = !!snake.isYou;
-
-        // Fast path for remote snakes: stroke-based, not sprite-stamped
-        if (!isYou) {
-            this._drawSnakeFast(snake, zoom);
-            return;
-        }
 
         const ctx = this.ctx;
         ctx.save();
@@ -1724,18 +1572,17 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // Body stamps — player only
+        // Body stamps — all snakes
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             const sprite = (boosting && i === 0) ? boostBody : normal;
-            const tangent = this._bumpTangent(bumps, i);
-            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
+            // Removed rotation for perfectly uniform spherical lighting
+            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, 0);
         }
 
-        // Spine highlight only (side shadow removed for performance)
-        this._blitSpineHighlight(ctx, bumps, bumpCount, bodyRadius, cs, boosting ? 1.08 : 1, { isYou: true, quality: q });
+        // Spine highlight baked into the radial gradient. No separate blit pass needed.
 
         if (prNeeds.glow && glow) {
             ctx.save();

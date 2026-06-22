@@ -13,7 +13,6 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
-import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
@@ -255,17 +254,6 @@ export default function Game() {
     const handleHoldEnd = useCallback(() => {
         global.holdStartAt = 0;
     }, []);
-
-    const { isHolding, startHold, cancelHold } = useHoldKeyCashout({
-        canStart: () => canCashOutRef.current,
-        onComplete: handleCashOut,
-        onHoldStart: handleHoldStart,
-        onHoldEnd: handleHoldEnd,
-    });
-
-    useEffect(() => {
-        if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
-    }, [localTimer, isDead, cashedAmount, isBattleRoyale, cancelHold]);
 
     useEffect(() => {
         stopSessionRecording();
@@ -1013,13 +1001,13 @@ export default function Game() {
 
             {!isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
-                    disabled={localTimer > 0 || isDead || cashedAmount !== null}
-                    isHolding={isHolding}
-                    onHoldStart={startHold}
-                    onHoldEnd={cancelHold}
+                    disabled={!cashoutReady}
+                    onHoldStart={() => { cashoutActiveRef.current = true; }}
+                    onHoldEnd={() => { cashoutActiveRef.current = false; }}
+                    onComplete={handleCashOut}
                     localTimer={localTimer}
-                    cashOutTotal={cashOutTotalRef.current || CASHOUT_SECONDS}
-                    cashOutEndAt={cashOutEndAt}
+                    cashOutTotal={cashOutTotalRef.current}
+                    cashOutEndAt={cashOutEndAtRef.current}
                 />
             )}
 

@@ -15,7 +15,6 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
-import { useHoldKeyCashout } from '../../hooks/useHoldKeyCashout';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice } from '../../utils/mobile';
@@ -322,13 +321,6 @@ export default function SlitherGame() {
         rendererRef.current?.setHoldStart(0);
     }, []);
 
-    const { isHolding, startHold, cancelHold } = useHoldKeyCashout({
-        canStart: () => canCashOutRef.current,
-        onComplete: handleCashOut,
-        onHoldStart: handleHoldStart,
-        onHoldEnd: handleHoldEnd,
-    });
-
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
         && localTimer <= 0 && cashedAmount === null && !isDead;
 
@@ -342,8 +334,10 @@ export default function SlitherGame() {
     }, [currentBalance, localTimer]);
 
     useEffect(() => {
-        if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) cancelHold();
-    }, [localTimer, isDead, cashedAmount, isBattleRoyale, cancelHold]);
+        if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) {
+            // CashoutBar handles its own cancelHold internally when disabled
+        }
+    }, [localTimer, isDead, cashedAmount, isBattleRoyale]);
 
     useEffect(() => {
         const renderer = rendererRef.current;
@@ -1010,12 +1004,12 @@ export default function SlitherGame() {
             {!isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={!cashoutReady}
-                    isHolding={isHolding}
-                    onHoldStart={startHold}
-                    onHoldEnd={cancelHold}
+                    onHoldStart={handleHoldStart}
+                    onHoldEnd={handleHoldEnd}
+                    onComplete={handleCashOut}
                     localTimer={localTimer}
-                    cashOutTotal={cashOutTotalRef.current || CASHOUT_SECONDS}
-                    cashOutEndAt={cashOutEndAt}
+                    cashOutTotal={cashOutTotalRef.current}
+                    cashOutEndAt={cashOutEndAtRef.current}
                 />
             )}
 
