@@ -43,7 +43,7 @@ export default function Profile() {
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs] = useState([]);
-    const [displayCur, setDisplayCur] = useState(() => localStorage.getItem('profile_balance_currency') || 'USD');
+    const [displayCur, setDisplayCur] = useState(() => localStorage.getItem('balance_currency') || 'USD');
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
@@ -125,8 +125,14 @@ export default function Profile() {
         return cumulative;
     })];
 
-    const minVal = Math.min(...chartPts, displayCur === 'SOL' ? -0.15 : -10);
-    const maxVal = Math.max(...chartPts, displayCur === 'SOL' ? 0.15 : 10);
+    const minChartVal = Math.min(...chartPts);
+    const maxChartVal = Math.max(...chartPts);
+    const rawRange = maxChartVal - minChartVal;
+    
+    // Zoom out the chart by adding a 40% padding top and bottom, preventing lines from feeling super inzoomed/stretched
+    const padding = rawRange === 0 ? (displayCur === 'SOL' ? 0.2 : 10) : rawRange * 0.40;
+    const minVal = minChartVal - padding;
+    const maxVal = maxChartVal + padding;
     const pnlRange = (maxVal - minVal) || 1;
 
     const toXY = (val, i) => ({
@@ -136,27 +142,13 @@ export default function Profile() {
 
     const xyPts = chartPts.map((v, i) => toXY(v, i));
 
-    // Smooth Bezier cubic spline — matches the reference image style
-    const getBezierPath = (points) => {
-        if (points.length < 2) return '';
-        let d = `M ${points[0].x} ${points[0].y}`;
-        for (let i = 0; i < points.length - 1; i++) {
-            const p0 = points[Math.max(0, i - 1)];
-            const p1 = points[i];
-            const p2 = points[i + 1];
-            const p3 = points[Math.min(points.length - 1, i + 2)];
-            // Catmull-Rom → Bezier conversion for smooth natural curves
-            const cp1x = p1.x + (p2.x - p0.x) / 6;
-            const cp1y = p1.y + (p2.y - p0.y) / 6;
-            const cp2x = p2.x - (p3.x - p1.x) / 6;
-            const cp2y = p2.y - (p3.y - p1.y) / 6;
-            d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
-        }
-        return d;
+    // Clean straight lines for the graph (polyline)
+    const getStraightPath = (points) => {
+        if (points.length < 1) return '';
+        return 'M ' + points.map(p => `${p.x} ${p.y}`).join(' L ');
     };
 
-    const curvePath = getBezierPath(xyPts);
-    const linePath = curvePath; // alias used in JSX
+    const linePath = getStraightPath(xyPts);
 
     const zeroY = 95 - ((0 - minVal) / pnlRange) * 90;
     const zeroPercent = Math.max(0, Math.min(100, zeroY));
@@ -313,7 +305,7 @@ export default function Profile() {
                                                 value={displayCur}
                                                 onChange={val => {
                                                     setDisplayCur(val);
-                                                    localStorage.setItem('profile_balance_currency', val);
+                                                    localStorage.setItem('balance_currency', val);
                                                 }}
                                                 renderValue={v => (
                                                     <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -514,26 +506,14 @@ export default function Profile() {
                                         {/* Area fill */}
                                         <path d={fillPath} fill="url(#areaGrad)" />
 
-                                        {/* Glow halo behind the main line */}
-                                        <path
-                                            d={linePath}
-                                            fill="none"
-                                            stroke="url(#lineGrad)"
-                                            strokeWidth="5"
-                                            opacity="0.18"
-                                            strokeLinejoin="round"
-                                            strokeLinecap="round"
-                                        />
-
                                         {/* Main crisp line */}
                                         <path
                                             d={linePath}
                                             fill="none"
                                             stroke="url(#lineGrad)"
-                                            strokeWidth="1.8"
+                                            strokeWidth="1.0"
                                             strokeLinejoin="round"
                                             strokeLinecap="round"
-                                            filter="url(#lineGlow)"
                                         />
 
                                         {/* Vertical cursor line */}

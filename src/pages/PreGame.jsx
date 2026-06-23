@@ -130,7 +130,7 @@ export default function PreGame() {
     const [withdrawAddress, setWithdrawAddress] = useState('');
     const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
-    const [isCurSOL, setIsCurSOL] = useState(false);
+    const [isCurSOL, setIsCurSOL] = useState(() => localStorage.getItem('balance_currency') === 'SOL');
     const [isMatchmaking, setIsMatchmaking] = useState(false);
 
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(
@@ -196,6 +196,10 @@ export default function PreGame() {
     useEffect(() => {
         localStorage.setItem('selected_skin_agar', selectedSkinAgar);
     }, [selectedSkinAgar]);
+
+    useEffect(() => {
+        localStorage.setItem('balance_currency', isCurSOL ? 'SOL' : 'USD');
+    }, [isCurSOL]);
 
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
@@ -1678,20 +1682,8 @@ function SnakeSkinPreview({ color, isLarge }) {
         const totalLength = segmentsCount * spacing;
         const headX = centerX + (totalLength / 2) - radius * 1.2;
 
-        const trail = [];
-        const speedX = isLarge ? 1.3 : 1.1;
         const amp = isLarge ? 20 : 9;
         const wiggleSpeed = isLarge ? 0.045 : 0.055;
-
-        // Pre-populate trail by simulating past frames so it starts fully formed
-        for (let j = 400; j >= 0; j--) {
-            const tempT = -j;
-            const tempWiggle = Math.sin(tempT * wiggleSpeed) * amp;
-            trail.push({
-                x: headX - j * speedX,
-                y: centerY + tempWiggle
-            });
-        }
 
         const render = () => {
             tRef.current += 1;
@@ -1700,54 +1692,12 @@ function SnakeSkinPreview({ color, isLarge }) {
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Shift current trail points to the left
-            for (let j = 0; j < trail.length; j++) {
-                trail[j].x -= speedX;
-            }
-
-            // Insert new head at start (on the right)
-            const headY = centerY + Math.sin(t * wiggleSpeed) * amp;
-            trail.unshift({ x: headX, y: headY });
-
-            // Keep trail bounded
-            if (trail.length > 500) trail.length = 500;
-
-            // Interpolate points along trail at exact 'spacing' intervals
+            // Compute points directly using sine wave to eliminate memory shifting and distance search CPU overhead
             const points = [];
-            if (trail.length > 0) {
-                let currentPoint = trail[0];
-                points.push(currentPoint);
-
-                let trailIdx = 1;
-                let distAccum = 0;
-
-                for (let i = 1; i < segmentsCount; i++) {
-                    let needed = spacing;
-                    let found = false;
-                    while (trailIdx < trail.length) {
-                        const p1 = trail[trailIdx - 1];
-                        const p2 = trail[trailIdx];
-                        const segD = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-
-                        if (distAccum + segD >= needed) {
-                            const ratio = (needed - distAccum) / segD;
-                            currentPoint = {
-                                x: p1.x + (p2.x - p1.x) * ratio,
-                                y: p1.y + (p2.y - p1.y) * ratio
-                            };
-                            points.push(currentPoint);
-                            distAccum = 0;
-                            found = true;
-                            break;
-                        } else {
-                            distAccum += segD;
-                            trailIdx++;
-                        }
-                    }
-                    if (!found) {
-                        points.push(trail[trail.length - 1]);
-                    }
-                }
+            for (let i = 0; i < segmentsCount; i++) {
+                const x = headX - i * spacing;
+                const y = centerY + Math.sin(t * wiggleSpeed - i * 0.35) * amp;
+                points.push({ x, y });
             }
 
             // Draw shadow & body segments from tail to head

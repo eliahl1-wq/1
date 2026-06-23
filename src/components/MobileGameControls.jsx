@@ -86,12 +86,15 @@ export function SlitherMobileControls({ onBoostChange }) {
     );
 }
 
-/** Agar: split (tap). Eject is double-tap on the canvas (see Game.jsx). */
-export function AgarMobileControls({ onSplit }) {
+/** Agar: split (tap) and eject (tap) buttons. */
+export function AgarMobileControls({ onSplit, onEject }) {
     if (!IS_MOBILE) return null;
 
     return (
         <div className="game-mobile-controls game-mobile-controls--agar">
+            <MobileBtn ariaLabel="Eject" onTap={() => onEject?.()}>
+                <span className="game-mobile-btn-text">Eject</span>
+            </MobileBtn>
             <MobileBtn ariaLabel="Split" onTap={() => onSplit?.()}>
                 <span className="game-mobile-btn-text">Split</span>
             </MobileBtn>

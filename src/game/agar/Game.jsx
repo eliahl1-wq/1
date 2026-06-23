@@ -857,7 +857,10 @@ export default function Game() {
             )}
 
             {IS_MOBILE && isConnected && !isDead && cashedAmount === null && !isSpectating && (
-                <AgarMobileControls onSplit={() => socketRef.current?.emit('2')} />
+                <AgarMobileControls 
+                    onSplit={() => socketRef.current?.emit('2')} 
+                    onEject={() => socketRef.current?.emit('1')} 
+                />
             )}
 
             {!isBattleRoyale && (cashedAmount !== null || isDead) && showResultModal && (

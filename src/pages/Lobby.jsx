@@ -35,8 +35,12 @@ export default function Lobby() {
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
     const [depositMethod, setDepositMethod] = useState('manual');
-    const [isCurSOL, setIsCurSOL] = useState(false);
+    const [isCurSOL, setIsCurSOL] = useState(() => localStorage.getItem('balance_currency') === 'SOL');
     const solPrice = user?.solPrice || 64;
+
+    useEffect(() => {
+        localStorage.setItem('balance_currency', isCurSOL ? 'SOL' : 'USD');
+    }, [isCurSOL]);
 
     const qrRef = useRef(null);
     const userMenuRef = useRef(null);
