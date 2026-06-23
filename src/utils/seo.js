@@ -52,19 +52,19 @@ export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
 
 export const SEO = {
     home: {
-        tabTitle: 'AgarStake | Competitive PvP Games with Real Cash & Crypto Wagers',
+        tabTitle: 'Play Agar & Slither with money - PvP Wagering Games | AgarStake',
         description: 'Welcome to the premier platform for competitive Web3 gaming. Wager Solana (SOL) in skill-based Agar and Slither arenas, outplay opponents, and withdraw your winnings instantly.',
         keywords: BASE_KEYWORDS,
         path: '/',
     },
     agar: {
-        tabTitle: 'AgarStake | Play Agar for Solana',
+        tabTitle: 'AgarStake | Play Agar with Money',
         description: 'Enter the high-stakes Agar arena. Wager SOL against real players, grow your mass, dominate the map, and cash out your crypto instantly.',
         keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
         path: '/agar',
     },
     slither: {
-        tabTitle: 'AgarStake | Play Slither for Solana',
+        tabTitle: 'AgarStake | Play Slither with Money',
         description: 'Join the ultimate competitive Slither arena. Stake SOL, outmaneuver opponents, claim the leaderboard, and cash out immediately.',
         keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
         path: '/slither',
