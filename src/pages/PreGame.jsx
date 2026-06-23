@@ -1672,7 +1672,7 @@ function SnakeSkinPreview({ color, isLarge }) {
         const ctx = canvas.getContext('2d');
 
         let animationFrameId;
-        const segmentsCount = isLarge ? 32 : 38;
+        const segmentsCount = isLarge ? 32 : 24;
         const radius = isLarge ? 13 : 13.5;
         const spacing = isLarge ? 6 : 6;
 
