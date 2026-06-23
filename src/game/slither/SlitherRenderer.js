@@ -628,7 +628,7 @@ export class SlitherRenderer {
                     delete s._extrapX;
                     delete s._extrapY;
                 }
-                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: true });
+                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: false });
                 continue;
             }
 
@@ -930,26 +930,27 @@ export class SlitherRenderer {
     /** Soft glowing orb — compact bloom, tighter falloff, more transparent. */
     _foodSprite(hue, rPx, golden, deathDrop) {
         const halo = Math.ceil(rPx * (golden ? 2.6 : deathDrop ? 1.95 : 1.7));
-        const key = `f10|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        const key = `f11|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                // High quality golden orb: bright white-yellow core, strong gold mid, soft amber outer
-                grad.addColorStop(0, 'hsla(55, 100%, 100%, 1)');
-                grad.addColorStop(0.12, 'hsla(50, 100%, 85%, 0.95)');
-                grad.addColorStop(0.30, 'hsla(45, 100%, 65%, 0.75)');
-                grad.addColorStop(0.55, 'hsla(40, 100%, 50%, 0.35)');
-                grad.addColorStop(0.80, 'hsla(35, 100%, 40%, 0.10)');
+                // Brighter golden orb: white core, bright gold/white mid, soft translucent amber outer
+                grad.addColorStop(0, 'hsla(55, 100%, 100%, 0.85)');
+                grad.addColorStop(0.12, 'hsla(52, 100%, 94%, 0.70)');
+                grad.addColorStop(0.32, 'hsla(46, 100%, 75%, 0.42)');
+                grad.addColorStop(0.55, 'hsla(40, 100%, 55%, 0.20)');
+                grad.addColorStop(0.80, 'hsla(35, 100%, 42%, 0.05)');
                 grad.addColorStop(1, 'hsla(30, 100%, 30%, 0)');
             } else {
+                // Translucent normal orb: white core, semi-transparent colored mid, soft fading outer
                 const sat = deathDrop ? 95 : 88;
-                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 86%, 0.60)`);
-                grad.addColorStop(0.22, `hsla(${hue}, ${sat}%, 68%, 0.42)`);
-                grad.addColorStop(0.46, `hsla(${hue}, ${sat}%, 58%, 0.18)`);
-                grad.addColorStop(0.64, `hsla(${hue}, ${sat}%, 52%, 0.05)`);
-                grad.addColorStop(0.78, `hsla(${hue}, ${sat}%, 48%, 0.012)`);
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 46%, 0)`);
+                grad.addColorStop(0, `hsla(${hue}, 15%, 98%, 0.72)`);
+                grad.addColorStop(0.15, `hsla(${hue}, ${sat}%, 82%, 0.48)`);
+                grad.addColorStop(0.40, `hsla(${hue}, ${sat}%, 62%, 0.26)`);
+                grad.addColorStop(0.65, `hsla(${hue}, ${sat}%, 52%, 0.08)`);
+                grad.addColorStop(0.80, `hsla(${hue}, ${sat}%, 46%, 0.02)`);
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 44%, 0)`);
             }
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
