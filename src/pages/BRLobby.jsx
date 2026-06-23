@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import Background from '../components/Background';
 import { normalizeBREntryFee, formatUsd } from '../constants/economy';
+import { getOrCreatePresenceId } from '../utils/sitePresence';
 import '../styles/ui.css';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
@@ -49,7 +50,7 @@ export default function BRLobby() {
         localStorage.setItem('selected_entry_fee', String(entryFeeUsd));
 
         const socket = io(API_URL, {
-            auth: { token },
+            auth: { token, presenceId: getOrCreatePresenceId() },
             transports: ['websocket', 'polling'],
             reconnection: true,
         });

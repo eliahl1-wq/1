@@ -8,6 +8,7 @@ import { SlitherRenderer } from '../game/slither/SlitherRenderer.js';
 import global from '../game/agar/global.js';
 import * as renderUtils from '../game/agar/render.js';
 import { useSpectatorCamera } from '../hooks/useSpectatorCamera';
+import { getOrCreatePresenceId } from '../utils/sitePresence';
 import '../styles/ui.css';
 
 const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
@@ -361,7 +362,7 @@ export default function AdminSandbox() {
         }
 
         const socket = io(API_URL, {
-            auth: { token },
+            auth: { token, presenceId: getOrCreatePresenceId() },
             transports: ['polling', 'websocket'],
             reconnection: true,
         });
