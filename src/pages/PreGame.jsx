@@ -1668,9 +1668,9 @@ function SnakeSkinPreview({ color, isLarge }) {
         const ctx = canvas.getContext('2d');
 
         let animationFrameId;
-        const segmentsCount = isLarge ? 32 : 20;
-        const radius = isLarge ? 13 : 8;
-        const spacing = isLarge ? 6 : 4.5;
+        const segmentsCount = isLarge ? 32 : 30;
+        const radius = isLarge ? 13 : 11;
+        const spacing = isLarge ? 6 : 5.5;
 
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
@@ -1864,8 +1864,7 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
         const ctx = canvas.getContext('2d');
 
         let animationFrameId;
-        const radius = isLarge ? 55 : 24;
-        
+
         const render = () => {
             tRef.current += 1;
             const t = tRef.current;
@@ -1903,60 +1902,96 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
                 strokeStyle = '#' + ((1 << 24) + (br << 16) + (bg << 8) + bb).toString(16).slice(1);
             }
 
-            // Draw organic wiggling cell identical to drawOrganicCell in render.js
-            const pointCount = Math.min(Math.max(~~radius, 24), 60);
-            const points = [];
-            const time = Date.now() * 0.002;
-            const FULL_ANGLE = 2 * Math.PI;
-
-            for (let i = 0; i < pointCount; i++) {
-                const theta = (i / pointCount) * FULL_ANGLE;
-                // Wobble matches in-game cell.radius * 0.02
-                const wobble = Math.sin(time + theta * 5) * (radius * 0.02);
-                
-                points.push({
-                    x: centerX + Math.cos(theta) * (radius + wobble),
-                    y: centerY + Math.sin(theta) * (radius + wobble)
+            const cells = [];
+            if (isLarge) {
+                // One big blob for customizing preview modal
+                cells.push({
+                    radius: 65,
+                    cx: centerX + Math.sin(t * 0.015) * 12,
+                    cy: centerY + Math.cos(t * 0.02) * 6,
+                    drawName: true
+                });
+            } else {
+                // Split cells for the small lobby preview box (1 large, 2 small floating around)
+                cells.push({
+                    radius: 30,
+                    cx: centerX - 12 + Math.sin(t * 0.01) * 8,
+                    cy: centerY - 5 + Math.cos(t * 0.015) * 5,
+                    drawName: true
+                });
+                cells.push({
+                    radius: 15,
+                    cx: centerX + 24 + Math.sin(t * 0.012 + 1.5) * 6,
+                    cy: centerY + 12 + Math.cos(t * 0.008 + 1.5) * 5,
+                    drawName: false
+                });
+                cells.push({
+                    radius: 11,
+                    cx: centerX - 26 + Math.sin(t * 0.015 + 3.0) * 5,
+                    cy: centerY + 24 + Math.cos(t * 0.013 + 3.0) * 4,
+                    drawName: false
                 });
             }
 
-            // Draw body path
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
-            }
-            ctx.closePath();
-            
-            // Set styles & render
-            ctx.fillStyle = fillStyle;
-            ctx.strokeStyle = strokeStyle;
-            ctx.lineWidth = isLarge ? 6 : 3;
-            ctx.shadowBlur = 0; // No drop shadow glow, identical to game
-            
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
+            cells.forEach(cell => {
+                const { radius, cx, cy, drawName } = cell;
 
-            // Draw nickname identical to in-game text formatting
-            let fontSize = radius / 1.8;
-            const nameStr = (nickname || 'GUEST').toUpperCase();
-            if (nameStr.length > 3) fontSize *= 0.7;
-            fontSize = Math.max(fontSize, isLarge ? 14 : 8);
+                // Draw organic wiggling cell identical to drawOrganicCell in render.js
+                const pointCount = Math.min(Math.max(~~radius, 24), 60);
+                const points = [];
+                const time = Date.now() * 0.002;
+                const FULL_ANGLE = 2 * Math.PI;
 
-            ctx.save();
-            ctx.font = 'bold ' + fontSize + 'px sans-serif';
-            ctx.fillStyle = '#ffffff';
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 3;
-            ctx.miterLimit = 1;
-            ctx.lineJoin = 'round';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.strokeText(nameStr, centerX, centerY);
-            ctx.fillText(nameStr, centerX, centerY);
-            ctx.restore();
+                for (let i = 0; i < pointCount; i++) {
+                    const theta = (i / pointCount) * FULL_ANGLE;
+                    const wobble = Math.sin(time + theta * 5) * (radius * 0.02);
+                    points.push({
+                        x: cx + Math.cos(theta) * (radius + wobble),
+                        y: cy + Math.sin(theta) * (radius + wobble)
+                    });
+                }
+
+                // Draw body path
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                ctx.closePath();
+                
+                // Set styles & render
+                ctx.fillStyle = fillStyle;
+                ctx.strokeStyle = strokeStyle;
+                ctx.lineWidth = isLarge ? 6 : 3;
+                ctx.shadowBlur = 0; // No drop shadow glow, identical to game
+                
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+
+                if (drawName) {
+                    // Draw nickname identical to in-game text formatting
+                    let fontSize = radius / 1.8;
+                    const nameStr = (nickname || 'GUEST').toUpperCase();
+                    if (nameStr.length > 3) fontSize *= 0.7;
+                    fontSize = Math.max(fontSize, isLarge ? 14 : 9);
+
+                    ctx.save();
+                    ctx.font = 'bold ' + fontSize + 'px sans-serif';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 3;
+                    ctx.miterLimit = 1;
+                    ctx.lineJoin = 'round';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    ctx.strokeText(nameStr, cx, cy);
+                    ctx.fillText(nameStr, cx, cy);
+                    ctx.restore();
+                }
+            });
 
             animationFrameId = requestAnimationFrame(render);
         };
