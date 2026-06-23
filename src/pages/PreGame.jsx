@@ -106,6 +106,20 @@ export default function PreGame() {
     const { connection } = useConnection();
 
     // ── State ──────────────────────────────────────────
+    const modeCardRef = useRef(null);
+    const [leaderboardHeight, setLeaderboardHeight] = useState('auto');
+
+    useEffect(() => {
+        if (!modeCardRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+                setLeaderboardHeight(entry.target.offsetHeight);
+            }
+        });
+        observer.observe(modeCardRef.current);
+        return () => observer.disconnect();
+    }, []);
+
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
@@ -1177,7 +1191,7 @@ export default function PreGame() {
             )}
 
             <div className="pre-game-grid">
-                <div className="mode-card">
+                <div className="mode-card" ref={modeCardRef}>
                     <span className="mode-card-label">Gamemode</span>
                     <div className="mode-card-title mode-card-title--stacked">
                         {modeCardTitle.toUpperCase()}
@@ -1374,7 +1388,7 @@ export default function PreGame() {
                 <div className="right-panel-stack">
 
 
-                    <div className="leaderboard-card">
+                    <div className="leaderboard-card" style={{ height: leaderboardHeight }}>
                         <div className="tab-bar leaderboard-tab-bar">
                             {[{ id: 'alltime', label: 'Leaderboard' }, { id: 'live', label: 'LIVE', dot: true }].map(tab => (
                                 <button

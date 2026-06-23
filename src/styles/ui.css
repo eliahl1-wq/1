@@ -346,11 +346,8 @@
   justify-content: flex-start;
   align-items: center;
   gap: 12px;
-  height: 380px;
+  min-height: 140px;
   width: 100%;
-  max-width: 250px;
-  text-align: center;
-  box-sizing: border-box;
 }
 
 .mode-card-stake {
@@ -855,7 +852,6 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 380px;
 }
 
 .customize-lobby-card {
