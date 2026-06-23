@@ -135,20 +135,41 @@ export default function Profile() {
     });
 
     const xyPts = chartPts.map((v, i) => toXY(v, i));
-    
-    // Straight sharp line segments matching reference image
-    const linePath = xyPts.length > 0
-        ? `M ${xyPts[0].x} ${xyPts[0].y} ` + xyPts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ')
-        : '';
-        
+
+    // Smooth Bezier cubic spline — matches the reference image style
+    const getBezierPath = (points) => {
+        if (points.length < 2) return '';
+        let d = `M ${points[0].x} ${points[0].y}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i - 1)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(points.length - 1, i + 2)];
+            // Catmull-Rom → Bezier conversion for smooth natural curves
+            const cp1x = p1.x + (p2.x - p0.x) / 6;
+            const cp1y = p1.y + (p2.y - p0.y) / 6;
+            const cp2x = p2.x - (p3.x - p1.x) / 6;
+            const cp2y = p2.y - (p3.y - p1.y) / 6;
+            d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+        }
+        return d;
+    };
+
+    const curvePath = getBezierPath(xyPts);
+    const linePath = curvePath; // alias used in JSX
+
     const zeroY = 95 - ((0 - minVal) / pnlRange) * 90;
     const zeroPercent = Math.max(0, Math.min(100, zeroY));
-    
+
+    // Area fill anchored to the zero baseline
     const fillPath = xyPts.length > 0
         ? `M ${xyPts[0].x} ${zeroY} ` + xyPts.map(p => `L ${p.x} ${p.y}`).join(' ') + ` L ${xyPts[xyPts.length - 1].x} ${zeroY} Z`
         : '';
 
-    const chartColor = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
+    // Use the correct brand colors (green = #14F195, red = #FF3B30)
+    const C_GREEN = '#14F195';
+    const C_RED   = '#FF3B30';
+    const chartColor = totalPnL >= 0 ? C_GREEN : C_RED;
 
     const handleUpdateUsername = async () => {
         const trimmed = usernameInput.trim();
@@ -389,36 +410,55 @@ export default function Profile() {
                                 </div>
 
                                 {/* Equity chart */}
-                                <div style={{ position: 'relative', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '18px 18px 12px 18px', overflow: 'hidden' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <div style={{
+                                    position: 'relative',
+                                    background: 'rgba(0,0,0,0.25)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 'var(--r-lg)',
+                                    padding: '20px 20px 14px 20px',
+                                    overflow: 'hidden',
+                                }}>
+                                    {/* Background glow matching the current curve color */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        right: 0,
+                                        width: '60%',
+                                        height: '70%',
+                                        background: `radial-gradient(ellipse at bottom right, ${totalPnL >= 0 ? 'rgba(20,241,149,0.04)' : 'rgba(255,59,48,0.06)'} 0%, transparent 70%)`,
+                                        pointerEvents: 'none',
+                                    }} />
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position: 'relative', zIndex: 1 }}>
                                         <span className="label">Equity Curve</span>
+                                        {hoveredPoint && (
+                                            <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED }}>
+                                                {formatVal(hoveredPoint.cumVal, true)}
+                                            </span>
+                                        )}
                                     </div>
 
                                     <svg
                                         viewBox="0 0 100 100"
                                         preserveAspectRatio="none"
-                                        style={{ width: '100%', height: '160px', display: 'block', overflow: 'hidden' }}
+                                        style={{ width: '100%', height: '220px', display: 'block' }}
                                         onMouseMove={e => {
                                             if (chartPts.length < 2) return;
                                             const rect = e.currentTarget.getBoundingClientRect();
                                             const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
-                                            const idx    = Math.max(0, Math.min(
+                                            const idx = Math.max(0, Math.min(
                                                 Math.round((mouseX / 100) * (chartPts.length - 1)),
                                                 chartPts.length - 1
                                             ));
-                                            const log    = idx > 0 ? processedLogs[idx - 1] : null;
-                                            
+                                            const log = idx > 0 ? processedLogs[idx - 1] : null;
                                             const ptVal = chartPts[idx];
                                             const p = toXY(ptVal, idx);
-                                            
                                             let formattedDate = 'Initial Session';
                                             if (log) {
                                                 const d = new Date(log.createdAt);
-                                                const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-                                                const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                                                formattedDate = `${dateStr}, ${timeStr}`;
+                                                formattedDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                                                    + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                                             }
-                                            
                                             setHoveredPoint({
                                                 index: idx,
                                                 cumVal: ptVal,
@@ -434,108 +474,131 @@ export default function Profile() {
                                         onMouseLeave={() => setHoveredPoint(null)}
                                     >
                                         <defs>
+                                            {/* Line gradient: green above zero → red below */}
                                             <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#10B981" />
-                                                <stop offset={`${zeroPercent}%`} stopColor="#10B981" />
-                                                <stop offset={`${zeroPercent}%`} stopColor="#FF2E93" />
-                                                <stop offset="100%" stopColor="#FF2E93" />
+                                                <stop offset="0%" stopColor={C_GREEN} />
+                                                <stop offset={`${zeroPercent}%`} stopColor={C_GREEN} />
+                                                <stop offset={`${zeroPercent}%`} stopColor={C_RED} />
+                                                <stop offset="100%" stopColor={C_RED} />
                                             </linearGradient>
 
+                                            {/* Area fill gradient anchored at zero */}
                                             <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#10B981" stopOpacity="0.25" />
-                                                <stop offset={`${zeroPercent}%`} stopColor="#10B981" stopOpacity="0" />
-                                                <stop offset={`${zeroPercent}%`} stopColor="#FF2E93" stopOpacity="0" />
-                                                <stop offset="100%" stopColor="#FF2E93" stopOpacity="0.25" />
+                                                <stop offset="0%" stopColor={C_GREEN} stopOpacity="0.18" />
+                                                <stop offset={`${Math.max(0, zeroPercent - 1)}%`} stopColor={C_GREEN} stopOpacity="0.03" />
+                                                <stop offset={`${Math.min(100, zeroPercent + 1)}%`} stopColor={C_RED} stopOpacity="0.03" />
+                                                <stop offset="100%" stopColor={C_RED} stopOpacity="0.2" />
                                             </linearGradient>
 
-                                            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                                                <feGaussianBlur stdDeviation="1.5" result="blur" />
-                                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                            {/* Glow filter for the line */}
+                                            <filter id="lineGlow" x="-10%" y="-80%" width="120%" height="260%">
+                                                <feGaussianBlur stdDeviation="1.2" result="blur" />
+                                                <feMerge>
+                                                    <feMergeNode in="blur" />
+                                                    <feMergeNode in="SourceGraphic" />
+                                                </feMerge>
                                             </filter>
                                         </defs>
 
-                                        {/* Break-even line */}
-                                        <line x1="0" y1={zeroY} x2="100" y2={zeroY} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" strokeDasharray="4,4" />
+                                        {/* Subtle horizontal grid lines */}
+                                        {[20, 40, 60, 80].map(y => (
+                                            <line key={y} x1="0" y1={y} x2="100" y2={y}
+                                                stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+                                        ))}
+
+                                        {/* Zero / break-even baseline */}
+                                        <line x1="0" y1={zeroY} x2="100" y2={zeroY}
+                                            stroke="rgba(255,255,255,0.1)" strokeWidth="0.6"
+                                            strokeDasharray="4,4" />
 
                                         {/* Area fill */}
                                         <path d={fillPath} fill="url(#areaGrad)" />
 
-                                        {/* Glow line shadow */}
+                                        {/* Glow halo behind the main line */}
                                         <path
                                             d={linePath}
                                             fill="none"
                                             stroke="url(#lineGrad)"
-                                            strokeWidth="3.5"
-                                            opacity="0.25"
-                                            filter="url(#glow)"
+                                            strokeWidth="5"
+                                            opacity="0.18"
                                             strokeLinejoin="round"
                                             strokeLinecap="round"
                                         />
 
-                                        {/* Foreground line */}
+                                        {/* Main crisp line */}
                                         <path
                                             d={linePath}
                                             fill="none"
                                             stroke="url(#lineGrad)"
-                                            strokeWidth="2"
+                                            strokeWidth="1.8"
                                             strokeLinejoin="round"
                                             strokeLinecap="round"
+                                            filter="url(#lineGlow)"
                                         />
 
-                                        {/* Hover cursor vertical line */}
+                                        {/* Vertical cursor line */}
                                         {hoveredPoint && (
                                             <line
-                                                x1={hoveredPoint.x}
-                                                y1="0"
-                                                x2={hoveredPoint.x}
-                                                y2="100"
-                                                stroke="rgba(255,255,255,0.25)"
-                                                strokeWidth="1"
-                                                strokeDasharray="4,4"
+                                                x1={hoveredPoint.x} y1="0"
+                                                x2={hoveredPoint.x} y2="100"
+                                                stroke="rgba(255,255,255,0.2)"
+                                                strokeWidth="0.8"
+                                                strokeDasharray="3,3"
                                             />
                                         )}
 
-                                        {/* Hovered point dot indicator */}
+                                        {/* Dot at hovered point */}
                                         {hoveredPoint && (
-                                            <circle
-                                                cx={hoveredPoint.x}
-                                                cy={hoveredPoint.y}
-                                                r="4.5"
-                                                fill={hoveredPoint.cumVal >= 0 ? '#10B981' : '#FF2E93'}
-                                                stroke="#ffffff"
-                                                strokeWidth="1.5"
-                                            />
+                                            <>
+                                                {/* outer glow ring */}
+                                                <circle
+                                                    cx={hoveredPoint.x}
+                                                    cy={hoveredPoint.y}
+                                                    r="5"
+                                                    fill={hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED}
+                                                    opacity="0.2"
+                                                />
+                                                {/* inner dot */}
+                                                <circle
+                                                    cx={hoveredPoint.x}
+                                                    cy={hoveredPoint.y}
+                                                    r="3"
+                                                    fill={hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED}
+                                                    stroke="#ffffff"
+                                                    strokeWidth="1.2"
+                                                />
+                                            </>
                                         )}
                                     </svg>
 
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', position: 'relative', zIndex: 1 }}>
                                         <span>Start</span>
                                         <span>{processedLogs.length} sessions</span>
                                     </div>
 
-                                    {/* Tooltip Overlay */}
+                                    {/* Floating tooltip */}
                                     {hoveredPoint && (
                                         <div style={{
                                             position: 'absolute',
-                                            left: `${hoveredPoint.clientCoords.x + 18}px`,
-                                            top: `${hoveredPoint.clientCoords.y + 18 - 12}px`,
+                                            left: `${Math.min(hoveredPoint.clientCoords.x + 18, 999)}px`,
+                                            top: `${hoveredPoint.clientCoords.y + 42}px`,
                                             transform: 'translate(-50%, -100%)',
-                                            background: 'rgba(20, 21, 28, 0.98)',
-                                            border: '1px solid rgba(255,255,255,0.12)',
+                                            background: 'rgba(16, 17, 22, 0.97)',
+                                            border: `1px solid ${hoveredPoint.cumVal >= 0 ? 'rgba(20,241,149,0.25)' : 'rgba(255,59,48,0.25)'}`,
                                             borderRadius: 'var(--r-md)',
-                                            padding: '8px 12px',
+                                            padding: '8px 14px',
                                             pointerEvents: 'none',
-                                            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-                                            zIndex: 10,
+                                            boxShadow: `0 4px 24px rgba(0,0,0,0.6), 0 0 12px ${hoveredPoint.cumVal >= 0 ? 'rgba(20,241,149,0.08)' : 'rgba(255,59,48,0.08)'}`,
+                                            zIndex: 20,
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: '4px',
-                                            whiteSpace: 'nowrap'
+                                            gap: '3px',
+                                            whiteSpace: 'nowrap',
                                         }}>
-                                            <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--mono)' }}>
+                                            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
                                                 {formatVal(hoveredPoint.cumVal, true)}
                                             </span>
-                                            <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-3)' }}>
+                                            <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
                                                 {hoveredPoint.date}
                                             </span>
                                         </div>
