@@ -1351,11 +1351,11 @@ export default function PreGame() {
                             <div className="customize-lobby-card-header">
                                 <div className="customize-lobby-card-title-group">
                                     <svg className="customize-lobby-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.94-.92 1.94-2 0-.49-.18-.95-.5-1.3-.32-.34-.5-.81-.5-1.3 0-1.03.87-1.9 1.9-1.9H17c3.31 0 6-2.69 6-6 0-4.97-4.92-9-11-9z"/>
-                                        <circle cx="6.5" cy="11.5" r="1.5" fill="currentColor"/>
-                                        <circle cx="10" cy="7" r="1.5" fill="currentColor"/>
-                                        <circle cx="15" cy="7" r="1.5" fill="currentColor"/>
-                                        <circle cx="18.5" cy="11.5" r="1.5" fill="currentColor"/>
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.94-.92 1.94-2 0-.49-.18-.95-.5-1.3-.32-.34-.5-.81-.5-1.3 0-1.03.87-1.9 1.9-1.9H17c3.31 0 6-2.69 6-6 0-4.97-4.92-9-11-9z" />
+                                        <circle cx="6.5" cy="11.5" r="1.5" fill="currentColor" />
+                                        <circle cx="10" cy="7" r="1.5" fill="currentColor" />
+                                        <circle cx="15" cy="7" r="1.5" fill="currentColor" />
+                                        <circle cx="18.5" cy="11.5" r="1.5" fill="currentColor" />
                                     </svg>
                                     <span className="customize-lobby-title">Customize Appearance</span>
                                 </div>
@@ -1510,16 +1510,16 @@ export default function PreGame() {
                     if (isRainbow) return;
 
                     const chromas = [
-                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
+                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
                         '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
                     ];
                     let idx = chromas.indexOf(currentChroma);
                     if (idx === -1) idx = 0;
-                    
+
                     let nextIdx = idx + direction;
                     if (nextIdx < 0) nextIdx = chromas.length - 1;
                     if (nextIdx >= chromas.length) nextIdx = 0;
-                    
+
                     if (customizerTab === 'slither') {
                         setSelectedSkin(chromas[nextIdx]);
                     } else {
@@ -1571,7 +1571,7 @@ export default function PreGame() {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div className="customizer-modal-body">
                                 <div className="customizer-preview-stage">
                                     {!isRainbow && (
@@ -1594,8 +1594,8 @@ export default function PreGame() {
                                         </button>
                                     )}
 
-                                    <div className="customizer-preview-glow" style={{ 
-                                        backgroundColor: isRainbow ? '#A78BFA' : currentChroma 
+                                    <div className="customizer-preview-glow" style={{
+                                        backgroundColor: isRainbow ? '#A78BFA' : currentChroma
                                     }}></div>
 
                                     <div className="chroma-name-badge" style={
@@ -1606,10 +1606,10 @@ export default function PreGame() {
                                         {getChromaName(currentChroma)}
                                     </div>
                                 </div>
-                                
+
                                 <div className="customizer-selection-area">
                                     <span className="customizer-section-title">Skin Options</span>
-                                    
+
                                     <div className="skin-cards-grid">
                                         <button
                                             type="button"
@@ -1634,7 +1634,7 @@ export default function PreGame() {
                                             <span>Rainbow</span>
                                         </button>
                                     </div>
-                                    
+
                                     <button
                                         className="btn-primary customizer-done-btn"
                                         onClick={() => setShowCustomizer(false)}
@@ -1717,10 +1717,10 @@ function SnakeSkinPreview({ color, isLarge }) {
             if (trail.length > 0) {
                 let currentPoint = trail[0];
                 points.push(currentPoint);
-                
+
                 let trailIdx = 1;
                 let distAccum = 0;
-                
+
                 for (let i = 1; i < segmentsCount; i++) {
                     let needed = spacing;
                     let found = false;
@@ -1728,7 +1728,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                         const p1 = trail[trailIdx - 1];
                         const p2 = trail[trailIdx];
                         const segD = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                        
+
                         if (distAccum + segD >= needed) {
                             const ratio = (needed - distAccum) / segD;
                             currentPoint = {
@@ -1756,7 +1756,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                 let segColorHex = currentColor;
                 if (currentColor === 'random') {
                     const colors = [
-                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
+                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
                         '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
                     ];
                     const colorIndex = Math.floor((t * 0.15 + i * 0.45) % colors.length);
@@ -1775,7 +1775,7 @@ function SnakeSkinPreview({ color, isLarge }) {
 
                 ctx.save();
                 ctx.translate(pt.x, pt.y);
-                
+
                 // Draw drop shadow
                 ctx.save();
                 ctx.translate(0, radius * 0.12);
@@ -1789,7 +1789,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                 ctx.rotate(segmentAngle);
                 const segHalf = segmentCanvas.width / 2;
                 ctx.drawImage(segmentCanvas, -segHalf, -segHalf);
-                
+
                 ctx.restore();
             }
 
@@ -1959,13 +1959,13 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
                     ctx.lineTo(points[i].x, points[i].y);
                 }
                 ctx.closePath();
-                
+
                 // Set styles & render
                 ctx.fillStyle = fillStyle;
                 ctx.strokeStyle = strokeStyle;
                 ctx.lineWidth = isLarge ? 6 : 3;
                 ctx.shadowBlur = 0; // No drop shadow glow, identical to game
-                
+
                 ctx.fill();
                 ctx.stroke();
                 ctx.restore();
@@ -1986,7 +1986,7 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
                     ctx.lineJoin = 'round';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    
+
                     ctx.strokeText(nameStr, cx, cy);
                     ctx.fillText(nameStr, cx, cy);
                     ctx.restore();

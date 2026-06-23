@@ -19,18 +19,18 @@ const getGamemodeLabel = (log) => {
     const reason = log.meta?.reason || '';
     const mode = log.meta?.mode;
     const variant = log.meta?.variant;
-    
+
     const isBR = reason.includes('BR') || log.meta?.event?.includes('br') || (variant && (reason.includes('Victory') || reason.includes('Eliminated') || reason.includes('Refund')));
     const rawMode = mode || variant || 'agar';
-    
+
     if (isBR) {
         return rawMode.toLowerCase().includes('slither') ? 'Battle Royale Slither' : 'Battle Royale Agar';
     }
-    
+
     if (rawMode === 'competitive-slither') return 'Arena Slither';
     if (rawMode === 'slither') return 'Classic Slither';
     if (rawMode === 'agar') return 'Classic Agar';
-    
+
     // Fallbacks
     if (rawMode.toLowerCase().includes('slither')) return 'Slither';
     return 'Agar';
@@ -38,12 +38,12 @@ const getGamemodeLabel = (log) => {
 
 export default function Profile() {
     const { user, token, refreshUser, login } = useAuth();
-    const navigate  = useNavigate();
-    const location  = useLocation();
-    const [activeTab, setActiveTab]     = useState(location.state?.tab || 'stats');
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
-    const [gameLogs, setGameLogs]       = useState([]);
-    const [displayCur, setDisplayCur]   = useState(() => localStorage.getItem('profile_balance_currency') || 'USD');
+    const [gameLogs, setGameLogs] = useState([]);
+    const [displayCur, setDisplayCur] = useState(() => localStorage.getItem('profile_balance_currency') || 'USD');
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
@@ -53,8 +53,8 @@ export default function Profile() {
     const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
     const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
     const [usernameMsg, setUsernameMsg] = useState('');
-    const [isUpdating, setIsUpdating]   = useState(false);
-    const [updateMsg, setUpdateMsg]     = useState('');
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [updateMsg, setUpdateMsg] = useState('');
 
     useEffect(() => {
         setUsernameInput(user?.username || '');
@@ -65,7 +65,7 @@ export default function Profile() {
         setPageSeo(SEO.profile);
         const fetchLogs = async () => {
             try {
-                const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const data = await res.json();
@@ -74,7 +74,7 @@ export default function Profile() {
                     return (tx.type === 'withdraw' && (reason.includes('Arena Cashout') || reason.includes('BR Victory')))
                         || (tx.type === 'game' && (reason === 'Arena Death' || reason === 'BR Eliminated'));
                 }));
-            } catch {}
+            } catch { }
         };
         fetchLogs();
         refreshUser();
@@ -98,14 +98,14 @@ export default function Profile() {
     // ── Chart data ────────────────────────────────────
     const processedLogs = [...gameLogs].reverse().map(log => {
         const isCashout = log.type === 'withdraw' && ((log.meta?.reason || '').includes('Arena Cashout') || (log.meta?.reason || '').includes('BR Victory'));
-        const amount    = Number(log.amount) || 0;
+        const amount = Number(log.amount) || 0;
         const entryCost = Number(log.meta?.entryFeeUsd) || 10;
         const netProfit = isCashout ? (amount - entryCost) : (0 - entryCost);
         return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount, isCashout };
     });
 
     const totalPnL = processedLogs.reduce((acc, l) => acc + l.netProfit, 0);
-    const winRate  = processedLogs.length > 0
+    const winRate = processedLogs.length > 0
         ? Math.round((processedLogs.filter(l => l.netProfit > 0).length / processedLogs.length) * 100)
         : 0;
 
@@ -125,8 +125,8 @@ export default function Profile() {
         return cumulative;
     })];
 
-    const minVal   = Math.min(...chartPts, displayCur === 'SOL' ? -0.15 : -10);
-    const maxVal   = Math.max(...chartPts, displayCur === 'SOL' ? 0.15 : 10);
+    const minVal = Math.min(...chartPts, displayCur === 'SOL' ? -0.15 : -10);
+    const maxVal = Math.max(...chartPts, displayCur === 'SOL' ? 0.15 : 10);
     const pnlRange = (maxVal - minVal) || 1;
 
     const toXY = (val, i) => ({
@@ -168,7 +168,7 @@ export default function Profile() {
 
     // Use the correct brand colors (green = #14F195, red = #FF3B30)
     const C_GREEN = '#14F195';
-    const C_RED   = '#FF3B30';
+    const C_RED = '#FF3B30';
     const chartColor = totalPnL >= 0 ? C_GREEN : C_RED;
 
     const handleUpdateUsername = async () => {
@@ -204,7 +204,7 @@ export default function Profile() {
         setIsUpdating(true);
         setUpdateMsg('');
         try {
-            const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ walletAddress: walletInput })
@@ -251,7 +251,7 @@ export default function Profile() {
                     {/* ── Tab bar ── */}
                     <div className="profile-tabs">
                         {[
-                            { id: 'stats',   label: 'Performance' },
+                            { id: 'stats', label: 'Performance' },
                             { id: 'profile', label: 'Settings' },
                         ].map(tab => (
                             <button
@@ -301,7 +301,7 @@ export default function Profile() {
                                             background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(0,0,0,0) 70%)',
                                         }} />
                                     </div>
-                                    
+
                                     <div style={{ position: 'relative', zIndex: 1 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                             <span className="label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Available Balance</span>
@@ -327,7 +327,7 @@ export default function Profile() {
                                                 )}
                                             />
                                         </div>
-                                        
+
                                         {displayCur === 'SOL' ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -355,7 +355,7 @@ export default function Profile() {
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', zIndex: 1 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: 'var(--r-full)', padding: '4px 10px' }}>
                                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', animation: 'livePulse 2s ease-in-out infinite' }} />

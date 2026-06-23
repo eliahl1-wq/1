@@ -1032,7 +1032,7 @@ export default function SlitherGame() {
             </div>
             )}
 
-            {user?.isAdmin && import.meta.env.DEV && (
+            {user?.isAdmin && (
                 <div style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 10000, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <button 
                         className="ui-btn ui-btn-primary" 
