@@ -460,6 +460,7 @@ export default function Profile() {
                                                     x: (idx / Math.max(chartPts.length - 1, 1)) * rect.width,
                                                     y: (p.y / 100) * rect.height
                                                 },
+                                                containerWidth: rect.width,
                                                 date: formattedDate
                                             });
                                         }}
@@ -495,12 +496,12 @@ export default function Profile() {
                                         {/* Subtle horizontal grid lines */}
                                         {[20, 40, 60, 80].map(y => (
                                             <line key={y} x1="0" y1={y} x2="100" y2={y}
-                                                stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+                                                stroke="rgba(255,255,255,0.04)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                                         ))}
 
                                         {/* Zero / break-even baseline */}
                                         <line x1="0" y1={zeroY} x2="100" y2={zeroY}
-                                            stroke="rgba(255,255,255,0.1)" strokeWidth="0.6"
+                                            stroke="rgba(255,255,255,0.1)" strokeWidth="1" vectorEffect="non-scaling-stroke"
                                             strokeDasharray="4,4" />
 
                                         {/* Area fill */}
@@ -511,45 +512,43 @@ export default function Profile() {
                                             d={linePath}
                                             fill="none"
                                             stroke="url(#lineGrad)"
-                                            strokeWidth="1.0"
+                                            strokeWidth="1.2"
+                                            vectorEffect="non-scaling-stroke"
                                             strokeLinejoin="round"
                                             strokeLinecap="round"
                                         />
-
-                                        {/* Vertical cursor line */}
-                                        {hoveredPoint && (
-                                            <line
-                                                x1={hoveredPoint.x} y1="0"
-                                                x2={hoveredPoint.x} y2="100"
-                                                stroke="rgba(255,255,255,0.2)"
-                                                strokeWidth="0.8"
-                                                strokeDasharray="3,3"
-                                            />
-                                        )}
-
-                                        {/* Dot at hovered point */}
-                                        {hoveredPoint && (
-                                            <>
-                                                {/* outer glow ring */}
-                                                <circle
-                                                    cx={hoveredPoint.x}
-                                                    cy={hoveredPoint.y}
-                                                    r="5"
-                                                    fill={hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED}
-                                                    opacity="0.2"
-                                                />
-                                                {/* inner dot */}
-                                                <circle
-                                                    cx={hoveredPoint.x}
-                                                    cy={hoveredPoint.y}
-                                                    r="3"
-                                                    fill={hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED}
-                                                    stroke="#ffffff"
-                                                    strokeWidth="1.2"
-                                                />
-                                            </>
-                                        )}
                                     </svg>
+
+                                    {/* HTML/CSS Vertical cursor line */}
+                                    {hoveredPoint && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            left: `${hoveredPoint.clientCoords.x + 20}px`,
+                                            top: '20px',
+                                            bottom: '14px',
+                                            width: '1px',
+                                            borderLeft: '1px dashed rgba(255, 255, 255, 0.25)',
+                                            pointerEvents: 'none',
+                                            zIndex: 10,
+                                        }} />
+                                    )}
+
+                                    {/* HTML/CSS Dot at hovered point */}
+                                    {hoveredPoint && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            left: `${hoveredPoint.clientCoords.x + 20}px`,
+                                            top: `${hoveredPoint.clientCoords.y + 20}px`,
+                                            width: '8px',
+                                            height: '8px',
+                                            borderRadius: '50%',
+                                            background: hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED,
+                                            boxShadow: `0 0 0 4px ${hoveredPoint.cumVal >= 0 ? 'rgba(20,241,149,0.25)' : 'rgba(255,59,48,0.25)'}`,
+                                            transform: 'translate(-50%, -50%)',
+                                            pointerEvents: 'none',
+                                            zIndex: 11,
+                                        }} />
+                                    )}
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', position: 'relative', zIndex: 1 }}>
                                         <span>Start</span>
@@ -557,32 +556,36 @@ export default function Profile() {
                                     </div>
 
                                     {/* Floating tooltip */}
-                                    {hoveredPoint && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            left: `${Math.min(hoveredPoint.clientCoords.x + 18, 999)}px`,
-                                            top: `${hoveredPoint.clientCoords.y + 42}px`,
-                                            transform: 'translate(-50%, -100%)',
-                                            background: 'rgba(16, 17, 22, 0.97)',
-                                            border: `1px solid ${hoveredPoint.cumVal >= 0 ? 'rgba(20,241,149,0.25)' : 'rgba(255,59,48,0.25)'}`,
-                                            borderRadius: 'var(--r-md)',
-                                            padding: '8px 14px',
-                                            pointerEvents: 'none',
-                                            boxShadow: `0 4px 24px rgba(0,0,0,0.6), 0 0 12px ${hoveredPoint.cumVal >= 0 ? 'rgba(20,241,149,0.08)' : 'rgba(255,59,48,0.08)'}`,
-                                            zIndex: 20,
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '3px',
-                                            whiteSpace: 'nowrap',
-                                        }}>
-                                            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
-                                                {formatVal(hoveredPoint.cumVal, true)}
-                                            </span>
-                                            <span style={{ fontSize: '0.68rem', fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>
-                                                {hoveredPoint.date}
-                                            </span>
-                                        </div>
-                                    )}
+                                    {hoveredPoint && (() => {
+                                        const tooltipLeft = Math.max(80, Math.min(hoveredPoint.clientCoords.x + 20, hoveredPoint.containerWidth + 40 - 80));
+                                        return (
+                                            <div style={{
+                                                position: 'absolute',
+                                                left: `${tooltipLeft}px`,
+                                                top: `${hoveredPoint.clientCoords.y + 20 - 12}px`,
+                                                transform: 'translate(-50%, -100%)',
+                                                background: '#131722',
+                                                border: `1px solid rgba(255, 255, 255, 0.12)`,
+                                                borderRadius: '6px',
+                                                padding: '8px 12px',
+                                                pointerEvents: 'none',
+                                                boxShadow: `0 4px 16px rgba(0,0,0,0.5)`,
+                                                zIndex: 20,
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '3px',
+                                                alignItems: 'flex-start',
+                                                whiteSpace: 'nowrap',
+                                            }}>
+                                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
+                                                    {formatVal(hoveredPoint.cumVal, true)}
+                                                </span>
+                                                <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'rgba(255,255,255,0.45)' }}>
+                                                    {hoveredPoint.date}
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Session log */}
