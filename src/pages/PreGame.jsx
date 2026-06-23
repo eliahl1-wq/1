@@ -1660,18 +1660,23 @@ function SnakeSkinPreview({ color, isLarge }) {
 
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const radiusX = isLarge ? 120 : 65;
-        const radiusY = isLarge ? 45 : 22;
+
+        const totalLength = segmentsCount * spacing;
+        const headX = centerX + (totalLength / 2) - radius * 1.2;
 
         const trail = [];
+        const speedX = isLarge ? 2.5 : 1.8;
+        const amp = isLarge ? 20 : 9;
+        const wiggleSpeed = 0.08;
 
         // Pre-populate trail by simulating past frames so it starts fully formed
-        for (let j = 300; j >= 0; j--) {
+        for (let j = 400; j >= 0; j--) {
             const tempT = -j;
-            const angle = tempT * 0.035;
-            const tempX = centerX + Math.cos(angle) * radiusX;
-            const tempY = centerY + Math.sin(angle * 2) * radiusY;
-            trail.unshift({ x: tempX, y: tempY });
+            const tempWiggle = Math.sin(tempT * wiggleSpeed) * amp;
+            trail.push({
+                x: headX - j * speedX,
+                y: centerY + tempWiggle
+            });
         }
 
         const render = () => {
@@ -1681,11 +1686,13 @@ function SnakeSkinPreview({ color, isLarge }) {
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Calculate new head position in a figure-8 infinity loop
-            const angle = t * 0.035;
-            const headX = centerX + Math.cos(angle) * radiusX;
-            const headY = centerY + Math.sin(angle * 2) * radiusY;
-            
+            // Shift current trail points to the left
+            for (let j = 0; j < trail.length; j++) {
+                trail[j].x -= speedX;
+            }
+
+            // Insert new head at start (on the right)
+            const headY = centerY + Math.sin(t * wiggleSpeed) * amp;
             trail.unshift({ x: headX, y: headY });
 
             // Keep trail bounded
