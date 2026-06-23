@@ -241,6 +241,8 @@ export default function Game() {
     const canCashOutRef = useRef(false);
     canCashOutRef.current = !isBattleRoyale && localTimer <= 0 && cashedAmount === null && !isDead;
 
+    const cashoutReady = !isBattleRoyale && isConnected && !isDead && cashedAmount === null;
+
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
         if (cashoutActiveRef.current) return;

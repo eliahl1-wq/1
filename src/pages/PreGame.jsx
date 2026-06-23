@@ -1679,9 +1679,9 @@ function SnakeSkinPreview({ color, isLarge }) {
         const headX = centerX + (totalLength / 2) - radius * 1.2;
 
         const trail = [];
-        const speedX = isLarge ? 2.5 : 1.8;
+        const speedX = isLarge ? 1.3 : 1.1;
         const amp = isLarge ? 20 : 9;
-        const wiggleSpeed = 0.08;
+        const wiggleSpeed = isLarge ? 0.045 : 0.055;
 
         // Pre-populate trail by simulating past frames so it starts fully formed
         for (let j = 400; j >= 0; j--) {
