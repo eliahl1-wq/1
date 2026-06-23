@@ -125,8 +125,15 @@ function drawPlayerCashoutRing(graph, cell) {
 
 const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
     for (let cell of cells) {
-        graph.fillStyle = cell.color;
-        graph.strokeStyle = cell.borderColor;
+        if (cell.color === 'rainbow') {
+            const time = Date.now() * 0.002;
+            const hue = (time * 100) % 360;
+            graph.fillStyle = `hsl(${hue}, 100%, 55%)`;
+            graph.strokeStyle = `hsl(${hue}, 100%, 42%)`;
+        } else {
+            graph.fillStyle = cell.color;
+            graph.strokeStyle = cell.borderColor;
+        }
         graph.lineWidth = 6;
         
         // Disable shadow glow completely for performance and clean aesthetic
