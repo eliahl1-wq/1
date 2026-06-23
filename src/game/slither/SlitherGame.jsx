@@ -234,7 +234,7 @@ export default function SlitherGame() {
                 token: authToken,
                 mode: joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither',
                 entryFeeUsd: fee,
-                skinColor: preferredSkin !== 'random' ? preferredSkin : null,
+                skinColor: preferredSkin,
             });
         }
     }, [authToken, liveSession]);
@@ -474,7 +474,7 @@ export default function SlitherGame() {
                         token: authToken,
                         mode: joinMode,
                         entryFeeUsd: fee,
-                        skinColor: preferredSkin !== 'random' ? preferredSkin : null,
+                        skinColor: preferredSkin,
                     });
                 }
                 hasJoinedRef.current = true;

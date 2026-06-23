@@ -1532,7 +1532,7 @@ export default function PreGame() {
 /* ── SnakeSkinPreview ── */
 function SnakeSkinPreview({ color, isLarge }) {
     const canvasRef = useRef(null);
-    const frameRef = useRef(0);
+    const tRef = useRef(0);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -1544,25 +1544,81 @@ function SnakeSkinPreview({ color, isLarge }) {
         const radius = isLarge ? 18 : 12;
         const spacing = isLarge ? 6 : 4;
 
+        const trail = [];
+        const centerX = isLarge ? 300 / 2 : 250 / 2;
+        const startY = isLarge ? 30 : 20;
+
+        // Pre-populate trail so the snake starts wiggling instantly when mounted
+        for (let j = 0; j < 300; j++) {
+            const tempT = -j;
+            const tempWiggle = Math.sin(tempT * 0.08) * (isLarge ? 28 : 16);
+            trail.push({
+                x: centerX + tempWiggle,
+                y: startY + j * (isLarge ? 2.5 : 1.8)
+            });
+        }
+
         const render = () => {
-            frameRef.current += 1;
-            const t = frameRef.current;
+            tRef.current += 1;
+            const t = tRef.current;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const points = [];
-            const startY = isLarge ? 30 : 20;
-            const amp = isLarge ? 20 : 12;
-
-            for (let i = 0; i < segmentsCount; i++) {
-                const segT = i * 0.12 - t * 0.03;
-                points.push({
-                    x: (isLarge ? 150 : 125) + Math.sin(segT) * amp,
-                    y: startY + i * spacing
-                });
+            // Shift current trail points down
+            const speedY = isLarge ? 2.5 : 1.8;
+            for (let j = 0; j < trail.length; j++) {
+                trail[j].y += speedY;
             }
 
-            for (let i = segmentsCount - 1; i >= 0; i--) {
+            // Insert new head at start
+            const amp = isLarge ? 28 : 16;
+            const wiggleSpeed = 0.08;
+            const headX = centerX + Math.sin(t * wiggleSpeed) * amp;
+            trail.unshift({ x: headX, y: startY });
+
+            // Keep trail bounded
+            if (trail.length > 500) trail.length = 500;
+
+            // Interpolate points along trail at exact 'spacing' intervals
+            const points = [];
+            if (trail.length > 0) {
+                let currentPoint = trail[0];
+                points.push(currentPoint);
+                
+                let trailIdx = 1;
+                let distAccum = 0;
+                
+                for (let i = 1; i < segmentsCount; i++) {
+                    let needed = spacing;
+                    let found = false;
+                    while (trailIdx < trail.length) {
+                        const p1 = trail[trailIdx - 1];
+                        const p2 = trail[trailIdx];
+                        const segD = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                        
+                        if (distAccum + segD >= needed) {
+                            const ratio = (needed - distAccum) / segD;
+                            currentPoint = {
+                                x: p1.x + (p2.x - p1.x) * ratio,
+                                y: p1.y + (p2.y - p1.y) * ratio
+                            };
+                            points.push(currentPoint);
+                            distAccum = 0;
+                            found = true;
+                            break;
+                        } else {
+                            distAccum += segD;
+                            trailIdx++;
+                        }
+                    }
+                    if (!found) {
+                        points.push(trail[trail.length - 1]);
+                    }
+                }
+            }
+
+            // Draw shadow & body segments from tail to head
+            for (let i = points.length - 1; i >= 0; i--) {
                 const pt = points[i];
                 let segColorHex = color;
                 if (color === 'random') {
@@ -1570,7 +1626,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                         '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
                         '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
                     ];
-                    const colorIndex = Math.floor((t * 0.01 + i * 0.35) % colors.length);
+                    const colorIndex = Math.floor((t * 0.15 + i * 0.45) % colors.length);
                     segColorHex = colors[colorIndex];
                 }
 
@@ -1604,6 +1660,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                 ctx.restore();
             }
 
+            // Draw eyes on the head segment
             const head = points[0];
             const next = points[1];
             if (head && next) {

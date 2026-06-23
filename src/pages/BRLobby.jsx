@@ -65,7 +65,7 @@ export default function BRLobby() {
                 token,
                 username: matchNickname,
                 entryFeeUsd,
-                skinColor: preferredSkin !== 'random' ? preferredSkin : null
+                skinColor: preferredSkin
             });
         });
 

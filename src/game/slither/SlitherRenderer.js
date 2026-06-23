@@ -84,6 +84,7 @@ function normalizeSnakeColor(color) {
 
 /** Bucket colors so sprite cache stays small across many snakes. */
 function bucketSnakeColor(color) {
+    if (color === 'random') return 'random';
     const cs = normalizeSnakeColor(color);
     const { r, g, b } = parseColor(cs);
     const step = 24;
@@ -701,13 +702,13 @@ export class SlitherRenderer {
             s._lastUsed = this._frame;
             return s;
         }
-        if (this._sprites.size >= 512) {
+        if (this._sprites.size >= 4096) {
             const entries = [...this._sprites.entries()]
                 .sort((a, b) => (a[1]._lastUsed || 0) - (b[1]._lastUsed || 0));
-            for (let i = 0; i < 96 && i < entries.length; i++) {
+            for (let i = 0; i < 512 && i < entries.length; i++) {
                 this._sprites.delete(entries[i][0]);
             }
-            if (this._prImgs.size > 200) {
+            if (this._prImgs.size > 1000) {
                 this._prImgs.clear();
             }
         }
@@ -1205,7 +1206,6 @@ export class SlitherRenderer {
         const segmentCanvas = getSnakeSegmentCanvas(rPx, cs);
         g.save();
         g.translate(c, c);
-        g.rotate(-Math.PI / 2); // Or whatever default rotation is expected if needed, but since it's a circle it doesn't matter much. Actually getSnakeSegmentCanvas is a circle, no rotation needed.
         const half = segmentCanvas.width / 2;
         g.drawImage(segmentCanvas, -half, -half);
         g.restore();
@@ -1528,8 +1528,30 @@ export class SlitherRenderer {
             boostOverlay: boosting && q >= 0.8,
             trailGlow: boosting,
         };
-        const { normal, boostBody, glow, boostOverlay, trailGlow, bodySS } = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
-        const stampScale = bodySS * (cacheR / bodyRadius);
+
+        const isRainbow = (snake.color === 'random');
+        const rainbowColors = [
+            '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
+            '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
+        ];
+
+        let normal, boostBody, glow, boostOverlay, trailGlow, bodySS, stampScale;
+        if (!isRainbow) {
+            const stamp = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
+            normal = stamp.normal;
+            boostBody = stamp.boostBody;
+            glow = stamp.glow;
+            boostOverlay = stamp.boostOverlay;
+            trailGlow = stamp.trailGlow;
+            bodySS = stamp.bodySS;
+            stampScale = bodySS * (cacheR / bodyRadius);
+        } else {
+            const stamp = this._getSnakeSegmentStamp('#c080ff', cacheR, prNeeds);
+            trailGlow = stamp.trailGlow;
+            boostOverlay = stamp.boostOverlay;
+            bodySS = stamp.bodySS;
+            stampScale = bodySS * (cacheR / bodyRadius);
+        }
         const halfT = trailGlow ? trailGlow.width / 2 : 0;
         const halfB = boostOverlay ? boostOverlay.width / 2 : 0;
         const bumpCount = bumps.length;
@@ -1564,15 +1586,26 @@ export class SlitherRenderer {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
-            const sprite = (boosting && i === 0) ? boostBody : normal;
+            let sprite;
+            let currentStampScale = stampScale;
+            if (isRainbow) {
+                const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowColors.length);
+                const segColor = rainbowColors[colorIndex];
+                const stamp = this._getSnakeSegmentStamp(segColor, cacheR, prNeeds);
+                sprite = (boosting && i === 0) ? stamp.boostBody : stamp.normal;
+                currentStampScale = stamp.bodySS * (cacheR / bodyRadius);
+            } else {
+                sprite = (boosting && i === 0) ? boostBody : normal;
+            }
+
             // Restore rotation so the linear light streak dynamically follows the snake's curves!
             const tangent = this._bumpTangent(bumps, i);
-            this._blitSprite(ctx, sprite, p.x, p.y, stampScale, tangent);
+            this._blitSprite(ctx, sprite, p.x, p.y, currentStampScale, tangent);
         }
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
 
-        if (prNeeds.glow && glow) {
+        if (prNeeds.glow) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
@@ -1580,7 +1613,13 @@ export class SlitherRenderer {
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
-                this._blitSprite(ctx, glow, p.x, p.y);
+                let currentGlow = glow;
+                if (isRainbow) {
+                    const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowColors.length);
+                    const segColor = rainbowColors[colorIndex];
+                    currentGlow = this._getSnakeSegmentStamp(segColor, cacheR, prNeeds).glow;
+                }
+                if (currentGlow) this._blitSprite(ctx, currentGlow, p.x, p.y);
             }
             ctx.restore();
         }
