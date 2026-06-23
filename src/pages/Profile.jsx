@@ -430,161 +430,176 @@ export default function Profile() {
                                         )}
                                     </div>
 
-                                    <svg
-                                        viewBox="0 0 100 100"
-                                        preserveAspectRatio="none"
-                                        style={{ width: '100%', height: '220px', display: 'block' }}
-                                        onMouseMove={e => {
-                                            if (chartPts.length < 2) return;
-                                            const rect = e.currentTarget.getBoundingClientRect();
-                                            const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
-                                            const idx = Math.max(0, Math.min(
-                                                Math.round((mouseX / 100) * (chartPts.length - 1)),
-                                                chartPts.length - 1
-                                            ));
-                                            const log = idx > 0 ? processedLogs[idx - 1] : null;
-                                            const ptVal = chartPts[idx];
-                                            const p = toXY(ptVal, idx);
-                                            let formattedDate = 'Initial Session';
-                                            if (log) {
-                                                const d = new Date(log.createdAt);
-                                                formattedDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-                                                    + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                                            }
-                                            setHoveredPoint({
-                                                index: idx,
-                                                cumVal: ptVal,
-                                                x: p.x,
-                                                y: p.y,
-                                                clientCoords: {
-                                                    x: (idx / Math.max(chartPts.length - 1, 1)) * rect.width,
-                                                    y: (p.y / 100) * rect.height
-                                                },
-                                                containerWidth: rect.width,
-                                                date: formattedDate
-                                            });
-                                        }}
-                                        onMouseLeave={() => setHoveredPoint(null)}
-                                    >
-                                        <defs>
-                                            {/* Line gradient: green above zero → red below */}
-                                            <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor={C_GREEN} />
-                                                <stop offset={`${zeroPercent}%`} stopColor={C_GREEN} />
-                                                <stop offset={`${zeroPercent}%`} stopColor={C_RED} />
-                                                <stop offset="100%" stopColor={C_RED} />
-                                            </linearGradient>
+                                    <div style={{ position: 'relative', width: '100%', height: '220px' }}>
+                                        <svg
+                                            viewBox="0 0 100 100"
+                                            preserveAspectRatio="none"
+                                            style={{ width: '100%', height: '100%', display: 'block' }}
+                                            onMouseMove={e => {
+                                                if (chartPts.length < 2) return;
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
+                                                const idx = Math.max(0, Math.min(
+                                                    Math.round((mouseX / 100) * (chartPts.length - 1)),
+                                                    chartPts.length - 1
+                                                ));
+                                                const log = idx > 0 ? processedLogs[idx - 1] : null;
+                                                const ptVal = chartPts[idx];
+                                                const p = toXY(ptVal, idx);
+                                                let formattedDate = 'Initial Session';
+                                                if (log) {
+                                                    const d = new Date(log.createdAt);
+                                                    formattedDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                                                        + ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                                                }
+                                                setHoveredPoint({
+                                                    index: idx,
+                                                    cumVal: ptVal,
+                                                    x: p.x,
+                                                    y: p.y,
+                                                    clientCoords: {
+                                                        x: (idx / Math.max(chartPts.length - 1, 1)) * rect.width,
+                                                        y: (p.y / 100) * rect.height
+                                                    },
+                                                    containerWidth: rect.width,
+                                                    date: formattedDate,
+                                                    netProfit: log ? log.netProfit : null,
+                                                    gameLabel: log ? getGamemodeLabel(log) : null
+                                                });
+                                            }}
+                                            onMouseLeave={() => setHoveredPoint(null)}
+                                        >
+                                            <defs>
+                                                {/* Line gradient: green above zero → red below */}
+                                                <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+                                                    <stop offset="0%" stopColor={C_GREEN} />
+                                                    <stop offset={`${zeroPercent}%`} stopColor={C_GREEN} />
+                                                    <stop offset={`${zeroPercent}%`} stopColor={C_RED} />
+                                                    <stop offset="100%" stopColor={C_RED} />
+                                                </linearGradient>
 
-                                            {/* Area fill gradient anchored at zero */}
-                                            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor={C_GREEN} stopOpacity="0.18" />
-                                                <stop offset={`${Math.max(0, zeroPercent - 1)}%`} stopColor={C_GREEN} stopOpacity="0.03" />
-                                                <stop offset={`${Math.min(100, zeroPercent + 1)}%`} stopColor={C_RED} stopOpacity="0.03" />
-                                                <stop offset="100%" stopColor={C_RED} stopOpacity="0.2" />
-                                            </linearGradient>
+                                                {/* Area fill gradient anchored at zero */}
+                                                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+                                                    <stop offset="0%" stopColor={C_GREEN} stopOpacity="0.18" />
+                                                    <stop offset={`${Math.max(0, zeroPercent - 1)}%`} stopColor={C_GREEN} stopOpacity="0.03" />
+                                                    <stop offset={`${Math.min(100, zeroPercent + 1)}%`} stopColor={C_RED} stopOpacity="0.03" />
+                                                    <stop offset="100%" stopColor={C_RED} stopOpacity="0.2" />
+                                                </linearGradient>
 
-                                            {/* Glow filter for the line */}
-                                            <filter id="lineGlow" x="-10%" y="-80%" width="120%" height="260%">
-                                                <feGaussianBlur stdDeviation="1.2" result="blur" />
-                                                <feMerge>
-                                                    <feMergeNode in="blur" />
-                                                    <feMergeNode in="SourceGraphic" />
-                                                </feMerge>
-                                            </filter>
-                                        </defs>
+                                                {/* Glow filter for the line */}
+                                                <filter id="lineGlow" x="-10%" y="-80%" width="120%" height="260%">
+                                                    <feGaussianBlur stdDeviation="1.2" result="blur" />
+                                                    <feMerge>
+                                                        <feMergeNode in="blur" />
+                                                        <feMergeNode in="SourceGraphic" />
+                                                    </feMerge>
+                                                </filter>
+                                            </defs>
 
-                                        {/* Subtle horizontal grid lines */}
-                                        {[20, 40, 60, 80].map(y => (
-                                            <line key={y} x1="0" y1={y} x2="100" y2={y}
-                                                stroke="rgba(255,255,255,0.04)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                                        ))}
+                                            {/* Subtle horizontal grid lines */}
+                                            {[20, 40, 60, 80].map(y => (
+                                                <line key={y} x1="0" y1={y} x2="100" y2={y}
+                                                    stroke="rgba(255,255,255,0.04)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                                            ))}
 
-                                        {/* Zero / break-even baseline */}
-                                        <line x1="0" y1={zeroY} x2="100" y2={zeroY}
-                                            stroke="rgba(255,255,255,0.1)" strokeWidth="1" vectorEffect="non-scaling-stroke"
-                                            strokeDasharray="4,4" />
+                                            {/* Zero / break-even baseline */}
+                                            <line x1="0" y1={zeroY} x2="100" y2={zeroY}
+                                                stroke="rgba(255,255,255,0.1)" strokeWidth="1" vectorEffect="non-scaling-stroke"
+                                                strokeDasharray="4,4" />
 
-                                        {/* Area fill */}
-                                        <path d={fillPath} fill="url(#areaGrad)" />
+                                            {/* Area fill */}
+                                            <path d={fillPath} fill="url(#areaGrad)" />
 
-                                        {/* Main crisp line */}
-                                        <path
-                                            d={linePath}
-                                            fill="none"
-                                            stroke="url(#lineGrad)"
-                                            strokeWidth="1.2"
-                                            vectorEffect="non-scaling-stroke"
-                                            strokeLinejoin="round"
-                                            strokeLinecap="round"
-                                        />
-                                    </svg>
+                                            {/* Main crisp line */}
+                                            <path
+                                                d={linePath}
+                                                fill="none"
+                                                stroke="url(#lineGrad)"
+                                                strokeWidth="1.2"
+                                                vectorEffect="non-scaling-stroke"
+                                                strokeLinejoin="round"
+                                                strokeLinecap="round"
+                                            />
+                                        </svg>
 
-                                    {/* HTML/CSS Vertical cursor line */}
-                                    {hoveredPoint && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            left: `${hoveredPoint.clientCoords.x + 20}px`,
-                                            top: '20px',
-                                            bottom: '14px',
-                                            width: '1px',
-                                            borderLeft: '1px dashed rgba(255, 255, 255, 0.25)',
-                                            pointerEvents: 'none',
-                                            zIndex: 10,
-                                        }} />
-                                    )}
+                                        {/* HTML/CSS Vertical cursor line */}
+                                        {hoveredPoint && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                left: `${hoveredPoint.clientCoords.x}px`,
+                                                top: '0px',
+                                                bottom: '0px',
+                                                width: '1px',
+                                                borderLeft: '1px dashed rgba(255, 255, 255, 0.25)',
+                                                pointerEvents: 'none',
+                                                zIndex: 10,
+                                            }} />
+                                        )}
 
-                                    {/* HTML/CSS Dot at hovered point */}
-                                    {hoveredPoint && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            left: `${hoveredPoint.clientCoords.x + 20}px`,
-                                            top: `${hoveredPoint.clientCoords.y + 20}px`,
-                                            width: '8px',
-                                            height: '8px',
-                                            borderRadius: '50%',
-                                            background: hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED,
-                                            boxShadow: `0 0 0 4px ${hoveredPoint.cumVal >= 0 ? 'rgba(20,241,149,0.25)' : 'rgba(255,59,48,0.25)'}`,
-                                            transform: 'translate(-50%, -50%)',
-                                            pointerEvents: 'none',
-                                            zIndex: 11,
-                                        }} />
-                                    )}
+                                        {/* HTML/CSS Dot at hovered point */}
+                                        {hoveredPoint && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                left: `${hoveredPoint.clientCoords.x}px`,
+                                                top: `${hoveredPoint.clientCoords.y}px`,
+                                                width: '8px',
+                                                height: '8px',
+                                                borderRadius: '50%',
+                                                background: hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED,
+                                                boxShadow: `0 0 0 4px ${hoveredPoint.cumVal >= 0 ? 'rgba(20,241,149,0.25)' : 'rgba(255,59,48,0.25)'}`,
+                                                transform: 'translate(-50%, -50%)',
+                                                pointerEvents: 'none',
+                                                zIndex: 11,
+                                            }} />
+                                        )}
+
+                                        {/* Floating tooltip */}
+                                        {hoveredPoint && (() => {
+                                            const tooltipLeft = Math.max(80, Math.min(hoveredPoint.clientCoords.x, hoveredPoint.containerWidth - 80));
+                                            return (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    left: `${tooltipLeft}px`,
+                                                    top: `${hoveredPoint.clientCoords.y - 12}px`,
+                                                    transform: 'translate(-50%, -100%)',
+                                                    background: '#131722',
+                                                    border: `1px solid rgba(255, 255, 255, 0.12)`,
+                                                    borderRadius: '6px',
+                                                    padding: '10px 14px',
+                                                    pointerEvents: 'none',
+                                                    boxShadow: `0 4px 16px rgba(0,0,0,0.5)`,
+                                                    zIndex: 20,
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '4px',
+                                                    alignItems: 'flex-start',
+                                                    whiteSpace: 'nowrap',
+                                                }}>
+                                                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                                        {hoveredPoint.gameLabel || 'Initial Balance'}
+                                                    </span>
+                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                                        <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
+                                                            {formatVal(hoveredPoint.cumVal, true)}
+                                                        </span>
+                                                        {hoveredPoint.netProfit !== null && (
+                                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: hoveredPoint.netProfit >= 0 ? C_GREEN : C_RED, fontFamily: 'var(--mono)' }}>
+                                                                ({formatVal(hoveredPoint.netProfit, true)})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span style={{ fontSize: '0.62rem', fontWeight: 500, color: 'rgba(255,255,255,0.45)' }}>
+                                                        {hoveredPoint.date}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', position: 'relative', zIndex: 1 }}>
                                         <span>Start</span>
                                         <span>{processedLogs.length} sessions</span>
                                     </div>
-
-                                    {/* Floating tooltip */}
-                                    {hoveredPoint && (() => {
-                                        const tooltipLeft = Math.max(80, Math.min(hoveredPoint.clientCoords.x + 20, hoveredPoint.containerWidth + 40 - 80));
-                                        return (
-                                            <div style={{
-                                                position: 'absolute',
-                                                left: `${tooltipLeft}px`,
-                                                top: `${hoveredPoint.clientCoords.y + 20 - 12}px`,
-                                                transform: 'translate(-50%, -100%)',
-                                                background: '#131722',
-                                                border: `1px solid rgba(255, 255, 255, 0.12)`,
-                                                borderRadius: '6px',
-                                                padding: '8px 12px',
-                                                pointerEvents: 'none',
-                                                boxShadow: `0 4px 16px rgba(0,0,0,0.5)`,
-                                                zIndex: 20,
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '3px',
-                                                alignItems: 'flex-start',
-                                                whiteSpace: 'nowrap',
-                                            }}>
-                                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--mono)', letterSpacing: '-0.02em' }}>
-                                                    {formatVal(hoveredPoint.cumVal, true)}
-                                                </span>
-                                                <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'rgba(255,255,255,0.45)' }}>
-                                                    {hoveredPoint.date}
-                                                </span>
-                                            </div>
-                                        );
                                     })()}
                                 </div>
 
