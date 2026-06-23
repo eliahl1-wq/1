@@ -82,6 +82,22 @@ function resolvePreGameMode(pathname, locationStateMode, isAdmin = false) {
     return normalizeGamemodeForLobby(raw, isAdmin);
 }
 
+const getChromaName = (color) => {
+    if (color === 'random') return 'Rainbow';
+    switch (color) {
+        case '#c080ff': return 'Lavender Purple';
+        case '#9099ff': return 'Indigo Blue';
+        case '#80d0d0': return 'Turquoise Cyan';
+        case '#80ff80': return 'Lime Green';
+        case '#eeee70': return 'Tinted Yellow';
+        case '#ffa060': return 'Orange';
+        case '#ff9050': return 'Pink Red';
+        case '#ff4040': return 'Dark Red';
+        case '#e030e0': return 'Magenta';
+        default: return color.toUpperCase();
+    }
+};
+
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
     const navigate = useNavigate();
@@ -1331,11 +1347,11 @@ export default function PreGame() {
                                 </div>
                                 {isSlitherFamily ? (
                                     <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
-                                        {selectedSkin === 'random' ? 'Default' : 'Active'}
+                                        {getChromaName(selectedSkin)}
                                     </span>
                                 ) : (
                                     <span className="customize-lobby-status-pill" style={selectedSkinAgar === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkinAgar }}>
-                                        {selectedSkinAgar === 'random' ? 'Default' : 'Active'}
+                                        {getChromaName(selectedSkinAgar)}
                                     </span>
                                 )}
                             </div>
@@ -1622,10 +1638,15 @@ export default function PreGame() {
 }
 
 /* ── SnakeSkinPreview ── */
-/* ── SnakeSkinPreview ── */
 function SnakeSkinPreview({ color, isLarge }) {
     const canvasRef = useRef(null);
     const tRef = useRef(0);
+    const colorRef = useRef(color);
+
+    // Keep colorRef updated without re-triggering the main animation effect
+    useEffect(() => {
+        colorRef.current = color;
+    }, [color]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -1633,16 +1654,16 @@ function SnakeSkinPreview({ color, isLarge }) {
         const ctx = canvas.getContext('2d');
 
         let animationFrameId;
-        const segmentsCount = isLarge ? 40 : 25;
-        const radius = isLarge ? 18 : 12;
-        const spacing = isLarge ? 6 : 4;
+        const segmentsCount = isLarge ? 70 : 25;
+        const radius = isLarge ? 16 : 12;
+        const spacing = isLarge ? 5.5 : 4;
 
         const trail = [];
-        const headX = isLarge ? 260 : 200;
-        const centerY = isLarge ? 260 / 2 : 100 / 2;
+        const headX = isLarge ? 410 : 200;
+        const centerY = isLarge ? 100 : 50;
 
         // Pre-populate trail so the snake starts wiggling instantly when mounted
-        for (let j = 0; j < 300; j++) {
+        for (let j = 0; j < 500; j++) {
             const tempT = -j;
             const tempWiggle = Math.sin(tempT * 0.08) * (isLarge ? 24 : 10);
             trail.push({
@@ -1654,6 +1675,7 @@ function SnakeSkinPreview({ color, isLarge }) {
         const render = () => {
             tRef.current += 1;
             const t = tRef.current;
+            const currentColor = colorRef.current;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1670,7 +1692,7 @@ function SnakeSkinPreview({ color, isLarge }) {
             trail.unshift({ x: headX, y: headY });
 
             // Keep trail bounded
-            if (trail.length > 500) trail.length = 500;
+            if (trail.length > 600) trail.length = 600;
 
             // Interpolate points along trail at exact 'spacing' intervals
             const points = [];
@@ -1713,8 +1735,8 @@ function SnakeSkinPreview({ color, isLarge }) {
             // Draw shadow & body segments from tail to head
             for (let i = points.length - 1; i >= 0; i--) {
                 const pt = points[i];
-                let segColorHex = color;
-                if (color === 'random') {
+                let segColorHex = currentColor;
+                if (currentColor === 'random') {
                     const colors = [
                         '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
                         '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
@@ -1753,7 +1775,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                 ctx.restore();
             }
 
-            // Draw eyes on the head segment (facing right)
+            // Draw eyes on the head segment
             const head = points[0];
             const next = points[1];
             if (head && next) {
@@ -1794,15 +1816,15 @@ function SnakeSkinPreview({ color, isLarge }) {
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [color, isLarge]);
+    }, [isLarge]);
 
     return (
-        <div className="snake-preview-wrapper" style={{ width: '100%', height: isLarge ? '260px' : '100px', display: 'flex', justifyContent: 'center' }}>
+        <div className="snake-preview-wrapper" style={{ width: '100%', height: isLarge ? '200px' : '100px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <canvas
                 ref={canvasRef}
-                width={isLarge ? 300 : 250}
-                height={isLarge ? 260 : 100}
-                style={{ height: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
+                width={isLarge ? 450 : 250}
+                height={isLarge ? 200 : 100}
+                style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block' }}
             />
         </div>
     );
@@ -1812,6 +1834,11 @@ function SnakeSkinPreview({ color, isLarge }) {
 function AgarBlobPreview({ color, isLarge, nickname }) {
     const canvasRef = useRef(null);
     const tRef = useRef(0);
+    const colorRef = useRef(color);
+
+    useEffect(() => {
+        colorRef.current = color;
+    }, [color]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -1820,71 +1847,27 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
 
         let animationFrameId;
         const radius = isLarge ? 55 : 24;
-        const numPoints = 8;
-        const pts = [];
         
-        // Initialize blob points
-        for (let j = 0; j < numPoints; j++) {
-            pts.push({ x: 0, y: 0 });
-        }
-
         const render = () => {
             tRef.current += 1;
             const t = tRef.current;
+            const currentColor = colorRef.current;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
 
-            // Calculate wiggling blob points
-            for (let j = 0; j < numPoints; j++) {
-                const angle = (j / numPoints) * Math.PI * 2;
-                // Wobble radius with sine wave
-                const r = radius + Math.sin(t * 0.06 + j * 0.8) * (isLarge ? 4 : 2);
-                pts[j] = {
-                    x: centerX + Math.cos(angle) * r,
-                    y: centerY + Math.sin(angle) * r
-                };
-            }
+            // Generate fill and border colors identical to the in-game rendering logic
+            let fillStyle = currentColor;
+            let strokeStyle = '#000000';
 
-            // Draw shadow first
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-            ctx.shadowBlur = isLarge ? 20 : 10;
-            ctx.shadowOffsetY = isLarge ? 8 : 4;
-
-            // Draw blob using quadratic curves
-            ctx.beginPath();
-            const firstMid = {
-                x: (pts[0].x + pts[numPoints - 1].x) / 2,
-                y: (pts[0].y + pts[numPoints - 1].y) / 2
-            };
-            ctx.moveTo(firstMid.x, firstMid.y);
-            for (let j = 0; j < numPoints; j++) {
-                const next = pts[(j + 1) % numPoints];
-                const mid = {
-                    x: (pts[j].x + next.x) / 2,
-                    y: (pts[j].y + next.y) / 2
-                };
-                ctx.quadraticCurveTo(pts[j].x, pts[j].y, mid.x, mid.y);
-            }
-            ctx.closePath();
-
-            // Set up radial gradient
-            const gradX = centerX - radius * 0.25;
-            const gradY = centerY - radius * 0.25;
-            const grad = ctx.createRadialGradient(gradX, gradY, radius * 0.05, centerX, centerY, radius * 1.05);
-
-            if (color === 'random') {
+            if (currentColor === 'random') {
                 const hue = (t * 0.35) % 360;
-                grad.addColorStop(0, `hsla(${hue}, 95%, 75%, 1)`);
-                grad.addColorStop(1, `hsla(${hue}, 85%, 52%, 1)`);
-                ctx.fillStyle = grad;
+                fillStyle = `hsl(${hue}, 100%, 55%)`;
+                strokeStyle = `hsl(${hue}, 100%, 42%)`;
             } else {
-                // custom color
-                // parse color to make a beautiful 3D spherical gradient
-                const h = color.replace('#', '');
+                const h = currentColor.replace('#', '');
                 let r = 120, g = 120, b = 120;
                 if (h.length === 3) {
                     r = parseInt(h[0] + h[0], 16);
@@ -1895,26 +1878,67 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
                     g = parseInt(h.slice(2, 4), 16);
                     b = parseInt(h.slice(4, 6), 16);
                 }
-                const inner = `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)}, 1)`;
-                const outer = `rgba(${r}, ${g}, ${b}, 1)`;
-                grad.addColorStop(0, inner);
-                grad.addColorStop(1, outer);
-                ctx.fillStyle = grad;
+                const br = Math.max(0, r - 32);
+                const bg = Math.max(0, g - 32);
+                const bb = Math.max(0, b - 32);
+                fillStyle = currentColor;
+                strokeStyle = '#' + ((1 << 24) + (br << 16) + (bg << 8) + bb).toString(16).slice(1);
             }
 
+            // Draw organic wiggling cell identical to drawOrganicCell in render.js
+            const pointCount = Math.min(Math.max(~~radius, 24), 60);
+            const points = [];
+            const time = Date.now() * 0.002;
+            const FULL_ANGLE = 2 * Math.PI;
+
+            for (let i = 0; i < pointCount; i++) {
+                const theta = (i / pointCount) * FULL_ANGLE;
+                // Wobble matches in-game cell.radius * 0.02
+                const wobble = Math.sin(time + theta * 5) * (radius * 0.02);
+                
+                points.push({
+                    x: centerX + Math.cos(theta) * (radius + wobble),
+                    y: centerY + Math.sin(theta) * (radius + wobble)
+                });
+            }
+
+            // Draw body path
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.closePath();
+            
+            // Set styles & render
+            ctx.fillStyle = fillStyle;
+            ctx.strokeStyle = strokeStyle;
+            ctx.lineWidth = isLarge ? 6 : 3;
+            ctx.shadowBlur = 0; // No drop shadow glow, identical to game
+            
             ctx.fill();
+            ctx.stroke();
             ctx.restore();
 
-            // Draw player nickname in the center
-            ctx.font = 'bold ' + (isLarge ? '15px' : '10px') + ' "Outfit", "Inter", sans-serif';
+            // Draw nickname identical to in-game text formatting
+            let fontSize = radius / 1.8;
+            const nameStr = (nickname || 'GUEST').toUpperCase();
+            if (nameStr.length > 3) fontSize *= 0.7;
+            fontSize = Math.max(fontSize, isLarge ? 14 : 8);
+
+            ctx.save();
+            ctx.font = 'bold ' + fontSize + 'px sans-serif';
             ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.miterLimit = 1;
+            ctx.lineJoin = 'round';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
-            ctx.fillText((nickname || 'GUEST').toUpperCase(), centerX, centerY);
+            ctx.strokeText(nameStr, centerX, centerY);
+            ctx.fillText(nameStr, centerX, centerY);
+            ctx.restore();
 
             animationFrameId = requestAnimationFrame(render);
         };
@@ -1924,15 +1948,15 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [color, isLarge, nickname]);
+    }, [isLarge, nickname]);
 
     return (
-        <div className="agar-preview-wrapper" style={{ width: '100%', height: isLarge ? '260px' : '100px', display: 'flex', justifyContent: 'center' }}>
+        <div className="agar-preview-wrapper" style={{ width: '100%', height: isLarge ? '200px' : '100px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <canvas
                 ref={canvasRef}
-                width={isLarge ? 300 : 250}
-                height={isLarge ? 260 : 100}
-                style={{ height: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
+                width={isLarge ? 450 : 250}
+                height={isLarge ? 200 : 100}
+                style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block' }}
             />
         </div>
     );
