@@ -1699,8 +1699,10 @@ export class SlitherRenderer {
 
             if (!this.isBattleRoyale) {
                 const pillY = hy + headRadius + 14;
-                const displayBalance = this.hud.balance ?? snake.dollarBalance ?? snake.balance;
-                drawBalanceBadge(ctx, hx, pillY, displayBalance, true);
+                const displayBalance = isYou 
+                    ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance) 
+                    : (snake.dollarBalance ?? snake.balance);
+                drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
             }
         }
 
