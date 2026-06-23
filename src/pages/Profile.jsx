@@ -43,8 +43,12 @@ export default function Profile() {
     const [activeTab, setActiveTab]     = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs]       = useState([]);
-    const [displayCur, setDisplayCur]   = useState(() => localStorage.getItem('profile_balance_currency') || 'SOL');
+    const [displayCur, setDisplayCur]   = useState(() => localStorage.getItem('profile_balance_currency') || 'USD');
     const [currentPage, setCurrentPage] = useState(1);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [displayCur]);
     const [usernameInput, setUsernameInput] = useState(user?.username || '');
     const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
     const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
@@ -76,6 +80,21 @@ export default function Profile() {
         refreshUser();
     }, [token, refreshUser]);
 
+    // ── Currency Converter Helper ─────────────────────
+    const solPrice = user?.solPrice || 70;
+    const formatVal = (usdAmount, includeSign = false) => {
+        if (displayCur === 'SOL') {
+            const solAmt = usdAmount / solPrice;
+            if (solAmt === 0) return '0.0000 SOL';
+            const sign = solAmt > 0 ? (includeSign ? '+' : '') : '-';
+            return `${sign}${Math.abs(solAmt).toFixed(4)} SOL`;
+        } else {
+            if (usdAmount === 0) return '$0.00';
+            const sign = usdAmount > 0 ? (includeSign ? '+' : '') : '-';
+            return `${sign}$${Math.abs(usdAmount).toFixed(2)}`;
+        }
+    };
+
     // ── Chart data ────────────────────────────────────
     const processedLogs = [...gameLogs].reverse().map(log => {
         const isCashout = log.type === 'withdraw' && ((log.meta?.reason || '').includes('Arena Cashout') || (log.meta?.reason || '').includes('BR Victory'));
@@ -90,7 +109,7 @@ export default function Profile() {
         ? Math.round((processedLogs.filter(l => l.netProfit > 0).length / processedLogs.length) * 100)
         : 0;
 
-    // Advanced metrics
+    // Advanced metrics (in USD, converted on render via formatVal)
     const avgPnL = processedLogs.length > 0 ? totalPnL / processedLogs.length : 0;
     const biggestCashout = processedLogs.length > 0
         ? Math.max(...processedLogs.map(l => l.isCashout ? l.grossAmount : 0))
@@ -98,10 +117,16 @@ export default function Profile() {
     const totalWon = processedLogs.filter(l => l.netProfit > 0).reduce((acc, l) => acc + l.netProfit, 0);
     const totalLost = processedLogs.filter(l => l.netProfit < 0).reduce((acc, l) => acc + Math.abs(l.netProfit), 0);
 
+    // Cumulative points in selected currency
+    const pnlConversion = displayCur === 'SOL' ? (1 / solPrice) : 1;
     let cumulative = 0;
-    const chartPts = [0, ...processedLogs.map(l => { cumulative += l.netProfit; return cumulative; })];
-    const minVal   = Math.min(...chartPts, -10);
-    const maxVal   = Math.max(...chartPts, 10);
+    const chartPts = [0, ...processedLogs.map(l => {
+        cumulative += l.netProfit * pnlConversion;
+        return cumulative;
+    })];
+
+    const minVal   = Math.min(...chartPts, displayCur === 'SOL' ? -0.15 : -10);
+    const maxVal   = Math.max(...chartPts, displayCur === 'SOL' ? 0.15 : 10);
     const pnlRange = (maxVal - minVal) || 1;
 
     const toXY = (val, i) => ({
@@ -110,23 +135,18 @@ export default function Profile() {
     });
 
     const xyPts = chartPts.map((v, i) => toXY(v, i));
-    const getBezierPath = (points) => {
-        if (points.length === 0) return '';
-        let path = `M ${points[0].x} ${points[0].y}`;
-        for (let i = 0; i < points.length - 1; i++) {
-            const p0 = points[i];
-            const p1 = points[i + 1];
-            const cp1x = p0.x + (p1.x - p0.x) / 2;
-            const cp1y = p0.y;
-            const cp2x = p1.x - (p1.x - p0.x) / 2;
-            const cp2y = p1.y;
-            path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
-        }
-        return path;
-    };
-
-    const bezierPath = getBezierPath(xyPts);
-    const fillPath = xyPts.length > 0 ? `${bezierPath} L 100 100 L 0 100 Z` : '';
+    
+    // Straight sharp line segments matching reference image
+    const linePath = xyPts.length > 0
+        ? `M ${xyPts[0].x} ${xyPts[0].y} ` + xyPts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ')
+        : '';
+        
+    const zeroY = 95 - ((0 - minVal) / pnlRange) * 90;
+    const zeroPercent = Math.max(0, Math.min(100, zeroY));
+    
+    const fillPath = xyPts.length > 0
+        ? `M ${xyPts[0].x} ${zeroY} ` + xyPts.map(p => `L ${p.x} ${p.y}`).join(' ') + ` L ${xyPts[xyPts.length - 1].x} ${zeroY} Z`
+        : '';
 
     const chartColor = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
 
@@ -205,7 +225,7 @@ export default function Profile() {
                 </div>
 
                 {/* ── Main card ── */}
-                <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', overflow: 'hidden', boxShadow: 'var(--shadow-xl)' }}>
+                <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', boxShadow: 'var(--shadow-xl)' }}>
 
                     {/* ── Tab bar ── */}
                     <div className="profile-tabs">
@@ -240,20 +260,28 @@ export default function Profile() {
                                     alignItems: 'center',
                                     boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.05)',
                                     position: 'relative',
-                                    overflow: 'hidden',
+                                    overflow: 'visible',
                                 }}>
+                                    {/* Decorative background glow wrapper */}
                                     <div style={{
                                         position: 'absolute',
-                                        top: '-50%',
-                                        right: '-10%',
-                                        width: '180px',
-                                        height: '180px',
-                                        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(0,0,0,0) 70%)',
+                                        inset: 0,
+                                        borderRadius: 'var(--r-xl)',
+                                        overflow: 'hidden',
                                         pointerEvents: 'none',
                                         zIndex: 0
-                                    }} />
+                                    }}>
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '-50%',
+                                            right: '-10%',
+                                            width: '180px',
+                                            height: '180px',
+                                            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(0,0,0,0) 70%)',
+                                        }} />
+                                    </div>
                                     
-                                    <div style={{ zIndex: 1 }}>
+                                    <div style={{ position: 'relative', zIndex: 1 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                             <span className="label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Available Balance</span>
                                             <CustomDropdown
@@ -280,25 +308,29 @@ export default function Profile() {
                                         </div>
                                         
                                         {displayCur === 'SOL' ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                <SolLogo size={24} style={{ marginRight: '2px' }} />
-                                                <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                                                    {(user?.balance || 0).toFixed(4)}
-                                                </span>
-                                                <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>SOL</span>
-                                                <span className="mono" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-3)', marginLeft: '12px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <SolLogo size={24} style={{ marginRight: '2px' }} />
+                                                    <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                                                        {(user?.balance || 0).toFixed(4)}
+                                                    </span>
+                                                    <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>SOL</span>
+                                                </div>
+                                                <div className="mono" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-3)', paddingLeft: '28px' }}>
                                                     ≈ ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)} USD
-                                                </span>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                                                    ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)}
-                                                </span>
-                                                <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>USD</span>
-                                                <span className="mono" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-3)', marginLeft: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                                                        ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)}
+                                                    </span>
+                                                    <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>USD</span>
+                                                </div>
+                                                <div className="mono" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                     ≈ <SolLogo size={12} /> {(user?.balance || 0).toFixed(4)} SOL
-                                                </span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -319,7 +351,7 @@ export default function Profile() {
                                     {[
                                         {
                                             label: 'Total P&L',
-                                            value: `${totalPnL >= 0 ? '+' : ''}$${Math.abs(totalPnL).toFixed(2)}`,
+                                            value: formatVal(totalPnL, true),
                                             color: totalPnL >= 0 ? 'var(--green)' : 'var(--red)',
                                         },
                                         {
@@ -329,7 +361,7 @@ export default function Profile() {
                                         },
                                         {
                                             label: 'Biggest Cashout',
-                                            value: `$${biggestCashout.toFixed(2)}`,
+                                            value: formatVal(biggestCashout),
                                             color: biggestCashout > 0 ? 'var(--green)' : 'var(--text-h)',
                                         },
                                     ].map(s => (
@@ -346,8 +378,8 @@ export default function Profile() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 8px', marginTop: '-8px', gap: '16px', flexWrap: 'wrap' }}>
                                     {[
                                         { label: 'Sessions', value: processedLogs.length },
-                                        { label: 'Avg P&L', value: `${avgPnL >= 0 ? '+' : ''}$${Math.abs(avgPnL).toFixed(2)}`, color: avgPnL >= 0 ? 'var(--green)' : 'var(--red)' },
-                                        { label: 'Total Won / Lost', value: `+$${totalWon.toFixed(2)} / -$${totalLost.toFixed(2)}` }
+                                        { label: 'Avg P&L', value: formatVal(avgPnL, true), color: avgPnL >= 0 ? 'var(--green)' : 'var(--red)' },
+                                        { label: 'Total Won / Lost', value: `${formatVal(totalWon)} / ${formatVal(totalLost)}` }
                                     ].map(s => (
                                         <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}:</span>
@@ -360,11 +392,6 @@ export default function Profile() {
                                 <div style={{ position: 'relative', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '18px 18px 12px 18px', overflow: 'hidden' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                         <span className="label">Equity Curve</span>
-                                        {hoveredPoint && (
-                                            <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: chartColor }}>
-                                                {hoveredPoint.label}
-                                            </span>
-                                        )}
                                     </div>
 
                                     <svg
@@ -380,15 +407,20 @@ export default function Profile() {
                                                 chartPts.length - 1
                                             ));
                                             const log    = idx > 0 ? processedLogs[idx - 1] : null;
-                                            const label  = idx === 0
-                                                ? 'START $0.00'
-                                                : `${log?.netProfit >= 0 ? 'PROFIT' : 'LOSS'} $${Math.abs(log?.netProfit || 0).toFixed(2)}`;
                                             
                                             const ptVal = chartPts[idx];
                                             const p = toXY(ptVal, idx);
+                                            
+                                            let formattedDate = 'Initial Session';
+                                            if (log) {
+                                                const d = new Date(log.createdAt);
+                                                const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                                                const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                                                formattedDate = `${dateStr}, ${timeStr}`;
+                                            }
+                                            
                                             setHoveredPoint({
                                                 index: idx,
-                                                label,
                                                 cumVal: ptVal,
                                                 x: p.x,
                                                 y: p.y,
@@ -396,45 +428,45 @@ export default function Profile() {
                                                     x: (idx / Math.max(chartPts.length - 1, 1)) * rect.width,
                                                     y: (p.y / 100) * rect.height
                                                 },
-                                                date: log ? new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Initial'
+                                                date: formattedDate
                                             });
                                         }}
                                         onMouseLeave={() => setHoveredPoint(null)}
                                     >
                                         <defs>
-                                            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor={chartColor} stopOpacity="0.12" />
-                                                <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
+                                            <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#10B981" />
+                                                <stop offset={`${zeroPercent}%`} stopColor="#10B981" />
+                                                <stop offset={`${zeroPercent}%`} stopColor="#FF2E93" />
+                                                <stop offset="100%" stopColor="#FF2E93" />
                                             </linearGradient>
+
+                                            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#10B981" stopOpacity="0.25" />
+                                                <stop offset={`${zeroPercent}%`} stopColor="#10B981" stopOpacity="0" />
+                                                <stop offset={`${zeroPercent}%`} stopColor="#FF2E93" stopOpacity="0" />
+                                                <stop offset="100%" stopColor="#FF2E93" stopOpacity="0.25" />
+                                            </linearGradient>
+
                                             <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                                                <feGaussianBlur stdDeviation="0.6" result="blur" />
+                                                <feGaussianBlur stdDeviation="1.5" result="blur" />
                                                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
                                             </filter>
                                         </defs>
 
-                                        {/* Horizontal grid lines */}
-                                        <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" strokeDasharray="2,4" />
-                                        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" strokeDasharray="2,4" />
-                                        <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" strokeDasharray="2,4" />
-
                                         {/* Break-even line */}
-                                        {(() => {
-                                            const zeroY = 95 - ((0 - minVal) / pnlRange) * 90;
-                                            return (
-                                                <line x1="0" y1={zeroY} x2="100" y2={zeroY} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" strokeDasharray="3,3" />
-                                            );
-                                        })()}
+                                        <line x1="0" y1={zeroY} x2="100" y2={zeroY} stroke="rgba(255,255,255,0.08)" strokeWidth="0.75" strokeDasharray="4,4" />
 
                                         {/* Area fill */}
-                                        <path d={fillPath} fill="url(#chartGrad)" />
+                                        <path d={fillPath} fill="url(#areaGrad)" />
 
                                         {/* Glow line shadow */}
                                         <path
-                                            d={bezierPath}
+                                            d={linePath}
                                             fill="none"
-                                            stroke={chartColor}
-                                            strokeWidth="2.5"
-                                            opacity="0.3"
+                                            stroke="url(#lineGrad)"
+                                            strokeWidth="3.5"
+                                            opacity="0.25"
                                             filter="url(#glow)"
                                             strokeLinejoin="round"
                                             strokeLinecap="round"
@@ -442,37 +474,38 @@ export default function Profile() {
 
                                         {/* Foreground line */}
                                         <path
-                                            d={bezierPath}
+                                            d={linePath}
                                             fill="none"
-                                            stroke={chartColor}
-                                            strokeWidth="1.5"
+                                            stroke="url(#lineGrad)"
+                                            strokeWidth="2"
                                             strokeLinejoin="round"
                                             strokeLinecap="round"
                                         />
 
-                                        {/* Interactive dots */}
-                                        {xyPts.map((p, i) => {
-                                            const isHovered = hoveredPoint && hoveredPoint.index === i;
-                                            return (
-                                                <circle
-                                                    key={i}
-                                                    cx={p.x}
-                                                    cy={p.y}
-                                                    r={isHovered ? 2.2 : 0.8}
-                                                    fill={isHovered ? 'white' : chartColor}
-                                                    stroke={isHovered ? chartColor : 'none'}
-                                                    strokeWidth={isHovered ? 0.6 : 0}
-                                                    style={{ transition: 'r 0.15s, fill 0.15s' }}
-                                                />
-                                            );
-                                        })}
+                                        {/* Hover cursor vertical line */}
+                                        {hoveredPoint && (
+                                            <line
+                                                x1={hoveredPoint.x}
+                                                y1="0"
+                                                x2={hoveredPoint.x}
+                                                y2="100"
+                                                stroke="rgba(255,255,255,0.25)"
+                                                strokeWidth="1"
+                                                strokeDasharray="4,4"
+                                            />
+                                        )}
 
-                                        {/* Hover crosshair line */}
-                                        {hoveredPoint && chartPts.length > 1 && (() => {
-                                            return (
-                                                <line x1={hoveredPoint.x} y1="0" x2={hoveredPoint.x} y2="100" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
-                                            );
-                                        })()}
+                                        {/* Hovered point dot indicator */}
+                                        {hoveredPoint && (
+                                            <circle
+                                                cx={hoveredPoint.x}
+                                                cy={hoveredPoint.y}
+                                                r="4.5"
+                                                fill={hoveredPoint.cumVal >= 0 ? '#10B981' : '#FF2E93'}
+                                                stroke="#ffffff"
+                                                strokeWidth="1.5"
+                                            />
+                                        )}
                                     </svg>
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -485,11 +518,10 @@ export default function Profile() {
                                         <div style={{
                                             position: 'absolute',
                                             left: `${hoveredPoint.clientCoords.x + 18}px`,
-                                            top: `${hoveredPoint.clientCoords.y + 18}px`,
-                                            transform: 'translate(-50%, -120%)',
-                                            background: 'rgba(10, 10, 12, 0.95)',
-                                            backdropFilter: 'blur(8px)',
-                                            border: `1px solid ${hoveredPoint.cumVal >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,59,48,0.25)'}`,
+                                            top: `${hoveredPoint.clientCoords.y + 18 - 12}px`,
+                                            transform: 'translate(-50%, -100%)',
+                                            background: 'rgba(20, 21, 28, 0.98)',
+                                            border: '1px solid rgba(255,255,255,0.12)',
                                             borderRadius: 'var(--r-md)',
                                             padding: '8px 12px',
                                             pointerEvents: 'none',
@@ -497,17 +529,14 @@ export default function Profile() {
                                             zIndex: 10,
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: '2px',
+                                            gap: '4px',
                                             whiteSpace: 'nowrap'
                                         }}>
-                                            <span style={{ fontSize: '0.58rem', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                            <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--mono)' }}>
+                                                {formatVal(hoveredPoint.cumVal, true)}
+                                            </span>
+                                            <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-3)' }}>
                                                 {hoveredPoint.date}
-                                            </span>
-                                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: hoveredPoint.cumVal >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--mono)' }}>
-                                                Equity: {hoveredPoint.cumVal >= 0 ? '+' : ''}${hoveredPoint.cumVal.toFixed(2)}
-                                            </span>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-2)' }}>
-                                                {hoveredPoint.label}
                                             </span>
                                         </div>
                                     )}
@@ -564,13 +593,13 @@ export default function Profile() {
                                                                         <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginTop: '1px' }}>
                                                                             {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                                             {log.type === 'withdraw'
-                                                                                ? ` · Collected $${log.grossAmount.toFixed(2)}`
-                                                                                : ` · Lost $${Math.abs(log.netProfit).toFixed(2)}`}
+                                                                                ? ` · Collected ${formatVal(log.grossAmount)}`
+                                                                                : ` · Lost ${formatVal(Math.abs(log.netProfit))}`}
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                                 <div className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
-                                                                    {win ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
+                                                                    {formatVal(log.netProfit, true)}
                                                                 </div>
                                                             </div>
                                                         );

@@ -88,13 +88,11 @@
   right: 0;
   top: calc(100% + 4px);
   min-width: 90px;
-  background: var(--bg-elevated);
+  background: rgba(22, 23, 30, 0.98);
   border: 1px solid var(--border-2);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--r-md);
   padding: 3px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 0 4px 24px rgba(0,0,0,0.4);
   opacity: 0;
   transform: translateY(-4px) scale(0.97);
   pointer-events: none;
@@ -1890,7 +1888,6 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-2);
   border-radius: var(--r-md);
-  overflow: hidden;
   box-shadow: var(--shadow-xl);
   animation: fadeUp 0.15s ease-out;
   z-index: 1100;
