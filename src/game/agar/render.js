@@ -79,13 +79,23 @@ const regulatePoint = (point, borders) => ({
     y: valueInRange(borders.top, borders.bottom, point.y)
 });
 
-function drawOrganicCell(cell, borders, graph) {
+function drawOrganicCell(cell, borders, graph, allCells = []) {
     // Dynamiskt antal punkter baserat på storlek för prestanda/utseende
     let pointCount = Math.min(Math.max(~~(cell.radius), 24), 60);
     let points = [];
     let time = Date.now() * 0.002;
     let moveAngle = Math.atan2(cell.vY || 0, cell.vX || 0);
     let speed = Math.min(Math.sqrt((cell.vX || 0) ** 2 + (cell.vY || 0) ** 2), 6);
+
+    // Hitta överlappande celler (både egna celler och andra spelares celler)
+    const overlaps = [];
+    for (let other of allCells) {
+        if (other.id === cell.id) continue;
+        const d = Math.hypot(cell.x - other.x, cell.y - other.y);
+        if (d < cell.radius + other.radius) {
+            overlaps.push(other);
+        }
+    }
 
     for (let i = 0; i < pointCount; i++) {
         let theta = (i / pointCount) * FULL_ANGLE;
@@ -94,7 +104,24 @@ function drawOrganicCell(cell, borders, graph) {
         // Stretch deformerar cirkeln i den riktning den rör sig (dämpad för mindre motion blur)
         let stretch = Math.cos(theta - moveAngle) * (speed * 0.35);
         
-        let point = circlePoint(cell, cell.radius + wobble + stretch, theta);
+        let currentRadius = cell.radius + wobble + stretch;
+        
+        // Beräkna punktens ursprungliga position
+        let px = cell.x + currentRadius * Math.cos(theta);
+        let py = cell.y + currentRadius * Math.sin(theta);
+        
+        // Deformera kanten (sänk in) om den krockar/överlappar med en annan cell
+        for (let other of overlaps) {
+            const distToOther = Math.hypot(px - other.x, py - other.y);
+            if (distToOther < other.radius) {
+                const depth = other.radius - distToOther;
+                currentRadius -= depth * 0.85; // Dra in radien för att platta till kanten (squishy effekt)
+                px = cell.x + currentRadius * Math.cos(theta);
+                py = cell.y + currentRadius * Math.sin(theta);
+            }
+        }
+
+        let point = { x: px, y: py };
         points.push(regulatePoint(point, borders));
     }
     graph.beginPath();
@@ -140,7 +167,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
         graph.shadowBlur = 0;
         
         // Använd den organiska ritningen för slimy-effekt
-        drawOrganicCell(cell, borders, graph);
+        drawOrganicCell(cell, borders, graph, cells);
 
         // Draw the name of the player
         // Dynamisk fontstorlek: aggressivare skalning för korta namn (som 'eli')
