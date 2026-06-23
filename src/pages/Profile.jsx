@@ -600,7 +600,6 @@ export default function Profile() {
                                         <span>Start</span>
                                         <span>{processedLogs.length} sessions</span>
                                     </div>
-                                    })()}
                                 </div>
 
                                 {/* Session log */}
