@@ -151,10 +151,10 @@ export default function PreGame() {
     ];
 
     const [selectedSkin, setSelectedSkin] = useState(
-        () => localStorage.getItem('selected_skin') || 'random'
+        () => localStorage.getItem('selected_skin') || '#c080ff'
     );
     const [selectedSkinAgar, setSelectedSkinAgar] = useState(
-        () => localStorage.getItem('selected_skin_agar') || 'random'
+        () => localStorage.getItem('selected_skin_agar') || '#c080ff'
     );
 
     const [showCustomizer, setShowCustomizer] = useState(false);
@@ -1458,7 +1458,7 @@ export default function PreGame() {
             {/* Customizer Modal Overlay */}
             {showCustomizer && (() => {
                 const getChromaName = (color) => {
-                    if (color === 'random') return 'Default (Random)';
+                    if (color === 'random') return 'Rainbow';
                     switch (color) {
                         case '#c080ff': return 'Lavender Purple';
                         case '#9099ff': return 'Indigo Blue';
@@ -1473,14 +1473,17 @@ export default function PreGame() {
                     }
                 };
 
+                const currentChroma = customizerTab === 'slither' ? selectedSkin : selectedSkinAgar;
+                const isRainbow = currentChroma === 'random';
+
                 const cycleChroma = (direction) => {
+                    if (isRainbow) return;
+
                     const chromas = [
-                        'random',
                         '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
                         '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
                     ];
-                    const current = customizerTab === 'slither' ? selectedSkin : selectedSkinAgar;
-                    let idx = chromas.indexOf(current);
+                    let idx = chromas.indexOf(currentChroma);
                     if (idx === -1) idx = 0;
                     
                     let nextIdx = idx + direction;
@@ -1494,7 +1497,15 @@ export default function PreGame() {
                     }
                 };
 
-                const currentChroma = customizerTab === 'slither' ? selectedSkin : selectedSkinAgar;
+                const setSkinStyle = (style) => {
+                    if (style === 'rainbow') {
+                        if (customizerTab === 'slither') setSelectedSkin('random');
+                        else setSelectedSkinAgar('random');
+                    } else {
+                        if (customizerTab === 'slither') setSelectedSkin('#c080ff');
+                        else setSelectedSkinAgar('#c080ff');
+                    }
+                };
 
                 return (
                     <div className="customizer-overlay-backdrop" onClick={() => setShowCustomizer(false)}>
@@ -1502,9 +1513,9 @@ export default function PreGame() {
                             <div className="customizer-modal-header">
                                 <div>
                                     <h2 className="customizer-modal-title">Customize Appearance</h2>
-                                    <p className="customizer-modal-subtitle">Stand out on the battlefield with a custom color</p>
+                                    <p className="customizer-modal-subtitle">Stand out on the battlefield</p>
                                 </div>
-                                <button className="customizer-close-icon-btn" onClick={() => setShowCustomizer(false)}>
+                                <button className="customizer-close-btn" onClick={() => setShowCustomizer(false)}>
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <line x1="18" y1="6" x2="6" y2="18"></line>
                                         <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -1512,176 +1523,94 @@ export default function PreGame() {
                                 </button>
                             </div>
 
-                            <div className="customizer-tabs" style={{ display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.01)' }}>
-                                <button
-                                    type="button"
-                                    className={`customizer-tab-btn ${customizerTab === 'slither' ? 'active' : ''}`}
-                                    style={{
-                                        flex: 1,
-                                        padding: '14px',
-                                        background: 'none',
-                                        border: 'none',
-                                        borderBottom: customizerTab === 'slither' ? '2px solid var(--accent)' : '2px solid transparent',
-                                        color: customizerTab === 'slither' ? '#fff' : 'var(--text-1)',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onClick={() => setCustomizerTab('slither')}
-                                >
-                                    Slither Skin
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`customizer-tab-btn ${customizerTab === 'agar' ? 'active' : ''}`}
-                                    style={{
-                                        flex: 1,
-                                        padding: '14px',
-                                        background: 'none',
-                                        border: 'none',
-                                        borderBottom: customizerTab === 'agar' ? '2px solid var(--accent)' : '2px solid transparent',
-                                        color: customizerTab === 'agar' ? '#fff' : 'var(--text-1)',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onClick={() => setCustomizerTab('agar')}
-                                >
-                                    Agar Skin
-                                </button>
+                            <div className="customizer-segmented-control-wrapper">
+                                <div className="customizer-segmented-control">
+                                    <button
+                                        type="button"
+                                        className={`seg-btn ${customizerTab === 'slither' ? 'active' : ''}`}
+                                        onClick={() => setCustomizerTab('slither')}
+                                    >
+                                        Slither Skin
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`seg-btn ${customizerTab === 'agar' ? 'active' : ''}`}
+                                        onClick={() => setCustomizerTab('agar')}
+                                    >
+                                        Agar Skin
+                                    </button>
+                                </div>
                             </div>
                             
-                            <div className="customizer-modal-body" style={{ flexDirection: 'column', padding: '24px', gap: '24px' }}>
-                                <div className="customizer-preview-wrapper" style={{ width: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    {customizerTab === 'slither' ? (
-                                        <SnakeSkinPreview color={selectedSkin} isLarge={true} />
-                                    ) : (
-                                        <AgarBlobPreview color={selectedSkinAgar} isLarge={true} nickname={nickname} />
+                            <div className="customizer-modal-body">
+                                <div className="customizer-preview-stage">
+                                    {!isRainbow && (
+                                        <button className="chroma-arrow left" onClick={() => cycleChroma(-1)}>
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                        </button>
                                     )}
-                                    
+
+                                    <div className="preview-canvas-container">
+                                        {customizerTab === 'slither' ? (
+                                            <SnakeSkinPreview color={selectedSkin} isLarge={true} />
+                                        ) : (
+                                            <AgarBlobPreview color={selectedSkinAgar} isLarge={true} nickname={nickname} />
+                                        )}
+                                    </div>
+
+                                    {!isRainbow && (
+                                        <button className="chroma-arrow right" onClick={() => cycleChroma(1)}>
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                        </button>
+                                    )}
+
                                     <div className="customizer-preview-glow" style={{ 
-                                        position: 'absolute',
-                                        top: '50%',
-                                        left: '50%',
-                                        transform: 'translate(-50%, -50%)',
-                                        width: '180px',
-                                        height: '180px',
-                                        borderRadius: '50%',
-                                        zIndex: -1,
-                                        filter: 'blur(50px)',
-                                        opacity: 0.15,
-                                        backgroundColor: currentChroma === 'random' ? '#A78BFA' : currentChroma 
+                                        backgroundColor: isRainbow ? '#A78BFA' : currentChroma 
                                     }}></div>
 
-                                    {/* Cycle Chroma Arrows */}
-                                    <div className="chroma-selector" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
-                                        <button
-                                            type="button"
-                                            className="chroma-arrow-btn"
-                                            style={{
-                                                background: 'rgba(255,255,255,0.04)',
-                                                border: '1px solid rgba(255,255,255,0.08)',
-                                                borderRadius: '50%',
-                                                width: '36px',
-                                                height: '36px',
-                                                color: '#fff',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                cursor: 'pointer',
-                                                fontSize: '1.1rem',
-                                                fontWeight: 'bold',
-                                                transition: 'all 0.2s'
-                                            }}
-                                            onClick={() => cycleChroma(-1)}
-                                        >
-                                            &larr;
-                                        </button>
-                                        
-                                        <span className="skin-status-badge" style={
-                                            currentChroma === 'random'
-                                                ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)', minWidth: '160px', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }
-                                                : { backgroundColor: currentChroma, minWidth: '160px', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }
-                                        }>
-                                            {getChromaName(currentChroma)}
-                                        </span>
-                                        
-                                        <button
-                                            type="button"
-                                            className="chroma-arrow-btn"
-                                            style={{
-                                                background: 'rgba(255,255,255,0.04)',
-                                                border: '1px solid rgba(255,255,255,0.08)',
-                                                borderRadius: '50%',
-                                                width: '36px',
-                                                height: '36px',
-                                                color: '#fff',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                cursor: 'pointer',
-                                                fontSize: '1.1rem',
-                                                fontWeight: 'bold',
-                                                transition: 'all 0.2s'
-                                            }}
-                                            onClick={() => cycleChroma(1)}
-                                        >
-                                            &rarr;
-                                        </button>
+                                    <div className="chroma-name-badge" style={
+                                        isRainbow
+                                            ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' }
+                                            : { backgroundColor: currentChroma }
+                                    }>
+                                        {getChromaName(currentChroma)}
                                     </div>
                                 </div>
                                 
-                                <div className="customizer-controls-col" style={{ width: '100%' }}>
-                                    <span className="customizer-section-title" style={{ display: 'block', marginBottom: '16px', textAlign: 'center', color: 'var(--text-h)' }}>
-                                        Select Skin Style
-                                    </span>
+                                <div className="customizer-selection-area">
+                                    <span className="customizer-section-title">Skin Options</span>
                                     
-                                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                                    <div className="skin-cards-grid">
                                         <button
                                             type="button"
-                                            className="skin-swatch-btn active"
-                                            style={{
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                background: 'rgba(255,255,255,0.02)',
-                                                border: '2px solid var(--accent)',
-                                                borderRadius: '12px',
-                                                padding: '12px',
-                                                width: '120px',
-                                                cursor: 'pointer',
-                                                boxShadow: '0 0 16px rgba(167, 139, 250, 0.15)'
-                                            }}
+                                            className={`skin-card ${!isRainbow ? 'active' : ''}`}
+                                            onClick={() => setSkinStyle('classic')}
                                         >
-                                            {/* 2x2 grid representing color palette */}
-                                            <div style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: '1fr 1fr',
-                                                width: '40px',
-                                                height: '40px',
-                                                borderRadius: '50%',
-                                                overflow: 'hidden',
-                                                border: '2px solid rgba(255,255,255,0.2)'
-                                            }}>
+                                            <div className="skin-card-icon grid-icon">
                                                 <div style={{ backgroundColor: '#c080ff' }}></div>
                                                 <div style={{ backgroundColor: '#80d0d0' }}></div>
                                                 <div style={{ backgroundColor: '#eeee70' }}></div>
                                                 <div style={{ backgroundColor: '#ff4040' }}></div>
                                             </div>
-                                            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#fff' }}>Classic</span>
+                                            <span>Classic</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            className={`skin-card ${isRainbow ? 'active' : ''}`}
+                                            onClick={() => setSkinStyle('rainbow')}
+                                        >
+                                            <div className="skin-card-icon rainbow-icon"></div>
+                                            <span>Rainbow</span>
                                         </button>
                                     </div>
                                     
-                                    <div className="customizer-modal-actions" style={{ display: 'flex', gap: '12px' }}>
-                                        <button
-                                            className="btn-secondary"
-                                            style={{ flex: 1, height: '48px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.95rem' }}
-                                            onClick={() => setShowCustomizer(false)}
-                                        >
-                                            Close
-                                        </button>
-                                    </div>
+                                    <button
+                                        className="btn-primary customizer-done-btn"
+                                        onClick={() => setShowCustomizer(false)}
+                                    >
+                                        Done
+                                    </button>
                                 </div>
                             </div>
                         </div>
