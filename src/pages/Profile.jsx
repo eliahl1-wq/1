@@ -3,8 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import CustomDropdown from '../components/CustomDropdown';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
+
+const SolLogo = ({ size = 13, style }) => (
+    <img
+        src="/solana-sol-logo.png"
+        alt="SOL"
+        style={{ height: size, width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, ...style }}
+    />
+);
 
 const getGamemodeLabel = (log) => {
     const reason = log.meta?.reason || '';
@@ -18,7 +27,7 @@ const getGamemodeLabel = (log) => {
         return rawMode.toLowerCase().includes('slither') ? 'Battle Royale Slither' : 'Battle Royale Agar';
     }
     
-    if (rawMode === 'competitive-slither') return 'Competitive Slither';
+    if (rawMode === 'competitive-slither') return 'Arena Slither';
     if (rawMode === 'slither') return 'Classic Slither';
     if (rawMode === 'agar') return 'Classic Agar';
     
@@ -34,6 +43,8 @@ export default function Profile() {
     const [activeTab, setActiveTab]     = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs]       = useState([]);
+    const [displayCur, setDisplayCur]   = useState(() => localStorage.getItem('profile_balance_currency') || 'SOL');
+    const [currentPage, setCurrentPage] = useState(1);
     const [usernameInput, setUsernameInput] = useState(user?.username || '');
     const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
     const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
@@ -81,7 +92,9 @@ export default function Profile() {
 
     // Advanced metrics
     const avgPnL = processedLogs.length > 0 ? totalPnL / processedLogs.length : 0;
-    const bestSession = processedLogs.length > 0 ? Math.max(...processedLogs.map(l => l.netProfit)) : 0;
+    const biggestCashout = processedLogs.length > 0
+        ? Math.max(...processedLogs.map(l => l.isCashout ? l.grossAmount : 0))
+        : 0;
     const totalWon = processedLogs.filter(l => l.netProfit > 0).reduce((acc, l) => acc + l.netProfit, 0);
     const totalLost = processedLogs.filter(l => l.netProfit < 0).reduce((acc, l) => acc + Math.abs(l.netProfit), 0);
 
@@ -96,8 +109,24 @@ export default function Profile() {
         y: 95 - ((val - minVal) / pnlRange) * 90,
     });
 
-    const polyline = chartPts.map((v, i) => { const p = toXY(v, i); return `${p.x},${p.y}`; }).join(' ');
-    const areaPath = chartPts.map((v, i) => { const p = toXY(v, i); return `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`; }).join(' ');
+    const xyPts = chartPts.map((v, i) => toXY(v, i));
+    const getBezierPath = (points) => {
+        if (points.length === 0) return '';
+        let path = `M ${points[0].x} ${points[0].y}`;
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[i];
+            const p1 = points[i + 1];
+            const cp1x = p0.x + (p1.x - p0.x) / 2;
+            const cp1y = p0.y;
+            const cp2x = p1.x - (p1.x - p0.x) / 2;
+            const cp2y = p1.y;
+            path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
+        }
+        return path;
+    };
+
+    const bezierPath = getBezierPath(xyPts);
+    const fillPath = xyPts.length > 0 ? `${bezierPath} L 100 100 L 0 100 Z` : '';
 
     const chartColor = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
 
@@ -225,16 +254,53 @@ export default function Profile() {
                                     }} />
                                     
                                     <div style={{ zIndex: 1 }}>
-                                        <div className="label" style={{ marginBottom: '6px', fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Available Balance</div>
-                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                            <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em' }}>
-                                                {(user?.balance || 0).toFixed(4)}
-                                            </span>
-                                            <span className="mono" style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-3)' }}>SOL</span>
-                                            <span className="mono" style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--green)', marginLeft: '12px' }}>
-                                                ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)}
-                                            </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                            <span className="label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Available Balance</span>
+                                            <CustomDropdown
+                                                options={[
+                                                    { label: 'SOL', value: 'SOL' },
+                                                    { label: 'USD', value: 'USD' }
+                                                ]}
+                                                value={displayCur}
+                                                onChange={val => {
+                                                    setDisplayCur(val);
+                                                    localStorage.setItem('profile_balance_currency', val);
+                                                }}
+                                                renderValue={v => (
+                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        {v === 'SOL' ? <><SolLogo size={10} /> SOL</> : '$ USD'}
+                                                    </span>
+                                                )}
+                                                renderOption={opt => (
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        {opt.value === 'SOL' ? <><SolLogo size={11} /> SOL</> : '$ USD'}
+                                                    </span>
+                                                )}
+                                            />
                                         </div>
+                                        
+                                        {displayCur === 'SOL' ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <SolLogo size={24} style={{ marginRight: '2px' }} />
+                                                <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                                                    {(user?.balance || 0).toFixed(4)}
+                                                </span>
+                                                <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>SOL</span>
+                                                <span className="mono" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-3)', marginLeft: '12px' }}>
+                                                    ≈ ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)} USD
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                                                    ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)}
+                                                </span>
+                                                <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>USD</span>
+                                                <span className="mono" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-3)', marginLeft: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    ≈ <SolLogo size={12} /> {(user?.balance || 0).toFixed(4)} SOL
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', zIndex: 1 }}>
@@ -248,8 +314,8 @@ export default function Profile() {
                                     </div>
                                 </div>
 
-                                {/* Stat cards */}
-                                <div className="profile-stat-grid">
+                                {/* Main Stat cards */}
+                                <div className="profile-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                                     {[
                                         {
                                             label: 'Total P&L',
@@ -262,32 +328,30 @@ export default function Profile() {
                                             color: winRate >= 50 ? 'var(--green)' : 'var(--text-h)',
                                         },
                                         {
-                                            label: 'Sessions',
-                                            value: processedLogs.length,
-                                            color: 'var(--text-h)',
-                                        },
-                                        {
-                                            label: 'Avg P&L',
-                                            value: `${avgPnL >= 0 ? '+' : ''}$${Math.abs(avgPnL).toFixed(2)}`,
-                                            color: avgPnL >= 0 ? 'var(--green)' : 'var(--red)',
-                                        },
-                                        {
-                                            label: 'Best Session',
-                                            value: `${bestSession >= 0 ? '+' : ''}$${Math.abs(bestSession).toFixed(2)}`,
-                                            color: bestSession > 0 ? 'var(--green)' : bestSession < 0 ? 'var(--red)' : 'var(--text-h)',
-                                        },
-                                        {
-                                            label: 'Won / Lost',
-                                            value: `+$${totalWon.toFixed(2)} / -$${totalLost.toFixed(2)}`,
-                                            color: 'var(--text-h)',
-                                            isMono: true
+                                            label: 'Biggest Cashout',
+                                            value: `$${biggestCashout.toFixed(2)}`,
+                                            color: biggestCashout > 0 ? 'var(--green)' : 'var(--text-h)',
                                         },
                                     ].map(s => (
-                                        <div key={s.label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px' }}>
+                                        <div key={s.label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
                                             <div className="label" style={{ marginBottom: '8px' }}>{s.label}</div>
-                                            <div className="mono" style={{ fontSize: s.isMono ? '0.95rem' : '1.4rem', fontWeight: 800, color: s.color, letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
+                                            <div className="mono" style={{ fontSize: '1.45rem', fontWeight: 900, color: s.color, letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
                                                 {s.value}
                                             </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Secondary stats (smaller & less prominent) */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 8px', marginTop: '-8px', gap: '16px', flexWrap: 'wrap' }}>
+                                    {[
+                                        { label: 'Sessions', value: processedLogs.length },
+                                        { label: 'Avg P&L', value: `${avgPnL >= 0 ? '+' : ''}$${Math.abs(avgPnL).toFixed(2)}`, color: avgPnL >= 0 ? 'var(--green)' : 'var(--red)' },
+                                        { label: 'Total Won / Lost', value: `+$${totalWon.toFixed(2)} / -$${totalLost.toFixed(2)}` }
+                                    ].map(s => (
+                                        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}:</span>
+                                            <span className="mono" style={{ fontSize: '0.78rem', fontWeight: 700, color: s.color || 'var(--text-2)' }}>{s.value}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -362,11 +426,11 @@ export default function Profile() {
                                         })()}
 
                                         {/* Area fill */}
-                                        <path d={`${areaPath} L 100 100 L 0 100 Z`} fill="url(#chartGrad)" />
+                                        <path d={fillPath} fill="url(#chartGrad)" />
 
                                         {/* Glow line shadow */}
                                         <path
-                                            d={areaPath}
+                                            d={bezierPath}
                                             fill="none"
                                             stroke={chartColor}
                                             strokeWidth="2.5"
@@ -378,7 +442,7 @@ export default function Profile() {
 
                                         {/* Foreground line */}
                                         <path
-                                            d={areaPath}
+                                            d={bezierPath}
                                             fill="none"
                                             stroke={chartColor}
                                             strokeWidth="1.5"
@@ -387,8 +451,7 @@ export default function Profile() {
                                         />
 
                                         {/* Interactive dots */}
-                                        {chartPts.map((v, i) => {
-                                            const p = toXY(v, i);
+                                        {xyPts.map((p, i) => {
                                             const isHovered = hoveredPoint && hoveredPoint.index === i;
                                             return (
                                                 <circle
@@ -458,54 +521,98 @@ export default function Profile() {
                                             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-3)', fontSize: '0.78rem', fontWeight: 600 }}>
                                                 No sessions yet
                                             </div>
-                                        ) : (
-                                            [...processedLogs].reverse().map(log => {
-                                                const win = log.netProfit >= 0;
-                                                return (
-                                                    <div
-                                                        key={log._id}
-                                                        style={{
-                                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                            padding: '10px 14px',
-                                                            borderRadius: 'var(--r-md)',
-                                                            background: 'rgba(255,255,255,0.02)',
-                                                            border: '1px solid var(--border)',
-                                                            transition: 'background 0.1s',
-                                                        }}
-                                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
-                                                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-                                                    >
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                            <div style={{
-                                                                width: 26, height: 26,
-                                                                borderRadius: 'var(--r-sm)',
-                                                                background: win ? 'var(--green-dim)' : 'var(--red-dim)',
-                                                                border: `1px solid ${win ? 'var(--green-border)' : 'rgba(255,59,48,0.2)'}`,
-                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                fontSize: '0.7rem',
-                                                                color: win ? 'var(--green)' : 'var(--red)',
-                                                            }}>
-                                                                {win ? '↑' : '↓'}
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
-                                                                    {log.type === 'withdraw' ? 'Cashout' : 'Eliminated'} · <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{getGamemodeLabel(log)}</span>
+                                        ) : (() => {
+                                            const reversedLogs = [...processedLogs].reverse();
+                                            const totalPages = Math.ceil(reversedLogs.length / 15) || 1;
+                                            const startIndex = (currentPage - 1) * 15;
+                                            const paginatedLogs = reversedLogs.slice(startIndex, startIndex + 15);
+
+                                            return (
+                                                <>
+                                                    {paginatedLogs.map(log => {
+                                                        const win = log.netProfit >= 0;
+                                                        return (
+                                                            <div
+                                                                key={log._id}
+                                                                style={{
+                                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                                    padding: '10px 14px',
+                                                                    borderRadius: 'var(--r-md)',
+                                                                    background: 'rgba(255,255,255,0.02)',
+                                                                    border: '1px solid var(--border)',
+                                                                    transition: 'background 0.1s',
+                                                                }}
+                                                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                                                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                    <div style={{
+                                                                        width: 26, height: 26,
+                                                                        borderRadius: 'var(--r-sm)',
+                                                                        background: win ? 'var(--green-dim)' : 'var(--red-dim)',
+                                                                        border: `1px solid ${win ? 'var(--green-border)' : 'rgba(255,59,48,0.2)'}`,
+                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                        fontSize: '0.7rem',
+                                                                        color: win ? 'var(--green)' : 'var(--red)',
+                                                                    }}>
+                                                                        {win ? '↑' : '↓'}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
+                                                                            {log.type === 'withdraw' ? 'Cashout' : 'Eliminated'} · <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{getGamemodeLabel(log)}</span>
+                                                                        </div>
+                                                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginTop: '1px' }}>
+                                                                            {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                                            {log.type === 'withdraw'
+                                                                                ? ` · Collected $${log.grossAmount.toFixed(2)}`
+                                                                                : ` · Lost $${Math.abs(log.netProfit).toFixed(2)}`}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                                <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginTop: '1px' }}>
-                                                                    {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                                    {log.type === 'withdraw'
-                                                                        ? ` · Collected $${log.grossAmount.toFixed(2)}`
-                                                                        : ` · Lost $${Math.abs(log.netProfit).toFixed(2)}`}
+                                                                <div className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
+                                                                    {win ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
                                                                 </div>
                                                             </div>
+                                                        );
+                                                    })}
+
+                                                    {/* Pagination Controls */}
+                                                    {totalPages > 1 && (
+                                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
+                                                            <button
+                                                                className="btn btn-ghost"
+                                                                disabled={currentPage === 1}
+                                                                onClick={() => {
+                                                                    setCurrentPage(p => Math.max(1, p - 1));
+                                                                    // Scroll up to session history header when page changes
+                                                                    const el = document.getElementById('session-history-hdr');
+                                                                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                                                }}
+                                                                style={{ padding: '6px 12px', fontSize: '0.72rem', borderRadius: 'var(--r-md)' }}
+                                                            >
+                                                                Previous
+                                                            </button>
+                                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-2)' }}>
+                                                                Page {currentPage} of {totalPages}
+                                                            </span>
+                                                            <button
+                                                                className="btn btn-ghost"
+                                                                disabled={currentPage === totalPages}
+                                                                onClick={() => {
+                                                                    setCurrentPage(p => Math.min(totalPages, p + 1));
+                                                                    // Scroll up to session history header when page changes
+                                                                    const el = document.getElementById('session-history-hdr');
+                                                                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                                                }}
+                                                                style={{ padding: '6px 12px', fontSize: '0.72rem', borderRadius: 'var(--r-md)' }}
+                                                            >
+                                                                Next
+                                                            </button>
                                                         </div>
-                                                        <div className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
-                                                            {win ? '+' : '-'}${Math.abs(log.netProfit).toFixed(2)}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
