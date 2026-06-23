@@ -1654,22 +1654,24 @@ function SnakeSkinPreview({ color, isLarge }) {
         const ctx = canvas.getContext('2d');
 
         let animationFrameId;
-        const segmentsCount = isLarge ? 70 : 25;
-        const radius = isLarge ? 16 : 12;
-        const spacing = isLarge ? 5.5 : 4;
+        const segmentsCount = isLarge ? 32 : 20;
+        const radius = isLarge ? 13 : 8;
+        const spacing = isLarge ? 6 : 4.5;
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radiusX = isLarge ? 120 : 65;
+        const radiusY = isLarge ? 45 : 22;
 
         const trail = [];
-        const headX = isLarge ? 410 : 200;
-        const centerY = isLarge ? 100 : 50;
 
-        // Pre-populate trail so the snake starts wiggling instantly when mounted
-        for (let j = 0; j < 500; j++) {
+        // Pre-populate trail by simulating past frames so it starts fully formed
+        for (let j = 300; j >= 0; j--) {
             const tempT = -j;
-            const tempWiggle = Math.sin(tempT * 0.08) * (isLarge ? 24 : 10);
-            trail.push({
-                x: headX - j * (isLarge ? 2.5 : 1.8),
-                y: centerY + tempWiggle
-            });
+            const angle = tempT * 0.035;
+            const tempX = centerX + Math.cos(angle) * radiusX;
+            const tempY = centerY + Math.sin(angle * 2) * radiusY;
+            trail.unshift({ x: tempX, y: tempY });
         }
 
         const render = () => {
@@ -1679,20 +1681,15 @@ function SnakeSkinPreview({ color, isLarge }) {
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Shift current trail points to the left
-            const speedX = isLarge ? 2.5 : 1.8;
-            for (let j = 0; j < trail.length; j++) {
-                trail[j].x -= speedX;
-            }
-
-            // Insert new head at start (on the right)
-            const amp = isLarge ? 24 : 10;
-            const wiggleSpeed = 0.08;
-            const headY = centerY + Math.sin(t * wiggleSpeed) * amp;
+            // Calculate new head position in a figure-8 infinity loop
+            const angle = t * 0.035;
+            const headX = centerX + Math.cos(angle) * radiusX;
+            const headY = centerY + Math.sin(angle * 2) * radiusY;
+            
             trail.unshift({ x: headX, y: headY });
 
             // Keep trail bounded
-            if (trail.length > 600) trail.length = 600;
+            if (trail.length > 500) trail.length = 500;
 
             // Interpolate points along trail at exact 'spacing' intervals
             const points = [];
@@ -1745,11 +1742,11 @@ function SnakeSkinPreview({ color, isLarge }) {
                     segColorHex = colors[colorIndex];
                 }
 
-                let angle = 0;
+                let segmentAngle = 0;
                 if (i > 0) {
-                    angle = Math.atan2(points[i - 1].y - pt.y, points[i - 1].x - pt.x);
+                    segmentAngle = Math.atan2(points[i - 1].y - pt.y, points[i - 1].x - pt.x);
                 } else if (points[i + 1]) {
-                    angle = Math.atan2(pt.y - points[i + 1].y, pt.x - points[i + 1].x);
+                    segmentAngle = Math.atan2(pt.y - points[i + 1].y, pt.x - points[i + 1].x);
                 }
 
                 const segmentCanvas = getSnakeSegmentCanvas(radius, segColorHex);
@@ -1768,7 +1765,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                 ctx.restore();
 
                 // Draw segment
-                ctx.rotate(angle);
+                ctx.rotate(segmentAngle);
                 const segHalf = segmentCanvas.width / 2;
                 ctx.drawImage(segmentCanvas, -segHalf, -segHalf);
                 
@@ -1779,11 +1776,11 @@ function SnakeSkinPreview({ color, isLarge }) {
             const head = points[0];
             const next = points[1];
             if (head && next) {
-                const angle = Math.atan2(head.y - next.y, head.x - next.x);
-                const perpX = Math.sin(angle);
-                const perpY = -Math.cos(angle);
-                const fwdX = Math.cos(angle);
-                const fwdY = Math.sin(angle);
+                const headAngle = Math.atan2(head.y - next.y, head.x - next.x);
+                const perpX = Math.sin(headAngle);
+                const perpY = -Math.cos(headAngle);
+                const fwdX = Math.cos(headAngle);
+                const fwdY = Math.sin(headAngle);
 
                 const eyeSide = radius * 0.39;
                 const eyeFwd = radius * 0.31;
