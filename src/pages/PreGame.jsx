@@ -1458,10 +1458,6 @@ export default function PreGame() {
                                 </div>
                             </div>
                             
-                            <div className="customizer-controls-col">
-                                <div className="customizer-section-header">
-                                    <span className="customizer-section-title">Color Palette</span>
-                                </div>
                             <div className="customizer-controls-col" style={{ width: '100%' }}>
                                 <span className="customizer-section-title" style={{ display: 'block', marginBottom: '16px', textAlign: 'center', color: 'var(--text-h)' }}>Select Skin Color</span>
                                 <div className="skin-swatch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '32px' }}>
