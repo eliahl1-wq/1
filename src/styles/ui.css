@@ -329,7 +329,7 @@
   display: grid;
   grid-template-columns: 250px minmax(320px, 420px) 250px;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
   justify-content: center;
   justify-items: center;
   margin: 18px auto 0;
@@ -855,6 +855,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .customize-lobby-card {
@@ -886,7 +887,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 98px;
+  flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -916,7 +917,6 @@
 
 .leaderboard-list--live {
   gap: 6px;
-  max-height: 132px;
 }
 
 .leaderboard-entry {
