@@ -59,7 +59,8 @@ export default function BRLobby() {
             if (joinedRef.current) return;
             joinedRef.current = true;
             setJoining(true);
-            const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+            const skinKey = variant === 'slither' ? 'selected_skin' : 'selected_skin_agar';
+            const preferredSkin = localStorage.getItem(skinKey) || 'random';
             socket.emit('brJoinQueue', {
                 variant,
                 token,

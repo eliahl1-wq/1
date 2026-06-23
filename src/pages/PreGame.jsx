@@ -153,12 +153,19 @@ export default function PreGame() {
     const [selectedSkin, setSelectedSkin] = useState(
         () => localStorage.getItem('selected_skin') || 'random'
     );
+    const [selectedSkinAgar, setSelectedSkinAgar] = useState(
+        () => localStorage.getItem('selected_skin_agar') || 'random'
+    );
 
     const [showCustomizer, setShowCustomizer] = useState(false);
 
     useEffect(() => {
         localStorage.setItem('selected_skin', selectedSkin);
     }, [selectedSkin]);
+
+    useEffect(() => {
+        localStorage.setItem('selected_skin_agar', selectedSkinAgar);
+    }, [selectedSkinAgar]);
 
     const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
@@ -224,6 +231,20 @@ export default function PreGame() {
         ? competitiveTierEconomy(entryFeeForSession)
         : tierEconomy(entryFeeForSession);
     const brVariant = isBattleRoyaleMode ? selectedMode.replace(/^br-/, '') : null;
+    const isSlitherFamily = selectedMode === 'slither'
+        || selectedMode === 'competitive-slither'
+        || (isBattleRoyaleMode && brVariant === 'slither');
+    const isAgarFamily = selectedMode === 'agar'
+        || selectedMode === 'competitive-agar'
+        || (isBattleRoyaleMode && brVariant === 'agar');
+
+    const [customizerTab, setCustomizerTab] = useState('slither');
+    useEffect(() => {
+        if (showCustomizer) {
+            setCustomizerTab(isSlitherFamily ? 'slither' : 'agar');
+        }
+    }, [showCustomizer, isSlitherFamily]);
+
     const tierOptions = isCompetitiveSlitherMode
         ? COMPETITIVE_ENTRY_TIERS
         : (isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS);
@@ -721,9 +742,6 @@ export default function PreGame() {
                 : canJoin ? 'play-btn play-btn-ready'
                     : 'play-btn play-btn-disabled';
 
-    const isSlitherFamily = selectedMode === 'slither'
-        || selectedMode === 'competitive-slither'
-        || (isBattleRoyaleMode && brVariant === 'slither');
     const modeCardTitle = isSlitherFamily ? 'Slither' : 'Agar';
     const modeSubtitle = isBattleRoyaleMode
         ? 'Battle Royale'
@@ -1294,7 +1312,7 @@ export default function PreGame() {
                     </div>
 
                     {/* Customize Lobby Card */}
-                    {isAuthenticated && isSlitherFamily && (
+                    {isAuthenticated && (isSlitherFamily || isAgarFamily) && (
                         <div
                             className="leaderboard-card customize-lobby-card"
                             onClick={() => setShowCustomizer(true)}
@@ -1311,13 +1329,23 @@ export default function PreGame() {
                                     </svg>
                                     <span className="customize-lobby-title">Customize Appearance</span>
                                 </div>
-                                <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
-                                    {selectedSkin === 'random' ? 'Rainbow' : 'Active'}
-                                </span>
+                                {isSlitherFamily ? (
+                                    <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
+                                        {selectedSkin === 'random' ? 'Default' : 'Active'}
+                                    </span>
+                                ) : (
+                                    <span className="customize-lobby-status-pill" style={selectedSkinAgar === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkinAgar }}>
+                                        {selectedSkinAgar === 'random' ? 'Default' : 'Active'}
+                                    </span>
+                                )}
                             </div>
 
                             <div className="customize-lobby-preview-box">
-                                <SnakeSkinPreview color={selectedSkin} />
+                                {isSlitherFamily ? (
+                                    <SnakeSkinPreview color={selectedSkin} isLarge={false} />
+                                ) : (
+                                    <AgarBlobPreview color={selectedSkinAgar} isLarge={false} nickname={nickname} />
+                                )}
                             </div>
 
                             <div className="customize-lobby-footer">
@@ -1428,107 +1456,243 @@ export default function PreGame() {
             </div>
 
             {/* Customizer Modal Overlay */}
-            {showCustomizer && (
-                <div className="customizer-overlay-backdrop" onClick={() => setShowCustomizer(false)}>
-                    <div className="customizer-modal-content" onClick={e => e.stopPropagation()}>
-                        <div className="customizer-modal-header">
-                            <div>
-                                <h2 className="customizer-modal-title">Customize Appearance</h2>
-                                <p className="customizer-modal-subtitle">Stand out on the battlefield with a custom color</p>
+            {showCustomizer && (() => {
+                const getChromaName = (color) => {
+                    if (color === 'random') return 'Default (Random)';
+                    switch (color) {
+                        case '#c080ff': return 'Lavender Purple';
+                        case '#9099ff': return 'Indigo Blue';
+                        case '#80d0d0': return 'Turquoise Cyan';
+                        case '#80ff80': return 'Lime Green';
+                        case '#eeee70': return 'Tinted Yellow';
+                        case '#ffa060': return 'Orange';
+                        case '#ff9050': return 'Pink Red';
+                        case '#ff4040': return 'Dark Red';
+                        case '#e030e0': return 'Magenta';
+                        default: return color.toUpperCase();
+                    }
+                };
+
+                const cycleChroma = (direction) => {
+                    const chromas = [
+                        'random',
+                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
+                        '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
+                    ];
+                    const current = customizerTab === 'slither' ? selectedSkin : selectedSkinAgar;
+                    let idx = chromas.indexOf(current);
+                    if (idx === -1) idx = 0;
+                    
+                    let nextIdx = idx + direction;
+                    if (nextIdx < 0) nextIdx = chromas.length - 1;
+                    if (nextIdx >= chromas.length) nextIdx = 0;
+                    
+                    if (customizerTab === 'slither') {
+                        setSelectedSkin(chromas[nextIdx]);
+                    } else {
+                        setSelectedSkinAgar(chromas[nextIdx]);
+                    }
+                };
+
+                const currentChroma = customizerTab === 'slither' ? selectedSkin : selectedSkinAgar;
+
+                return (
+                    <div className="customizer-overlay-backdrop" onClick={() => setShowCustomizer(false)}>
+                        <div className="customizer-modal-content" onClick={e => e.stopPropagation()}>
+                            <div className="customizer-modal-header">
+                                <div>
+                                    <h2 className="customizer-modal-title">Customize Appearance</h2>
+                                    <p className="customizer-modal-subtitle">Stand out on the battlefield with a custom color</p>
+                                </div>
+                                <button className="customizer-close-icon-btn" onClick={() => setShowCustomizer(false)}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
                             </div>
-                            <button className="customizer-close-icon-btn" onClick={() => setShowCustomizer(false)}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                </svg>
-                            </button>
-                        </div>
-                        
-                        <div className="customizer-modal-body">
-                            <div className="customizer-preview-col">
-                                <div className="customizer-preview-wrapper">
-                                    <SnakeSkinPreview color={selectedSkin} isLarge={true} />
-                                    <div className="customizer-preview-glow" style={{ backgroundColor: selectedSkin === 'random' ? '#A78BFA' : selectedSkin }}></div>
-                                </div>
-                                <div className="customizer-preview-status">
-                                    <span className="skin-status-label">Current Skin:</span>
-                                    <span className="skin-status-badge" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
-                                        {selectedSkin === 'random' ? 'Rainbow Palette' : selectedSkin.toUpperCase()}
-                                    </span>
-                                </div>
+
+                            <div className="customizer-tabs" style={{ display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', background: 'rgba(255, 255, 255, 0.01)' }}>
+                                <button
+                                    type="button"
+                                    className={`customizer-tab-btn ${customizerTab === 'slither' ? 'active' : ''}`}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px',
+                                        background: 'none',
+                                        border: 'none',
+                                        borderBottom: customizerTab === 'slither' ? '2px solid var(--accent)' : '2px solid transparent',
+                                        color: customizerTab === 'slither' ? '#fff' : 'var(--text-1)',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onClick={() => setCustomizerTab('slither')}
+                                >
+                                    Slither Skin
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`customizer-tab-btn ${customizerTab === 'agar' ? 'active' : ''}`}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px',
+                                        background: 'none',
+                                        border: 'none',
+                                        borderBottom: customizerTab === 'agar' ? '2px solid var(--accent)' : '2px solid transparent',
+                                        color: customizerTab === 'agar' ? '#fff' : 'var(--text-1)',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onClick={() => setCustomizerTab('agar')}
+                                >
+                                    Agar Skin
+                                </button>
                             </div>
                             
-                            <div className="customizer-controls-col" style={{ width: '100%' }}>
-                                <span className="customizer-section-title" style={{ display: 'block', marginBottom: '16px', textAlign: 'center', color: 'var(--text-h)' }}>Select Skin Color</span>
-                                <div className="skin-swatch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '32px' }}>
-                                    {SKIN_COLORS.filter(c => c !== 'random').map(color => {
-                                        const isSelected = selectedSkin === color;
-                                        return (
-                                            <button
-                                                key={color}
-                                                type="button"
-                                                className={`skin-swatch-btn${isSelected ? ' active' : ''}`}
-                                                style={{ 
-                                                    backgroundColor: color, 
-                                                    height: '44px', 
-                                                    borderRadius: '8px', 
-                                                    border: isSelected ? '3px solid #fff' : '1px solid var(--border)',
-                                                    boxShadow: isSelected ? `0 0 12px ${color}` : 'none'
-                                                }}
-                                                onClick={() => setSelectedSkin(color)}
-                                            >
-                                                {isSelected && (
-                                                    <svg style={{ margin: '0 auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
-                                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                    <button
-                                        type="button"
-                                        className={`skin-swatch-btn${selectedSkin === 'random' ? ' active' : ''}`}
-                                        style={{ 
-                                            gridColumn: 'span 5', 
-                                            height: '48px', 
-                                            borderRadius: '8px', 
-                                            backgroundColor: 'var(--bg-hover)', 
-                                            border: selectedSkin === 'random' ? '2px solid var(--accent)' : '1px solid var(--border)', 
-                                            color: selectedSkin === 'random' ? '#fff' : 'var(--text-1)', 
-                                            fontWeight: 'bold',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        onClick={() => setSelectedSkin('random')}
-                                    >
-                                        No Skin (Default)
-                                    </button>
+                            <div className="customizer-modal-body" style={{ flexDirection: 'column', padding: '24px', gap: '24px' }}>
+                                <div className="customizer-preview-wrapper" style={{ width: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    {customizerTab === 'slither' ? (
+                                        <SnakeSkinPreview color={selectedSkin} isLarge={true} />
+                                    ) : (
+                                        <AgarBlobPreview color={selectedSkinAgar} isLarge={true} nickname={nickname} />
+                                    )}
+                                    
+                                    <div className="customizer-preview-glow" style={{ 
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '50%',
+                                        transform: 'translate(-50%, -50%)',
+                                        width: '180px',
+                                        height: '180px',
+                                        borderRadius: '50%',
+                                        zIndex: -1,
+                                        filter: 'blur(50px)',
+                                        opacity: 0.15,
+                                        backgroundColor: currentChroma === 'random' ? '#A78BFA' : currentChroma 
+                                    }}></div>
+
+                                    {/* Cycle Chroma Arrows */}
+                                    <div className="chroma-selector" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
+                                        <button
+                                            type="button"
+                                            className="chroma-arrow-btn"
+                                            style={{
+                                                background: 'rgba(255,255,255,0.04)',
+                                                border: '1px solid rgba(255,255,255,0.08)',
+                                                borderRadius: '50%',
+                                                width: '36px',
+                                                height: '36px',
+                                                color: '#fff',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                fontSize: '1.1rem',
+                                                fontWeight: 'bold',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onClick={() => cycleChroma(-1)}
+                                        >
+                                            &larr;
+                                        </button>
+                                        
+                                        <span className="skin-status-badge" style={
+                                            currentChroma === 'random'
+                                                ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)', minWidth: '160px', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }
+                                                : { backgroundColor: currentChroma, minWidth: '160px', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }
+                                        }>
+                                            {getChromaName(currentChroma)}
+                                        </span>
+                                        
+                                        <button
+                                            type="button"
+                                            className="chroma-arrow-btn"
+                                            style={{
+                                                background: 'rgba(255,255,255,0.04)',
+                                                border: '1px solid rgba(255,255,255,0.08)',
+                                                borderRadius: '50%',
+                                                width: '36px',
+                                                height: '36px',
+                                                color: '#fff',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                fontSize: '1.1rem',
+                                                fontWeight: 'bold',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onClick={() => cycleChroma(1)}
+                                        >
+                                            &rarr;
+                                        </button>
+                                    </div>
                                 </div>
                                 
-                                <div className="customizer-modal-actions" style={{ display: 'flex', gap: '12px' }}>
-                                    <button
-                                        className="btn-secondary"
-                                        style={{ flex: 1, height: '48px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.95rem' }}
-                                        onClick={() => setShowCustomizer(false)}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        className="btn-primary"
-                                        style={{ flex: 1, height: '48px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.95rem' }}
-                                        onClick={() => setShowCustomizer(false)}
-                                    >
-                                        Apply
-                                    </button>
+                                <div className="customizer-controls-col" style={{ width: '100%' }}>
+                                    <span className="customizer-section-title" style={{ display: 'block', marginBottom: '16px', textAlign: 'center', color: 'var(--text-h)' }}>
+                                        Select Skin Style
+                                    </span>
+                                    
+                                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                                        <button
+                                            type="button"
+                                            className="skin-swatch-btn active"
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                background: 'rgba(255,255,255,0.02)',
+                                                border: '2px solid var(--accent)',
+                                                borderRadius: '12px',
+                                                padding: '12px',
+                                                width: '120px',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 0 16px rgba(167, 139, 250, 0.15)'
+                                            }}
+                                        >
+                                            {/* 2x2 grid representing color palette */}
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '1fr 1fr',
+                                                width: '40px',
+                                                height: '40px',
+                                                borderRadius: '50%',
+                                                overflow: 'hidden',
+                                                border: '2px solid rgba(255,255,255,0.2)'
+                                            }}>
+                                                <div style={{ backgroundColor: '#c080ff' }}></div>
+                                                <div style={{ backgroundColor: '#80d0d0' }}></div>
+                                                <div style={{ backgroundColor: '#eeee70' }}></div>
+                                                <div style={{ backgroundColor: '#ff4040' }}></div>
+                                            </div>
+                                            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#fff' }}>Classic</span>
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="customizer-modal-actions" style={{ display: 'flex', gap: '12px' }}>
+                                        <button
+                                            className="btn-secondary"
+                                            style={{ flex: 1, height: '48px', borderRadius: '12px', fontWeight: 'bold', fontSize: '0.95rem' }}
+                                            onClick={() => setShowCustomizer(false)}
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
         </div>
     );
 }
 
+/* ── SnakeSkinPreview ── */
 /* ── SnakeSkinPreview ── */
 function SnakeSkinPreview({ color, isLarge }) {
     const canvasRef = useRef(null);
@@ -1545,16 +1709,16 @@ function SnakeSkinPreview({ color, isLarge }) {
         const spacing = isLarge ? 6 : 4;
 
         const trail = [];
-        const centerX = isLarge ? 300 / 2 : 250 / 2;
-        const startY = isLarge ? 30 : 20;
+        const headX = isLarge ? 260 : 200;
+        const centerY = isLarge ? 260 / 2 : 100 / 2;
 
         // Pre-populate trail so the snake starts wiggling instantly when mounted
         for (let j = 0; j < 300; j++) {
             const tempT = -j;
-            const tempWiggle = Math.sin(tempT * 0.08) * (isLarge ? 28 : 16);
+            const tempWiggle = Math.sin(tempT * 0.08) * (isLarge ? 24 : 10);
             trail.push({
-                x: centerX + tempWiggle,
-                y: startY + j * (isLarge ? 2.5 : 1.8)
+                x: headX - j * (isLarge ? 2.5 : 1.8),
+                y: centerY + tempWiggle
             });
         }
 
@@ -1564,17 +1728,17 @@ function SnakeSkinPreview({ color, isLarge }) {
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Shift current trail points down
-            const speedY = isLarge ? 2.5 : 1.8;
+            // Shift current trail points to the left
+            const speedX = isLarge ? 2.5 : 1.8;
             for (let j = 0; j < trail.length; j++) {
-                trail[j].y += speedY;
+                trail[j].x -= speedX;
             }
 
-            // Insert new head at start
-            const amp = isLarge ? 28 : 16;
+            // Insert new head at start (on the right)
+            const amp = isLarge ? 24 : 10;
             const wiggleSpeed = 0.08;
-            const headX = centerX + Math.sin(t * wiggleSpeed) * amp;
-            trail.unshift({ x: headX, y: startY });
+            const headY = centerY + Math.sin(t * wiggleSpeed) * amp;
+            trail.unshift({ x: headX, y: headY });
 
             // Keep trail bounded
             if (trail.length > 500) trail.length = 500;
@@ -1660,7 +1824,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                 ctx.restore();
             }
 
-            // Draw eyes on the head segment
+            // Draw eyes on the head segment (facing right)
             const head = points[0];
             const next = points[1];
             if (head && next) {
@@ -1705,6 +1869,136 @@ function SnakeSkinPreview({ color, isLarge }) {
 
     return (
         <div className="snake-preview-wrapper" style={{ width: '100%', height: isLarge ? '260px' : '100px', display: 'flex', justifyContent: 'center' }}>
+            <canvas
+                ref={canvasRef}
+                width={isLarge ? 300 : 250}
+                height={isLarge ? 260 : 100}
+                style={{ height: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
+            />
+        </div>
+    );
+}
+
+/* ── AgarBlobPreview ── */
+function AgarBlobPreview({ color, isLarge, nickname }) {
+    const canvasRef = useRef(null);
+    const tRef = useRef(0);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        let animationFrameId;
+        const radius = isLarge ? 55 : 24;
+        const numPoints = 8;
+        const pts = [];
+        
+        // Initialize blob points
+        for (let j = 0; j < numPoints; j++) {
+            pts.push({ x: 0, y: 0 });
+        }
+
+        const render = () => {
+            tRef.current += 1;
+            const t = tRef.current;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // Calculate wiggling blob points
+            for (let j = 0; j < numPoints; j++) {
+                const angle = (j / numPoints) * Math.PI * 2;
+                // Wobble radius with sine wave
+                const r = radius + Math.sin(t * 0.06 + j * 0.8) * (isLarge ? 4 : 2);
+                pts[j] = {
+                    x: centerX + Math.cos(angle) * r,
+                    y: centerY + Math.sin(angle) * r
+                };
+            }
+
+            // Draw shadow first
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+            ctx.shadowBlur = isLarge ? 20 : 10;
+            ctx.shadowOffsetY = isLarge ? 8 : 4;
+
+            // Draw blob using quadratic curves
+            ctx.beginPath();
+            const firstMid = {
+                x: (pts[0].x + pts[numPoints - 1].x) / 2,
+                y: (pts[0].y + pts[numPoints - 1].y) / 2
+            };
+            ctx.moveTo(firstMid.x, firstMid.y);
+            for (let j = 0; j < numPoints; j++) {
+                const next = pts[(j + 1) % numPoints];
+                const mid = {
+                    x: (pts[j].x + next.x) / 2,
+                    y: (pts[j].y + next.y) / 2
+                };
+                ctx.quadraticCurveTo(pts[j].x, pts[j].y, mid.x, mid.y);
+            }
+            ctx.closePath();
+
+            // Set up radial gradient
+            const gradX = centerX - radius * 0.25;
+            const gradY = centerY - radius * 0.25;
+            const grad = ctx.createRadialGradient(gradX, gradY, radius * 0.05, centerX, centerY, radius * 1.05);
+
+            if (color === 'random') {
+                const hue = (t * 0.35) % 360;
+                grad.addColorStop(0, `hsla(${hue}, 95%, 75%, 1)`);
+                grad.addColorStop(1, `hsla(${hue}, 85%, 52%, 1)`);
+                ctx.fillStyle = grad;
+            } else {
+                // custom color
+                // parse color to make a beautiful 3D spherical gradient
+                const h = color.replace('#', '');
+                let r = 120, g = 120, b = 120;
+                if (h.length === 3) {
+                    r = parseInt(h[0] + h[0], 16);
+                    g = parseInt(h[1] + h[1], 16);
+                    b = parseInt(h[2] + h[2], 16);
+                } else if (h.length >= 6) {
+                    r = parseInt(h.slice(0, 2), 16);
+                    g = parseInt(h.slice(2, 4), 16);
+                    b = parseInt(h.slice(4, 6), 16);
+                }
+                const inner = `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)}, 1)`;
+                const outer = `rgba(${r}, ${g}, ${b}, 1)`;
+                grad.addColorStop(0, inner);
+                grad.addColorStop(1, outer);
+                ctx.fillStyle = grad;
+            }
+
+            ctx.fill();
+            ctx.restore();
+
+            // Draw player nickname in the center
+            ctx.font = 'bold ' + (isLarge ? '15px' : '10px') + ' "Outfit", "Inter", sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            ctx.fillText((nickname || 'GUEST').toUpperCase(), centerX, centerY);
+
+            animationFrameId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
+    }, [color, isLarge, nickname]);
+
+    return (
+        <div className="agar-preview-wrapper" style={{ width: '100%', height: isLarge ? '260px' : '100px', display: 'flex', justifyContent: 'center' }}>
             <canvas
                 ref={canvasRef}
                 width={isLarge ? 300 : 250}

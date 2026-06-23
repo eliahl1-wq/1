@@ -186,11 +186,13 @@ export default function Game() {
         }
 
         if (socketRef.current?.connected) {
+            const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
             socketRef.current.emit('joinGame', {
                 username: nickname,
                 token,
                 mode: playMode,
                 entryFeeUsd: fee,
+                skinColor: preferredSkinAgar,
             });
         }
     }, [token, liveSession]);
@@ -333,7 +335,14 @@ export default function Game() {
                 if (isBR) {
                     socket.emit('brRejoinMatch', { token });
                 } else {
-                    socket.emit('joinGame', { username: matchNickname, token, mode: gameMode, entryFeeUsd });
+                    const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
+                    socket.emit('joinGame', {
+                        username: matchNickname,
+                        token,
+                        mode: gameMode,
+                        entryFeeUsd,
+                        skinColor: preferredSkinAgar,
+                    });
                 }
                 hasJoinedGameRef.current = true;
             }
