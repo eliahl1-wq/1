@@ -30,12 +30,30 @@ export default function Transactions() {
         const fetch_ = async () => {
             setLoading(true);
             try {
-                const res  = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/transactions`, {
+                const res  = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/transactions?filter=external`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (!res.ok) throw new Error();
                 const data = await res.json();
-                setTxs(data.filter(tx => tx.type === 'deposit' || tx.type === 'withdraw'));
+                
+                // Fallback client-side safety filtering
+                const filtered = data.filter(tx => {
+                    if (tx.type === 'deposit') {
+                        if (tx.meta?.entryFor === 'arena-entry' || tx.meta?.isEntryPayment) return false;
+                        return true;
+                    }
+                    if (tx.type === 'withdraw') {
+                        const reason = tx.meta?.reason || '';
+                        const event = tx.meta?.event || '';
+                        const isGameWithdrawal = 
+                            /Arena Cashout|Admin Forced Cashout|Auto Room Reset|BR Victory|BR Refund/i.test(reason) ||
+                            ['pool_sweep', 'br_owner_sweep'].includes(event);
+                        if (isGameWithdrawal) return false;
+                        return !!tx.meta?.destination;
+                    }
+                    return false;
+                });
+                setTxs(filtered);
             } catch {
                 setTxs([]);
             } finally {
