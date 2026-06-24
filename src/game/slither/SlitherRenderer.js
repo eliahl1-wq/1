@@ -807,10 +807,10 @@ export class SlitherRenderer {
     _getBgPattern(ctx) {
         if (!this._bgTileImage) return null;
         if (this._bgPattern) return this._bgPattern;
-        const s = 1.0;
+        const s = this._getBgTileScale(this._bgTileImage);
         const oc = document.createElement('canvas');
-        oc.width = this._bgTileImage.width * s;
-        oc.height = this._bgTileImage.height * s;
+        oc.width = Math.max(1, Math.round(this._bgTileImage.width * s));
+        oc.height = Math.max(1, Math.round(this._bgTileImage.height * s));
         const octx = oc.getContext('2d');
         octx.drawImage(this._bgTileImage, 0, 0, oc.width, oc.height);
         this._bgPattern = ctx.createPattern(oc, 'repeat');
@@ -991,7 +991,7 @@ export class SlitherRenderer {
 
     /** Soft glowing orb — slither.io-style pinpoint with tight bloom. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.4 : 1.35));
+        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.25 : 1.35));
         const key = `f12|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
@@ -1003,6 +1003,13 @@ export class SlitherRenderer {
                 grad.addColorStop(0.55, `hsla(48, ${sat}%, 65%, 0.15)`);
                 grad.addColorStop(0.75, `hsla(42, ${sat}%, 55%, 0.05)`);
                 grad.addColorStop(1, `hsla(35, ${sat}%, 55%, 0)`);
+            } else if (deathDrop) {
+                const sat = 55; 
+                grad.addColorStop(0, `hsla(${hue}, 20%, 95%, 0.65)`);
+                grad.addColorStop(0.70, `hsla(${hue}, ${sat}%, 80%, 0.45)`); // Push solid core further out
+                grad.addColorStop(0.85, `hsla(${hue}, ${sat}%, 65%, 0.15)`); // Very sharp drop off
+                grad.addColorStop(0.95, `hsla(${hue}, ${sat}%, 55%, 0.05)`); // Thin glow
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 55%, 0)`);
             } else {
                 const sat = 55; // Much less colorful
                 grad.addColorStop(0, `hsla(${hue}, 20%, 95%, 0.65)`);
@@ -1283,8 +1290,8 @@ export class SlitherRenderer {
             const { x: fx, y: fy } = toScreen(wx, wy);
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenScale = isGolden ? 1.65 : (f.deathDrop ? 1.58 : 1.48);
-            const screenR = Math.max(f.deathDrop ? 6.5 : 4.2, baseR * safeZoom * screenScale);
+            const screenScale = isGolden ? 1.65 : (f.deathDrop ? 1.35 : 1.48);
+            const screenR = Math.max(f.deathDrop ? 4.5 : 4.2, baseR * safeZoom * screenScale);
 
             if (simpleFood && !isGolden && !f.deathDrop) {
                 if (!simpleFoodGroups[hue]) {
