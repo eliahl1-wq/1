@@ -400,7 +400,7 @@ export class SlitherRenderer {
         const cell = this._FOOD_CELL;
         for (let i = 0; i < src.length; i++) {
             const f = src[i];
-            const key = `${Math.floor(f.x / cell)},${Math.floor(f.y / cell)}`;
+            const key = (Math.floor(f.x / cell) + 2000) + (Math.floor(f.y / cell) + 2000) * 10000;
             let bucket = grid.get(key);
             if (!bucket) {
                 bucket = [];
@@ -456,7 +456,8 @@ export class SlitherRenderer {
 
         for (let gx = minCx; gx <= maxCx; gx++) {
             for (let gy = minCy; gy <= maxCy; gy++) {
-                const bucket = grid.get(`${gx},${gy}`);
+                const key = (gx + 2000) + (gy + 2000) * 10000;
+                const bucket = grid.get(key);
                 if (!bucket) continue;
                 for (let i = 0; i < bucket.length; i++) {
                     const f = bucket[i];
@@ -482,7 +483,8 @@ export class SlitherRenderer {
         const maxCy = Math.floor((wy + reach) / cell);
         for (let cx = minCx; cx <= maxCx; cx++) {
             for (let cy = minCy; cy <= maxCy; cy++) {
-                const bucket = grid.get(`${cx},${cy}`);
+                const key = (cx + 2000) + (cy + 2000) * 10000;
+                const bucket = grid.get(key);
                 if (!bucket) continue;
                 for (let i = 0; i < bucket.length; i++) out.push(bucket[i]);
             }
@@ -1114,16 +1116,19 @@ export class SlitherRenderer {
             const half = size / 2;
 
             if (isGolden) {
-                ctx.save();
-                ctx.globalAlpha = alpha;
                 ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = alpha;
                 ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
-                ctx.restore();
+                ctx.globalAlpha = 1.0;
+                ctx.globalCompositeOperation = 'source-over';
             } else {
-                ctx.save();
-                if (alpha < 0.99) ctx.globalAlpha = alpha;
-                ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
-                ctx.restore();
+                if (alpha < 0.99) {
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+                    ctx.globalAlpha = 1.0;
+                } else {
+                    ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+                }
             }
         }
 
@@ -1160,10 +1165,9 @@ export class SlitherRenderer {
             const half = size / 2;
             const { x: fx, y: fy } = toScreen(wx, wy);
 
-            ctx.save();
             ctx.globalAlpha = Math.max(0.12, 1 - ease * 0.88);
             ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
-            ctx.restore();
+            ctx.globalAlpha = 1.0;
 
             ghosts[kept++] = g;
         }
@@ -1174,13 +1178,13 @@ export class SlitherRenderer {
         const half = sprite.width / scale / 2;
         const dw = sprite.width / scale;
         const dh = sprite.height / scale;
-        if (angle === 0 && scale === 1) {
-            ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0);
+        if (angle === 0) {
+            ctx.drawImage(sprite, (x - half) | 0, (y - half) | 0, dw, dh);
             return;
         }
         ctx.save();
         ctx.translate(x, y);
-        if (angle !== 0) ctx.rotate(angle);
+        ctx.rotate(angle);
         ctx.drawImage(sprite, -dw / 2, -dh / 2, dw, dh);
         ctx.restore();
     }
@@ -1583,25 +1587,45 @@ export class SlitherRenderer {
         }
 
         // Body stamps — all snakes
+        const dw = normal ? normal.width / stampScale : 0;
+        const dh = normal ? normal.height / stampScale : 0;
+        const half = dw / 2;
+
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
             let sprite;
             let currentStampScale = stampScale;
+            let currentDw = dw;
+            let currentDh = dh;
+            let currentHalf = half;
+
             if (isRainbow) {
                 const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowColors.length);
                 const segColor = rainbowColors[colorIndex];
                 const stamp = this._getSnakeSegmentStamp(segColor, cacheR, prNeeds);
                 sprite = (boosting && i === 0) ? stamp.boostBody : stamp.normal;
                 currentStampScale = stamp.bodySS * (cacheR / bodyRadius);
+                currentDw = sprite.width / currentStampScale;
+                currentDh = sprite.height / currentStampScale;
+                currentHalf = currentDw / 2;
             } else {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            // Restore rotation so the linear light streak dynamically follows the snake's curves!
-            const tangent = this._bumpTangent(bumps, i);
-            this._blitSprite(ctx, sprite, p.x, p.y, currentStampScale, tangent);
+            // Only compute tangent/rotate for player snake (major CPU win!)
+            const tangent = (isYou || (q >= 0.9 && !this.isMobile)) ? this._bumpTangent(bumps, i) : 0;
+
+            if (tangent === 0) {
+                ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
+            } else {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(tangent);
+                ctx.drawImage(sprite, -currentDw / 2, -currentDh / 2, currentDw, currentDh);
+                ctx.restore();
+            }
         }
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
@@ -1615,12 +1639,20 @@ export class SlitherRenderer {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 let currentGlow = glow;
+                let currentGlowScale = stampScale;
                 if (isRainbow) {
                     const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowColors.length);
                     const segColor = rainbowColors[colorIndex];
-                    currentGlow = this._getSnakeSegmentStamp(segColor, cacheR, prNeeds).glow;
+                    const stamp = this._getSnakeSegmentStamp(segColor, cacheR, prNeeds);
+                    currentGlow = stamp.glow;
+                    currentGlowScale = stamp.bodySS * (cacheR / bodyRadius);
                 }
-                if (currentGlow) this._blitSprite(ctx, currentGlow, p.x, p.y);
+                if (currentGlow) {
+                    const gdw = currentGlow.width / currentGlowScale;
+                    const gdh = currentGlow.height / currentGlowScale;
+                    const ghalf = gdw / 2;
+                    ctx.drawImage(currentGlow, (p.x - ghalf) | 0, (p.y - ghalf) | 0, gdw, gdh);
+                }
             }
             ctx.restore();
         }
@@ -1628,13 +1660,16 @@ export class SlitherRenderer {
         if (boosting && prNeeds.boostOverlay && boostOverlay) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
+            const bdw = boostOverlay.width / stampScale;
+            const bdh = boostOverlay.height / stampScale;
+            const bhalf = bdw / 2;
             for (let i = bumpCount - 1; i >= 0; i -= 4) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
                 const headProx = 1 - along;
                 ctx.globalAlpha = (0.22 + headProx * 0.22) * pulse;
-                this._blitSprite(ctx, boostOverlay, p.x, p.y);
+                ctx.drawImage(boostOverlay, (p.x - bhalf) | 0, (p.y - bhalf) | 0, bdw, bdh);
             }
             ctx.restore();
         }
@@ -1759,11 +1794,10 @@ export class SlitherRenderer {
         const nowMs = Date.now();
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
-        const qFloor = this.isMobile ? 0.88 : 0.76;
-        if (this._perfEma > 24) this._quality = Math.max(qFloor, this.isMobile ? 0.78 : 0.72);
-        else if (this._perfEma > 20) this._quality = Math.min(this._quality, Math.max(qFloor, this.isMobile ? 0.88 : 0.82));
-        else if (this._perfEma > 16) this._quality = Math.min(this._quality, Math.max(qFloor, this.isMobile ? 0.94 : 0.88));
-        else if (this._perfEma < 14) this._quality = Math.min(1, this._quality + 0.02);
+        const qFloor = this.isMobile ? 0.45 : 0.35;
+        if (this._perfEma > 24) this._quality = Math.max(qFloor, this._quality - 0.08);
+        else if (this._perfEma > 20) this._quality = Math.max(qFloor, this._quality - 0.03);
+        else if (this._perfEma < 15) this._quality = Math.min(1, this._quality + 0.02);
 
         if (!this.isMobile && this._quality < 0.88) {
             this.ctx.imageSmoothingQuality = 'low';
