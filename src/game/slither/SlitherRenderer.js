@@ -400,6 +400,7 @@ export class SlitherRenderer {
         const cell = this._FOOD_CELL;
         for (let i = 0; i < src.length; i++) {
             const f = src[i];
+            if (!f || f.x == null || f.y == null) continue;
             const key = (Math.floor(f.x / cell) + 2000) + (Math.floor(f.y / cell) + 2000) * 10000;
             let bucket = grid.get(key);
             if (!bucket) {
@@ -439,7 +440,7 @@ export class SlitherRenderer {
     _rebuildVisibleFoodBuf(cx = this.camera.x, cy = this.camera.y, halfW = null, halfH = null) {
         const W = this.W;
         const H = this.H;
-        const zoom = this.zoom;
+        const zoom = this.zoom || this.baseZoom || 1.0;
         if (halfW == null) halfW = W / 2 / zoom + 160 / zoom;
         if (halfH == null) halfH = H / 2 / zoom + 160 / zoom;
 
@@ -449,10 +450,11 @@ export class SlitherRenderer {
         const dest = this._visibleFoodBuf;
         dest.length = 0;
 
-        const minCx = Math.floor((cx - halfW) / cell);
-        const maxCx = Math.floor((cx + halfW) / cell);
-        const minCy = Math.floor((cy - halfH) / cell);
-        const maxCy = Math.floor((cy + halfH) / cell);
+        const minCx = Math.max(-100, Math.min(100, Math.floor((cx - halfW) / cell)));
+        const maxCx = Math.max(-100, Math.min(100, Math.floor((cx + halfW) / cell)));
+        const minCy = Math.max(-100, Math.min(100, Math.floor((cy - halfH) / cell)));
+        const maxCy = Math.max(-100, Math.min(100, Math.floor((cy + halfH) / cell)));
+        if (isNaN(minCx) || isNaN(maxCx) || isNaN(minCy) || isNaN(maxCy)) return;
 
         for (let gx = minCx; gx <= maxCx; gx++) {
             for (let gy = minCy; gy <= maxCy; gy++) {
@@ -461,6 +463,7 @@ export class SlitherRenderer {
                 if (!bucket) continue;
                 for (let i = 0; i < bucket.length; i++) {
                     const f = bucket[i];
+                    if (!f || f.x == null || f.y == null) continue;
                     const dx = f.x - cx;
                     const dy = f.y - cy;
                     if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfH) dest.push(f);
@@ -477,16 +480,21 @@ export class SlitherRenderer {
         if (!out) out = this._foodNearBuf;
         out.length = 0;
         const cell = this._FOOD_CELL;
-        const minCx = Math.floor((wx - reach) / cell);
-        const maxCx = Math.floor((wx + reach) / cell);
-        const minCy = Math.floor((wy - reach) / cell);
-        const maxCy = Math.floor((wy + reach) / cell);
+        const minCx = Math.max(-100, Math.min(100, Math.floor((wx - reach) / cell)));
+        const maxCx = Math.max(-100, Math.min(100, Math.floor((wx + reach) / cell)));
+        const minCy = Math.max(-100, Math.min(100, Math.floor((wy - reach) / cell)));
+        const maxCy = Math.max(-100, Math.min(100, Math.floor((wy + reach) / cell)));
+        if (isNaN(minCx) || isNaN(maxCx) || isNaN(minCy) || isNaN(maxCy)) return out;
         for (let cx = minCx; cx <= maxCx; cx++) {
             for (let cy = minCy; cy <= maxCy; cy++) {
                 const key = (cx + 2000) + (cy + 2000) * 10000;
                 const bucket = grid.get(key);
                 if (!bucket) continue;
-                for (let i = 0; i < bucket.length; i++) out.push(bucket[i]);
+                for (let i = 0; i < bucket.length; i++) {
+                    const f = bucket[i];
+                    if (!f || f.x == null || f.y == null) continue;
+                    out.push(f);
+                }
             }
         }
         return out;
