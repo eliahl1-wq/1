@@ -998,18 +998,18 @@ export class SlitherRenderer {
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
                 const sat = 55;
-                grad.addColorStop(0, `hsla(55, 10%, 100%, 0.95)`);
-                grad.addColorStop(0.35, `hsla(52, ${sat}%, 85%, 0.85)`);
-                grad.addColorStop(0.55, `hsla(48, ${sat}%, 70%, 0.35)`);
-                grad.addColorStop(0.75, `hsla(42, ${sat}%, 60%, 0.10)`);
-                grad.addColorStop(1, `hsla(35, ${sat}%, 60%, 0)`);
+                grad.addColorStop(0, `hsla(55, 20%, 95%, 0.65)`);
+                grad.addColorStop(0.35, `hsla(52, ${sat}%, 80%, 0.45)`);
+                grad.addColorStop(0.55, `hsla(48, ${sat}%, 65%, 0.15)`);
+                grad.addColorStop(0.75, `hsla(42, ${sat}%, 55%, 0.05)`);
+                grad.addColorStop(1, `hsla(35, ${sat}%, 55%, 0)`);
             } else {
-                const sat = 55; // Much less colorful (mindre färgstark)
-                grad.addColorStop(0, `hsla(${hue}, 10%, 100%, 0.95)`); // Very white center
-                grad.addColorStop(0.35, `hsla(${hue}, ${sat}%, 85%, 0.85)`); // Still mostly white, slight color
-                grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, 70%, 0.35)`); // Sharp drop off (less glow)
-                grad.addColorStop(0.75, `hsla(${hue}, ${sat}%, 60%, 0.10)`); // Minimal outer glow
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 60%, 0)`);
+                const sat = 55; // Much less colorful
+                grad.addColorStop(0, `hsla(${hue}, 20%, 95%, 0.65)`);
+                grad.addColorStop(0.35, `hsla(${hue}, ${sat}%, 80%, 0.45)`);
+                grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, 65%, 0.15)`);
+                grad.addColorStop(0.75, `hsla(${hue}, ${sat}%, 55%, 0.05)`);
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 55%, 0)`);
             }
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
@@ -1717,7 +1717,7 @@ export class SlitherRenderer {
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
-        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.52, q);
+        const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);
         let arcLen = 0;
         if (segs.length > 1) {
             const dx0 = segs[1].x - segs[0].x;
@@ -1726,7 +1726,7 @@ export class SlitherRenderer {
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const mobileCap = boosting ? 78 : 68;
-        const desktopCap = boosting ? 72 : 62;
+        const desktopCap = boosting ? 88 : 76;
         const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1831,7 +1831,17 @@ export class SlitherRenderer {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
+            const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
+
+            if (tangent === 0) {
+                ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
+            } else {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(tangent);
+                ctx.drawImage(sprite, -currentDw / 2, -currentDh / 2, currentDw, currentDh);
+                ctx.restore();
+            }
         }
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
@@ -2002,10 +2012,7 @@ export class SlitherRenderer {
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
 
-        const targetQuality = this.isMobile
-            ? 1
-            : (this._perfEma > 50 ? 0.52 : this._perfEma > 34 ? 0.68 : this._perfEma > 24 ? 0.84 : 1);
-        this._quality += (targetQuality - this._quality) * 0.35;
+        this._quality = 1;
 
         this._applyCanvasDpr(this.W, this.H);
 
