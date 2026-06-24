@@ -806,15 +806,15 @@ export class SlitherRenderer {
 
     /** Repeating slither.io hex tile — sized to match in-game reference. */
     _getBgPattern(ctx) {
-        const img = this._bgTileImage;
-        if (!img?.complete || !img.naturalWidth) return null;
-        const scale = this._getBgTileScale(img);
-        if (this._bgPattern && this._bgPatternScale === scale) return this._bgPattern;
-        this._bgPattern = ctx.createPattern(img, 'repeat');
-        this._bgPatternScale = scale;
-        if (this._bgPattern?.setTransform) {
-            this._bgPattern.setTransform(new DOMMatrix([scale, 0, 0, scale, 0, 0]));
-        }
+        if (!this._bgTileImage) return null;
+        if (this._bgPattern) return this._bgPattern;
+        const s = 1.0;
+        const oc = document.createElement('canvas');
+        oc.width = this._bgTileImage.width * s;
+        oc.height = this._bgTileImage.height * s;
+        const octx = oc.getContext('2d');
+        octx.drawImage(this._bgTileImage, 0, 0, oc.width, oc.height);
+        this._bgPattern = ctx.createPattern(oc, 'repeat');
         return this._bgPattern;
     }
 
@@ -1717,7 +1717,7 @@ export class SlitherRenderer {
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
-        const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);
+        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.52, q);
         let arcLen = 0;
         if (segs.length > 1) {
             const dx0 = segs[1].x - segs[0].x;
@@ -1726,7 +1726,7 @@ export class SlitherRenderer {
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const mobileCap = boosting ? 78 : 68;
-        const desktopCap = boosting ? 88 : 76;
+        const desktopCap = boosting ? 72 : 62;
         const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1831,8 +1831,7 @@ export class SlitherRenderer {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            // Tangent rotation only for your snake — other snakes use axis-aligned stamps (big CPU win).
-            const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
+            const tangent = 0;
 
             if (tangent === 0) {
                 ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
@@ -2013,8 +2012,10 @@ export class SlitherRenderer {
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
 
-        // Adaptive quality removed to prevent visual bugs on normal PCs
-        this._quality = 1;
+        const targetQuality = this.isMobile
+            ? 1
+            : (this._perfEma > 50 ? 0.52 : this._perfEma > 34 ? 0.68 : this._perfEma > 24 ? 0.84 : 1);
+        this._quality += (targetQuality - this._quality) * 0.35;
 
         this._applyCanvasDpr(this.W, this.H);
 
