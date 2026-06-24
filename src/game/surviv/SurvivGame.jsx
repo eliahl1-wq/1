@@ -437,7 +437,7 @@ export default function SurvivGame() {
             {(!isConnected || !gameReady) && !pendingAtMount && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
                     <div style={{ textAlign: 'center' }}>
-                        <h2 style={{ marginBottom: '10px' }}>Deploying to Surviv…</h2>
+                        <h2 style={{ marginBottom: '10px' }}>Deploying to Surviv...</h2>
                         <p style={{ opacity: 0.5 }}>
                             Make sure you have at least {formatUsd(entryFeeUsd)} balance.
                         </p>
