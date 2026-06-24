@@ -295,7 +295,10 @@ export class SlitherRenderer {
 
     _setInputFromScreen(sx, sy) {
         if (!this._inputEnabled || this.spectatorMode) return;
-        const rect = this.canvas.getBoundingClientRect();
+        if (!this._cachedRect || this._frame % 60 === 0) {
+            this._cachedRect = this.canvas.getBoundingClientRect();
+        }
+        const rect = this._cachedRect;
         const x = sx - rect.left - this.W / 2;
         const y = sy - rect.top - this.H / 2;
         const mag = Math.hypot(x, y);
@@ -1161,10 +1164,8 @@ export class SlitherRenderer {
             if (foodList[i]?.deathDrop) deathDropCount++;
         }
 
-        const clusteredDeathIds = deathDropCount >= 24
-            ? this._buildDeathFoodClusters(foodList, cx, cy, halfW, halfH, 3)
-            : this._deathClusterIds;
-        if (deathDropCount < 24) this._deathClusterIds.clear();
+        const clusteredDeathIds = this._deathClusterIds;
+        this._deathClusterIds.clear();
 
         const mouthValid = this._mouthValid;
         const mouthX = this._mouthX;

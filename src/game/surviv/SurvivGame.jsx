@@ -47,6 +47,7 @@ export default function SurvivGame() {
     const reloadPendingRef = useRef(false);
     const useMedkitPendingRef = useRef(false);
     const equipSlotPendingRef = useRef(null);
+    const openChestPendingRef = useRef(null);
 
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
     const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
@@ -281,7 +282,12 @@ export default function SurvivGame() {
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            if (e.button === 0) renderer.handlePointerDown();
+            if (e.button !== 0) return;
+            renderer.handlePointerMove(e.clientX, e.clientY);
+            const action = renderer.handlePointerDown();
+            if (typeof action === 'string' && action.startsWith('openChest:')) {
+                openChestPendingRef.current = action.slice('openChest:'.length);
+            }
         };
         const onPointerUp = () => renderer.handlePointerUp();
 
@@ -392,6 +398,10 @@ export default function SurvivGame() {
                 payload.equipSlot = equipSlotPendingRef.current;
                 equipSlotPendingRef.current = null;
             }
+            if (openChestPendingRef.current) {
+                payload.openChestId = openChestPendingRef.current;
+                openChestPendingRef.current = null;
+            }
             socket.emit('survivInput', payload);
         }, 1000 / 20);
 
@@ -430,6 +440,16 @@ export default function SurvivGame() {
     const handleHoldEnd = useCallback(() => {
         rendererRef.current?.setHoldStart(0);
     }, []);
+
+    const handleAdminSpawnBot = useCallback(() => {
+        if (!authToken) return;
+        socketRef.current?.emit('adminSpawnBotNearMe', { token: authToken, mode: 'surviv' });
+    }, [authToken]);
+
+    const handleAdminClearBots = useCallback(() => {
+        if (!authToken) return;
+        socketRef.current?.emit('adminClearBots', { token: authToken });
+    }, [authToken]);
 
     const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
 
@@ -478,6 +498,45 @@ export default function SurvivGame() {
             {resetCountdown != null && resetCountdown < 300 && (
                 <div className="game-reset-banner">
                     Arena reset in {Math.floor(resetCountdown / 60)}:{String(resetCountdown % 60).padStart(2, '0')}
+                </div>
+            )}
+
+            {user?.isAdmin && gameReady && !showResultModal && (
+                <div style={{
+                    position: 'absolute',
+                    left: 14,
+                    top: 96,
+                    zIndex: 20,
+                    display: 'flex',
+                    gap: 8,
+                    padding: '8px',
+                    borderRadius: 8,
+                    background: 'rgba(10, 14, 12, 0.72)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    backdropFilter: 'blur(8px)',
+                }}>
+                    <button type="button" onClick={handleAdminSpawnBot} style={{
+                        border: '1px solid rgba(255,255,255,0.16)',
+                        background: '#385f45',
+                        color: '#edf5e9',
+                        borderRadius: 6,
+                        padding: '7px 10px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                    }}>
+                        Spawn Bot
+                    </button>
+                    <button type="button" onClick={handleAdminClearBots} style={{
+                        border: '1px solid rgba(255,255,255,0.16)',
+                        background: '#5c3f3b',
+                        color: '#f5ebe8',
+                        borderRadius: 6,
+                        padding: '7px 10px',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                    }}>
+                        Clear Bots
+                    </button>
                 </div>
             )}
 
