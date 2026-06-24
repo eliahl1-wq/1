@@ -440,7 +440,7 @@ export class SurvivRenderer {
         this.drawHud(ctx, W, H);
         this.drawMinimapPanel(ctx, W, H);
         this.drawLootToast(ctx, W, H);
-        if (this.inventoryOpen) this.drawInventoryOverlay(ctx, W, H);
+        // Handled by React UI overlay
     }
 
     drawTerrain(ctx, camX, camY, viewW, viewH, z) {
@@ -696,41 +696,117 @@ export class SurvivRenderer {
 
     drawLoot(ctx, l) {
         const color = LOOT_COLORS[l.type] || '#d5d5d5';
-        const pulse = 1 + Math.sin(Date.now() / 190 + l.x * 0.03) * 0.06;
+        const isChest = l.type === 'chest' || l.type === 'deathCrate';
+        const pulse = isChest ? 1 : (1 + Math.sin(Date.now() / 190 + l.x * 0.03) * 0.06);
         ctx.save();
         ctx.translate(l.x, l.y);
         ctx.scale(pulse, pulse);
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = color;
-        ctx.strokeStyle = 'rgba(18, 18, 14, 0.55)';
-        ctx.lineWidth = 2;
 
-        if (l.type === 'chest' || l.type === 'deathCrate') {
-            const rare = l.tier === 'rare' || l.tier === 'military' || l.type === 'deathCrate';
+        if (isChest) {
+            // Draw a subtle dark drop shadow ellipse underneath the chest
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+            ctx.beginPath();
+            ctx.ellipse(0, 4, 18, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw a rich pulsating radial glow matching the rarity color
+            const tierColor = l.type === 'deathCrate' ? '#a855f7' : (RARITY_COLORS[l.tier] || '#d7c396');
+            const glowRad = 32 + Math.sin(Date.now() / 220 + l.x * 0.05) * 8;
+            const glowGrad = ctx.createRadialGradient(0, 0, 6, 0, 0, glowRad);
+            glowGrad.addColorStop(0, tierColor + '40'); // 25% opacity
+            glowGrad.addColorStop(0.5, tierColor + '15'); // 8% opacity
+            glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, glowRad, 0, Math.PI * 2);
+            ctx.fill();
+
+            // White outline on hover
             const hovered = this.hoveredChestId === l.id;
             if (hovered) {
-                ctx.shadowBlur = 18;
-                ctx.strokeStyle = RARITY_COLORS[l.tier] || '#f0cf82';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(0, 0, 24, 0, Math.PI * 2);
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 12;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3.5;
+                roundRect(ctx, -17, -12, 34, 24, 6);
                 ctx.stroke();
+                ctx.shadowBlur = 0; // reset shadow
             }
-            ctx.fillStyle = l.type === 'deathCrate' ? '#4b3b2f' : rare ? '#82633b' : '#6a4729';
-            roundRect(ctx, -14, -10, 28, 20, 4);
+
+            // Solid chest design variables based on tier
+            let bodyColor = '#6d4c41'; // warm wood
+            let bandColor = '#4e342e'; // dark wood/iron band
+            let lockColor = '#ffb300'; // brass lock core
+            
+            if (l.type === 'deathCrate') {
+                bodyColor = '#2d3748'; // charcoal
+                bandColor = '#1a202c'; // black
+                lockColor = '#d53f8c'; // purple/pink soul
+            } else if (l.tier === 'military') {
+                bodyColor = '#1f2937'; // military dark grey
+                bandColor = '#10b981'; // neon emerald green
+                lockColor = '#06b6d4'; // bright cyan
+            } else if (l.tier === 'rare') {
+                bodyColor = '#3e2723'; // dark cherry wood
+                bandColor = '#d97706'; // gold/amber trim
+                lockColor = '#fbbf24'; // bright gold
+            }
+
+            // Draw chest body
+            ctx.fillStyle = bodyColor;
+            ctx.strokeStyle = 'rgba(12, 16, 14, 0.9)';
+            ctx.lineWidth = 2;
+            roundRect(ctx, -15, -10, 30, 20, 5);
             ctx.fill();
             ctx.stroke();
-            ctx.fillStyle = rare ? '#d5b36a' : '#a7834c';
-            ctx.fillRect(-14, -2, 28, 4);
-            ctx.fillStyle = '#252018';
-            ctx.fillRect(-3, -2, 6, 7);
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#f2df9a';
-            ctx.font = '800 7px system-ui, sans-serif';
+
+            // Horizontal panel divider (lid seam)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(-15, -1, 30, 3);
+
+            // Metal corner reinforcements (bands)
+            ctx.fillStyle = bandColor;
+            // top left corner
+            ctx.fillRect(-15, -10, 5, 5);
+            // top right corner
+            ctx.fillRect(10, -10, 5, 5);
+            // bottom left corner
+            ctx.fillRect(-15, 5, 5, 5);
+            // bottom right corner
+            ctx.fillRect(10, 5, 5, 5);
+
+            // Vertical iron straps (bands running from top to bottom)
+            ctx.fillRect(-9, -10, 3.5, 20);
+            ctx.fillRect(5.5, -10, 3.5, 20);
+
+            // Top highlight reflection
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.fillRect(-15, -10, 30, 2.5);
+
+            // Center Lock
+            ctx.fillStyle = 'rgba(12, 16, 14, 0.95)';
+            ctx.fillRect(-4.5, -3.5, 9, 8);
+            ctx.fillStyle = lockColor;
+            ctx.beginPath();
+            ctx.arc(0, 0.5, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Final border stroke for crisp outline definition
+            ctx.strokeStyle = 'rgba(12, 16, 14, 0.85)';
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, -15, -10, 30, 20, 5);
+            ctx.stroke();
+
+            // Label above the chest
+            ctx.fillStyle = l.type === 'deathCrate' ? '#a855f7' : (RARITY_COLORS[l.tier] || '#ffffff');
+            ctx.font = '900 8px system-ui, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(l.type === 'deathCrate' ? 'BAG' : 'LOOT', 0, -15);
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+            ctx.shadowBlur = 3;
+            ctx.fillText(l.type === 'deathCrate' ? 'DEATH CRATE' : `${l.tier.toUpperCase()} CHEST`, 0, -18);
+            ctx.shadowBlur = 0;
+
         } else if (l.type === 'weapon') {
             ctx.rotate(-0.2);
             roundRect(ctx, -15, -5, 24, 10, 2);
