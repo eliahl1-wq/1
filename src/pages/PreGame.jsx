@@ -13,7 +13,7 @@ import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import GamemodeDiscoveryPrompt from '../components/GamemodeDiscoveryPrompt';
 import { markGamemodePlayed, shouldShowDiscoveryPrompt } from '../constants/gamemodes';
-import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, tierEconomy, competitiveTierEconomy, formatUsd } from '../constants/economy';
+import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, SURVIV_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, DEFAULT_SURVIV_ENTRY_FEE, tierEconomy, competitiveTierEconomy, survivTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
 import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeGamemodeForLobby } from '../constants/features';
@@ -78,6 +78,7 @@ function resolvePreGameMode(pathname, locationStateMode, isAdmin = false) {
         if (brAvailable && stored === 'br-slither') return stored;
         return 'slither';
     }
+    if (pathname === '/surviv') return 'surviv';
     const raw = stored || locationStateMode || 'agar';
     return normalizeGamemodeForLobby(raw, isAdmin);
 }
@@ -261,13 +262,17 @@ export default function PreGame() {
     const isBattleRoyaleMode = isBRGamemode(selectedMode)
         && (brAvailable || (isAlreadyInGame && isBRGamemode(currentGameMode)));
     const isCompetitiveSlitherMode = selectedMode === 'competitive-slither';
-    const economy = isCompetitiveSlitherMode
-        ? competitiveTierEconomy(entryFeeForSession)
-        : tierEconomy(entryFeeForSession);
+    const isSurvivMode = selectedMode === 'surviv';
+    const economy = isSurvivMode
+        ? survivTierEconomy(entryFeeForSession)
+        : isCompetitiveSlitherMode
+            ? competitiveTierEconomy(entryFeeForSession)
+            : tierEconomy(entryFeeForSession);
     const brVariant = isBattleRoyaleMode ? selectedMode.replace(/^br-/, '') : null;
     const isSlitherFamily = selectedMode === 'slither'
         || selectedMode === 'competitive-slither'
         || (isBattleRoyaleMode && brVariant === 'slither');
+    const isSurvivFamily = isSurvivMode;
     const isAgarFamily = selectedMode === 'agar'
         || selectedMode === 'competitive-agar'
         || (isBattleRoyaleMode && brVariant === 'agar');
@@ -275,22 +280,27 @@ export default function PreGame() {
     const [customizerTab, setCustomizerTab] = useState('slither');
     useEffect(() => {
         if (showCustomizer) {
-            setCustomizerTab(isSlitherFamily ? 'slither' : 'agar');
+            setCustomizerTab((isSlitherFamily || isSurvivFamily) ? 'slither' : 'agar');
         }
-    }, [showCustomizer, isSlitherFamily]);
+    }, [showCustomizer, isSlitherFamily, isSurvivFamily]);
 
-    const tierOptions = isCompetitiveSlitherMode
-        ? COMPETITIVE_ENTRY_TIERS
-        : (isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS);
+    const tierOptions = isSurvivMode
+        ? SURVIV_ENTRY_TIERS
+        : isCompetitiveSlitherMode
+            ? COMPETITIVE_ENTRY_TIERS
+            : (isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS);
 
     useEffect(() => {
+        if (isSurvivMode && !SURVIV_ENTRY_TIERS.includes(selectedEntryFee)) {
+            setSelectedEntryFee(DEFAULT_SURVIV_ENTRY_FEE);
+        }
         if (isCompetitiveSlitherMode && !COMPETITIVE_ENTRY_TIERS.includes(selectedEntryFee)) {
             setSelectedEntryFee(DEFAULT_COMPETITIVE_ENTRY_FEE);
         }
         if (isBattleRoyaleMode && !BR_ENTRY_TIERS.includes(selectedEntryFee)) {
             setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
         }
-    }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, selectedEntryFee]);
+    }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, isSurvivMode, selectedEntryFee]);
 
     useEffect(() => {
         setShowDiscovery(isAuthenticated && shouldShowDiscoveryPrompt(selectedMode, brAvailable));
@@ -676,7 +686,11 @@ export default function PreGame() {
             return;
         }
 
-        const targetPath = (activeMode === 'slither' || activeMode === 'competitive-slither') ? '/slither-game' : '/game';
+        const targetPath = activeMode === 'surviv'
+            ? '/surviv-game'
+            : (activeMode === 'slither' || activeMode === 'competitive-slither')
+                ? '/slither-game'
+                : '/game';
         const baseMode = activeMode.replace(/^br-/, '');
         setTimeout(() => navigate(targetPath, {
             state: {
@@ -776,7 +790,7 @@ export default function PreGame() {
                 : canJoin ? 'play-btn play-btn-ready'
                     : 'play-btn play-btn-disabled';
 
-    const modeCardTitle = isSlitherFamily ? 'Slither' : 'Agar';
+    const modeCardTitle = isSurvivFamily ? 'Surviv' : isSlitherFamily ? 'Slither' : 'Agar';
     const modeSubtitle = isBattleRoyaleMode
         ? 'Battle Royale'
         : isCompetitiveSlitherMode
@@ -792,7 +806,7 @@ export default function PreGame() {
             : (isAlreadyInGame && canRejoinThisMode)
                 ? 'Rejoin'
                 : (isAlreadyInGame && !canRejoinThisMode)
-                    ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')} — switch mode`
+                    ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'surviv' ? 'Surviv' : currentGameMode === 'slither' || currentGameMode === 'competitive-slither' ? 'Slither' : 'Agar')} — switch mode`
                     : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
                         : 'Deposit to Play';
 
@@ -1295,7 +1309,31 @@ export default function PreGame() {
                             </div>
                             <div className={`hiw-dropdown${showHowItWorks ? ' hiw-dropdown--open' : ''}`}>
                                 <div className="hiw-content">
-                                    {isCompetitiveSlitherMode ? (
+                                    {isSurvivMode ? (
+                                        <>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Entry fee</span>
+                                                <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                            </div>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Starting balance</span>
+                                                <span className="mono">{formatUsd(economy.dollarStart)}</span>
+                                            </div>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Map loot pool</span>
+                                                <span className="mono">{formatUsd(economy.lootPoolOnJoin)}</span>
+                                            </div>
+                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                <span>Cashout fee</span>
+                                                <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
+                                            </div>
+                                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
+                                                Top-down battle royale shooter. $2 starts in your pocket, $3 seeds loot across the map.
+                                                Loot weapons, armor, medkits, and cash. Fight players and bots. Cash out anytime — or risk it all for more.
+                                                The safe zone shrinks before each arena reset.
+                                            </div>
+                                        </>
+                                    ) : isCompetitiveSlitherMode ? (
                                         <>
                                             <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                 <span>Entry fee</span>
@@ -1346,7 +1384,7 @@ export default function PreGame() {
                     </div>
 
                     {/* Customize Lobby Card */}
-                    {isAuthenticated && (isSlitherFamily || isAgarFamily) && (
+                    {isAuthenticated && (isSlitherFamily || isAgarFamily || isSurvivFamily) && (
                         <div
                             className="leaderboard-card customize-lobby-card"
                             onClick={() => setShowCustomizer(true)}
@@ -1363,7 +1401,7 @@ export default function PreGame() {
                                     </svg>
                                     <span className="customize-lobby-title">Customize Appearance</span>
                                 </div>
-                                {isSlitherFamily ? (
+                                {(isSlitherFamily || isSurvivFamily) ? (
                                     <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
                                         {getChromaName(selectedSkin)}
                                     </span>
@@ -1375,7 +1413,7 @@ export default function PreGame() {
                             </div>
 
                             <div className="customize-lobby-preview-box">
-                                {isSlitherFamily ? (
+                                {(isSlitherFamily || isSurvivFamily) ? (
                                     <SnakeSkinPreview color={selectedSkin} isLarge={false} />
                                 ) : (
                                     <AgarBlobPreview color={selectedSkinAgar} isLarge={false} nickname={nickname} />

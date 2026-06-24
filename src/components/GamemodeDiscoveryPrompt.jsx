@@ -20,6 +20,7 @@ export default function GamemodeDiscoveryPrompt({
         agar: 'agar',
         slither: 'slither',
         'competitive-slither': 'competitiveSlither',
+        surviv: 'surviv',
         'br-agar': 'brAgar',
         'br-slither': 'brSlither',
     };

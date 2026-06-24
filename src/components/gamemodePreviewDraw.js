@@ -453,12 +453,64 @@ function drawBRSlitherPreview(ctx, W, H) {
     }
 }
 
+function drawSurvivPreview(ctx, W, H) {
+    ctx.fillStyle = '#12141a';
+    ctx.fillRect(0, 0, W, H);
+
+    const cx = W / 2;
+    const cy = H / 2;
+
+    ctx.strokeStyle = 'rgba(255,100,100,0.35)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, W * 0.38, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const buildings = [
+        { x: cx - 90, y: cy - 50, w: 70, h: 55 },
+        { x: cx + 60, y: cy - 70, w: 90, h: 60 },
+        { x: cx - 40, y: cy + 70, w: 80, h: 50 },
+        { x: cx + 100, y: cy + 40, w: 60, h: 80 },
+    ];
+    for (const b of buildings) {
+        ctx.fillStyle = '#2a3040';
+        ctx.fillRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
+    }
+
+    ctx.fillStyle = '#ffd060';
+    ctx.beginPath();
+    ctx.arc(cx + 50, cy - 30, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#60ff90';
+    ctx.fillRect(cx - 70, cy + 20, 14, 14);
+
+    const me = { x: cx, y: cy };
+    ctx.fillStyle = '#80d0d0';
+    ctx.shadowColor = '#80d0d0';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(me.x, me.y, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(me.x + 5, me.y - 3, 18, 6);
+
+    drawBalanceBadge(ctx, me.x, me.y + 22, 4.25, true);
+    drawCashoutProgressRing(ctx, me.x, me.y, 24, 0.4, { counterClockwise: true });
+
+    ctx.fillStyle = '#ff6060';
+    ctx.beginPath();
+    ctx.arc(cx - 120, cy - 80, 12, 0, Math.PI * 2);
+    ctx.fill();
+}
+
 const DRAWERS = {
     agar: (ctx, W, H) => drawAgarPreview(ctx, W, H),
     'br-agar': (ctx, W, H) => drawAgarPreview(ctx, W, H, { battleRoyale: true }),
     slither: (ctx, W, H) => drawSlitherPreview(ctx, W, H, { arena: 'square', showCashout: true }),
     'competitive-slither': (ctx, W, H) => drawCompetitiveSlitherPreview(ctx, W, H),
     'br-slither': (ctx, W, H) => drawBRSlitherPreview(ctx, W, H),
+    surviv: (ctx, W, H) => drawSurvivPreview(ctx, W, H),
 };
 
 export function drawGamemodePreview(ctx, W, H, mode, { fit = false } = {}) {

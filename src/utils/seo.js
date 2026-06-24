@@ -87,6 +87,12 @@ export const SEO = {
         keywords: `${BASE_KEYWORDS}, agar.io cash out`,
         path: '/pre-game',
     },
+    gamemodesSurviv: {
+        tabTitle: 'AgarStake | Surviv Arena',
+        description: 'Surviv Normal — $5 entry top-down battle royale. Loot, fight, and cash out your balance anytime.',
+        keywords: `${BASE_KEYWORDS}, surviv.io real money, battle royale shooter`,
+        path: '/gamemodes',
+    },
     preGameSlither: {
         tabTitle: 'AgarStake | Join Slither Match',
         description: 'Select your entry tier and jump straight into the Slither action. High stakes, real opponents, instant crypto cashouts.',

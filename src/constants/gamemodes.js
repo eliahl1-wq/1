@@ -31,6 +31,15 @@ export const GAMEMODE_CATALOG = [
         longDesc: '$2 or $5 entry — separate pools, real players only. Circular arena, shrinking zone before reset. Cash out your dollar balance anytime.',
     },
     {
+        id: 'surviv',
+        tab: 'surviv',
+        title: 'Surviv Normal',
+        shortTitle: 'Surviv',
+        badge: 'new',
+        desc: 'Top-down battle royale shooter. Loot, fight, cash out.',
+        longDesc: '$5 entry — start with $2 in-game. Loot weapons, armor, and cash across the map. Shrinking zone, last one standing wins the tension. Cash out anytime.',
+    },
+    {
         id: 'br-agar',
         tab: 'agar',
         title: 'Agar Battle Royale',

@@ -17,6 +17,7 @@ const PLAYING_KEY = {
     agar: 'agar',
     slither: 'slither',
     'competitive-slither': 'competitiveSlither',
+    surviv: 'surviv',
     'br-agar': 'brAgar',
     'br-slither': 'brSlither',
 };
@@ -36,11 +37,13 @@ export default function Gamemodes() {
         brAgar: 0,
         brSlither: 0,
         competitiveSlither: 0,
+        surviv: 0,
     });
 
     const catalog = useMemo(() => getVisibleGamemodes(brAvailable), [brAvailable]);
     const agarModes = catalog.filter((m) => m.tab === 'agar');
     const slitherModes = catalog.filter((m) => m.tab === 'slither');
+    const survivModes = catalog.filter((m) => m.tab === 'surviv');
 
     useEffect(() => {
         if (user == null) return;
@@ -83,18 +86,20 @@ export default function Gamemodes() {
 
     const isSlitherTab = activeTab === 'slither' || activeTab === 'competitive-slither'
         || (brAvailable && activeTab === 'br-slither');
+    const isSurvivTab = activeTab === 'surviv';
     const isAgarTab = activeTab === 'agar' || (brAvailable && activeTab === 'br-agar');
 
     useEffect(() => {
-        setPageSeo(isSlitherTab ? SEO.gamemodesSlither : SEO.gamemodesAgar);
-    }, [isSlitherTab]);
+        if (isSurvivTab) setPageSeo(SEO.gamemodesSurviv ?? SEO.gamemodesAgar);
+        else setPageSeo(isSlitherTab ? SEO.gamemodesSlither : SEO.gamemodesAgar);
+    }, [isSlitherTab, isSurvivTab]);
 
     const handleSelectMode = (modeId) => {
         localStorage.setItem('selected_gamemode', modeId);
         navigate('/pre-game', { state: { selectedMode: modeId } });
     };
 
-    const activeModes = isAgarTab ? agarModes : slitherModes;
+    const activeModes = isAgarTab ? agarModes : isSurvivTab ? survivModes : slitherModes;
 
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
@@ -125,6 +130,12 @@ export default function Gamemodes() {
                         onClick={() => handleTabChange('slither')}
                     >
                         Slither
+                    </button>
+                    <button
+                        className={`gm-tab${isSurvivTab ? ' gm-tab--active' : ''}`}
+                        onClick={() => handleTabChange('surviv')}
+                    >
+                        Surviv
                     </button>
                 </div>
 

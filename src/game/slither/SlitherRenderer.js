@@ -187,6 +187,8 @@ export class SlitherRenderer {
         this._minimapFrame = 0;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
+        this._lastDpr = 1;
+        this._lastDprChangeTime = 0;
 
         this._onResize = () => this.resize();
         this._onLayoutChange = () => this.resize();
@@ -251,10 +253,27 @@ export class SlitherRenderer {
     _pickDpr() {
         const rawDpr = window.devicePixelRatio || 1;
         if (!this.isMobile) return 1;
+
+        const now = performance.now();
+        if (this._lastDpr && now - this._lastDprChangeTime < 3000) {
+            return this._lastDpr;
+        }
+
+        let targetDpr = 1;
         // Adaptive retina — 2× was causing 1–5 FPS freezes on phones; scale with perf headroom.
-        if (this._perfEma > 22 || this._quality < 0.5) return 1;
-        if (this._perfEma > 14 || this._quality < 0.72) return Math.min(1.25, rawDpr);
-        return Math.min(1.35, rawDpr);
+        if (this._perfEma > 22 || this._quality < 0.5) {
+            targetDpr = 1;
+        } else if (this._perfEma > 14 || this._quality < 0.72) {
+            targetDpr = Math.min(1.25, rawDpr);
+        } else {
+            targetDpr = Math.min(1.35, rawDpr);
+        }
+
+        if (targetDpr !== this._lastDpr) {
+            this._lastDpr = targetDpr;
+            this._lastDprChangeTime = now;
+        }
+        return targetDpr;
     }
 
     _applyCanvasDpr(width, height) {
@@ -1179,6 +1198,8 @@ export class SlitherRenderer {
             this._drawDeathFoodClusters(ctx, this._deathClusterBuf, toScreen, safeZoom);
         }
 
+        const simpleFoodGroups = {};
+
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
             const f = foodList[fi];
             const dxCam = f.x - cx;
@@ -1277,22 +1298,10 @@ export class SlitherRenderer {
             const screenR = Math.max(f.deathDrop ? 6.5 : 4.2, baseR * safeZoom * screenScale);
 
             if (simpleFood && !isGolden && !f.deathDrop) {
-                ctx.globalAlpha = 0.58;
-                ctx.fillStyle = `hsla(${hue}, 88%, 62%, 0.52)`;
-                ctx.beginPath();
-                ctx.arc(fx, fy, screenR * 0.52, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
-                continue;
-            }
-
-            if (screenR < 6 && !isGolden && !f.deathDrop) {
-                ctx.globalAlpha = 0.65;
-                ctx.fillStyle = `hsla(${hue}, 90%, 60%, 0.58)`;
-                ctx.beginPath();
-                ctx.arc(fx, fy, screenR * 0.55, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
+                if (!simpleFoodGroups[hue]) {
+                    simpleFoodGroups[hue] = [];
+                }
+                simpleFoodGroups[hue].push({ x: fx, y: fy, r: screenR * 0.52 });
                 continue;
             }
 
@@ -1317,6 +1326,21 @@ export class SlitherRenderer {
                 }
             }
         }
+
+        // Draw batched simple food
+        ctx.globalAlpha = 0.58;
+        for (const hue in simpleFoodGroups) {
+            ctx.fillStyle = `hsla(${hue}, 88%, 62%, 0.52)`;
+            ctx.beginPath();
+            const list = simpleFoodGroups[hue];
+            for (let i = 0; i < list.length; i++) {
+                const item = list[i];
+                ctx.moveTo(item.x + item.r, item.y);
+                ctx.arc(item.x, item.y, item.r, 0, Math.PI * 2);
+            }
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
 
         if (deathDropCount < 80 && this._quality >= 0.6) {
             this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
@@ -2005,6 +2029,8 @@ export class SlitherRenderer {
         else if (this._perfEma > 14) this._quality = Math.max(qFloor, this._quality - 0.03);
         else if (this._perfEma < 10) this._quality = Math.min(1, this._quality + 0.02);
 
+        this._applyCanvasDpr(this.W, this.H);
+
         if (this._quality >= 0.9 && !this.isMobile) {
             this.ctx.imageSmoothingQuality = 'high';
         } else if (this._quality < 0.65) {
@@ -2012,8 +2038,7 @@ export class SlitherRenderer {
         } else {
             this.ctx.imageSmoothingQuality = 'medium';
         }
-
-        this._applyCanvasDpr(this.W, this.H);
+        this.ctx.imageSmoothingEnabled = true;
 
         ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
         ctx.globalAlpha = 1;

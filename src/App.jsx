@@ -8,6 +8,7 @@ import Transactions from './pages/Transactions';
 import Profile from './pages/Profile';
 import Game from './game/agar/Game'; // Uppdaterad sökväg
 import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
+import SurvivGame from './game/surviv/SurvivGame';
 import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
 import AdminDashboard from './pages/AdminDashboard';
@@ -40,7 +41,7 @@ function buildWalletAdapters() {
         projectId: '8b2f78d206bbaec981376e03d9d15376',
         metadata: {
           name: 'AgarStake',
-          description: 'Competitive Agar.io and Slither.io with Solana stakes.',
+          description: 'Competitive Agar.io, Slither.io, and Surviv with Solana stakes.',
           url: 'https://www.agararena.space',
           icons: ['https://www.agararena.space/logo-512.png'],
         },
@@ -120,11 +121,13 @@ function App() {
                 <Route path="/pre-game" element={<PreGame />} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
                 <Route path="/slither-game" element={<ArenaRoute><SlitherGame /></ArenaRoute>} />
+                <Route path="/surviv-game" element={<ArenaRoute><SurvivGame /></ArenaRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path="/gamemodes" element={<Gamemodes />} />
                 <Route path="/agar" element={<PreGame />} />
                 <Route path="/slither" element={<PreGame />} />
+                <Route path="/surviv" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 <Route path="/admin/sandbox" element={<AdminRoute><AdminSandbox /></AdminRoute>} />

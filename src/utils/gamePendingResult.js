@@ -1,6 +1,7 @@
 const KEYS = {
     slither: 'slither_pending_result',
     agar: 'agar_pending_result',
+    surviv: 'surviv_pending_result',
 };
 
 export function savePendingResult(game, data) {
