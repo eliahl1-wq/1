@@ -690,7 +690,6 @@ export default function SlitherGame() {
             setCashOutEndAt(0);
             cashoutActiveRef.current = false;
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
-            rendererRef.current?.pause();
             const startedAt = sessionStartAtRef.current || Date.now();
             const stats = {
                 timeSurvivedMs: Date.now() - startedAt,

@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody } from './snakePath.js';
+import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -658,33 +658,8 @@ export class SlitherRenderer {
                 this.smooth.set(snake.id, s);
                 for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
                 s.angle = snake.angle || 0;
-                if (snake.isYou) {
-                    rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, null, snake.fam ?? 0, segCount);
-                }
-                continue;
-            }
-
-            const meta = {
-                segmentCount: segCount,
-                fam: snake.fam ?? 0,
-            };
-
-            if (snake.isYou) {
-                const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
-                const headDy = tgt[0].y - (s.segments[0]?.y ?? tgt[0].y);
-                if (headDx * headDx + headDy * headDy > SNAP_SQ) {
-                    for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-                    s.angle = snake.angle || 0;
-                    rebuildPathFromSegments(s, s.segments);
-                    resetVisualGrowth(s, null, snake.fam ?? 0, segCount);
-                    resetSnakeBodyTick(s);
-                    delete s._prevSrvHead;
-                    delete s._extrapX;
-                    delete s._extrapY;
-                }
-                // Densify is done in _interpolateSnakeDrawPath at render time — skip here.
-                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: true });
+                rebuildPathFromSegments(s, s.segments);
+                resetVisualGrowth(s, null, snake.fam ?? 0, segCount);
                 continue;
             }
 
@@ -694,24 +669,25 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const tau = 0.08;
-            const a = 1 - Math.exp(-dt / tau);
-            for (let i = 0; i < spineLen; i++) {
-                if (i >= s.segments.length) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
-                const dx = tgt[i].x - s.segments[i].x;
-                const dy = tgt[i].y - s.segments[i].y;
-                if (dx * dx + dy * dy > SNAP_SQ) {
-                    s.segments[i].x = tgt[i].x;
-                    s.segments[i].y = tgt[i].y;
-                } else {
-                    s.segments[i].x += dx * a;
-                    s.segments[i].y += dy * a;
-                }
+            const meta = {
+                segmentCount: segCount,
+                fam: snake.fam ?? 0,
+            };
+
+            const headDx = tgt[0].x - (s.segments[0]?.x ?? tgt[0].x);
+            const headDy = tgt[0].y - (s.segments[0]?.y ?? tgt[0].y);
+            if (headDx * headDx + headDy * headDy > SNAP_SQ) {
+                for (let i = 0; i < spineLen; i++) this._smoothSeg(s, i, tgt[i].x, tgt[i].y);
+                s.angle = snake.angle || 0;
+                rebuildPathFromSegments(s, s.segments);
+                resetVisualGrowth(s, null, snake.fam ?? 0, segCount);
+                resetSnakeBodyTick(s);
+                delete s._prevSrvHead;
+                delete s._extrapX;
+                delete s._extrapY;
             }
-            if (s.segments.length > spineLen) s.segments.length = spineLen;
-            let da = (snake.angle || 0) - s.angle;
-            da = Math.atan2(Math.sin(da), Math.cos(da));
-            s.angle += da * a;
+            // Densify is done in _interpolateSnakeDrawPath at render time — skip here.
+            stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: true });
         }
 
         for (const id of this.smooth.keys()) {
@@ -989,7 +965,6 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Soft glowing orb — slither.io-style pinpoint with tight bloom. */
     _foodSprite(hue, rPx, golden, deathDrop) {
         const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.35 : 1.45));
         const key = `f12|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
@@ -997,26 +972,26 @@ export class SlitherRenderer {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                const sat = 55;
-                grad.addColorStop(0, `hsla(55, 30%, 85%, 0.55)`);
-                grad.addColorStop(0.35, `hsla(52, ${sat}%, 75%, 0.35)`);
-                grad.addColorStop(0.55, `hsla(48, ${sat}%, 60%, 0.10)`);
-                grad.addColorStop(0.75, `hsla(42, ${sat}%, 50%, 0.03)`);
-                grad.addColorStop(1, `hsla(35, ${sat}%, 50%, 0)`);
+                const sat = 90;
+                grad.addColorStop(0, `hsla(55, ${sat}%, 70%, 0.70)`);
+                grad.addColorStop(0.35, `hsla(52, ${sat}%, 60%, 0.40)`);
+                grad.addColorStop(0.55, `hsla(48, ${sat}%, 50%, 0.15)`);
+                grad.addColorStop(0.75, `hsla(42, ${sat}%, 45%, 0.04)`);
+                grad.addColorStop(1, `hsla(35, ${sat}%, 45%, 0)`);
             } else if (deathDrop) {
-                const sat = 55; 
-                grad.addColorStop(0, `hsla(${hue}, 30%, 85%, 0.55)`);
-                grad.addColorStop(0.65, `hsla(${hue}, ${sat}%, 75%, 0.35)`); // Solid core
-                grad.addColorStop(0.85, `hsla(${hue}, ${sat}%, 60%, 0.10)`); // Sharp drop off
-                grad.addColorStop(0.95, `hsla(${hue}, ${sat}%, 50%, 0.03)`); // Thin glow
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 50%, 0)`);
+                const sat = 85; 
+                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 70%, 0.70)`);
+                grad.addColorStop(0.65, `hsla(${hue}, ${sat}%, 60%, 0.40)`); // Solid core
+                grad.addColorStop(0.85, `hsla(${hue}, ${sat}%, 50%, 0.15)`); // Sharp drop off
+                grad.addColorStop(0.95, `hsla(${hue}, ${sat}%, 45%, 0.04)`); // Thin glow
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 45%, 0)`);
             } else {
-                const sat = 55; 
-                grad.addColorStop(0, `hsla(${hue}, 30%, 85%, 0.55)`);
-                grad.addColorStop(0.35, `hsla(${hue}, ${sat}%, 75%, 0.35)`);
-                grad.addColorStop(0.60, `hsla(${hue}, ${sat}%, 60%, 0.10)`);
-                grad.addColorStop(0.80, `hsla(${hue}, ${sat}%, 50%, 0.03)`);
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 50%, 0)`);
+                const sat = 85; 
+                grad.addColorStop(0, `hsla(${hue}, ${sat}%, 70%, 0.70)`);
+                grad.addColorStop(0.35, `hsla(${hue}, ${sat}%, 60%, 0.40)`);
+                grad.addColorStop(0.60, `hsla(${hue}, ${sat}%, 50%, 0.15)`);
+                grad.addColorStop(0.80, `hsla(${hue}, ${sat}%, 45%, 0.04)`);
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 45%, 0)`);
             }
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
@@ -1680,7 +1655,11 @@ export class SlitherRenderer {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
-        const segs = snake.drawSpine || snake.segments || [];
+        const s = this.smooth.get(snake.id);
+        let segs = snake.segments || [];
+        if (s && s.visualArcLen) {
+            segs = fitSpineToArcLength(s.segments || snake.segments || [], s.visualArcLen);
+        }
         if (segs.length === 0) {
             ctx.restore();
             return;
@@ -1843,7 +1822,15 @@ export class SlitherRenderer {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
+            if (boosting) {
+                const wave = Math.sin(i * 0.38 - this._frame * 0.35);
+                const scaleMultiplier = 1.0 + 0.08 * wave;
+                currentDw *= scaleMultiplier;
+                currentDh *= scaleMultiplier;
+                currentHalf *= scaleMultiplier;
+            }
+
+            const tangent = this._bumpTangent(bumps, i);
 
             if (tangent === 0) {
                 ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
@@ -2057,10 +2044,8 @@ export class SlitherRenderer {
             rs.id = snake.id;
             rs.color = snake.color;
             const s = this.smooth.get(snake.id);
-            rs.radius = snake.isYou ? (s?.visualRadius ?? snake.radius) : snake.radius;
-            rs.sc = snake.isYou
-                ? ((s?.visualRadius ?? snake.radius) / 6.2)
-                : (snake.sc ?? (rs.radius / 6.2));
+            rs.radius = s?.visualRadius ?? snake.radius ?? 6.2;
+            rs.sc = rs.radius / 6.2;
             rs.fam = snake.fam ?? 0;
             rs.boost = snake.boost;
             rs.isYou = snake.isYou;
