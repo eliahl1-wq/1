@@ -12,7 +12,7 @@ const drawRoundObject = (position, radius, graph) => {
     graph.stroke();
 }
 
-const drawFood = (position, food, graph) => {
+const drawFood = (position, food, graph, highQuality = false) => {
     const r = food.radius || 5;
     const sx = Math.round(position.x);
     const sy = Math.round(position.y);
@@ -28,6 +28,18 @@ const drawFood = (position, food, graph) => {
         graph.beginPath();
         graph.arc(sx, sy, r * 0.55, 0, FULL_ANGLE);
         graph.fill();
+        return;
+    }
+    if (highQuality && r >= 3) {
+        const grad = graph.createRadialGradient(sx, sy, 0, sx, sy, r);
+        grad.addColorStop(0, `hsla(${food.hue}, 30%, 98%, 0.95)`);
+        grad.addColorStop(0.35, `hsl(${food.hue}, 100%, 58%)`);
+        grad.addColorStop(0.72, `hsl(${food.hue}, 96%, 48%)`);
+        grad.addColorStop(1, `hsla(${food.hue}, 90%, 40%, 0.85)`);
+        graph.fillStyle = grad;
+        graph.strokeStyle = `hsl(${food.hue}, 100%, 38%)`;
+        graph.lineWidth = Math.max(0.5, r * 0.08);
+        drawRoundObject({ x: sx, y: sy }, r, graph);
         return;
     }
     graph.fillStyle = 'hsl(' + food.hue + ', 100%, 55%)';
@@ -79,9 +91,11 @@ const regulatePoint = (point, borders) => ({
     y: valueInRange(borders.top, borders.bottom, point.y)
 });
 
-function drawOrganicCell(cell, borders, graph, allCells = []) {
+function drawOrganicCell(cell, borders, graph, allCells = [], highQuality = false) {
     // Dynamiskt antal punkter baserat på storlek för prestanda/utseende
-    let pointCount = Math.min(Math.max(~~(cell.radius), 24), 60);
+    const minPoints = highQuality ? 28 : 24;
+    const maxPoints = highQuality ? 68 : 60;
+    let pointCount = Math.min(Math.max(~~(cell.radius), minPoints), maxPoints);
     let points = [];
     let time = Date.now() * 0.002;
     let moveAngle = Math.atan2(cell.vY || 0, cell.vX || 0);
@@ -150,7 +164,7 @@ function drawPlayerCashoutRing(graph, cell) {
     drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress);
 }
 
-const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
+const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQuality = false) => {
     for (let cell of cells) {
         if (cell.color === 'rainbow') {
             const time = Date.now() * 0.002;
@@ -161,13 +175,13 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph) => {
             graph.fillStyle = cell.color;
             graph.strokeStyle = cell.borderColor;
         }
-        graph.lineWidth = 6;
+        graph.lineWidth = highQuality ? 7 : 6;
         
         // Disable shadow glow completely for performance and clean aesthetic
         graph.shadowBlur = 0;
         
         // Använd den organiska ritningen för slimy-effekt
-        drawOrganicCell(cell, borders, graph, cells);
+        drawOrganicCell(cell, borders, graph, cells, highQuality);
 
         // Draw the name of the player
         // Dynamisk fontstorlek: aggressivare skalning för korta namn (som 'eli')

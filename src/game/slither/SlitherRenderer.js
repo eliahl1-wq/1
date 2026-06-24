@@ -123,7 +123,7 @@ export class SlitherRenderer {
         // alpha channel makes page compositing cheaper with no visual change.
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'medium';
+        this.ctx.imageSmoothingQuality = this.isMobile ? 'high' : 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
         // which gives crisp, well-antialiased snake edges instead of upscaled-blurry ones.
         this._bodySS = 2;
@@ -256,8 +256,8 @@ export class SlitherRenderer {
             ({ width, height } = getGameScreenSize());
         }
         const rawDpr = window.devicePixelRatio || 1;
-        // Cap at 1× CSS pixels — avoids 1.5×/2× internal buffers on HiDPI (major CPU win for canvas).
-        this._dpr = this.isMobile ? Math.min(1.25, rawDpr) : 1;
+        // Mobile: up to 2× retina backing store for sharper snakes/food on HiDPI screens.
+        this._dpr = this.isMobile ? Math.min(2, rawDpr) : 1;
         if (this._dpr < 1) this._dpr = 1;
         this.canvas.width = Math.round(width * this._dpr);
         this.canvas.height = Math.round(height * this._dpr);
@@ -1578,7 +1578,9 @@ export class SlitherRenderer {
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const stampCap = Math.round((
-            boosting ? (this.isMobile ? 110 : 90) : (this.isMobile ? 95 : 80)
+            boosting
+                ? (this.isMobile ? 110 : 92)
+                : (this.isMobile ? 98 : 85)
         ) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1862,12 +1864,14 @@ export class SlitherRenderer {
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
         // Adaptive quality — targets ~120 FPS (8.3ms), degrades only under sustained load.
-        const qFloor = this.isMobile ? 0.50 : 0.62;
+        const qFloor = 0.62;
         if (this._perfEma > 16) this._quality = Math.max(qFloor, this._quality - 0.06);
         else if (this._perfEma > 11) this._quality = Math.max(qFloor, this._quality - 0.02);
         else if (this._perfEma < 8.5) this._quality = Math.min(1, this._quality + 0.03);
 
-        if (!this.isMobile && this._quality < 0.88) {
+        if (this._quality >= 0.88) {
+            this.ctx.imageSmoothingQuality = 'high';
+        } else if (this._quality < 0.72) {
             this.ctx.imageSmoothingQuality = 'low';
         } else {
             this.ctx.imageSmoothingQuality = 'medium';

@@ -15,7 +15,7 @@ import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import MobileGameSession from '../../components/MobileGameSession';
 import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
-import { isTouchDevice } from '../../utils/mobile';
+import { isTouchDevice, getMobileCanvasDpr } from '../../utils/mobile';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
 import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
@@ -130,6 +130,7 @@ export default function Game() {
     const [brPlayerCount, setBrPlayerCount] = useState(0);
     const brIntroTriggeredRef = useRef(false);
     const foodCacheRef = useRef(new Map());
+    const canvasDprRef = useRef(1);
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: DEFAULT_ENTRY_FEE, mode: 'agar' });
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
@@ -633,8 +634,12 @@ export default function Game() {
         if (!canvas) return;
         const { width, height } = getGameScreenSize();
         const viewZoom = getMobileViewZoom();
-        canvas.width = width;
-        canvas.height = height;
+        const dpr = IS_MOBILE ? getMobileCanvasDpr() : 1;
+        canvasDprRef.current = dpr;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
         if (socketRef.current?.connected) {
             socketRef.current.emit('0', {
                 x: 0,
@@ -652,7 +657,12 @@ export default function Game() {
         
         const gameLoop = () => {
             const { player, users, viruses, ejected, zoneSize } = gameData.current;
-            const screen = { width: canvas.width, height: canvas.height };
+            const { width, height } = getGameScreenSize();
+            const dpr = canvasDprRef.current;
+            graph.setTransform(dpr, 0, 0, dpr, 0, 0);
+            graph.imageSmoothingEnabled = true;
+            graph.imageSmoothingQuality = IS_MOBILE ? 'high' : 'medium';
+            const screen = { width, height };
             const hasPlayer = player && player.x !== undefined;
             if (hasPlayer && !isSpectating) {
                 spectatorCamRef.current = { x: player.x, y: player.y };
@@ -707,7 +717,7 @@ export default function Game() {
                         return d < Math.max((c.radius || 0) - fr * 0.15, fr * 0.25);
                     });
                     if (underMe) continue;
-                    renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: fr * viewZoom }, graph);
+                    renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: fr * viewZoom }, graph, IS_MOBILE);
                 }
 
                 (ejected || []).forEach(m => {
@@ -738,7 +748,7 @@ export default function Game() {
                     ...worldToScreen(c.x, c.y),
                 })));
                 
-                renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph);
+                renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph, IS_MOBILE);
                 renderUtils.drawHUD(global, graph);
 
                 const viewHalfW = screen.width / (2 * viewZoom);

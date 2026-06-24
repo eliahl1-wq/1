@@ -1,7 +1,7 @@
 import { isTouchDevice } from './mobile';
 
 /** < 1 = zoomed out (more world visible). Desktop always 1. */
-export const MOBILE_VIEW_ZOOM = 0.68;
+export const MOBILE_VIEW_ZOOM = 0.76;
 
 export function getMobileViewZoom() {
     return isTouchDevice() ? MOBILE_VIEW_ZOOM : 1;
