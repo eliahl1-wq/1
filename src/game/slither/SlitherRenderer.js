@@ -153,6 +153,9 @@ export class SlitherRenderer {
         this._sprites = new Map();
         /** o.pr_imgs — normal + boost overlay canvases per (cs, radius) */
         this._prImgs = new Map();
+        this._rotatedSprites = new Map();
+        this._spriteIds = new WeakMap();
+        this._nextSpriteId = 1;
         this._bgTileImage = null;
         this._bgPattern = null;
         this._bgPatternScale = 0;
@@ -804,17 +807,16 @@ export class SlitherRenderer {
         return (snakeBodyDiam * hexToBody * hexesAcross) / img.naturalWidth;
     }
 
-    /** Repeating slither.io hex tile — sized to match in-game reference. */
     _getBgPattern(ctx) {
-        if (!this._bgTileImage) return null;
-        if (this._bgPattern) return this._bgPattern;
-        const s = 1.0;
-        const oc = document.createElement('canvas');
-        oc.width = this._bgTileImage.width * s;
-        oc.height = this._bgTileImage.height * s;
-        const octx = oc.getContext('2d');
-        octx.drawImage(this._bgTileImage, 0, 0, oc.width, oc.height);
-        this._bgPattern = ctx.createPattern(oc, 'repeat');
+        const img = this._bgTileImage;
+        if (!img?.complete || !img.naturalWidth) return null;
+        const scale = this._getBgTileScale(img);
+        if (this._bgPattern && this._bgPatternScale === scale) return this._bgPattern;
+        this._bgPattern = ctx.createPattern(img, 'repeat');
+        this._bgPatternScale = scale;
+        if (this._bgPattern?.setTransform) {
+            this._bgPattern.setTransform(new DOMMatrix([scale, 0, 0, scale, 0, 0]));
+        }
         return this._bgPattern;
     }
 
@@ -1391,6 +1393,46 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
+
+    _getSpriteId(sprite) {
+        let id = this._spriteIds.get(sprite);
+        if (!id) {
+            id = this._nextSpriteId++;
+            this._spriteIds.set(sprite, id);
+        }
+        return id;
+    }
+
+    _getRotatedSprite(sprite, angle) {
+        const buckets = 256;
+        const turn = Math.PI * 2;
+        const normalized = ((angle % turn) + turn) % turn;
+        const bucket = Math.round((normalized / turn) * buckets) % buckets;
+        const spriteId = this._getSpriteId(sprite);
+        const key = `${spriteId}|${bucket}`;
+        let rotated = this._rotatedSprites.get(key);
+        if (rotated) return rotated;
+
+        if (this._rotatedSprites.size > 900) {
+            const oldest = this._rotatedSprites.keys().next().value;
+            if (oldest != null) this._rotatedSprites.delete(oldest);
+        }
+
+        const drawAngle = (bucket / buckets) * turn;
+        const size = Math.ceil(Math.hypot(sprite.width, sprite.height));
+        rotated = document.createElement('canvas');
+        rotated.width = size;
+        rotated.height = size;
+        const g = rotated.getContext('2d');
+        g.imageSmoothingEnabled = true;
+        g.imageSmoothingQuality = 'high';
+        g.translate(size / 2, size / 2);
+        g.rotate(drawAngle);
+        g.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
+        this._rotatedSprites.set(key, rotated);
+        return rotated;
+    }
+
     /** Tangent angle at bump index (radians, toward head). */
     _bumpTangent(bumps, i) {
         if (bumps.length < 2) return 0;
@@ -1717,7 +1759,7 @@ export class SlitherRenderer {
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
-        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.52, q);
+        const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);
         let arcLen = 0;
         if (segs.length > 1) {
             const dx0 = segs[1].x - segs[0].x;
@@ -1726,7 +1768,7 @@ export class SlitherRenderer {
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const mobileCap = boosting ? 78 : 68;
-        const desktopCap = boosting ? 72 : 62;
+        const desktopCap = boosting ? 88 : 76;
         const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1831,16 +1873,15 @@ export class SlitherRenderer {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            const tangent = 0;
+            const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
 
             if (tangent === 0) {
                 ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
             } else {
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(tangent);
-                ctx.drawImage(sprite, -currentDw / 2, -currentDh / 2, currentDw, currentDh);
-                ctx.restore();
+                const rotated = this._getRotatedSprite(sprite, tangent);
+                const rw = rotated.width / currentStampScale;
+                const rh = rotated.height / currentStampScale;
+                ctx.drawImage(rotated, (p.x - rw / 2) | 0, (p.y - rh / 2) | 0, rw, rh);
             }
         }
 
@@ -2012,10 +2053,7 @@ export class SlitherRenderer {
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
 
-        const targetQuality = this.isMobile
-            ? 1
-            : (this._perfEma > 50 ? 0.52 : this._perfEma > 34 ? 0.68 : this._perfEma > 24 ? 0.84 : 1);
-        this._quality += (targetQuality - this._quality) * 0.35;
+        this._quality = 1;
 
         this._applyCanvasDpr(this.W, this.H);
 
@@ -2206,6 +2244,7 @@ export class SlitherRenderer {
         this._boostTrailPool.clear();
         this._sprites.clear();
         this._prImgs.clear();
+        this._rotatedSprites.clear();
         this._foodAnimCache.clear();
         this._slurpGhosts.length = 0;
         this._visibleFoodBuf.length = 0;
