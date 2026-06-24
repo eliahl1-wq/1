@@ -153,9 +153,6 @@ export class SlitherRenderer {
         this._sprites = new Map();
         /** o.pr_imgs — normal + boost overlay canvases per (cs, radius) */
         this._prImgs = new Map();
-        this._rotatedSprites = new Map();
-        this._spriteIds = new WeakMap();
-        this._nextSpriteId = 1;
         this._bgTileImage = null;
         this._bgPattern = null;
         this._bgPatternScale = 0;
@@ -993,26 +990,25 @@ export class SlitherRenderer {
 
     /** Soft glowing orb — slither.io-style pinpoint with tight bloom. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.8 : 1.52));
+        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.4 : 1.35));
         const key = `f12|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                grad.addColorStop(0, 'hsla(55, 100%, 100%, 0.90)');
-                grad.addColorStop(0.10, 'hsla(52, 100%, 92%, 0.72)');
-                grad.addColorStop(0.28, 'hsla(46, 100%, 72%, 0.40)');
-                grad.addColorStop(0.52, 'hsla(40, 100%, 54%, 0.18)');
-                grad.addColorStop(0.78, 'hsla(35, 100%, 42%, 0.04)');
-                grad.addColorStop(1, 'hsla(30, 100%, 30%, 0)');
+                const sat = 55;
+                grad.addColorStop(0, `hsla(55, 10%, 100%, 0.95)`);
+                grad.addColorStop(0.35, `hsla(52, ${sat}%, 85%, 0.85)`);
+                grad.addColorStop(0.55, `hsla(48, ${sat}%, 70%, 0.35)`);
+                grad.addColorStop(0.75, `hsla(42, ${sat}%, 60%, 0.10)`);
+                grad.addColorStop(1, `hsla(35, ${sat}%, 60%, 0)`);
             } else {
-                const sat = deathDrop ? 92 : 90;
-                grad.addColorStop(0, `hsla(${hue}, 18%, 100%, 0.90)`);
-                grad.addColorStop(0.10, `hsla(${hue}, ${sat}%, 80%, 0.72)`);
-                grad.addColorStop(0.26, `hsla(${hue}, ${sat}%, 64%, 0.50)`);
-                grad.addColorStop(0.46, `hsla(${hue}, ${sat}%, 54%, 0.24)`);
-                grad.addColorStop(0.66, `hsla(${hue}, ${sat}%, 48%, 0.08)`);
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 42%, 0)`);
+                const sat = 55; // Much less colorful (mindre färgstark)
+                grad.addColorStop(0, `hsla(${hue}, 10%, 100%, 0.95)`); // Very white center
+                grad.addColorStop(0.35, `hsla(${hue}, ${sat}%, 85%, 0.85)`); // Still mostly white, slight color
+                grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, 70%, 0.35)`); // Sharp drop off (less glow)
+                grad.addColorStop(0.75, `hsla(${hue}, ${sat}%, 60%, 0.10)`); // Minimal outer glow
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 60%, 0)`);
             }
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
@@ -1394,45 +1390,6 @@ export class SlitherRenderer {
     }
 
 
-    _getSpriteId(sprite) {
-        let id = this._spriteIds.get(sprite);
-        if (!id) {
-            id = this._nextSpriteId++;
-            this._spriteIds.set(sprite, id);
-        }
-        return id;
-    }
-
-    _getRotatedSprite(sprite, angle) {
-        const buckets = 256;
-        const turn = Math.PI * 2;
-        const normalized = ((angle % turn) + turn) % turn;
-        const bucket = Math.round((normalized / turn) * buckets) % buckets;
-        const spriteId = this._getSpriteId(sprite);
-        const key = `${spriteId}|${bucket}`;
-        let rotated = this._rotatedSprites.get(key);
-        if (rotated) return rotated;
-
-        if (this._rotatedSprites.size > 900) {
-            const oldest = this._rotatedSprites.keys().next().value;
-            if (oldest != null) this._rotatedSprites.delete(oldest);
-        }
-
-        const drawAngle = (bucket / buckets) * turn;
-        const size = Math.ceil(Math.hypot(sprite.width, sprite.height));
-        rotated = document.createElement('canvas');
-        rotated.width = size;
-        rotated.height = size;
-        const g = rotated.getContext('2d');
-        g.imageSmoothingEnabled = true;
-        g.imageSmoothingQuality = 'high';
-        g.translate(size / 2, size / 2);
-        g.rotate(drawAngle);
-        g.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
-        this._rotatedSprites.set(key, rotated);
-        return rotated;
-    }
-
     /** Tangent angle at bump index (radians, toward head). */
     _bumpTangent(bumps, i) {
         if (bumps.length < 2) return 0;
@@ -1759,7 +1716,7 @@ export class SlitherRenderer {
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
-        const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);
+        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.62, q);
         let arcLen = 0;
         if (segs.length > 1) {
             const dx0 = segs[1].x - segs[0].x;
@@ -1768,7 +1725,7 @@ export class SlitherRenderer {
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const mobileCap = boosting ? 78 : 68;
-        const desktopCap = boosting ? 88 : 76;
+        const desktopCap = boosting ? 72 : 62;
         const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1873,16 +1830,7 @@ export class SlitherRenderer {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
-
-            if (tangent === 0) {
-                ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
-            } else {
-                const rotated = this._getRotatedSprite(sprite, tangent);
-                const rw = rotated.width / currentStampScale;
-                const rh = rotated.height / currentStampScale;
-                ctx.drawImage(rotated, (p.x - rw / 2) | 0, (p.y - rh / 2) | 0, rw, rh);
-            }
+            ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
         }
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
@@ -2244,7 +2192,6 @@ export class SlitherRenderer {
         this._boostTrailPool.clear();
         this._sprites.clear();
         this._prImgs.clear();
-        this._rotatedSprites.clear();
         this._foodAnimCache.clear();
         this._slurpGhosts.length = 0;
         this._visibleFoodBuf.length = 0;
