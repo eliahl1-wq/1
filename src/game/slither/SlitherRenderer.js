@@ -139,7 +139,7 @@ export class SlitherRenderer {
         this._maxFoodDraw = this.isMobile ? 650 : 850;
         this._slurpSetPool = new Set();
         this._foodNearBuf = [];
-        this._FOOD_CELL = 64;
+        this._FOOD_CELL = 256;
         this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
@@ -252,31 +252,12 @@ export class SlitherRenderer {
 
     _pickDpr() {
         const rawDpr = window.devicePixelRatio || 1;
-        if (!this.isMobile) return 1;
-
-        const now = performance.now();
-        if (this._lastDpr && now - this._lastDprChangeTime < 3000) {
-            return this._lastDpr;
-        }
-
-        let targetDpr = 1;
-        // Adaptive retina — 2× was causing 1–5 FPS freezes on phones; scale with perf headroom.
-        if (this._perfEma > 22 || this._quality < 0.5) {
-            targetDpr = 1;
-        } else if (this._perfEma > 14 || this._quality < 0.72) {
-            targetDpr = Math.min(1.25, rawDpr);
-        } else {
-            targetDpr = Math.min(1.35, rawDpr);
-        }
-
-        if (targetDpr !== this._lastDpr) {
-            this._lastDpr = targetDpr;
-            this._lastDprChangeTime = now;
-        }
-        return targetDpr;
+        // Stable, static DPR selection to prevent dynamic canvas resizing / layout thrashing stutters
+        return this.isMobile ? Math.min(1.25, rawDpr) : Math.min(1.5, rawDpr);
     }
 
     _applyCanvasDpr(width, height) {
+        if (!width || !height || isNaN(width) || isNaN(height)) return;
         const dpr = this._pickDpr();
         const nextW = Math.round(width * dpr);
         const nextH = Math.round(height * dpr);
@@ -1161,8 +1142,8 @@ export class SlitherRenderer {
         const halfH = H / 2 / safeZoom + 160 / safeZoom;
         const isCompetitive = !!this.state.competitiveSlither;
         const animateFood = !isCompetitive && this._quality >= 0.68 && foodList.length < 220;
-        const simpleFood = this._quality < 0.55;
-        const foodStride = this._quality < 0.42 ? 3 : this._quality < 0.58 ? 2 : 1;
+        const simpleFood = false;
+        const foodStride = 1;
         const crowdedView = foodList.length > 120;
         const farCullR = Math.min(halfW, halfH) * 0.58;
         const farCullR2 = farCullR * farCullR;

@@ -420,64 +420,82 @@ export default function SurvivGame() {
     const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
 
     return (
-        <MobileGameSession viewportRef={viewportRef} mode="surviv">
-            <div className="game-viewport" ref={viewportRef}>
-                <canvas ref={canvasRef} className="game-canvas" />
+        <div ref={viewportRef} className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
+            width: '100vw',
+            height: '100vh',
+            background: '#0a0a0c',
+            overflow: 'hidden',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            fontFamily: 'system-ui',
+        }}>
+            <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
 
-                {!gameReady && !pendingAtMount && (
-                    <div className="game-loading-overlay">
-                        <div className="game-loading-text">Deploying to Surviv…</div>
+            <MobileGameSession containerRef={viewportRef} />
+
+            {(!isConnected || !gameReady) && !pendingAtMount && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <h2 style={{ marginBottom: '10px' }}>Deploying to Surviv…</h2>
+                        <p style={{ opacity: 0.5 }}>
+                            Make sure you have at least {formatUsd(entryFeeUsd)} balance.
+                        </p>
                     </div>
-                )}
+                </div>
+            )}
 
-                {gameReady && cashedAmount === null && (
-                    <GameCashoutBar
-                        disabled={!cashoutReady}
-                        onHoldStart={handleHoldStart}
-                        onHoldEnd={handleHoldEnd}
-                        onComplete={handleCashOut}
-                        localTimer={localTimer}
-                        cashOutTotal={cashOutTotalRef.current}
-                        cashOutEndAt={cashOutEndAtRef.current}
-                    />
-                )}
+            {gameReady && cashedAmount === null && (
+                <GameCashoutBar
+                    disabled={!cashoutReady}
+                    onHoldStart={handleHoldStart}
+                    onHoldEnd={handleHoldEnd}
+                    onComplete={handleCashOut}
+                    localTimer={localTimer}
+                    cashOutTotal={cashOutTotalRef.current}
+                    cashOutEndAt={cashOutEndAtRef.current}
+                />
+            )}
 
-                {isSpectating && (
-                    <GameSpectateHud onExit={exitSpectate} />
-                )}
+            {isSpectating && (
+                <GameSpectateHud onBack={exitSpectate} />
+            )}
 
-                {resetCountdown != null && resetCountdown < 300 && (
-                    <div className="game-reset-banner">
-                        Arena reset in {Math.floor(resetCountdown / 60)}:{String(resetCountdown % 60).padStart(2, '0')}
-                    </div>
-                )}
+            {resetCountdown != null && resetCountdown < 300 && (
+                <div className="game-reset-banner">
+                    Arena reset in {Math.floor(resetCountdown / 60)}:{String(resetCountdown % 60).padStart(2, '0')}
+                </div>
+            )}
 
-                {leaderboard.length > 0 && gameReady && !showResultModal && (
-                    <div className="game-leaderboard-panel">
-                        <div className="game-leaderboard-title">Top Earners</div>
-                        {leaderboard.slice(0, 5).map((entry, i) => (
-                            <div key={`${entry.username}-${i}`} className="game-leaderboard-row">
-                                <span>{entry.username}</span>
-                                <span>{formatUsd(entry.balance)}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
+            {leaderboard.length > 0 && gameReady && !showResultModal && (
+                <div className="game-leaderboard-panel">
+                    <div className="game-leaderboard-title">Top Earners</div>
+                    {leaderboard.slice(0, 5).map((entry, i) => (
+                        <div key={`${entry.username}-${i}`} className="game-leaderboard-row">
+                            <span>{entry.username}</span>
+                            <span>{formatUsd(entry.balance)}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
-                {showResultModal && (
-                    <GameResultModal
-                        type={cashedAmount != null ? 'cashout' : 'death'}
-                        cashedAmount={cashedAmount}
-                        balance={currentBalance}
-                        entryFee={entryFeeUsd}
-                        timeSurvivedMs={sessionStats.timeSurvivedMs}
-                        eliminations={sessionStats.eliminations}
-                        onPlayAgain={handlePlayAgain}
-                        onLobby={handleLobby}
-                        onSpectate={!cashedAmount && isDead ? enterSpectate : undefined}
-                    />
-                )}
-            </div>
-        </MobileGameSession>
+            {showResultModal && (
+                <GameResultModal
+                    type={cashedAmount != null ? 'cashout' : 'death'}
+                    amount={cashedAmount}
+                    timeSurvivedMs={sessionStats.timeSurvivedMs}
+                    eliminations={sessionStats.eliminations}
+                    walletBalanceUsd={user?.balanceUsd ?? 0}
+                    walletBalanceSol={user?.balanceSol ?? 0}
+                    solPrice={user?.solPrice ?? 57}
+                    onPlayAgain={handlePlayAgain}
+                    onHome={handleLobby}
+                    onSpectate={!cashedAmount && isDead ? enterSpectate : undefined}
+                    showSpectate={!cashedAmount && isDead}
+                    isJoining={isRejoining}
+                    onClose={handleLobby}
+                />
+            )}
+        </div>
     );
 }
