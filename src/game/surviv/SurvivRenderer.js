@@ -261,6 +261,7 @@ export class SurvivRenderer {
         }
         if (k === 'r') return 'reload';
         if (k === 'q') return 'useMedkit';
+        if (['1', '2', '3', '4'].includes(k)) return `equipSlot:${Number(k) - 1}`;
         return null;
     }
 

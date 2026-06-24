@@ -20,7 +20,7 @@ import '../../styles/gameInGame.css';
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
-const WORLD_HALF = 2000;
+const WORLD_HALF = 40000;
 const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
 
 export default function SurvivGame() {
@@ -45,6 +45,8 @@ export default function SurvivGame() {
     const sessionStartAtRef = useRef(null);
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 5 });
     const reloadPendingRef = useRef(false);
+    const useMedkitPendingRef = useRef(false);
+    const equipSlotPendingRef = useRef(null);
 
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
     const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
@@ -269,6 +271,10 @@ export default function SurvivGame() {
             if (blockInputRef.current) return;
             const action = renderer.handleKeyDown(e);
             if (action === 'reload') reloadPendingRef.current = true;
+            if (action === 'useMedkit') useMedkitPendingRef.current = true;
+            if (typeof action === 'string' && action.startsWith('equipSlot:')) {
+                equipSlotPendingRef.current = Number(action.split(':')[1]);
+            }
         };
         const onKeyUp = (e) => renderer.handleKeyUp(e);
         const onPointerMove = (e) => {
@@ -377,6 +383,14 @@ export default function SurvivGame() {
             if (reloadPendingRef.current) {
                 payload.reload = true;
                 reloadPendingRef.current = false;
+            }
+            if (useMedkitPendingRef.current) {
+                payload.useMedkit = true;
+                useMedkitPendingRef.current = false;
+            }
+            if (equipSlotPendingRef.current != null) {
+                payload.equipSlot = equipSlotPendingRef.current;
+                equipSlotPendingRef.current = null;
             }
             socket.emit('survivInput', payload);
         }, 1000 / 20);
