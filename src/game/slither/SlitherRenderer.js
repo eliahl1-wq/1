@@ -801,7 +801,8 @@ export class SlitherRenderer {
         const snakeBodyDiam = 12.4;
         const hexToBody = 2.2;
         const hexesAcross = 9;
-        return (snakeBodyDiam * hexToBody * hexesAcross) / img.naturalWidth;
+        const baseScale = (snakeBodyDiam * hexToBody * hexesAcross) / img.naturalWidth;
+        return this.isMobile ? baseScale : Math.max(1.75, baseScale * 4);
     }
 
     _getBgPattern(ctx) {
