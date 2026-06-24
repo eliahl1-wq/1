@@ -423,8 +423,11 @@ export class SlitherRenderer {
             this.hud.balance = tick.balance;
         }
         const __t1 = performance.now();
-        if (__t1 - __t0 > 5) {
-            console.log(`[Perf] updateState took ${(__t1 - __t0).toFixed(1)}ms. Food: ${tick.food?.length || 0}`);
+        if (!this._lastTickLogMs) this._lastTickLogMs = __t1;
+        const tickGap = __t1 - this._lastTickLogMs;
+        this._lastTickLogMs = __t1;
+        if (this._frame % 60 === 0) {
+            console.log(`[Perf] Last server tick gap: ${tickGap.toFixed(1)}ms. Food: ${tick.food?.length || 0}`);
         }
     }
 

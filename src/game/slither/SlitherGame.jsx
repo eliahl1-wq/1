@@ -424,14 +424,17 @@ export default function SlitherGame() {
             if (blockInputRef.current) return;
             if (!socketRef.current?.connected || !rendererRef.current) return;
             const inp = rendererRef.current.getInput();
+            const now = Date.now();
             if (
                 inp.dx === lastInputSentRef.dx
                 && inp.dy === lastInputSentRef.dy
                 && inp.boost === lastInputSentRef.boost
+                && (now - (lastInputSentRef.time || 0)) < 250
             ) return;
             lastInputSentRef.dx = inp.dx;
             lastInputSentRef.dy = inp.dy;
             lastInputSentRef.boost = inp.boost;
+            lastInputSentRef.time = now;
             socketRef.current.emit('slitherInput', inp);
         };
 

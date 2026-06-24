@@ -414,7 +414,7 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     if (state._snapBT) {
         t = (nowMs - state._snapBT) / duration;
         if (t < 0) t = 0;
-        else if (t > 1.5) t = 1.5;
+        // removed clamp to allow indefinite extrapolation if server tick is late
     }
 
     const snapA = state._snapA || state._snapB;
