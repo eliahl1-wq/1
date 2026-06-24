@@ -1716,7 +1716,7 @@ export class SlitherRenderer {
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
-        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.52, q);
+        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.38, q);
         let arcLen = 0;
         if (segs.length > 1) {
             const dx0 = segs[1].x - segs[0].x;
@@ -1725,7 +1725,9 @@ export class SlitherRenderer {
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const mobileCap = boosting ? 78 : 68;
-        const desktopCap = boosting ? 72 : 62;
+        const desktopCap = isYou
+            ? (boosting ? 42 : 36)
+            : (boosting ? 72 : 62);
         const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
@@ -1748,10 +1750,11 @@ export class SlitherRenderer {
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const glowMinQ = this.isMobile ? 0.88 : 0.75;
+        const stableDesktop = this.isMobile || q >= 0.9;
         const prNeeds = {
-            glow: !holdActive && q >= glowMinQ,
-            boostOverlay: boosting && q >= 0.82,
-            trailGlow: boosting && q >= 0.78,
+            glow: !holdActive && q >= glowMinQ && (!isYou || stableDesktop),
+            boostOverlay: boosting && q >= 0.82 && (!isYou || stableDesktop),
+            trailGlow: boosting && q >= 0.78 && (!isYou || stableDesktop),
         };
 
         const isRainbow = (snake.color === 'random');
