@@ -991,32 +991,32 @@ export class SlitherRenderer {
 
     /** Soft glowing orb — slither.io-style pinpoint with tight bloom. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.25 : 1.35));
+        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.35 : 1.45));
         const key = `f12|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
                 const sat = 55;
-                grad.addColorStop(0, `hsla(55, 20%, 95%, 0.65)`);
-                grad.addColorStop(0.35, `hsla(52, ${sat}%, 80%, 0.45)`);
-                grad.addColorStop(0.55, `hsla(48, ${sat}%, 65%, 0.15)`);
-                grad.addColorStop(0.75, `hsla(42, ${sat}%, 55%, 0.05)`);
-                grad.addColorStop(1, `hsla(35, ${sat}%, 55%, 0)`);
+                grad.addColorStop(0, `hsla(55, 30%, 85%, 0.55)`);
+                grad.addColorStop(0.35, `hsla(52, ${sat}%, 75%, 0.35)`);
+                grad.addColorStop(0.55, `hsla(48, ${sat}%, 60%, 0.10)`);
+                grad.addColorStop(0.75, `hsla(42, ${sat}%, 50%, 0.03)`);
+                grad.addColorStop(1, `hsla(35, ${sat}%, 50%, 0)`);
             } else if (deathDrop) {
                 const sat = 55; 
-                grad.addColorStop(0, `hsla(${hue}, 20%, 95%, 0.65)`);
-                grad.addColorStop(0.70, `hsla(${hue}, ${sat}%, 80%, 0.45)`); // Push solid core further out
-                grad.addColorStop(0.85, `hsla(${hue}, ${sat}%, 65%, 0.15)`); // Very sharp drop off
-                grad.addColorStop(0.95, `hsla(${hue}, ${sat}%, 55%, 0.05)`); // Thin glow
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 55%, 0)`);
+                grad.addColorStop(0, `hsla(${hue}, 30%, 85%, 0.55)`);
+                grad.addColorStop(0.65, `hsla(${hue}, ${sat}%, 75%, 0.35)`); // Solid core
+                grad.addColorStop(0.85, `hsla(${hue}, ${sat}%, 60%, 0.10)`); // Sharp drop off
+                grad.addColorStop(0.95, `hsla(${hue}, ${sat}%, 50%, 0.03)`); // Thin glow
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 50%, 0)`);
             } else {
-                const sat = 55; // Much less colorful
-                grad.addColorStop(0, `hsla(${hue}, 20%, 95%, 0.65)`);
-                grad.addColorStop(0.35, `hsla(${hue}, ${sat}%, 80%, 0.45)`);
-                grad.addColorStop(0.55, `hsla(${hue}, ${sat}%, 65%, 0.15)`);
-                grad.addColorStop(0.75, `hsla(${hue}, ${sat}%, 55%, 0.05)`);
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 55%, 0)`);
+                const sat = 55; 
+                grad.addColorStop(0, `hsla(${hue}, 30%, 85%, 0.55)`);
+                grad.addColorStop(0.35, `hsla(${hue}, ${sat}%, 75%, 0.35)`);
+                grad.addColorStop(0.60, `hsla(${hue}, ${sat}%, 60%, 0.10)`);
+                grad.addColorStop(0.80, `hsla(${hue}, ${sat}%, 50%, 0.03)`);
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 50%, 0)`);
             }
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
@@ -1243,6 +1243,11 @@ export class SlitherRenderer {
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
                 sizeMul = 1.2 + ((f.radius || 3) - 2) * 0.14;
+                if (animateFood) {
+                    const amp = anim.driftAmp;
+                    wx += Math.sin(now * 0.0024 + anim.phase) * amp;
+                    wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * amp;
+                }
             } else {
                 sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.10);
                 if (animateFood) {
