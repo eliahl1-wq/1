@@ -119,14 +119,15 @@ export class SlitherRenderer {
         this._mouseRafQueued = false;
         this._lastMouseX = 0;
         this._lastMouseY = 0;
+        this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = this.isMobile ? 'high' : 'medium';
+        this.ctx.imageSmoothingQuality = 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
         // which gives crisp, well-antialiased snake edges instead of upscaled-blurry ones.
-        this._bodySS = 2;
+        this._bodySS = this.isMobile ? 1.5 : 2;
         this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null, minimap: [] };
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
@@ -135,7 +136,7 @@ export class SlitherRenderer {
         this._visibleFoodBuf = [];
         this._foodSpatialGrid = new Map();
         this._foodGridDirty = true;
-        this._maxFoodDraw = 1000;
+        this._maxFoodDraw = this.isMobile ? 650 : 850;
         this._slurpSetPool = new Set();
         this._foodNearBuf = [];
         this._FOOD_CELL = 64;
@@ -144,7 +145,6 @@ export class SlitherRenderer {
         this._cameraInit = false;
         this._holdActive = false;
         this._cashoutActive = false;
-        this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         this.baseZoom = this.isMobile ? 2.05 : 2.88;
         this.zoom = this.baseZoom;
         this.snakeThickness = this.isMobile ? 1.0 : 0.9;
@@ -180,6 +180,9 @@ export class SlitherRenderer {
         this._perfEma = 16.7;
         this._quality = 1;
         this._rainbowStampPack = null;
+        this._deathClusterBuf = [];
+        this._deathClusterIds = new Set();
+        this._deathFoodScratch = [];
         this._minimapFallback = { players: [], food: [] };
         this._minimapFrame = 0;
         this._hlBlurCv = null;
@@ -245,6 +248,29 @@ export class SlitherRenderer {
         this.resize();
     }
 
+    _pickDpr() {
+        const rawDpr = window.devicePixelRatio || 1;
+        if (!this.isMobile) return 1;
+        // Adaptive retina — 2× was causing 1–5 FPS freezes on phones; scale with perf headroom.
+        if (this._perfEma > 22 || this._quality < 0.5) return 1;
+        if (this._perfEma > 14 || this._quality < 0.72) return Math.min(1.25, rawDpr);
+        return Math.min(1.35, rawDpr);
+    }
+
+    _applyCanvasDpr(width, height) {
+        const dpr = this._pickDpr();
+        const nextW = Math.round(width * dpr);
+        const nextH = Math.round(height * dpr);
+        if (this._dpr === dpr && this.canvas.width === nextW && this.canvas.height === nextH) return;
+        this._dpr = dpr;
+        this.canvas.width = nextW;
+        this.canvas.height = nextH;
+        this.canvas.style.width = `${width}px`;
+        this.canvas.style.height = `${height}px`;
+        this.W = width;
+        this.H = height;
+    }
+
     resize() {
         let width;
         let height;
@@ -255,16 +281,7 @@ export class SlitherRenderer {
         } else {
             ({ width, height } = getGameScreenSize());
         }
-        const rawDpr = window.devicePixelRatio || 1;
-        // Mobile: up to 2× retina backing store for sharper snakes/food on HiDPI screens.
-        this._dpr = this.isMobile ? Math.min(2, rawDpr) : 1;
-        if (this._dpr < 1) this._dpr = 1;
-        this.canvas.width = Math.round(width * this._dpr);
-        this.canvas.height = Math.round(height * this._dpr);
-        this.canvas.style.width = `${width}px`;
-        this.canvas.style.height = `${height}px`;
-        this.W = width;
-        this.H = height;
+        this._applyCanvasDpr(width, height);
     }
 
     _scheduleInputEmit() {
@@ -372,6 +389,13 @@ export class SlitherRenderer {
             for (const id of this._foodAnimCache.keys()) {
                 if (!seenFood.has(id)) this._foodAnimCache.delete(id);
             }
+            if (this._foodAnimCache.size > 600) {
+                let trimmed = 0;
+                for (const id of this._foodAnimCache.keys()) {
+                    this._foodAnimCache.delete(id);
+                    if (++trimmed >= 150) break;
+                }
+            }
             this._foodGridDirty = true;
         }
         const isCompetitive = tick.competitiveSlither ?? this.state.competitiveSlither;
@@ -428,20 +452,20 @@ export class SlitherRenderer {
             if (f.golden || f.deathDrop) priority.push(f);
             else normal.push(f);
         }
-        if (priority.length >= maxCount) {
-            dest.length = 0;
-            for (let i = 0; i < maxCount; i++) dest.push(priority[i]);
+        dest.length = 0;
+        const priorityKeep = Math.min(priority.length, maxCount);
+        for (let i = 0; i < priorityKeep; i++) dest.push(priority[i]);
+        const budget = maxCount - dest.length;
+        if (budget <= 0 || normal.length === 0) return;
+        if (normal.length <= budget) {
+            for (let i = 0; i < normal.length; i++) dest.push(normal[i]);
             return;
         }
-        normal.sort((a, b) => {
-            const da = (a.x - cx) ** 2 + (a.y - cy) ** 2;
-            const db = (b.x - cx) ** 2 + (b.y - cy) ** 2;
-            return da - db;
-        });
-        const keepNormal = maxCount - priority.length;
-        dest.length = 0;
-        for (let i = 0; i < priority.length; i++) dest.push(priority[i]);
-        for (let i = 0; i < keepNormal && i < normal.length; i++) dest.push(normal[i]);
+        // Cheap cap — avoid O(n log n) sort every frame during death-drop floods.
+        const stride = Math.max(1, Math.ceil(normal.length / budget));
+        for (let i = 0; i < normal.length && dest.length < maxCount; i += stride) {
+            dest.push(normal[i]);
+        }
     }
 
     _rebuildVisibleFoodBuf(cx = this.camera.x, cy = this.camera.y, halfW = null, halfH = null) {
@@ -481,6 +505,8 @@ export class SlitherRenderer {
 
         if (dest.length > this._maxFoodDraw) {
             this._capVisibleFoodBuf(dest, cx, cy, this._maxFoodDraw);
+        } else if (this._quality < 0.55 && dest.length > 420) {
+            this._capVisibleFoodBuf(dest, cx, cy, 420);
         }
     }
 
@@ -714,24 +740,25 @@ export class SlitherRenderer {
         this._raf = null;
     }
 
-    /** Get (or build once) a cached sprite canvas. LRU eviction avoids full-cache clear stutters. */
+    /** Get (or build once) a cached sprite canvas. Cheap FIFO eviction — no full-cache sort. */
     _getSprite(key, size, painter) {
         let s = this._sprites.get(key);
         if (s) {
             s._lastUsed = this._frame;
             return s;
         }
-        if (this._sprites.size >= 4096) {
-            const entries = [...this._sprites.entries()]
-                .sort((a, b) => (a[1]._lastUsed || 0) - (b[1]._lastUsed || 0));
-            for (let i = 0; i < 512 && i < entries.length; i++) {
-                this._sprites.delete(entries[i][0]);
+        const SPRITE_CAP = 1536;
+        if (this._sprites.size >= SPRITE_CAP) {
+            let evicted = 0;
+            for (const k of this._sprites.keys()) {
+                this._sprites.delete(k);
+                if (++evicted >= 192) break;
             }
-            if (this._prImgs.size > 800) {
-                const prEntries = [...this._prImgs.entries()]
-                    .sort((a, b) => (a[1].normal?._lastUsed || 0) - (b[1].normal?._lastUsed || 0));
-                for (let i = 0; i < 128 && i < prEntries.length; i++) {
-                    this._prImgs.delete(prEntries[i][0]);
+            if (this._prImgs.size > 512) {
+                let prEvicted = 0;
+                for (const k of this._prImgs.keys()) {
+                    this._prImgs.delete(k);
+                    if (++prEvicted >= 64) break;
                 }
             }
         }
@@ -994,6 +1021,118 @@ export class SlitherRenderer {
         });
     }
 
+    /**
+     * Group nearby death-drop pellets into visual blobs (render only — server pellets unchanged).
+     * Fewer draw calls, larger orbs, same per-pellet pickup value.
+     */
+    _buildDeathFoodClusters(foodList, cx, cy, halfW, halfH, minCluster = 3) {
+        const scratch = this._deathFoodScratch;
+        scratch.length = 0;
+        for (let i = 0; i < foodList.length; i++) {
+            const f = foodList[i];
+            if (!f?.deathDrop || f.golden) continue;
+            const dx = f.x - cx;
+            const dy = f.y - cy;
+            if (Math.abs(dx) > halfW || Math.abs(dy) > halfH) continue;
+            scratch.push(f);
+        }
+        const clusters = this._deathClusterBuf;
+        clusters.length = 0;
+        const clusteredIds = this._deathClusterIds;
+        clusteredIds.clear();
+        if (scratch.length < minCluster * 2) {
+            return clusteredIds;
+        }
+
+        const mergeR = 22;
+        const mergeR2 = mergeR * mergeR;
+        const cell = mergeR;
+        const grid = new Map();
+        for (let i = 0; i < scratch.length; i++) {
+            const f = scratch[i];
+            const key = (Math.floor(f.x / cell) + 500) + (Math.floor(f.y / cell) + 500) * 10000;
+            let bucket = grid.get(key);
+            if (!bucket) {
+                bucket = [];
+                grid.set(key, bucket);
+            }
+            bucket.push(i);
+        }
+
+        const visited = new Uint8Array(scratch.length);
+        for (let si = 0; si < scratch.length; si++) {
+            if (visited[si]) continue;
+            const queue = [si];
+            visited[si] = 1;
+            const members = [];
+
+            while (queue.length) {
+                const idx = queue.pop();
+                const f = scratch[idx];
+                members.push(f);
+
+                const gx = Math.floor(f.x / cell);
+                const gy = Math.floor(f.y / cell);
+                for (let ox = -1; ox <= 1; ox++) {
+                    for (let oy = -1; oy <= 1; oy++) {
+                        const key = (gx + ox + 500) + (gy + oy + 500) * 10000;
+                        const bucket = grid.get(key);
+                        if (!bucket) continue;
+                        for (let bi = 0; bi < bucket.length; bi++) {
+                            const j = bucket[bi];
+                            if (visited[j]) continue;
+                            const o = scratch[j];
+                            const ddx = o.x - f.x;
+                            const ddy = o.y - f.y;
+                            if (ddx * ddx + ddy * ddy <= mergeR2) {
+                                visited[j] = 1;
+                                queue.push(j);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (members.length < minCluster) continue;
+
+            let sx = 0;
+            let sy = 0;
+            let hueSum = 0;
+            let massSum = 0;
+            for (let mi = 0; mi < members.length; mi++) {
+                const m = members[mi];
+                sx += m.x;
+                sy += m.y;
+                hueSum += m.hue ?? 120;
+                massSum += m.radius || 3;
+                if (m.id != null) clusteredIds.add(m.id);
+            }
+            const n = members.length;
+            const avgR = massSum / n;
+            clusters.push({
+                x: sx / n,
+                y: sy / n,
+                hue: Math.round(hueSum / n / 12) * 12,
+                count: n,
+                radius: Math.min(14, avgR * 0.55 + Math.sqrt(n) * 1.45 + 1.2),
+            });
+        }
+        return clusteredIds;
+    }
+
+    _drawDeathFoodClusters(ctx, clusters, toScreen, safeZoom) {
+        const spriteR = 4;
+        for (let i = 0; i < clusters.length; i++) {
+            const c = clusters[i];
+            const { x: fx, y: fy } = toScreen(c.x, c.y);
+            const screenR = Math.max(9, c.radius * safeZoom * 1.62);
+            const sprite = this._foodSprite(c.hue, spriteR, false, true);
+            const size = sprite.width * (screenR / spriteR);
+            const half = size / 2;
+            ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
+        }
+    }
+
     _drawFood(ctx, foodList, toScreen, W, H, zoom, dt = 1 / 60) {
         const now = performance.now();
         const cx = this.camera.x;
@@ -1002,21 +1141,22 @@ export class SlitherRenderer {
         const halfW = W / 2 / safeZoom + 160 / safeZoom;
         const halfH = H / 2 / safeZoom + 160 / safeZoom;
         const isCompetitive = !!this.state.competitiveSlither;
-        const animateFood = !isCompetitive;
-        const simpleFood = this._quality < 0.50;
-        const foodStride = this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
-        const crowdedView = foodList.length > 140;
+        const animateFood = !isCompetitive && this._quality >= 0.68 && foodList.length < 220;
+        const simpleFood = this._quality < 0.55;
+        const foodStride = this._quality < 0.42 ? 3 : this._quality < 0.58 ? 2 : 1;
+        const crowdedView = foodList.length > 120;
         const farCullR = Math.min(halfW, halfH) * 0.58;
         const farCullR2 = farCullR * farCullR;
 
         let deathDropCount = 0;
-        if (crowdedView) {
-            for (let i = 0; i < foodList.length; i++) {
-                if (foodList[i]?.deathDrop) deathDropCount++;
-            }
+        for (let i = 0; i < foodList.length; i++) {
+            if (foodList[i]?.deathDrop) deathDropCount++;
         }
-        const heavyDeathCluster = deathDropCount > 70;
-        const deathStride = heavyDeathCluster ? 2 : 1;
+
+        const clusteredDeathIds = deathDropCount >= 24
+            ? this._buildDeathFoodClusters(foodList, cx, cy, halfW, halfH, 3)
+            : this._deathClusterIds;
+        if (deathDropCount < 24) this._deathClusterIds.clear();
 
         const mouthValid = this._mouthValid;
         const mouthX = this._mouthX;
@@ -1030,9 +1170,13 @@ export class SlitherRenderer {
         const foodGrid = this._foodSpatialGrid;
         const slurpSet = this._slurpSetPool;
         slurpSet.clear();
-        if (mouthValid && !this._holdActive && !crowdedView) {
+        if (mouthValid && !this._holdActive && !crowdedView && this._quality >= 0.65) {
             const near = this._foodNearPoint(foodGrid, mouthX, mouthY, maxSlurpReach);
             for (let ni = 0; ni < near.length; ni++) slurpSet.add(near[ni]);
+        }
+
+        if (this._deathClusterBuf.length > 0) {
+            this._drawDeathFoodClusters(ctx, this._deathClusterBuf, toScreen, safeZoom);
         }
 
         for (let fi = 0; fi < foodList.length; fi += foodStride) {
@@ -1041,10 +1185,11 @@ export class SlitherRenderer {
             const dyCam = f.y - cy;
             if (Math.abs(dxCam) > halfW || Math.abs(dyCam) > halfH) continue;
 
+            if (f.deathDrop && f.id != null && clusteredDeathIds.has(f.id)) continue;
+
             if (f.deathDrop && crowdedView) {
                 const d2cam = dxCam * dxCam + dyCam * dyCam;
-                if (d2cam > farCullR2 && (fi & 1) === 1) continue;
-                if (heavyDeathCluster && d2cam > farCullR2 * 0.32 && (fi & (deathStride - 1)) !== 0) continue;
+                if (d2cam > farCullR2 * 1.2 && (fi & 1) === 1) continue;
             } else if (f.deathDrop && foodList.length > 90) {
                 const d2cam = dxCam * dxCam + dyCam * dyCam;
                 if (d2cam > farCullR2 * 1.35 && (fi & 3) === 3) continue;
@@ -1080,7 +1225,7 @@ export class SlitherRenderer {
                 sizeMul = 0.85 + pulse;
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
-                sizeMul = 1.15 + ((f.radius || 3) - 2) * 0.12;
+                sizeMul = 1.2 + ((f.radius || 3) - 2) * 0.14;
             } else {
                 sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.10);
                 if (animateFood) {
@@ -1128,8 +1273,8 @@ export class SlitherRenderer {
             const { x: fx, y: fy } = toScreen(wx, wy);
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenScale = isGolden ? 1.65 : (f.deathDrop ? 1.52 : 1.48);
-            const screenR = Math.max(4.2, baseR * safeZoom * screenScale);
+            const screenScale = isGolden ? 1.65 : (f.deathDrop ? 1.58 : 1.48);
+            const screenR = Math.max(f.deathDrop ? 6.5 : 4.2, baseR * safeZoom * screenScale);
 
             if (simpleFood && !isGolden && !f.deathDrop) {
                 ctx.globalAlpha = 0.58;
@@ -1149,19 +1294,6 @@ export class SlitherRenderer {
                 ctx.fill();
                 ctx.globalAlpha = 1;
                 continue;
-            }
-
-            if (f.deathDrop && heavyDeathCluster) {
-                const d2cam = dxCam * dxCam + dyCam * dyCam;
-                if (d2cam > farCullR2 * 0.25 || screenR < 7) {
-                    ctx.globalAlpha = 0.72;
-                    ctx.fillStyle = `hsla(${hue}, 90%, 58%, 0.62)`;
-                    ctx.beginPath();
-                    ctx.arc(fx, fy, screenR * 0.58, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.globalAlpha = 1;
-                    continue;
-                }
             }
 
             const spriteR = 4;
@@ -1186,7 +1318,9 @@ export class SlitherRenderer {
             }
         }
 
-        this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
+        if (deathDropCount < 80 && this._quality >= 0.6) {
+            this._drawSlurpGhosts(ctx, toScreen, zoom, now, mouthValid ? mouthX : null, mouthValid ? mouthY : null);
+        }
     }
 
     _drawSlurpGhosts(ctx, toScreen, zoom, now, mouthX, mouthY) {
@@ -1569,7 +1703,7 @@ export class SlitherRenderer {
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
-        const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
+        const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);
         let arcLen = 0;
         if (segs.length > 1) {
             const dx0 = segs[1].x - segs[0].x;
@@ -1577,11 +1711,9 @@ export class SlitherRenderer {
             arcLen = Math.sqrt(dx0 * dx0 + dy0 * dy0) * (segs.length - 1);
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
-        const stampCap = Math.round((
-            boosting
-                ? (this.isMobile ? 110 : 92)
-                : (this.isMobile ? 98 : 85)
-        ) * qMul);
+        const mobileCap = boosting ? 78 : 68;
+        const desktopCap = boosting ? 88 : 76;
+        const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
@@ -1602,10 +1734,11 @@ export class SlitherRenderer {
         const hy = bumps[0].y;
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
+        const glowMinQ = this.isMobile ? 0.88 : 0.75;
         const prNeeds = {
-            glow: !holdActive && q >= 0.75,
-            boostOverlay: boosting && q >= 0.8,
-            trailGlow: boosting,
+            glow: !holdActive && q >= glowMinQ,
+            boostOverlay: boosting && q >= 0.82,
+            trailGlow: boosting && q >= 0.78,
         };
 
         const isRainbow = (snake.color === 'random');
@@ -1700,11 +1833,11 @@ export class SlitherRenderer {
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
 
-        if (prNeeds.glow) {
+        if (prNeeds.glow && glow) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
-            const glowStride = boosting ? 4 : 5;
+            const glowStride = boosting ? (this.isMobile ? 6 : 4) : (this.isMobile ? 7 : 5);
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -1732,7 +1865,8 @@ export class SlitherRenderer {
             const bdw = boostOverlay.width / stampScale;
             const bdh = boostOverlay.height / stampScale;
             const bhalf = bdw / 2;
-            for (let i = bumpCount - 1; i >= 0; i -= 4) {
+            const boostStride = this.isMobile ? 6 : 4;
+            for (let i = bumpCount - 1; i >= 0; i -= boostStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
@@ -1863,19 +1997,23 @@ export class SlitherRenderer {
         const nowMs = Date.now();
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
-        // Adaptive quality — targets ~120 FPS (8.3ms), degrades only under sustained load.
-        const qFloor = 0.62;
-        if (this._perfEma > 16) this._quality = Math.max(qFloor, this._quality - 0.06);
-        else if (this._perfEma > 11) this._quality = Math.max(qFloor, this._quality - 0.02);
-        else if (this._perfEma < 8.5) this._quality = Math.min(1, this._quality + 0.03);
 
-        if (this._quality >= 0.88) {
+        // Adaptive quality — recover slowly, degrade fast to escape death spirals.
+        const qFloor = this.isMobile ? 0.38 : 0.48;
+        if (this._perfEma > 33) this._quality = Math.max(qFloor, this._quality - 0.14);
+        else if (this._perfEma > 22) this._quality = Math.max(qFloor, this._quality - 0.08);
+        else if (this._perfEma > 14) this._quality = Math.max(qFloor, this._quality - 0.03);
+        else if (this._perfEma < 10) this._quality = Math.min(1, this._quality + 0.02);
+
+        if (this._quality >= 0.9 && !this.isMobile) {
             this.ctx.imageSmoothingQuality = 'high';
-        } else if (this._quality < 0.72) {
+        } else if (this._quality < 0.65) {
             this.ctx.imageSmoothingQuality = 'low';
         } else {
             this.ctx.imageSmoothingQuality = 'medium';
         }
+
+        this._applyCanvasDpr(this.W, this.H);
 
         ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
         ctx.globalAlpha = 1;
