@@ -1716,7 +1716,7 @@ export class SlitherRenderer {
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
-        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.62, q);
+        const qMul = this.isMobile ? Math.max(0.72, q) : Math.max(0.52, q);
         let arcLen = 0;
         if (segs.length > 1) {
             const dx0 = segs[1].x - segs[0].x;
@@ -2001,7 +2001,10 @@ export class SlitherRenderer {
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
 
-        this._quality = 1;
+        const targetQuality = this.isMobile
+            ? 1
+            : (this._perfEma > 50 ? 0.52 : this._perfEma > 34 ? 0.68 : this._perfEma > 24 ? 0.84 : 1);
+        this._quality += (targetQuality - this._quality) * 0.35;
 
         this._applyCanvasDpr(this.W, this.H);
 
