@@ -82,6 +82,9 @@ export class SurvivRenderer {
         this.loot = [];
         this.bullets = [];
         this.obstacles = [];
+        this.houseFloors = [];
+        this.surfaceObstacles = [];
+        this.sortedWorldObstacles = [];
         this.zone = null;
         this.me = null;
         this.hoveredChestId = null;
@@ -162,6 +165,9 @@ export class SurvivRenderer {
         this.loot = [];
         this.bullets = [];
         this.obstacles = [];
+        this.houseFloors = [];
+        this.surfaceObstacles = [];
+        this.sortedWorldObstacles = [];
         this.myId = null;
     }
 
@@ -201,7 +207,11 @@ export class SurvivRenderer {
         this.players = tick.players || [];
         this.loot = tick.loot || [];
         this.bullets = tick.bullets || [];
-        this.obstacles = tick.obstacles || [];
+        const nextObstacles = tick.obstacles || [];
+        if (nextObstacles !== this.obstacles) {
+            this.obstacles = nextObstacles;
+            this.rebuildObstacleRenderCache();
+        }
         this.zone = tick.zone || null;
 
         const me = tick.you || this.players.find(p => p.isYou);
@@ -319,13 +329,29 @@ export class SurvivRenderer {
         this.mouse.down = false;
     }
 
+    rebuildObstacleRenderCache() {
+        const surfaceKinds = new Set(['road', 'houseFloor', 'field', 'water']);
+        this.houseFloors = this.obstacles.filter(o => o.kind === 'houseFloor');
+        this.surfaceObstacles = [];
+        const solid = [];
+        for (const o of this.obstacles) {
+            if (o.kind === 'furniture' || o.kind === 'interiorWall') {
+                const house = this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
+                o._insideHouseId = house?.id || null;
+            }
+            if (surfaceKinds.has(o.kind)) this.surfaceObstacles.push(o);
+            else solid.push(o);
+        }
+        this.sortedWorldObstacles = solid.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+    }
+
     pointInsideRect(o, x, y, pad = 0) {
         return x >= o.x - o.w / 2 - pad && x <= o.x + o.w / 2 + pad
             && y >= o.y - o.h / 2 - pad && y <= o.y + o.h / 2 + pad;
     }
 
     findHouseContainingPoint(x, y) {
-        return this.obstacles.find(o => o.kind === 'houseFloor' && this.pointInsideRect(o, x, y, -2)) || null;
+        return this.houseFloors.find(o => this.pointInsideRect(o, x, y, -2)) || null;
     }
 
     getCurrentHouse() {
@@ -336,8 +362,7 @@ export class SurvivRenderer {
     shouldDrawObstacle(o, currentHouse) {
         if (o.kind === 'houseFloor') return !!currentHouse && currentHouse.id === o.id;
         if (o.kind === 'furniture' || o.kind === 'interiorWall') {
-            const house = this.findHouseContainingPoint(o.x, o.y);
-            return !house || (currentHouse && currentHouse.id === house.id);
+            return !o._insideHouseId || (currentHouse && currentHouse.id === o._insideHouseId);
         }
         return true;
     }
@@ -393,17 +418,16 @@ export class SurvivRenderer {
         this.drawTerrain(ctx, camX, camY, W, H, z);
         const currentHouse = this.getCurrentHouse();
         this.hoveredChestId = this.findInteractChest()?.id || null;
-        const surfaceKinds = new Set(['road', 'houseFloor', 'field', 'water']);
-        const surfaces = this.obstacles.filter(o => surfaceKinds.has(o.kind) && this.shouldDrawObstacle(o, currentHouse));
-        for (const o of surfaces) this.drawObstacle(ctx, o);
-        this.drawWorldBorder(ctx);
-        for (const o of this.obstacles.filter(o => o.kind === 'houseFloor' && (!currentHouse || currentHouse.id !== o.id))) {
-            this.drawHouseRoof(ctx, o);
+        for (const o of this.surfaceObstacles) {
+            if (this.shouldDrawObstacle(o, currentHouse)) this.drawObstacle(ctx, o);
         }
-        const sortedObstacles = this.obstacles
-            .filter(o => !surfaceKinds.has(o.kind) && this.shouldDrawObstacle(o, currentHouse))
-            .sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
-        for (const o of sortedObstacles) this.drawObstacle(ctx, o);
+        this.drawWorldBorder(ctx);
+        for (const o of this.houseFloors) {
+            if (!currentHouse || currentHouse.id !== o.id) this.drawHouseRoof(ctx, o);
+        }
+        for (const o of this.sortedWorldObstacles) {
+            if (this.shouldDrawObstacle(o, currentHouse)) this.drawObstacle(ctx, o);
+        }
         for (const l of this.loot) {
             if (!this.isLootHiddenByRoof(l, currentHouse)) this.drawLoot(ctx, l);
         }

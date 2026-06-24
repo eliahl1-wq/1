@@ -805,17 +805,18 @@ export class SlitherRenderer {
     }
 
     _getBgPattern(ctx) {
-        const img = this._bgTileImage;
-        if (!img?.complete || !img.naturalWidth) return null;
-        const scale = this._getBgTileScale(img);
-        if (this._bgPattern && this._bgPatternScale === scale) return this._bgPattern;
-        this._bgPattern = ctx.createPattern(img, 'repeat');
-        this._bgPatternScale = scale;
-        if (this._bgPattern?.setTransform) {
-            this._bgPattern.setTransform(new DOMMatrix([scale, 0, 0, scale, 0, 0]));
-        }
+        if (!this._bgTileImage) return null;
+        if (this._bgPattern) return this._bgPattern;
+        const s = 1.0;
+        const oc = document.createElement('canvas');
+        oc.width = this._bgTileImage.width * s;
+        oc.height = this._bgTileImage.height * s;
+        const octx = oc.getContext('2d');
+        octx.drawImage(this._bgTileImage, 0, 0, oc.width, oc.height);
+        this._bgPattern = ctx.createPattern(oc, 'repeat');
         return this._bgPattern;
     }
+
 
     _drawBackground(ctx, W, H, cx, cy, worldHalf, zoom) {
         ctx.fillStyle = '#2c2c36';
