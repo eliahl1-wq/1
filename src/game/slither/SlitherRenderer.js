@@ -1146,7 +1146,7 @@ export class SlitherRenderer {
         const halfW = W / 2 / safeZoom + 160 / safeZoom;
         const halfH = H / 2 / safeZoom + 160 / safeZoom;
         const isCompetitive = !!this.state.competitiveSlither;
-        const animateFood = !isCompetitive && this._quality >= 0.68 && foodList.length < 220;
+        const animateFood = true;
         const simpleFood = false;
         const foodStride = 1;
         const crowdedView = foodList.length > 120;
@@ -2009,12 +2009,8 @@ export class SlitherRenderer {
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
 
-        // Adaptive quality — recover slowly, degrade fast to escape death spirals.
-        const qFloor = this.isMobile ? 0.38 : 0.48;
-        if (this._perfEma > 33) this._quality = Math.max(qFloor, this._quality - 0.14);
-        else if (this._perfEma > 22) this._quality = Math.max(qFloor, this._quality - 0.08);
-        else if (this._perfEma > 14) this._quality = Math.max(qFloor, this._quality - 0.03);
-        else if (this._perfEma < 10) this._quality = Math.min(1, this._quality + 0.02);
+        // Adaptive quality removed to prevent visual bugs on normal PCs
+        this._quality = 1;
 
         this._applyCanvasDpr(this.W, this.H);
 
