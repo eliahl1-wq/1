@@ -340,6 +340,7 @@ export class SlitherRenderer {
     }
 
     updateState(tick) {
+        const __t0 = performance.now();
         if (tick.snakes) {
             this.targetSnakes = tick.snakes;
             this._sortDirty = true;
@@ -389,11 +390,11 @@ export class SlitherRenderer {
             for (const id of this._foodAnimCache.keys()) {
                 if (!seenFood.has(id)) this._foodAnimCache.delete(id);
             }
-            if (this._foodAnimCache.size > 600) {
+            if (this._foodAnimCache.size > 5000) {
                 let trimmed = 0;
                 for (const id of this._foodAnimCache.keys()) {
                     this._foodAnimCache.delete(id);
-                    if (++trimmed >= 150) break;
+                    if (++trimmed >= 1000) break;
                 }
             }
             this._foodGridDirty = true;
@@ -420,6 +421,10 @@ export class SlitherRenderer {
             this.hud.balance = tick.dollarBalance;
         } else if (!isCompetitive && tick.balance != null && !tick.battleRoyale) {
             this.hud.balance = tick.balance;
+        }
+        const __t1 = performance.now();
+        if (__t1 - __t0 > 5) {
+            console.log(`[Perf] updateState took ${(__t1 - __t0).toFixed(1)}ms. Food: ${tick.food?.length || 0}`);
         }
     }
 
@@ -747,7 +752,7 @@ export class SlitherRenderer {
             s._lastUsed = this._frame;
             return s;
         }
-        const SPRITE_CAP = 1536;
+        const SPRITE_CAP = 5000;
         if (this._sprites.size >= SPRITE_CAP) {
             let evicted = 0;
             for (const k of this._sprites.keys()) {
@@ -1993,6 +1998,7 @@ export class SlitherRenderer {
         const H = this.H;
 
         const now = performance.now();
+        const __t0 = performance.now();
         let dt = this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 1 / 60;
         this._lastFrameTime = now;
         if (dt > 0.1) dt = 0.1;
@@ -2025,7 +2031,9 @@ export class SlitherRenderer {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
+        const __t1 = performance.now();
         this._updateSmoothing(dt);
+        const __t2 = performance.now();
 
         // Build render snakes without per-frame object spreads
         const renderSnakes = this._renderSnakeBuf;
@@ -2117,7 +2125,9 @@ export class SlitherRenderer {
         const foodHalfW = W / 2 / zoom + 160 / zoom;
         const foodHalfH = H / 2 / zoom + 160 / zoom;
         this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
+        const __t3 = performance.now();
         this._drawFood(ctx, this._visibleFoodBuf, toScreen, W, H, zoom, dt);
+        const __t4 = performance.now();
 
         const sorted = this._sortedRenderSnakes;
         if (this._sortDirty || sorted.length !== renderSnakes.length) {
@@ -2136,6 +2146,11 @@ export class SlitherRenderer {
                 if (dx * dx + dy * dy > viewPad * viewPad) continue;
             }
             this._drawSnake(snake, toScreen, zoom);
+        }
+        const __t5 = performance.now();
+        
+        if (this._frame % 60 === 0) {
+            console.log(`[Perf] frameMs=${frameMs.toFixed(1)} dt=${dt.toFixed(3)} | smooth=${(__t2-__t1).toFixed(1)}ms | bg/setup=${(__t3-__t2).toFixed(1)}ms | food=${(__t4-__t3).toFixed(1)}ms | snakes=${(__t5-__t4).toFixed(1)}ms | total=${(__t5-__t0).toFixed(1)}ms`);
         }
 
         // Balance badge + cashout rings on your snake head
