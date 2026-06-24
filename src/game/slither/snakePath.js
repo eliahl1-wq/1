@@ -387,28 +387,25 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     const snapKey = `${serverHead.x}|${serverHead.y}|${spineLen}|${serverAngle || 0}`;
     if (state._lastSnapKey !== snapKey) {
         state._lastSnapKey = snapKey;
-        if (state._snapB) {
-            state._snapA = state._snapB;
-            state._snapAT = state._snapBT;
-            state._snapAAngle = state._snapBAngle;
-            const gap = nowMs - (state._snapBT ?? nowMs);
-            if (gap > 8 && gap < 500) {
-                state._tickMs = state._tickMs ? state._tickMs * 0.88 + gap * 0.12 : gap;
-            }
-        }
+        state._snapA = state.segments.map(s => ({ x: s.x, y: s.y }));
+        state._snapAAngle = state.angle || 0;
         state._snapB = copySpineSnapshot(serverSegments, spineLen);
-        state._snapBT = nowMs;
         state._snapBAngle = serverAngle || 0;
-        if (!state._snapA) {
-            state._snapA = copySpineSnapshot(serverSegments, spineLen);
-            state._snapAT = state._snapBT;
-            state._snapAAngle = state._snapBAngle;
+        
+        const lastBT = state._snapBT || nowMs;
+        state._snapBT = nowMs;
+        const gap = nowMs - lastBT;
+        if (gap > 8 && gap < 500) {
+            state._tickMs = state._tickMs ? state._tickMs * 0.82 + gap * 0.18 : gap;
+        } else {
+            state._tickMs = 125;
         }
     }
 
     let t = 1;
-    if (state._snapA && state._snapB && state._snapBT > state._snapAT) {
-        t = (nowMs - state._snapAT) / (state._snapBT - state._snapAT);
+    const duration = state._tickMs || 125;
+    if (state._snapBT) {
+        t = (nowMs - state._snapBT) / duration;
         if (t < 0) t = 0;
         else if (t > 1) t = 1;
     }

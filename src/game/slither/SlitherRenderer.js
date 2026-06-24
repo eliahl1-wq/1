@@ -135,7 +135,7 @@ export class SlitherRenderer {
         this._visibleFoodBuf = [];
         this._foodSpatialGrid = new Map();
         this._foodGridDirty = true;
-        this._maxFoodDraw = 180;
+        this._maxFoodDraw = 1000;
         this._slurpSetPool = new Set();
         this._foodNearBuf = [];
         this._FOOD_CELL = 64;
@@ -1794,10 +1794,7 @@ export class SlitherRenderer {
         const nowMs = Date.now();
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
-        const qFloor = this.isMobile ? 0.45 : 0.35;
-        if (this._perfEma > 24) this._quality = Math.max(qFloor, this._quality - 0.08);
-        else if (this._perfEma > 20) this._quality = Math.max(qFloor, this._quality - 0.03);
-        else if (this._perfEma < 15) this._quality = Math.min(1, this._quality + 0.02);
+        this._quality = 1.0;
 
         if (!this.isMobile && this._quality < 0.88) {
             this.ctx.imageSmoothingQuality = 'low';
