@@ -26,11 +26,15 @@ export function normalizeBREntryFee(fee) {
 export function tierEconomy(entryFeeUsd) {
     const entry = normalizeEntryFee(entryFeeUsd);
     const s = entry / DEFAULT_ENTRY_FEE;
+    const cashoutFeePct = 0.035;
     return {
         entryFee: entry,
         startBalance: 1.0 * s,
         snakeStartMass: 1.0,
         goldenBlobValue: entry * 0.10,
+        joinFoodBonus: 1.0 * s,
+        cashoutFeePct,
+        cashoutPlayerPct: 1 - cashoutFeePct,
     };
 }
 

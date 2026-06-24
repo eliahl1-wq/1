@@ -387,7 +387,14 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     const snapKey = `${serverHead.x}|${serverHead.y}|${spineLen}|${serverAngle || 0}`;
     if (state._lastSnapKey !== snapKey) {
         state._lastSnapKey = snapKey;
-        state._snapA = state.segments.map(s => ({ x: s.x, y: s.y }));
+        if (!state._snapA || state._snapA.length !== state.segments.length) {
+            state._snapA = state.segments.map(s => ({ x: s.x, y: s.y }));
+        } else {
+            for (let i = 0; i < state.segments.length; i++) {
+                state._snapA[i].x = state.segments[i].x;
+                state._snapA[i].y = state.segments[i].y;
+            }
+        }
         state._snapAAngle = state.angle || 0;
         state._snapB = copySpineSnapshot(serverSegments, spineLen);
         state._snapBAngle = serverAngle || 0;

@@ -179,6 +179,7 @@ export class SlitherRenderer {
         this._screenScratch = { x: 0, y: 0 };
         this._perfEma = 16.7;
         this._quality = 1;
+        this._rainbowStampPack = null;
         this._minimapFallback = { players: [], food: [] };
         this._minimapFrame = 0;
         this._hlBlurCv = null;
@@ -315,6 +316,12 @@ export class SlitherRenderer {
         return { dx: this.inputDx, dy: this.inputDy, boost: this.boost };
     }
 
+    /** Guard against NaN/0 zoom — invalid zoom used to freeze the food grid loop at ~1 FPS. */
+    _safeZoom(zoom = this.zoom) {
+        const z = zoom || this.baseZoom || 1;
+        return (z > 0.01 && Number.isFinite(z)) ? z : (this.baseZoom || 1);
+    }
+
     updateState(tick) {
         if (tick.snakes) {
             this.targetSnakes = tick.snakes;
@@ -440,9 +447,10 @@ export class SlitherRenderer {
     _rebuildVisibleFoodBuf(cx = this.camera.x, cy = this.camera.y, halfW = null, halfH = null) {
         const W = this.W;
         const H = this.H;
-        const zoom = this.zoom || this.baseZoom || 1.0;
+        const zoom = this._safeZoom();
         if (halfW == null) halfW = W / 2 / zoom + 160 / zoom;
         if (halfH == null) halfH = H / 2 / zoom + 160 / zoom;
+        if (!Number.isFinite(halfW) || !Number.isFinite(halfH)) return;
 
         this._ensureFoodGrid();
         const grid = this._foodSpatialGrid;
@@ -638,7 +646,8 @@ export class SlitherRenderer {
                     delete s._extrapX;
                     delete s._extrapY;
                 }
-                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: false });
+                // Densify is done in _interpolateSnakeDrawPath at render time — skip here.
+                stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: true });
                 continue;
             }
 
@@ -718,8 +727,12 @@ export class SlitherRenderer {
             for (let i = 0; i < 512 && i < entries.length; i++) {
                 this._sprites.delete(entries[i][0]);
             }
-            if (this._prImgs.size > 1000) {
-                this._prImgs.clear();
+            if (this._prImgs.size > 800) {
+                const prEntries = [...this._prImgs.entries()]
+                    .sort((a, b) => (a[1].normal?._lastUsed || 0) - (b[1].normal?._lastUsed || 0));
+                for (let i = 0; i < 128 && i < prEntries.length; i++) {
+                    this._prImgs.delete(prEntries[i][0]);
+                }
             }
         }
         const cv = document.createElement('canvas');
@@ -891,7 +904,8 @@ export class SlitherRenderer {
             let dy = by - ay;
             let segLen = Math.sqrt(dx * dx + dy * dy);
 
-            while (segLen > 0 && acc + segLen >= step && bi < maxPoints) {
+            let guard = 0;
+            while (segLen > 0 && acc + segLen >= step && bi < maxPoints && guard++ < maxPoints) {
                 const t = (step - acc) / segLen;
                 ax += dx * t;
                 ay += dy * t;
@@ -937,30 +951,28 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    /** Soft glowing orb — compact bloom, tighter falloff, more transparent. */
+    /** Soft glowing orb — slither.io-style pinpoint with tight bloom. */
     _foodSprite(hue, rPx, golden, deathDrop) {
-        const halo = Math.ceil(rPx * (golden ? 2.6 : deathDrop ? 1.95 : 1.7));
-        const key = `f11|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.8 : 1.52));
+        const key = `f12|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                // Brighter golden orb: white core, bright gold/white mid, soft translucent amber outer
-                grad.addColorStop(0, 'hsla(55, 100%, 100%, 0.85)');
-                grad.addColorStop(0.12, 'hsla(52, 100%, 94%, 0.70)');
-                grad.addColorStop(0.32, 'hsla(46, 100%, 75%, 0.42)');
-                grad.addColorStop(0.55, 'hsla(40, 100%, 55%, 0.20)');
-                grad.addColorStop(0.80, 'hsla(35, 100%, 42%, 0.05)');
+                grad.addColorStop(0, 'hsla(55, 100%, 100%, 0.90)');
+                grad.addColorStop(0.10, 'hsla(52, 100%, 92%, 0.72)');
+                grad.addColorStop(0.28, 'hsla(46, 100%, 72%, 0.40)');
+                grad.addColorStop(0.52, 'hsla(40, 100%, 54%, 0.18)');
+                grad.addColorStop(0.78, 'hsla(35, 100%, 42%, 0.04)');
                 grad.addColorStop(1, 'hsla(30, 100%, 30%, 0)');
             } else {
-                // Translucent normal orb: white core, semi-transparent colored mid, soft fading outer
-                const sat = deathDrop ? 95 : 88;
-                grad.addColorStop(0, `hsla(${hue}, 15%, 98%, 0.72)`);
-                grad.addColorStop(0.15, `hsla(${hue}, ${sat}%, 82%, 0.48)`);
-                grad.addColorStop(0.40, `hsla(${hue}, ${sat}%, 62%, 0.26)`);
-                grad.addColorStop(0.65, `hsla(${hue}, ${sat}%, 52%, 0.08)`);
-                grad.addColorStop(0.80, `hsla(${hue}, ${sat}%, 46%, 0.02)`);
-                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 44%, 0)`);
+                const sat = deathDrop ? 92 : 90;
+                grad.addColorStop(0, `hsla(${hue}, 18%, 100%, 0.90)`);
+                grad.addColorStop(0.10, `hsla(${hue}, ${sat}%, 80%, 0.72)`);
+                grad.addColorStop(0.26, `hsla(${hue}, ${sat}%, 64%, 0.50)`);
+                grad.addColorStop(0.46, `hsla(${hue}, ${sat}%, 54%, 0.24)`);
+                grad.addColorStop(0.66, `hsla(${hue}, ${sat}%, 48%, 0.08)`);
+                grad.addColorStop(1, `hsla(${hue}, ${sat}%, 42%, 0)`);
             }
             g.fillStyle = grad;
             g.fillRect(0, 0, sz, sz);
@@ -986,13 +998,25 @@ export class SlitherRenderer {
         const now = performance.now();
         const cx = this.camera.x;
         const cy = this.camera.y;
-        const halfW = W / 2 / zoom + 160 / zoom;
-        const halfH = H / 2 / zoom + 160 / zoom;
+        const safeZoom = this._safeZoom(zoom);
+        const halfW = W / 2 / safeZoom + 160 / safeZoom;
+        const halfH = H / 2 / safeZoom + 160 / safeZoom;
+        const isCompetitive = !!this.state.competitiveSlither;
+        const animateFood = !isCompetitive;
         const simpleFood = this._quality < 0.50;
         const foodStride = this._quality < 0.45 ? 3 : this._quality < 0.55 ? 2 : 1;
         const crowdedView = foodList.length > 140;
         const farCullR = Math.min(halfW, halfH) * 0.58;
         const farCullR2 = farCullR * farCullR;
+
+        let deathDropCount = 0;
+        if (crowdedView) {
+            for (let i = 0; i < foodList.length; i++) {
+                if (foodList[i]?.deathDrop) deathDropCount++;
+            }
+        }
+        const heavyDeathCluster = deathDropCount > 70;
+        const deathStride = heavyDeathCluster ? 2 : 1;
 
         const mouthValid = this._mouthValid;
         const mouthX = this._mouthX;
@@ -1020,6 +1044,7 @@ export class SlitherRenderer {
             if (f.deathDrop && crowdedView) {
                 const d2cam = dxCam * dxCam + dyCam * dyCam;
                 if (d2cam > farCullR2 && (fi & 1) === 1) continue;
+                if (heavyDeathCluster && d2cam > farCullR2 * 0.32 && (fi & (deathStride - 1)) !== 0) continue;
             } else if (f.deathDrop && foodList.length > 90) {
                 const d2cam = dxCam * dxCam + dyCam * dyCam;
                 if (d2cam > farCullR2 * 1.35 && (fi & 3) === 3) continue;
@@ -1032,12 +1057,14 @@ export class SlitherRenderer {
                 for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
                 anim = {
                     phase: (Math.abs(h) % 1000) / 1000 * Math.PI * 2,
-                    sizeMul: 0.72 + (Math.abs(h) % 100) / 100 * 0.65,
+                    sizeMul: 0.78 + (Math.abs(h) % 100) / 100 * 0.55,
+                    driftAmp: 1.5 + (Math.abs(h >> 4) % 90) / 90 * 1.4,
                     slurp: 0,
                 };
                 if (f.id != null) this._foodAnimCache.set(f.id, anim);
             }
             if (anim.slurp == null) anim.slurp = 0;
+            if (anim.driftAmp == null) anim.driftAmp = 2.2;
 
             let wx = f.x;
             let wy = f.y;
@@ -1053,9 +1080,14 @@ export class SlitherRenderer {
                 sizeMul = 0.85 + pulse;
                 alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
             } else if (f.deathDrop) {
-                sizeMul = 1.25 + ((f.radius || 3) - 2) * 0.15;
+                sizeMul = 1.15 + ((f.radius || 3) - 2) * 0.12;
             } else {
-                sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.12);
+                sizeMul = anim.sizeMul * (1 + Math.sin(now * 0.004 + anim.phase) * 0.10);
+                if (animateFood) {
+                    const amp = anim.driftAmp;
+                    wx += Math.sin(now * 0.0024 + anim.phase) * amp;
+                    wy += Math.cos(now * 0.0028 + anim.phase * 1.3) * amp;
+                }
             }
 
             const runSlurp = mouthValid && !this._holdActive && !f.deathDrop && !isGolden
@@ -1096,11 +1128,22 @@ export class SlitherRenderer {
             const { x: fx, y: fy } = toScreen(wx, wy);
 
             const baseR = (f.radius || 3) * sizeMul;
-            const screenR = Math.max(4.5, baseR * zoom * 1.65);
+            const screenScale = isGolden ? 1.65 : (f.deathDrop ? 1.52 : 1.48);
+            const screenR = Math.max(4.2, baseR * safeZoom * screenScale);
 
             if (simpleFood && !isGolden && !f.deathDrop) {
-                ctx.globalAlpha = 0.55;
-                ctx.fillStyle = `hsla(${hue}, 82%, 58%, 0.5)`;
+                ctx.globalAlpha = 0.58;
+                ctx.fillStyle = `hsla(${hue}, 88%, 62%, 0.52)`;
+                ctx.beginPath();
+                ctx.arc(fx, fy, screenR * 0.52, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                continue;
+            }
+
+            if (screenR < 6 && !isGolden && !f.deathDrop) {
+                ctx.globalAlpha = 0.65;
+                ctx.fillStyle = `hsla(${hue}, 90%, 60%, 0.58)`;
                 ctx.beginPath();
                 ctx.arc(fx, fy, screenR * 0.55, 0, Math.PI * 2);
                 ctx.fill();
@@ -1108,14 +1151,17 @@ export class SlitherRenderer {
                 continue;
             }
 
-            if (screenR < 6 && !isGolden && !f.deathDrop) {
-                ctx.globalAlpha = 0.62;
-                ctx.fillStyle = `hsla(${hue}, 86%, 58%, 0.55)`;
-                ctx.beginPath();
-                ctx.arc(fx, fy, screenR * 0.6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
-                continue;
+            if (f.deathDrop && heavyDeathCluster) {
+                const d2cam = dxCam * dxCam + dyCam * dyCam;
+                if (d2cam > farCullR2 * 0.25 || screenR < 7) {
+                    ctx.globalAlpha = 0.72;
+                    ctx.fillStyle = `hsla(${hue}, 90%, 58%, 0.62)`;
+                    ctx.beginPath();
+                    ctx.arc(fx, fy, screenR * 0.58, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                    continue;
+                }
             }
 
             const spriteR = 4;
@@ -1448,6 +1494,24 @@ export class SlitherRenderer {
         return this._getSnakePrImgs(cs, rPx, needs);
     }
 
+    /** Cache all rainbow segment stamps once per snake draw (avoids per-bump lookups). */
+    _getRainbowStamps(cacheR, prNeeds, bodyRadius) {
+        const rainbowColors = [
+            '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
+            '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0',
+        ];
+        let pack = this._rainbowStampPack;
+        if (!pack || pack.cacheR !== cacheR || pack.prKey !== `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`) {
+            const stamps = new Array(rainbowColors.length);
+            for (let i = 0; i < rainbowColors.length; i++) {
+                stamps[i] = this._getSnakeSegmentStamp(rainbowColors[i], cacheR, prNeeds);
+            }
+            pack = { cacheR, prKey: `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`, colors: rainbowColors, stamps };
+            this._rainbowStampPack = pack;
+        }
+        return pack;
+    }
+
     _drawSnake(snake, toScreen, zoom) {
         const isYou = !!snake.isYou;
 
@@ -1507,10 +1571,10 @@ export class SlitherRenderer {
         const holdActive = this._holdActive;
         const qMul = Math.max(this.isMobile ? 0.88 : 0.78, q);
         let arcLen = 0;
-        for (let i = 1; i < segs.length; i++) {
-            const dx = segs[i].x - segs[i - 1].x;
-            const dy = segs[i].y - segs[i - 1].y;
-            arcLen += Math.sqrt(dx * dx + dy * dy);
+        if (segs.length > 1) {
+            const dx0 = segs[1].x - segs[0].x;
+            const dy0 = segs[1].y - segs[0].y;
+            arcLen = Math.sqrt(dx0 * dx0 + dy0 * dy0) * (segs.length - 1);
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         const stampCap = Math.round((
@@ -1543,10 +1607,7 @@ export class SlitherRenderer {
         };
 
         const isRainbow = (snake.color === 'random');
-        const rainbowColors = [
-            '#c080ff', '#9099ff', '#80d0d0', '#80ff80', 
-            '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
-        ];
+        const rainbowPack = isRainbow ? this._getRainbowStamps(cacheR, prNeeds, bodyRadius) : null;
 
         let normal, boostBody, glow, boostOverlay, trailGlow, bodySS, stampScale;
         if (!isRainbow) {
@@ -1559,7 +1620,7 @@ export class SlitherRenderer {
             bodySS = stamp.bodySS;
             stampScale = bodySS * (cacheR / bodyRadius);
         } else {
-            const stamp = this._getSnakeSegmentStamp('#c080ff', cacheR, prNeeds);
+            const stamp = rainbowPack.stamps[0];
             trailGlow = stamp.trailGlow;
             boostOverlay = stamp.boostOverlay;
             bodySS = stamp.bodySS;
@@ -1610,9 +1671,8 @@ export class SlitherRenderer {
             let currentHalf = half;
 
             if (isRainbow) {
-                const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowColors.length);
-                const segColor = rainbowColors[colorIndex];
-                const stamp = this._getSnakeSegmentStamp(segColor, cacheR, prNeeds);
+                const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowPack.colors.length);
+                const stamp = rainbowPack.stamps[colorIndex];
                 sprite = (boosting && i === 0) ? stamp.boostBody : stamp.normal;
                 currentStampScale = stamp.bodySS * (cacheR / bodyRadius);
                 currentDw = sprite.width / currentStampScale;
@@ -1622,8 +1682,8 @@ export class SlitherRenderer {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            // Only compute tangent/rotate for player snake (major CPU win!)
-            const tangent = (isYou || (q >= 0.9 && !this.isMobile)) ? this._bumpTangent(bumps, i) : 0;
+            // Tangent rotation only for your snake — other snakes use axis-aligned stamps (big CPU win).
+            const tangent = isYou ? this._bumpTangent(bumps, i) : 0;
 
             if (tangent === 0) {
                 ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
@@ -1649,9 +1709,8 @@ export class SlitherRenderer {
                 let currentGlow = glow;
                 let currentGlowScale = stampScale;
                 if (isRainbow) {
-                    const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowColors.length);
-                    const segColor = rainbowColors[colorIndex];
-                    const stamp = this._getSnakeSegmentStamp(segColor, cacheR, prNeeds);
+                    const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowPack.colors.length);
+                    const stamp = rainbowPack.stamps[colorIndex];
                     currentGlow = stamp.glow;
                     currentGlowScale = stamp.bodySS * (cacheR / bodyRadius);
                 }
@@ -1802,7 +1861,11 @@ export class SlitherRenderer {
         const nowMs = Date.now();
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
-        this._quality = 1.0;
+        // Adaptive quality — targets ~120 FPS (8.3ms), degrades only under sustained load.
+        const qFloor = this.isMobile ? 0.50 : 0.62;
+        if (this._perfEma > 16) this._quality = Math.max(qFloor, this._quality - 0.06);
+        else if (this._perfEma > 11) this._quality = Math.max(qFloor, this._quality - 0.02);
+        else if (this._perfEma < 8.5) this._quality = Math.min(1, this._quality + 0.03);
 
         if (!this.isMobile && this._quality < 0.88) {
             this.ctx.imageSmoothingQuality = 'low';
@@ -1839,7 +1902,6 @@ export class SlitherRenderer {
             rs.balance = snake.balance;
             rs.dollarBalance = snake.dollarBalance;
             rs.segments = s ? s.segments : snake.segments;
-            rs.drawSpine = rs.segments;
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);
         }
@@ -1876,7 +1938,7 @@ export class SlitherRenderer {
 
         const cx = this.camera.x;
         const cy = this.camera.y;
-        const zoom = this.zoom;
+        const zoom = this._safeZoom();
 
         // Mouth point for eat-range slurp animation (see _drawFood).
         if (me?.segments?.[0]) {

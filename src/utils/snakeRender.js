@@ -1,5 +1,15 @@
 export const snakeSegmentCache = new Map();
 export const snakeShadowCache = new Map();
+const SEGMENT_CACHE_MAX = 512;
+
+function touchSegmentCache(key, canvas) {
+    if (snakeSegmentCache.size >= SEGMENT_CACHE_MAX && !snakeSegmentCache.has(key)) {
+        const oldest = snakeSegmentCache.keys().next().value;
+        if (oldest != null) snakeSegmentCache.delete(oldest);
+    }
+    snakeSegmentCache.set(key, canvas);
+    return canvas;
+}
 
 function parseColorHex(hex) {
     if (!hex || typeof hex !== 'string') return { r: 120, g: 120, b: 120 };
@@ -76,13 +86,15 @@ export function getSnakeSegmentCanvas(radius, hexColor) {
     const col = normalizeColor(hexColor);
     const f = 1.416 * s;
 
-    for (let t = 0; t < canvasSize; t++) { // y
-        for (let e = 0; e < canvasSize; e++) { // x
+    for (let t = 0; t < canvasSize; t++) {
+        for (let e = 0; e < canvasSize; e++) {
             const dx = e - s + 0.5;
             const dy = t - s + 0.5;
-            const n = Math.sqrt(dx * dx + dy * dy);
-            
-            if (n >= s) continue; // outside circle
+            const n2 = dx * dx + dy * dy;
+            const s2 = s * s;
+            if (n2 >= s2) continue;
+
+            const n = Math.sqrt(n2);
             
             // Cylindrical
             let r_cyl = Math.max(0, 1 - Math.abs(t - s) / s);
@@ -106,8 +118,7 @@ export function getSnakeSegmentCanvas(radius, hexColor) {
     }
     
     ctx.putImageData(imgData, 0, 0);
-    snakeSegmentCache.set(key, canvas);
-    return canvas;
+    return touchSegmentCache(key, canvas);
 }
 
 export function getSnakeShadowCanvas(radius) {
