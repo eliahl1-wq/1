@@ -1,5 +1,4 @@
-# Static assets — must not SPA-fallback to index.html (breaks JS module MIME type)
-/assets/*  /assets/:splat  200
+# Static assets must never SPA-fallback to index.html.
 /favicon-48.png  /favicon-48.png  200
 /favicon.png  /favicon.png  200
 /apple-touch-icon.png  /apple-touch-icon.png  200
@@ -9,4 +8,22 @@
 /sitemap.xml  /sitemap.xml  200
 /google680c9e97322f5664.html  /google680c9e97322f5664.html  200
 /solana-sol-logo.png  /solana-sol-logo.png  200
-/*  /index.html  200
+/  /index.html  200
+/login  /index.html  200
+/register  /index.html  200
+/lobby  /index.html  200
+/pre-game  /index.html  200
+/game  /index.html  200
+/slither-game  /index.html  200
+/surviv-game  /index.html  200
+/transactions  /index.html  200
+/profile  /index.html  200
+/gamemodes  /index.html  200
+/agar  /index.html  200
+/slither  /index.html  200
+/surviv  /index.html  200
+/br-lobby  /index.html  200
+/admin  /index.html  200
+/admin/sandbox  /index.html  200
+/how-it-works  /index.html  200
+/faq  /index.html  200

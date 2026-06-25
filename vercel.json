@@ -4,11 +4,79 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/assets/:path*",
-      "destination": "/assets/:path*"
+      "source": "/",
+      "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/register",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/lobby",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pre-game",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/game",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/slither-game",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/surviv-game",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/transactions",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/profile",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/gamemodes",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/agar",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/slither",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/surviv",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/br-lobby",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/sandbox",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/how-it-works",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/faq",
       "destination": "/index.html"
     }
   ],
