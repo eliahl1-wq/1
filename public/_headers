@@ -1,0 +1,12 @@
+# Keep the app shell fresh so it never points at old hashed JS files.
+/
+  Cache-Control: no-store, no-cache, must-revalidate
+/*.html
+  Cache-Control: no-store, no-cache, must-revalidate
+/surviv
+  Cache-Control: no-store, no-cache, must-revalidate
+/surviv-game
+  Cache-Control: no-store, no-cache, must-revalidate
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+  X-Content-Type-Options: nosniff
