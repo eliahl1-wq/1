@@ -61,6 +61,14 @@ export default function SurvivGame() {
     const openChestPendingRef = useRef(null);
     const takeChestItemPendingRef = useRef(null);
     const prevOpenedContainerIdRef = useRef(null);
+    const closeChestPendingRef = useRef(false);
+    const putChestItemPendingRef = useRef(null);
+    const dropItemPendingRef = useRef(null);
+
+    const handleCloseInventory = useCallback(() => {
+        setIsInventoryOpen(false);
+        closeChestPendingRef.current = true;
+    }, []);
 
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
     const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
@@ -288,11 +296,22 @@ export default function SurvivGame() {
             const k = e.key.toLowerCase();
             if (k === 'tab') {
                 e.preventDefault();
-                setIsInventoryOpen(prev => !prev);
+                setIsInventoryOpen(prev => {
+                    const next = !prev;
+                    if (!next) {
+                        closeChestPendingRef.current = true;
+                    }
+                    return next;
+                });
                 return;
             }
             if (k === 'escape') {
-                setIsInventoryOpen(false);
+                setIsInventoryOpen(prev => {
+                    if (prev) {
+                        closeChestPendingRef.current = true;
+                    }
+                    return false;
+                });
                 return;
             }
             const action = renderer.handleKeyDown(e);
@@ -438,6 +457,18 @@ export default function SurvivGame() {
             if (takeChestItemPendingRef.current) {
                 payload.takeChestItem = takeChestItemPendingRef.current;
                 takeChestItemPendingRef.current = null;
+            }
+            if (putChestItemPendingRef.current) {
+                payload.putChestItem = putChestItemPendingRef.current;
+                putChestItemPendingRef.current = null;
+            }
+            if (dropItemPendingRef.current) {
+                payload.dropItem = dropItemPendingRef.current;
+                dropItemPendingRef.current = null;
+            }
+            if (closeChestPendingRef.current) {
+                payload.closeChest = true;
+                closeChestPendingRef.current = false;
             }
             socket.emit('survivInput', payload);
         }, 1000 / 20);
@@ -589,6 +620,36 @@ export default function SurvivGame() {
                 </div>
             )}
 
+            {/* Weapon Hotbar HUD */}
+            {gameReady && me && !showResultModal && (
+                <div className="surviv-weapons-hotbar">
+                    {[0, 1, 2, 3].map((slotIdx) => {
+                        const weaponId = me.inventory?.weapons?.[slotIdx];
+                        const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
+                        const isActive = weaponId && weaponId === me.weapon;
+                        
+                        return (
+                            <div 
+                                key={`hotbar-slot-${slotIdx}`}
+                                className={`hotbar-slot ${isActive ? 'active-slot' : ''} ${weaponId ? 'has-item' : 'empty-slot'}`}
+                                onClick={() => {
+                                    if (weaponId) {
+                                        equipSlotPendingRef.current = slotIdx;
+                                    }
+                                }}
+                            >
+                                <span className="hotbar-slot-key">{slotIdx + 1}</span>
+                                {weaponId ? (
+                                    <span className="hotbar-slot-name">{weaponLabel}</span>
+                                ) : (
+                                    <span className="hotbar-slot-name">-</span>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
             {showResultModal && (
                 <GameResultModal
                     type={cashedAmount != null ? 'cashout' : 'death'}
@@ -609,13 +670,30 @@ export default function SurvivGame() {
 
             {/* Side-by-Side React Inventory Overlay */}
             {isInventoryOpen && me && (
-                <div className="surviv-inventory-modal" onClick={() => setIsInventoryOpen(false)}>
+                <div 
+                    className="surviv-inventory-modal" 
+                    onClick={handleCloseInventory}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        const itemData = e.dataTransfer.getData('text/plain');
+                        if (itemData.startsWith('backpack-')) {
+                            const key = itemData.replace('backpack-', '');
+                            if (key.startsWith('weapon-')) {
+                                const slotIdx = parseInt(key.replace('weapon-', ''), 10);
+                                dropItemPendingRef.current = { itemKey: 'weapon', slotIdx };
+                            } else {
+                                dropItemPendingRef.current = { itemKey: key };
+                            }
+                        }
+                    }}
+                >
                     <div className="surviv-inventory-container" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="surviv-inventory-header">
                             <div className="surviv-inventory-title-row">
                                 <span className="surviv-inventory-title">INVENTORY</span>
-                                <button className="surviv-inventory-close-btn" onClick={() => setIsInventoryOpen(false)}>
+                                <button className="surviv-inventory-close-btn" onClick={handleCloseInventory}>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                                 </button>
                             </div>
@@ -631,7 +709,7 @@ export default function SurvivGame() {
                                 onDrop={(e) => {
                                     e.preventDefault();
                                     const itemKey = e.dataTransfer.getData('text/plain');
-                                    if (itemKey && me.openedContainer?.id) {
+                                    if (itemKey && me.openedContainer?.id && !itemKey.startsWith('backpack-')) {
                                         takeChestItemPendingRef.current = { chestId: me.openedContainer.id, itemKey };
                                     }
                                 }}
@@ -652,14 +730,29 @@ export default function SurvivGame() {
                                             
                                             const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
                                             const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
+                                            const isChestOpen = !!me.openedContainer;
 
                                             return (
                                                 <div 
                                                     key={`weapon-slot-${slotIdx}`}
                                                     className={`weapon-slot-card ${isActive ? 'active-slot' : ''} ${borderRarityClass} ${weaponId ? 'has-item' : 'empty-slot'}`}
+                                                    draggable={!!weaponId && weaponId !== 'pistol'}
+                                                    onDragStart={(e) => {
+                                                        if (weaponId && weaponId !== 'pistol') {
+                                                            e.dataTransfer.setData('text/plain', `backpack-weapon-${slotIdx}`);
+                                                        }
+                                                    }}
                                                     onClick={() => {
                                                         if (weaponId) {
-                                                            equipSlotPendingRef.current = slotIdx;
+                                                            if (isChestOpen && weaponId !== 'pistol') {
+                                                                putChestItemPendingRef.current = {
+                                                                    chestId: me.openedContainer.id,
+                                                                    itemKey: 'weapon',
+                                                                    weaponType: weaponId
+                                                                };
+                                                            } else {
+                                                                equipSlotPendingRef.current = slotIdx;
+                                                            }
                                                         }
                                                     }}
                                                 >
@@ -670,7 +763,31 @@ export default function SurvivGame() {
                                                                 <span className="weapon-name">{weaponLabel}</span>
                                                                 <span className={`weapon-rarity-badge ${weaponRarity}`}>{weaponRarity.toUpperCase()}</span>
                                                             </div>
-                                                            {isActive && <div className="equipped-badge">EQUIPPED</div>}
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', marginTop: '2px' }}>
+                                                                {isActive && <span className="equipped-badge" style={{ fontSize: '0.52rem' }}>EQUIPPED</span>}
+                                                                {weaponId !== 'pistol' && (
+                                                                    <button 
+                                                                        className="slot-drop-btn" 
+                                                                        style={{
+                                                                            background: 'rgba(255, 59, 48, 0.16)',
+                                                                            border: '1px solid rgba(255, 59, 48, 0.3)',
+                                                                            borderRadius: '3px',
+                                                                            color: '#ff6b6b',
+                                                                            fontSize: '0.52rem',
+                                                                            padding: '1px 4px',
+                                                                            cursor: 'pointer',
+                                                                            fontWeight: 800,
+                                                                            marginLeft: 'auto'
+                                                                        }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            dropItemPendingRef.current = { itemKey: 'weapon', slotIdx };
+                                                                        }}
+                                                                    >
+                                                                        DROP
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     ) : (
                                                         <span className="empty-slot-label">EMPTY SLOT</span>
@@ -688,9 +805,24 @@ export default function SurvivGame() {
                                         {/* Medkit Slot (Interactive) */}
                                         <div 
                                             className={`item-slot-card medkit-slot ${(me.inventory?.medkits || 0) > 0 ? 'has-qty' : 'empty-qty'}`}
-                                            onClick={() => {
+                                            draggable={(me.inventory?.medkits || 0) > 0}
+                                            onDragStart={(e) => {
                                                 if ((me.inventory?.medkits || 0) > 0) {
-                                                    useMedkitPendingRef.current = true;
+                                                    e.dataTransfer.setData('text/plain', 'backpack-medkits');
+                                                }
+                                            }}
+                                            onClick={() => {
+                                                const qty = me.inventory?.medkits || 0;
+                                                const isChestOpen = !!me.openedContainer;
+                                                if (qty > 0) {
+                                                    if (isChestOpen) {
+                                                        putChestItemPendingRef.current = {
+                                                            chestId: me.openedContainer.id,
+                                                            itemKey: 'medkits'
+                                                        };
+                                                    } else {
+                                                        useMedkitPendingRef.current = true;
+                                                    }
                                                 }
                                             }}
                                         >
@@ -702,12 +834,56 @@ export default function SurvivGame() {
                                                 <span className="item-slot-value">{me.inventory?.medkits || 0} / 6</span>
                                             </div>
                                             {(me.inventory?.medkits || 0) > 0 && (
-                                                <div className="item-action-badge">CLICK TO HEAL</div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
+                                                    {!(!!me.openedContainer) ? (
+                                                        <span className="item-action-badge" style={{ position: 'static' }}>CLICK TO HEAL</span>
+                                                    ) : (
+                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>CLICK TO DEPOSIT</span>
+                                                    )}
+                                                    <button 
+                                                        className="slot-drop-btn" 
+                                                        style={{
+                                                            background: 'rgba(255, 59, 48, 0.16)',
+                                                            border: '1px solid rgba(255, 59, 48, 0.3)',
+                                                            borderRadius: '3px',
+                                                            color: '#ff6b6b',
+                                                            fontSize: '0.5rem',
+                                                            padding: '1px 3px',
+                                                            cursor: 'pointer',
+                                                            fontWeight: 800,
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            dropItemPendingRef.current = { itemKey: 'medkits' };
+                                                        }}
+                                                    >
+                                                        DROP
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
 
                                         {/* Ammo Slot */}
-                                        <div className="item-slot-card ammo-slot">
+                                        <div 
+                                            className={`item-slot-card ammo-slot ${(me.inventory?.ammoPacks || 0) > 0 ? 'has-qty' : 'empty-qty'}`}
+                                            draggable={(me.inventory?.ammoPacks || 0) > 0}
+                                            onDragStart={(e) => {
+                                                if ((me.inventory?.ammoPacks || 0) > 0) {
+                                                    e.dataTransfer.setData('text/plain', 'backpack-ammoPacks');
+                                                }
+                                            }}
+                                            onClick={() => {
+                                                const qty = me.inventory?.ammoPacks || 0;
+                                                const isChestOpen = !!me.openedContainer;
+                                                if (qty > 0 && isChestOpen) {
+                                                    putChestItemPendingRef.current = {
+                                                        chestId: me.openedContainer.id,
+                                                        itemKey: 'ammoPacks'
+                                                    };
+                                                }
+                                            }}
+                                            style={{ cursor: (!!me.openedContainer) && (me.inventory?.ammoPacks || 0) > 0 ? 'pointer' : 'default' }}
+                                        >
                                             <div className="item-slot-icon-container">
                                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d7d1bb" strokeWidth="2"><path d="M6 3h12v18H6zM10 6h4v2h-4zM10 10h4v2h-4zM10 14h4v2h-4z"/></svg>
                                             </div>
@@ -715,10 +891,54 @@ export default function SurvivGame() {
                                                 <span className="item-slot-name">AMMO PACKS</span>
                                                 <span className="item-slot-value">{me.inventory?.ammoPacks || 0} / 9</span>
                                             </div>
+                                            {(me.inventory?.ammoPacks || 0) > 0 && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
+                                                    {(!!me.openedContainer) && (
+                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>CLICK TO DEPOSIT</span>
+                                                    )}
+                                                    <button 
+                                                        className="slot-drop-btn" 
+                                                        style={{
+                                                            background: 'rgba(255, 59, 48, 0.16)',
+                                                            border: '1px solid rgba(255, 59, 48, 0.3)',
+                                                            borderRadius: '3px',
+                                                            color: '#ff6b6b',
+                                                            fontSize: '0.5rem',
+                                                            padding: '1px 3px',
+                                                            cursor: 'pointer',
+                                                            fontWeight: 800,
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            dropItemPendingRef.current = { itemKey: 'ammoPacks' };
+                                                        }}
+                                                    >
+                                                        DROP
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Armor Slot */}
-                                        <div className="item-slot-card armor-slot">
+                                        <div 
+                                            className={`item-slot-card armor-slot ${(me.armor || 0) > 0 ? 'has-qty' : 'empty-qty'}`}
+                                            draggable={(me.armor || 0) > 0}
+                                            onDragStart={(e) => {
+                                                if ((me.armor || 0) > 0) {
+                                                    e.dataTransfer.setData('text/plain', 'backpack-armor');
+                                                }
+                                            }}
+                                            onClick={() => {
+                                                const isChestOpen = !!me.openedContainer;
+                                                if ((me.armor || 0) > 0 && isChestOpen) {
+                                                    putChestItemPendingRef.current = {
+                                                        chestId: me.openedContainer.id,
+                                                        itemKey: 'armor'
+                                                    };
+                                                }
+                                            }}
+                                            style={{ cursor: (!!me.openedContainer) && (me.armor || 0) > 0 ? 'pointer' : 'default' }}
+                                        >
                                             <div className="item-slot-icon-container">
                                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5d9cff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                                             </div>
@@ -726,6 +946,32 @@ export default function SurvivGame() {
                                                 <span className="item-slot-name">ARMOR LEVEL</span>
                                                 <span className="item-slot-value">{Math.round(me.armor || 0)}%</span>
                                             </div>
+                                            {(me.armor || 0) > 0 && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
+                                                    {(!!me.openedContainer) && (
+                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>CLICK TO DEPOSIT</span>
+                                                    )}
+                                                    <button 
+                                                        className="slot-drop-btn" 
+                                                        style={{
+                                                            background: 'rgba(255, 59, 48, 0.16)',
+                                                            border: '1px solid rgba(255, 59, 48, 0.3)',
+                                                            borderRadius: '3px',
+                                                            color: '#ff6b6b',
+                                                            fontSize: '0.5rem',
+                                                            padding: '1px 3px',
+                                                            cursor: 'pointer',
+                                                            fontWeight: 800,
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            dropItemPendingRef.current = { itemKey: 'armor' };
+                                                        }}
+                                                    >
+                                                        DROP
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Balance Slot */}
@@ -743,7 +989,33 @@ export default function SurvivGame() {
                             </div>
 
                             {/* Right Column: Chest Inventory */}
-                            <div className="surviv-inventory-panel chest-loot-panel">
+                            <div 
+                                className="surviv-inventory-panel chest-loot-panel"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    const itemData = e.dataTransfer.getData('text/plain');
+                                    if (itemData.startsWith('backpack-') && me.openedContainer?.id) {
+                                        const key = itemData.replace('backpack-', '');
+                                        if (key.startsWith('weapon-')) {
+                                            const slotIdx = parseInt(key.replace('weapon-', ''), 10);
+                                            const weaponType = me.inventory?.weapons?.[slotIdx];
+                                            if (weaponType && weaponType !== 'pistol') {
+                                                putChestItemPendingRef.current = {
+                                                    chestId: me.openedContainer.id,
+                                                    itemKey: 'weapon',
+                                                    weaponType: weaponType
+                                                };
+                                            }
+                                        } else {
+                                            putChestItemPendingRef.current = {
+                                                chestId: me.openedContainer.id,
+                                                itemKey: key
+                                            };
+                                        }
+                                    }
+                                }}
+                            >
                                 <h3 className="panel-title">
                                     <svg className="panel-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 8H3M21 16H3M12 2v20M2 5h20v14H2z"/></svg>
                                     {me.openedContainer ? `${me.openedContainer.tier?.toUpperCase() || 'COMMON'} CHEST` : 'CHEST DETAILS'}
@@ -751,7 +1023,7 @@ export default function SurvivGame() {
 
                                 {me.openedContainer ? (
                                     <div className="chest-items-section">
-                                        <div className="chest-items-hint">Drag items to your backpack or click to pick them up instantly.</div>
+                                        <div className="chest-items-hint">Drag items here to deposit, or click chest items to take them.</div>
                                         <div className="chest-items-grid">
                                             {me.openedContainer.items?.map((item) => {
                                                 const rarityClass = item.rarity || 'common';

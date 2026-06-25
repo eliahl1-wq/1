@@ -12,6 +12,7 @@ import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import GamemodeDiscoveryPrompt from '../components/GamemodeDiscoveryPrompt';
+import GamemodePreview from '../components/GamemodePreview';
 import { markGamemodePlayed, shouldShowDiscoveryPrompt } from '../constants/gamemodes';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, SURVIV_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, DEFAULT_SURVIV_ENTRY_FEE, tierEconomy, competitiveTierEconomy, survivTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
@@ -1210,45 +1211,30 @@ export default function PreGame() {
 
             <div className="pre-game-grid">
                 <div className="mode-card" ref={modeCardRef}>
-                    <span className="mode-card-label">Gamemode</span>
-                    <div className="mode-card-title mode-card-title--stacked">
-                        {modeCardTitle.toUpperCase()}
-                    </div>
-                    <div className="mode-card-subtitle">{modeSubtitle}</div>
-                    <button
-                        type="button"
-                        className="mode-card-action"
-                        onClick={() => navigate('/gamemodes', { state: { selectedMode: isBattleRoyaleMode ? brVariant : selectedMode } })}
-                    >
-                        Change
-                    </button>
-
-                    <div className="mode-card-stake">
-                        <span className="label" style={{ display: 'block', marginBottom: '8px' }}>
-                            {isBattleRoyaleMode ? 'Entry fee' : 'Entry stake'}
-                        </span>
-                        <div className="entry-tier-row">
-                            {tierOptions.map(tier => {
-                                const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
-                                const active = entryFeeForSession === tier;
-                                return (
-                                    <button
-                                        key={tier}
-                                        type="button"
-                                        className={`entry-tier-btn${active ? ' entry-tier-btn--active' : ''}${locked ? ' entry-tier-btn--locked' : ''}`}
-                                        disabled={locked || isMatchmaking}
-                                        onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
-                                    >
-                                        {freePlay ? 'FREE' : `$${tier}`}
-                                    </button>
-                                );
-                            })}
+                    <GamemodePreview mode={selectedMode} className="mode-card-preview" />
+                    <div className="mode-card-overlay">
+                        <div className="mode-card-header">
+                            <span className="mode-card-label">Gamemode</span>
+                            <div className="mode-card-title mode-card-title--stacked">
+                                {modeCardTitle.toUpperCase()}
+                            </div>
+                            <div className="mode-card-subtitle">{modeSubtitle}</div>
                         </div>
-                        <div className="mode-playing-count">
-                            <span className="live-dot" aria-hidden="true" />
-                            <span>
-                                Playing: <span className="mono">{siteUsersOnline}</span>
-                            </span>
+
+                        <div className="mode-card-footer">
+                            <div className="mode-playing-count">
+                                <span className="live-dot" aria-hidden="true" />
+                                <span>
+                                    Playing: <span className="mono">{siteUsersOnline}</span>
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                className="mode-card-action"
+                                onClick={() => navigate('/gamemodes', { state: { selectedMode: isBattleRoyaleMode ? brVariant : selectedMode } })}
+                            >
+                                Change
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1272,11 +1258,35 @@ export default function PreGame() {
 
                         <div className="divider" style={{ marginBottom: '14px' }} />
 
-                        <div className="entry-row" style={{ marginBottom: '18px' }}>
+                        <div className="entry-row" style={{ marginBottom: '14px' }}>
                             <span className="label">Entry Fee</span>
                             <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
                                 {freePlay ? 'FREE (Test)' : formatUsd(entryFeeForSession)}
                             </span>
+                        </div>
+
+                        {/* Stake Selection Selector */}
+                        <div className="lobby-stake-selection" style={{ marginBottom: '18px' }}>
+                            <label className="label" style={{ display: 'block', marginBottom: '8px' }}>
+                                {isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake'}
+                            </label>
+                            <div className="lobby-tier-row">
+                                {tierOptions.map(tier => {
+                                    const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
+                                    const active = entryFeeForSession === tier;
+                                    return (
+                                        <button
+                                            key={tier}
+                                            type="button"
+                                            className={`lobby-tier-btn${active ? ' lobby-tier-btn--active' : ''}${locked ? ' lobby-tier-btn--locked' : ''}`}
+                                            disabled={locked || isMatchmaking}
+                                            onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
+                                        >
+                                            {freePlay ? 'FREE' : `$${tier}`}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
                         <button

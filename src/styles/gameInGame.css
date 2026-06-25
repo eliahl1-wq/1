@@ -280,7 +280,7 @@
 
 .game-br-hud-meta {
     font-size: 0.72rem;
-    color: var(--orange, #f97316);
+    color: var(--red, #FF3B30);
     font-weight: 700;
     margin-top: 4px;
 }
@@ -587,9 +587,9 @@
 }
 
 .game-result-badge--loss {
-    background: rgba(249, 115, 22, 0.12);
-    color: var(--orange, #f97316);
-    border: 1px solid rgba(249, 115, 22, 0.25);
+    background: rgba(255, 59, 48, 0.12);
+    color: var(--red, #FF3B30);
+    border: 1px solid rgba(255, 59, 48, 0.25);
 }
 
 .game-result-title {
@@ -668,8 +668,8 @@
 }
 
 .game-result-stat-icon--kills {
-    background: rgba(249, 115, 22, 0.14);
-    color: var(--orange, #f97316);
+    background: rgba(255, 59, 48, 0.14);
+    color: var(--red, #FF3B30);
 }
 
 .game-result-stat-value {
@@ -683,7 +683,7 @@
 }
 
 .game-result-stat-value--kills {
-    color: var(--orange, #f97316);
+    color: var(--red, #FF3B30);
 }
 
 .game-result-stat-label {
@@ -864,9 +864,8 @@
 }
 
 /* ==========================================================================
-   SURVIV NEW REACT INVENTORY OVERLAY STYLES
+   SURVIV NEW REACT INVENTORY OVERLAY STYLES (COMPACTED)
    ========================================================================== */
-
 .surviv-inventory-modal {
     position: absolute;
     inset: 0;
@@ -874,11 +873,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(4, 5, 8, 0.72);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    padding: 20px;
-    animation: inventoryFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    background: rgba(6, 7, 10, 0.76);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding: 12px;
+    animation: inventoryFadeIn 0.18s ease-out forwards;
 }
 
 @keyframes inventoryFadeIn {
@@ -888,25 +887,25 @@
 
 .surviv-inventory-container {
     width: 100%;
-    max-width: 860px;
-    max-height: 90vh;
-    background: rgba(12, 13, 18, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--r-2xl);
-    box-shadow: var(--shadow-xl), 0 0 50px rgba(0, 0, 0, 0.7);
+    max-width: 660px;
+    max-height: 420px;
+    background: rgba(9, 10, 15, 0.96);
+    border: 1px solid rgba(120, 94, 255, 0.35);
+    border-radius: var(--r-xl);
+    box-shadow: 0 0 35px rgba(120, 94, 255, 0.18), 0 20px 40px rgba(0, 0, 0, 0.7);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: inventorySlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: inventorySlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes inventorySlideUp {
-    from { transform: translateY(15px) scale(0.98); }
+    from { transform: translateY(12px) scale(0.985); }
     to { transform: translateY(0) scale(1); }
 }
 
 .surviv-inventory-header {
-    padding: 20px 24px 16px;
+    padding: 12px 18px 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -918,11 +917,11 @@
 
 .surviv-inventory-title {
     font-family: var(--display);
-    font-size: 1.35rem;
+    font-size: 1.1rem;
     font-weight: 900;
-    letter-spacing: 1.5px;
+    letter-spacing: 1.2px;
     color: var(--text-bright);
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.08);
 }
 
 .surviv-inventory-close-btn {
@@ -930,7 +929,7 @@
     border: none;
     color: rgba(255, 255, 255, 0.4);
     cursor: pointer;
-    padding: 6px;
+    padding: 4px;
     border-radius: var(--r-full);
     display: flex;
     align-items: center;
@@ -942,21 +941,20 @@
 .surviv-inventory-close-btn:hover {
     color: var(--text-bright);
     background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.15);
-    transform: scale(1.05);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .surviv-inventory-subtitle {
-    margin-top: 4px;
-    font-size: 0.8rem;
+    margin-top: 2px;
+    font-size: 0.72rem;
     font-weight: 500;
     color: var(--text-2);
 }
 
 .surviv-inventory-body {
     display: flex;
-    gap: 20px;
-    padding: 24px;
+    gap: 14px;
+    padding: 14px 18px;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -966,23 +964,23 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.015);
-    border: 1px solid rgba(255, 255, 255, 0.045);
-    border-radius: var(--r-xl);
-    padding: 20px;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: var(--r-lg);
+    padding: 12px 14px;
     min-height: 0;
 }
 
 .panel-title {
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
     font-family: var(--display);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 800;
-    letter-spacing: 1.2px;
+    letter-spacing: 1px;
     color: var(--text-bright);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .panel-title-icon {
@@ -990,17 +988,17 @@
 }
 
 .section-subtitle {
-    margin: 18px 0 10px 0;
+    margin: 12px 0 6px 0;
     font-family: var(--display);
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: 800;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.5px;
     color: var(--text-2);
     text-transform: uppercase;
 }
 
 .weapons-section {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .weapons-section .section-subtitle {
@@ -1010,27 +1008,27 @@
 .weapons-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 8px;
 }
 
 .weapon-slot-card {
-    height: 72px;
-    border-radius: var(--r-md);
+    height: 52px;
+    border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
     position: relative;
-    padding: 10px 12px;
+    padding: 6px 10px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 }
 
 .weapon-slot-card:hover {
     background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
 }
 
 .weapon-slot-card.empty-slot {
@@ -1046,10 +1044,10 @@
 
 .slot-number {
     position: absolute;
-    top: 6px;
-    right: 8px;
+    top: 4px;
+    right: 6px;
     font-family: var(--mono);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 700;
     color: var(--text-3);
 }
@@ -1064,77 +1062,73 @@
 .weapon-card-details {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
 }
 
 .weapon-name {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 700;
     color: var(--text-bright);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-right: 14px;
+    padding-right: 12px;
 }
 
 .weapon-rarity-badge {
     align-self: flex-start;
-    font-size: 0.58rem;
+    font-size: 0.54rem;
     font-weight: 800;
-    padding: 1px 4px;
+    padding: 0px 3px;
     border-radius: var(--r-xs);
-    letter-spacing: 0.5px;
 }
 
-.weapon-rarity-badge.common { background: rgba(215, 195, 150, 0.15); color: #d7c396; }
-.weapon-rarity-badge.rare { background: rgba(113, 167, 255, 0.15); color: #71a7ff; }
-.weapon-rarity-badge.military { background: rgba(201, 133, 255, 0.15); color: #c985ff; }
+.weapon-rarity-badge.common { background: rgba(215, 195, 150, 0.12); color: #d7c396; }
+.weapon-rarity-badge.rare { background: rgba(113, 167, 255, 0.12); color: #71a7ff; }
+.weapon-rarity-badge.military { background: rgba(201, 133, 255, 0.12); color: #c985ff; }
 
 .equipped-badge {
     align-self: flex-start;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 900;
     color: var(--green);
     letter-spacing: 0.5px;
-    text-shadow: 0 0 5px rgba(20, 241, 149, 0.4);
 }
 
 .weapon-slot-card.active-slot {
-    background: rgba(120, 94, 255, 0.1);
+    background: rgba(120, 94, 255, 0.08);
     border-color: var(--accent) !important;
-    box-shadow: inset 0 0 10px rgba(120, 94, 255, 0.15), 0 0 12px rgba(120, 94, 255, 0.2);
+    box-shadow: 0 0 10px rgba(120, 94, 255, 0.16);
 }
 
 .empty-slot-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: var(--text-3);
-    letter-spacing: 0.5px;
 }
 
-/* Rarity border styles for cards */
-.rarity-border-common { border-color: rgba(215, 195, 150, 0.35); }
-.rarity-border-rare { border-color: rgba(113, 167, 255, 0.4); }
-.rarity-border-military { border-color: rgba(201, 133, 255, 0.45); }
+.rarity-border-common { border-color: rgba(215, 195, 150, 0.28); }
+.rarity-border-rare { border-color: rgba(113, 167, 255, 0.3); }
+.rarity-border-military { border-color: rgba(201, 133, 255, 0.35); }
 
-/* Consumables Grid */
+/* Consumables Grid (Tighter) */
 .items-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 8px;
 }
 
 .item-slot-card {
-    height: 58px;
-    border-radius: var(--r-md);
+    height: 44px;
+    border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.04);
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
+    gap: 8px;
+    padding: 6px 10px;
     position: relative;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 }
 
 .item-slot-card.medkit-slot.has-qty {
@@ -1142,37 +1136,42 @@
 }
 
 .item-slot-card.medkit-slot.has-qty:hover {
-    background: rgba(95, 224, 138, 0.06);
-    border-color: rgba(95, 224, 138, 0.25);
-    transform: translateY(-1px);
+    background: rgba(95, 224, 138, 0.05);
+    border-color: rgba(95, 224, 138, 0.2);
+    transform: translateY(-0.5px);
 }
 
 .item-slot-icon-container {
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
+    width: 26px;
+    height: 26px;
     border-radius: var(--r-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.02);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
+.item-slot-icon-container svg {
+    width: 16px;
+    height: 16px;
+}
+
 .item-slot-details {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 0px;
 }
 
 .item-slot-name {
-    font-size: 0.68rem;
+    font-size: 0.6rem;
     font-weight: 700;
     color: var(--text-2);
-    letter-spacing: 0.4px;
+    letter-spacing: 0.2px;
 }
 
 .item-slot-value {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     font-weight: 800;
     font-family: var(--mono);
     color: var(--text-bright);
@@ -1180,23 +1179,16 @@
 
 .cyan-glow {
     color: var(--green) !important;
-    text-shadow: 0 0 8px rgba(20, 241, 149, 0.35);
 }
 
 .item-action-badge {
     position: absolute;
-    top: 5px;
-    right: 8px;
-    font-size: 0.55rem;
+    top: 4px;
+    right: 6px;
+    font-size: 0.5rem;
     font-weight: 900;
     color: var(--green);
-    letter-spacing: 0.5px;
-    animation: pulseText 1.5s infinite;
-}
-
-@keyframes pulseText {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
+    letter-spacing: 0.3px;
 }
 
 /* Right side Chest panel */
@@ -1208,76 +1200,77 @@
 }
 
 .chest-items-hint {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     color: var(--text-3);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     font-style: italic;
 }
 
 .chest-items-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 8px;
     overflow-y: auto;
-    padding-right: 4px;
+    padding-right: 2px;
 }
 
 .chest-item-card {
-    height: 64px;
-    border-radius: var(--r-md);
+    height: 48px;
+    border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.04);
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 8px 10px;
     cursor: grab;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.15s ease;
     position: relative;
     overflow: hidden;
 }
 
-.chest-item-card:active {
-    cursor: grabbing;
-}
-
 .chest-item-card:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.04);
     border-color: #ffffff; /* White contour outline requested! */
-    box-shadow: 0 0 14px rgba(255, 255, 255, 0.15), inset 0 0 10px rgba(255, 255, 255, 0.04);
-    transform: translateY(-2px);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
 }
 
 .chest-item-icon-container {
-    width: 38px;
-    height: 38px;
+    width: 28px;
+    height: 28px;
     border-radius: var(--r-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.02);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
+.chest-item-icon-container svg {
+    width: 16px;
+    height: 16px;
+}
+
 .chest-item-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
 }
 
 .chest-item-label {
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--text-bright);
 }
 
 .chest-item-action {
-    font-size: 0.58rem;
+    font-size: 0.55rem;
     font-weight: 800;
     color: var(--accent);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     opacity: 0;
-    transform: translateY(4px);
-    transition: all 0.18s ease;
+    transform: translateY(2px);
+    transition: all 0.15s ease;
 }
 
 .chest-item-card:hover .chest-item-action {
@@ -1285,27 +1278,10 @@
     transform: translateY(0);
 }
 
-/* Rarity background tint glows for chest items */
-.rarity-card-common { border-color: rgba(215, 195, 150, 0.18); }
-.rarity-card-rare { border-color: rgba(113, 167, 255, 0.25); }
-.rarity-card-military { border-color: rgba(201, 133, 255, 0.3); }
+.rarity-card-common { border-color: rgba(215, 195, 150, 0.15); }
+.rarity-card-rare { border-color: rgba(113, 167, 255, 0.2); }
+.rarity-card-military { border-color: rgba(201, 133, 255, 0.25); }
 
-.rarity-card-rare::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 10% 20%, rgba(113, 167, 255, 0.05) 0%, transparent 60%);
-    pointer-events: none;
-}
-.rarity-card-military::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 10% 20%, rgba(201, 133, 255, 0.06) 0%, transparent 60%);
-    pointer-events: none;
-}
-
-/* Empty states */
 .chest-empty-state {
     flex: 1;
     display: flex;
@@ -1313,66 +1289,200 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 40px 24px;
+    padding: 24px;
     border: 1px dashed rgba(255, 255, 255, 0.06);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-md);
     background: rgba(0, 0, 0, 0.1);
 }
 
 .chest-empty-icon {
-    margin-bottom: 14px;
-    animation: floatIcon 3s ease-in-out infinite;
-}
-
-@keyframes floatIcon {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
+    margin-bottom: 8px;
+    opacity: 0.5;
 }
 
 .chest-empty-state p {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 700;
     color: var(--text-2);
 }
 
 .chest-empty-state span {
-    margin-top: 6px;
-    font-size: 0.72rem;
+    margin-top: 4px;
+    font-size: 0.65rem;
     color: var(--text-3);
-    line-height: 1.45;
-    max-width: 240px;
+    line-height: 1.35;
+    max-width: 220px;
 }
 
-/* Footer rules */
 .surviv-inventory-footer {
-    padding: 16px 24px 20px;
+    padding: 10px 18px 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     justify-content: space-between;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     color: var(--text-3);
     font-weight: 600;
 }
 
-.game-keycap-mini {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.4em;
-    height: 1.4em;
-    padding: 0 0.3em;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-bottom: 2px solid rgba(255, 255, 255, 0.18);
+/* ==========================================================================
+   WEBSITE STYLED HUD OVERLAYS & ALERTS
+   ========================================================================== */
+.game-leaderboard-panel {
+    position: absolute;
+    top: 96px;
+    right: 14px;
+    width: 172px;
+    padding: 10px 12px;
+    background: rgba(9, 10, 15, 0.9);
+    border: 1px solid rgba(120, 94, 255, 0.3);
+    border-radius: var(--r-md);
+    box-shadow: 0 0 15px rgba(120, 94, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.35);
+    z-index: 100;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.game-leaderboard-title {
+    font-family: var(--display);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: var(--accent);
+    text-shadow: 0 0 6px rgba(120, 94, 255, 0.4);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(120, 94, 255, 0.2);
+    padding-bottom: 4px;
+}
+
+.game-leaderboard-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-2);
+    padding: 2.5px 0;
+}
+
+.game-leaderboard-row span:first-child {
+    color: var(--text-h);
+    font-weight: 500;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.game-leaderboard-row span:last-child {
+    color: var(--green);
+    font-weight: 700;
+}
+
+.game-reset-banner {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 120;
+    padding: 5px 14px;
+    background: rgba(255, 59, 48, 0.12);
+    border: 1px solid rgba(255, 59, 48, 0.25);
+    border-radius: var(--r-sm);
+    color: var(--red, #FF3B30);
     font-family: var(--mono);
     font-size: 0.75rem;
-    font-weight: 800;
-    color: var(--text-2);
-    line-height: 1;
-    font-style: normal;
-    margin: 0 2px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 15px rgba(255, 59, 48, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* ==========================================================================
+   WEAPON HOTBAR HUD OVERLAY
+   ========================================================================== */
+.surviv-weapons-hotbar {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    z-index: 100;
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    background: rgba(9, 10, 15, 0.9);
+    border: 1px solid rgba(120, 94, 255, 0.25);
+    border-radius: var(--r-md);
+    box-shadow: 0 0 15px rgba(120, 94, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.hotbar-slot {
+    width: 82px;
+    height: 42px;
+    border-radius: var(--r-sm);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.hotbar-slot:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.hotbar-slot.empty-slot {
+    border-style: dashed;
+    cursor: default;
+    opacity: 0.4;
+}
+
+.hotbar-slot.empty-slot:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.hotbar-slot-key {
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--text-3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.hotbar-slot-name {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-h);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 72px;
+    margin-top: 8px;
+}
+
+.hotbar-slot.active-slot {
+    background: rgba(120, 94, 255, 0.12);
+    border-color: var(--accent) !important;
+    box-shadow: inset 0 0 6px rgba(120, 94, 255, 0.1), 0 0 10px rgba(120, 94, 255, 0.25);
+}
+
+.hotbar-slot.active-slot .hotbar-slot-name {
+    color: var(--text-bright);
 }
 
 /* Mobile adjustments */
@@ -1382,25 +1492,39 @@
     }
     .surviv-inventory-body {
         flex-direction: column;
-        gap: 16px;
-        padding: 16px;
+        gap: 12px;
+        padding: 12px;
     }
     .surviv-inventory-panel {
-        padding: 14px;
+        padding: 10px;
     }
     .weapons-grid, .items-grid, .chest-items-grid {
         grid-template-columns: 1fr;
-        gap: 8px;
+        gap: 6px;
     }
     .weapon-slot-card {
-        height: 56px;
+        height: 48px;
     }
     .surviv-inventory-footer {
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
         align-items: center;
         text-align: center;
-        padding: 12px;
+        padding: 10px;
+    }
+    .surviv-weapons-hotbar {
+        bottom: 12px;
+        right: 12px;
+        padding: 4px;
+    }
+    .hotbar-slot {
+        width: 64px;
+        height: 36px;
+    }
+    .hotbar-slot-name {
+        width: 56px;
+        font-size: 0.6rem;
     }
 }
+
 

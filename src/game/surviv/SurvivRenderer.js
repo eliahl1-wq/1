@@ -262,6 +262,11 @@ export class SurvivRenderer {
             dx /= len;
             dy /= len;
         }
+        // Recalculate mouse world coordinates because camera (and player) moved
+        const w = this.screenToWorld(this.mouse.x, this.mouse.y);
+        this.mouse.worldX = w.x;
+        this.mouse.worldY = w.y;
+
         const aimAngle = Math.atan2(
             this.mouse.worldY - this.camera.y,
             this.mouse.worldX - this.camera.x,
@@ -852,11 +857,57 @@ export class SurvivRenderer {
         ctx.save();
         ctx.translate(b.x, b.y);
         ctx.rotate(tail);
-        ctx.fillStyle = '#ffe38b';
-        ctx.shadowColor = '#ffe38b';
-        ctx.shadowBlur = 8;
-        roundRect(ctx, -8, -2, 16, 4, 2);
-        ctx.fill();
+
+        let length = 20;
+        let thickness = 3;
+        let color = '#ffd45a';
+        let glowColor = 'rgba(255, 212, 90, 0.4)';
+        let isPellet = false;
+
+        const wt = b.weaponType;
+        if (wt === 'shotgun') {
+            length = 8;
+            thickness = 3.5;
+            color = '#ff8c3b';
+            glowColor = 'rgba(255, 140, 59, 0.5)';
+            isPellet = true;
+        } else if (wt === 'sniper') {
+            length = 42;
+            thickness = 4.5;
+            color = '#ff3b3b';
+            glowColor = 'rgba(255, 59, 59, 0.6)';
+        } else if (wt === 'assault' || wt === 'dmr') {
+            length = 32;
+            thickness = 3.2;
+            color = '#ffe38b';
+            glowColor = 'rgba(255, 227, 139, 0.5)';
+        } else if (wt === 'smg' || wt === 'lmg') {
+            length = 22;
+            thickness = 2.8;
+            color = '#ffb03b';
+            glowColor = 'rgba(255, 176, 59, 0.45)';
+        }
+
+        ctx.shadowColor = color;
+        ctx.shadowBlur = isPellet ? 6 : 10;
+        
+        if (isPellet) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(0, 0, thickness, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            const grad = ctx.createLinearGradient(-length, 0, 4, 0);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            grad.addColorStop(0.3, glowColor);
+            grad.addColorStop(0.8, color);
+            grad.addColorStop(1, '#ffffff');
+            
+            ctx.fillStyle = grad;
+            roundRect(ctx, -length, -thickness / 2, length + 4, thickness, thickness / 2);
+            ctx.fill();
+        }
+
         ctx.restore();
     }
 

@@ -82,6 +82,20 @@ function normalizeSnakeColor(color) {
     return toHex({ r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 });
 }
 
+function colorToRgba(color, alpha) {
+    if (!color) return `rgba(20, 241, 149, ${alpha})`;
+    if (color.startsWith('hsl')) {
+        return color.replace(')', `, ${alpha})`).replace('hsl', 'hsla');
+    }
+    if (color.startsWith('#')) {
+        const r = parseInt(color.slice(1, 3), 16);
+        const g = parseInt(color.slice(3, 5), 16);
+        const b = parseInt(color.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    return `rgba(20, 241, 149, ${alpha})`;
+}
+
 /** Bucket colors so sprite cache stays small across many snakes. */
 function bucketSnakeColor(color) {
     if (color === 'random') return 'random';
@@ -178,6 +192,7 @@ export class SlitherRenderer {
         this._smoothSeen = new Set();
         this._screenScratch = { x: 0, y: 0 };
         this._perfEma = 16.7;
+        this.boostParticles = [];
         this._quality = 1;
         this._rainbowStampPack = null;
         this._deathClusterBuf = [];
@@ -1780,6 +1795,32 @@ export class SlitherRenderer {
         if (boosting) {
             trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
             if (trail.length > 6) trail.length = 6;
+
+            // Spawn boost sparks from tail in world space
+            if (segs.length > 0 && this._frame % 3 === 0) {
+                const tail = segs[segs.length - 1];
+                const angleBack = (snake.angle || 0) + Math.PI;
+                const scatter = 0.4;
+                const pAngle = angleBack + (Math.random() - 0.5) * scatter;
+                const pSpeed = (bodyRadiusWorld * 0.25) + Math.random() * (bodyRadiusWorld * 0.25);
+                
+                let pColor = cs;
+                if (cs === 'random') {
+                    const hue = (this._frame * 1.8 + Math.random() * 360) % 360;
+                    pColor = `hsl(${hue}, 100%, 55%)`;
+                }
+
+                this.boostParticles.push({
+                    x: tail.x,
+                    y: tail.y,
+                    vx: Math.cos(pAngle) * pSpeed * 0.8,
+                    vy: Math.sin(pAngle) * pSpeed * 0.8,
+                    color: pColor,
+                    size: bodyRadiusWorld * (0.16 + Math.random() * 0.16),
+                    maxLife: 25 + Math.round(Math.random() * 15),
+                    life: 0
+                });
+            }
         } else if (trail.length > 0) {
             trail.length = 0;
         }
@@ -1822,13 +1863,7 @@ export class SlitherRenderer {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
 
-            if (boosting) {
-                const wave = Math.sin(i * 0.38 - this._frame * 0.35);
-                const scaleMultiplier = 1.0 + 0.08 * wave;
-                currentDw *= scaleMultiplier;
-                currentDh *= scaleMultiplier;
-                currentHalf *= scaleMultiplier;
-            }
+            // Removed segment wiggling scale wave here for authentic smooth body look
 
             const tangent = this._bumpTangent(bumps, i);
 
@@ -2122,6 +2157,47 @@ export class SlitherRenderer {
         this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
         const __t3 = performance.now();
         this._drawFood(ctx, this._visibleFoodBuf, toScreen, W, H, zoom, dt);
+
+        // Update and draw client-side boost particles
+        if (this.boostParticles && this.boostParticles.length > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = this.boostParticles.length - 1; i >= 0; i--) {
+                const p = this.boostParticles[i];
+                p.life++;
+                if (p.life >= p.maxLife) {
+                    this.boostParticles.splice(i, 1);
+                    continue;
+                }
+
+                // Apply physics: simple deceleration
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.94;
+                p.vy *= 0.94;
+
+                const screenPos = toScreen(p.x, p.y);
+                const r = p.size * zoom;
+
+                if (r > 0.3 && screenPos.x > -r && screenPos.y > -r && screenPos.x < W + r && screenPos.y < H + r) {
+                    const lifeRatio = p.life / p.maxLife;
+                    const alpha = (1 - lifeRatio) * 0.65;
+
+                    const grad = ctx.createRadialGradient(screenPos.x, screenPos.y, r * 0.1, screenPos.x, screenPos.y, r);
+                    grad.addColorStop(0, 'rgba(255, 255, 255, ' + alpha + ')');
+                    grad.addColorStop(0.2, colorToRgba(p.color, alpha));
+                    grad.addColorStop(0.7, colorToRgba(p.color, alpha * 0.25));
+                    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(screenPos.x, screenPos.y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
         const __t4 = performance.now();
 
         const sorted = this._sortedRenderSnakes;

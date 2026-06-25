@@ -124,8 +124,16 @@ globalThis.snake = class snake {
             arc -= this.range(path[path.length - 1], last);
         }
 
-        if (this.speed == 2)
-            this.score -= this.score / 2000;;
+        if (this.speed == 2) {
+            this.score -= this.score / 2000;
+            // Spawn real food behind tail
+            if (Math.random() < 0.15 && this.v.length > 0) {
+                const tail = this.v[this.v.length - 1];
+                const pSize = this.size * 0.45;
+                const f = new window.food(this.game, pSize, tail.x, tail.y);
+                FOOD.push(f);
+            }
+        }
         let csUp = Math.pow((this.score) / 1000, 1 / 5);
         this.size = this.game.getSize() / 2 * csUp;
         
