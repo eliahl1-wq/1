@@ -4,6 +4,7 @@
 
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawCashoutProgressRing } from '../cashoutRing.js';
+import { drawGameMinimap } from '../minimap.js';
 
 const WEAPON_LABELS = {
     pistol: 'M9 Pistol',
@@ -60,13 +61,8 @@ function seededNoise(x, y) {
     return n - Math.floor(n);
 }
 
-function biomeAt(x, y) {
-    if (y < -11000) return { base: '#7f9294', alt: '#9caeb0', grass: 'rgba(230,245,245,0.12)' };
-    if (x < -9000 && y > 4250) return { base: '#82784a', alt: '#9a8d54', grass: 'rgba(235,210,130,0.12)' };
-    if (x > 7250 && y > 4750) return { base: '#51675a', alt: '#61765f', grass: 'rgba(95,125,88,0.16)' };
-    if (x > 6250 && y < -4000) return { base: '#626862', alt: '#74746a', grass: 'rgba(40,40,35,0.11)' };
-    if (x < -11500) return { base: '#506d4b', alt: '#5d7a55', grass: 'rgba(38,78,40,0.18)' };
-    return { base: '#58764f', alt: '#638257', grass: 'rgba(35,70,40,0.18)' };
+function biomeAt() {
+    return { base: '#58764f', alt: '#638257', grass: 'rgba(35,70,40,0.16)' };
 }
 
 export class SurvivRenderer {
@@ -82,7 +78,9 @@ export class SurvivRenderer {
         this.loot = [];
         this.bullets = [];
         this.obstacles = [];
+        this.minimap = { players: [], food: [], obstacles: [] };
         this.houseFloors = [];
+        this.roomZones = [];
 
         this.surfaceObstacles = [];
         this.sortedWorldObstacles = [];
@@ -92,7 +90,7 @@ export class SurvivRenderer {
         this.lootToast = null;
         this.lastLootId = null;
         this.hud = {
-            balance: 2,
+            balance: 0,
             hp: 100,
             maxHp: 100,
             armor: 0,
@@ -166,7 +164,9 @@ export class SurvivRenderer {
         this.loot = [];
         this.bullets = [];
         this.obstacles = [];
+        this.minimap = { players: [], food: [], obstacles: [] };
         this.houseFloors = [];
+        this.roomZones = [];
         this.surfaceObstacles = [];
         this.sortedWorldObstacles = [];
         this.myId = null;
@@ -214,6 +214,7 @@ export class SurvivRenderer {
             this.rebuildObstacleRenderCache();
         }
         this.zone = tick.zone || null;
+        this.minimap = tick.minimap || { players: [], food: [], obstacles: [] };
 
         const me = tick.you || this.players.find(p => p.isYou);
         this.me = me || null;
@@ -338,12 +339,20 @@ export class SurvivRenderer {
     rebuildObstacleRenderCache() {
         const surfaceKinds = new Set(['road', 'houseFloor', 'field', 'water']);
         this.houseFloors = this.obstacles.filter(o => o.kind === 'houseFloor');
+        this.roomZones = this.obstacles.filter(o => o.kind === 'roomZone');
         this.surfaceObstacles = [];
         const solid = [];
         for (const o of this.obstacles) {
-            if (o.kind === 'furniture' || o.kind === 'interiorWall') {
-                const house = this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
+            if (o.kind === 'roomZone') continue;
+            if (o.kind === 'furniture' || o.kind === 'interiorWall' || o.kind === 'wall') {
+                const house = o.houseId
+                    ? this.houseFloors.find(h => h.id === o.houseId)
+                    : this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
                 o._insideHouseId = house?.id || null;
+                const room = house
+                    ? this.roomZones.find(r => r.houseId === house.id && this.pointInsideRect(r, o.x, o.y, 1))
+                    : null;
+                o._insideRoomId = room?.id || null;
             }
             if (surfaceKinds.has(o.kind)) this.surfaceObstacles.push(o);
             else solid.push(o);
@@ -365,25 +374,81 @@ export class SurvivRenderer {
         return this.findHouseContainingPoint(this.me.x, this.me.y);
     }
 
-    shouldDrawObstacle(o, currentHouse) {
+    findRoomContainingPoint(x, y, house = null) {
+        const houseId = house?.id || this.findHouseContainingPoint(x, y)?.id;
+        if (!houseId) return null;
+        return this.roomZones.find(r => r.houseId === houseId && this.pointInsideRect(r, x, y, -1)) || null;
+    }
+
+    getCurrentRoom(currentHouse) {
+        if (!this.me || !currentHouse) return null;
+        return this.findRoomContainingPoint(this.me.x, this.me.y, currentHouse);
+    }
+
+    isPointHiddenByRooms(x, y, currentHouse, currentRoom) {
+        const house = this.findHouseContainingPoint(x, y);
+        if (!house) return false;
+        if (!currentHouse || house.id !== currentHouse.id) return true;
+        if (!currentRoom) return false;
+        const room = this.findRoomContainingPoint(x, y, house);
+        return !!room && room.id !== currentRoom.id;
+    }
+
+    shouldDrawObstacle(o, currentHouse, currentRoom) {
+        if (o.kind === 'roomZone') return false;
         if (o.kind === 'houseFloor') return !!currentHouse && currentHouse.id === o.id;
-        if (o.kind === 'furniture' || o.kind === 'interiorWall') {
+        if (o.kind === 'wall' || o.kind === 'interiorWall') {
             return !o._insideHouseId || (currentHouse && currentHouse.id === o._insideHouseId);
+        }
+        if (o.kind === 'furniture') {
+            if (!o._insideHouseId) return true;
+            if (!currentHouse || currentHouse.id !== o._insideHouseId) return false;
+            return !currentRoom || !o._insideRoomId || o._insideRoomId === currentRoom.id;
         }
         return true;
     }
 
-    isLootHiddenByRoof(l, currentHouse) {
-        const house = this.findHouseContainingPoint(l.x, l.y);
-        return !!house && (!currentHouse || currentHouse.id !== house.id);
+    isLootHidden(l, currentHouse, currentRoom) {
+        return this.isPointHiddenByRooms(l.x, l.y, currentHouse, currentRoom);
+    }
+
+    isPlayerHidden(p, currentHouse, currentRoom) {
+        if (p.isYou || p.id === this.myId) return false;
+        return this.isPointHiddenByRooms(p.x, p.y, currentHouse, currentRoom);
+    }
+
+    drawRoomShadows(ctx, currentHouse, currentRoom) {
+        if (!currentHouse) return;
+        const zones = this.roomZones.filter(r => r.houseId === currentHouse.id);
+        if (!zones.length) return;
+        ctx.save();
+        for (const room of zones) {
+            if (currentRoom && room.id === currentRoom.id) continue;
+            ctx.fillStyle = 'rgba(3, 4, 5, 0.78)';
+            roundRect(ctx, room.x - room.w / 2, room.y - room.h / 2, room.w, room.h, 4);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        if (currentRoom) {
+            ctx.strokeStyle = 'rgba(255, 230, 170, 0.08)';
+            ctx.lineWidth = 3;
+            roundRect(ctx, currentRoom.x - currentRoom.w / 2, currentRoom.y - currentRoom.h / 2, currentRoom.w, currentRoom.h, 6);
+            ctx.stroke();
+        }
+        ctx.restore();
     }
 
     findInteractChest() {
         if (!this.me) return null;
+        const currentHouse = this.getCurrentHouse();
+        const currentRoom = this.getCurrentRoom(currentHouse);
         let best = null;
         let bestCursor = Infinity;
         for (const l of this.loot) {
             if (l.type !== 'chest' && l.type !== 'deathCrate') continue;
+            if (this.isLootHidden(l, currentHouse, currentRoom)) continue;
             if (Math.hypot(this.me.x - l.x, this.me.y - l.y) > 96) continue;
             const cursorDist = Math.hypot(this.mouse.worldX - l.x, this.mouse.worldY - l.y);
             if (cursorDist < 34 && cursorDist < bestCursor) {
@@ -423,22 +488,28 @@ export class SurvivRenderer {
 
         this.drawTerrain(ctx, camX, camY, W, H, z);
         const currentHouse = this.getCurrentHouse();
+        const currentRoom = this.getCurrentRoom(currentHouse);
         this.hoveredChestId = this.findInteractChest()?.id || null;
         for (const o of this.surfaceObstacles) {
-            if (this.shouldDrawObstacle(o, currentHouse)) this.drawObstacle(ctx, o);
+            if (this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
         this.drawWorldBorder(ctx);
         for (const o of this.houseFloors) {
             if (!currentHouse || currentHouse.id !== o.id) this.drawHouseRoof(ctx, o);
         }
         for (const o of this.sortedWorldObstacles) {
-            if (this.shouldDrawObstacle(o, currentHouse)) this.drawObstacle(ctx, o);
+            if (this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
+        this.drawRoomShadows(ctx, currentHouse, currentRoom);
         for (const l of this.loot) {
-            if (!this.isLootHiddenByRoof(l, currentHouse)) this.drawLoot(ctx, l);
+            if (!this.isLootHidden(l, currentHouse, currentRoom)) this.drawLoot(ctx, l);
         }
-        for (const b of this.bullets) this.drawBullet(ctx, b);
-        for (const p of this.players) this.drawPlayer(ctx, p);
+        for (const b of this.bullets) {
+            if (!this.isPointHiddenByRooms(b.x, b.y, currentHouse, currentRoom)) this.drawBullet(ctx, b);
+        }
+        for (const p of this.players) {
+            if (!this.isPlayerHidden(p, currentHouse, currentRoom)) this.drawPlayer(ctx, p);
+        }
 
         ctx.restore();
         this.drawCrosshair(ctx);
@@ -556,11 +627,11 @@ export class SurvivRenderer {
             ctx.stroke();
         } else if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
-            const fill = o.variant === 'mansion' ? '#695f50' : o.variant === 'warehouse' ? '#59656a' : '#75644f';
+            const fill = o.variant === 'mansion' ? '#665c50' : o.variant === 'warehouse' ? '#566268' : '#75664f';
             ctx.fillStyle = fill;
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
             ctx.lineWidth = 2;
             for (let ix = -o.w / 2 + 46; ix < o.w / 2; ix += 46) {
                 ctx.beginPath();
@@ -568,11 +639,22 @@ export class SurvivRenderer {
                 ctx.lineTo(ix, o.h / 2 - 8);
                 ctx.stroke();
             }
+            ctx.strokeStyle = 'rgba(25, 20, 15, 0.18)';
+            for (let iy = -o.h / 2 + 46; iy < o.h / 2; iy += 46) {
+                ctx.beginPath();
+                ctx.moveTo(-o.w / 2 + 8, iy);
+                ctx.lineTo(o.w / 2 - 8, iy);
+                ctx.stroke();
+            }
         } else if (kind === 'wall' || kind === 'interiorWall') {
-            ctx.fillStyle = o.variant === 'stone' ? '#7e786b' : o.variant === 'warehouse' ? '#46545a' : '#6f5945';
+            const wallFill = o.variant === 'stone' ? '#80796b' : o.variant === 'warehouse' ? '#425159' : '#70583f';
+            ctx.fillStyle = wallFill;
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(24,20,16,0.45)';
+            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            if (o.w > o.h) ctx.fillRect(-o.w / 2 + 3, -o.h / 2 + 2, o.w - 6, Math.max(2, o.h * 0.22));
+            else ctx.fillRect(-o.w / 2 + 2, -o.h / 2 + 3, Math.max(2, o.w * 0.22), o.h - 6);
+            ctx.strokeStyle = 'rgba(24,20,16,0.48)';
             ctx.lineWidth = 2;
             ctx.stroke();
         } else if (kind === 'furniture') {
@@ -710,110 +792,104 @@ export class SurvivRenderer {
         ctx.scale(pulse, pulse);
 
         if (isChest) {
-            // Draw a subtle dark drop shadow ellipse underneath the chest
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+            const hovered = this.hoveredChestId === l.id;
+            const isDeathCrate = l.type === 'deathCrate';
+            const tierColor = isDeathCrate ? '#a855f7' : (RARITY_COLORS[l.tier] || '#d7c396');
+            const glowRad = 34 + Math.sin(Date.now() / 260 + l.x * 0.035) * 5;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
             ctx.beginPath();
-            ctx.ellipse(0, 4, 18, 11, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 9, 23, 10, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Draw a rich pulsating radial glow matching the rarity color
-            const tierColor = l.type === 'deathCrate' ? '#a855f7' : (RARITY_COLORS[l.tier] || '#d7c396');
-            const glowRad = 32 + Math.sin(Date.now() / 220 + l.x * 0.05) * 8;
-            const glowGrad = ctx.createRadialGradient(0, 0, 6, 0, 0, glowRad);
-            glowGrad.addColorStop(0, tierColor + '40'); // 25% opacity
-            glowGrad.addColorStop(0.5, tierColor + '15'); // 8% opacity
+            const glowGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, glowRad);
+            glowGrad.addColorStop(0, tierColor + '42');
+            glowGrad.addColorStop(0.5, tierColor + '18');
             glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = glowGrad;
             ctx.beginPath();
             ctx.arc(0, 0, glowRad, 0, Math.PI * 2);
             ctx.fill();
 
-            // White outline on hover
-            const hovered = this.hoveredChestId === l.id;
             if (hovered) {
+                ctx.save();
                 ctx.shadowColor = '#ffffff';
-                ctx.shadowBlur = 12;
+                ctx.shadowBlur = 15;
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 3.5;
-                roundRect(ctx, -17, -12, 34, 24, 6);
+                ctx.lineWidth = 3.2;
+                roundRect(ctx, -23, -18, 46, 34, 8);
                 ctx.stroke();
-                ctx.shadowBlur = 0; // reset shadow
+                ctx.restore();
             }
 
-            // Solid chest design variables based on tier
-            let bodyColor = '#6d4c41'; // warm wood
-            let bandColor = '#4e342e'; // dark wood/iron band
-            let lockColor = '#ffb300'; // brass lock core
-            
-            if (l.type === 'deathCrate') {
-                bodyColor = '#2d3748'; // charcoal
-                bandColor = '#1a202c'; // black
-                lockColor = '#d53f8c'; // purple/pink soul
-            } else if (l.tier === 'military') {
-                bodyColor = '#1f2937'; // military dark grey
-                bandColor = '#10b981'; // neon emerald green
-                lockColor = '#06b6d4'; // bright cyan
-            } else if (l.tier === 'rare') {
-                bodyColor = '#3e2723'; // dark cherry wood
-                bandColor = '#d97706'; // gold/amber trim
-                lockColor = '#fbbf24'; // bright gold
-            }
+            const palette = isDeathCrate
+                ? { lid: '#3b2654', body: '#271b35', trim: '#a855f7', dark: '#120b1d', lock: '#f5d0fe' }
+                : l.tier === 'military'
+                    ? { lid: '#4f5d38', body: '#2f3b25', trim: '#20291a', dark: '#10170d', lock: '#c8ff86' }
+                    : l.tier === 'rare'
+                        ? { lid: '#7a3f23', body: '#4d2919', trim: '#d29a36', dark: '#261208', lock: '#ffe08a' }
+                        : { lid: '#8a5730', body: '#5b351f', trim: '#2f2018', dark: '#20120b', lock: '#ffd45a' };
 
-            // Draw chest body
-            ctx.fillStyle = bodyColor;
-            ctx.strokeStyle = 'rgba(12, 16, 14, 0.9)';
+            ctx.save();
+            ctx.rotate(isDeathCrate ? 0.04 : -0.055);
+
+            ctx.fillStyle = 'rgba(18, 11, 6, 0.55)';
+            roundRect(ctx, -18, 7, 36, 5, 3);
+            ctx.fill();
+
+            const bodyGrad = ctx.createLinearGradient(0, -5, 0, 15);
+            bodyGrad.addColorStop(0, palette.body);
+            bodyGrad.addColorStop(1, palette.dark);
+            ctx.fillStyle = bodyGrad;
+            ctx.strokeStyle = 'rgba(9, 10, 8, 0.95)';
             ctx.lineWidth = 2;
-            roundRect(ctx, -15, -10, 30, 20, 5);
+            roundRect(ctx, -20, -4, 40, 21, 5);
             ctx.fill();
             ctx.stroke();
 
-            // Horizontal panel divider (lid seam)
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.fillRect(-15, -1, 30, 3);
-
-            // Metal corner reinforcements (bands)
-            ctx.fillStyle = bandColor;
-            // top left corner
-            ctx.fillRect(-15, -10, 5, 5);
-            // top right corner
-            ctx.fillRect(10, -10, 5, 5);
-            // bottom left corner
-            ctx.fillRect(-15, 5, 5, 5);
-            // bottom right corner
-            ctx.fillRect(10, 5, 5, 5);
-
-            // Vertical iron straps (bands running from top to bottom)
-            ctx.fillRect(-9, -10, 3.5, 20);
-            ctx.fillRect(5.5, -10, 3.5, 20);
-
-            // Top highlight reflection
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-            ctx.fillRect(-15, -10, 30, 2.5);
-
-            // Center Lock
-            ctx.fillStyle = 'rgba(12, 16, 14, 0.95)';
-            ctx.fillRect(-4.5, -3.5, 9, 8);
-            ctx.fillStyle = lockColor;
+            const lidGrad = ctx.createLinearGradient(0, -19, 0, 3);
+            lidGrad.addColorStop(0, palette.lid);
+            lidGrad.addColorStop(0.72, palette.body);
+            lidGrad.addColorStop(1, palette.dark);
+            ctx.fillStyle = lidGrad;
             ctx.beginPath();
-            ctx.arc(0, 0.5, 2, 0, Math.PI * 2);
+            ctx.moveTo(-20, -3);
+            ctx.lineTo(-20, -8);
+            ctx.quadraticCurveTo(-15, -19, 0, -19);
+            ctx.quadraticCurveTo(15, -19, 20, -8);
+            ctx.lineTo(20, -3);
+            ctx.closePath();
             ctx.fill();
-
-            // Final border stroke for crisp outline definition
-            ctx.strokeStyle = 'rgba(12, 16, 14, 0.85)';
-            ctx.lineWidth = 1.5;
-            roundRect(ctx, -15, -10, 30, 20, 5);
             ctx.stroke();
 
-            // Label above the chest
-            ctx.fillStyle = l.type === 'deathCrate' ? '#a855f7' : (RARITY_COLORS[l.tier] || '#ffffff');
-            ctx.font = '900 8px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-            ctx.shadowBlur = 3;
-            ctx.fillText(l.type === 'deathCrate' ? 'DEATH CRATE' : `${l.tier.toUpperCase()} CHEST`, 0, -18);
-            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-14, -13);
+            ctx.quadraticCurveTo(0, -17, 14, -13);
+            ctx.stroke();
 
+            ctx.fillStyle = palette.trim;
+            roundRect(ctx, -21, -5, 42, 4, 2);
+            ctx.fill();
+            ctx.fillStyle = isDeathCrate ? '#1a1026' : palette.trim;
+            roundRect(ctx, -13, -18, 5, 34, 2);
+            ctx.fill();
+            roundRect(ctx, 8, -18, 5, 34, 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
+            roundRect(ctx, -17, -2, 34, 3, 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            roundRect(ctx, -5, -2, 10, 10, 3);
+            ctx.fill();
+            ctx.fillStyle = palette.lock;
+            roundRect(ctx, -3, 0, 6, 6, 2);
+            ctx.fill();
+
+            ctx.restore();
         } else if (l.type === 'weapon') {
             ctx.rotate(-0.2);
             roundRect(ctx, -15, -5, 24, 10, 2);
@@ -845,12 +921,14 @@ export class SurvivRenderer {
             ctx.stroke();
         }
 
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = l.type === 'money' ? '#3f3007' : '#111';
-        ctx.font = '700 8px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(LOOT_LABELS[l.type] || '?', 0, 1);
+        if (!isChest) {
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = l.type === 'money' ? '#3f3007' : '#111';
+            ctx.font = '700 8px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(LOOT_LABELS[l.type] || '?', 0, 1);
+        }
         ctx.restore();
     }
 
@@ -1086,36 +1164,59 @@ export class SurvivRenderer {
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
         const palette = o.variant === 'mansion'
-            ? ['#73634f', '#4f4438']
+            ? { main: '#74614a', dark: '#46382c', ridge: '#8b7659', trim: '#2f261f' }
             : o.variant === 'warehouse'
-                ? ['#5b676b', '#3d4a50']
+                ? { main: '#59686e', dark: '#344249', ridge: '#78878c', trim: '#263238' }
                 : o.variant === 'barn'
-                    ? ['#704034', '#4c2924']
-                    : ['#69513e', '#3f3128'];
-        ctx.shadowColor = 'rgba(10, 14, 10, 0.36)';
-        ctx.shadowBlur = 9;
-        ctx.shadowOffsetY = 7;
-        ctx.fillStyle = palette[0];
-        roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 6);
+                    ? { main: '#783f32', dark: '#4a241f', ridge: '#985747', trim: '#2c1714' }
+                    : { main: '#6c513b', dark: '#3c2b22', ridge: '#80664c', trim: '#2c211b' };
+
+        ctx.shadowColor = 'rgba(10, 14, 10, 0.42)';
+        ctx.shadowBlur = 13;
+        ctx.shadowOffsetY = 9;
+        ctx.fillStyle = palette.trim;
+        roundRect(ctx, -o.w / 2 - 9, -o.h / 2 - 7, o.w + 18, o.h + 16, 8);
         ctx.fill();
         ctx.shadowBlur = 0;
-        ctx.fillStyle = palette[1];
-        ctx.beginPath();
-        ctx.moveTo(-o.w / 2 + 8, -o.h / 2 + 8);
-        ctx.lineTo(0, -o.h / 2 - 26);
-        ctx.lineTo(o.w / 2 - 8, -o.h / 2 + 8);
-        ctx.lineTo(o.w / 2 - 12, o.h / 2 - 8);
-        ctx.lineTo(0, o.h / 2 + 18);
-        ctx.lineTo(-o.w / 2 + 12, o.h / 2 - 8);
-        ctx.closePath();
-        ctx.globalAlpha = 0.68;
+
+        const grad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+        grad.addColorStop(0, palette.main);
+        grad.addColorStop(1, palette.dark);
+        ctx.fillStyle = grad;
+        roundRect(ctx, -o.w / 2 - 4, -o.h / 2 - 4, o.w + 8, o.h + 8, 7);
         ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-        ctx.lineWidth = 2;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
         ctx.beginPath();
-        ctx.moveTo(0, -o.h / 2 - 22);
-        ctx.lineTo(0, o.h / 2 + 16);
+        ctx.moveTo(-o.w / 2 - 4, -o.h / 2 - 4);
+        ctx.lineTo(0, -o.h / 2 - 32);
+        ctx.lineTo(o.w / 2 + 4, -o.h / 2 - 4);
+        ctx.lineTo(o.w / 2 + 2, o.h / 2 + 4);
+        ctx.lineTo(0, o.h / 2 + 24);
+        ctx.lineTo(-o.w / 2 - 2, o.h / 2 + 4);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.11)';
+        ctx.lineWidth = 2;
+        const shingleStep = o.variant === 'mansion' ? 54 : 42;
+        for (let yy = -o.h / 2 + shingleStep; yy < o.h / 2; yy += shingleStep) {
+            ctx.beginPath();
+            ctx.moveTo(-o.w / 2 + 10, yy);
+            ctx.lineTo(o.w / 2 - 10, yy - 8);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle = palette.ridge;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, -o.h / 2 - 28);
+        ctx.lineTo(0, o.h / 2 + 20);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(12, 10, 8, 0.42)';
+        ctx.lineWidth = 2;
+        roundRect(ctx, -o.w / 2 - 4, -o.h / 2 - 4, o.w + 8, o.h + 8, 7);
         ctx.stroke();
         ctx.restore();
     }
@@ -1220,128 +1321,28 @@ export class SurvivRenderer {
     }
 
     drawMinimapPanel(ctx, W, H) {
-        const size = W < 760 ? 92 : 124;
-        const x = W - size - 14;
-        const y = H - size - 14;
-        const cx = x + size / 2;
-        const cy = y + size / 2;
-        const scale = size / (this.worldHalf * 2);
-
-        ctx.save();
-        ctx.fillStyle = 'rgba(9, 10, 15, 0.9)';
-        ctx.strokeStyle = 'rgba(120, 94, 255, 0.35)';
-        ctx.lineWidth = 1.5;
-        roundRect(ctx, x, y, size, size, 7);
-        ctx.fill();
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.rect(x + 6, y + 6, size - 12, size - 12);
-        ctx.clip();
-
-        ctx.fillStyle = '#58764f';
-        ctx.fillRect(x + 6, y + 6, size - 12, size - 12);
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.strokeRect(cx - this.worldHalf * scale, cy - this.worldHalf * scale, this.worldHalf * 2 * scale, this.worldHalf * 2 * scale);
-
-        for (const p of this.players) {
-            const mx = cx + p.x * scale;
-            const my = cy + p.y * scale;
-            ctx.fillStyle = p.isYou || p.id === this.myId ? '#ffffff' : (p.isBot ? '#e5b66a' : '#ff735e');
-            ctx.beginPath();
-            ctx.arc(mx, my, p.isYou || p.id === this.myId ? 3.2 : 2.1, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
-    }
-
-    drawInventoryOverlay(ctx, W, H) {
-        const inv = this.hud.inventory || {};
-        const weapons = Array.isArray(inv.weapons) ? inv.weapons : [this.hud.weapon || 'pistol'];
-        const panelW = Math.min(440, W - 28);
-        const panelH = Math.min(330, H - 32);
-        const x = W / 2 - panelW / 2;
-        const y = H / 2 - panelH / 2;
-        ctx.save();
-        ctx.fillStyle = 'rgba(11, 15, 13, 0.86)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-        ctx.lineWidth = 1;
-        roundRect(ctx, x, y, panelW, panelH, 8);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#e4eadc';
-        ctx.font = '900 18px system-ui, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('Backpack', x + 18, y + 30);
-        ctx.fillStyle = '#9ea99a';
-        ctx.font = '700 10px system-ui, sans-serif';
-        ctx.fillText(String(weapons.length) + '/4 weapons', x + 20, y + 50);
-
-        const slot = 76;
-        const gap = 10;
-        const startX = x + 18;
-        const startY = y + 72;
-        for (let i = 0; i < 4; i++) {
-            const sx = startX + i * (slot + gap);
-            this.drawInventorySlot(ctx, sx, startY, slot, slot, weapons[i] ? WEAPON_LABELS[weapons[i]] || weapons[i] : '', i === 0 || weapons[i] === this.hud.weapon);
-        }
-
-        const items = [
-            { label: 'Medkit', value: inv.medkits || 0, color: '#5fe08a' },
-            { label: 'Ammo', value: inv.ammoPacks || 0, color: '#d7d1bb' },
-            { label: 'Armor', value: Math.round(this.hud.armor || 0), color: '#5d9cff' },
-            { label: 'Chests', value: inv.chestsOpened || 0, color: '#d5b36a' },
-        ];
-        for (let i = 0; i < items.length; i++) {
-            const sx = startX + i * (slot + gap);
-            const sy = startY + slot + 18;
-            this.drawInventorySlot(ctx, sx, sy, slot, 64, items[i].label, false, items[i]);
-        }
-
-        ctx.fillStyle = '#dce8d9';
-        ctx.font = '800 13px system-ui, sans-serif';
-        ctx.fillText('Equipped: ' + (WEAPON_LABELS[this.hud.weapon] || this.hud.weapon), x + 20, y + panelH - 42);
-        ctx.fillStyle = '#b9c5b3';
-        ctx.font = '700 12px system-ui, sans-serif';
-        ctx.fillText('Ammo ' + this.hud.ammo + '/' + this.hud.clipSize, x + 20, y + panelH - 22);
-        ctx.restore();
-    }
-
-    drawInventorySlot(ctx, x, y, w, h, label, active = false, item = null) {
-        ctx.save();
-        ctx.fillStyle = active ? 'rgba(92, 156, 255, 0.24)' : 'rgba(255,255,255,0.06)';
-        ctx.strokeStyle = active ? 'rgba(126, 180, 255, 0.72)' : 'rgba(255,255,255,0.14)';
-        ctx.lineWidth = active ? 2 : 1;
-        roundRect(ctx, x, y, w, h, 7);
-        ctx.fill();
-        ctx.stroke();
-        if (item) {
-            ctx.fillStyle = item.color;
-            ctx.beginPath();
-            ctx.arc(x + w / 2, y + 20, 9, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#edf3e8';
-            ctx.font = '900 18px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(String(item.value), x + w / 2, y + 48);
-            ctx.font = '700 9px system-ui, sans-serif';
-            ctx.fillStyle = '#aeb8a8';
-            ctx.fillText(item.label, x + w / 2, y + h - 8);
-        } else if (label) {
-            ctx.fillStyle = '#dce8d9';
-            ctx.font = '800 10px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            const short = label.length > 12 ? label.slice(0, 12) : label;
-            ctx.fillText(short, x + w / 2, y + h / 2 + 4);
-        }
-        ctx.restore();
-    }
-
-    drawVignette(ctx, W, H) {
-        const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.72);
-        g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(1, 'rgba(0,0,0,0.18)');
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, W, H);
+        const viewHalfW = W / (2 * this.zoom);
+        const viewHalfH = H / (2 * this.zoom);
+        const lootDots = this.minimap.food?.length
+            ? this.minimap.food
+            : this.loot
+                .filter(l => l.type === 'chest' || l.type === 'deathCrate' || l.type === 'money')
+                .map(l => ({ x: l.x, y: l.y, golden: l.type !== 'chest' }));
+        const minimapPlayers = this.minimap.players?.length
+            ? this.minimap.players
+            : this.players.map(p => ({ x: p.x, y: p.y, isYou: p.isYou || p.id === this.myId }));
+        drawGameMinimap(ctx, {
+            screenW: W,
+            screenH: H,
+            isMobile: W < 760,
+            centerX: this.camera.x,
+            centerY: this.camera.y,
+            viewHalfW,
+            viewHalfH,
+            players: minimapPlayers,
+            food: lootDots,
+            obstacles: this.minimap.obstacles?.length ? this.minimap.obstacles : this.obstacles,
+            time: performance.now(),
+        });
     }
 }

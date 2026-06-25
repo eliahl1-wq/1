@@ -9,8 +9,8 @@ const DESKTOP_SIZE = 132;
 const MOBILE_SIZE = 76;
 const MARGIN_DESKTOP = 14;
 const MARGIN_MOBILE = 8;
-const RANGE_MULT_DESKTOP = 2.35;
-const RANGE_MULT_MOBILE = 2.0;
+const RANGE_MULT_DESKTOP = 3.35;
+const RANGE_MULT_MOBILE = 2.8;
 const THREAT_MULT = 1.55;
 const EDGE_BUCKETS = 40;
 
@@ -41,6 +41,7 @@ export function drawGameMinimap(ctx, opts) {
         food = [],
         viruses = [],
         ejected = [],
+        obstacles = [],
         zone = null,
         time = performance.now(),
     } = opts;
@@ -99,6 +100,43 @@ export function drawGameMinimap(ctx, opts) {
                 ctx.fillRect(gx, gy, 1, 1);
             }
         }
+    }
+
+    const obstacleFill = (o) => {
+        if (o.kind === 'houseFloor') return 'rgba(196, 169, 117, 0.72)';
+        if (o.kind === 'wall' || o.kind === 'interiorWall') return 'rgba(38, 31, 24, 0.9)';
+        if (o.kind === 'road') return 'rgba(120, 113, 95, 0.42)';
+        if (o.kind === 'water') return 'rgba(72, 128, 150, 0.58)';
+        if (o.kind === 'container') return 'rgba(99, 119, 126, 0.62)';
+        return null;
+    };
+
+    const maxObstacles = isMobile ? 80 : 160;
+    let obstacleDrawn = 0;
+    for (const o of obstacles) {
+        if (obstacleDrawn >= maxObstacles) break;
+        if (!o || o.x == null || o.y == null || !o.w || !o.h) continue;
+        if (Math.abs(o.x - centerX) > halfRange + o.w / 2 || Math.abs(o.y - centerY) > halfRange + o.h / 2) continue;
+        const fill = obstacleFill(o);
+        if (!fill) continue;
+        const p = toMini(o.x, o.y);
+        const mw = Math.max(1, o.w * scale);
+        const mh = Math.max(1, o.h * scale);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(o.rotation || 0);
+        ctx.fillStyle = fill;
+        if (o.kind === 'wall' || o.kind === 'interiorWall') {
+            ctx.fillRect(-mw / 2, -mh / 2, mw, mh);
+        } else if (o.kind === 'water') {
+            ctx.beginPath();
+            ctx.ellipse(0, 0, mw / 2, mh / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.fillRect(-mw / 2, -mh / 2, mw, mh);
+        }
+        ctx.restore();
+        obstacleDrawn++;
     }
 
     // BR zone edge when it crosses the local radar

@@ -1338,9 +1338,8 @@ export default function PreGame() {
                                                 <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
                                             </div>
                                             <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                Top-down battle royale shooter. $2 starts in your pocket, $3 seeds loot across the map.
-                                                Loot weapons, armor, medkits, and cash. Fight players and bots. Cash out anytime — or risk it all for more.
-                                                The safe zone shrinks before each arena reset.
+                                                Top-down battle royale shooter. Your entry seeds cash across the map while you start at $0.
+                                                Loot weapons, armor, medkits, and cash from chests. Fight players and bots. Cash out anytime, or risk it all for more.
                                             </div>
                                         </>
                                     ) : isCompetitiveSlitherMode ? (

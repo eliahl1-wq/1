@@ -887,10 +887,10 @@
 
 .surviv-inventory-container {
     width: 100%;
-    max-width: 660px;
-    max-height: 420px;
-    background: rgba(9, 10, 15, 0.76);
-    border: 1px solid rgba(120, 94, 255, 0.35);
+    max-width: 680px;
+    max-height: 450px;
+    background: rgba(8, 10, 9, 0.82);
+    border: 1px solid rgba(213, 193, 142, 0.22);
     border-radius: var(--r-xl);
     box-shadow: 0 0 35px rgba(120, 94, 255, 0.15), 0 20px 40px rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(12px);
@@ -905,6 +905,10 @@
 
 .surviv-inventory-container.backpack-only {
     max-width: 380px;
+}
+
+.surviv-inventory-container.has-chest {
+    max-width: 780px;
 }
 
 @keyframes inventorySlideUp {
@@ -955,8 +959,9 @@
 .surviv-inventory-subtitle {
     margin-top: 2px;
     font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-2);
+    font-weight: 700;
+    color: rgba(215, 195, 150, 0.82);
+    text-transform: uppercase;
 }
 
 .surviv-inventory-body {
@@ -1208,10 +1213,11 @@
 }
 
 .chest-items-hint {
-    font-size: 0.65rem;
-    color: var(--text-3);
+    font-size: 0.62rem;
+    color: rgba(215, 195, 150, 0.78);
     margin-bottom: 8px;
-    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.7px;
 }
 
 .chest-items-grid {
@@ -1238,9 +1244,9 @@
 }
 
 .chest-item-card:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: #ffffff; /* White contour outline requested! */
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.75), 0 0 14px rgba(255, 255, 255, 0.14);
     transform: translateY(-1px);
 }
 
@@ -1291,6 +1297,8 @@
 .rarity-card-military { border-color: rgba(201, 133, 255, 0.25); }
 
 .chest-empty-state {
+    grid-column: 1 / -1;
+    min-height: 116px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1329,8 +1337,9 @@
     display: flex;
     justify-content: space-between;
     font-size: 0.68rem;
-    color: var(--text-3);
-    font-weight: 600;
+    color: rgba(215, 195, 150, 0.72);
+    font-weight: 900;
+    letter-spacing: 0.8px;
 }
 
 /* ==========================================================================
@@ -1405,6 +1414,20 @@
     box-shadow: 0 0 15px rgba(255, 59, 48, 0.1);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+}
+
+.game-reset-banner.surviv-server-timer {
+    top: 14px;
+    background: rgba(8, 10, 9, 0.74);
+    border-color: rgba(215, 195, 142, 0.28);
+    color: #f2e6bd;
+    box-shadow: 0 0 18px rgba(0, 0, 0, 0.22);
+}
+
+.game-reset-banner.surviv-server-timer.is-warning {
+    background: rgba(255, 59, 48, 0.14);
+    border-color: rgba(255, 59, 48, 0.34);
+    color: var(--red, #FF3B30);
 }
 
 /* ==========================================================================

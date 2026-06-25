@@ -73,7 +73,13 @@ export default function SurvivGame() {
 
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
     const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
-    const [currentBalance, setCurrentBalance] = useState(2.0);
+    const [currentBalance, setCurrentBalanceState] = useState(0);
+    const currentBalanceRef = useRef(0);
+    const setCurrentBalance = useCallback((val) => {
+        currentBalanceRef.current = val;
+        setCurrentBalanceState(val);
+    }, []);
+
     const [leaderboard, setLeaderboard] = useState([]);
     const [isDead, setIsDead] = useState(() => pendingAtMount?.type === 'death');
     const [cashedAmount, setCashedAmount] = useState(() => (
@@ -82,11 +88,28 @@ export default function SurvivGame() {
     const [showResultModal, setShowResultModal] = useState(() => !!pendingAtMount);
     const [isSpectating, setIsSpectating] = useState(false);
     const [isRejoining, setIsRejoining] = useState(false);
-    const [sessionStats, setSessionStats] = useState(() => (
+    const [sessionStats, setSessionStatsState] = useState(() => (
         pendingAtMount
             ? { timeSurvivedMs: pendingAtMount.timeSurvivedMs ?? 0, eliminations: pendingAtMount.eliminations ?? 0 }
             : { timeSurvivedMs: 0, eliminations: 0 }
     ));
+    const sessionStatsRef = useRef(
+        pendingAtMount
+            ? { timeSurvivedMs: pendingAtMount.timeSurvivedMs ?? 0, eliminations: pendingAtMount.eliminations ?? 0 }
+            : { timeSurvivedMs: 0, eliminations: 0 }
+    );
+    const setSessionStats = useCallback((val) => {
+        if (typeof val === 'function') {
+            setSessionStatsState(prev => {
+                const next = val(prev);
+                sessionStatsRef.current = next;
+                return next;
+            });
+        } else {
+            sessionStatsRef.current = val;
+            setSessionStatsState(val);
+        }
+    }, []);
     const [liveSession, setLiveSession] = useState(() => !pendingAtMount);
     const [localTimer, setLocalTimer] = useState(0);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
@@ -350,7 +373,7 @@ export default function SurvivGame() {
             myIdRef.current = player.id;
             renderer.setMyId(player.id);
             sessionStartAtRef.current = Date.now();
-            setCurrentBalance(player.dollarBalance ?? 2);
+            setCurrentBalance(player.dollarBalance ?? 0);
             setGameReady(true);
             setIsRejoining(false);
             renderer.start();
@@ -399,7 +422,7 @@ export default function SurvivGame() {
                 type: 'cashout',
                 cashedAmount: amount,
                 timeSurvivedMs: survived,
-                eliminations: sessionStats.eliminations,
+                eliminations: sessionStatsRef.current.eliminations,
             });
             blockAutoJoinRef.current = true;
             refreshUser();
@@ -412,14 +435,14 @@ export default function SurvivGame() {
 
         socket.on('died', (data) => {
             const survived = Date.now() - (sessionStartAtRef.current || Date.now());
-            const eliminations = data?.kills ?? sessionStats.eliminations;
+            const eliminations = data?.kills ?? sessionStatsRef.current.eliminations;
             setSessionStats({ timeSurvivedMs: survived, eliminations });
             setIsDead(true);
             setShowResultModal(true);
             renderer.pause();
             savePendingResult('surviv', {
                 type: 'death',
-                balance: data?.balance ?? currentBalance,
+                balance: data?.balance ?? currentBalanceRef.current,
                 timeSurvivedMs: survived,
                 eliminations,
             });
@@ -500,7 +523,7 @@ export default function SurvivGame() {
             socket.off();
             socket.disconnect();
         };
-    }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser, sessionStats.eliminations, currentBalance]);
+    }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser]);
 
     const handleHoldStart = useCallback(() => {
         rendererRef.current?.setHoldStart(Date.now());
@@ -564,9 +587,11 @@ export default function SurvivGame() {
                 <GameSpectateHud onBack={exitSpectate} />
             )}
 
-            {resetCountdown != null && resetCountdown < 300 && (
-                <div className="game-reset-banner">
-                    Arena reset in {Math.floor(resetCountdown / 60)}:{String(resetCountdown % 60).padStart(2, '0')}
+            {gameReady && resetCountdown != null && resetCountdown > 0 && !showResultModal && (
+                <div className={`game-reset-banner surviv-server-timer ${resetCountdown < 300 ? 'is-warning' : ''}`}>
+                    SERVER RESET {Math.floor(resetCountdown / 3600) > 0
+                        ? `${Math.floor(resetCountdown / 3600)}:${String(Math.floor((resetCountdown % 3600) / 60)).padStart(2, '0')}:${String(resetCountdown % 60).padStart(2, '0')}`
+                        : `${Math.floor(resetCountdown / 60)}:${String(resetCountdown % 60).padStart(2, '0')}`}
                 </div>
             )}
 
@@ -755,7 +780,7 @@ export default function SurvivGame() {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                                 </button>
                             </div>
-                            <div className="surviv-inventory-subtitle">Manage weapons and chest contents</div>
+                            <div className="surviv-inventory-subtitle">Backpack & chest</div>
                         </div>
 
                         {/* Side-by-side grids */}
@@ -779,7 +804,7 @@ export default function SurvivGame() {
 
                                 {/* Weapons Grid */}
                                 <div className="weapons-section">
-                                    <h4 className="section-subtitle">WEAPONS (Slots 1-4)</h4>
+                                    <h4 className="section-subtitle">WEAPONS</h4>
                                     <div className="weapons-grid">
                                         {[0, 1, 2, 3].map((slotIdx) => {
                                             const weaponId = me.inventory?.weapons?.[slotIdx];
@@ -788,8 +813,6 @@ export default function SurvivGame() {
                                             
                                             const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
                                             const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
-                                            const isChestOpen = !!me.openedContainer;
-
                                             return (
                                                 <div 
                                                     key={`weapon-slot-${slotIdx}`}
@@ -802,15 +825,7 @@ export default function SurvivGame() {
                                                     }}
                                                     onClick={() => {
                                                         if (weaponId) {
-                                                            if (isChestOpen && weaponId !== 'pistol') {
-                                                                putChestItemPendingRef.current = {
-                                                                    chestId: me.openedContainer.id,
-                                                                    itemKey: 'weapon',
-                                                                    weaponType: weaponId
-                                                                };
-                                                            } else {
-                                                                equipSlotPendingRef.current = slotIdx;
-                                                            }
+                                                            equipSlotPendingRef.current = slotIdx;
                                                         }
                                                     }}
                                                 >
@@ -871,16 +886,8 @@ export default function SurvivGame() {
                                             }}
                                             onClick={() => {
                                                 const qty = me.inventory?.medkits || 0;
-                                                const isChestOpen = !!me.openedContainer;
                                                 if (qty > 0) {
-                                                    if (isChestOpen) {
-                                                        putChestItemPendingRef.current = {
-                                                            chestId: me.openedContainer.id,
-                                                            itemKey: 'medkits'
-                                                        };
-                                                    } else {
-                                                        useMedkitPendingRef.current = true;
-                                                    }
+                                                    useMedkitPendingRef.current = true;
                                                 }
                                             }}
                                         >
@@ -893,11 +900,7 @@ export default function SurvivGame() {
                                             </div>
                                             {(me.inventory?.medkits || 0) > 0 && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
-                                                    {!(!!me.openedContainer) ? (
-                                                        <span className="item-action-badge" style={{ position: 'static' }}>CLICK TO HEAL</span>
-                                                    ) : (
-                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>CLICK TO DEPOSIT</span>
-                                                    )}
+                                                    <span className="item-action-badge" style={{ position: 'static' }}>HEAL</span>
                                                     <button 
                                                         className="slot-drop-btn" 
                                                         style={{
@@ -952,7 +955,7 @@ export default function SurvivGame() {
                                             {(me.inventory?.ammoPacks || 0) > 0 && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
                                                     {(!!me.openedContainer) && (
-                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>CLICK TO DEPOSIT</span>
+                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>DEPOSIT</span>
                                                     )}
                                                     <button 
                                                         className="slot-drop-btn" 
@@ -1007,7 +1010,7 @@ export default function SurvivGame() {
                                             {(me.armor || 0) > 0 && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
                                                     {(!!me.openedContainer) && (
-                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>CLICK TO DEPOSIT</span>
+                                                        <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>DEPOSIT</span>
                                                     )}
                                                     <button 
                                                         className="slot-drop-btn" 
@@ -1081,9 +1084,13 @@ export default function SurvivGame() {
                                     </h3>
 
                                     <div className="chest-items-section">
-                                        <div className="chest-items-hint">Drag items here to deposit, or click chest items to take them.</div>
+                                        <div className="chest-items-hint">{me.openedContainer.items?.length || 0} ITEMS</div>
                                         <div className="chest-items-grid">
-                                            {me.openedContainer.items?.map((item) => {
+                                            {(me.openedContainer.items?.length || 0) === 0 ? (
+                                                <div className="chest-empty-state">
+                                                    <p>EMPTY</p>
+                                                </div>
+                                            ) : me.openedContainer.items.map((item) => {
                                                 const rarityClass = item.rarity || 'common';
                                                 
                                                 let strokeColor = '#ffffff';
@@ -1125,7 +1132,7 @@ export default function SurvivGame() {
                                                         </div>
                                                         <div className="chest-item-info">
                                                             <div className="chest-item-label">{item.label}</div>
-                                                            <div className="chest-item-action">CLICK TO TAKE</div>
+                                                            <div className="chest-item-action">TAKE</div>
                                                         </div>
                                                     </div>
                                                 );
@@ -1136,10 +1143,9 @@ export default function SurvivGame() {
                             )}
                         </div>
 
-                        {/* Footer / Controls reminder */}
                         <div className="surviv-inventory-footer">
-                            <span>Press <kbd className="game-keycap-mini">TAB</kbd> or <kbd className="game-keycap-mini">ESC</kbd> to Close</span>
-                            <span>Press <kbd className="game-keycap-mini">1-4</kbd> to switch weapons  |  Press <kbd className="game-keycap-mini">Q</kbd> to Quick Heal</span>
+                            <span>{me.openedContainer ? 'CHEST OPEN' : 'BACKPACK'}</span>
+                            <span>{formatUsd(me.dollarBalance || 0)}</span>
                         </div>
                     </div>
                 </div>
