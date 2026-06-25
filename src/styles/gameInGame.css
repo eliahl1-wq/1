@@ -873,9 +873,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(6, 7, 10, 0.76);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(6, 7, 10, 0.25);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     padding: 12px;
     animation: inventoryFadeIn 0.18s ease-out forwards;
 }
@@ -889,14 +889,22 @@
     width: 100%;
     max-width: 660px;
     max-height: 420px;
-    background: rgba(9, 10, 15, 0.96);
+    background: rgba(9, 10, 15, 0.76);
     border: 1px solid rgba(120, 94, 255, 0.35);
     border-radius: var(--r-xl);
-    box-shadow: 0 0 35px rgba(120, 94, 255, 0.18), 0 20px 40px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 35px rgba(120, 94, 255, 0.15), 0 20px 40px rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     animation: inventorySlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: max-width 0.15s ease-out;
+}
+
+
+.surviv-inventory-container.backpack-only {
+    max-width: 380px;
 }
 
 @keyframes inventorySlideUp {
@@ -1400,27 +1408,110 @@
 }
 
 /* ==========================================================================
-   WEAPON HOTBAR HUD OVERLAY
+   UNIFIED BOTTOM HUD CONTAINER & OVERLAYS
    ========================================================================== */
-.surviv-weapons-hotbar {
+.surviv-hud-container {
     position: absolute;
     bottom: 24px;
-    right: 24px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 100;
     display: flex;
-    gap: 6px;
-    padding: 6px;
-    background: rgba(9, 10, 15, 0.9);
-    border: 1px solid rgba(120, 94, 255, 0.25);
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(9, 10, 15, 0.85);
+    border: 1px solid rgba(120, 94, 255, 0.28);
     border-radius: var(--r-md);
-    box-shadow: 0 0 15px rgba(120, 94, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 0 20px rgba(120, 94, 255, 0.12), 0 8px 32px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    width: 368px;
+    pointer-events: auto;
+}
+
+.surviv-hud-status-bars {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+}
+
+.hud-bar-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.hud-bar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.58rem;
+    font-weight: 800;
+    font-family: var(--mono);
+}
+
+.hud-bar-title-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    letter-spacing: 0.5px;
+}
+
+.hud-bar-icon {
+    opacity: 0.85;
+}
+
+.hud-bar-value {
+    font-family: var(--mono);
+    font-weight: 800;
+}
+
+.health .hud-bar-title-row, .health .hud-bar-value {
+    color: #14F195;
+    text-shadow: 0 0 4px rgba(20, 241, 149, 0.25);
+}
+
+.armor .hud-bar-title-row, .armor .hud-bar-value {
+    color: #00c2ff;
+    text-shadow: 0 0 4px rgba(0, 194, 255, 0.25);
+}
+
+.hud-bar-track {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.hud-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.15s ease-out;
+}
+
+.hud-bar-fill.health-fill {
+    background: linear-gradient(90deg, #10b981, #14F195);
+    box-shadow: 0 0 8px rgba(20, 241, 149, 0.45);
+}
+
+.hud-bar-fill.armor-fill {
+    background: linear-gradient(90deg, #0088ff, #00c2ff);
+    box-shadow: 0 0 8px rgba(0, 194, 255, 0.45);
+}
+
+.surviv-weapons-hotbar {
+    display: flex;
+    gap: 6px;
+    width: 100%;
 }
 
 .hotbar-slot {
-    width: 82px;
-    height: 42px;
+    flex: 1;
+    height: 44px;
     border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
@@ -1434,14 +1525,14 @@
 }
 
 .hotbar-slot:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.14);
 }
 
 .hotbar-slot.empty-slot {
     border-style: dashed;
     cursor: default;
-    opacity: 0.4;
+    opacity: 0.35;
 }
 
 .hotbar-slot.empty-slot:hover {
@@ -1452,79 +1543,116 @@
 .hotbar-slot-key {
     position: absolute;
     top: 3px;
-    left: 5px;
+    left: 4px;
     font-family: var(--mono);
-    font-size: 0.55rem;
-    font-weight: 700;
+    font-size: 0.52rem;
+    font-weight: 800;
     color: var(--text-3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.35);
     padding: 0 2px;
     border-radius: 2px;
+    line-height: 1;
 }
 
 .hotbar-slot-name {
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: var(--text-h);
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--text-2);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 72px;
+    width: 90%;
     margin-top: 8px;
 }
 
 .hotbar-slot.active-slot {
-    background: rgba(120, 94, 255, 0.12);
+    background: rgba(120, 94, 255, 0.15);
     border-color: var(--accent) !important;
-    box-shadow: inset 0 0 6px rgba(120, 94, 255, 0.1), 0 0 10px rgba(120, 94, 255, 0.25);
+    box-shadow: inset 0 0 6px rgba(120, 94, 255, 0.15), 0 0 12px rgba(120, 94, 255, 0.3);
 }
 
 .hotbar-slot.active-slot .hotbar-slot-name {
     color: var(--text-bright);
 }
 
+.hotbar-slot-ammo {
+    font-family: var(--mono);
+    font-size: 0.52rem;
+    font-weight: 900;
+    color: #14F195;
+    margin-top: 1px;
+    text-shadow: 0 0 4px rgba(20, 241, 149, 0.3);
+}
+
+.hotbar-slot-ammo.reloading {
+    color: #ffb700;
+    text-shadow: 0 0 6px rgba(255, 183, 0, 0.4);
+    animation: hotbarReloadPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes hotbarReloadPulse {
+    from { opacity: 0.5; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1.05); }
+}
+
+/* Kills/Elims overlay */
+.surviv-kills-badge {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: rgba(239, 84, 79, 0.12);
+    border: 1px solid rgba(239, 84, 79, 0.38);
+    border-radius: var(--r-sm);
+    color: #ef544f;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    box-shadow: 0 0 12px rgba(239, 84, 79, 0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: inventoryFadeIn 0.2s ease-out;
+}
+
+.elim-icon {
+    animation: hotbarReloadPulse 1.5s ease-in-out infinite alternate;
+}
+
+/* Offset Cashout for Surviv Game mode so it stays clear of unified Bottom HUD */
+.surviv-game-page .game-cashout-wrap {
+    bottom: 148px !important;
+}
+
 /* Mobile adjustments */
 @media (max-width: 768px) {
-    .surviv-inventory-container {
-        max-height: 95vh;
-    }
-    .surviv-inventory-body {
-        flex-direction: column;
-        gap: 12px;
-        padding: 12px;
-    }
-    .surviv-inventory-panel {
-        padding: 10px;
-    }
-    .weapons-grid, .items-grid, .chest-items-grid {
-        grid-template-columns: 1fr;
-        gap: 6px;
-    }
-    .weapon-slot-card {
-        height: 48px;
-    }
-    .surviv-inventory-footer {
-        flex-direction: column;
-        gap: 4px;
-        align-items: center;
-        text-align: center;
-        padding: 10px;
-    }
-    .surviv-weapons-hotbar {
+    .surviv-hud-container {
+        width: 320px;
         bottom: 12px;
-        right: 12px;
-        padding: 4px;
+        padding: 8px 10px;
+        gap: 8px;
     }
     .hotbar-slot {
-        width: 64px;
-        height: 36px;
+        height: 38px;
     }
     .hotbar-slot-name {
-        width: 56px;
-        font-size: 0.6rem;
+        font-size: 0.58rem;
+        margin-top: 6px;
+    }
+    .hotbar-slot-ammo {
+        font-size: 0.48rem;
+    }
+    .surviv-game-page .game-cashout-wrap {
+        bottom: 124px !important;
     }
 }
+
 
 

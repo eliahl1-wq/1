@@ -61,11 +61,11 @@ function seededNoise(x, y) {
 }
 
 function biomeAt(x, y) {
-    if (y < -22000) return { base: '#7f9294', alt: '#9caeb0', grass: 'rgba(230,245,245,0.12)' };
-    if (x < -18000 && y > 8500) return { base: '#82784a', alt: '#9a8d54', grass: 'rgba(235,210,130,0.12)' };
-    if (x > 14500 && y > 9500) return { base: '#51675a', alt: '#61765f', grass: 'rgba(95,125,88,0.16)' };
-    if (x > 12500 && y < -8000) return { base: '#626862', alt: '#74746a', grass: 'rgba(40,40,35,0.11)' };
-    if (x < -23000) return { base: '#506d4b', alt: '#5d7a55', grass: 'rgba(38,78,40,0.18)' };
+    if (y < -11000) return { base: '#7f9294', alt: '#9caeb0', grass: 'rgba(230,245,245,0.12)' };
+    if (x < -9000 && y > 4250) return { base: '#82784a', alt: '#9a8d54', grass: 'rgba(235,210,130,0.12)' };
+    if (x > 7250 && y > 4750) return { base: '#51675a', alt: '#61765f', grass: 'rgba(95,125,88,0.16)' };
+    if (x > 6250 && y < -4000) return { base: '#626862', alt: '#74746a', grass: 'rgba(40,40,35,0.11)' };
+    if (x < -11500) return { base: '#506d4b', alt: '#5d7a55', grass: 'rgba(38,78,40,0.18)' };
     return { base: '#58764f', alt: '#638257', grass: 'rgba(35,70,40,0.18)' };
 }
 
@@ -76,13 +76,14 @@ export class SurvivRenderer {
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
         this.targetZoom = 1.08;
-        this.worldHalf = 40000;
+        this.worldHalf = 20000;
         this.myId = null;
         this.players = [];
         this.loot = [];
         this.bullets = [];
         this.obstacles = [];
         this.houseFloors = [];
+
         this.surfaceObstacles = [];
         this.sortedWorldObstacles = [];
         this.zone = null;
@@ -442,9 +443,10 @@ export class SurvivRenderer {
         ctx.restore();
         this.drawCrosshair(ctx);
         this.drawVignette(ctx, W, H);
-        this.drawHud(ctx, W, H);
+        // Handled by React UI overlay: this.drawHud(ctx, W, H);
         this.drawMinimapPanel(ctx, W, H);
         this.drawLootToast(ctx, W, H);
+
         // Handled by React UI overlay
     }
 
@@ -1123,14 +1125,14 @@ export class SurvivRenderer {
 
         ctx.save();
         this.drawPanel(ctx, pad, pad, panelW, armorPct > 0 ? 76 : 58);
-        ctx.fillStyle = '#dce8d9';
-        ctx.font = '800 11px system-ui, sans-serif';
+        ctx.fillStyle = '#785eff';
+        ctx.font = '800 11px "Space Mono", monospace';
         ctx.textAlign = 'left';
         ctx.fillText('SURVIVOR', pad + 12, pad + 17);
-        this.drawBar(ctx, pad + 12, pad + 26, panelW - 24, 12, hpPct, '#4fdb73', '#ef504d');
+        this.drawBar(ctx, pad + 12, pad + 26, panelW - 24, 12, hpPct, '#5fe08a', '#ef544f');
         if (armorPct > 0) {
-            ctx.fillStyle = '#9fb7d6';
-            ctx.font = '700 9px system-ui, sans-serif';
+            ctx.fillStyle = '#5c9cff';
+            ctx.font = '700 9px "Space Mono", monospace';
             ctx.fillText('ARMOR', pad + 12, pad + 52);
             this.drawBar(ctx, pad + 12, pad + 58, panelW - 24, 7, armorPct, '#5c9cff', '#5c9cff');
         }
@@ -1140,19 +1142,19 @@ export class SurvivRenderer {
         const weaponW = W < 760 ? 148 : 172;
         this.drawPanel(ctx, W - pad - weaponW, pad, weaponW, 58);
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#dce8d9';
-        ctx.font = '800 13px system-ui, sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 13px "Outfit", sans-serif';
         ctx.fillText(weaponLabel, W - pad - 12, pad + 20);
-        ctx.fillStyle = this.hud.reloading ? '#ffd45a' : '#b9c5b3';
-        ctx.font = '800 18px system-ui, sans-serif';
+        ctx.fillStyle = this.hud.reloading ? '#ffd45a' : '#5fe08a';
+        ctx.font = '800 18px "Space Mono", monospace';
         ctx.fillText(ammoText, W - pad - 12, pad + 44);
 
         if (this.hud.kills > 0) {
             const text = String(this.hud.kills) + ' ELIMS';
             const w = 88;
             this.drawPanel(ctx, W / 2 - w / 2, pad, w, 30);
-            ctx.fillStyle = '#ff896b';
-            ctx.font = '800 12px system-ui, sans-serif';
+            ctx.fillStyle = '#ef544f';
+            ctx.font = '800 12px "Space Mono", monospace';
             ctx.textAlign = 'center';
             ctx.fillText(text, W / 2, pad + 20);
         }
@@ -1161,9 +1163,9 @@ export class SurvivRenderer {
 
     drawPanel(ctx, x, y, w, h) {
         ctx.save();
-        ctx.fillStyle = 'rgba(18, 24, 20, 0.72)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-        ctx.lineWidth = 1;
+        ctx.fillStyle = 'rgba(9, 10, 15, 0.9)';
+        ctx.strokeStyle = 'rgba(120, 94, 255, 0.35)';
+        ctx.lineWidth = 1.5;
         roundRect(ctx, x, y, w, h, 6);
         ctx.fill();
         ctx.stroke();
@@ -1177,7 +1179,7 @@ export class SurvivRenderer {
         ctx.fillStyle = pct > 0.35 ? ok : danger;
         roundRect(ctx, x, y, w * pct, h, 3);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+        ctx.strokeStyle = 'rgba(120, 94, 255, 0.2)';
         ctx.lineWidth = 1;
         roundRect(ctx, x, y, w, h, 3);
         ctx.stroke();
@@ -1192,9 +1194,9 @@ export class SurvivRenderer {
         const scale = size / (this.worldHalf * 2);
 
         ctx.save();
-        ctx.fillStyle = 'rgba(18, 24, 20, 0.72)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-        ctx.lineWidth = 1;
+        ctx.fillStyle = 'rgba(9, 10, 15, 0.9)';
+        ctx.strokeStyle = 'rgba(120, 94, 255, 0.35)';
+        ctx.lineWidth = 1.5;
         roundRect(ctx, x, y, size, size, 7);
         ctx.fill();
         ctx.stroke();

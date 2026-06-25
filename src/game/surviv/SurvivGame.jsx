@@ -20,7 +20,8 @@ import '../../styles/gameInGame.css';
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
-const WORLD_HALF = 40000;
+const WORLD_HALF = 20000;
+
 const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
 
 const WEAPON_LABELS = {
@@ -522,7 +523,7 @@ export default function SurvivGame() {
     const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
 
     return (
-        <div ref={viewportRef} className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
+        <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
             width: '100vw',
             height: '100vh',
             background: '#0a0a0c',
@@ -620,33 +621,84 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {/* Weapon Hotbar HUD */}
+            {/* Unified Bottom HUD Container */}
             {gameReady && me && !showResultModal && (
-                <div className="surviv-weapons-hotbar">
-                    {[0, 1, 2, 3].map((slotIdx) => {
-                        const weaponId = me.inventory?.weapons?.[slotIdx];
-                        const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
-                        const isActive = weaponId && weaponId === me.weapon;
-                        
-                        return (
-                            <div 
-                                key={`hotbar-slot-${slotIdx}`}
-                                className={`hotbar-slot ${isActive ? 'active-slot' : ''} ${weaponId ? 'has-item' : 'empty-slot'}`}
-                                onClick={() => {
-                                    if (weaponId) {
-                                        equipSlotPendingRef.current = slotIdx;
-                                    }
-                                }}
-                            >
-                                <span className="hotbar-slot-key">{slotIdx + 1}</span>
-                                {weaponId ? (
-                                    <span className="hotbar-slot-name">{weaponLabel}</span>
-                                ) : (
-                                    <span className="hotbar-slot-name">-</span>
-                                )}
+                <div className="surviv-hud-container">
+                    {/* HP and Armor Progress Bars */}
+                    <div className="surviv-hud-status-bars">
+                        <div className="hud-bar-wrapper health">
+                            <div className="hud-bar-header">
+                                <span className="hud-bar-title-row">
+                                    <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                                    HEALTH
+                                </span>
+                                <span className="hud-bar-value">{Math.round(me.hp || 0)} / {Math.round(me.maxHp || 100)}</span>
                             </div>
-                        );
-                    })}
+                            <div className="hud-bar-track">
+                                <div className="hud-bar-fill health-fill" style={{ width: `${Math.max(0, Math.min(1, (me.hp || 0) / (me.maxHp || 100))) * 100}%` }} />
+                            </div>
+                        </div>
+
+                        <div className="hud-bar-wrapper armor">
+                            <div className="hud-bar-header">
+                                <span className="hud-bar-title-row">
+                                    <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    ARMOR
+                                </span>
+                                <span className="hud-bar-value">{Math.round(me.armor || 0)}%</span>
+                            </div>
+                            <div className="hud-bar-track">
+                                <div className="hud-bar-fill armor-fill" style={{ width: `${Math.max(0, Math.min(1, (me.armor || 0) / 100)) * 100}%` }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Weapons Hotbar */}
+                    <div className="surviv-weapons-hotbar">
+                        {[0, 1, 2, 3].map((slotIdx) => {
+                            const weaponId = me.inventory?.weapons?.[slotIdx];
+                            const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
+                            const isActive = weaponId && weaponId === me.weapon;
+                            const isReloading = isActive && me.reloading;
+                            
+                            return (
+                                <div 
+                                    key={`hotbar-slot-${slotIdx}`}
+                                    className={`hotbar-slot ${isActive ? 'active-slot' : ''} ${weaponId ? 'has-item' : 'empty-slot'}`}
+                                    onClick={() => {
+                                        if (weaponId) {
+                                            equipSlotPendingRef.current = slotIdx;
+                                        }
+                                    }}
+                                >
+                                    <span className="hotbar-slot-key">{slotIdx + 1}</span>
+                                    {weaponId ? (
+                                        <>
+                                            <span className="hotbar-slot-name">{weaponLabel}</span>
+                                            {isActive && (
+                                                <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
+                                                    {isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`}
+                                                </span>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <span className="hotbar-slot-name">-</span>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Eliminations Badge */}
+            {gameReady && me && me.kills > 0 && !showResultModal && (
+                <div className="surviv-kills-badge">
+                    <svg className="elim-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M9 12h.01M15 12h.01M12 2a8 8 0 0 0-8 8v3a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-3a8 8 0 0 0-8-8z"/>
+                        <path d="M10 22v-3h4v3"/>
+                    </svg>
+                    <span>{me.kills} {me.kills === 1 ? 'ELIM' : 'ELIMS'}</span>
                 </div>
             )}
 
@@ -688,7 +740,7 @@ export default function SurvivGame() {
                         }
                     }}
                 >
-                    <div className="surviv-inventory-container" onClick={(e) => e.stopPropagation()}>
+                    <div className={`surviv-inventory-container ${!me.openedContainer ? 'backpack-only' : 'has-chest'}`} onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="surviv-inventory-header">
                             <div className="surviv-inventory-title-row">
@@ -989,39 +1041,39 @@ export default function SurvivGame() {
                             </div>
 
                             {/* Right Column: Chest Inventory */}
-                            <div 
-                                className="surviv-inventory-panel chest-loot-panel"
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={(e) => {
-                                    e.preventDefault();
-                                    const itemData = e.dataTransfer.getData('text/plain');
-                                    if (itemData.startsWith('backpack-') && me.openedContainer?.id) {
-                                        const key = itemData.replace('backpack-', '');
-                                        if (key.startsWith('weapon-')) {
-                                            const slotIdx = parseInt(key.replace('weapon-', ''), 10);
-                                            const weaponType = me.inventory?.weapons?.[slotIdx];
-                                            if (weaponType && weaponType !== 'pistol') {
+                            {me.openedContainer && (
+                                <div 
+                                    className="surviv-inventory-panel chest-loot-panel"
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const itemData = e.dataTransfer.getData('text/plain');
+                                        if (itemData.startsWith('backpack-') && me.openedContainer?.id) {
+                                            const key = itemData.replace('backpack-', '');
+                                            if (key.startsWith('weapon-')) {
+                                                const slotIdx = parseInt(key.replace('weapon-', ''), 10);
+                                                const weaponType = me.inventory?.weapons?.[slotIdx];
+                                                if (weaponType && weaponType !== 'pistol') {
+                                                    putChestItemPendingRef.current = {
+                                                        chestId: me.openedContainer.id,
+                                                        itemKey: 'weapon',
+                                                        weaponType: weaponType
+                                                    };
+                                                }
+                                            } else {
                                                 putChestItemPendingRef.current = {
                                                     chestId: me.openedContainer.id,
-                                                    itemKey: 'weapon',
-                                                    weaponType: weaponType
+                                                    itemKey: key
                                                 };
                                             }
-                                        } else {
-                                            putChestItemPendingRef.current = {
-                                                chestId: me.openedContainer.id,
-                                                itemKey: key
-                                            };
                                         }
-                                    }
-                                }}
-                            >
-                                <h3 className="panel-title">
-                                    <svg className="panel-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 8H3M21 16H3M12 2v20M2 5h20v14H2z"/></svg>
-                                    {me.openedContainer ? `${me.openedContainer.tier?.toUpperCase() || 'COMMON'} CHEST` : 'CHEST DETAILS'}
-                                </h3>
+                                    }}
+                                >
+                                    <h3 className="panel-title">
+                                        <svg className="panel-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 8H3M21 16H3M12 2v20M2 5h20v14H2z"/></svg>
+                                        {me.openedContainer.tier?.toUpperCase() || 'COMMON'} CHEST
+                                    </h3>
 
-                                {me.openedContainer ? (
                                     <div className="chest-items-section">
                                         <div className="chest-items-hint">Drag items here to deposit, or click chest items to take them.</div>
                                         <div className="chest-items-grid">
@@ -1074,14 +1126,8 @@ export default function SurvivGame() {
                                             })}
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="chest-empty-state">
-                                        <svg className="chest-empty-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5"><path d="M21 8H3M21 16H3M12 2v20M2 5h20v14H2z"/></svg>
-                                        <p>No chest open</p>
-                                        <span>Walk up to a chest on the ground and click to open its contents side-by-side with your backpack.</span>
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer / Controls reminder */}
