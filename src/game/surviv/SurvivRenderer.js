@@ -1224,6 +1224,28 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawVignette(ctx, W, H) {
+        ctx.save();
+        const radius = Math.max(W, H) * 0.72;
+        const grad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
+        grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        grad.addColorStop(0.64, 'rgba(0, 0, 0, 0.08)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0.34)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        const hpPct = clamp((this.hud.hp || 0) / (this.hud.maxHp || 100), 0, 1);
+        if (hpPct > 0 && hpPct < 0.34) {
+            ctx.globalAlpha = clamp((0.34 - hpPct) / 0.34, 0, 1) * 0.28;
+            const danger = ctx.createRadialGradient(W / 2, H / 2, radius * 0.38, W / 2, H / 2, radius * 0.96);
+            danger.addColorStop(0, 'rgba(120, 0, 0, 0)');
+            danger.addColorStop(1, 'rgba(220, 32, 32, 0.72)');
+            ctx.fillStyle = danger;
+            ctx.fillRect(0, 0, W, H);
+        }
+        ctx.restore();
+    }
+
     drawLootToast(ctx, W, H) {
         if (!this.lootToast || this.lootToast.expiresAt < Date.now()) return;
         const items = this.lootToast.items || {};
