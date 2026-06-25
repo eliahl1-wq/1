@@ -1757,8 +1757,8 @@ export class SlitherRenderer {
         const glowMinQ = this.isMobile ? 0.88 : 0.75;
         const prNeeds = {
             glow: !holdActive && q >= glowMinQ,
-            boostOverlay: boosting && q >= 0.82,
-            trailGlow: boosting && q >= 0.78,
+            boostOverlay: false,
+            trailGlow: false,
         };
 
         const isRainbow = (snake.color === 'random');
@@ -1796,13 +1796,9 @@ export class SlitherRenderer {
             trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
             if (trail.length > 6) trail.length = 6;
 
-            // Spawn boost sparks from tail in world space
-            if (segs.length > 0 && this._frame % 3 === 0) {
+            // Spawn boost remains from tail in world space
+            if (segs.length > 0 && this._frame % 4 === 0) {
                 const tail = segs[segs.length - 1];
-                const angleBack = (snake.angle || 0) + Math.PI;
-                const scatter = 0.4;
-                const pAngle = angleBack + (Math.random() - 0.5) * scatter;
-                const pSpeed = (bodyRadiusWorld * 0.25) + Math.random() * (bodyRadiusWorld * 0.25);
                 
                 let pColor = cs;
                 if (cs === 'random') {
@@ -1813,11 +1809,11 @@ export class SlitherRenderer {
                 this.boostParticles.push({
                     x: tail.x,
                     y: tail.y,
-                    vx: Math.cos(pAngle) * pSpeed * 0.8,
-                    vy: Math.sin(pAngle) * pSpeed * 0.8,
+                    vx: 0,
+                    vy: 0,
                     color: pColor,
-                    size: bodyRadiusWorld * (0.16 + Math.random() * 0.16),
-                    maxLife: 25 + Math.round(Math.random() * 15),
+                    size: bodyRadiusWorld * (0.18 + Math.random() * 0.12),
+                    maxLife: 18 + Math.round(Math.random() * 8),
                     life: 0
                 });
             }
@@ -2176,17 +2172,17 @@ export class SlitherRenderer {
                 p.vx *= 0.94;
                 p.vy *= 0.94;
 
+                const lifeRatio = p.life / p.maxLife;
                 const screenPos = toScreen(p.x, p.y);
-                const r = p.size * zoom;
+                const r = p.size * (1 - lifeRatio) * zoom;
 
                 if (r > 0.3 && screenPos.x > -r && screenPos.y > -r && screenPos.x < W + r && screenPos.y < H + r) {
-                    const lifeRatio = p.life / p.maxLife;
-                    const alpha = (1 - lifeRatio) * 0.65;
+                    const alpha = (1 - lifeRatio) * 0.45;
 
-                    const grad = ctx.createRadialGradient(screenPos.x, screenPos.y, r * 0.1, screenPos.x, screenPos.y, r);
+                    const grad = ctx.createRadialGradient(screenPos.x, screenPos.y, r * 0.05, screenPos.x, screenPos.y, r);
                     grad.addColorStop(0, 'rgba(255, 255, 255, ' + alpha + ')');
-                    grad.addColorStop(0.2, colorToRgba(p.color, alpha));
-                    grad.addColorStop(0.7, colorToRgba(p.color, alpha * 0.25));
+                    grad.addColorStop(0.2, colorToRgba(p.color, alpha * 0.9));
+                    grad.addColorStop(0.65, colorToRgba(p.color, alpha * 0.18));
                     grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
                     ctx.fillStyle = grad;

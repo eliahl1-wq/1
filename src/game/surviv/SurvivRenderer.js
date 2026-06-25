@@ -205,7 +205,11 @@ export class SurvivRenderer {
 
     updateState(tick) {
         if (!tick) return;
-        this.players = tick.players || [];
+        const me = tick.you || (tick.players || []).find(p => p.isYou || p.id === this.myId);
+        const rawPlayers = tick.players || [];
+        this.players = me
+            ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
+            : rawPlayers;
         this.loot = tick.loot || [];
         this.bullets = tick.bullets || [];
         const nextObstacles = tick.obstacles || [];
@@ -216,7 +220,6 @@ export class SurvivRenderer {
         this.zone = tick.zone || null;
         this.minimap = tick.minimap || { players: [], food: [], obstacles: [] };
 
-        const me = tick.you || this.players.find(p => p.isYou);
         this.me = me || null;
         if (me?.lastLoot && me.lastLoot.id !== this.lastLootId) {
             this.lastLootId = me.lastLoot.id;
