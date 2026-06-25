@@ -941,7 +941,40 @@ export class SurvivRenderer {
 
         this.drawWeapon(ctx, p.weapon, r);
 
+        // Reload progress ring near weapon
+        if (p.reloading && p.reloadEndAt && p.reloadMs && p.reloadEndAt > Date.now()) {
+            const progress = clamp(1 - (p.reloadEndAt - Date.now()) / p.reloadMs, 0, 1);
+            if (progress > 0 && progress < 1) {
+                const ringX = r + 12;
+                const ringY = -12;
+                const ringRadius = 6;
+                const ringLineWidth = 2.2;
+                const startAngle = -Math.PI / 2;
+                const endAngle = startAngle + progress * Math.PI * 2;
+
+                ctx.save();
+                ctx.lineCap = 'round';
+                
+                // Track
+                ctx.beginPath();
+                ctx.arc(ringX, ringY, ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+                ctx.lineWidth = ringLineWidth;
+                ctx.stroke();
+
+                // Progress
+                ctx.beginPath();
+                ctx.arc(ringX, ringY, ringRadius, startAngle, endAngle);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = ringLineWidth;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
         ctx.restore();
+
 
         const hpPct = clamp((p.hp || 0) / (p.maxHp || 100), 0, 1);
         const barW = 36;
@@ -1128,7 +1161,8 @@ export class SurvivRenderer {
         ctx.fillStyle = '#785eff';
         ctx.font = '800 11px "Space Mono", monospace';
         ctx.textAlign = 'left';
-        ctx.fillText('SURVIVOR', pad + 12, pad + 17);
+        ctx.fillText('HEALTH', pad + 12, pad + 17);
+
         this.drawBar(ctx, pad + 12, pad + 26, panelW - 24, 12, hpPct, '#5fe08a', '#ef544f');
         if (armorPct > 0) {
             ctx.fillStyle = '#5c9cff';

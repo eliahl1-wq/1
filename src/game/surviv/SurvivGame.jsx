@@ -680,6 +680,12 @@ export default function SurvivGame() {
                                                     {isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`}
                                                 </span>
                                             )}
+                                            {isActive && isReloading && (
+                                                <div 
+                                                    className="hotbar-reload-sweep"
+                                                    style={{ animationDuration: `${me.reloadMs || 1500}ms` }}
+                                                />
+                                            )}
                                         </>
                                     ) : (
                                         <span className="hotbar-slot-name">-</span>

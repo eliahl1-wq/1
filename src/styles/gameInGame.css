@@ -1654,5 +1654,26 @@
     }
 }
 
+.hotbar-reload-sweep {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: rgba(20, 241, 149, 0.12); /* nice green degen progress */
+    border-radius: var(--r-sm);
+    animation-name: hotbarReloadFill;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+    pointer-events: none;
+    z-index: 1;
+}
+
+@keyframes hotbarReloadFill {
+    from { width: 0%; }
+    to { width: 100%; }
+}
+
+
 
 
