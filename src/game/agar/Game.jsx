@@ -736,17 +736,24 @@ export default function Game() {
                 };
 
                 // Rita celler
-                const cellsToDraw = users.flatMap(u => u.cells.map(c => ({
-                    ...c, 
-                    name: u.username, 
-                    isMe: u.id === myIdRef.current,
-                    isCashingOut: u.isCashingOut,
-                    dollarBalance: u.balance ?? u.dollarBalance ?? 0,
-                    color: u.color.fill || u.color, 
-                    borderColor: u.color.border || '#000',
-                    radius: (c.radius || 0) * viewZoom,
-                    ...worldToScreen(c.x, c.y),
-                })));
+                const cellsToDraw = users.flatMap(u => {
+                    const totalCellMass = (u.cells || []).reduce((sum, cell) => sum + (Number(cell.balance) || 0), 0);
+                    const totalDollarBalance = Number(u.balance ?? u.dollarBalance ?? 0) || 0;
+                    return (u.cells || []).map(c => {
+                        const massShare = totalCellMass > 0 ? (Number(c.balance) || 0) / totalCellMass : 0;
+                        return {
+                            ...c,
+                            name: u.username,
+                            isMe: u.id === myIdRef.current,
+                            isCashingOut: u.isCashingOut,
+                            dollarBalance: totalDollarBalance * massShare,
+                            color: u.color.fill || u.color,
+                            borderColor: u.color.border || '#000',
+                            radius: (c.radius || 0) * viewZoom,
+                            ...worldToScreen(c.x, c.y),
+                        };
+                    });
+                });
                 
                 renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph, IS_MOBILE);
                 renderUtils.drawHUD(global, graph);
