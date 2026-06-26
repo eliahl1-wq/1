@@ -855,6 +855,19 @@ export default function Game() {
         });
     };
 
+    useEffect(() => {
+        const onMouseMove = (e) => handleMouseMove(e);
+        const onTouchMove = (e) => handleTouch(e);
+        window.addEventListener('mousemove', onMouseMove, { passive: true });
+        window.addEventListener('touchstart', onTouchMove, { passive: true });
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('touchstart', onTouchMove);
+            window.removeEventListener('touchmove', onTouchMove);
+        };
+    }, [isSpectating, isDead, cashedAmount, tryDoubleTapEject]);
+
     const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
     const rewardInfo = gameData.current.rewardInfo;
