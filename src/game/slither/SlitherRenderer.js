@@ -1575,10 +1575,10 @@ export class SlitherRenderer {
     }
 
     /** Soft outer glow for additive body pass. */
-    _paintSnakeGlow(g, c, rPx, cs) {
+    _paintSnakeGlow(g, c, rPx, cs, bodySS = 1.6) {
         const col = parseColor(cs);
         const bright = shadeColor(col, 55);
-        const glowR = rPx * 2.2;
+        const glowR = rPx * 2.3 * bodySS; // Multiply by bodySS to compensate for scaling down in draw loop!
         const grad = g.createRadialGradient(c, c, rPx * 0.2, c, c, glowR);
         grad.addColorStop(0, rgb(bright, 0.52));
         grad.addColorStop(0.3, rgb(col, 0.35));
@@ -1618,9 +1618,9 @@ export class SlitherRenderer {
         }
 
         if (needs.glow && !pair.glow) {
-            const glowPad = Math.ceil(rPx * 1.3);
+            const glowPad = Math.ceil(rPx * 2.3 * bodySS); // Expand padding to match larger glowR
             pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 8, (g, sz) => {
-                this._paintSnakeGlow(g, sz / 2, rPx, cs);
+                this._paintSnakeGlow(g, sz / 2, rPx, cs, bodySS);
             });
         }
 
@@ -1778,9 +1778,8 @@ export class SlitherRenderer {
         const hy = bumps[0].y;
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
-        const glowMinQ = this.isMobile ? 0.78 : 0.65;
         const prNeeds = {
-            glow: q >= glowMinQ,
+            glow: true,
             boostOverlay: false,
             trailGlow: false,
         };

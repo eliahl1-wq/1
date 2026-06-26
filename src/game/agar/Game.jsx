@@ -301,21 +301,22 @@ export default function Game() {
             hasJoinedGameRef.current = false;
         }
 
-                const matchNickname = location.state?.nickname || user?.username || 'Guest';
-        const gameMode = localStorage.getItem('current_game_mode') || 'agar';
-        const isBR = gameMode.startsWith('br-') || !!location.state?.battleRoyale;
-        if (isBR) {
+        const matchNickname = location.state?.nickname || user?.username || 'Guest';
+        const storedMode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || 'agar';
+        const wantsBattleRoyale = storedMode === 'br-agar' || !!location.state?.battleRoyale;
+        const sessionMode = wantsBattleRoyale ? 'br-agar' : 'agar';
+        if (wantsBattleRoyale) {
             setIsBattleRoyale(true);
             global.battleRoyale = true;
         }
-        const entryFeeUsd = isBR
+        const entryFeeUsd = wantsBattleRoyale
             ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
             : normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
         joinParamsRef.current = {
             nickname: matchNickname,
             entryFeeUsd,
-            mode: isBR ? gameMode : (gameMode.replace(/^br-/, '') || 'agar'),
+            mode: sessionMode,
         };
 
         const socket = io(API_URL, {
@@ -335,14 +336,14 @@ export default function Game() {
             console.log('Connected to socket server');
             setIsConnected(true);
             if (!hasJoinedGameRef.current && !blockAutoJoinRef.current) {
-                if (isBR) {
+                if (wantsBattleRoyale) {
                     socket.emit('brRejoinMatch', { token });
                 } else {
                     const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
                     socket.emit('joinGame', {
                         username: matchNickname,
                         token,
-                        mode: gameMode,
+                        mode: sessionMode,
                         entryFeeUsd,
                         skinColor: preferredSkinAgar,
                     });
@@ -1149,4 +1150,6 @@ export default function Game() {
         </div>
     );
 }
+
+
 
