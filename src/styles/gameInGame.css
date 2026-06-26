@@ -1804,3 +1804,44 @@
         bottom: 122px !important;
     }
 }
+
+
+/* Surviv HUD correction: cashout owns the bottom edge. */
+.surviv-game-page .game-cashout-wrap {
+    bottom: 22px !important;
+}
+
+.surviv-game-page .surviv-hud-container {
+    bottom: 86px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 384px;
+}
+
+.surviv-game-page .surviv-weapons-hotbar {
+    width: 384px;
+}
+
+.surviv-game-page .surviv-hud-status-bars {
+    left: 18px;
+    bottom: 22px;
+    width: 250px;
+}
+
+@media (max-width: 768px) {
+    .surviv-game-page .game-cashout-wrap {
+        bottom: 18px !important;
+    }
+    .surviv-game-page .surviv-hud-container {
+        bottom: 84px;
+        width: 320px;
+    }
+    .surviv-game-page .surviv-weapons-hotbar {
+        width: 320px;
+    }
+    .surviv-game-page .surviv-hud-status-bars {
+        left: 10px;
+        bottom: 84px;
+        width: 172px;
+    }
+}

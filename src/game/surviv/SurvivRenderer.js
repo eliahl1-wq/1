@@ -81,6 +81,7 @@ export class SurvivRenderer {
         this.minimap = { players: [], food: [], obstacles: [] };
         this.houseFloors = [];
         this.roomZones = [];
+        this.doorways = [];
 
         this.surfaceObstacles = [];
         this.sortedWorldObstacles = [];
@@ -167,6 +168,7 @@ export class SurvivRenderer {
         this.minimap = { players: [], food: [], obstacles: [] };
         this.houseFloors = [];
         this.roomZones = [];
+        this.doorways = [];
         this.surfaceObstacles = [];
         this.sortedWorldObstacles = [];
         this.myId = null;
@@ -343,11 +345,12 @@ export class SurvivRenderer {
         const surfaceKinds = new Set(['road', 'houseFloor', 'field', 'water']);
         this.houseFloors = this.obstacles.filter(o => o.kind === 'houseFloor');
         this.roomZones = this.obstacles.filter(o => o.kind === 'roomZone');
+        this.doorways = this.obstacles.filter(o => o.kind === 'door');
         this.surfaceObstacles = [];
         const solid = [];
         for (const o of this.obstacles) {
             if (o.kind === 'roomZone') continue;
-            if (o.kind === 'furniture' || o.kind === 'interiorWall' || o.kind === 'wall') {
+            if (o.kind === 'furniture' || o.kind === 'interiorWall' || o.kind === 'wall' || o.kind === 'door') {
                 const house = o.houseId
                     ? this.houseFloors.find(h => h.id === o.houseId)
                     : this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
@@ -389,7 +392,10 @@ export class SurvivRenderer {
     }
 
     usesInteriorFog(house) {
-        return !!house && (house.variant === 'mansion' || house.variant === 'warehouse' || house.w >= 300 || house.h >= 260);
+        if (!house) return false;
+        const huge = house.w >= 430 || house.h >= 330;
+        const corridorHouse = this.roomZones.some(r => r.houseId === house.id && r.variant === 'hallway');
+        return huge && corridorHouse && (house.variant === 'mansion' || house.variant === 'warehouse');
     }
 
     roomVisibilityStrength(room, currentRoom, playerX, playerY) {
@@ -421,7 +427,7 @@ export class SurvivRenderer {
     shouldDrawObstacle(o, currentHouse, currentRoom) {
         if (o.kind === 'roomZone') return false;
         if (o.kind === 'houseFloor') return !!currentHouse && currentHouse.id === o.id;
-        if (o.kind === 'wall' || o.kind === 'interiorWall') {
+        if (o.kind === 'wall' || o.kind === 'interiorWall' || o.kind === 'door') {
             return !o._insideHouseId || (currentHouse && currentHouse.id === o._insideHouseId);
         }
         if (o.kind === 'furniture') {
@@ -685,6 +691,29 @@ export class SurvivRenderer {
                 ctx.lineTo(o.w / 2 - 8, iy);
                 ctx.stroke();
             }
+        } else if (kind === 'door') {
+            ctx.shadowBlur = 0;
+            const frame = o.variant === 'warehouse' ? '#2f3b40' : o.variant === 'mansion' ? '#4c3828' : '#543722';
+            ctx.fillStyle = 'rgba(8, 7, 5, 0.88)';
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
+            ctx.fill();
+            ctx.strokeStyle = frame;
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(-o.w / 2 + 3, o.h / 2 - 3);
+            ctx.lineTo(-o.w / 2 + 3, -o.h / 2 + 5);
+            ctx.lineTo(o.w / 2 - 3, -o.h / 2 + 5);
+            ctx.lineTo(o.w / 2 - 3, o.h / 2 - 3);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(238, 205, 138, 0.24)';
+            roundRect(ctx, -o.w / 2 + 10, o.h / 2 - 8, o.w - 20, 8, 3);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-o.w / 2 + 10, -o.h / 2 + 9);
+            ctx.lineTo(o.w / 2 - 10, -o.h / 2 + 9);
+            ctx.stroke();
         } else if (kind === 'wall' || kind === 'interiorWall') {
             const wallFill = o.variant === 'stone' ? '#80796b' : o.variant === 'warehouse' ? '#425159' : '#70583f';
             ctx.fillStyle = wallFill;
@@ -1253,20 +1282,30 @@ export class SurvivRenderer {
         ctx.lineTo(0, o.h / 2 + 20);
         ctx.stroke();
 
-        const doorW = Math.min(82, o.w * 0.28);
-        const doorY = o.h / 2 + 2;
-        ctx.fillStyle = 'rgba(12, 10, 8, 0.72)';
-        roundRect(ctx, -doorW / 2, doorY - 18, doorW, 28, 5);
-        ctx.fill();
-        ctx.fillStyle = 'rgba(240, 210, 145, 0.24)';
-        roundRect(ctx, -doorW / 2 + 8, doorY - 6, doorW - 16, 8, 3);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 238, 180, 0.32)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-doorW / 2 + 8, doorY - 18);
-        ctx.lineTo(doorW / 2 - 8, doorY - 18);
-        ctx.stroke();
+        const door = this.doorways.find(d => d.houseId === o.id);
+        if (door) {
+            const doorX = door.x - o.x;
+            const doorY = door.y - o.y;
+            const doorW = Math.max(door.w, 86);
+            const lipH = Math.max(28, door.h * 1.15);
+            ctx.fillStyle = 'rgba(12, 10, 8, 0.82)';
+            roundRect(ctx, doorX - doorW / 2, doorY - lipH / 2, doorW, lipH, 6);
+            ctx.fill();
+            ctx.fillStyle = palette.trim;
+            roundRect(ctx, doorX - doorW / 2 - 10, doorY - lipH / 2 - 5, 10, lipH + 7, 3);
+            ctx.fill();
+            roundRect(ctx, doorX + doorW / 2, doorY - lipH / 2 - 5, 10, lipH + 7, 3);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(236, 205, 140, 0.28)';
+            roundRect(ctx, doorX - doorW / 2 + 10, doorY + lipH / 2 - 9, doorW - 20, 8, 3);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 238, 180, 0.34)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(doorX - doorW / 2 + 11, doorY - lipH / 2 + 5);
+            ctx.lineTo(doorX + doorW / 2 - 11, doorY - lipH / 2 + 5);
+            ctx.stroke();
+        }
 
         ctx.strokeStyle = 'rgba(12, 10, 8, 0.42)';
         ctx.lineWidth = 2;

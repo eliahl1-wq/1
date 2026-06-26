@@ -178,7 +178,7 @@ function ModeCard({ mode, title, desc, badge, playing, onPlay }) {
                 <div className="gm-card-right">
                     {mode && (
                         <div className="gm-card-preview-wrap">
-                            <GamemodePreview mode={mode} className="gm-card-preview" />
+                            <GamemodePreview mode={mode} className="gm-card-preview" fit />
                         </div>
                     )}
                     {!isDisabled && (

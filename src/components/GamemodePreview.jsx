@@ -1,17 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import { drawGamemodePreview } from './gamemodePreviewDraw.js';
 
-const SLITHER_PREVIEW_IMAGES = {
+const PREVIEW_IMAGES = {
     slither: '/normal slither.png',
     'competitive-slither': '/arena slither.png',
     'br-slither': '/battle royale slither.png',
+    surviv: '/surviv normal.png',
 };
 
 const CANVAS_W = 480;
 const CANVAS_H = 480;
+const FIT_CANVAS_W = 640;
+const FIT_CANVAS_H = 480;
 
-export default function GamemodePreview({ mode, className = '' }) {
-    const imageSrc = SLITHER_PREVIEW_IMAGES[mode];
+export default function GamemodePreview({ mode, className = '', fit = false }) {
+    const imageSrc = PREVIEW_IMAGES[mode];
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -20,9 +23,11 @@ export default function GamemodePreview({ mode, className = '' }) {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
+        const previewW = fit ? FIT_CANVAS_W : CANVAS_W;
+        const previewH = fit ? FIT_CANVAS_H : CANVAS_H;
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.round(CANVAS_W * dpr);
-        canvas.height = Math.round(CANVAS_H * dpr);
+        canvas.width = Math.round(previewW * dpr);
+        canvas.height = Math.round(previewH * dpr);
         canvas.style.width = '';
         canvas.style.height = '';
 
@@ -30,8 +35,8 @@ export default function GamemodePreview({ mode, className = '' }) {
         if (!ctx) return;
 
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        drawGamemodePreview(ctx, CANVAS_W, CANVAS_H, mode, { fit: false });
-    }, [mode, imageSrc]);
+        drawGamemodePreview(ctx, previewW, previewH, mode, { fit });
+    }, [mode, imageSrc, fit]);
 
     if (imageSrc) {
         return (
@@ -49,8 +54,8 @@ export default function GamemodePreview({ mode, className = '' }) {
         <canvas
             ref={canvasRef}
             className={className}
-            width={CANVAS_W}
-            height={CANVAS_H}
+            width={fit ? FIT_CANVAS_W : CANVAS_W}
+            height={fit ? FIT_CANVAS_H : CANVAS_H}
             aria-hidden="true"
         />
     );
