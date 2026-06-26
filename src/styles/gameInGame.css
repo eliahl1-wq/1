@@ -1727,7 +1727,10 @@
 .surviv-game-page .chest-item-card,
 .surviv-game-page .hotbar-slot {
     background: rgba(20, 25, 18, 0.46);
-    border-color: rgba(22/* Disable standard hotbar container since we split health and loadout */
+    border-color: rgba(225, 204, 150, 0.1);
+}
+
+/* Disable standard hotbar container since we split health and loadout */
 .surviv-game-page .surviv-hud-container {
     display: none;
 }
@@ -1959,4 +1962,5 @@
         font-size: 0.5rem;
     }
 }
+
 
