@@ -82,19 +82,6 @@ function normalizeSnakeColor(color) {
     return toHex({ r: (rr + m) * 255, g: (gg + m) * 255, b: (bb + m) * 255 });
 }
 
-function colorToRgba(color, alpha) {
-    if (!color) return `rgba(20, 241, 149, ${alpha})`;
-    if (color.startsWith('hsl')) {
-        return color.replace(')', `, ${alpha})`).replace('hsl', 'hsla');
-    }
-    if (color.startsWith('#')) {
-        const r = parseInt(color.slice(1, 3), 16);
-        const g = parseInt(color.slice(3, 5), 16);
-        const b = parseInt(color.slice(5, 7), 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-    return `rgba(20, 241, 149, ${alpha})`;
-}
 
 /** Bucket colors so sprite cache stays small across many snakes. */
 function bucketSnakeColor(color) {
@@ -192,7 +179,6 @@ export class SlitherRenderer {
         this._smoothSeen = new Set();
         this._screenScratch = { x: 0, y: 0 };
         this._perfEma = 16.7;
-        this.boostParticles = [];
         this._quality = 1;
         this._rainbowStampPack = null;
         this._deathClusterBuf = [];
@@ -1411,6 +1397,29 @@ export class SlitherRenderer {
         return Math.atan2(prev.y - next.y, prev.x - next.x);
     }
 
+    _drawBoostWaves(ctx, bumps, count, radius, pulse = 1) {
+        if (count < 6 || radius <= 0) return;
+        const stride = this.isMobile ? 8 : 6;
+        const phase = Math.floor((this._frame * 0.42) % stride);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = '#ffffff';
+        for (let i = count - 3 - phase; i >= 2; i -= stride) {
+            const p = bumps[i];
+            if (!p || p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
+            const tailFade = 0.55 + 0.45 * (1 - i / Math.max(1, count - 1));
+            const shimmer = 0.75 + 0.25 * Math.sin(this._frame * 0.16 + i * 0.9);
+            ctx.globalAlpha = 0.07 * pulse * tailFade * shimmer;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(this._bumpTangent(bumps, i) + Math.PI / 2);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, radius * 0.86, radius * 0.11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.restore();
+    }
     _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
         const segmentCanvas = getSnakeSegmentCanvas(rPx, cs);
         g.save();
@@ -1757,7 +1766,7 @@ export class SlitherRenderer {
         const glowMinQ = this.isMobile ? 0.88 : 0.75;
         const prNeeds = {
             glow: !holdActive && q >= glowMinQ,
-            boostOverlay: false,
+            boostOverlay: boosting && q >= 0.82,
             trailGlow: false,
         };
 
@@ -1795,28 +1804,6 @@ export class SlitherRenderer {
         if (boosting) {
             trail.unshift({ x: headBump.x, y: headBump.y, a: angle });
             if (trail.length > 6) trail.length = 6;
-
-            // Spawn boost remains from tail in world space
-            if (segs.length > 0 && this._frame % 4 === 0) {
-                const tail = segs[segs.length - 1];
-                
-                let pColor = cs;
-                if (cs === 'random') {
-                    const hue = (this._frame * 1.8 + Math.random() * 360) % 360;
-                    pColor = `hsl(${hue}, 100%, 55%)`;
-                }
-
-                this.boostParticles.push({
-                    x: tail.x,
-                    y: tail.y,
-                    vx: 0,
-                    vy: 0,
-                    color: pColor,
-                    size: bodyRadiusWorld * (0.18 + Math.random() * 0.12),
-                    maxLife: 18 + Math.round(Math.random() * 8),
-                    life: 0
-                });
-            }
         } else if (trail.length > 0) {
             trail.length = 0;
         }
@@ -1879,7 +1866,7 @@ export class SlitherRenderer {
         if (prNeeds.glow && glow) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = boosting ? 0.22 * pulse : 0.12;
+            ctx.globalAlpha = boosting ? 0.34 * pulse : 0.12;
             const glowStride = boosting ? (this.isMobile ? 6 : 4) : (this.isMobile ? 7 : 5);
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
@@ -1914,10 +1901,14 @@ export class SlitherRenderer {
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
                 const headProx = 1 - along;
-                ctx.globalAlpha = (0.22 + headProx * 0.22) * pulse;
+                ctx.globalAlpha = (0.11 + headProx * 0.12) * pulse;
                 ctx.drawImage(boostOverlay, (p.x - bhalf) | 0, (p.y - bhalf) | 0, bdw, bdh);
             }
             ctx.restore();
+        }
+
+        if (boosting) {
+            this._drawBoostWaves(ctx, bumps, bumpCount, bodyRadius, pulse);
         }
 
         // Head and Eyes
@@ -2153,47 +2144,6 @@ export class SlitherRenderer {
         this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
         const __t3 = performance.now();
         this._drawFood(ctx, this._visibleFoodBuf, toScreen, W, H, zoom, dt);
-
-        // Update and draw client-side boost particles
-        if (this.boostParticles && this.boostParticles.length > 0) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            for (let i = this.boostParticles.length - 1; i >= 0; i--) {
-                const p = this.boostParticles[i];
-                p.life++;
-                if (p.life >= p.maxLife) {
-                    this.boostParticles.splice(i, 1);
-                    continue;
-                }
-
-                // Apply physics: simple deceleration
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vx *= 0.94;
-                p.vy *= 0.94;
-
-                const lifeRatio = p.life / p.maxLife;
-                const screenPos = toScreen(p.x, p.y);
-                const r = p.size * (1 - lifeRatio) * zoom;
-
-                if (r > 0.3 && screenPos.x > -r && screenPos.y > -r && screenPos.x < W + r && screenPos.y < H + r) {
-                    const alpha = (1 - lifeRatio) * 0.45;
-
-                    const grad = ctx.createRadialGradient(screenPos.x, screenPos.y, r * 0.05, screenPos.x, screenPos.y, r);
-                    grad.addColorStop(0, 'rgba(255, 255, 255, ' + alpha + ')');
-                    grad.addColorStop(0.2, colorToRgba(p.color, alpha * 0.9));
-                    grad.addColorStop(0.65, colorToRgba(p.color, alpha * 0.18));
-                    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-                    ctx.fillStyle = grad;
-                    ctx.beginPath();
-                    ctx.arc(screenPos.x, screenPos.y, r, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-            ctx.restore();
-        }
-
         const __t4 = performance.now();
 
         const sorted = this._sortedRenderSnakes;
