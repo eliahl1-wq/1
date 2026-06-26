@@ -43,20 +43,6 @@ function foodEatenByPlayer(f, myId, users) {
 }
 
 /** Drop stale cached pellets; keep edge blobs briefly through spatial-filter gaps. */
-function getAgarPlayerPoint(player) {
-    if (!player) return null;
-    if (Number.isFinite(player.x) && Number.isFinite(player.y)) return { x: player.x, y: player.y };
-    const cell = player.cells?.[0];
-    if (cell && Number.isFinite(cell.x) && Number.isFinite(cell.y)) return { x: cell.x, y: cell.y };
-    return null;
-}
-
-function ensureLocalAgarUser(users, player, myId) {
-    const list = Array.isArray(users) ? users : [];
-    if (!player?.cells?.length || !myId || list.some(u => u.id === myId)) return list;
-    return [{ ...player, id: myId }, ...list];
-}
-
 function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
     const margin = 280;
     const halfW = screenW / 2 + margin;
@@ -108,7 +94,6 @@ export default function Game() {
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const sessionStartAtRef = useRef(null);
     const spectatorCamRef = useRef({ x: 3000, y: 3000 });
-    const lastPointerRef = useRef(null);
     
     const WORLD_SIZE = 6000;
 
@@ -373,12 +358,6 @@ export default function Game() {
 
         socket.on('welcome', (playerSettings, gameSizes) => {
             clearPendingResult('agar');
-            const serverMode = gameSizes?.mode || 'agar';
-            if (!wantsBattleRoyale && serverMode !== 'agar') {
-                alert(`You still have an active ${serverMode === 'slither' ? 'Slither' : serverMode} game. Finish or cash out before starting Agar.`);
-                navigate('/pre-game', { state: { selectedMode: serverMode === 'slither' ? 'slither' : 'agar' } });
-                return;
-            }
             const isRejoin = gameSizes?.rejoin === true;
             console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
             foodCacheRef.current.clear(); // Prevent flickering from old food cache
@@ -413,8 +392,8 @@ export default function Game() {
                 const { width, height } = getGameScreenSize();
                 const viewZoom = getMobileViewZoom();
                 socketRef.current.emit('0', {
-                    x: 220,
-                    y: 0,
+                    x: playerSettings.x ?? playerSettings.cells?.[0]?.x ?? 0,
+                    y: playerSettings.y ?? playerSettings.cells?.[0]?.y ?? 0,
                     screenWidth: width / viewZoom,
                     screenHeight: height / viewZoom,
                 });
@@ -461,7 +440,7 @@ export default function Game() {
             }
             gameData.current = {
                 player: playerData,
-                users: ensureLocalAgarUser(userData, playerData, myIdRef.current),
+                users: userData,
                 food: Array.from(foodMap.values()),
                 ejected: massList,
                 viruses: virusList,
@@ -614,9 +593,6 @@ export default function Game() {
                 navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'agar' } });
             } else if (typeof msg === 'string' && msg.includes('Account')) {
                 alert(msg);
-            } else if (typeof msg === 'string') {
-                alert(msg);
-                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'agar' } });
             }
         });
 
@@ -681,25 +657,23 @@ export default function Game() {
         const graph = canvas.getContext('2d');
         
         const gameLoop = () => {
-            const { player, viruses, ejected, zoneSize } = gameData.current;
-            const users = ensureLocalAgarUser(gameData.current.users, player, myIdRef.current);
+            const { player, users, viruses, ejected, zoneSize } = gameData.current;
             const { width, height } = getGameScreenSize();
             const dpr = canvasDprRef.current;
             graph.setTransform(dpr, 0, 0, dpr, 0, 0);
             graph.imageSmoothingEnabled = true;
             graph.imageSmoothingQuality = IS_MOBILE ? 'high' : 'medium';
             const screen = { width, height };
-            const playerPoint = getAgarPlayerPoint(player);
-            const hasPlayer = !!playerPoint;
+            const hasPlayer = player && player.x !== undefined;
             if (hasPlayer && !isSpectating) {
-                spectatorCamRef.current = { x: playerPoint.x, y: playerPoint.y };
+                spectatorCamRef.current = { x: player.x, y: player.y };
             }
             const camX = isSpectating
                 ? specCamRef.current.x
-                : (hasPlayer ? playerPoint.x : spectatorCamRef.current.x);
+                : (hasPlayer ? player.x : spectatorCamRef.current.x);
             const camY = isSpectating
                 ? specCamRef.current.y
-                : (hasPlayer ? playerPoint.y : spectatorCamRef.current.y);
+                : (hasPlayer ? player.y : spectatorCamRef.current.y);
             const viewZoom = baseViewZoom * (isSpectating ? specCamRef.current.zoom : 1);
             const canRenderWorld = isConnected && (!isDead || isSpectating) && (hasPlayer || cashedAmount !== null || isSpectating);
             
@@ -829,57 +803,32 @@ export default function Game() {
         () => socketRef.current?.emit('1'),
     );
 
-    const emitAgarPointerInput = useCallback((clientX, clientY) => {
+    const handleMouseMove = (e) => {
         if (isSpectating || isDead || cashedAmount !== null) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(clientX, clientY, canvas);
-        lastPointerRef.current = { clientX, clientY };
-        socketRef.current?.emit('0', { x, y, screenWidth, screenHeight });
-    }, [isSpectating, isDead, cashedAmount]);
-
-    const handleMouseMove = (e) => {
-        emitAgarPointerInput(e.clientX, e.clientY);
+        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
+        socketRef.current?.emit('0', {
+            x, y,
+            screenWidth,
+            screenHeight,
+        });
     };
 
     const handleTouch = (e) => {
+        if (isSpectating || isDead || cashedAmount !== null) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
         const t = e.touches?.[0];
         if (!t) return;
         tryDoubleTapEject(t.clientX, t.clientY);
-        emitAgarPointerInput(t.clientX, t.clientY);
+        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(t.clientX, t.clientY, canvas);
+        socketRef.current?.emit('0', {
+            x, y,
+            screenWidth,
+            screenHeight,
+        });
     };
-
-    useEffect(() => {
-        const onMouseMove = (e) => emitAgarPointerInput(e.clientX, e.clientY);
-        const onTouchMove = (e) => {
-            const t = e.touches?.[0];
-            if (t) emitAgarPointerInput(t.clientX, t.clientY);
-        };
-        window.addEventListener('mousemove', onMouseMove, { passive: true });
-        window.addEventListener('touchstart', onTouchMove, { passive: true });
-        window.addEventListener('touchmove', onTouchMove, { passive: true });
-        return () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('touchstart', onTouchMove);
-            window.removeEventListener('touchmove', onTouchMove);
-        };
-    }, [emitAgarPointerInput]);
-
-    useEffect(() => {
-        if (!isConnected || isSpectating || isDead || cashedAmount !== null) return undefined;
-        const send = () => {
-            const p = lastPointerRef.current;
-            if (p) {
-                emitAgarPointerInput(p.clientX, p.clientY);
-                return;
-            }
-            const { width, height } = getGameScreenSize();
-            emitAgarPointerInput(width / 2 + 220, height / 2);
-        };
-        send();
-        const id = setInterval(send, 100);
-        return () => clearInterval(id);
-    }, [isConnected, isSpectating, isDead, cashedAmount, emitAgarPointerInput]);
 
     const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
