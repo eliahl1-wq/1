@@ -35,6 +35,87 @@ const WEAPON_LABELS = {
     lmg: 'M249 LMG',
 };
 
+function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
+    switch (weaponId) {
+        case 'pistol':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M17 8H6c-.6 0-1 .4-1 1v2c0 .6.4 1 1 1h4l1 1.5v.5l2.5 5.5c.2.4.6.5 1 .5h1.5c.5 0 .8-.4.7-.9l-2.2-5.1H17c.6 0 1-.4 1-1V9c0-.6-.4-1-1-1Z" />
+                    <path d="M11 12c0 .8.7 1.5 1.5 1.5" />
+                </svg>
+            );
+        case 'revolver':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M19 8H13V7.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5V8H5c-.6 0-1 .4-1 1v1.5c0 .6.4 1 1 1h8v1h-3l2 6.5c.1.4.5.5.9.5h1.7c.5 0 .8-.4.7-.9l-1.8-5.1H19c.6 0 1-.4 1-1V9c0-.6-.4-1-1-1Z" />
+                    <rect x="13" y="8" width="4.5" height="3" rx="0.5" fill="none" />
+                    <circle cx="15.25" cy="9.5" r="0.75" fill={strokeColor} />
+                </svg>
+            );
+        case 'smg':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M21 8h-4.5L15 7.5c-.3-.3-.8-.5-1.2-.5H5c-.6 0-1 .4-1 1v2.5c0 .6.4 1 1 1h8.5l.5.5v3.5c0 .6.4 1 1 1h1.5c.6 0 1-.4 1-1v-4H21c.6 0 1-.4 1-1V9c0-.6-.4-1-1-1Z" />
+                    <path d="M9.5 11l-.5 4.5c0 .3-.3.5-.6.5H7.2c-.3 0-.5-.2-.5-.5l-.7-4.5" />
+                    <path d="M17.5 11l1.5 5.5c.1.4.5.5.9.5h1.1c.5 0 .8-.4.7-.9l-2.2-5.1" />
+                    <path d="M22 9h-2v2h2V9Z" />
+                </svg>
+            );
+        case 'shotgun':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M2 9.5h15c.3 0 .5-.2.5-.5v-1c0-.3-.2-.5-.5-.5H2v2Z" />
+                    <path d="M17 8h3.5a1.5 1.5 0 0 1 1.5 1.5v2c0 .6-.4 1-1 1h-2l-3 4.5c-.2.3-.5.5-.9.5h-1.6c-.5 0-.8-.4-.7-.9l1.2-4.1h-4v-1" />
+                    <rect x="7" y="10" width="4.5" height="1.5" rx="0.3" fill="none" />
+                </svg>
+            );
+        case 'assault':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M2 9h16V8c0-.6-.4-1-1-1H3c-.6 0-1 .4-1 1v1Z" />
+                    <path d="M18 9h3a1.5 1.5 0 0 1 1.5 1.5v2c0 .6-.4 1-1 1h-1.5L18 17c-.2.3-.5.5-.9.5h-1.7c-.5 0-.8-.4-.7-.9l1.3-4.1h-5l-.5 4.5c0 .3-.3.5-.6.5H9.2c-.3 0-.5-.2-.5-.5l-.7-4.5H4v-1.5h14V9Z" />
+                    <rect x="9" y="5.5" width="5.5" height="1.5" rx="0.3" />
+                    <path d="M10.5 7v1M13 7v1" />
+                </svg>
+            );
+        case 'dmr':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M1 9h18V8c0-.6-.4-1-1-1H2c-.6 0-1 .4-1 1v1Z" />
+                    <path d="M19 9h2.5a1.5 1.5 0 0 1 1.5 1.5v2.5c0 .6-.4 1-1 1h-2l-2.2 4c-.2.3-.5.5-.9.5h-1.4c-.5 0-.8-.4-.7-.9l1.2-3.6h-5.5l-.8 4.5c0 .3-.3.5-.6.5H11c-.4 0-.6-.3-.5-.7l.8-4.3H4v-1.5h15V9Z" />
+                    <rect x="8.5" y="4.5" width="7" height="2" rx="0.4" />
+                    <path d="M10 6.5v1.5M14 6.5v1.5M1.5 9v1" />
+                </svg>
+            );
+        case 'sniper':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M1 9.5h20V9c0-.6-.4-1-1-1H2c-.6 0-1 .4-1 1v.5Z" />
+                    <path d="M21 9h1.5v2H21V9Z" />
+                    <path d="M21 10.5h.5a1 1 0 0 1 1 1v2c0 .6-.4 1-1 1h-1.5L18 18.5c-.2.3-.6.5-1 .5h-1.5c-.5 0-.8-.4-.7-.9l1.2-4.1H10.5l-1.5 4.5c0 .3-.3.5-.6.5H7.2c-.4 0-.6-.3-.5-.7l1.3-4.3H3.5v-1h17.5v.5Z" />
+                    <rect x="8" y="4.5" width="8.5" height="2.2" rx="0.4" />
+                    <path d="M9.5 6.7v1.8M15 6.7v1.8" />
+                    <path d="M4 11.5L2 16M5 11.5l2 16" />
+                </svg>
+            );
+        case 'lmg':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M1 9.5h18V8c0-.6-.4-1-1-1H2c-.6 0-1 .4-1 1v1.5Z" />
+                    <path d="M19 9.5h2.5a1.5 1.5 0 0 1 1.5 1.5v2.5c0 .6-.4 1-1 1h-1.5l-2.5 4.5c-.2.3-.5.5-.9.5h-2c-.5 0-.8-.4-.7-.9l1.3-4.1H13v3.5c0 .6-.4 1-1 1h-2c-.6 0-1-.4-1-1V12.5H4v-1.5h15v-1.5Z" />
+                    <path d="M5.5 8V6.5h7V8" />
+                    <path d="M3.5 11L2 16.5M4.5 11l1.5 5.5" />
+                </svg>
+            );
+        default:
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M20 4L4 20M14 4h6v6M8 20H4v-4" />
+                </svg>
+            );
+    }
+}
+
 export default function SurvivGame() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -646,79 +727,81 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {/* Unified Bottom HUD Container */}
+            {/* HP and Armor Progress Bars */}
             {gameReady && me && !showResultModal && (
-                <div className="surviv-hud-container">
-                    {/* HP and Armor Progress Bars */}
-                    <div className="surviv-hud-status-bars">
-                        <div className="hud-bar-wrapper health">
-                            <div className="hud-bar-header">
-                                <span className="hud-bar-title-row">
-                                    <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
-                                    HEALTH
-                                </span>
-                                <span className="hud-bar-value">{Math.round(me.hp || 0)} / {Math.round(me.maxHp || 100)}</span>
-                            </div>
-                            <div className="hud-bar-track">
-                                <div className="hud-bar-fill health-fill" style={{ width: `${Math.max(0, Math.min(1, (me.hp || 0) / (me.maxHp || 100))) * 100}%` }} />
-                            </div>
+                <div className="surviv-hud-status-bars">
+                    <div className="hud-bar-wrapper health">
+                        <div className="hud-bar-header">
+                            <span className="hud-bar-title-row">
+                                <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                                HEALTH
+                            </span>
+                            <span className="hud-bar-value">{Math.round(me.hp || 0)} / {Math.round(me.maxHp || 100)}</span>
                         </div>
-
-                        <div className="hud-bar-wrapper armor">
-                            <div className="hud-bar-header">
-                                <span className="hud-bar-title-row">
-                                    <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                    ARMOR
-                                </span>
-                                <span className="hud-bar-value">{Math.round(me.armor || 0)}%</span>
-                            </div>
-                            <div className="hud-bar-track">
-                                <div className="hud-bar-fill armor-fill" style={{ width: `${Math.max(0, Math.min(1, (me.armor || 0) / 100)) * 100}%` }} />
-                            </div>
+                        <div className="hud-bar-track">
+                            <div className="hud-bar-fill health-fill" style={{ width: `${Math.max(0, Math.min(1, (me.hp || 0) / (me.maxHp || 100))) * 100}%` }} />
                         </div>
                     </div>
 
-                    {/* Weapons Hotbar */}
-                    <div className="surviv-weapons-hotbar">
-                        {[0, 1, 2, 3].map((slotIdx) => {
-                            const weaponId = me.inventory?.weapons?.[slotIdx];
-                            const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
-                            const isActive = weaponId && weaponId === me.weapon;
-                            const isReloading = isActive && me.reloading;
-                            
-                            return (
-                                <div 
-                                    key={`hotbar-slot-${slotIdx}`}
-                                    className={`hotbar-slot ${isActive ? 'active-slot' : ''} ${weaponId ? 'has-item' : 'empty-slot'}`}
-                                    onClick={() => {
-                                        if (weaponId) {
-                                            equipSlotPendingRef.current = slotIdx;
-                                        }
-                                    }}
-                                >
-                                    <span className="hotbar-slot-key">{slotIdx + 1}</span>
-                                    {weaponId ? (
-                                        <>
-                                            <span className="hotbar-slot-name">{weaponLabel}</span>
-                                            {isActive && (
-                                                <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
-                                                    {isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`}
-                                                </span>
-                                            )}
-                                            {isActive && isReloading && (
-                                                <div 
-                                                    className="hotbar-reload-sweep"
-                                                    style={{ animationDuration: `${me.reloadMs || 1500}ms` }}
-                                                />
-                                            )}
-                                        </>
-                                    ) : (
-                                        <span className="hotbar-slot-name">-</span>
-                                    )}
-                                </div>
-                            );
-                        })}
+                    <div className="hud-bar-wrapper armor">
+                        <div className="hud-bar-header">
+                            <span className="hud-bar-title-row">
+                                <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                ARMOR
+                            </span>
+                            <span className="hud-bar-value">{Math.round(me.armor || 0)}%</span>
+                        </div>
+                        <div className="hud-bar-track">
+                            <div className="hud-bar-fill armor-fill" style={{ width: `${Math.max(0, Math.min(1, (me.armor || 0) / 100)) * 100}%` }} />
+                        </div>
                     </div>
+                </div>
+            )}
+
+            {/* Weapons Vertical Hotbar */}
+            {gameReady && me && !showResultModal && (
+                <div className="surviv-weapons-hotbar">
+                    {[0, 1, 2, 3].map((slotIdx) => {
+                        const weaponId = me.inventory?.weapons?.[slotIdx];
+                        const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
+                        const isActive = weaponId && weaponId === me.weapon;
+                        const isReloading = isActive && me.reloading;
+                        const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
+                        const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
+                        
+                        return (
+                            <div 
+                                key={`hotbar-slot-${slotIdx}`}
+                                className={`hotbar-slot ${isActive ? 'active-slot' : ''} ${weaponId ? 'has-item' : 'empty-slot'} ${borderRarityClass}`}
+                                onClick={() => {
+                                    if (weaponId) {
+                                        equipSlotPendingRef.current = slotIdx;
+                                    }
+                                }}
+                            >
+                                <span className="hotbar-slot-key">{slotIdx + 1}</span>
+                                {weaponId ? (
+                                    <>
+                                        <div className="hotbar-weapon-icon-wrap">
+                                            {renderWeaponIcon(weaponId, isActive ? '#14F195' : 'rgba(255,255,255,0.72)', 32)}
+                                        </div>
+                                        <span className="hotbar-slot-name-compact">{weaponLabel}</span>
+                                        <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
+                                            {isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`}
+                                        </span>
+                                        {isActive && isReloading && (
+                                            <div 
+                                                className="hotbar-reload-sweep"
+                                                style={{ animationDuration: `${me.reloadMs || 1500}ms` }}
+                                            />
+                                        )}
+                                    </>
+                                ) : (
+                                    <span className="hotbar-slot-empty-label">-</span>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
@@ -831,36 +914,39 @@ export default function SurvivGame() {
                                                 >
                                                     <div className="slot-number">{slotIdx + 1}</div>
                                                     {weaponId ? (
-                                                        <div className="weapon-card-content">
-                                                            <div className="weapon-card-details">
-                                                                <span className="weapon-name">{weaponLabel}</span>
-                                                                <span className={`weapon-rarity-badge ${weaponRarity}`}>{weaponRarity.toUpperCase()}</span>
+                                                        <div className="weapon-card-content-flex" style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
+                                                            <div className="weapon-card-icon-wrap" style={{ flexShrink: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+                                                                {renderWeaponIcon(weaponId, isActive ? '#14F195' : 'rgba(255,255,255,0.7)', 28)}
                                                             </div>
-                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', marginTop: '2px' }}>
-                                                                {isActive && <span className="equipped-badge" style={{ fontSize: '0.52rem' }}>EQUIPPED</span>}
-                                                                {weaponId !== 'pistol' && (
-                                                                    <button 
-                                                                        className="slot-drop-btn" 
-                                                                        style={{
-                                                                            background: 'rgba(255, 59, 48, 0.16)',
-                                                                            border: '1px solid rgba(255, 59, 48, 0.3)',
-                                                                            borderRadius: '3px',
-                                                                            color: '#ff6b6b',
-                                                                            fontSize: '0.52rem',
-                                                                            padding: '1px 4px',
-                                                                            cursor: 'pointer',
-                                                                            fontWeight: 800,
-                                                                            marginLeft: 'auto'
-                                                                        }}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            dropItemPendingRef.current = { itemKey: 'weapon', slotIdx };
-                                                                        }}
-                                                                    >
-                                                                        DROP
-                                                                    </button>
-                                                                )}
+                                                            <div className="weapon-card-details" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+                                                                <span className="weapon-name" style={{ fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{weaponLabel}</span>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                                                    <span className={`weapon-rarity-badge ${weaponRarity}`}>{weaponRarity.toUpperCase()}</span>
+                                                                    {isActive && <span className="equipped-badge" style={{ fontSize: '0.52rem', color: '#14F195', fontWeight: 900 }}>EQUIPPED</span>}
+                                                                </div>
                                                             </div>
+                                                            {weaponId !== 'pistol' && (
+                                                                <button 
+                                                                    className="slot-drop-btn" 
+                                                                    style={{
+                                                                        background: 'rgba(255, 59, 48, 0.16)',
+                                                                        border: '1px solid rgba(255, 59, 48, 0.3)',
+                                                                        borderRadius: '3px',
+                                                                        color: '#ff6b6b',
+                                                                        fontSize: '0.52rem',
+                                                                        padding: '2px 5px',
+                                                                        cursor: 'pointer',
+                                                                        fontWeight: 800,
+                                                                        alignSelf: 'center',
+                                                                    }}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        dropItemPendingRef.current = { itemKey: 'weapon', slotIdx };
+                                                                    }}
+                                                                >
+                                                                    DROP
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <span className="empty-slot-label">EMPTY SLOT</span>
@@ -1098,7 +1184,7 @@ export default function SurvivGame() {
 
                                                 if (item.kind === 'weapon') {
                                                     strokeColor = '#f2774f';
-                                                    itemIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2"><path d="M20 4L4 20M14 4h6v6M8 20H4v-4"/></svg>;
+                                                    itemIcon = renderWeaponIcon(item.weaponType || 'pistol', strokeColor, 24);
                                                 } else if (item.kind === 'money') {
                                                     strokeColor = '#ffd45a';
                                                     itemIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 8H10.5a2.5 2.5 0 0 0 0 5H13.5a2.5 2.5 0 0 1 0 5H9"/></svg>;
