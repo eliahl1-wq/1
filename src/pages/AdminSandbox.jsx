@@ -10,8 +10,8 @@ import * as renderUtils from '../game/agar/render.js';
 import { useSpectatorCamera } from '../hooks/useSpectatorCamera';
 import { getOrCreatePresenceId } from '../utils/sitePresence';
 import '../styles/ui.css';
+import { API_URL } from '../utils/apiBase';
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
 /** Same as competitive Slither arena (SLITHER.worldHalf × 0.3). */
 const SANDBOX_SLITHER_HALF = 900;
 const AGAR_WORLD_SIZE = 6000;
@@ -992,3 +992,4 @@ export default function AdminSandbox() {
         </div>
     );
 }
+

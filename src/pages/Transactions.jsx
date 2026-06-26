@@ -6,6 +6,7 @@ import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
+import { API_URL } from '../utils/apiBase';
 
 const TYPE_COLOR = {
     deposit:  'var(--green)',
@@ -30,7 +31,7 @@ export default function Transactions() {
         const fetch_ = async () => {
             setLoading(true);
             try {
-                const res  = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/transactions?filter=external`, {
+                const res  = await fetch(`${API_URL}/api/transactions?filter=external`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (!res.ok) throw new Error();
@@ -281,3 +282,4 @@ export default function Transactions() {
         </div>
     );
 }
+

@@ -4,6 +4,7 @@ import Background from '../components/Background';
 import { identifyMixpanelUser, trackMixpanelEvent } from '../utils/mixpanel';
 import { setPageSeo, SEO } from '../utils/seo';
 import '../styles/ui.css';
+import { API_URL } from '../utils/apiBase';
 
 export default function RegisterPage() {
     const [email, setEmail]       = useState('');
@@ -22,7 +23,7 @@ export default function RegisterPage() {
         setMessage('');
         setIsLoading(true);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
+            const res = await fetch(`${API_URL}/api/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminders': 'true' },
                 body: JSON.stringify({ email, username, password }),
@@ -48,7 +49,7 @@ export default function RegisterPage() {
     };
 
     const handleGoogleLogin = () => {
-        window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`;
+        window.location.href = `${API_URL}/api/auth/google`;
     };
 
     return (

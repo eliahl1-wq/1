@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import '../styles/ui.css';
+import { API_URL } from '../utils/apiBase';
 
-const API_BASE = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
+const API_BASE = API_URL;
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
@@ -1468,3 +1469,4 @@ export default function AdminDashboard() {
         </div>
     );
 }
+

@@ -6,6 +6,7 @@ import AppTopbar from '../components/AppTopbar';
 import CustomDropdown from '../components/CustomDropdown';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
+import { API_URL } from '../utils/apiBase';
 
 const SolLogo = ({ size = 13, style }) => (
     <img
@@ -65,7 +66,7 @@ export default function Profile() {
         setPageSeo(SEO.profile);
         const fetchLogs = async () => {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/transactions`, {
+                const res = await fetch(`${API_URL}/api/transactions`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const data = await res.json();
@@ -169,7 +170,7 @@ export default function Profile() {
         setIsUpdatingUsername(true);
         setUsernameMsg('');
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
+            const res = await fetch(`${API_URL}/api/update-profile`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ username: trimmed }),
@@ -196,7 +197,7 @@ export default function Profile() {
         setIsUpdating(true);
         setUpdateMsg('');
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/update-profile`, {
+            const res = await fetch(`${API_URL}/api/update-profile`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ walletAddress: walletInput })

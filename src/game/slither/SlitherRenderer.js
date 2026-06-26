@@ -1410,23 +1410,25 @@ export class SlitherRenderer {
             
             const tailFade = 1 - (i / (count - 1));
             const shimmer = 0.8 + 0.2 * Math.sin(this._frame * 0.2 + i * 0.5);
-            ctx.globalAlpha = 0.38 * pulse * tailFade * shimmer;
+            ctx.globalAlpha = 0.48 * pulse * tailFade * shimmer;
             
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(this._bumpTangent(bumps, i) + Math.PI / 2);
             
-            const h = radius * 0.3; // wave half-thickness along body
-            const w = radius * 1.02; // wave half-width across body
+            const w = radius * 1.35; // wave half-width across body (overflows body for wrap-around glow)
+            const h = radius * 0.85; // wave half-thickness along body (thick and soft)
+            ctx.scale(w, h);
             
-            const grad = ctx.createLinearGradient(0, -h, 0, h);
-            grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-            grad.addColorStop(0.5, 'rgba(255, 255, 255, 1)');
+            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+            grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.55)');
+            grad.addColorStop(0.7, 'rgba(255, 255, 255, 0.15)');
             grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
             ctx.fillStyle = grad;
             
             ctx.beginPath();
-            ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+            ctx.arc(0, 0, 1, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         }
@@ -1575,12 +1577,12 @@ export class SlitherRenderer {
     /** Soft outer glow for additive body pass. */
     _paintSnakeGlow(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const bright = shadeColor(col, 50);
-        const glowR = rPx * 1.9;
-        const grad = g.createRadialGradient(c, c, rPx * 0.3, c, c, glowR);
-        grad.addColorStop(0, rgb(bright, 0.45));
-        grad.addColorStop(0.35, rgb(col, 0.28));
-        grad.addColorStop(0.7, rgb(col, 0.1));
+        const bright = shadeColor(col, 55);
+        const glowR = rPx * 2.2;
+        const grad = g.createRadialGradient(c, c, rPx * 0.2, c, c, glowR);
+        grad.addColorStop(0, rgb(bright, 0.52));
+        grad.addColorStop(0.3, rgb(col, 0.35));
+        grad.addColorStop(0.65, rgb(col, 0.15));
         grad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = grad;
         g.beginPath();
@@ -1616,8 +1618,8 @@ export class SlitherRenderer {
         }
 
         if (needs.glow && !pair.glow) {
-            const glowPad = Math.ceil(rPx * 0.45);
-            pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 4, (g, sz) => {
+            const glowPad = Math.ceil(rPx * 1.3);
+            pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 8, (g, sz) => {
                 this._paintSnakeGlow(g, sz / 2, rPx, cs);
             });
         }
@@ -1776,9 +1778,9 @@ export class SlitherRenderer {
         const hy = bumps[0].y;
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
-        const glowMinQ = this.isMobile ? 0.88 : 0.75;
+        const glowMinQ = this.isMobile ? 0.78 : 0.65;
         const prNeeds = {
-            glow: (!holdActive && q >= glowMinQ) || boosting,
+            glow: q >= glowMinQ,
             boostOverlay: false,
             trailGlow: false,
         };
@@ -1833,9 +1835,9 @@ export class SlitherRenderer {
         if (prNeeds.glow && (glow || isRainbow)) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = boosting ? 0.65 * pulse : 0.15;
-            // Shorter stride for a smoother, continuous neon glow line
-            const glowStride = boosting ? (this.isMobile ? 3 : 2) : (this.isMobile ? 6 : 4);
+            ctx.globalAlpha = boosting ? 0.42 * pulse : 0.22;
+            // Draw a perfectly continuous smooth glow line using stride of 1
+            const glowStride = boosting ? 1 : 2;
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;

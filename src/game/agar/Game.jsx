@@ -23,6 +23,7 @@ import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
+import { API_URL } from '../../utils/apiBase';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
@@ -300,8 +301,7 @@ export default function Game() {
             hasJoinedGameRef.current = false;
         }
 
-        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
-        const matchNickname = location.state?.nickname || user?.username || 'Guest';
+                const matchNickname = location.state?.nickname || user?.username || 'Guest';
         const gameMode = localStorage.getItem('current_game_mode') || 'agar';
         const isBR = gameMode.startsWith('br-') || !!location.state?.battleRoyale;
         if (isBR) {
@@ -318,7 +318,7 @@ export default function Game() {
             mode: isBR ? gameMode : (gameMode.replace(/^br-/, '') || 'agar'),
         };
 
-        const socket = io(apiUrl, {
+        const socket = io(API_URL, {
             auth: { token, presenceId: getOrCreatePresenceId() },
             transports: ['polling', 'websocket'],
             upgrade: true,
@@ -1149,3 +1149,4 @@ export default function Game() {
         </div>
     );
 }
+

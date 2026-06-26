@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Background from '../components/Background';
 import { setPageSeo, SEO } from '../utils/seo';
 import '../styles/ui.css';
+import { API_URL } from '../utils/apiBase';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -27,7 +28,7 @@ export default function LoginPage() {
         setError('');
         setIsLoading(true);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
+            const res = await fetch(`${API_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminders': 'true' },
                 body: JSON.stringify({ username, password }),
@@ -46,7 +47,7 @@ export default function LoginPage() {
     };
 
     const handleGoogleLogin = () => {
-        window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`;
+        window.location.href = `${API_URL}/api/auth/google`;
     };
 
     return (

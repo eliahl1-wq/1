@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { syncMixpanelUser, resetMixpanel } from '../utils/mixpanel';
 import { flagDiscoveryForSession } from '../constants/gamemodes';
+import { API_URL } from '../utils/apiBase';
 
 const AuthContext = createContext();
 
@@ -25,7 +26,7 @@ export const AuthProvider = ({ children }) => {
             if (storedToken) {
                 console.log('AuthContext: Token hittades i localStorage, försöker validera.');
                 try {
-                    const baseUrl = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
+                    const baseUrl = API_URL;
                     const url = `${baseUrl}/api/me?t=${Date.now()}`;
                     
                     const res = await fetch(url, {
@@ -71,7 +72,7 @@ export const AuthProvider = ({ children }) => {
     const refreshUser = useCallback(async () => {
         if (!token) return;
 
-        const baseUrl = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
+        const baseUrl = API_URL;
         const url = `${baseUrl}/api/me?t=${Date.now()}`;
         
         if (!baseUrl && !window.location.hostname.includes('localhost')) {

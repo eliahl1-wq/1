@@ -12,6 +12,7 @@ import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import { MIN_ENTRY_FEE } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
+import { API_URL } from '../utils/apiBase';
 
 const SolLogo = ({ size = 13, style }) => (
     <img src="/solana-sol-logo.png" alt="SOL"
@@ -88,8 +89,7 @@ export default function Lobby() {
             let alive = true;
             const check = async () => {
                 try {
-                    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
-                    const r = await fetch(`${apiUrl}/api/game-status?t=${Date.now()}`, {
+                                        const r = await fetch(`${apiUrl}/api/game-status?t=${Date.now()}`, {
                         headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                     });
                     if (r.ok && alive) {
@@ -149,7 +149,7 @@ export default function Lobby() {
             const conf = await connection.confirmTransaction(sig, 'confirmed');
             if (conf.value.err) throw new Error('Transaction failed on-chain.');
             setStatusMsg('Verifying with backend…');
-            const vr = await fetch(`${import.meta.env.VITE_API_URL}/api/deposit-verify`, {
+            const vr = await fetch(`${API_URL}/api/deposit-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' },
                 body: JSON.stringify({ signature: sig, amountUSD: usdAmt, solAmount: solAmt, walletAddress: publicKey.toString() })

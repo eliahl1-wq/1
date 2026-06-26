@@ -10,8 +10,8 @@ import { setPageSeo, SEO } from '../utils/seo';
 import { useAuth } from '../context/AuthContext';
 import { isBattleRoyaleAvailable, isBattleRoyaleMode, normalizeGamemodeForLobby } from '../constants/features';
 import { getVisibleGamemodes } from '../constants/gamemodes';
+import { API_URL } from '../utils/apiBase';
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 
 const PLAYING_KEY = {
     agar: 'agar',
@@ -189,3 +189,4 @@ function ModeCard({ mode, title, desc, badge, playing, onPlay }) {
         </div>
     );
 }
+

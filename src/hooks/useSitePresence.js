@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { pingSitePresence } from '../utils/sitePresence';
+import { API_URL } from '../utils/apiBase';
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000')).replace(/\/$/, '');
 
 /**
  * Lightweight heartbeat on all pages — keeps admin presence list up to date.
@@ -29,3 +29,4 @@ export default function useSitePresence() {
         };
     }, [location.pathname, user?.username]);
 }
+

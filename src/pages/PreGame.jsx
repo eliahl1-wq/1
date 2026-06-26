@@ -20,6 +20,7 @@ import { trackMixpanelEvent } from '../utils/mixpanel';
 import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeGamemodeForLobby } from '../constants/features';
 import { buildPresenceHeaders } from '../utils/sitePresence';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
+import { API_URL } from '../utils/apiBase';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -210,7 +211,6 @@ export default function PreGame() {
         localStorage.setItem('balance_currency', isCurSOL ? 'SOL' : 'USD');
     }, [isCurSOL]);
 
-    const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
     const [selectedMode, setSelectedMode] = useState(
         () => resolvePreGameMode(location.pathname, location.state?.selectedMode)
     );
@@ -2071,3 +2071,4 @@ function AgarBlobPreview({ color, isLarge, nickname }) {
         </div>
     );
 }
+

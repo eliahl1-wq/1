@@ -23,8 +23,8 @@ import { clearPendingResult, loadPendingResult, savePendingResult } from '../../
 import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
 import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
+import { API_URL } from '../../utils/apiBase';
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
@@ -1162,5 +1162,6 @@ export default function SlitherGame() {
     );
 
 }
+
 
 

@@ -6,8 +6,8 @@ import Background from '../components/Background';
 import { normalizeBREntryFee, formatUsd } from '../constants/economy';
 import { getOrCreatePresenceId } from '../utils/sitePresence';
 import '../styles/ui.css';
+import { API_URL } from '../utils/apiBase';
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : 'http://localhost:5000');
 const MIN_PLAYERS = 5;
 const MAX_PLAYERS = 10;
 
@@ -274,3 +274,4 @@ export default function BRLobby() {
         </div>
     );
 }
+
