@@ -489,6 +489,12 @@ export default function SlitherGame() {
         socket.on('welcome', (playerSettings, gameSizes) => {
             clearPendingResult('slither');
             const mode = gameSizes?.mode || lobbyModeForSession(joinParamsRef.current.isCompetitive);
+            const expectedMode = lobbyModeForSession(joinParamsRef.current.isCompetitive);
+            if (!joinParamsRef.current.isBR && mode !== expectedMode) {
+                alert(`You still have an active ${mode === 'agar' ? 'Agar' : mode} game. Finish or cash out before starting Slither.`);
+                navigate('/pre-game', { state: { selectedMode: mode === 'agar' ? 'agar' : expectedMode } });
+                return;
+            }
             localStorage.setItem('current_game_mode', mode);
             localStorage.setItem('selected_gamemode', mode);
             if (gameSizes?.entryFeeUsd) {

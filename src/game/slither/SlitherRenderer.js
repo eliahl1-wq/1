@@ -1578,11 +1578,11 @@ export class SlitherRenderer {
     _paintSnakeGlow(g, c, rPx, cs, bodySS = 1.6) {
         const col = parseColor(cs);
         const bright = shadeColor(col, 55);
-        const glowR = rPx * 2.3 * bodySS; // Multiply by bodySS to compensate for scaling down in draw loop!
-        const grad = g.createRadialGradient(c, c, rPx * 0.2, c, c, glowR);
-        grad.addColorStop(0, rgb(bright, 0.52));
-        grad.addColorStop(0.3, rgb(col, 0.35));
-        grad.addColorStop(0.65, rgb(col, 0.15));
+        const glowR = rPx * 1.75 * bodySS;
+        const grad = g.createRadialGradient(c, c, rPx * 0.35, c, c, glowR);
+        grad.addColorStop(0, rgb(bright, 0.34));
+        grad.addColorStop(0.32, rgb(col, 0.22));
+        grad.addColorStop(0.72, rgb(col, 0.08));
         grad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = grad;
         g.beginPath();
@@ -1618,7 +1618,7 @@ export class SlitherRenderer {
         }
 
         if (needs.glow && !pair.glow) {
-            const glowPad = Math.ceil(rPx * 2.3 * bodySS); // Expand padding to match larger glowR
+            const glowPad = Math.ceil(rPx * 1.75 * bodySS);
             pair.glow = this._getSprite(`pr_glow_v20|${key}`, rPx * 2 + glowPad * 2 + 8, (g, sz) => {
                 this._paintSnakeGlow(g, sz / 2, rPx, cs, bodySS);
             });
@@ -1779,9 +1779,9 @@ export class SlitherRenderer {
 
         const cacheR = Math.max(8, Math.round(bodyRadius / 8) * 8);
         const prNeeds = {
-            glow: true,
+            glow: boosting,
             boostOverlay: false,
-            trailGlow: false,
+            trailGlow: boosting,
         };
 
         const isRainbow = (snake.color === 'random');
@@ -1831,12 +1831,11 @@ export class SlitherRenderer {
         }
 
         // Glow (underneath the body segments for a clean outline)
-        if (prNeeds.glow && (glow || isRainbow)) {
+        if (boosting && prNeeds.glow && (glow || isRainbow)) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = boosting ? 0.42 * pulse : 0.22;
-            // Draw a perfectly continuous smooth glow line using stride of 1
-            const glowStride = boosting ? 1 : 2;
+            ctx.globalAlpha = 0.28 * pulse;
+            const glowStride = 1;
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;

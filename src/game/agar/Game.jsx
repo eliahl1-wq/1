@@ -358,6 +358,12 @@ export default function Game() {
 
         socket.on('welcome', (playerSettings, gameSizes) => {
             clearPendingResult('agar');
+            const serverMode = gameSizes?.mode || 'agar';
+            if (!wantsBattleRoyale && serverMode !== 'agar') {
+                alert(`You still have an active ${serverMode === 'slither' ? 'Slither' : serverMode} game. Finish or cash out before starting Agar.`);
+                navigate('/pre-game', { state: { selectedMode: serverMode === 'slither' ? 'slither' : 'agar' } });
+                return;
+            }
             const isRejoin = gameSizes?.rejoin === true;
             console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
             foodCacheRef.current.clear(); // Prevent flickering from old food cache
@@ -593,6 +599,9 @@ export default function Game() {
                 navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'agar' } });
             } else if (typeof msg === 'string' && msg.includes('Account')) {
                 alert(msg);
+            } else if (typeof msg === 'string') {
+                alert(msg);
+                navigate('/pre-game', { state: { selectedMode: localStorage.getItem('selected_gamemode') || 'agar' } });
             }
         });
 
