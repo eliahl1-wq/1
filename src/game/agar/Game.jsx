@@ -43,6 +43,20 @@ function foodEatenByPlayer(f, myId, users) {
 }
 
 /** Drop stale cached pellets; keep edge blobs briefly through spatial-filter gaps. */
+function getAgarPlayerPoint(player) {
+    if (!player) return null;
+    if (Number.isFinite(player.x) && Number.isFinite(player.y)) return { x: player.x, y: player.y };
+    const cell = player.cells?.[0];
+    if (cell && Number.isFinite(cell.x) && Number.isFinite(cell.y)) return { x: cell.x, y: cell.y };
+    return null;
+}
+
+function ensureLocalAgarUser(users, player, myId) {
+    const list = Array.isArray(users) ? users : [];
+    if (!player?.cells?.length || !myId || list.some(u => u.id === myId)) return list;
+    return [{ ...player, id: myId }, ...list];
+}
+
 function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
     const margin = 280;
     const halfW = screenW / 2 + margin;
@@ -446,7 +460,7 @@ export default function Game() {
             }
             gameData.current = {
                 player: playerData,
-                users: userData,
+                users: ensureLocalAgarUser(userData, playerData, myIdRef.current),
                 food: Array.from(foodMap.values()),
                 ejected: massList,
                 viruses: virusList,
@@ -666,23 +680,25 @@ export default function Game() {
         const graph = canvas.getContext('2d');
         
         const gameLoop = () => {
-            const { player, users, viruses, ejected, zoneSize } = gameData.current;
+            const { player, viruses, ejected, zoneSize } = gameData.current;
+            const users = ensureLocalAgarUser(gameData.current.users, player, myIdRef.current);
             const { width, height } = getGameScreenSize();
             const dpr = canvasDprRef.current;
             graph.setTransform(dpr, 0, 0, dpr, 0, 0);
             graph.imageSmoothingEnabled = true;
             graph.imageSmoothingQuality = IS_MOBILE ? 'high' : 'medium';
             const screen = { width, height };
-            const hasPlayer = player && player.x !== undefined;
+            const playerPoint = getAgarPlayerPoint(player);
+            const hasPlayer = !!playerPoint;
             if (hasPlayer && !isSpectating) {
-                spectatorCamRef.current = { x: player.x, y: player.y };
+                spectatorCamRef.current = { x: playerPoint.x, y: playerPoint.y };
             }
             const camX = isSpectating
                 ? specCamRef.current.x
-                : (hasPlayer ? player.x : spectatorCamRef.current.x);
+                : (hasPlayer ? playerPoint.x : spectatorCamRef.current.x);
             const camY = isSpectating
                 ? specCamRef.current.y
-                : (hasPlayer ? player.y : spectatorCamRef.current.y);
+                : (hasPlayer ? playerPoint.y : spectatorCamRef.current.y);
             const viewZoom = baseViewZoom * (isSpectating ? specCamRef.current.zoom : 1);
             const canRenderWorld = isConnected && (!isDead || isSpectating) && (hasPlayer || cashedAmount !== null || isSpectating);
             
