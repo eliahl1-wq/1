@@ -188,6 +188,9 @@ export default function PreGame() {
     const [selectedSkinAgar, setSelectedSkinAgar] = useState(
         () => localStorage.getItem('selected_skin_agar') || '#c080ff'
     );
+    const [selectedSkinSurviv, setSelectedSkinSurviv] = useState(
+        () => localStorage.getItem('selected_skin_surviv') || 'random'
+    );
 
     const [showCustomizer, setShowCustomizer] = useState(false);
 
@@ -198,6 +201,10 @@ export default function PreGame() {
     useEffect(() => {
         localStorage.setItem('selected_skin_agar', selectedSkinAgar);
     }, [selectedSkinAgar]);
+
+    useEffect(() => {
+        localStorage.setItem('selected_skin_surviv', selectedSkinSurviv);
+    }, [selectedSkinSurviv]);
 
     useEffect(() => {
         localStorage.setItem('balance_currency', isCurSOL ? 'SOL' : 'USD');
@@ -1691,7 +1698,7 @@ export default function PreGame() {
                                     <div className="skin-cards-grid">
                                         <button
                                             type="button"
-                                            className={`skin-card ${!isRainbow ? 'active' : ''}`}
+                                            className={`skin-card ${!isRandomSelection ? 'active' : ''}`}
                                             onClick={() => setSkinStyle('classic')}
                                         >
                                             <div className="skin-card-icon grid-icon">
@@ -1705,7 +1712,7 @@ export default function PreGame() {
 
                                         <button
                                             type="button"
-                                            className={`skin-card ${isRainbow ? 'active' : ''}`}
+                                            className={`skin-card ${isRandomSelection ? 'active' : ''}`}
                                             onClick={() => setSkinStyle(customizerTab === 'surviv' ? 'random' : 'rainbow')}
                                         >
                                             <div className={`skin-card-icon ${customizerTab === 'surviv' ? 'surviv-random-icon' : 'rainbow-icon'}`}></div>
@@ -1725,6 +1732,32 @@ export default function PreGame() {
                     </div>
                 );
             })()}
+        </div>
+    );
+}
+
+function SurvivSkinPreview({ color, isLarge, nickname }) {
+    const isRandom = color === 'random';
+    const displayColor = isRandom ? '#80d0d0' : color;
+    const displayName = (nickname || 'SURVIV').slice(0, 10).toUpperCase();
+
+    return (
+        <div
+            className={`surviv-skin-preview ${isLarge ? 'large' : 'small'} ${isRandom ? 'is-random' : ''}`}
+            style={{ '--surviv-skin-color': displayColor }}
+        >
+            <div className="surviv-preview-grid" aria-hidden="true"></div>
+            <div className="surviv-preview-shadow" aria-hidden="true"></div>
+            <div className="surviv-preview-player">
+                <div className="surviv-preview-arm left" aria-hidden="true"></div>
+                <div className="surviv-preview-arm right" aria-hidden="true"></div>
+                <div className="surviv-preview-body">
+                    <div className="surviv-preview-vest" aria-hidden="true"></div>
+                    <div className="surviv-preview-head" aria-hidden="true"></div>
+                </div>
+                <div className="surviv-preview-weapon" aria-hidden="true"></div>
+            </div>
+            {isLarge && <div className="surviv-preview-name">{displayName}</div>}
         </div>
     );
 }

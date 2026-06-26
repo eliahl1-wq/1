@@ -264,7 +264,7 @@ export default function SurvivGame() {
         rendererRef.current?.start();
 
         if (socketRef.current?.connected) {
-            const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+            const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
             socketRef.current.emit('joinGame', {
                 username: joinParamsRef.current.nickname,
                 token: authToken,
@@ -579,7 +579,7 @@ export default function SurvivGame() {
         }, 1000 / 20);
 
         if (!blockAutoJoinRef.current) {
-            const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+            const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
             localStorage.setItem('current_game_mode', 'surviv');
             socket.emit('joinGame', {
                 username: matchNickname,
