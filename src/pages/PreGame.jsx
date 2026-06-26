@@ -281,7 +281,7 @@ export default function PreGame() {
     const [customizerTab, setCustomizerTab] = useState('slither');
     useEffect(() => {
         if (showCustomizer) {
-            setCustomizerTab((isSlitherFamily || isSurvivFamily) ? 'slither' : 'agar');
+            setCustomizerTab(isSurvivFamily ? 'surviv' : (isSlitherFamily ? 'slither' : 'agar'));
         }
     }, [showCustomizer, isSlitherFamily, isSurvivFamily]);
 
@@ -1410,7 +1410,11 @@ export default function PreGame() {
                                     </svg>
                                     <span className="customize-lobby-title">Customize Appearance</span>
                                 </div>
-                                {(isSlitherFamily || isSurvivFamily) ? (
+                                {isSurvivFamily ? (
+                                    <span className="customize-lobby-status-pill" style={selectedSkinSurviv === 'random' ? { backgroundImage: 'linear-gradient(135deg, #80d0d0, #c080ff, #ffa060)' } : { backgroundColor: selectedSkinSurviv }}>
+                                        {selectedSkinSurviv === 'random' ? 'Random' : getChromaName(selectedSkinSurviv)}
+                                    </span>
+                                ) : isSlitherFamily ? (
                                     <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
                                         {getChromaName(selectedSkin)}
                                     </span>
@@ -1422,7 +1426,9 @@ export default function PreGame() {
                             </div>
 
                             <div className="customize-lobby-preview-box">
-                                {(isSlitherFamily || isSurvivFamily) ? (
+                                {isSurvivFamily ? (
+                                    <SurvivSkinPreview color={selectedSkinSurviv} isLarge={false} nickname={nickname} />
+                                ) : isSlitherFamily ? (
                                     <SnakeSkinPreview color={selectedSkin} isLarge={false} />
                                 ) : (
                                     <AgarBlobPreview color={selectedSkinAgar} isLarge={false} nickname={nickname} />
@@ -1539,7 +1545,7 @@ export default function PreGame() {
             {/* Customizer Modal Overlay */}
             {showCustomizer && (() => {
                 const getChromaName = (color) => {
-                    if (color === 'random') return 'Rainbow';
+                    if (color === 'random') return customizerTab === 'surviv' ? 'Random' : 'Rainbow';
                     switch (color) {
                         case '#c080ff': return 'Lavender Purple';
                         case '#9099ff': return 'Indigo Blue';
@@ -1554,11 +1560,17 @@ export default function PreGame() {
                     }
                 };
 
-                const currentChroma = customizerTab === 'slither' ? selectedSkin : selectedSkinAgar;
-                const isRainbow = currentChroma === 'random';
+                const currentChroma = customizerTab === 'slither'
+                    ? selectedSkin
+                    : customizerTab === 'surviv'
+                        ? selectedSkinSurviv
+                        : selectedSkinAgar;
+                const isRandomSelection = currentChroma === 'random';
+                const isRainbow = customizerTab !== 'surviv' && isRandomSelection;
+                const displayChroma = isRandomSelection ? '#80d0d0' : currentChroma;
 
                 const cycleChroma = (direction) => {
-                    if (isRainbow) return;
+                    if (isRandomSelection) return;
 
                     const chromas = [
                         '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
@@ -1573,17 +1585,21 @@ export default function PreGame() {
 
                     if (customizerTab === 'slither') {
                         setSelectedSkin(chromas[nextIdx]);
+                    } else if (customizerTab === 'surviv') {
+                        setSelectedSkinSurviv(chromas[nextIdx]);
                     } else {
                         setSelectedSkinAgar(chromas[nextIdx]);
                     }
                 };
 
                 const setSkinStyle = (style) => {
-                    if (style === 'rainbow') {
+                    if (style === 'rainbow' || style === 'random') {
                         if (customizerTab === 'slither') setSelectedSkin('random');
+                        else if (customizerTab === 'surviv') setSelectedSkinSurviv('random');
                         else setSelectedSkinAgar('random');
                     } else {
                         if (customizerTab === 'slither') setSelectedSkin('#c080ff');
+                        else if (customizerTab === 'surviv') setSelectedSkinSurviv('#c080ff');
                         else setSelectedSkinAgar('#c080ff');
                     }
                 };
@@ -1620,12 +1636,19 @@ export default function PreGame() {
                                     >
                                         Agar Skin
                                     </button>
+                                    <button
+                                        type="button"
+                                        className={`seg-btn ${customizerTab === 'surviv' ? 'active' : ''}`}
+                                        onClick={() => setCustomizerTab('surviv')}
+                                    >
+                                        Surviv Skin
+                                    </button>
                                 </div>
                             </div>
 
                             <div className="customizer-modal-body">
                                 <div className="customizer-preview-stage">
-                                    {!isRainbow && (
+                                    {!isRandomSelection && (
                                         <button className="chroma-arrow left" onClick={() => cycleChroma(-1)}>
                                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                                         </button>
@@ -1634,25 +1657,29 @@ export default function PreGame() {
                                     <div className="preview-canvas-container">
                                         {customizerTab === 'slither' ? (
                                             <SnakeSkinPreview color={selectedSkin} isLarge={true} />
+                                        ) : customizerTab === 'surviv' ? (
+                                            <SurvivSkinPreview color={selectedSkinSurviv} isLarge={true} nickname={nickname} />
                                         ) : (
                                             <AgarBlobPreview color={selectedSkinAgar} isLarge={true} nickname={nickname} />
                                         )}
                                     </div>
 
-                                    {!isRainbow && (
+                                    {!isRandomSelection && (
                                         <button className="chroma-arrow right" onClick={() => cycleChroma(1)}>
                                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                                         </button>
                                     )}
 
                                     <div className="customizer-preview-glow" style={{
-                                        backgroundColor: isRainbow ? '#A78BFA' : currentChroma
+                                        backgroundColor: displayChroma
                                     }}></div>
 
                                     <div className="chroma-name-badge" style={
                                         isRainbow
                                             ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' }
-                                            : { backgroundColor: currentChroma }
+                                            : isRandomSelection
+                                                ? { backgroundImage: 'linear-gradient(135deg, #80d0d0, #c080ff, #ffa060)' }
+                                                : { backgroundColor: currentChroma }
                                     }>
                                         {getChromaName(currentChroma)}
                                     </div>
@@ -1679,10 +1706,10 @@ export default function PreGame() {
                                         <button
                                             type="button"
                                             className={`skin-card ${isRainbow ? 'active' : ''}`}
-                                            onClick={() => setSkinStyle('rainbow')}
+                                            onClick={() => setSkinStyle(customizerTab === 'surviv' ? 'random' : 'rainbow')}
                                         >
-                                            <div className="skin-card-icon rainbow-icon"></div>
-                                            <span>Rainbow</span>
+                                            <div className={`skin-card-icon ${customizerTab === 'surviv' ? 'surviv-random-icon' : 'rainbow-icon'}`}></div>
+                                            <span>{customizerTab === 'surviv' ? 'Random' : 'Rainbow'}</span>
                                         </button>
                                     </div>
 
