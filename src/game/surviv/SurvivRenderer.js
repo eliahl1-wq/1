@@ -388,13 +388,34 @@ export class SurvivRenderer {
         return this.findRoomContainingPoint(this.me.x, this.me.y, currentHouse);
     }
 
+    usesInteriorFog(house) {
+        return !!house && (house.variant === 'mansion' || house.variant === 'warehouse' || house.w >= 300 || house.h >= 260);
+    }
+
+    roomVisibilityStrength(room, currentRoom, playerX, playerY) {
+        if (!room || !currentRoom) return 0;
+        if (room.id === currentRoom.id) return 1;
+        const dx = room.x - currentRoom.x;
+        const dy = room.y - currentRoom.y;
+        const centerDist = Math.hypot(dx, dy);
+        const playerDist = Math.hypot(room.x - playerX, room.y - playerY);
+        const touches = Math.abs(dx) < (room.w + currentRoom.w) * 0.56
+            && Math.abs(dy) < (room.h + currentRoom.h) * 0.56;
+        if (touches && centerDist < Math.max(room.w + currentRoom.w, room.h + currentRoom.h) * 0.82) return 0.42;
+        if (playerDist < 230) return 0.24;
+        return 0;
+    }
+
     isPointHiddenByRooms(x, y, currentHouse, currentRoom) {
         const house = this.findHouseContainingPoint(x, y);
         if (!house) return false;
         if (!currentHouse || house.id !== currentHouse.id) return true;
+        if (!this.usesInteriorFog(currentHouse)) return false;
         if (!currentRoom) return false;
         const room = this.findRoomContainingPoint(x, y, house);
-        return !!room && room.id !== currentRoom.id;
+        if (!room || room.id === currentRoom.id) return false;
+        const strength = this.roomVisibilityStrength(room, currentRoom, this.me?.x ?? 0, this.me?.y ?? 0);
+        return strength <= 0.18;
     }
 
     shouldDrawObstacle(o, currentHouse, currentRoom) {
@@ -421,25 +442,40 @@ export class SurvivRenderer {
     }
 
     drawRoomShadows(ctx, currentHouse, currentRoom) {
-        if (!currentHouse) return;
+        if (!currentHouse || !this.usesInteriorFog(currentHouse)) return;
         const zones = this.roomZones.filter(r => r.houseId === currentHouse.id);
-        if (!zones.length) return;
+        if (!zones.length || !currentRoom || !this.me) return;
         ctx.save();
+        ctx.fillStyle = 'rgba(3, 4, 5, 0.74)';
+        roundRect(ctx, currentHouse.x - currentHouse.w / 2 + 8, currentHouse.y - currentHouse.h / 2 + 8, currentHouse.w - 16, currentHouse.h - 16, 7);
+        ctx.fill();
+
+        ctx.globalCompositeOperation = 'destination-out';
         for (const room of zones) {
-            if (currentRoom && room.id === currentRoom.id) continue;
-            ctx.fillStyle = 'rgba(3, 4, 5, 0.78)';
-            roundRect(ctx, room.x - room.w / 2, room.y - room.h / 2, room.w, room.h, 4);
+            const strength = this.roomVisibilityStrength(room, currentRoom, this.me.x, this.me.y);
+            if (strength <= 0) continue;
+            const pad = room.id === currentRoom.id ? 34 : 14;
+            ctx.globalAlpha = strength;
+            roundRect(ctx, room.x - room.w / 2 - pad, room.y - room.h / 2 - pad, room.w + pad * 2, room.h + pad * 2, 20);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
-            ctx.lineWidth = 2;
-            ctx.stroke();
         }
-        if (currentRoom) {
-            ctx.strokeStyle = 'rgba(255, 230, 170, 0.08)';
-            ctx.lineWidth = 3;
-            roundRect(ctx, currentRoom.x - currentRoom.w / 2, currentRoom.y - currentRoom.h / 2, currentRoom.w, currentRoom.h, 6);
-            ctx.stroke();
-        }
+        ctx.globalAlpha = 0.92;
+        const r = currentHouse.variant === 'mansion' ? 310 : 255;
+        const glow = ctx.createRadialGradient(this.me.x, this.me.y, 24, this.me.x, this.me.y, r);
+        glow.addColorStop(0, 'rgba(0,0,0,1)');
+        glow.addColorStop(0.62, 'rgba(0,0,0,0.72)');
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(this.me.x, this.me.y, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = 'rgba(255, 230, 170, 0.12)';
+        ctx.lineWidth = 2;
+        roundRect(ctx, currentRoom.x - currentRoom.w / 2, currentRoom.y - currentRoom.h / 2, currentRoom.w, currentRoom.h, 10);
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -1215,6 +1251,21 @@ export class SurvivRenderer {
         ctx.beginPath();
         ctx.moveTo(0, -o.h / 2 - 28);
         ctx.lineTo(0, o.h / 2 + 20);
+        ctx.stroke();
+
+        const doorW = Math.min(82, o.w * 0.28);
+        const doorY = o.h / 2 + 2;
+        ctx.fillStyle = 'rgba(12, 10, 8, 0.72)';
+        roundRect(ctx, -doorW / 2, doorY - 18, doorW, 28, 5);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(240, 210, 145, 0.24)';
+        roundRect(ctx, -doorW / 2 + 8, doorY - 6, doorW - 16, 8, 3);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 238, 180, 0.32)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-doorW / 2 + 8, doorY - 18);
+        ctx.lineTo(doorW / 2 - 8, doorY - 18);
         ctx.stroke();
 
         ctx.strokeStyle = 'rgba(12, 10, 8, 0.42)';

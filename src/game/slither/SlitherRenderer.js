@@ -1399,7 +1399,7 @@ export class SlitherRenderer {
 
     _drawBoostWaves(ctx, bumps, count, radius, pulse = 1) {
         if (count < 6 || radius <= 0) return;
-        const stride = this.isMobile ? 8 : 6;
+        const stride = this.isMobile ? 11 : 9;
         const phase = Math.floor((this._frame * 0.42) % stride);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1409,12 +1409,12 @@ export class SlitherRenderer {
             if (!p || p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
             const tailFade = 0.55 + 0.45 * (1 - i / Math.max(1, count - 1));
             const shimmer = 0.75 + 0.25 * Math.sin(this._frame * 0.16 + i * 0.9);
-            ctx.globalAlpha = 0.07 * pulse * tailFade * shimmer;
+            ctx.globalAlpha = 0.026 * pulse * tailFade * shimmer;
             ctx.save();
             ctx.translate(p.x, p.y);
             ctx.rotate(this._bumpTangent(bumps, i) + Math.PI / 2);
             ctx.beginPath();
-            ctx.ellipse(0, 0, radius * 0.86, radius * 0.11, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, radius * 0.58, radius * 0.045, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         }
@@ -1563,11 +1563,11 @@ export class SlitherRenderer {
     /** Soft outer glow for additive body pass. */
     _paintSnakeGlow(g, c, rPx, cs) {
         const col = parseColor(cs);
-        const bright = shadeColor(col, 20);
-        const glowR = rPx * 1.35;
+        const bright = shadeColor(col, 42);
+        const glowR = rPx * 1.75;
         const grad = g.createRadialGradient(c, c, rPx * 0.4, c, c, glowR);
-        grad.addColorStop(0, rgb(bright, 0.1));
-        grad.addColorStop(0.5, rgb(col, 0.04));
+        grad.addColorStop(0, rgb(bright, 0.18));
+        grad.addColorStop(0.46, rgb(col, 0.11));
         grad.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = grad;
         g.beginPath();
@@ -1611,15 +1611,15 @@ export class SlitherRenderer {
 
         if (needs.boostOverlay && !pair.boostOverlay) {
             const col = parseColor(cs);
-            const bright = shadeColor(col, 35);
-            const pad = Math.max(3, Math.ceil(rPx * 0.2));
+            const bright = shadeColor(col, 58);
+            const pad = Math.max(6, Math.ceil(rPx * 0.72));
             pair.boostOverlay = this._getSprite(`pr_boost_v20|${key}`, rPx * 2 + pad * 2 + 6, (g, sz) => {
                 const c = sz / 2;
-                const glowR = rPx * 1.4 + pad;
+                const glowR = rPx * 2.15 + pad;
                 const aura = g.createRadialGradient(c, c, rPx * 0.5, c, c, glowR);
-                aura.addColorStop(0, rgb(bright, 0.05));
-                aura.addColorStop(0.4, rgb(bright, 0.15));
-                aura.addColorStop(0.7, rgb(bright, 0.08));
+                aura.addColorStop(0, rgb(bright, 0.08));
+                aura.addColorStop(0.34, rgb(bright, 0.26));
+                aura.addColorStop(0.68, rgb(col, 0.16));
                 aura.addColorStop(1, 'rgba(255,255,255,0)');
                 g.fillStyle = aura;
                 g.beginPath();
@@ -1630,7 +1630,7 @@ export class SlitherRenderer {
 
         if (needs.trailGlow && !pair.trailGlow) {
             const col = parseColor(cs);
-            const bright = shadeColor(col, 35);
+            const bright = shadeColor(col, 58);
             pair.trailGlow = this._getSprite(`pr_trail_v20|${key}`, rPx * 3 + 8, (g, sz) => {
                 const c = sz / 2;
                 const glowR = rPx * 1.7;
@@ -1866,7 +1866,7 @@ export class SlitherRenderer {
         if (prNeeds.glow && glow) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = boosting ? 0.34 * pulse : 0.12;
+            ctx.globalAlpha = boosting ? 0.48 * pulse : 0.12;
             const glowStride = boosting ? (this.isMobile ? 6 : 4) : (this.isMobile ? 7 : 5);
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
@@ -1895,13 +1895,13 @@ export class SlitherRenderer {
             const bdw = boostOverlay.width / stampScale;
             const bdh = boostOverlay.height / stampScale;
             const bhalf = bdw / 2;
-            const boostStride = this.isMobile ? 6 : 4;
+            const boostStride = this.isMobile ? 4 : 3;
             for (let i = bumpCount - 1; i >= 0; i -= boostStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 const along = i / Math.max(1, bumpCount - 1);
                 const headProx = 1 - along;
-                ctx.globalAlpha = (0.11 + headProx * 0.12) * pulse;
+                ctx.globalAlpha = (0.18 + headProx * 0.16) * pulse;
                 ctx.drawImage(boostOverlay, (p.x - bhalf) | 0, (p.y - bhalf) | 0, bdw, bdh);
             }
             ctx.restore();
