@@ -108,6 +108,7 @@ export default function Game() {
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const sessionStartAtRef = useRef(null);
     const spectatorCamRef = useRef({ x: 3000, y: 3000 });
+    const lastPointerRef = useRef(null);
     
     const WORLD_SIZE = 6000;
 
@@ -412,8 +413,8 @@ export default function Game() {
                 const { width, height } = getGameScreenSize();
                 const viewZoom = getMobileViewZoom();
                 socketRef.current.emit('0', {
-                    x: playerSettings.x ?? playerSettings.cells?.[0]?.x ?? 0,
-                    y: playerSettings.y ?? playerSettings.cells?.[0]?.y ?? 0,
+                    x: 220,
+                    y: 0,
                     screenWidth: width / viewZoom,
                     screenHeight: height / viewZoom,
                 });
@@ -828,36 +829,32 @@ export default function Game() {
         () => socketRef.current?.emit('1'),
     );
 
-    const handleMouseMove = (e) => {
+    const emitAgarPointerInput = useCallback((clientX, clientY) => {
         if (isSpectating || isDead || cashedAmount !== null) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
-        socketRef.current?.emit('0', {
-            x, y,
-            screenWidth,
-            screenHeight,
-        });
+        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(clientX, clientY, canvas);
+        lastPointerRef.current = { clientX, clientY };
+        socketRef.current?.emit('0', { x, y, screenWidth, screenHeight });
+    }, [isSpectating, isDead, cashedAmount]);
+
+    const handleMouseMove = (e) => {
+        emitAgarPointerInput(e.clientX, e.clientY);
     };
 
     const handleTouch = (e) => {
-        if (isSpectating || isDead || cashedAmount !== null) return;
-        const canvas = canvasRef.current;
-        if (!canvas) return;
         const t = e.touches?.[0];
         if (!t) return;
         tryDoubleTapEject(t.clientX, t.clientY);
-        const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(t.clientX, t.clientY, canvas);
-        socketRef.current?.emit('0', {
-            x, y,
-            screenWidth,
-            screenHeight,
-        });
+        emitAgarPointerInput(t.clientX, t.clientY);
     };
 
     useEffect(() => {
-        const onMouseMove = (e) => handleMouseMove(e);
-        const onTouchMove = (e) => handleTouch(e);
+        const onMouseMove = (e) => emitAgarPointerInput(e.clientX, e.clientY);
+        const onTouchMove = (e) => {
+            const t = e.touches?.[0];
+            if (t) emitAgarPointerInput(t.clientX, t.clientY);
+        };
         window.addEventListener('mousemove', onMouseMove, { passive: true });
         window.addEventListener('touchstart', onTouchMove, { passive: true });
         window.addEventListener('touchmove', onTouchMove, { passive: true });
@@ -866,7 +863,23 @@ export default function Game() {
             window.removeEventListener('touchstart', onTouchMove);
             window.removeEventListener('touchmove', onTouchMove);
         };
-    }, [isSpectating, isDead, cashedAmount, tryDoubleTapEject]);
+    }, [emitAgarPointerInput]);
+
+    useEffect(() => {
+        if (!isConnected || isSpectating || isDead || cashedAmount !== null) return undefined;
+        const send = () => {
+            const p = lastPointerRef.current;
+            if (p) {
+                emitAgarPointerInput(p.clientX, p.clientY);
+                return;
+            }
+            const { width, height } = getGameScreenSize();
+            emitAgarPointerInput(width / 2 + 220, height / 2);
+        };
+        send();
+        const id = setInterval(send, 100);
+        return () => clearInterval(id);
+    }, [isConnected, isSpectating, isDead, cashedAmount, emitAgarPointerInput]);
 
     const entryFeeUsd = normalizeEntryFee(localStorage.getItem('selected_entry_fee'));
 
