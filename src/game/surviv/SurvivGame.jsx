@@ -20,11 +20,12 @@ import { API_URL } from '../../utils/apiBase';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 10;
-const WORLD_HALF = 20000;
+const WORLD_HALF = 10000;
 
 const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
 
 const WEAPON_LABELS = {
+    fists: 'Fists',
     pistol: 'M9 Pistol',
     revolver: 'R8 Revolver',
     smg: 'Vector SMG',
@@ -37,6 +38,13 @@ const WEAPON_LABELS = {
 
 function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
     switch (weaponId) {
+        case 'fists':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M5.5 11.5V8.8a1.3 1.3 0 0 1 2.6 0v1.7-3a1.3 1.3 0 0 1 2.6 0v3-2.2a1.3 1.3 0 0 1 2.6 0v2.9-1.5a1.3 1.3 0 0 1 2.6 0v4.1c0 3.8-2.6 6.2-6.1 6.2-3 0-5.3-2.2-5.3-5.1v-2.2c0-.7.4-1.2 1-1.2Z" />
+                    <path d="M15.5 8.5V7.2a1.2 1.2 0 0 1 2.4 0v4.1M18 9.2a1.2 1.2 0 0 1 2.4 0v4.4c0 2.4-1.2 4.4-3.2 5.5" />
+                </svg>
+            );
         case 'pistol':
             return (
                 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
@@ -787,7 +795,7 @@ export default function SurvivGame() {
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
-                                            {isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`}
+                                            {weaponId === 'fists' ? 'MELEE' : (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`)}
                                         </span>
                                         {isActive && isReloading && (
                                             <div 
@@ -900,9 +908,9 @@ export default function SurvivGame() {
                                                 <div 
                                                     key={`weapon-slot-${slotIdx}`}
                                                     className={`weapon-slot-card ${isActive ? 'active-slot' : ''} ${borderRarityClass} ${weaponId ? 'has-item' : 'empty-slot'}`}
-                                                    draggable={!!weaponId && weaponId !== 'pistol'}
+                                                    draggable={!!weaponId && weaponId !== 'fists'}
                                                     onDragStart={(e) => {
-                                                        if (weaponId && weaponId !== 'pistol') {
+                                                        if (weaponId && weaponId !== 'fists') {
                                                             e.dataTransfer.setData('text/plain', `backpack-weapon-${slotIdx}`);
                                                         }
                                                     }}
@@ -925,7 +933,7 @@ export default function SurvivGame() {
                                                                     {isActive && <span className="equipped-badge" style={{ fontSize: '0.52rem', color: '#14F195', fontWeight: 900 }}>EQUIPPED</span>}
                                                                 </div>
                                                             </div>
-                                                            {weaponId !== 'pistol' && (
+                                                            {weaponId !== 'fists' && (
                                                                 <button 
                                                                     className="slot-drop-btn" 
                                                                     style={{
@@ -1148,7 +1156,7 @@ export default function SurvivGame() {
                                             if (key.startsWith('weapon-')) {
                                                 const slotIdx = parseInt(key.replace('weapon-', ''), 10);
                                                 const weaponType = me.inventory?.weapons?.[slotIdx];
-                                                if (weaponType && weaponType !== 'pistol') {
+                                                if (weaponType && weaponType !== 'fists') {
                                                     putChestItemPendingRef.current = {
                                                         chestId: me.openedContainer.id,
                                                         itemKey: 'weapon',

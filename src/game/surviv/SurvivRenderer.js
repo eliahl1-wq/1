@@ -7,6 +7,7 @@ import { drawCashoutProgressRing } from '../cashoutRing.js';
 import { drawGameMinimap } from '../minimap.js';
 
 const WEAPON_LABELS = {
+    fists: 'Fists',
     pistol: 'M9 Pistol',
     revolver: 'R8 Revolver',
     smg: 'Vector SMG',
@@ -72,7 +73,7 @@ export class SurvivRenderer {
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
         this.targetZoom = 1.08;
-        this.worldHalf = 20000;
+        this.worldHalf = 10000;
         this.myId = null;
         this.players = [];
         this.loot = [];
@@ -95,7 +96,7 @@ export class SurvivRenderer {
             hp: 100,
             maxHp: 100,
             armor: 0,
-            weapon: 'pistol',
+            weapon: 'fists',
             ammo: 15,
             clipSize: 15,
             reloading: false,
@@ -103,7 +104,7 @@ export class SurvivRenderer {
             cashoutEndAt: 0,
             cashoutTotal: 10,
             cashoutSeconds: 0,
-            inventory: { weapons: ['pistol'], medkits: 0, ammoPacks: 0, chestsOpened: 0 },
+            inventory: { weapons: ['fists'], medkits: 0, ammoPacks: 0, chestsOpened: 0 },
         };
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
@@ -996,6 +997,14 @@ export class SurvivRenderer {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(LOOT_LABELS[l.type] || '?', 0, 1);
+            if ((Number(l.amount) || 0) > 1) {
+                ctx.fillStyle = 'rgba(8, 10, 9, 0.88)';
+                roundRect(ctx, 7, -15, 17, 11, 4);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '800 7px system-ui, sans-serif';
+                ctx.fillText(`x${Math.round(l.amount)}`, 15.5, -9.5);
+            }
         }
         ctx.restore();
     }
@@ -1085,7 +1094,7 @@ export class SurvivRenderer {
         ctx.arc(-4, -5, r * 0.36, 0, Math.PI * 2);
         ctx.fill();
 
-        this.drawWeapon(ctx, p.weapon, r);
+        this.drawWeapon(ctx, p.weapon, r, p.meleeUntil, p.color);
 
         // Reload progress ring near weapon
         if (p.reloading && p.reloadEndAt && p.reloadMs && p.reloadEndAt > Date.now()) {
@@ -1159,11 +1168,32 @@ export class SurvivRenderer {
         }
     }
 
-    drawWeapon(ctx, weapon, r) {
+    drawWeapon(ctx, weapon, r, meleeUntil = 0, playerColor = '#77c7c8') {
         ctx.fillStyle = '#222823';
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
-        if (weapon === 'shotgun') {
+        if (weapon === 'fists') {
+            const punching = meleeUntil > Date.now();
+            const reach = punching ? r * 1.38 : r * 0.72;
+            ctx.strokeStyle = 'rgba(14, 20, 18, 0.72)';
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(r * 0.34, -6);
+            ctx.lineTo(reach, -6);
+            ctx.moveTo(r * 0.34, 6);
+            ctx.lineTo(punching ? r * 0.78 : reach, 6);
+            ctx.stroke();
+            ctx.fillStyle = playerColor;
+            ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+            ctx.lineWidth = 1.5;
+            for (const hand of [{ x: reach, y: -6 }, { x: punching ? r * 0.78 : reach, y: 6 }]) {
+                ctx.beginPath();
+                ctx.arc(hand.x, hand.y, 5.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+        } else if (weapon === 'shotgun') {
             roundRect(ctx, r * 0.25, -3, r * 1.35, 6, 2);
             ctx.fill();
             ctx.stroke();
@@ -1387,8 +1417,8 @@ export class SurvivRenderer {
             this.drawBar(ctx, pad + 12, pad + 58, panelW - 24, 7, armorPct, '#5c9cff', '#5c9cff');
         }
 
-        const weaponLabel = WEAPON_LABELS[this.hud.weapon] || 'M9 Pistol';
-        const ammoText = this.hud.reloading ? 'RELOADING' : String(this.hud.ammo) + '/' + String(this.hud.clipSize);
+        const weaponLabel = WEAPON_LABELS[this.hud.weapon] || 'Fists';
+        const ammoText = this.hud.weapon === 'fists' ? 'MELEE' : (this.hud.reloading ? 'RELOADING' : String(this.hud.ammo) + '/' + String(this.hud.clipSize));
         const weaponW = W < 760 ? 148 : 172;
         this.drawPanel(ctx, W - pad - weaponW, pad, weaponW, 58);
         ctx.textAlign = 'right';
