@@ -1153,11 +1153,11 @@ export default function AdminDashboard() {
                                     disabled={actionLoading || serverStatus?.isResetting}
                                     onClick={() => runAdminAction(
                                         '/api/admin/trigger-sweep',
-                                        'Sweep main house wallet to owner vault now?\n\nBR house wallets will NOT be touched.'
+                                        'Reset everything and sweep main house wallet now?\n\n- All arena players will be cashed out\n- Food, bots, loot and in-memory pools will be cleared\n- BR matches and BR wallets will NOT be touched'
                                     )}
                                     style={{ padding: '12px 20px', fontSize: '0.82rem' }}
                                 >
-                                    Sweep Main House Only
+                                    Full Reset + Sweep Wallet
                                 </button>
                             </div>
                         </Panel>

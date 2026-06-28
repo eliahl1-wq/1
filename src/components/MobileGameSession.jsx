@@ -4,9 +4,9 @@ import { enterGameMobileSession, exitGameMobileSession } from '../utils/gameMobi
 import { notifyGameLayoutChange } from '../utils/forcedLandscape';
 
 /**
- * On mobile: optional fullscreen when entering a game. Works in portrait and landscape.
+ * On mobile: optional fullscreen and best-effort orientation lock when entering a game.
  */
-export default function MobileGameSession({ containerRef }) {
+export default function MobileGameSession({ containerRef, orientation = null }) {
     useEffect(() => {
         if (!isTouchDevice()) return;
 
@@ -15,9 +15,9 @@ export default function MobileGameSession({ containerRef }) {
 
         const onLayoutChange = () => notifyGameLayoutChange();
 
-        enterGameMobileSession(container);
+        enterGameMobileSession(container, orientation);
 
-        const onFirstTouch = () => enterGameMobileSession(container);
+        const onFirstTouch = () => enterGameMobileSession(container, orientation);
 
         container.addEventListener('touchstart', onFirstTouch, { once: true, passive: true });
         window.addEventListener('resize', onLayoutChange);
@@ -29,7 +29,7 @@ export default function MobileGameSession({ containerRef }) {
             window.removeEventListener('orientationchange', onLayoutChange);
             exitGameMobileSession(container);
         };
-    }, [containerRef]);
+    }, [containerRef, orientation]);
 
     return null;
 }

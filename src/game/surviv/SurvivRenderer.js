@@ -108,6 +108,8 @@ export class SurvivRenderer {
         };
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
+        this.mobileMove = { x: 0, y: 0 };
+        this.mobileAim = { angle: 0, active: false, shooting: false };
         this.inputEnabled = true;
         this.spectatorMode = false;
         this.externalCameraGetter = null;
@@ -122,9 +124,9 @@ export class SurvivRenderer {
 
     resize() {
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const rect = this.canvas.parentElement?.getBoundingClientRect();
-        const w = rect?.width || window.innerWidth;
-        const h = rect?.height || window.innerHeight;
+        const parent = this.canvas.parentElement;
+        const w = parent?.clientWidth || window.innerWidth;
+        const h = parent?.clientHeight || window.innerHeight;
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
@@ -185,6 +187,10 @@ export class SurvivRenderer {
 
     setInputEnabled(enabled) {
         this.inputEnabled = enabled;
+        if (!enabled) {
+            this.mouse.down = false;
+            this.clearMobileInput();
+        }
     }
 
     setSpectatorMode(on, cam) {
@@ -258,13 +264,37 @@ export class SurvivRenderer {
         };
     }
 
+    setMobileMove(dx, dy) {
+        this.mobileMove.x = clamp(Number(dx) || 0, -1, 1);
+        this.mobileMove.y = clamp(Number(dy) || 0, -1, 1);
+    }
+
+    setMobileAim(dx, dy, magnitude = 0) {
+        const strength = clamp(Number(magnitude) || 0, 0, 1);
+        if (strength > 0.08) {
+            this.mobileAim.angle = Math.atan2(Number(dy) || 0, Number(dx) || 0);
+            this.mobileAim.active = true;
+        }
+        this.mobileAim.shooting = strength > 0.3;
+    }
+
+    clearMobileInput() {
+        this.mobileMove.x = 0;
+        this.mobileMove.y = 0;
+        this.mobileAim.shooting = false;
+    }
+
     getInputPayload() {
-        let dx = 0;
-        let dy = 0;
-        if (this.keys.w) dy -= 1;
-        if (this.keys.s) dy += 1;
-        if (this.keys.a) dx -= 1;
-        if (this.keys.d) dx += 1;
+        let dx = this.mobileMove.x;
+        let dy = this.mobileMove.y;
+        if (Math.hypot(dx, dy) < 0.04) {
+            dx = 0;
+            dy = 0;
+            if (this.keys.w) dy -= 1;
+            if (this.keys.s) dy += 1;
+            if (this.keys.a) dx -= 1;
+            if (this.keys.d) dx += 1;
+        }
         const len = Math.hypot(dx, dy);
         if (len > 1e-6) {
             dx /= len;
@@ -275,15 +305,16 @@ export class SurvivRenderer {
         this.mouse.worldX = w.x;
         this.mouse.worldY = w.y;
 
-        const aimAngle = Math.atan2(
+        const pointerAimAngle = Math.atan2(
             this.mouse.worldY - this.camera.y,
             this.mouse.worldX - this.camera.x,
         );
+        const aimAngle = this.mobileAim.active ? this.mobileAim.angle : pointerAimAngle;
         return {
             dx,
             dy,
             aimAngle,
-            shooting: this.mouse.down && this.inputEnabled,
+            shooting: (this.mouse.down || this.mobileAim.shooting) && this.inputEnabled,
             reload: false,
         };
     }
@@ -486,7 +517,7 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    findInteractChest() {
+    findInteractChest(requireCursor = true) {
         if (!this.me) return null;
         const currentHouse = this.getCurrentHouse();
         const currentRoom = this.getCurrentRoom(currentHouse);
@@ -496,13 +527,19 @@ export class SurvivRenderer {
             if (l.type !== 'chest' && l.type !== 'deathCrate') continue;
             if (this.isLootHidden(l, currentHouse, currentRoom)) continue;
             if (Math.hypot(this.me.x - l.x, this.me.y - l.y) > 96) continue;
-            const cursorDist = Math.hypot(this.mouse.worldX - l.x, this.mouse.worldY - l.y);
-            if (cursorDist < 34 && cursorDist < bestCursor) {
+            const cursorDist = requireCursor
+                ? Math.hypot(this.mouse.worldX - l.x, this.mouse.worldY - l.y)
+                : Math.hypot(this.me.x - l.x, this.me.y - l.y);
+            if ((!requireCursor || cursorDist < 34) && cursorDist < bestCursor) {
                 best = l;
                 bestCursor = cursorDist;
             }
         }
         return best;
+    }
+
+    getNearbyChest() {
+        return this.findInteractChest(false);
     }
 
     draw(dt = 1 / 60) {

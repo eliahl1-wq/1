@@ -9,6 +9,7 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import MobileGameSession from '../../components/MobileGameSession';
+import SurvivMobileControls from '../../components/SurvivMobileControls';
 import { isTouchDevice } from '../../utils/mobile';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
@@ -205,6 +206,7 @@ export default function SurvivGame() {
     const [resetCountdown, setResetCountdown] = useState(null);
     const [isInventoryOpen, setIsInventoryOpen] = useState(false);
     const [me, setMe] = useState(null);
+    const [canMobileInteract, setCanMobileInteract] = useState(false);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const entryFeeUsd = normalizeSurvivEntryFee(localStorage.getItem('selected_entry_fee'));
@@ -436,9 +438,11 @@ export default function SurvivGame() {
         };
         const onKeyUp = (e) => renderer.handleKeyUp(e);
         const onPointerMove = (e) => {
+            if (IS_MOBILE && e.pointerType !== 'mouse') return;
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
+            if (IS_MOBILE && e.pointerType !== 'mouse') return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
             const action = renderer.handlePointerDown();
@@ -474,6 +478,10 @@ export default function SurvivGame() {
 
         socket.on('survivTick', (tick) => {
             renderer.updateState(tick);
+            if (IS_MOBILE) {
+                const nearby = !!renderer.getNearbyChest();
+                setCanMobileInteract(previous => previous === nearby ? previous : nearby);
+            }
             if (tick.you) {
                 setMe(tick.you);
                 const chestId = tick.you.openedContainer?.id || null;
@@ -622,6 +630,34 @@ export default function SurvivGame() {
         rendererRef.current?.setHoldStart(0);
     }, []);
 
+    const handleMobileMove = useCallback((dx, dy) => {
+        rendererRef.current?.setMobileMove(dx, dy);
+    }, []);
+
+    const handleMobileAim = useCallback((dx, dy, magnitude) => {
+        rendererRef.current?.setMobileAim(dx, dy, magnitude);
+    }, []);
+
+    const handleMobileInventory = useCallback(() => {
+        setIsInventoryOpen(previous => {
+            if (previous) closeChestPendingRef.current = true;
+            return !previous;
+        });
+    }, []);
+
+    const handleMobileReload = useCallback(() => {
+        reloadPendingRef.current = true;
+    }, []);
+
+    const handleMobileHeal = useCallback(() => {
+        useMedkitPendingRef.current = true;
+    }, []);
+
+    const handleMobileInteract = useCallback(() => {
+        const chest = rendererRef.current?.getNearbyChest();
+        if (chest?.id) openChestPendingRef.current = chest.id;
+    }, []);
+
     const handleAdminSpawnBot = useCallback(() => {
         if (!authToken) return;
         socketRef.current?.emit('adminSpawnBotNearMe', { token: authToken, mode: 'surviv' });
@@ -635,7 +671,7 @@ export default function SurvivGame() {
     const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
 
     return (
-        <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
+        <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}`} style={{
             width: '100vw',
             height: '100vh',
             background: '#0a0a0c',
@@ -647,7 +683,19 @@ export default function SurvivGame() {
         }}>
             <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
 
-            <MobileGameSession containerRef={viewportRef} />
+            <MobileGameSession containerRef={viewportRef} orientation="landscape" />
+
+            {IS_MOBILE && gameReady && me && !showResultModal && !isDead && !isSpectating && !isInventoryOpen && (
+                <SurvivMobileControls
+                    onMove={handleMobileMove}
+                    onAim={handleMobileAim}
+                    onInventory={handleMobileInventory}
+                    onReload={handleMobileReload}
+                    onHeal={handleMobileHeal}
+                    onInteract={handleMobileInteract}
+                    canInteract={canMobileInteract}
+                />
+            )}
 
             {(!isConnected || !gameReady) && !pendingAtMount && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
