@@ -823,7 +823,7 @@ export default function SurvivGame() {
                         const isActive = weaponId && weaponId === me.weapon;
                         const isReloading = isActive && me.reloading;
                         const reloadDuration = Math.max(1, Number(me.reloadMs) || 1);
-                        const reloadRemaining = Math.max(0, (Number(me.reloadEndAt) || 0) - Date.now());
+                        const reloadRemaining = Math.max(0, Number(me.reloadRemainingMs) || 0);
                         const reloadProgress = isReloading
                             ? Math.max(0, Math.min(1, 1 - reloadRemaining / reloadDuration))
                             : 0;

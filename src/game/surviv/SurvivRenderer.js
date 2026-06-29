@@ -32,16 +32,24 @@ const LOOT_COLORS = {
     weapon: '#f2774f',
 };
 
-const LOOT_LABELS = {
-    money: '$',
-    medkit: '+',
-    armor: 'A',
-    ammo: 'AM',
-    weapon: 'W',
+const WEAPON_FIRE_RATE = {
+    fists: 0, pistol: 280, revolver: 600, smg: 80, shotgun: 750,
+    assault: 150, dmr: 350, sniper: 1400, lmg: 110,
+};
+
+const WEAPON_SHAKE = {
+    fists: 0, pistol: 1.8, revolver: 4, smg: 0.8, shotgun: 5,
+    assault: 1.5, dmr: 3, sniper: 7, lmg: 1.2,
 };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const lerp = (a, b, t) => a + (b - a) * t;
+const lerpAngle = (a, b, t) => {
+    let diff = b - a;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    return a + diff * t;
+};
 
 function roundRect(ctx, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
@@ -63,7 +71,7 @@ function seededNoise(x, y) {
 }
 
 function biomeAt() {
-    return { base: '#58764f', alt: '#638257', grass: 'rgba(35,70,40,0.16)' };
+    return { base: '#3d6b35', alt: '#4a7a42', grass: 'rgba(45,88,38,0.22)' };
 }
 
 export class SurvivRenderer {
@@ -109,7 +117,7 @@ export class SurvivRenderer {
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
         this.mobileMove = { x: 0, y: 0 };
-        this.mobileAim = { angle: 0, active: false, shooting: false };
+        this.mobileAim = { angle: 0, strength: 0, active: false, shooting: false };
         this.inputEnabled = true;
         this.spectatorMode = false;
         this.externalCameraGetter = null;
@@ -119,6 +127,38 @@ export class SurvivRenderer {
         this._lastFrameAt = performance.now();
         this._onResize = () => this.resize();
         window.addEventListener('resize', this._onResize);
+
+        // --- New visual feedback systems ---
+        // Particle system (muzzle flash, bullet impacts, debris)
+        this.particles = [];
+        // Hit marker (center-screen X when you deal damage)
+        this.hitMarkers = [];
+        // Damage direction indicators (red arcs at screen edge)
+        this.damageIndicators = [];
+        // Floating damage numbers
+        this.damageNumbers = [];
+        // Camera shake
+        this.cameraShake = { x: 0, y: 0, intensity: 0, decay: 0.88 };
+        // Kill feed
+        this.killFeed = [];
+        // Previous player states for interpolation & tracking
+        this._prevPlayers = new Map();
+        this._interpPlayers = new Map();
+        // Previous HP for detecting damage
+        this._prevHp = 100;
+        // Previous ammo for detecting shots fired
+        this._prevAmmo = -1;
+        this._prevWeapon = 'fists';
+        // Weapon switch animation
+        this._weaponSwitchT = 0;
+        this._weaponSwitchFrom = 'fists';
+        // Muzzle flash
+        this._muzzleFlash = 0;
+        // Low ammo pulse
+        this._lowAmmoPulse = 0;
+        // Player alive count
+        this.aliveCount = 0;
+
         this.resize();
     }
 
@@ -229,13 +269,112 @@ export class SurvivRenderer {
         this.zone = tick.zone || null;
         this.minimap = tick.minimap || { players: [], food: [], obstacles: [] };
 
+        // Count alive players
+        this.aliveCount = tick.aliveCount ?? rawPlayers.filter(p => (p.hp || 0) > 0).length;
+
+        // Store interpolation targets for remote players
+        for (const p of this.players) {
+            if (p.isYou || p.id === this.myId) continue;
+            const prev = this._interpPlayers.get(p.id);
+            if (prev) {
+                prev.targetX = p.x;
+                prev.targetY = p.y;
+                prev.targetAngle = p.angle || 0;
+            } else {
+                this._interpPlayers.set(p.id, {
+                    x: p.x, y: p.y, angle: p.angle || 0,
+                    targetX: p.x, targetY: p.y, targetAngle: p.angle || 0,
+                });
+            }
+        }
+        // Clean up disconnected players
+        const activeIds = new Set(this.players.map(p => p.id));
+        for (const [id] of this._interpPlayers) {
+            if (!activeIds.has(id)) this._interpPlayers.delete(id);
+        }
+
         this.me = me || null;
         if (me?.lastLoot && me.lastLoot.id !== this.lastLootId) {
             this.lastLootId = me.lastLoot.id;
-            this.lootToast = { ...me.lastLoot, expiresAt: Date.now() + 2800 };
+            this.lootToast = { ...me.lastLoot, shownAt: Date.now(), expiresAt: Date.now() + 2200 };
             this.inventoryOpen = true;
         }
         if (me) {
+            // Detect damage taken → spawn damage indicator + screen shake
+            const hpDelta = (me.hp || 0) - this._prevHp;
+            if (hpDelta < -0.5 && this._prevHp > 0) {
+                const dmgAmt = Math.abs(hpDelta);
+                // Camera shake proportional to damage
+                this.cameraShake.intensity += clamp(dmgAmt * 0.3, 1, 8);
+                // Damage direction indicator (try to find nearest enemy direction)
+                let damageAngle = Math.random() * Math.PI * 2;
+                const enemies = rawPlayers.filter(p => !p.isYou && p.id !== this.myId && (p.hp || 0) > 0);
+                if (enemies.length > 0) {
+                    let closest = enemies[0];
+                    let closestDist = Infinity;
+                    for (const e of enemies) {
+                        const d = Math.hypot(e.x - me.x, e.y - me.y);
+                        if (d < closestDist) { closestDist = d; closest = e; }
+                    }
+                    damageAngle = Math.atan2(closest.y - me.y, closest.x - me.x);
+                }
+                this.damageIndicators.push({
+                    angle: damageAngle,
+                    spawnedAt: Date.now(),
+                    duration: 900,
+                    intensity: clamp(dmgAmt / 30, 0.4, 1),
+                });
+                // Damage number on self
+                this.damageNumbers.push({
+                    x: me.x + (Math.random() - 0.5) * 16,
+                    y: me.y - 20,
+                    amount: Math.round(dmgAmt),
+                    spawnedAt: Date.now(),
+                    duration: 900,
+                    color: '#ff4444',
+                });
+            }
+            this._prevHp = me.hp || 0;
+
+            // Detect shots fired → muzzle flash + camera recoil
+            if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && me.weapon !== 'fists' && !me.reloading) {
+                this._muzzleFlash = 1.0;
+                const shakeAmt = WEAPON_SHAKE[me.weapon] || 1;
+                this.cameraShake.intensity += shakeAmt;
+                // Spawn muzzle flash particles
+                const angle = me.angle || 0;
+                const barrelDist = me.weapon === 'sniper' ? 38 : me.weapon === 'shotgun' ? 30 : 24;
+                const bx = me.x + Math.cos(angle) * barrelDist;
+                const by = me.y + Math.sin(angle) * barrelDist;
+                for (let i = 0; i < 4; i++) {
+                    const spread = (Math.random() - 0.5) * 0.6;
+                    const speed = 60 + Math.random() * 80;
+                    this.particles.push({
+                        x: bx, y: by,
+                        vx: Math.cos(angle + spread) * speed,
+                        vy: Math.sin(angle + spread) * speed,
+                        life: 0.15 + Math.random() * 0.1,
+                        maxLife: 0.2,
+                        size: 2 + Math.random() * 3,
+                        color: Math.random() > 0.5 ? '#ffdd44' : '#ff8800',
+                        type: 'muzzle',
+                    });
+                }
+            }
+            this._prevAmmo = me.ammo ?? this._prevAmmo;
+
+            // Detect weapon switch → animation
+            if (me.weapon !== this._prevWeapon) {
+                this._weaponSwitchT = 1.0;
+                this._weaponSwitchFrom = this._prevWeapon;
+                this._prevWeapon = me.weapon;
+            }
+
+            // Low ammo warning pulse
+            if (me.weapon !== 'fists' && !me.reloading && me.ammo <= 3 && me.ammo > 0) {
+                this._lowAmmoPulse = Math.max(this._lowAmmoPulse, 0.5);
+            }
+
             this.hud.hp = me.hp;
             this.hud.maxHp = me.maxHp;
             this.hud.armor = me.armor;
@@ -253,6 +392,42 @@ export class SurvivRenderer {
         if (tick.dollarBalance != null) {
             this.hud.balance = tick.dollarBalance;
         }
+
+        // Kill feed from server
+        if (tick.killFeed) {
+            for (const entry of tick.killFeed) {
+                this.killFeed.push({ ...entry, shownAt: Date.now() });
+            }
+        }
+        // Also detect kills from the 'you' data
+        if (tick.killNotify) {
+            this.killFeed.push({
+                killer: me?.username || 'You',
+                victim: tick.killNotify.victim || 'Player',
+                weapon: tick.killNotify.weapon || me?.weapon || 'fists',
+                shownAt: Date.now(),
+            });
+            // Hit marker for kill
+            this.hitMarkers.push({ spawnedAt: Date.now(), duration: 600, kill: true });
+        }
+        // Detect hit events
+        if (tick.hitConfirm) {
+            this.hitMarkers.push({ spawnedAt: Date.now(), duration: 350, kill: false });
+            // Spawn damage number on target
+            if (tick.hitConfirm.targetX != null) {
+                this.damageNumbers.push({
+                    x: tick.hitConfirm.targetX + (Math.random() - 0.5) * 10,
+                    y: tick.hitConfirm.targetY - 18,
+                    amount: Math.round(tick.hitConfirm.damage || 0),
+                    spawnedAt: Date.now(),
+                    duration: 800,
+                    color: '#ffffff',
+                });
+            }
+        }
+        // Keep kill feed trimmed
+        const now = Date.now();
+        this.killFeed = this.killFeed.filter(e => now - e.shownAt < 5000);
     }
 
     screenToWorld(sx, sy) {
@@ -271,9 +446,10 @@ export class SurvivRenderer {
 
     setMobileAim(dx, dy, magnitude = 0) {
         const strength = clamp(Number(magnitude) || 0, 0, 1);
-        if (strength > 0.08) {
+        this.mobileAim.strength = strength;
+        this.mobileAim.active = strength > 0.08;
+        if (this.mobileAim.active) {
             this.mobileAim.angle = Math.atan2(Number(dy) || 0, Number(dx) || 0);
-            this.mobileAim.active = true;
         }
         this.mobileAim.shooting = strength > 0.3;
     }
@@ -281,6 +457,8 @@ export class SurvivRenderer {
     clearMobileInput() {
         this.mobileMove.x = 0;
         this.mobileMove.y = 0;
+        this.mobileAim.strength = 0;
+        this.mobileAim.active = false;
         this.mobileAim.shooting = false;
     }
 
@@ -595,6 +773,7 @@ export class SurvivRenderer {
         }
 
         ctx.restore();
+        this.drawMobileAimGuide(ctx);
         this.drawCrosshair(ctx);
         this.drawVignette(ctx, W, H);
         // Handled by React UI overlay: this.drawHud(ctx, W, H);
@@ -996,51 +1175,102 @@ export class SurvivRenderer {
             ctx.fill();
 
             ctx.restore();
-        } else if (l.type === 'weapon') {
-            ctx.rotate(-0.2);
-            roundRect(ctx, -15, -5, 24, 10, 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillRect(7, -2, 12, 4);
-        } else if (l.type === 'medkit') {
-            roundRect(ctx, -10, -10, 20, 20, 3);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-2, -7, 4, 14);
-            ctx.fillRect(-7, -2, 14, 4);
-        } else if (l.type === 'armor') {
-            ctx.beginPath();
-            ctx.moveTo(0, -12);
-            ctx.lineTo(11, -6);
-            ctx.lineTo(8, 9);
-            ctx.lineTo(0, 14);
-            ctx.lineTo(-8, 9);
-            ctx.lineTo(-11, -6);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
         } else {
+            ctx.fillStyle = 'rgba(6, 9, 7, 0.34)';
             ctx.beginPath();
-            ctx.arc(0, 0, l.type === 'money' ? 10 : 8, 0, Math.PI * 2);
+            ctx.ellipse(0, 10, 18, 7, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.stroke();
-        }
 
-        if (!isChest) {
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = l.type === 'money' ? '#3f3007' : '#111';
-            ctx.font = '700 8px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(LOOT_LABELS[l.type] || '?', 0, 1);
-            if ((Number(l.amount) || 0) > 1) {
-                ctx.fillStyle = 'rgba(8, 10, 9, 0.88)';
-                roundRect(ctx, 7, -15, 17, 11, 4);
+            const groundGlow = ctx.createRadialGradient(0, 0, 3, 0, 0, 25);
+            groundGlow.addColorStop(0, color + '38');
+            groundGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = groundGlow;
+            ctx.beginPath();
+            ctx.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.save();
+            ctx.translate(0, -2);
+            ctx.fillStyle = color;
+            ctx.strokeStyle = 'rgba(8, 11, 9, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 7;
+
+            if (l.type === 'weapon') {
+                ctx.rotate(-0.22);
+                const longGun = ['assault', 'dmr', 'sniper', 'lmg', 'shotgun'].includes(l.weaponType);
+                roundRect(ctx, -15, -5, longGun ? 29 : 22, 9, 2);
                 ctx.fill();
+                ctx.stroke();
+                ctx.fillRect(longGun ? 12 : 6, -2, longGun ? 13 : 10, 4);
+                ctx.fillStyle = '#252b27';
+                ctx.fillRect(-8, 4, 7, 7);
+            } else if (l.type === 'medkit') {
+                roundRect(ctx, -11, -10, 22, 20, 4);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#f5f7ef';
+                roundRect(ctx, -2, -7, 4, 14, 1);
+                ctx.fill();
+                roundRect(ctx, -7, -2, 14, 4, 1);
+                ctx.fill();
+            } else if (l.type === 'armor') {
+                ctx.beginPath();
+                ctx.moveTo(0, -12);
+                ctx.lineTo(11, -7);
+                ctx.lineTo(8, 8);
+                ctx.lineTo(0, 14);
+                ctx.lineTo(-8, 8);
+                ctx.lineTo(-11, -7);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+                ctx.beginPath();
+                ctx.moveTo(0, -8);
+                ctx.lineTo(0, 9);
+                ctx.stroke();
+            } else if (l.type === 'ammo') {
+                roundRect(ctx, -12, -9, 24, 18, 4);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#6f684f';
+                for (const x of [-6, 0, 6]) {
+                    roundRect(ctx, x - 2, -6, 4, 11, 2);
+                    ctx.fill();
+                }
+            } else {
+                ctx.fillStyle = '#e5ba3d';
+                ctx.beginPath();
+                ctx.ellipse(-3, 2, 9, 7, -0.18, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.ellipse(4, -3, 9, 7, 0.12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#6f5310';
+                ctx.font = '900 9px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('$', 4, -3);
+            }
+            ctx.restore();
+
+            const amount = l.type === 'armor' ? l.armorValue : l.amount;
+            if ((Number(amount) || 0) > 1) {
+                ctx.fillStyle = 'rgba(8, 10, 9, 0.9)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.lineWidth = 1;
+                roundRect(ctx, 8, -17, 19, 12, 4);
+                ctx.fill();
+                ctx.stroke();
                 ctx.fillStyle = '#ffffff';
-                ctx.font = '800 7px system-ui, sans-serif';
-                ctx.fillText(`x${Math.round(l.amount)}`, 15.5, -9.5);
+                ctx.font = '800 8px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`x${Math.round(amount)}`, 17.5, -11);
             }
         }
         ctx.restore();
@@ -1131,11 +1361,11 @@ export class SurvivRenderer {
         ctx.arc(-4, -5, r * 0.36, 0, Math.PI * 2);
         ctx.fill();
 
-        this.drawWeapon(ctx, p.weapon, r, p.meleeUntil, p.color);
+        this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color);
 
         // Reload progress ring near weapon
-        if (p.reloading && p.reloadEndAt && p.reloadMs && p.reloadEndAt > Date.now()) {
-            const progress = clamp(1 - (p.reloadEndAt - Date.now()) / p.reloadMs, 0, 1);
+        if (p.reloading && p.reloadEndAtLocal && p.reloadMs && p.reloadEndAtLocal > Date.now()) {
+            const progress = clamp(1 - (p.reloadEndAtLocal - Date.now()) / p.reloadMs, 0, 1);
             if (progress > 0 && progress < 1) {
                 const ringX = r + 12;
                 const ringY = -12;
@@ -1205,28 +1435,46 @@ export class SurvivRenderer {
         }
     }
 
-    drawWeapon(ctx, weapon, r, meleeUntil = 0, playerColor = '#77c7c8') {
+    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8') {
         ctx.fillStyle = '#222823';
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
         if (weapon === 'fists') {
-            const punching = meleeUntil > Date.now();
-            const reach = punching ? r * 1.38 : r * 0.72;
-            ctx.strokeStyle = 'rgba(14, 20, 18, 0.72)';
+            const now = Date.now();
+            const punching = meleeUntil > now && meleeStartedAt > 0;
+            const duration = Math.max(1, meleeUntil - meleeStartedAt);
+            const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
+            const thrust = punching ? Math.sin(progress * Math.PI) : 0;
+            const leadTop = Math.floor(meleeStartedAt / 430) % 2 === 0;
+            const topReach = r * (0.76 + (leadTop ? 0.92 * thrust : 0.08 * thrust));
+            const bottomReach = r * (0.76 + (!leadTop ? 0.92 * thrust : 0.08 * thrust));
+
+            if (punching && thrust > 0.12) {
+                ctx.save();
+                ctx.globalAlpha = thrust * 0.48;
+                ctx.strokeStyle = '#f5df9a';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(r * 0.66, leadTop ? -7 : 7, r * (0.72 + thrust * 0.35), -0.5, 0.5);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
             ctx.lineWidth = 5;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(r * 0.34, -6);
-            ctx.lineTo(reach, -6);
-            ctx.moveTo(r * 0.34, 6);
-            ctx.lineTo(punching ? r * 0.78 : reach, 6);
+            ctx.moveTo(r * 0.3, -6);
+            ctx.lineTo(topReach, -6);
+            ctx.moveTo(r * 0.3, 6);
+            ctx.lineTo(bottomReach, 6);
             ctx.stroke();
             ctx.fillStyle = playerColor;
-            ctx.strokeStyle = 'rgba(255,255,255,0.32)';
-            ctx.lineWidth = 1.5;
-            for (const hand of [{ x: reach, y: -6 }, { x: punching ? r * 0.78 : reach, y: 6 }]) {
+            ctx.strokeStyle = punching ? 'rgba(255, 232, 158, 0.9)' : 'rgba(255,255,255,0.34)';
+            ctx.lineWidth = punching ? 2 : 1.5;
+            for (const hand of [{ x: topReach, y: -6 }, { x: bottomReach, y: 6 }]) {
                 ctx.beginPath();
-                ctx.arc(hand.x, hand.y, 5.5, 0, Math.PI * 2);
+                ctx.arc(hand.x, hand.y, punching ? 6.2 : 5.5, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
@@ -1273,8 +1521,34 @@ export class SurvivRenderer {
         }
     }
 
+    drawMobileAimGuide(ctx) {
+        if (!this.inputEnabled || this.spectatorMode || !this.mobileAim.active) return;
+        const x = this.viewW / 2;
+        const y = this.viewH / 2;
+        const angle = this.mobileAim.angle;
+        const length = Math.min(150, Math.max(88, Math.min(this.viewW, this.viewH) * 0.3));
+        const start = 24;
+        const endX = x + Math.cos(angle) * length;
+        const endY = y + Math.sin(angle) * length;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.setLineDash([8, 7]);
+        ctx.strokeStyle = this.mobileAim.shooting ? 'rgba(255, 116, 102, 0.82)' : 'rgba(255, 255, 255, 0.58)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(angle) * start, y + Math.sin(angle) * start);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = this.mobileAim.shooting ? '#ff7466' : 'rgba(255,255,255,0.82)';
+        ctx.beginPath();
+        ctx.arc(endX, endY, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
     drawCrosshair(ctx) {
-        if (!this.inputEnabled || this.spectatorMode) return;
+        if (!this.inputEnabled || this.spectatorMode || this.mobileAim.active) return;
         const x = this.mouse.x || this.viewW / 2;
         const y = this.mouse.y || this.viewH / 2;
         ctx.save();
@@ -1405,31 +1679,50 @@ export class SurvivRenderer {
 
     drawLootToast(ctx, W, H) {
         if (!this.lootToast || this.lootToast.expiresAt < Date.now()) return;
+        const now = Date.now();
         const items = this.lootToast.items || {};
         const lines = [];
-        if (items.weaponLabel) lines.push(items.weaponLabel);
-        if (items.money) lines.push('$' + Number(items.money).toFixed(2));
-        if (items.medkits) lines.push(String(items.medkits) + ' medkit');
-        if (items.ammoPacks) lines.push(String(items.ammoPacks) + ' ammo');
-        if (items.armor) lines.push(String(Math.round(items.armor)) + ' armor');
-        const text = lines.length ? lines.join('  |  ') : 'Empty';
-        const w = Math.min(W - 28, Math.max(250, text.length * 7 + 58));
+        if (items.weaponLabel) lines.push(`+ ${items.weaponLabel}`);
+        if (items.money) lines.push(`+$${Number(items.money).toFixed(2)}`);
+        if (items.medkits) lines.push(`+${items.medkits} medkit${items.medkits === 1 ? '' : 's'}`);
+        if (items.ammoPacks) lines.push(`+${items.ammoPacks} ammo`);
+        if (items.armor) lines.push(`+${Math.round(items.armor)} armor`);
+        const text = lines.length ? lines.join('   ') : 'Empty';
+        const w = Math.min(W - 28, Math.max(220, Math.min(390, text.length * 7 + 72)));
         const x = W / 2 - w / 2;
-        const y = Math.max(84, H * 0.12);
+        const baseY = Math.max(72, H * 0.11);
+        const age = Math.max(0, now - (this.lootToast.shownAt || now));
+        const enter = clamp(age / 180, 0, 1);
+        const exit = clamp((this.lootToast.expiresAt - now) / 380, 0, 1);
+        const y = baseY - (1 - enter) * 14;
+        const accent = RARITY_COLORS[this.lootToast.tier] || '#d7c396';
+
         ctx.save();
-        ctx.globalAlpha = clamp((this.lootToast.expiresAt - Date.now()) / 500, 0, 1);
-        this.drawPanel(ctx, x, y, w, 48);
-        ctx.fillStyle = RARITY_COLORS[this.lootToast.tier] || '#d7c396';
-        ctx.beginPath();
-        ctx.arc(x + 24, y + 24, 8, 0, Math.PI * 2);
+        ctx.globalAlpha = Math.min(enter, exit);
+        ctx.fillStyle = 'rgba(8, 12, 9, 0.84)';
+        ctx.strokeStyle = accent + '88';
+        ctx.lineWidth = 1.5;
+        roundRect(ctx, x, y, w, 48, 7);
         ctx.fill();
-        ctx.fillStyle = '#e8efe2';
-        ctx.font = '900 12px system-ui, sans-serif';
+        ctx.stroke();
+        ctx.fillStyle = accent;
+        roundRect(ctx, x, y, 4, 48, 3);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 25, y + 24, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#11170f';
+        ctx.font = '900 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('+', x + 25, y + 24);
+        ctx.fillStyle = '#f0f4eb';
+        ctx.font = '900 11px system-ui, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('Opened', x + 42, y + 19);
-        ctx.fillStyle = '#b8c3b1';
+        ctx.fillText(this.lootToast.source === 'ground' ? 'PICKED UP' : 'LOOTED', x + 43, y + 17);
+        ctx.fillStyle = '#c4cec0';
         ctx.font = '800 11px system-ui, sans-serif';
-        ctx.fillText(text, x + 42, y + 36);
+        ctx.fillText(text, x + 43, y + 34);
         ctx.restore();
     }
 

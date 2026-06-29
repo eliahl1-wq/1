@@ -1960,9 +1960,13 @@
 
 /* Surviv mobile landscape controls */
 .surviv-mobile-controls {
+    --surviv-stick-size: clamp(78px, min(22vw, 28vh), 110px);
+    --surviv-control-edge: max(12px, calc(env(safe-area-inset-bottom, 0px) + 7px));
+    --surviv-side-edge: max(14px, calc(env(safe-area-inset-right, 0px) + 8px));
     position: absolute;
     inset: 0;
     z-index: 160;
+    overflow: visible;
     pointer-events: none;
     touch-action: none;
     user-select: none;
@@ -1971,11 +1975,10 @@
 }
 
 .surviv-mobile-stick {
-    --stick-size: clamp(92px, 25vh, 112px);
     position: absolute;
-    bottom: max(18px, env(safe-area-inset-bottom, 0px) + 10px);
-    width: var(--stick-size);
-    height: var(--stick-size);
+    bottom: var(--surviv-control-edge);
+    width: var(--surviv-stick-size);
+    height: var(--surviv-stick-size);
     border-radius: 50%;
     pointer-events: auto;
     touch-action: none;
@@ -1987,11 +1990,11 @@
 }
 
 .surviv-mobile-stick--move {
-    left: max(22px, env(safe-area-inset-left, 0px) + 14px);
+    left: max(14px, calc(env(safe-area-inset-left, 0px) + 8px));
 }
 
 .surviv-mobile-stick--aim {
-    right: max(22px, env(safe-area-inset-right, 0px) + 14px);
+    right: var(--surviv-side-edge);
 }
 
 .surviv-mobile-stick-ring {
@@ -2036,17 +2039,18 @@
 
 .surviv-mobile-actions {
     position: absolute;
-    right: max(30px, env(safe-area-inset-right, 0px) + 20px);
-    bottom: max(142px, env(safe-area-inset-bottom, 0px) + 132px);
+    right: calc(var(--surviv-side-edge) + var(--surviv-stick-size) + 10px);
+    bottom: calc(var(--surviv-control-edge) + 3px);
     display: grid;
-    grid-template-columns: repeat(2, 42px);
-    gap: 7px;
+    grid-template-columns: repeat(2, 40px);
+    gap: 6px;
     pointer-events: none;
 }
 
 .surviv-mobile-action {
-    width: 42px;
-    height: 42px;
+    box-sizing: border-box;
+    width: 40px;
+    height: 40px;
     padding: 0;
     display: grid;
     place-items: center;
@@ -2184,5 +2188,24 @@
         left: 50% !important;
         transform: translate(-50%, -50%) rotate(90deg);
         transform-origin: center;
+    }
+}
+@media (pointer: coarse) and (max-height: 330px),
+       (orientation: portrait) and (pointer: coarse) and (max-width: 430px) {
+    .surviv-mobile-controls {
+        --surviv-stick-size: clamp(72px, 21vw, 84px);
+        --surviv-control-edge: max(8px, calc(env(safe-area-inset-bottom, 0px) + 4px));
+        --surviv-side-edge: max(10px, calc(env(safe-area-inset-right, 0px) + 5px));
+    }
+
+    .surviv-mobile-actions {
+        right: calc(var(--surviv-side-edge) + var(--surviv-stick-size) + 7px);
+        grid-template-columns: repeat(2, 36px);
+        gap: 5px;
+    }
+
+    .surviv-mobile-action {
+        width: 36px;
+        height: 36px;
     }
 }
