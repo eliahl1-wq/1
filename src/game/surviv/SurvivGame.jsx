@@ -864,7 +864,7 @@ export default function SurvivGame() {
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
-                                            {weaponId === 'fists' ? 'MELEE' : (isActive ? (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`) : `${WEAPON_CLIP_SIZES[weaponId] || 0}/${WEAPON_CLIP_SIZES[weaponId] || 0}`)}
+                                            {weaponId === 'fists' ? 'MELEE' : (isActive ? (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`) : `${me.weaponsAmmo?.[weaponId] !== undefined ? me.weaponsAmmo[weaponId] : WEAPON_CLIP_SIZES[weaponId] || 0}/${WEAPON_CLIP_SIZES[weaponId] || 0}`)}
                                         </span>
                                         {isActive && isReloading && (
                                             <div

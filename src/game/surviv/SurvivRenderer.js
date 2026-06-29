@@ -254,8 +254,17 @@ export class SurvivRenderer {
 
     updateState(tick) {
         if (!tick) return;
-        const me = tick.you || (tick.players || []).find(p => p.isYou || p.id === this.myId);
-        const rawPlayers = tick.players || [];
+        const receivedAt = Date.now();
+        const withLocalReloadClock = (player) => player ? {
+            ...player,
+            reloadEndAtLocal: player.reloading
+                ? receivedAt + Math.max(0, Number(player.reloadRemainingMs) || 0)
+                : 0,
+        } : null;
+
+        const rawMe = tick.you || (tick.players || []).find(p => p.isYou || p.id === this.myId);
+        const me = withLocalReloadClock(rawMe);
+        const rawPlayers = (tick.players || []).map(withLocalReloadClock);
         this.players = me
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
             : rawPlayers;
@@ -1625,29 +1634,32 @@ export class SurvivRenderer {
             ctx.restore();
         }
 
-        // Reload progress ring — larger and more visible than before
+        // Reload progress ring near weapon
         if (p.reloading && p.reloadEndAtLocal && p.reloadMs && p.reloadEndAtLocal > Date.now()) {
             const progress = clamp(1 - (p.reloadEndAtLocal - Date.now()) / p.reloadMs, 0, 1);
             if (progress > 0 && progress < 1) {
-                const ringRadius = r + 6;
+                const ringX = r + 12;
+                const ringY = -12;
+                const ringRadius = 6;
+                const ringLineWidth = 2.2;
                 const startAngle = -Math.PI / 2;
                 const endAngle = startAngle + progress * Math.PI * 2;
 
                 ctx.save();
                 ctx.lineCap = 'round';
-
+                
                 // Track
                 ctx.beginPath();
-                ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-                ctx.lineWidth = 3;
+                ctx.arc(ringX, ringY, ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+                ctx.lineWidth = ringLineWidth;
                 ctx.stroke();
 
-                // Progress arc
+                // Progress
                 ctx.beginPath();
-                ctx.arc(0, 0, ringRadius, startAngle, endAngle);
-                ctx.strokeStyle = '#ffb700';
-                ctx.lineWidth = 3;
+                ctx.arc(ringX, ringY, ringRadius, startAngle, endAngle);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = ringLineWidth;
                 ctx.stroke();
 
                 ctx.restore();
