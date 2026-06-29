@@ -63,6 +63,17 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
     }
 }
 
+function getAgarCameraZoom(cells) {
+    if (!Array.isArray(cells) || cells.length === 0) return 1;
+    const areaRadius = Math.sqrt(cells.reduce((sum, cell) => {
+        const radius = Number(cell.radius) || 0;
+        return sum + radius * radius;
+    }, 0));
+    if (areaRadius <= 48) return 1;
+    return Math.max(0.38, Math.min(1, Math.pow(58 / areaRadius, 0.36)));
+}
+
+
 /**
  * Version v11 - Full Agar.io Clone Logic Integrated
  * Version v12 - Full Agar.io Clone Logic Integrated (Frontend)
@@ -133,6 +144,9 @@ export default function Game() {
     const foodCacheRef = useRef(new Map());
     const canvasDprRef = useRef(1);
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: DEFAULT_ENTRY_FEE, mode: 'agar' });
+    const cameraZoomRef = useRef(1);
+    const cameraFrameTimeRef = useRef(0);
+    const cameraViewportRef = useRef({ zoom: 1, sentAt: 0 });
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
@@ -376,6 +390,9 @@ export default function Game() {
             }
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
+            cameraZoomRef.current = 1;
+            cameraFrameTimeRef.current = 0;
+            cameraViewportRef.current = { zoom: getMobileViewZoom(), sentAt: 0 };
             global.game.width = gameSizes.width;
             global.game.height = gameSizes.height;
             sessionStartAtRef.current = Date.now();
@@ -634,7 +651,7 @@ export default function Game() {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const { width, height } = getGameScreenSize();
-        const viewZoom = getMobileViewZoom();
+        const viewZoom = getMobileViewZoom() * cameraZoomRef.current;
         const dpr = IS_MOBILE ? getMobileCanvasDpr() : 1;
         canvasDprRef.current = dpr;
         canvas.width = Math.round(width * dpr);
@@ -665,6 +682,16 @@ export default function Game() {
             graph.imageSmoothingQuality = IS_MOBILE ? 'high' : 'medium';
             const screen = { width, height };
             const hasPlayer = player && player.x !== undefined;
+            const frameNow = performance.now();
+            const previousFrame = cameraFrameTimeRef.current || frameNow - 16.67;
+            const frameDelta = Math.min(0.1, Math.max(0.001, (frameNow - previousFrame) / 1000));
+            cameraFrameTimeRef.current = frameNow;
+            if (hasPlayer && !isSpectating) {
+                const targetZoom = getAgarCameraZoom(player.cells);
+                const easing = 1 - Math.exp(-frameDelta * 4.5);
+                cameraZoomRef.current += (targetZoom - cameraZoomRef.current) * easing;
+            }
+
             if (hasPlayer && !isSpectating) {
                 spectatorCamRef.current = { x: player.x, y: player.y };
             }
@@ -674,7 +701,18 @@ export default function Game() {
             const camY = isSpectating
                 ? specCamRef.current.y
                 : (hasPlayer ? player.y : spectatorCamRef.current.y);
-            const viewZoom = baseViewZoom * (isSpectating ? specCamRef.current.zoom : 1);
+            const viewZoom = baseViewZoom * (isSpectating ? specCamRef.current.zoom : cameraZoomRef.current);
+            if (hasPlayer && !isSpectating && socketRef.current?.connected) {
+                const sentViewport = cameraViewportRef.current;
+                const sentAt = Date.now();
+                if (sentAt - sentViewport.sentAt >= 250 && Math.abs(viewZoom - sentViewport.zoom) >= 0.015) {
+                    socketRef.current.emit('0', {
+                        screenWidth: width / viewZoom,
+                        screenHeight: height / viewZoom,
+                    });
+                    cameraViewportRef.current = { zoom: viewZoom, sentAt };
+                }
+            }
             const canRenderWorld = isConnected && (!isDead || isSpectating) && (hasPlayer || cashedAmount !== null || isSpectating);
             
             if (canRenderWorld) {
@@ -809,9 +847,10 @@ export default function Game() {
         if (!canvas) return;
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
         socketRef.current?.emit('0', {
-            x, y,
-            screenWidth,
-            screenHeight,
+            x: x / cameraZoomRef.current,
+            y: y / cameraZoomRef.current,
+            screenWidth: screenWidth / cameraZoomRef.current,
+            screenHeight: screenHeight / cameraZoomRef.current,
         });
     };
 
@@ -824,9 +863,10 @@ export default function Game() {
         tryDoubleTapEject(t.clientX, t.clientY);
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(t.clientX, t.clientY, canvas);
         socketRef.current?.emit('0', {
-            x, y,
-            screenWidth,
-            screenHeight,
+            x: x / cameraZoomRef.current,
+            y: y / cameraZoomRef.current,
+            screenWidth: screenWidth / cameraZoomRef.current,
+            screenHeight: screenHeight / cameraZoomRef.current,
         });
     };
 

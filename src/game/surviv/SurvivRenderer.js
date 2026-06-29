@@ -260,6 +260,59 @@ export class SurvivRenderer {
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
             : rawPlayers;
         this.loot = tick.loot || [];
+
+        // Track disappeared bullets for impact particles
+        const prevBullets = this.bullets || [];
+        const currentBulletIds = new Set((tick.bullets || []).map(b => b.id));
+        for (const b of prevBullets) {
+            if (!currentBulletIds.has(b.id)) {
+                // Bullet disappeared! Spawn impact particles at b.x, b.y
+                const angle = Math.atan2(b.vy || 0, b.vx || 1);
+                let hitType = 'spark'; // Default spark
+                let hitColor = '#ffd45a';
+
+                // Check if near any player (excluding owner, though target confirms are handled specifically, general debris is nice)
+                const hitPlayer = this.players.find(p => (p.hp || 0) > 0 && Math.hypot(p.x - b.x, p.y - b.y) < 22);
+                if (hitPlayer) {
+                    hitType = 'blood';
+                    hitColor = '#ef544f';
+                } else {
+                    // Check if near any obstacle
+                    const hitObstacle = this.obstacles.find(o => o.collidable !== false && this.pointInsideRect(o, b.x, b.y, 18));
+                    if (hitObstacle) {
+                        if (hitObstacle.kind === 'tree' || hitObstacle.variant === 'wood' || hitObstacle.kind === 'crate') {
+                            hitType = 'wood';
+                            hitColor = '#8c5b2f';
+                        } else if (hitObstacle.kind === 'rock' || hitObstacle.variant === 'stone') {
+                            hitType = 'rock';
+                            hitColor = '#7a7a7a';
+                        } else if (hitObstacle.kind === 'container' || hitObstacle.kind === 'wall') {
+                            hitType = 'spark';
+                            hitColor = '#ffd45a';
+                        }
+                    }
+                }
+
+                // Spawn 3-6 particles spraying in opposite direction of bullet
+                const count = hitType === 'blood' ? 6 : hitType === 'spark' ? 3 : 4;
+                for (let i = 0; i < count; i++) {
+                    const spread = (Math.random() - 0.5) * 1.2;
+                    const pAngle = angle + Math.PI + spread; // Spray backwards
+                    const speed = 40 + Math.random() * 80;
+                    this.particles.push({
+                        x: b.x,
+                        y: b.y,
+                        vx: Math.cos(pAngle) * speed,
+                        vy: Math.sin(pAngle) * speed,
+                        life: 0.2 + Math.random() * 0.15,
+                        maxLife: 0.35,
+                        size: hitType === 'blood' ? 2.5 + Math.random() * 2 : 1.5 + Math.random() * 2,
+                        color: hitColor,
+                        type: hitType,
+                    });
+                }
+            }
+        }
         this.bullets = tick.bullets || [];
         const nextObstacles = tick.obstacles || [];
         if (nextObstacles !== this.obstacles) {
@@ -732,14 +785,50 @@ export class SurvivRenderer {
             this.zoom = lerp(this.zoom, this.targetZoom, clamp(dt * 5, 0, 1));
         }
 
+        // Update camera shake
+        if (this.cameraShake.intensity > 0.05) {
+            this.cameraShake.x = (Math.random() - 0.5) * this.cameraShake.intensity * 2;
+            this.cameraShake.y = (Math.random() - 0.5) * this.cameraShake.intensity * 2;
+            this.cameraShake.intensity *= this.cameraShake.decay;
+        } else {
+            this.cameraShake.x = 0;
+            this.cameraShake.y = 0;
+            this.cameraShake.intensity = 0;
+        }
+
+        // Decay weapon switch animation
+        if (this._weaponSwitchT > 0) this._weaponSwitchT = Math.max(0, this._weaponSwitchT - dt * 6);
+        // Decay muzzle flash
+        if (this._muzzleFlash > 0) this._muzzleFlash = Math.max(0, this._muzzleFlash - dt * 12);
+        // Decay low ammo pulse
+        if (this._lowAmmoPulse > 0) this._lowAmmoPulse = Math.max(0, this._lowAmmoPulse - dt * 2);
+
+        // Update particles
+        this.particles = this.particles.filter(p => {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.life -= dt;
+            p.vx *= 0.92;
+            p.vy *= 0.92;
+            return p.life > 0;
+        });
+
+        // Interpolate remote players
+        const interpSpeed = clamp(dt * 12, 0.05, 0.6);
+        for (const [id, ip] of this._interpPlayers) {
+            ip.x = lerp(ip.x, ip.targetX, interpSpeed);
+            ip.y = lerp(ip.y, ip.targetY, interpSpeed);
+            ip.angle = lerpAngle(ip.angle, ip.targetAngle, interpSpeed);
+        }
+
         const ctx = this.ctx;
         const W = this.viewW;
         const H = this.viewH;
-        const camX = this.camera.x;
-        const camY = this.camera.y;
+        const camX = this.camera.x + this.cameraShake.x;
+        const camY = this.camera.y + this.cameraShake.y;
         const z = this.zoom;
 
-        ctx.fillStyle = '#48664a';
+        ctx.fillStyle = '#2d5426';
         ctx.fillRect(0, 0, W, H);
 
         ctx.save();
@@ -762,25 +851,50 @@ export class SurvivRenderer {
             if (this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
         this.drawRoomShadows(ctx, currentHouse, currentRoom);
+
+        // Draw zone (gas circle)
+        this.drawZone(ctx);
+
         for (const l of this.loot) {
             if (!this.isLootHidden(l, currentHouse, currentRoom)) this.drawLoot(ctx, l);
         }
         for (const b of this.bullets) {
             if (!this.isPointHiddenByRooms(b.x, b.y, currentHouse, currentRoom)) this.drawBullet(ctx, b);
         }
+        // Draw players with interpolation
         for (const p of this.players) {
-            if (!this.isPlayerHidden(p, currentHouse, currentRoom)) this.drawPlayer(ctx, p);
+            if (this.isPlayerHidden(p, currentHouse, currentRoom)) continue;
+            const isMe = p.isYou || p.id === this.myId;
+            if (!isMe) {
+                // Apply interpolated positions for remote players
+                const ip = this._interpPlayers.get(p.id);
+                if (ip) {
+                    p.x = ip.x;
+                    p.y = ip.y;
+                    p.angle = ip.angle;
+                }
+            }
+            this.drawPlayer(ctx, p);
         }
 
+        // Draw particles (world space)
+        this.drawParticles(ctx);
+
+        // Draw floating damage numbers (world space)
+        this.drawDamageNumbers(ctx);
+
         ctx.restore();
+
+        // Screen-space overlays
         this.drawMobileAimGuide(ctx);
         this.drawCrosshair(ctx);
         this.drawVignette(ctx, W, H);
-        // Handled by React UI overlay: this.drawHud(ctx, W, H);
+        this.drawDamageIndicators(ctx, W, H);
+        this.drawHitMarkers(ctx, W, H);
+        this.drawKillFeed(ctx, W, H);
+        this.drawLowAmmoWarning(ctx, W, H);
         this.drawMinimapPanel(ctx, W, H);
         this.drawLootToast(ctx, W, H);
-
-        // Handled by React UI overlay
     }
 
     drawTerrain(ctx, camX, camY, viewW, viewH, z) {
@@ -799,20 +913,57 @@ export class SurvivRenderer {
         for (let x = startX; x <= endX; x += tile) {
             for (let y = startY; y <= endY; y += tile) {
                 const n = seededNoise(x / tile, y / tile);
+                const n2 = seededNoise(x / tile + 100, y / tile + 100);
                 const b = biomeAt(x + tile / 2, y + tile / 2);
-                ctx.fillStyle = n > 0.62 ? b.grass : 'rgba(221,214,165,0.05)';
-                ctx.fillRect(x, y, tile, tile);
-                if (n > 0.82) {
+
+                // Subtle color variation per tile
+                if (n > 0.55) {
+                    ctx.fillStyle = n > 0.72 ? b.grass : `rgba(52,92,42,${0.08 + n2 * 0.1})`;
+                    ctx.fillRect(x, y, tile, tile);
+                } else {
+                    ctx.fillStyle = `rgba(180,172,130,${0.02 + n * 0.04})`;
+                    ctx.fillRect(x, y, tile, tile);
+                }
+
+                // Multiple organic grass patches
+                if (n > 0.68) {
                     ctx.fillStyle = b.grass;
+                    // Primary grass blob
                     ctx.beginPath();
-                    ctx.ellipse(x + tile * 0.4, y + tile * 0.55, tile * 0.24, tile * 0.07, n * 4, 0, Math.PI * 2);
+                    ctx.ellipse(
+                        x + tile * (0.3 + n2 * 0.4),
+                        y + tile * (0.3 + n * 0.4),
+                        tile * (0.12 + n2 * 0.14),
+                        tile * (0.04 + n * 0.04),
+                        n * 5, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                if (n > 0.82) {
+                    // Secondary small grass tuft
+                    ctx.fillStyle = `rgba(38,78,32,${0.18 + n2 * 0.12})`;
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        x + tile * (0.6 + n * 0.25),
+                        y + tile * (0.2 + n2 * 0.5),
+                        tile * 0.08, tile * 0.03,
+                        n2 * 3, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                if (n > 0.92) {
+                    // Third tiny detail patch
+                    ctx.fillStyle = 'rgba(28,65,24,0.14)';
+                    ctx.beginPath();
+                    ctx.arc(x + tile * n2, y + tile * n, tile * 0.06, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
         }
 
-        ctx.strokeStyle = 'rgba(25,40,28,0.16)';
-        ctx.lineWidth = 1;
+        // Softer, more subtle grid
+        ctx.strokeStyle = 'rgba(20,35,22,0.08)';
+        ctx.lineWidth = 0.5;
         ctx.beginPath();
         for (let x = startX; x <= endX; x += tile) {
             ctx.moveTo(x, startY);
@@ -835,8 +986,53 @@ export class SurvivRenderer {
         ctx.strokeRect(-wh + 10, -wh + 10, wh * 2 - 20, wh * 2 - 20);
     }
 
-    drawZone() {
-        return;
+    drawZone(ctx) {
+        if (!this.zone) return;
+        const { x, y, radius, targetX, targetY, targetRadius } = this.zone;
+        if (!radius || radius <= 0) return;
+
+        ctx.save();
+        // Draw danger zone fog outside safe circle
+        const wh = this.worldHalf + 200;
+        ctx.fillStyle = 'rgba(180, 40, 20, 0.22)';
+        ctx.beginPath();
+        ctx.rect(-wh, -wh, wh * 2, wh * 2);
+        ctx.arc(x, y, radius, 0, Math.PI * 2, true);
+        ctx.fill();
+
+        // Animated zone border
+        const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.5;
+        ctx.strokeStyle = `rgba(255, 80, 40, ${0.5 + pulse * 0.3})`;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([12, 8]);
+        ctx.lineDashOffset = -(Date.now() / 40) % 20;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Inner glow
+        const glowGrad = ctx.createRadialGradient(x, y, radius - 20, x, y, radius + 8);
+        glowGrad.addColorStop(0, 'rgba(255, 60, 30, 0)');
+        glowGrad.addColorStop(0.7, 'rgba(255, 60, 30, 0.08)');
+        glowGrad.addColorStop(1, 'rgba(255, 60, 30, 0.18)');
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(x, y, radius + 8, 0, Math.PI * 2);
+        ctx.arc(x, y, Math.max(0, radius - 20), 0, Math.PI * 2, true);
+        ctx.fill();
+
+        // Draw target zone if shrinking
+        if (targetRadius != null && targetRadius > 0 && targetRadius < radius) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.arc(targetX ?? x, targetY ?? y, targetRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        ctx.restore();
     }
 
     drawObstacle(ctx, o) {
@@ -1272,6 +1468,39 @@ export class SurvivRenderer {
                 ctx.textBaseline = 'middle';
                 ctx.fillText(`x${Math.round(amount)}`, 17.5, -11);
             }
+
+            // Weapon name label below ground loot
+            if (l.type === 'weapon' && l.weaponType) {
+                const wLabel = WEAPON_LABELS[l.weaponType] || l.weaponType;
+                ctx.fillStyle = 'rgba(8, 10, 9, 0.82)';
+                ctx.strokeStyle = color + '55';
+                ctx.lineWidth = 1;
+                const labelW = Math.max(50, wLabel.length * 6 + 14);
+                roundRect(ctx, -labelW / 2, 18, labelW, 14, 3);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = color;
+                ctx.font = '800 8px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(wLabel, 0, 25);
+            }
+
+            // Proximity interaction ring when player is near
+            if (this.me) {
+                const dist = Math.hypot(this.me.x - l.x, this.me.y - l.y);
+                if (dist < 60) {
+                    const proximity = clamp(1 - dist / 60, 0, 1);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${proximity * 0.5})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.lineDashOffset = -(Date.now() / 60) % 8;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
         }
         ctx.restore();
     }
@@ -1344,51 +1573,81 @@ export class SurvivRenderer {
         ctx.rotate(p.angle || 0);
         ctx.globalAlpha = knocked ? 0.45 : 1;
 
+        // Weapon switch animation (scale bounce)
+        if (isMe && this._weaponSwitchT > 0) {
+            const s = 1 - Math.sin(this._weaponSwitchT * Math.PI) * 0.15;
+            ctx.scale(s, s);
+        }
+
+        // Shadow
         ctx.shadowColor = 'rgba(0,0,0,0.35)';
         ctx.shadowBlur = 8;
         ctx.shadowOffsetY = 5;
+
+        // Body circle — surviv.io style thick outline
         ctx.fillStyle = p.color || '#77c7c8';
-        ctx.strokeStyle = isMe ? '#ffffff' : 'rgba(14, 20, 18, 0.68)';
-        ctx.lineWidth = isMe ? 3 : 2;
+        ctx.strokeStyle = isMe ? '#ffffff' : 'rgba(14, 20, 18, 0.78)';
+        ctx.lineWidth = isMe ? 3.5 : 2.5;
         ctx.beginPath();
         ctx.arc(0, 0, r, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 
+        // Body highlight
         ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
         ctx.beginPath();
-        ctx.arc(-4, -5, r * 0.36, 0, Math.PI * 2);
+        ctx.arc(-3, -4, r * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Darker rim at bottom
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.beginPath();
+        ctx.arc(0, 3, r * 0.7, 0.3, Math.PI - 0.3);
         ctx.fill();
 
         this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color);
 
-        // Reload progress ring near weapon
+        // Muzzle flash on self
+        if (isMe && this._muzzleFlash > 0.1) {
+            const barrelDist = p.weapon === 'sniper' ? r * 2.2 : p.weapon === 'shotgun' ? r * 1.5 : r * 1.1;
+            ctx.save();
+            ctx.globalAlpha = this._muzzleFlash * 0.9;
+            const flashGrad = ctx.createRadialGradient(barrelDist, 0, 1, barrelDist, 0, 12);
+            flashGrad.addColorStop(0, '#ffffff');
+            flashGrad.addColorStop(0.3, '#ffee88');
+            flashGrad.addColorStop(0.7, '#ff8800');
+            flashGrad.addColorStop(1, 'rgba(255, 136, 0, 0)');
+            ctx.fillStyle = flashGrad;
+            ctx.beginPath();
+            ctx.arc(barrelDist, 0, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Reload progress ring — larger and more visible than before
         if (p.reloading && p.reloadEndAtLocal && p.reloadMs && p.reloadEndAtLocal > Date.now()) {
             const progress = clamp(1 - (p.reloadEndAtLocal - Date.now()) / p.reloadMs, 0, 1);
             if (progress > 0 && progress < 1) {
-                const ringX = r + 12;
-                const ringY = -12;
-                const ringRadius = 6;
-                const ringLineWidth = 2.2;
+                const ringRadius = r + 6;
                 const startAngle = -Math.PI / 2;
                 const endAngle = startAngle + progress * Math.PI * 2;
 
                 ctx.save();
                 ctx.lineCap = 'round';
-                
+
                 // Track
                 ctx.beginPath();
-                ctx.arc(ringX, ringY, ringRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-                ctx.lineWidth = ringLineWidth;
+                ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+                ctx.lineWidth = 3;
                 ctx.stroke();
 
-                // Progress
+                // Progress arc
                 ctx.beginPath();
-                ctx.arc(ringX, ringY, ringRadius, startAngle, endAngle);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = ringLineWidth;
+                ctx.arc(0, 0, ringRadius, startAngle, endAngle);
+                ctx.strokeStyle = '#ffb700';
+                ctx.lineWidth = 3;
                 ctx.stroke();
 
                 ctx.restore();
@@ -1439,6 +1698,9 @@ export class SurvivRenderer {
         ctx.fillStyle = '#222823';
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
+
+        let hands = null;
+
         if (weapon === 'fists') {
             const now = Date.now();
             const punching = meleeUntil > now && meleeStartedAt > 0;
@@ -1484,29 +1746,34 @@ export class SurvivRenderer {
             ctx.stroke();
             ctx.fillStyle = '#8c5b2f';
             ctx.fillRect(r * 0.3, 2, 10, 4);
+            hands = [{ x: r * 0.4, y: -4.5 }, { x: r * 1.1, y: 4.5 }];
         } else if (weapon === 'smg') {
             roundRect(ctx, r * 0.2, -4, r * 1.0, 8, 2);
             ctx.fill();
             ctx.stroke();
             ctx.fillRect(r * 0.68, 3, 5, 8);
+            hands = [{ x: r * 0.35, y: -4.5 }, { x: r * 0.9, y: 4.5 }];
         } else if (weapon === 'assault' || weapon === 'dmr') {
             roundRect(ctx, r * 0.2, -4, r * (weapon === 'dmr' ? 1.8 : 1.55), 8, 2);
             ctx.fill();
             ctx.stroke();
             ctx.fillRect(r * 0.58, 3, 7, 9);
             if (weapon === 'dmr') ctx.fillRect(r * 1.25, -8, 10, 3);
+            hands = [{ x: r * 0.4, y: -5 }, { x: r * (weapon === 'dmr' ? 1.35 : 1.2), y: 5 }];
         } else if (weapon === 'sniper') {
             roundRect(ctx, r * 0.16, -3, r * 2.05, 6, 2);
             ctx.fill();
             ctx.stroke();
             ctx.fillStyle = '#4a545a';
             ctx.fillRect(r * 0.65, -9, 18, 4);
+            hands = [{ x: r * 0.35, y: -4.5 }, { x: r * 1.45, y: 4.5 }];
         } else if (weapon === 'lmg') {
             roundRect(ctx, r * 0.12, -5, r * 1.75, 10, 2);
             ctx.fill();
             ctx.stroke();
             ctx.fillRect(r * 0.5, 5, 12, 10);
             ctx.fillRect(r * 1.22, -2, 16, 4);
+            hands = [{ x: r * 0.35, y: -5.5 }, { x: r * 1.3, y: 5.5 }];
         } else if (weapon === 'revolver') {
             roundRect(ctx, r * 0.22, -3, r * 0.98, 6, 2);
             ctx.fill();
@@ -1514,10 +1781,30 @@ export class SurvivRenderer {
             ctx.beginPath();
             ctx.arc(r * 0.42, 0, 5, 0, Math.PI * 2);
             ctx.stroke();
+            hands = [{ x: r * 0.45, y: -4.5 }, { x: r * 0.55, y: 4.5 }];
+        } else if (weapon === 'pistol') {
+            roundRect(ctx, r * 0.25, -3, r * 0.82, 6, 2);
+            ctx.fill();
+            ctx.stroke();
+            hands = [{ x: r * 0.45, y: -4.5 }, { x: r * 0.55, y: 4.5 }];
         } else {
             roundRect(ctx, r * 0.25, -3, r * 0.82, 6, 2);
             ctx.fill();
             ctx.stroke();
+            hands = [{ x: r * 0.4, y: -4.5 }, { x: r * 0.8, y: 4.5 }];
+        }
+
+        // Draw hands gripping the gun (two-handed/one-handed)
+        if (weapon !== 'fists' && hands) {
+            ctx.fillStyle = playerColor;
+            ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
+            ctx.lineWidth = 1.8;
+            for (const hand of hands) {
+                ctx.beginPath();
+                ctx.arc(hand.x, hand.y, 5.8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
         }
     }
 
@@ -1819,5 +2106,210 @@ export class SurvivRenderer {
             obstacles: this.minimap.obstacles?.length ? this.minimap.obstacles : this.obstacles,
             time: performance.now(),
         });
+
+        // Draw zone circle on minimap
+        if (this.zone && this.zone.radius > 0) {
+            const minimapSize = W < 760 ? 90 : 128;
+            const pad = W < 760 ? 8 : 14;
+            const mx = W - pad - minimapSize / 2;
+            const my = H - pad - minimapSize / 2;
+            const scale = minimapSize / (this.worldHalf * 2);
+            const zx = mx + (this.zone.x - this.camera.x) * scale + minimapSize / 2 - (this.camera.x + this.worldHalf) * scale;
+            const zy = my + (this.zone.y - this.camera.y) * scale + minimapSize / 2 - (this.camera.y + this.worldHalf) * scale;
+            // Simplified: draw zone relative to minimap center
+            const zoneR = this.zone.radius * scale;
+            const zoneCx = mx + (this.zone.x + this.worldHalf) * scale;
+            const zoneCy = my + (this.zone.y + this.worldHalf) * scale;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 80, 40, 0.7)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(zoneCx, zoneCy, Math.max(1, zoneR), 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    // ========== NEW VISUAL FEEDBACK METHODS ==========
+
+    drawParticles(ctx) {
+        if (this.particles.length === 0) return;
+        ctx.save();
+        for (const p of this.particles) {
+            const alpha = clamp(p.life / (p.maxLife || 0.2), 0, 1);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color || '#ffdd44';
+            ctx.shadowColor = p.color || '#ffdd44';
+            ctx.shadowBlur = 4;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    drawDamageNumbers(ctx) {
+        const now = Date.now();
+        this.damageNumbers = this.damageNumbers.filter(d => now - d.spawnedAt < d.duration);
+        if (this.damageNumbers.length === 0) return;
+        ctx.save();
+        for (const d of this.damageNumbers) {
+            const age = now - d.spawnedAt;
+            const t = age / d.duration;
+            const alpha = t < 0.2 ? t / 0.2 : Math.max(0, 1 - (t - 0.5) / 0.5);
+            const yOffset = -t * 28;
+            const scale = t < 0.15 ? 0.7 + t / 0.15 * 0.6 : 1.3 - t * 0.3;
+
+            ctx.save();
+            ctx.translate(d.x, d.y + yOffset);
+            ctx.scale(scale, scale);
+            ctx.globalAlpha = alpha;
+            ctx.font = '900 14px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+            ctx.strokeText(`-${d.amount}`, 0, 0);
+            ctx.fillStyle = d.color || '#ff4444';
+            ctx.fillText(`-${d.amount}`, 0, 0);
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    drawDamageIndicators(ctx, W, H) {
+        const now = Date.now();
+        this.damageIndicators = this.damageIndicators.filter(d => now - d.spawnedAt < d.duration);
+        if (this.damageIndicators.length === 0) return;
+        const cx = W / 2;
+        const cy = H / 2;
+        const indicatorDist = Math.min(W, H) * 0.35;
+
+        ctx.save();
+        for (const d of this.damageIndicators) {
+            const age = now - d.spawnedAt;
+            const alpha = Math.max(0, 1 - age / d.duration) * d.intensity;
+            const x = cx + Math.cos(d.angle) * indicatorDist;
+            const y = cy + Math.sin(d.angle) * indicatorDist;
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(d.angle);
+            ctx.globalAlpha = alpha;
+
+            // Red damage arc
+            const grad = ctx.createLinearGradient(-30, 0, 30, 0);
+            grad.addColorStop(0, 'rgba(255, 40, 30, 0)');
+            grad.addColorStop(0.5, `rgba(255, 40, 30, ${0.8 * alpha})`);
+            grad.addColorStop(1, 'rgba(255, 40, 30, 0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(4, -18);
+            ctx.lineTo(12, 0);
+            ctx.lineTo(4, 18);
+            ctx.lineTo(0, 12);
+            ctx.lineTo(6, 0);
+            ctx.lineTo(0, -12);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    drawHitMarkers(ctx, W, H) {
+        const now = Date.now();
+        this.hitMarkers = this.hitMarkers.filter(h => now - h.spawnedAt < h.duration);
+        if (this.hitMarkers.length === 0) return;
+        const cx = W / 2;
+        const cy = H / 2;
+
+        ctx.save();
+        for (const h of this.hitMarkers) {
+            const age = now - h.spawnedAt;
+            const t = age / h.duration;
+            const alpha = t < 0.1 ? t / 0.1 : Math.max(0, 1 - (t - 0.3) / 0.7);
+            const size = h.kill ? 14 : 10;
+            const expand = t < 0.15 ? 1 + t * 4 : 1.6 - t * 0.6;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(expand, expand);
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = h.kill ? '#ff4444' : '#ffffff';
+            ctx.lineWidth = h.kill ? 2.5 : 2;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-size, -size);
+            ctx.lineTo(-size * 0.35, -size * 0.35);
+            ctx.moveTo(size, -size);
+            ctx.lineTo(size * 0.35, -size * 0.35);
+            ctx.moveTo(-size, size);
+            ctx.lineTo(-size * 0.35, size * 0.35);
+            ctx.moveTo(size, size);
+            ctx.lineTo(size * 0.35, size * 0.35);
+            ctx.stroke();
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    drawKillFeed(ctx, W, H) {
+        if (this.killFeed.length === 0) return;
+        const now = Date.now();
+        const maxShow = 5;
+        const entries = this.killFeed.slice(-maxShow);
+
+        ctx.save();
+        let y = 56;
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            const age = now - e.shownAt;
+            const alpha = age < 300 ? age / 300 : age > 4200 ? Math.max(0, 1 - (age - 4200) / 800) : 1;
+            if (alpha <= 0) continue;
+
+            ctx.globalAlpha = alpha;
+            const text = `${e.killer || '?'}  ⊕  ${e.victim || '?'}`;
+            const tw = Math.min(220, text.length * 7 + 32);
+            const x = W - tw - 14;
+
+            ctx.fillStyle = 'rgba(8, 10, 9, 0.72)';
+            roundRect(ctx, x, y, tw, 22, 4);
+            ctx.fill();
+
+            ctx.font = '700 10px system-ui, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+
+            // Killer name
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillText(e.killer || '?', x + 8, y + 11);
+
+            // Skull icon
+            const killerW = ctx.measureText(e.killer || '?').width;
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fillText(' ☠ ', x + 8 + killerW, y + 11);
+
+            // Victim name
+            const midW = ctx.measureText(' ☠ ').width;
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillText(e.victim || '?', x + 8 + killerW + midW, y + 11);
+
+            y += 26;
+        }
+        ctx.restore();
+    }
+
+    drawLowAmmoWarning(ctx, W, H) {
+        if (this._lowAmmoPulse <= 0) return;
+        ctx.save();
+        const pulse = 0.5 + Math.sin(Date.now() / 200) * 0.5;
+        ctx.globalAlpha = this._lowAmmoPulse * pulse * 0.25;
+        const grad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+        grad.addColorStop(0, 'rgba(255, 160, 0, 0)');
+        grad.addColorStop(1, 'rgba(255, 160, 0, 0.5)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
     }
 }

@@ -37,6 +37,18 @@ const WEAPON_LABELS = {
     lmg: 'M249 LMG',
 };
 
+const WEAPON_CLIP_SIZES = {
+    fists: 0,
+    pistol: 15,
+    revolver: 6,
+    smg: 30,
+    shotgun: 6,
+    assault: 22,
+    dmr: 10,
+    sniper: 5,
+    lmg: 45,
+};
+
 function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
     switch (weaponId) {
         case 'fists':
@@ -207,6 +219,7 @@ export default function SurvivGame() {
     const [isInventoryOpen, setIsInventoryOpen] = useState(false);
     const [me, setMe] = useState(null);
     const [canMobileInteract, setCanMobileInteract] = useState(false);
+    const [aliveCount, setAliveCount] = useState(0);
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const entryFeeUsd = normalizeSurvivEntryFee(localStorage.getItem('selected_entry_fee'));
@@ -497,6 +510,9 @@ export default function SurvivGame() {
                 const left = Math.max(0, Math.floor((tick.resetTime - Date.now()) / 1000));
                 setResetCountdown(left);
             }
+            // Track alive player count
+            const alive = tick.aliveCount ?? renderer.aliveCount ?? (tick.players || []).filter(p => (p.hp || 0) > 0).length;
+            setAliveCount(alive);
         });
 
         socket.on('leaderboard', (data) => {
@@ -848,7 +864,7 @@ export default function SurvivGame() {
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
-                                            {weaponId === 'fists' ? 'MELEE' : (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`)}
+                                            {weaponId === 'fists' ? 'MELEE' : (isActive ? (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`) : `${WEAPON_CLIP_SIZES[weaponId] || 0}/${WEAPON_CLIP_SIZES[weaponId] || 0}`)}
                                         </span>
                                         {isActive && isReloading && (
                                             <div
@@ -874,6 +890,19 @@ export default function SurvivGame() {
                         <path d="M10 22v-3h4v3"/>
                     </svg>
                     <span>{me.kills} {me.kills === 1 ? 'ELIM' : 'ELIMS'}</span>
+                </div>
+            )}
+
+            {/* Alive Players Count */}
+            {gameReady && !showResultModal && aliveCount > 0 && (
+                <div className="surviv-alive-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span>{aliveCount} ALIVE</span>
                 </div>
             )}
 
