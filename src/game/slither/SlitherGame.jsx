@@ -561,17 +561,20 @@ export default function SlitherGame() {
                 }
             }
 
-            if (!tick.battleRoyale && tick.balance != null) {
+            // Competitive arena food only changes mass. Dollar balance increases
+            // exclusively when eating paid death drops, so normal food stays silent.
+            const hudBalance = tick.competitiveSlither ? tick.dollarBalance : tick.balance;
+            if (!tick.battleRoyale && hudBalance != null) {
                 const prev = prevBalanceRef.current;
-                if (prev != null && tick.balance > prev + 0.001) {
+                if (prev != null && hudBalance > prev + 0.001) {
                     playFoodEatSound();
                 }
-                prevBalanceRef.current = tick.balance;
+                prevBalanceRef.current = hudBalance;
                 const nowB = Date.now();
                 if (nowB - lastBalanceUiAtRef.current >= 400) {
                     lastBalanceUiAtRef.current = nowB;
-                    setCurrentBalance((prevBal) => (prevBal === tick.balance ? prevBal : tick.balance));
-                    rendererRef.current?.setHud({ balance: tick.balance });
+                    setCurrentBalance((prevBal) => (prevBal === hudBalance ? prevBal : hudBalance));
+                    rendererRef.current?.setHud({ balance: hudBalance });
                 }
             }
             if (tick.battleRoyale) {

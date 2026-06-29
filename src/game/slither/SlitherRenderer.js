@@ -1755,8 +1755,9 @@ export class SlitherRenderer {
             arcLen = Math.sqrt(dx0 * dx0 + dy0 * dy0) * (segs.length - 1);
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
-        const mobileCap = boosting ? 78 : 68;
-        const desktopCap = boosting ? 88 : 76;
+        // Boost must never change how much of the body is rendered.
+        const mobileCap = 68;
+        const desktopCap = 76;
         const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
         const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);

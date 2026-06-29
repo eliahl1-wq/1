@@ -3,7 +3,9 @@
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
 const MAX_SC = 6;
-const SC_DIV = 106;
+const SPAWN_SEGMENTS = 12;
+const LENGTH_SC_DIV = 106;
+const RADIUS_SC_DIV = 150;
 const MAX_PATH_POINTS = 560;
 const MIN_HEAD_RECORD = 0.14;
 
@@ -197,11 +199,21 @@ export function wsepForSc(sc) {
 }
 
 export function continuousSc(sct, fam = 0) {
-    return Math.min(MAX_SC, 1 + (Math.max(2, sct) - 2 + Math.max(0, fam)) / SC_DIV);
+    const normalized = Math.max(2, sct) + Math.max(0, fam);
+    const baseSegments = Math.min(normalized, SPAWN_SEGMENTS);
+    const extraSegments = Math.max(0, normalized - SPAWN_SEGMENTS);
+    return Math.min(
+        MAX_SC,
+        1 + (baseSegments - 2) / LENGTH_SC_DIV + extraSegments / RADIUS_SC_DIV,
+    );
+}
+
+function continuousLengthSc(sct, fam = 0) {
+    return Math.min(MAX_SC, 1 + (Math.max(2, sct) - 2 + Math.max(0, fam)) / LENGTH_SC_DIV);
 }
 
 export function continuousArcLength(sct, fam, spacing) {
-    const sp = spacing ?? SEG_SEP * continuousSc(sct, fam);
+    const sp = spacing ?? SEG_SEP * continuousLengthSc(sct, fam);
     return Math.max(sp, (Math.max(1, sct) - 1 + Math.max(0, fam)) * sp);
 }
 
@@ -280,8 +292,9 @@ export function densifySpine(spine, maxEdgeLen) {
 
 /** Snap visual thickness to server after teleport or respawn. */
 export function resetVisualGrowth(state, radius, fam = 0, sct = 1) {
-    const sp = SEG_SEP * continuousSc(sct, fam);
+    const sp = SEG_SEP * continuousLengthSc(sct, fam);
     state.visualRadius = radius ?? BASE_RADIUS * continuousSc(sct, fam);
+    state.visualSpacing = sp;
     state.visualArcLen = continuousArcLength(sct, fam, sp);
     state._prevTargetSct = sct;
 }
@@ -291,18 +304,21 @@ function stepVisualGrowth(state, meta, dt) {
     const targetFam = meta.fam ?? 0;
     const targetSct = meta.segmentCount || 1;
     const targetSc = continuousSc(targetSct, targetFam);
-    const targetSpacing = SEG_SEP * targetSc;
+    const targetSpacing = SEG_SEP * continuousLengthSc(targetSct, targetFam);
     const targetRadius = BASE_RADIUS * targetSc;
     const targetArc = continuousArcLength(targetSct, targetFam, targetSpacing);
 
     if (state.visualRadius == null) state.visualRadius = targetRadius;
+    if (state.visualSpacing == null) state.visualSpacing = targetSpacing;
     if (state.visualArcLen == null) state.visualArcLen = targetArc;
     if (state._prevTargetSct == null) state._prevTargetSct = targetSct;
     state._prevTargetSct = targetSct;
 
-    const radiusA = 1 - Math.exp(-dt / 1.4);
-    const arcA = 1 - Math.exp(-dt / 1.5);
+    const radiusA = 1 - Math.exp(-dt / 1.6);
+    const spacingA = 1 - Math.exp(-dt / 0.9);
+    const arcA = 1 - Math.exp(-dt / 0.9);
     state.visualRadius += (targetRadius - state.visualRadius) * radiusA;
+    state.visualSpacing += (targetSpacing - state.visualSpacing) * spacingA;
     state.visualArcLen += (targetArc - state.visualArcLen) * arcA;
 
     const visSc = state.visualRadius / BASE_RADIUS;
@@ -310,7 +326,7 @@ function stepVisualGrowth(state, meta, dt) {
         radius: state.visualRadius,
         sc: visSc,
         arcLen: state.visualArcLen,
-        spacing: SEG_SEP * visSc,
+        spacing: state.visualSpacing,
     };
 }
 
