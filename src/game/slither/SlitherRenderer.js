@@ -966,9 +966,11 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    _foodSprite(hue, rPx, golden, deathDrop) {
+    _foodSprite(hue, rPx, golden, deathDrop, arenaDeathDrop = false) {
+        // Keep arena death food at exactly the normal death-food sprite size.
+        // Only its gradient is more golden and less hazy.
         const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.35 : 1.45));
-        const key = `f12|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}`;
+        const key = `f13|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}|${arenaDeathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
@@ -979,6 +981,13 @@ export class SlitherRenderer {
                 grad.addColorStop(0.55, `hsla(48, ${sat}%, 50%, 0.15)`);
                 grad.addColorStop(0.75, `hsla(42, ${sat}%, 45%, 0.04)`);
                 grad.addColorStop(1, `hsla(35, ${sat}%, 45%, 0)`);
+            } else if (arenaDeathDrop) {
+                const sat = 92;
+                grad.addColorStop(0, `hsla(55, ${sat}%, 72%, 0.72)`);
+                grad.addColorStop(0.62, `hsla(51, ${sat}%, 60%, 0.32)`);
+                grad.addColorStop(0.84, `hsla(47, ${sat}%, 50%, 0.08)`);
+                grad.addColorStop(0.94, `hsla(43, ${sat}%, 45%, 0.015)`);
+                grad.addColorStop(1, `hsla(40, ${sat}%, 45%, 0)`);
             } else if (deathDrop) {
                 const sat = 85; 
                 grad.addColorStop(0, `hsla(${hue}, ${sat}%, 70%, 0.70)`);
@@ -1119,7 +1128,13 @@ export class SlitherRenderer {
             const c = clusters[i];
             const { x: fx, y: fy } = toScreen(c.x, c.y);
             const screenR = Math.max(9, c.radius * safeZoom * 1.62);
-            const sprite = this._foodSprite(c.hue, spriteR, false, true);
+            const sprite = this._foodSprite(
+                c.hue,
+                spriteR,
+                false,
+                true,
+                !!this.state.competitiveSlither,
+            );
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
             ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
@@ -1283,7 +1298,13 @@ export class SlitherRenderer {
             }
 
             const spriteR = 4;
-            const sprite = this._foodSprite(hue, spriteR, isGolden, !!f.deathDrop);
+            const sprite = this._foodSprite(
+                hue,
+                spriteR,
+                isGolden,
+                !!f.deathDrop,
+                isCompetitive && !!f.deathDrop,
+            );
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
 
