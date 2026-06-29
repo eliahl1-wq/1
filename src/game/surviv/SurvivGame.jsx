@@ -822,6 +822,11 @@ export default function SurvivGame() {
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const isActive = weaponId && weaponId === me.weapon;
                         const isReloading = isActive && me.reloading;
+                        const reloadDuration = Math.max(1, Number(me.reloadMs) || 1);
+                        const reloadRemaining = Math.max(0, (Number(me.reloadEndAt) || 0) - Date.now());
+                        const reloadProgress = isReloading
+                            ? Math.max(0, Math.min(1, 1 - reloadRemaining / reloadDuration))
+                            : 0;
                         const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
                         const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
                         
@@ -846,9 +851,9 @@ export default function SurvivGame() {
                                             {weaponId === 'fists' ? 'MELEE' : (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`)}
                                         </span>
                                         {isActive && isReloading && (
-                                            <div 
+                                            <div
                                                 className="hotbar-reload-sweep"
-                                                style={{ animationDuration: `${me.reloadMs || 1500}ms` }}
+                                                style={{ width: `${reloadProgress * 100}%` }}
                                             />
                                         )}
                                     </>
