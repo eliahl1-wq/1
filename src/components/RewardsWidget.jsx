@@ -58,8 +58,7 @@ export default function RewardsWidget() {
     const canClaim = rentFallbackBalance > 0 || (!user.rewardsDisabled && isCompleted && promoBalance > 0);
 
     const shouldShowWidget = hasUnusedTicket || totalBalance > 0 || (user.freeTicketUsed && !isCompleted);
-    if (!shouldShowWidget) return null;
-
+    // if (!shouldShowWidget) return null; // Always show widget button if on allowed path
     // Notifications: Needs attention if ticket unused or balance > 0 and not fully completed/cashed out
     // and if they haven't explicitly opened the widget in this session.
     const hasNotification = (hasUnusedTicket || hasBalance) && !hasSeen;
