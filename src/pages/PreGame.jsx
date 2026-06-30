@@ -21,6 +21,7 @@ import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeG
 import { buildPresenceHeaders } from '../utils/sitePresence';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { API_URL } from '../utils/apiBase';
+import { clearAllPendingResults } from '../utils/gamePendingResult';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -107,6 +108,12 @@ export default function PreGame() {
     const location = useLocation();
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
+
+    // Reaching the lobby means the previous result screen was intentionally
+    // left (including via the browser Back button). It must not reopen on Play.
+    useEffect(() => {
+        clearAllPendingResults();
+    }, []);
 
     // ── State ──────────────────────────────────────────
     const modeCardRef = useRef(null);

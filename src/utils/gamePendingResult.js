@@ -27,3 +27,9 @@ export function clearPendingResult(game) {
         sessionStorage.removeItem(KEYS[game]);
     } catch { /* ignore */ }
 }
+
+export function clearAllPendingResults() {
+    try {
+        Object.values(KEYS).forEach(key => sessionStorage.removeItem(key));
+    } catch { /* ignore */ }
+}

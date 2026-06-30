@@ -47,7 +47,7 @@ function trimPath(path, maxArcLength) {
 function ensurePathArcLength(path, segmentCount, spacing, angle = 0) {
     const required = Math.max(spacing, (segmentCount - 1) * spacing);
     let arc = pathArcLength(path);
-    if (arc >= required * 0.98) return;
+    if (arc >= required) return;
 
     let dirX = 0;
     let dirY = 0;
@@ -248,11 +248,13 @@ export function fitSpineToArcLength(segments, targetArc) {
     let dx = tail.x - prev.x;
     let dy = tail.y - prev.y;
     let d = Math.hypot(dx, dy);
-    if (d < 1e-4 && n >= 3) {
-        const p2 = segments[n - 3];
-        dx = tail.x - p2.x;
-        dy = tail.y - p2.y;
-        d = Math.hypot(dx, dy);
+    if (d < 1e-4) {
+        for (let i = n - 1; i > 0; i--) {
+            dx = segments[i].x - segments[i - 1].x;
+            dy = segments[i].y - segments[i - 1].y;
+            d = Math.hypot(dx, dy);
+            if (d > 1e-4) break;
+        }
     }
     if (d < 1e-4) return segments;
     const out = segments.slice();
