@@ -103,10 +103,10 @@ export default function Rewards() {
                     </div>
                 </div>
 
-                {/* Section 1: Sponsored Match */}
+                {/* Section 1: Free Game Ticket */}
                 <section style={{ marginBottom: '40px' }}>
                     <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
-                        Sponsored Match
+                        Free Game Ticket
                     </h2>
                     
                     {hasUnusedTicket ? (
@@ -125,7 +125,9 @@ export default function Rewards() {
                                     color: '#4ade80'
                                 }}>
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
+                                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                                        <path d="M12 8v8"/>
+                                        <path d="M14.5 9.5a1.5 1.5 0 0 0-3 0 1.5 1.5 0 0 0 3 3 1.5 1.5 0 0 1 0 3 1.5 1.5 0 0 1-3 0"/>
                                     </svg>
                                 </div>
                                 <div>
@@ -141,14 +143,14 @@ export default function Rewards() {
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 <button 
                                     className="gm-btn gm-btn--primary"
-                                    onClick={() => navigate('/agar')}
-                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', background: '#4ade80', color: '#064e3b', fontWeight: '700' }}
+                                    onClick={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
+                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem' }}
                                 >
                                     Use on Agar
                                 </button>
                                 <button 
                                     className="gm-btn gm-btn--secondary"
-                                    onClick={() => navigate('/slither')}
+                                    onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                                     style={{ flex: 1, padding: '12px 20px', fontSize: '1rem' }}
                                 >
                                     Use on Slither

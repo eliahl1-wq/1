@@ -358,12 +358,15 @@ export default function Game() {
                     socket.emit('brRejoinMatch', { token });
                 } else {
                     const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
+                    const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
+                    localStorage.removeItem('use_free_ticket');
                     socket.emit('joinGame', {
                         username: matchNickname,
                         token,
                         mode: sessionMode,
                         entryFeeUsd,
                         skinColor: preferredSkinAgar,
+                        useFreeTicket,
                     });
                 }
                 hasJoinedGameRef.current = true;

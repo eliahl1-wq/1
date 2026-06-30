@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function RewardsWidget() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [expanded, setExpanded] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [hasSeen, setHasSeen] = useState(false);
@@ -23,6 +24,9 @@ export default function RewardsWidget() {
     }, []);
 
     if (!user || !isInitialized) return null;
+
+    const allowedPaths = ['/pre-game', '/agar', '/slither', '/surviv', '/competitive-slither', '/competitive-agar'];
+    if (!allowedPaths.includes(location.pathname)) return null;
 
     const hasUnusedTicket = user.hasFreeTicket && !user.freeTicketUsed;
     const hasBalance = (user.sponsoredRewardsBalance || 0) > 0;

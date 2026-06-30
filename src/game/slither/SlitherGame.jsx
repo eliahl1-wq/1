@@ -476,12 +476,15 @@ export default function SlitherGame() {
                 } else {
                     const joinMode = joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither';
                     const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+                    const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
+                    localStorage.removeItem('use_free_ticket');
                     socket.emit('joinGame', {
                         username: nickname,
                         token: authToken,
                         mode: joinMode,
                         entryFeeUsd: fee,
                         skinColor: preferredSkin,
+                        useFreeTicket,
                     });
                 }
                 hasJoinedRef.current = true;

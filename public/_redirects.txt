@@ -22,6 +22,7 @@
 /agar  /index.html  200
 /slither  /index.html  200
 /surviv  /index.html  200
+/rewards  /index.html  200
 /br-lobby  /index.html  200
 /admin  /index.html  200
 /admin/sandbox  /index.html  200
