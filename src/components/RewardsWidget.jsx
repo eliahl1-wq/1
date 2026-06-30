@@ -57,6 +57,9 @@ export default function RewardsWidget() {
     const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
     const canClaim = rentFallbackBalance > 0 || (!user.rewardsDisabled && isCompleted && promoBalance > 0);
 
+    const shouldShowWidget = hasUnusedTicket || totalBalance > 0 || (user.freeTicketUsed && !isCompleted);
+    if (!shouldShowWidget) return null;
+
     // Notifications: Needs attention if ticket unused or balance > 0 and not fully completed/cashed out
     // and if they haven't explicitly opened the widget in this session.
     const hasNotification = (hasUnusedTicket || hasBalance) && !hasSeen;
@@ -68,6 +71,7 @@ export default function RewardsWidget() {
     const normal5Progress = Math.min(req5, user.completedFiveDollarNormalGames ?? 0);
     const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
     const hasActiveChallenge = user.freeTicketUsed && !isCompleted && !user.rewardsDisabled;
+    const showReward = user.freeTicketUsed && (totalBalance > 0 || !isCompleted);
 
     const toggleExpand = (e) => {
         e.stopPropagation();
@@ -155,7 +159,9 @@ export default function RewardsWidget() {
                     <button
                         onClick={toggleExpand}
                         aria-label="Close challenges"
-                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', display: 'flex', transition: 'color 0.15s ease' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-3)'; }}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -170,7 +176,7 @@ export default function RewardsWidget() {
                     </div>
                 )}
 
-                {hasActiveChallenge && (
+                {showReward && (
                 <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ color: 'var(--text-h)', fontSize: '0.9rem', fontWeight: 700 }}>
                         Reward: <span style={{ color: 'var(--green)' }}>${totalBalance.toFixed(2)}</span>
@@ -191,11 +197,12 @@ export default function RewardsWidget() {
                             </span>
                             <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / {req5}</span>
                         </div>
-                        <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '999px', overflow: 'hidden' }}>
+                        <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
                             <div style={{
                                 height: '100%',
                                 width: `${(normal5Progress / req5) * 100}%`,
-                                background: '#fff', boxShadow: '0 0 9px rgba(255, 255, 255, 0.22)',
+                                background: normal5Progress >= req5 ? 'var(--green)' : 'var(--accent)',
+                                boxShadow: normal5Progress >= req5 ? '0 0 8px rgba(34, 197, 94, 0.4)' : '0 0 8px rgba(139, 92, 246, 0.3)',
                                 transition: 'width 0.5s ease-out'
                             }} />
                         </div>
@@ -209,11 +216,12 @@ export default function RewardsWidget() {
                             </span>
                             <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / {req10}</span>
                         </div>
-                        <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '999px', overflow: 'hidden' }}>
+                        <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '999px', overflow: 'hidden' }}>
                             <div style={{
                                 height: '100%',
                                 width: `${(normal10Progress / req10) * 100}%`,
-                                background: '#fff', boxShadow: '0 0 9px rgba(255, 255, 255, 0.22)',
+                                background: normal10Progress >= req10 ? 'var(--green)' : 'var(--accent)',
+                                boxShadow: normal10Progress >= req10 ? '0 0 8px rgba(34, 197, 94, 0.4)' : '0 0 8px rgba(139, 92, 246, 0.3)',
                                 transition: 'width 0.5s ease-out'
                             }} />
                         </div>
@@ -262,7 +270,16 @@ export default function RewardsWidget() {
                     fontFamily: 'inherit',
                     fontWeight: '700',
                     fontSize: '0.72rem',
-                    lineHeight: '1.5'
+                    lineHeight: '1.5',
+                    transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                    e.currentTarget.style.background = '#000';
                 }}
             >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
