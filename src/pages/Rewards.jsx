@@ -32,9 +32,14 @@ export default function Rewards() {
     const hasUnusedTicket = user.hasFreeTicket && !user.freeTicketUsed;
     const isCompleted = user.sponsoredRewardsCompleted || user.sponsoredRewardsUnlocked;
     
-    const normal5Progress = Math.min(3, user.completedFiveDollarNormalGames ?? 0);
-    const normal10Progress = Math.min(1, user.completedTenDollarNormalGames ?? 0);
     const balance = user.sponsoredRewardsBalance || 0;
+    const requiredContribution = Math.max(5, balance);
+    const multiplier = Math.ceil(requiredContribution / 5);
+    const req5 = multiplier * 3;
+    const req10 = multiplier * 1;
+    
+    const normal5Progress = Math.min(req5, user.completedFiveDollarNormalGames ?? 0);
+    const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
 
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
@@ -207,16 +212,16 @@ export default function Rewards() {
                             {/* $5 Challenge */}
                             <div style={{ marginBottom: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
-                                    <span style={{ color: normal5Progress >= 3 ? '#4ade80' : 'var(--text-2)' }}>
-                                        {normal5Progress >= 3 ? '✓ ' : ''}Complete 3 × $5 Normal Games
+                                    <span style={{ color: normal5Progress >= req5 ? '#4ade80' : 'var(--text-2)' }}>
+                                        {normal5Progress >= req5 ? '✓ ' : ''}Complete {req5} × $5 Normal Games
                                     </span>
-                                    <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / 3</span>
+                                    <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / {req5}</span>
                                 </div>
                                 <div style={{ height: '8px', background: 'var(--bg-3)', borderRadius: '4px', overflow: 'hidden' }}>
                                     <div style={{ 
                                         height: '100%', 
-                                        width: `${(normal5Progress / 3) * 100}%`, 
-                                        background: normal5Progress >= 3 ? '#4ade80' : 'var(--accent)',
+                                        width: `${(normal5Progress / req5) * 100}%`, 
+                                        background: normal5Progress >= req5 ? '#4ade80' : 'var(--accent)',
                                         transition: 'width 0.5s ease-out'
                                     }} />
                                 </div>
@@ -225,16 +230,16 @@ export default function Rewards() {
                             {/* $10 Challenge */}
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
-                                    <span style={{ color: normal10Progress >= 1 ? '#4ade80' : 'var(--text-2)' }}>
-                                        {normal10Progress >= 1 ? '✓ ' : ''}Complete 1 × $10 Normal Game
+                                    <span style={{ color: normal10Progress >= req10 ? '#4ade80' : 'var(--text-2)' }}>
+                                        {normal10Progress >= req10 ? '✓ ' : ''}Complete {req10} × $10 Normal Game
                                     </span>
-                                    <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / 1</span>
+                                    <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / {req10}</span>
                                 </div>
                                 <div style={{ height: '8px', background: 'var(--bg-3)', borderRadius: '4px', overflow: 'hidden' }}>
                                     <div style={{ 
                                         height: '100%', 
-                                        width: `${(normal10Progress / 1) * 100}%`, 
-                                        background: normal10Progress >= 1 ? '#4ade80' : 'var(--accent)',
+                                        width: `${(normal10Progress / req10) * 100}%`, 
+                                        background: normal10Progress >= req10 ? '#4ade80' : 'var(--accent)',
                                         transition: 'width 0.5s ease-out'
                                     }} />
                                 </div>
