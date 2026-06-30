@@ -140,7 +140,7 @@ export default function RewardsWidget() {
             {/* Expanded Content */}
             <div style={{
                 width: '320px',
-                background: '#1a1a1a',
+                background: 'var(--bg-2)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--r-xl)',
                 padding: '20px',
@@ -272,15 +272,15 @@ export default function RewardsWidget() {
             <button
                 onClick={toggleExpand}
                 style={{
-                    background: '#1a1a1a',
-                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: 'var(--bg-2)',
+                    border: '1px solid var(--border)',
                     borderRadius: '20px',
                     padding: '5px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                    boxShadow: 'var(--shadow-md)',
                     color: '#fff',
                     position: 'relative',
                     fontFamily: 'inherit',
@@ -290,12 +290,12 @@ export default function RewardsWidget() {
                     transition: 'all 0.15s ease'
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#2a2a2a';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+                    e.currentTarget.style.background = 'var(--bg-3)';
+                    e.currentTarget.style.borderColor = 'var(--border-2)';
                 }}
                 onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#1a1a1a';
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                    e.currentTarget.style.background = 'var(--bg-2)';
+                    e.currentTarget.style.borderColor = 'var(--border)';
                 }}
             >
                 challenges

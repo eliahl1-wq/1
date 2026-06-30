@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Connection, PublicKey } from '@solana/web3.js';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import '../styles/ui.css';
@@ -495,6 +496,29 @@ export default function AdminDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
     const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
+    const [rewardOnChainSol, setRewardOnChainSol] = useState(null);
+    const [rewardOnChainUsd, setRewardOnChainUsd] = useState(null);
+
+    useEffect(() => {
+        if (!wallets?.rewardWallet?.address) return;
+        let cancelled = false;
+        const fetchBalance = async () => {
+            try {
+                const conn = new Connection('https://api.mainnet-beta.solana.com');
+                const pk = new PublicKey(wallets.rewardWallet.address);
+                const lamports = await conn.getBalance(pk);
+                if (!cancelled) {
+                    const sol = lamports / 1e9;
+                    setRewardOnChainSol(sol);
+                    if (wallets.solPrice) setRewardOnChainUsd(sol * wallets.solPrice);
+                }
+            } catch (err) {
+                console.error('RPC fetch failed:', err);
+            }
+        };
+        fetchBalance();
+        return () => { cancelled = true; };
+    }, [wallets?.rewardWallet?.address, wallets?.solPrice]);
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -940,6 +964,11 @@ export default function AdminDashboard() {
                                     label="Reward Pool Balance"
                                     value={formatUsd(overview?.rewardPoolBalanceUsd)}
                                     sub={wallets?.rewardWallet ? `Wallet: ${wallets.rewardWallet.address.slice(0, 4)}...${wallets.rewardWallet.address.slice(-4)}` : 'Internal tracking'}
+                                />
+                                <StatCard
+                                    label="Reward Pool (On-Chain)"
+                                    value={rewardOnChainUsd != null ? formatUsd(rewardOnChainUsd) : 'Loading...'}
+                                    sub={rewardOnChainSol != null ? `${rewardOnChainSol.toFixed(4)} SOL via RPC` : 'Fetching real balance...'}
                                 />
                             </div>
                         </div>
