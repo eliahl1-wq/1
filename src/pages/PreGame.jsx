@@ -12,6 +12,7 @@ import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import GamemodeDiscoveryPrompt from '../components/GamemodeDiscoveryPrompt';
+import RewardsWidget from '../components/RewardsWidget';
 import GamemodePreview from '../components/GamemodePreview';
 import { markGamemodePlayed, shouldShowDiscoveryPrompt } from '../constants/gamemodes';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, SURVIV_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, DEFAULT_SURVIV_ENTRY_FEE, tierEconomy, competitiveTierEconomy, survivTierEconomy, formatUsd } from '../constants/economy';
@@ -1759,6 +1760,8 @@ export default function PreGame() {
                     </div>
                 );
             })()}
+
+            <RewardsWidget />
         </div>
     );
 }

@@ -26,7 +26,7 @@ export default function AppTopbar({ children }) {
             </button>
             {user && (
                 <button type="button" className={linkClass('/rewards')} onClick={() => navigate('/rewards')}>
-                    Challenges
+                    Rewards
                 </button>
             )}
             {user && (
