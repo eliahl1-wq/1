@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppTopbar from '../components/AppTopbar';
@@ -6,14 +6,15 @@ import Background from '../components/Background';
 import { API_URL } from '../utils/apiBase';
 
 export default function Rewards() {
-    const { user, loading } = useAuth();
+    const { user, loading, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [history, setHistory] = useState([]);
     const [claimStatus, setClaimStatus] = useState(null); // { type: 'success'|'error'|'loading', message: string }
+    const claimLockRef = useRef(false);
 
     useEffect(() => {
         document.title = 'AgarStake | Rewards';
-        
+
         // Fetch transaction history for rewards
         const fetchHistory = async () => {
             try {
@@ -22,7 +23,7 @@ export default function Rewards() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    const rewardTxs = data.filter(tx => 
+                    const rewardTxs = data.filter(tx =>
                         tx.meta?.event === 'sponsored_rewards_claim' ||
                         tx.meta?.isRentExemptFallback === true ||
                         tx.meta?.event === 'free_ticket_join'
@@ -39,6 +40,32 @@ export default function Rewards() {
         }
     }, [user]);
 
+    useEffect(() => {
+        if (!user?.rewardClaimInProgress) return undefined;
+        let cancelled = false;
+        setClaimStatus({ type: 'loading', message: 'Waiting for blockchain confirmation…' });
+        const poll = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/user/reward-claim-status`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await res.json();
+                if (cancelled) return;
+                if (data.claim?.status === 'confirmed') {
+                    await refreshUser();
+                    setClaimStatus({ type: 'success', message: `Successfully claimed $${Number(data.claim.amountUsd).toFixed(2)}!` });
+                } else if (data.claim?.status === 'failed') {
+                    await refreshUser();
+                    setClaimStatus({ type: 'error', message: data.claim.error || 'Reward claim failed.' });
+                }
+            } catch {
+                // Keep the claim locked; the server reconciler remains authoritative.
+            }
+        };
+        poll();
+        const id = setInterval(poll, 3000);
+        return () => { cancelled = true; clearInterval(id); };
+    }, [user?.rewardClaimInProgress, refreshUser]);
     if (loading) {
         return (
             <div className="page-shell page-shell--with-topbar page-shell--scroll">
@@ -57,23 +84,68 @@ export default function Rewards() {
     }
 
     const hasUnusedTicket = user.hasFreeTicket && !user.freeTicketUsed;
-    const isCompleted = user.sponsoredRewardsCompleted || user.sponsoredRewardsUnlocked;
-    
-    const balance = user.sponsoredRewardsBalance || 0;
-    const requiredContribution = Math.max(5, balance);
+    const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
+
+    const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
+    const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
+    const currentBalance = promoBalance + rentFallbackBalance;
+    const claimableBalance = rentFallbackBalance + (isCompleted && !user.rewardsDisabled ? promoBalance : 0);
+    const canClaim = claimableBalance > 0;
+    const requiredContribution = Math.max(5, promoBalance);
     const multiplier = Math.ceil(requiredContribution / 5);
     const req5 = multiplier * 3;
     const req10 = multiplier * 1;
-    
+
     const normal5Progress = Math.min(req5, user.completedFiveDollarNormalGames ?? 0);
     const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
 
+    const waitForClaim = async () => {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const res = await fetch(`${API_URL}/api/user/reward-claim-status`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            if (data.claim?.status === 'confirmed') {
+                await refreshUser();
+                setClaimStatus({ type: 'success', message: `Successfully claimed $${data.claim.amountUsd.toFixed(2)}!` });
+                return;
+            }
+            if (data.claim?.status === 'failed') throw new Error(data.claim.error || 'Reward claim failed.');
+        }
+        throw new Error('Claim is still processing. It is safe to close this page and check again later.');
+    };
+
+    const handleClaim = async () => {
+        if (claimLockRef.current || claimStatus?.type === 'loading' || !canClaim) return;
+        claimLockRef.current = true;
+        setClaimStatus({ type: 'loading', message: 'Reserving and processing your claim… Please wait.' });
+        try {
+            const res = await fetch(`${API_URL}/api/user/claim-rewards`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            if (res.status === 202 && data.processing) {
+                setClaimStatus({ type: 'loading', message: 'Payment submitted. Waiting for blockchain confirmation…' });
+                await waitForClaim();
+                return;
+            }
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to claim rewards.');
+            await refreshUser();
+            setClaimStatus({ type: 'success', message: `Successfully claimed $${data.amount.toFixed(2)}!` });
+        } catch (err) {
+            setClaimStatus({ type: 'error', message: err.message || 'Error claiming rewards. Try again later.' });
+        } finally {
+            claimLockRef.current = false;
+        }
+    };
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
             <AppTopbar />
             <div className="page-content" style={{ maxWidth: '800px', width: '100%' }}>
-                
+
                 <div className="page-header-row" style={{ marginBottom: '16px', marginTop: '20px' }}>
                     <div>
                         <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
@@ -90,66 +162,38 @@ export default function Rewards() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
                     <div className="panel" style={{ padding: '20px', background: 'rgba(20, 24, 30, 0.6)' }}>
                         <p style={{ margin: '0 0 4px', color: 'var(--text-2)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
-                            Total Rewards Earned
+                            Current Reward Balance
                         </p>
                         <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-h)' }}>
-                            ${balance.toFixed(2)}
+                            ${currentBalance.toFixed(2)}
                         </div>
-                        <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>Lifetime earnings from sponsored matches</p>
+                        <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>Locked promo rewards and retained game winnings</p>
                     </div>
-                    
+
                     <div className="panel" style={{ padding: '20px', background: 'rgba(20, 24, 30, 0.6)' }}>
                         <p style={{ margin: '0 0 4px', color: 'var(--green)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
                             To Claim
                         </p>
                         <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--green)', marginBottom: '8px' }}>
-                            ${isCompleted && balance === 0 ? '0.00' : balance.toFixed(2)}
+                            ${claimableBalance.toFixed(2)}
                         </div>
-                        {isCompleted && balance > 0 ? (
-                            <button
-                                className="gm-btn gm-btn--primary"
-                                onClick={async (e) => {
-                                    e.target.disabled = true;
-                                    setClaimStatus({ type: 'loading', message: 'Processing your claim... Please wait.' });
-                                    try {
-                                        const res = await fetch(`${API_URL}/api/user/claim-rewards`, {
-                                            method: 'POST',
-                                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                                        });
-                                        const data = await res.json();
-                                        if (data.success) {
-                                            setClaimStatus({ type: 'success', message: `Successfully claimed $${data.amount.toFixed(2)}!` });
-                                            // Refresh user details
-                                            setTimeout(() => {
-                                                window.location.reload();
-                                            }, 2000);
-                                        } else {
-                                            setClaimStatus({ type: 'error', message: data.error || 'Failed to claim rewards.' });
-                                            e.target.disabled = false;
-                                        }
-                                    } catch (err) {
-                                        setClaimStatus({ type: 'error', message: 'Error claiming rewards. Try again later.' });
-                                        e.target.disabled = false;
-                                    }
-                                }}
-                                style={{ width: '100%', padding: '14px', fontSize: '1.05rem', fontWeight: '800', letterSpacing: '0.05em', borderRadius: '12px' }}
-                            >
-                                CLAIM REWARDS
-                            </button>
-                        ) : (
-                            <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>
-                                {isCompleted && balance === 0 ? 'All rewards claimed!' : 'Requires challenges to be completed'}
-                            </p>
-                        )}
+                        <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>
+                            {user.rewardClaimInProgress ? 'Claim is processing' : canClaim ? 'Ready to claim below' : isCompleted && currentBalance === 0 ? 'All rewards claimed!' : 'Requires challenges to be completed'}
+                        </p>
                     </div>
                 </div>
 
+                {user.rewardsDisabled && (
+                    <div className="panel" style={{ padding: '16px 18px', marginBottom: '24px', border: '1px solid rgba(239,68,68,0.35)', color: 'var(--red)' }}>
+                        Promotional rewards are disabled while an admin reviews accounts funded by the same external wallet. Retained game winnings can still be claimed.
+                    </div>
+                )}
                 {/* Section 1: Free Game Ticket */}
                 <section style={{ marginBottom: '40px' }}>
                     <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
                         Free Game Ticket
                     </h2>
-                    
+
                     {hasUnusedTicket ? (
                         <div style={{
                             background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
@@ -180,17 +224,17 @@ export default function Rewards() {
                                     </p>
                                 </div>
                             </div>
-                            
+
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                <button 
-                                    className="gm-btn gm-btn--primary"
+                                <button
+                                    className="btn btn-primary"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                                     style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >
                                     Use on Agar
                                 </button>
-                                <button 
-                                    className="gm-btn gm-btn--secondary"
+                                <button
+                                    className="btn btn-primary"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                                     style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >
@@ -215,27 +259,19 @@ export default function Rewards() {
                 </section>
 
                 {/* Section 2: Rewards (Only visible if ticket has been used) */}
-                {user.freeTicketUsed && (
+                {(user.freeTicketUsed || rentFallbackBalance > 0 || user.rewardClaimInProgress) && (
                     <section style={{ marginBottom: '40px' }}>
                         <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
                             Rewards
                         </h2>
-                    
+
                     <div className="panel" style={{ padding: '24px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
                             <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-h)', fontWeight: '600' }}>
                                 Unlock Challenges
                             </h4>
-                            <div style={{ 
-                                padding: '6px 12px', 
-                                borderRadius: '20px', 
-                                fontSize: '0.85rem', 
-                                fontWeight: '700',
-                                background: 'rgba(139, 92, 246, 0.1)',
-                                color: '#a78bfa',
-                                border: '1px solid rgba(139, 92, 246, 0.2)'
-                            }}>
-                                Reward: ${balance.toFixed(2)}
+                            <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-h)' }}>
+                                Reward: <span style={{ color: 'var(--green)' }}>${promoBalance.toFixed(2)}</span>
                             </div>
                         </div>
 
@@ -250,9 +286,9 @@ export default function Rewards() {
                                     <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / {req5}</span>
                                 </div>
                                 <div style={{ height: '8px', background: 'var(--bg-3)', borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{ 
-                                        height: '100%', 
-                                        width: `${(normal5Progress / req5) * 100}%`, 
+                                    <div style={{
+                                        height: '100%',
+                                        width: `${(normal5Progress / req5) * 100}%`,
                                         background: normal5Progress >= req5 ? '#4ade80' : 'var(--accent)',
                                         transition: 'width 0.5s ease-out'
                                     }} />
@@ -268,15 +304,28 @@ export default function Rewards() {
                                     <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / {req10}</span>
                                 </div>
                                 <div style={{ height: '8px', background: 'var(--bg-3)', borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{ 
-                                        height: '100%', 
-                                        width: `${(normal10Progress / req10) * 100}%`, 
+                                    <div style={{
+                                        height: '100%',
+                                        width: `${(normal10Progress / req10) * 100}%`,
                                         background: normal10Progress >= req10 ? '#4ade80' : 'var(--accent)',
                                         transition: 'width 0.5s ease-out'
                                     }} />
                                 </div>
                             </div>
                         </div>
+
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={handleClaim}
+                            disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}
+                            style={{
+                                width: '100%', marginTop: '24px', padding: '13px 20px', fontSize: '0.95rem',
+                                ...(!canClaim && !user.rewardClaimInProgress ? { background: '#374151', color: '#9ca3af', boxShadow: 'none', opacity: 0.7 } : {})
+                            }}
+                        >
+                            {user.rewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING...' : canClaim ? (user.rewardsDisabled ? 'CLAIM RETAINED WINNINGS' : 'CLAIM REWARD') : isCompleted && currentBalance === 0 ? 'CLAIMED' : user.rewardsDisabled ? 'REWARDS UNDER REVIEW' : 'COMPLETE CHALLENGES'}
+                        </button>
                     </div>
                 </section>
                 )}
@@ -378,18 +427,18 @@ export default function Rewards() {
                                     </svg>
                                 )}
                             </div>
-                            
+
                             <h3 style={{ margin: '0 0 10px', color: 'var(--text-h)', fontSize: '1.25rem', fontWeight: '700' }}>
                                 {claimStatus.type === 'loading' ? 'Claiming Rewards' : claimStatus.type === 'success' ? 'Success!' : 'Failed'}
                             </h3>
-                            
+
                             <p style={{ margin: '0 0 24px', color: 'var(--text-2)', fontSize: '0.95rem', lineHeight: '1.5' }}>
                                 {claimStatus.message}
                             </p>
-                            
+
                             {claimStatus.type !== 'loading' && (
-                                <button 
-                                    className="gm-btn gm-btn--secondary" 
+                                <button
+                                    className="btn btn-primary"
                                     onClick={() => setClaimStatus(null)}
                                     style={{ padding: '10px 24px', fontSize: '0.9rem' }}
                                 >

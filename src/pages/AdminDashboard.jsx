@@ -14,6 +14,7 @@ const TABS = [
     { id: 'transactions', label: 'Transactions' },
     { id: 'users', label: 'Users' },
     { id: 'finances', label: 'Finances' },
+    { id: 'security', label: 'Reward Alerts' },
     { id: 'server', label: 'Server' },
 ];
 
@@ -492,6 +493,8 @@ export default function AdminDashboard() {
     const [selectedUserIds, setSelectedUserIds] = useState(new Set());
     const [userSort, setUserSort] = useState('balance_desc');
     const [selectedUserId, setSelectedUserId] = useState(null);
+    const [rewardAlerts, setRewardAlerts] = useState([]);
+    const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -557,18 +560,21 @@ export default function AdminDashboard() {
             if (includeExcludedUsers) userParams.set('showExcluded', 'true');
             if (sort) userParams.set('sort', sort);
             const userQuery = userParams.toString() ? `?${userParams}` : '';
-            const [ov, au, us, wal, sw] = await Promise.all([
+            const [ov, au, us, wal, sw, security] = await Promise.all([
                 fetchAdmin('/api/admin/dashboard/overview'),
                 fetchAdmin('/api/admin/dashboard/active-users'),
                 fetchAdmin(`/api/admin/dashboard/users${userQuery}`),
                 fetchAdmin('/api/admin/dashboard/wallets'),
                 fetchAdmin('/api/admin/dashboard/sweeps'),
+                fetchAdmin('/api/admin/reward-security-alerts'),
             ]);
             setOverview(ov);
             setActiveUsers(au);
             setUsers(us.users ?? []);
             setWallets(wal);
             setSweeps(sw.sweeps ?? []);
+            setRewardAlerts(security.alerts ?? []);
+            setPendingRewardClaims(security.pendingClaims ?? []);
             await Promise.all([
                 fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded),
                 fetchLiveFeed(true),
@@ -608,6 +614,26 @@ export default function AdminDashboard() {
         return () => clearInterval(id);
     }, [tab, txFilter, showExcluded, fetchTransactions]);
 
+    const resolveRewardAlert = async (alert, action) => {
+        const verb = action === 'approve' ? 'allow rewards for' : 'keep rewards blocked for';
+        if (!window.confirm(`${verb} all accounts linked to ${alert.sourceWallet}?`)) return;
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            await fetchAdmin(`/api/admin/reward-security-alerts/${alert._id}/resolve`, {
+                method: 'POST',
+                body: JSON.stringify({ action }),
+            });
+            const data = await fetchAdmin('/api/admin/reward-security-alerts');
+            setRewardAlerts(data.alerts ?? []);
+            setPendingRewardClaims(data.pendingClaims ?? []);
+            setActionMsg(action === 'approve' ? '✅ Linked accounts approved and rewards restored.' : '✅ Reward block confirmed.');
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
     const runAdminAction = async (path, confirmText, body) => {
         if (confirmText && !window.confirm(confirmText)) return;
         setActionLoading(true);
@@ -886,6 +912,11 @@ export default function AdminDashboard() {
                                     sub={`${overview?.activeSponsoredPlayers ?? 0} active sponsored players`}
                                 />
                                 <StatCard
+                                    label="Retained Game Winnings"
+                                    value={formatUsd(overview?.totalRetainedWinnings)}
+                                    sub="Below-rent cashouts still owed to players"
+                                />
+                                <StatCard
                                     label="Completed Challenges"
                                     value={overview?.completedBeginnerChallenges ?? 0}
                                     sub="Players fully unlocked"
@@ -899,6 +930,11 @@ export default function AdminDashboard() {
                                     label="Used Free Tickets"
                                     value={overview?.usedFreeTickets ?? 0}
                                     sub="Matches claimed"
+                                />
+                                <StatCard
+                                    label="Pending Reward Alerts"
+                                    value={rewardAlerts.filter(alert => alert.status === 'pending').length}
+                                    sub="Shared external funding wallets"
                                 />
                                 <StatCard
                                     label="Reward Pool Balance"
@@ -1114,6 +1150,55 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
+                {tab === 'security' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <Panel
+                            title={`Shared deposit-wallet alerts (${rewardAlerts.filter(alert => alert.status === 'pending').length} pending)`}
+                            sub="Rewards are removed automatically until you allow the linked accounts or confirm the block."
+                        >
+                            {rewardAlerts.length === 0 ? (
+                                <div style={{ padding: '24px', color: 'var(--text-2)', fontSize: '0.82rem' }}>No linked-wallet alerts.</div>
+                            ) : rewardAlerts.map(alert => (
+                                <div key={alert._id} style={{ padding: '18px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: '16px', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '7px' }}>
+                                            <CategoryBadge category={alert.status === 'approved' ? 'deposit' : alert.status === 'denied' ? 'death' : 'withdraw'} />
+                                            <strong style={{ color: 'var(--text-h)', textTransform: 'capitalize' }}>{alert.status}</strong>
+                                        </div>
+                                        <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-2)', wordBreak: 'break-all' }}>{alert.sourceWallet}</div>
+                                        <div style={{ marginTop: '7px', fontSize: '0.78rem', color: 'var(--text-1)' }}>
+                                            {(alert.userIds || []).map(user => user.username || user.email || user._id).join(' · ')}
+                                        </div>
+                                        <div style={{ marginTop: '4px', fontSize: '0.68rem', color: 'var(--text-3)' }}>{formatDate(alert.createdAt)}</div>
+                                    </div>
+                                    {alert.status === 'pending' && (
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'approve')}>
+                                                Allow linked accounts
+                                            </button>
+                                            <button type="button" className="btn btn-danger" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'deny')}>
+                                                Keep rewards blocked
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </Panel>
+                        <Panel title={`Claims awaiting settlement (${pendingRewardClaims.length})`} sub="Broadcast claims reconcile automatically. Reserved claims stay locked for investigation rather than risking a double payment.">
+                            <DataTable
+                                columns={[
+                                    { key: 'user', label: 'User', render: claim => claim.userId?.username || claim.userId?.email || 'Unknown' },
+                                    { key: 'amount', label: 'Amount', render: claim => formatUsd(claim.amountUsd) },
+                                    { key: 'status', label: 'Status', render: claim => <strong style={{ textTransform: 'capitalize' }}>{claim.status}</strong> },
+                                    { key: 'signature', label: 'Signature', render: claim => claim.signature ? <span className="mono">{truncateAddr(claim.signature)}</span> : 'Not recorded' },
+                                    { key: 'created', label: 'Created', render: claim => formatDate(claim.createdAt) },
+                                ]}
+                                rows={pendingRewardClaims}
+                                loading={false}
+                                emptyMessage="No unsettled reward claims"
+                            />
+                        </Panel>                    </div>
+                )}
                 {tab === 'server' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>

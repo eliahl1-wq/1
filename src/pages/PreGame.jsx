@@ -765,11 +765,14 @@ export default function PreGame() {
                 const err = ct?.includes('application/json') ? (await vr.json()).message : await vr.text();
                 throw new Error(err || 'Backend verification failed.');
             }
+            const verification = await vr.json();
             if (token) {
                 const mr = await fetch(`${API_URL}/api/me`, { headers: { Authorization: `Bearer ${token}` } });
                 if (mr.ok) login(await mr.json(), token);
             }
-            setStatusMsg(`✅ ${solAmt.toFixed(4)} SOL deposited!`);
+            setStatusMsg(verification.rewardsReview
+                ? 'Deposit confirmed. Rewards are under linked-wallet review.'
+                : `✅ ${solAmt.toFixed(4)} SOL deposited!`);
             setAmount('');
         } catch (err) {
             const m = err.message || '';

@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../utils/apiBase';
 
 export default function RewardsWidget() {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [expanded, setExpanded] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [hasSeen, setHasSeen] = useState(false);
+    const [claimState, setClaimState] = useState({ loading: false, error: '' });
+    const claimLockRef = useRef(false);
 
     useEffect(() => {
         const storedState = localStorage.getItem('rewards_widget_expanded');
@@ -23,21 +26,47 @@ export default function RewardsWidget() {
         setIsInitialized(true);
     }, []);
 
+    useEffect(() => {
+        if (!user?.rewardClaimInProgress) return undefined;
+        let cancelled = false;
+        const poll = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/user/reward-claim-status`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await res.json();
+                if (!cancelled && ['confirmed', 'failed'].includes(data.claim?.status)) await refreshUser();
+            } catch {
+                // Server reconciliation continues even if this lightweight poll fails.
+            }
+        };
+        poll();
+        const id = setInterval(poll, 3000);
+        return () => { cancelled = true; clearInterval(id); };
+    }, [user?.rewardClaimInProgress, refreshUser]);
     if (!user || !isInitialized) return null;
 
     const allowedPaths = ['/pre-game', '/agar', '/slither', '/surviv', '/competitive-slither', '/competitive-agar'];
     if (!allowedPaths.includes(location.pathname)) return null;
 
     const hasUnusedTicket = user.hasFreeTicket && !user.freeTicketUsed;
-    const hasBalance = (user.sponsoredRewardsBalance || 0) > 0;
-    const isCompleted = user.sponsoredRewardsCompleted || user.sponsoredRewardsUnlocked;
-    
+    const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
+    const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
+    const totalBalance = promoBalance + rentFallbackBalance;
+    const hasBalance = totalBalance > 0;
+    const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
+    const canClaim = rentFallbackBalance > 0 || (!user.rewardsDisabled && isCompleted && promoBalance > 0);
+
     // Notifications: Needs attention if ticket unused or balance > 0 and not fully completed/cashed out
     // and if they haven't explicitly opened the widget in this session.
-    const hasNotification = (hasUnusedTicket || (hasBalance && !isCompleted)) && !hasSeen;
+    const hasNotification = (hasUnusedTicket || hasBalance) && !hasSeen;
 
-    const normal5Progress = Math.min(3, user.completedFiveDollarNormalGames ?? 0);
-    const normal10Progress = Math.min(1, user.completedTenDollarNormalGames ?? 0);
+    const requiredContribution = Math.max(5, promoBalance);
+    const multiplier = Math.ceil(requiredContribution / 5);
+    const req5 = multiplier * 3;
+    const req10 = multiplier;
+    const normal5Progress = Math.min(req5, user.completedFiveDollarNormalGames ?? 0);
+    const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
 
     const toggleExpand = (e) => {
         e.stopPropagation();
@@ -54,11 +83,51 @@ export default function RewardsWidget() {
         navigate('/rewards');
     };
 
+    const waitForClaim = async () => {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const res = await fetch(`${API_URL}/api/user/reward-claim-status`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            if (data.claim?.status === 'confirmed') {
+                await refreshUser();
+                return;
+            }
+            if (data.claim?.status === 'failed') throw new Error(data.claim.error || 'Reward claim failed.');
+        }
+        throw new Error('Claim is still processing. Check Rewards again shortly.');
+    };
+
+    const handleClaim = async () => {
+        if (claimLockRef.current || claimState.loading || !canClaim) return;
+        claimLockRef.current = true;
+        setClaimState({ loading: true, error: '' });
+        try {
+            const res = await fetch(`${API_URL}/api/user/claim-rewards`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            if (res.status === 202 && data.processing) {
+                await waitForClaim();
+                return;
+            }
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to claim reward.');
+            await refreshUser();
+        } catch (err) {
+            setClaimState({ loading: false, error: err.message || 'Failed to claim reward.' });
+        } finally {
+            claimLockRef.current = false;
+        }
+    };
+    if ((!hasUnusedTicket && !hasBalance && !user.rewardClaimInProgress) || (user.rewardsDisabled && rentFallbackBalance <= 0)) return null;
+
     return (
         <div style={{
             position: 'fixed',
-            bottom: '16px',
-            right: '16px',
+            bottom: '18px',
+            right: '18px',
             zIndex: 1050,
             display: 'flex',
             flexDirection: 'column',
@@ -67,13 +136,13 @@ export default function RewardsWidget() {
         }}>
             {/* Expanded Content */}
             <div style={{
-                width: '320px',
-                background: '#000',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--r-xl)',
-                padding: '20px',
-                boxShadow: 'var(--shadow-xl)',
-                marginBottom: '10px',
+                width: '340px',
+                background: 'linear-gradient(155deg, #151515 0%, #080808 62%, #050505 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                borderRadius: '18px',
+                padding: '18px',
+                boxShadow: '0 22px 60px rgba(0, 0, 0, 0.58), 0 1px 0 rgba(255, 255, 255, 0.05) inset',
+                marginBottom: '12px',
                 transform: expanded ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
                 opacity: expanded ? 1 : 0,
                 pointerEvents: expanded ? 'auto' : 'none',
@@ -84,9 +153,10 @@ export default function RewardsWidget() {
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>
                         Challenges
                     </span>
-                    <button 
+                    <button
                         onClick={toggleExpand}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                        aria-label="Close challenges"
+                        style={{ width: '28px', height: '28px', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'var(--text-3)', cursor: 'pointer', padding: 0, display: 'flex' }}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -101,53 +171,48 @@ export default function RewardsWidget() {
                     </div>
                 )}
 
-                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <p style={{ margin: '0 0 4px', color: 'var(--text-3)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                            To Claim
-                        </p>
-                        <div style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-h)' }}>
-                            ${(user.sponsoredRewardsBalance || 0).toFixed(2)}
-                        </div>
+                <div style={{ marginBottom: '16px', padding: '12px 13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '11px' }}>
+                    <div style={{ color: 'var(--text-h)', fontSize: '0.9rem', fontWeight: 700 }}>
+                        Reward: <span style={{ color: 'var(--green)' }}>${totalBalance.toFixed(2)}</span>
                     </div>
-                    {(hasUnusedTicket || (hasBalance && !isCompleted)) && !hasSeen && (
+                    {(hasUnusedTicket || hasBalance) && !hasSeen && (
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 10px rgba(34,197,94,0.5)' }} />
                     )}
                 </div>
 
-                {user.freeTicketUsed && (
+                {user.freeTicketUsed && !isCompleted && !user.rewardsDisabled && (
                 <div style={{ marginBottom: '20px' }}>
                     {/* $5 Challenge Bar */}
                     <div style={{ marginBottom: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
-                            <span style={{ color: normal5Progress >= 3 ? 'var(--green)' : 'var(--text-2)' }}>
-                                {normal5Progress >= 3 ? '✓ ' : ''}3 × $5 Games
+                            <span style={{ color: normal5Progress >= req5 ? 'var(--green)' : 'var(--text-2)' }}>
+                                {normal5Progress >= req5 ? '✓ ' : ''}{req5} × $5 Games
                             </span>
-                            <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / 3</span>
+                            <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / {req5}</span>
                         </div>
-                        <div style={{ height: '4px', background: 'var(--bg-3)', borderRadius: '2px', overflow: 'hidden' }}>
-                            <div style={{ 
-                                height: '100%', 
-                                width: `${(normal5Progress / 3) * 100}%`, 
-                                background: normal5Progress >= 3 ? 'var(--green)' : 'var(--accent)',
+                        <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{
+                                height: '100%',
+                                width: `${(normal5Progress / req5) * 100}%`,
+                                background: '#fff', boxShadow: '0 0 9px rgba(255, 255, 255, 0.22)',
                                 transition: 'width 0.5s ease-out'
                             }} />
                         </div>
                     </div>
-                    
+
                     {/* $10 Challenge Bar */}
                     <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
-                            <span style={{ color: normal10Progress >= 1 ? 'var(--green)' : 'var(--text-2)' }}>
-                                {normal10Progress >= 1 ? '✓ ' : ''}1 × $10 Game
+                            <span style={{ color: normal10Progress >= req10 ? 'var(--green)' : 'var(--text-2)' }}>
+                                {normal10Progress >= req10 ? '✓ ' : ''}{req10} × $10 Games
                             </span>
-                            <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / 1</span>
+                            <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / {req10}</span>
                         </div>
-                        <div style={{ height: '4px', background: 'var(--bg-3)', borderRadius: '2px', overflow: 'hidden' }}>
-                            <div style={{ 
-                                height: '100%', 
-                                width: `${(normal10Progress / 1) * 100}%`, 
-                                background: normal10Progress >= 1 ? 'var(--green)' : 'var(--accent)',
+                        <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{
+                                height: '100%',
+                                width: `${(normal10Progress / req10) * 100}%`,
+                                background: '#fff', boxShadow: '0 0 9px rgba(255, 255, 255, 0.22)',
                                 transition: 'width 0.5s ease-out'
                             }} />
                         </div>
@@ -155,30 +220,26 @@ export default function RewardsWidget() {
                 </div>
                 )}
 
-                <button 
+                {(canClaim || user.rewardClaimInProgress) && (
+                    <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={handleClaim}
+                        disabled={claimState.loading || user.rewardClaimInProgress}
+                        style={{ width: '100%', padding: '11px', marginBottom: claimState.error ? '8px' : '12px' }}
+                    >
+                        {claimState.loading || user.rewardClaimInProgress ? 'CLAIMING...' : 'CLAIM REWARD'}
+                    </button>
+                )}
+                {claimState.error && (
+                    <p style={{ margin: '0 0 12px', color: 'var(--red)', fontSize: '0.78rem' }}>{claimState.error}</p>
+                )}
+                <button className="btn btn-primary"
                     onClick={goToRewards}
-                    style={{ 
-                        width: '100%', 
-                        padding: '10px', 
-                        fontSize: '0.9rem', 
-                        fontWeight: '600',
-                        color: 'var(--text-2)',
-                        background: 'transparent',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                    }}
-                    onMouseOver={(e) => {
-                        e.target.style.background = 'rgba(255, 255, 255, 0.05)';
-                        e.target.style.color = '#fff';
-                    }}
-                    onMouseOut={(e) => {
-                        e.target.style.background = 'transparent';
-                        e.target.style.color = 'var(--text-2)';
-                    }}
+                    style={{ width: '100%', padding: '10px' }}
+
                 >
-                    View details
+                    View all challenges
                 </button>
             </div>
 
@@ -186,27 +247,27 @@ export default function RewardsWidget() {
             <button
                 onClick={toggleExpand}
                 style={{
-                    background: '#000',
-                    border: '1px solid var(--border)',
-                    borderRadius: '20px',
-                    padding: '5px 12px',
+                    background: 'linear-gradient(180deg, #171717 0%, #080808 100%)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: '22px',
+                    padding: '6px 12px 6px 8px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                     cursor: 'pointer',
-                    boxShadow: 'var(--shadow-xl)',
+                    boxShadow: '0 10px 28px rgba(0,0,0,0.42), 0 1px 0 rgba(255,255,255,0.05) inset',
                     color: 'var(--text-1)',
                     position: 'relative',
                     fontFamily: 'inherit',
                     fontWeight: '700',
-                    fontSize: '0.72rem',
+                    fontSize: '0.74rem',
                     lineHeight: '1.5'
                 }}
             >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
-                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+                    <path d="M5 21V4"/><path d="M5 5h10.5l-2 3 2 3H5"/>
                 </svg>
-                CHALLENGES
+                challenges
                 {hasNotification && !expanded && (
                     <div style={{
                         position: 'absolute',

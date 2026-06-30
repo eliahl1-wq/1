@@ -2186,7 +2186,7 @@
 
 .sol-price-pill {
   position: fixed;
-  right: 130px;
+  right: 150px;
   bottom: 16px;
   display: flex;
   align-items: center;
@@ -3212,7 +3212,7 @@
 
   .sol-price-pill {
     position: fixed;
-    right: 130px;
+    right: 150px;
     bottom: 16px;
     margin: 0;
   }

@@ -159,7 +159,11 @@ export default function Lobby() {
                 const err = ct?.includes('json') ? (await vr.json()).message : await vr.text();
                 throw new Error(err || 'Verification failed.');
             }
-            setStatusMsg(`✅ ${solAmt.toFixed(4)} SOL deposited!`);
+            const verification = await vr.json();
+            await refreshUser();
+            setStatusMsg(verification.rewardsReview
+                ? 'Deposit confirmed. Rewards are under linked-wallet review.'
+                : `✅ ${solAmt.toFixed(4)} SOL deposited!`);
             setDepositAmount('');
         } catch (err) {
             const m = err.message || '';
