@@ -204,7 +204,6 @@ export default function Game() {
         if (socketRef.current?.connected) {
             const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
             const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
-            localStorage.removeItem('use_free_ticket');
             
             socketRef.current.emit('joinGame', {
                 username: nickname,

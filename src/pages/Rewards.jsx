@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppTopbar from '../components/AppTopbar';
 import Background from '../components/Background';
+import { API_URL } from '../utils/apiBase';
 
 export default function Rewards() {
     const { user, loading } = useAuth();
@@ -47,15 +48,15 @@ export default function Rewards() {
             <AppTopbar />
             <div className="page-content" style={{ maxWidth: '800px', width: '100%' }}>
                 
-                <div className="page-header-row" style={{ marginBottom: '16px' }}>
+                <div className="page-header-row" style={{ marginBottom: '16px', marginTop: '20px' }}>
                     <div>
                         <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
-                        <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)', lineHeight: 1 }}>
+                        <h1 style={{ margin: 0, fontSize: 'clamp(1.8rem, 5vw, 2.8rem)', fontWeight: 800, letterSpacing: '-1px', color: 'var(--text-h)', lineHeight: 1 }}>
                             Rewards
                         </h1>
                     </div>
                 </div>
-                <p style={{ margin: '0 0 32px', color: 'var(--text-1)', fontSize: '1.05rem', lineHeight: '1.5' }}>
+                <p style={{ margin: '0 0 32px', color: 'var(--text-2)', fontSize: '1.05rem', lineHeight: '1.5' }}>
                     Complete challenges to unlock your earned rewards and claim free tickets.
                 </p>
 
@@ -84,7 +85,7 @@ export default function Rewards() {
                                 onClick={async (e) => {
                                     e.target.disabled = true;
                                     try {
-                                        const res = await fetch('/api/user/claim-rewards', {
+                                        const res = await fetch(`${API_URL}/api/user/claim-rewards`, {
                                             method: 'POST',
                                             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                                         });
@@ -136,7 +137,8 @@ export default function Rewards() {
                                 }}>
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
-                                        <text x="12" y="16.5" textAnchor="middle" fontSize="13" fontWeight="bold" fill="currentColor" stroke="none">$</text>
+                                        <path d="M12 11v6" />
+                                        <path d="M10 13a2 2 0 1 0 0-4h2a2 2 0 1 1 0 4h-2a2 2 0 1 0 0 4" />
                                     </svg>
                                 </div>
                                 <div>
@@ -151,14 +153,14 @@ export default function Rewards() {
                             
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 <button 
-                                    className="btn btn-primary"
+                                    className="gm-btn gm-btn--primary"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                                     style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >
                                     Use on Agar
                                 </button>
                                 <button 
-                                    className="btn btn-secondary"
+                                    className="gm-btn gm-btn--secondary"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                                     style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >

@@ -230,7 +230,6 @@ export default function SlitherGame() {
         if (socketRef.current?.connected) {
             const preferredSkin = localStorage.getItem('selected_skin') || 'random';
             const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
-            localStorage.removeItem('use_free_ticket');
 
             socketRef.current.emit('joinGame', {
                 username: nickname,
