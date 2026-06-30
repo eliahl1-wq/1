@@ -71,6 +71,7 @@ export default function RewardsWidget() {
     const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
     const hasActiveChallenge = user.freeTicketUsed && !isCompleted && !user.rewardsDisabled;
     const showReward = user.freeTicketUsed && (totalBalance > 0 || !isCompleted);
+    const hasAnyContent = hasUnusedTicket || showReward || hasActiveChallenge || canClaim || user.rewardClaimInProgress;
 
     const toggleExpand = (e) => {
         e.stopPropagation();
@@ -228,6 +229,12 @@ export default function RewardsWidget() {
                 </div>
                 )}
 
+                {!hasAnyContent && (
+                    <div style={{ marginBottom: '16px', color: 'var(--text-3)', fontSize: '0.8rem', textAlign: 'center' }}>
+                        No active challenges right now.
+                    </div>
+                )}
+
                 {(canClaim || user.rewardClaimInProgress) && (
                     <button
                         type="button"
@@ -255,30 +262,33 @@ export default function RewardsWidget() {
             <button
                 onClick={toggleExpand}
                 style={{
-                    background: '#000',
-                    border: '1px solid var(--border)',
-                    borderRadius: '20px',
-                    padding: '5px 12px',
+                    background: '#1a1a1a',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '24px',
+                    padding: '8px 16px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '8px',
                     cursor: 'pointer',
-                    boxShadow: 'var(--shadow-xl)',
-                    color: 'var(--text-1)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                    color: '#fff',
                     position: 'relative',
                     fontFamily: 'inherit',
                     fontWeight: '700',
-                    fontSize: '0.72rem',
+                    fontSize: '0.75rem',
+                    letterSpacing: '0.5px',
                     lineHeight: '1.5',
-                    transition: 'all 0.15s ease'
+                    transition: 'all 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                    e.currentTarget.style.background = '#2a2a2a';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.background = '#000';
+                    e.currentTarget.style.background = '#1a1a1a';
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                    e.currentTarget.style.transform = 'translateY(0)';
                 }}
             >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
