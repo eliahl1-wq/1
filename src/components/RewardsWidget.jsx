@@ -67,6 +67,7 @@ export default function RewardsWidget() {
     const req10 = multiplier;
     const normal5Progress = Math.min(req5, user.completedFiveDollarNormalGames ?? 0);
     const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
+    const hasActiveChallenge = user.freeTicketUsed && !isCompleted && !user.rewardsDisabled;
 
     const toggleExpand = (e) => {
         e.stopPropagation();
@@ -124,8 +125,8 @@ export default function RewardsWidget() {
     return (
         <div style={{
             position: 'fixed',
-            bottom: '18px',
-            right: '18px',
+            bottom: '16px',
+            right: '16px',
             zIndex: 1050,
             display: 'flex',
             flexDirection: 'column',
@@ -134,13 +135,13 @@ export default function RewardsWidget() {
         }}>
             {/* Expanded Content */}
             <div style={{
-                width: '340px',
-                background: 'linear-gradient(155deg, #151515 0%, #080808 62%, #050505 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                borderRadius: '18px',
-                padding: '18px',
-                boxShadow: '0 22px 60px rgba(0, 0, 0, 0.58), 0 1px 0 rgba(255, 255, 255, 0.05) inset',
-                marginBottom: '12px',
+                width: '320px',
+                background: '#000',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-xl)',
+                padding: '20px',
+                boxShadow: 'var(--shadow-xl)',
+                marginBottom: '10px',
                 transform: expanded ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
                 opacity: expanded ? 1 : 0,
                 pointerEvents: expanded ? 'auto' : 'none',
@@ -154,7 +155,7 @@ export default function RewardsWidget() {
                     <button
                         onClick={toggleExpand}
                         aria-label="Close challenges"
-                        style={{ width: '28px', height: '28px', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'var(--text-3)', cursor: 'pointer', padding: 0, display: 'flex' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', display: 'flex' }}
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -169,7 +170,8 @@ export default function RewardsWidget() {
                     </div>
                 )}
 
-                <div style={{ marginBottom: '16px', padding: '12px 13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '11px' }}>
+                {hasActiveChallenge && (
+                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ color: 'var(--text-h)', fontSize: '0.9rem', fontWeight: 700 }}>
                         Reward: <span style={{ color: 'var(--green)' }}>${totalBalance.toFixed(2)}</span>
                     </div>
@@ -177,8 +179,9 @@ export default function RewardsWidget() {
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 10px rgba(34,197,94,0.5)' }} />
                     )}
                 </div>
+                )}
 
-                {user.freeTicketUsed && !isCompleted && !user.rewardsDisabled && (
+                {hasActiveChallenge && (
                 <div style={{ marginBottom: '20px' }}>
                     {/* $5 Challenge Bar */}
                     <div style={{ marginBottom: '12px' }}>
@@ -237,7 +240,7 @@ export default function RewardsWidget() {
                     style={{ width: '100%', padding: '10px' }}
 
                 >
-                    View all challenges
+                    View details
                 </button>
             </div>
 
@@ -245,27 +248,27 @@ export default function RewardsWidget() {
             <button
                 onClick={toggleExpand}
                 style={{
-                    background: 'linear-gradient(180deg, #171717 0%, #080808 100%)',
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    borderRadius: '22px',
-                    padding: '6px 12px 6px 8px',
+                    background: '#000',
+                    border: '1px solid var(--border)',
+                    borderRadius: '20px',
+                    padding: '5px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                     cursor: 'pointer',
-                    boxShadow: '0 10px 28px rgba(0,0,0,0.42), 0 1px 0 rgba(255,255,255,0.05) inset',
+                    boxShadow: 'var(--shadow-xl)',
                     color: 'var(--text-1)',
                     position: 'relative',
                     fontFamily: 'inherit',
                     fontWeight: '700',
-                    fontSize: '0.74rem',
+                    fontSize: '0.72rem',
                     lineHeight: '1.5'
                 }}
             >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
-                    <path d="M5 21V4"/><path d="M5 5h10.5l-2 3 2 3H5"/>
+                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
                 </svg>
-                challenges
+                CHALLENGES
                 {hasNotification && !expanded && (
                     <div style={{
                         position: 'absolute',
