@@ -7,11 +7,19 @@ export default function RewardsWidget() {
     const navigate = useNavigate();
     const [expanded, setExpanded] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [hasSeen, setHasSeen] = useState(false);
 
     useEffect(() => {
         const storedState = localStorage.getItem('rewards_widget_expanded');
         if (storedState !== null) {
-            setExpanded(storedState === 'true');
+            const isExpanded = storedState === 'true';
+            setExpanded(isExpanded);
+            if (isExpanded) {
+                setHasSeen(true);
+            }
+        } else {
+            // Default to expanded
+            setHasSeen(true);
         }
         setIsInitialized(true);
     }, []);
@@ -23,7 +31,8 @@ export default function RewardsWidget() {
     const isCompleted = user.sponsoredRewardsCompleted || user.sponsoredRewardsUnlocked;
     
     // Notifications: Needs attention if ticket unused or balance > 0 and not fully completed/cashed out
-    const hasNotification = hasUnusedTicket || (hasBalance && !isCompleted);
+    // and if they haven't explicitly opened the widget in this session.
+    const hasNotification = (hasUnusedTicket || (hasBalance && !isCompleted)) && !hasSeen;
 
     const normal5Progress = Math.min(3, user.completedFiveDollarNormalGames ?? 0);
     const normal10Progress = Math.min(1, user.completedTenDollarNormalGames ?? 0);
@@ -33,6 +42,9 @@ export default function RewardsWidget() {
         const newState = !expanded;
         setExpanded(newState);
         localStorage.setItem('rewards_widget_expanded', String(newState));
+        if (newState) {
+            setHasSeen(true);
+        }
     };
 
     const goToRewards = () => {
@@ -95,11 +107,12 @@ export default function RewardsWidget() {
                             ${(user.sponsoredRewardsBalance || 0).toFixed(2)}
                         </div>
                     </div>
-                    {hasNotification && (
+                    {(hasUnusedTicket || (hasBalance && !isCompleted)) && !hasSeen && (
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 10px rgba(34,197,94,0.5)' }} />
                     )}
                 </div>
 
+                {user.freeTicketUsed && (
                 <div style={{ marginBottom: '20px' }}>
                     <p style={{ margin: '0 0 10px', color: 'var(--text-3)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
                         Challenges
@@ -123,7 +136,7 @@ export default function RewardsWidget() {
                     </div>
                     
                     {/* $10 Challenge Bar */}
-                    <div style={{ marginBottom: '12px' }}>
+                    <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
                             <span style={{ color: normal10Progress >= 1 ? 'var(--green)' : 'var(--text-2)' }}>
                                 {normal10Progress >= 1 ? '✓ ' : ''}1 × $10 Game
@@ -140,11 +153,34 @@ export default function RewardsWidget() {
                         </div>
                     </div>
                 </div>
+                )}
 
                 <button 
                     onClick={goToRewards}
-                    className="gm-btn gm-btn--secondary"
-                    style={{ width: '100%', padding: '10px', fontSize: '0.85rem' }}
+                    style={{ 
+                        width: '100%', 
+                        padding: '10px', 
+                        fontSize: '0.8rem', 
+                        fontWeight: '700',
+                        color: 'var(--text-2)',
+                        background: 'transparent',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r-md)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.color = 'var(--text-1)';
+                        e.currentTarget.style.borderColor = 'var(--text-3)';
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'var(--text-2)';
+                        e.currentTarget.style.borderColor = 'var(--border)';
+                        e.currentTarget.style.background = 'transparent';
+                    }}
                 >
                     View Details
                 </button>

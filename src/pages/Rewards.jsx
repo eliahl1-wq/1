@@ -62,12 +62,41 @@ export default function Rewards() {
                         <p style={{ margin: '0 0 4px', color: 'var(--green)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
                             To Claim
                         </p>
-                        <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--green)' }}>
-                            ${isCompleted ? '0.00' : balance.toFixed(2)}
+                        <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--green)', marginBottom: '8px' }}>
+                            ${isCompleted && balance === 0 ? '0.00' : balance.toFixed(2)}
                         </div>
-                        <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>
-                            {isCompleted ? 'All rewards claimed!' : 'Requires challenges to be completed'}
-                        </p>
+                        {isCompleted && balance > 0 ? (
+                            <button
+                                className="gm-btn gm-btn--primary"
+                                onClick={async (e) => {
+                                    e.target.disabled = true;
+                                    try {
+                                        const res = await fetch('/api/user/claim-rewards', {
+                                            method: 'POST',
+                                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                                        });
+                                        const data = await res.json();
+                                        if (data.success) {
+                                            alert(`Successfully claimed $${data.amount.toFixed(2)}!`);
+                                            window.location.reload();
+                                        } else {
+                                            alert(data.error || 'Failed to claim');
+                                            e.target.disabled = false;
+                                        }
+                                    } catch (err) {
+                                        alert('Error claiming rewards');
+                                        e.target.disabled = false;
+                                    }
+                                }}
+                                style={{ width: '100%', padding: '14px', fontSize: '1.05rem', fontWeight: '800', letterSpacing: '0.05em', borderRadius: '12px' }}
+                            >
+                                CLAIM REWARDS
+                            </button>
+                        ) : (
+                            <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>
+                                {isCompleted && balance === 0 ? 'All rewards claimed!' : 'Requires challenges to be completed'}
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -139,11 +168,12 @@ export default function Rewards() {
                     )}
                 </section>
 
-                {/* Section 2: Rewards */}
-                <section style={{ marginBottom: '40px' }}>
-                    <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
-                        Rewards
-                    </h2>
+                {/* Section 2: Rewards (Only visible if ticket has been used) */}
+                {user.freeTicketUsed && (
+                    <section style={{ marginBottom: '40px' }}>
+                        <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
+                            Rewards
+                        </h2>
                     
                     <div className="panel" style={{ padding: '24px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -203,6 +233,7 @@ export default function Rewards() {
                         </div>
                     </div>
                 </section>
+                )}
 
                 {/* Section 3: Information */}
                 <section>
