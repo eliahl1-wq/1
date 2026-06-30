@@ -140,7 +140,7 @@ export default function RewardsWidget() {
             {/* Expanded Content */}
             <div style={{
                 width: '320px',
-                background: '#000',
+                background: '#1a1a1a',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--r-xl)',
                 padding: '20px',
@@ -249,10 +249,20 @@ export default function RewardsWidget() {
                 {claimState.error && (
                     <p style={{ margin: '0 0 12px', color: 'var(--red)', fontSize: '0.78rem' }}>{claimState.error}</p>
                 )}
-                <button className="btn btn-primary"
+                <button
                     onClick={goToRewards}
-                    style={{ width: '100%', padding: '10px' }}
-
+                    style={{ 
+                        width: '100%', 
+                        padding: '10px', 
+                        background: 'none', 
+                        border: 'none', 
+                        color: 'var(--text-2)', 
+                        cursor: 'pointer', 
+                        fontSize: '0.85rem',
+                        textDecoration: 'underline'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-2)'}
                 >
                     View details
                 </button>
@@ -264,37 +274,34 @@ export default function RewardsWidget() {
                 style={{
                     background: '#1a1a1a',
                     border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: '24px',
-                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    padding: '5px 12px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '6px',
                     cursor: 'pointer',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
                     color: '#fff',
                     position: 'relative',
                     fontFamily: 'inherit',
                     fontWeight: '700',
-                    fontSize: '0.75rem',
-                    letterSpacing: '0.5px',
+                    fontSize: '0.72rem',
                     lineHeight: '1.5',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.15s ease'
                 }}
                 onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#2a2a2a';
                     e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
                     e.currentTarget.style.background = '#1a1a1a';
                     e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
-                    e.currentTarget.style.transform = 'translateY(0)';
                 }}
             >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
-                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+                challenges
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)', transition: 'transform 0.2s ease', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                    <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
-                CHALLENGES
                 {hasNotification && !expanded && (
                     <div style={{
                         position: 'absolute',
