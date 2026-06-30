@@ -121,8 +121,6 @@ export default function RewardsWidget() {
             claimLockRef.current = false;
         }
     };
-    if ((!hasUnusedTicket && !hasBalance && !user.rewardClaimInProgress) || (user.rewardsDisabled && rentFallbackBalance <= 0)) return null;
-
     return (
         <div style={{
             position: 'fixed',
