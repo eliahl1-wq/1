@@ -60,6 +60,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/rewards",
+      "destination": "/index.html"
+    },
+    {
       "source": "/br-lobby",
       "destination": "/index.html"
     },

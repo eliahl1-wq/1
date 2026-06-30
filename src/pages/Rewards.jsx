@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppTopbar from '../components/AppTopbar';
+import Background from '../components/Background';
 
 export default function Rewards() {
     const { user, loading } = useAuth();
@@ -13,11 +14,12 @@ export default function Rewards() {
 
     if (loading) {
         return (
-            <div className="lobby-container">
+            <div className="page-shell page-shell--with-topbar page-shell--scroll">
+                <Background />
                 <AppTopbar />
-                <main className="lobby-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="page-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
                     <div className="spinner" />
-                </main>
+                </div>
             </div>
         );
     }
@@ -35,13 +37,14 @@ export default function Rewards() {
     const balance = user.sponsoredRewardsBalance || 0;
 
     return (
-        <div className="lobby-container">
+        <div className="page-shell page-shell--with-topbar page-shell--scroll">
+            <Background />
             <AppTopbar />
-            <main className="lobby-content" style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+            <div className="page-content" style={{ maxWidth: '800px', width: '100%' }}>
                 
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px', color: 'var(--text-h)', fontWeight: '800', letterSpacing: '-0.02em' }}>
-                    Rewards Overview
-                </h1>
+                <div className="page-header-row">
+                    <h1 className="page-title">Rewards</h1>
+                </div>
                 <p style={{ color: 'var(--text-2)', marginBottom: '32px', fontSize: '1rem' }}>
                     Complete challenges to unlock your earned rewards and claim free tickets.
                 </p>
@@ -255,7 +258,7 @@ export default function Rewards() {
                     </div>
                 </section>
 
-            </main>
+            </div>
         </div>
     );
 }

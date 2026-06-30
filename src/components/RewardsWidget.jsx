@@ -11,14 +11,12 @@ export default function RewardsWidget() {
 
     useEffect(() => {
         const storedState = localStorage.getItem('rewards_widget_expanded');
+        const storedSeen = localStorage.getItem('rewards_notif_seen');
         if (storedState !== null) {
             const isExpanded = storedState === 'true';
             setExpanded(isExpanded);
-            if (isExpanded) {
-                setHasSeen(true);
-            }
-        } else {
-            // Default to expanded
+        }
+        if (storedSeen === 'true') {
             setHasSeen(true);
         }
         setIsInitialized(true);
@@ -44,6 +42,7 @@ export default function RewardsWidget() {
         localStorage.setItem('rewards_widget_expanded', String(newState));
         if (newState) {
             setHasSeen(true);
+            localStorage.setItem('rewards_notif_seen', 'true');
         }
     };
 
@@ -78,9 +77,9 @@ export default function RewardsWidget() {
                 transformOrigin: 'bottom right'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-1)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Rewards
-                    </h3>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>
+                        Challenges
+                    </span>
                     <button 
                         onClick={toggleExpand}
                         style={{ background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', display: 'flex' }}
@@ -114,9 +113,6 @@ export default function RewardsWidget() {
 
                 {user.freeTicketUsed && (
                 <div style={{ marginBottom: '20px' }}>
-                    <p style={{ margin: '0 0 10px', color: 'var(--text-3)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                        Challenges
-                    </p>
                     {/* $5 Challenge Bar */}
                     <div style={{ marginBottom: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
@@ -160,29 +156,25 @@ export default function RewardsWidget() {
                     style={{ 
                         width: '100%', 
                         padding: '10px', 
-                        fontSize: '0.8rem', 
-                        fontWeight: '700',
+                        fontSize: '0.9rem', 
+                        fontWeight: '600',
                         color: 'var(--text-2)',
                         background: 'transparent',
                         border: '1px solid var(--border)',
-                        borderRadius: 'var(--r-md)',
+                        borderRadius: '8px',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
                     }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'var(--text-1)';
-                        e.currentTarget.style.borderColor = 'var(--text-3)';
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    onMouseOver={(e) => {
+                        e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                        e.target.style.color = '#fff';
                     }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.color = 'var(--text-2)';
-                        e.currentTarget.style.borderColor = 'var(--border)';
-                        e.currentTarget.style.background = 'transparent';
+                    onMouseOut={(e) => {
+                        e.target.style.background = 'transparent';
+                        e.target.style.color = 'var(--text-2)';
                     }}
                 >
-                    View Details
+                    View details
                 </button>
             </div>
 
