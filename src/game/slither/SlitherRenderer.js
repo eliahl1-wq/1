@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength } from './snakePath.js';
+import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -1718,7 +1718,10 @@ export class SlitherRenderer {
         const s = this.smooth.get(snake.id);
         let segs = snake.segments || [];
         if (s && s.visualArcLen) {
-            segs = fitSpineToArcLength(s.segments || snake.segments || [], s.visualArcLen);
+            const rawSegs = s.segments || snake.segments || [];
+            const visSpacing = s.visualSpacing || 3.6;
+            const dense = densifySpine(rawSegs, visSpacing * 0.45);
+            segs = fitSpineToArcLength(dense, s.visualArcLen);
         }
         if (segs.length === 0) {
             ctx.restore();

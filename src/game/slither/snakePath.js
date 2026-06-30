@@ -94,18 +94,7 @@ function syncSegmentCount(state, targetCount, spacing, refHead, angle = 0) {
     const segments = state.segments;
     while (segments.length < targetCount) {
         const tail = segments[segments.length - 1] || refHead;
-        const prev = segments.length >= 2 ? segments[segments.length - 2] : tail;
-        let dx = tail.x - prev.x;
-        let dy = tail.y - prev.y;
-        const d = Math.hypot(dx, dy);
-        if (d > 1e-6) {
-            dx /= d;
-            dy /= d;
-        } else {
-            dx = -Math.cos(angle);
-            dy = -Math.sin(angle);
-        }
-        segments.push({ x: tail.x - dx * spacing, y: tail.y - dy * spacing });
+        segments.push({ x: tail.x, y: tail.y });
     }
     if (segments.length > targetCount) segments.length = targetCount;
 }
@@ -271,20 +260,36 @@ export function fitSpineToArcLength(segments, targetArc) {
     return out;
 }
 
-/** Subdivide long edges so turns stay round on large snakes. */
+/** Subdivide long edges so turns stay round on large snakes (Catmull-Rom Spline). */
 export function densifySpine(spine, maxEdgeLen) {
     if (!spine || spine.length < 2 || maxEdgeLen <= 0) return spine;
     const out = [{ x: spine[0].x, y: spine[0].y }];
     for (let i = 1; i < spine.length; i++) {
-        const ax = spine[i - 1].x;
-        const ay = spine[i - 1].y;
-        const bx = spine[i].x;
-        const by = spine[i].y;
-        const edge = dist(ax, ay, bx, by);
+        const p1 = spine[i - 1];
+        const p2 = spine[i];
+        const p0 = i >= 2 ? spine[i - 2] : p1;
+        const p3 = i + 1 < spine.length ? spine[i + 1] : p2;
+
+        const edge = dist(p1.x, p1.y, p2.x, p2.y);
         const steps = Math.max(1, Math.ceil(edge / maxEdgeLen));
         for (let s = 1; s <= steps; s++) {
             const t = s / steps;
-            out.push({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t });
+            const t2 = t * t;
+            const t3 = t2 * t;
+
+            const x = 0.5 * (
+                (2 * p1.x) +
+                (-p0.x + p2.x) * t +
+                (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+            );
+            const y = 0.5 * (
+                (2 * p1.y) +
+                (-p0.y + p2.y) * t +
+                (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+            );
+            out.push({ x, y });
         }
     }
     return out;
