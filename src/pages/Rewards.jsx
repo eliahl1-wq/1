@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppTopbar from '../components/AppTopbar';
@@ -8,10 +8,36 @@ import { API_URL } from '../utils/apiBase';
 export default function Rewards() {
     const { user, loading } = useAuth();
     const navigate = useNavigate();
+    const [history, setHistory] = useState([]);
+    const [claimStatus, setClaimStatus] = useState(null); // { type: 'success'|'error'|'loading', message: string }
 
     useEffect(() => {
         document.title = 'AgarStake | Rewards';
-    }, []);
+        
+        // Fetch transaction history for rewards
+        const fetchHistory = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/transactions`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const rewardTxs = data.filter(tx => 
+                        tx.meta?.event === 'sponsored_rewards_claim' ||
+                        tx.meta?.isRentExemptFallback === true ||
+                        tx.meta?.event === 'free_ticket_join'
+                    );
+                    setHistory(rewardTxs);
+                }
+            } catch (err) {
+                console.error("Failed to fetch rewards history:", err);
+            }
+        };
+
+        if (user) {
+            fetchHistory();
+        }
+    }, [user]);
 
     if (loading) {
         return (
@@ -84,6 +110,7 @@ export default function Rewards() {
                                 className="gm-btn gm-btn--primary"
                                 onClick={async (e) => {
                                     e.target.disabled = true;
+                                    setClaimStatus({ type: 'loading', message: 'Processing your claim... Please wait.' });
                                     try {
                                         const res = await fetch(`${API_URL}/api/user/claim-rewards`, {
                                             method: 'POST',
@@ -91,14 +118,17 @@ export default function Rewards() {
                                         });
                                         const data = await res.json();
                                         if (data.success) {
-                                            alert(`Successfully claimed $${data.amount.toFixed(2)}!`);
-                                            window.location.reload();
+                                            setClaimStatus({ type: 'success', message: `Successfully claimed $${data.amount.toFixed(2)}!` });
+                                            // Refresh user details
+                                            setTimeout(() => {
+                                                window.location.reload();
+                                            }, 2000);
                                         } else {
-                                            alert(data.error || 'Failed to claim');
+                                            setClaimStatus({ type: 'error', message: data.error || 'Failed to claim rewards.' });
                                             e.target.disabled = false;
                                         }
                                     } catch (err) {
-                                        alert('Error claiming rewards');
+                                        setClaimStatus({ type: 'error', message: 'Error claiming rewards. Try again later.' });
                                         e.target.disabled = false;
                                     }
                                 }}
@@ -252,7 +282,7 @@ export default function Rewards() {
                 )}
 
                 {/* Section 3: Information */}
-                <section>
+                <section style={{ marginBottom: '40px' }}>
                     <div className="panel" style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
                         <h3 style={{ margin: '0 0 12px', fontSize: '1rem', color: 'var(--text-h)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -270,6 +300,105 @@ export default function Rewards() {
                         </p>
                     </div>
                 </section>
+
+                {/* Section 4: History */}
+                <section style={{ marginBottom: '40px' }}>
+                    <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
+                        Rewards History
+                    </h2>
+                    {history.length === 0 ? (
+                        <div className="panel" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-2)', fontSize: '0.9rem' }}>
+                            No rewards activity found.
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {history.map((tx) => {
+                                let title = 'Reward Activity';
+                                let desc = '';
+                                let val = '';
+                                let color = 'var(--text-h)';
+
+                                if (tx.meta?.event === 'sponsored_rewards_claim') {
+                                    title = 'Claim Payout';
+                                    desc = `Claimed via Solana: ${tx.meta.signature ? tx.meta.signature.slice(0, 8) + '...' : 'Pending'}`;
+                                    val = `-$${(tx.meta.amountUsd || 0).toFixed(2)}`;
+                                    color = 'var(--green)';
+                                } else if (tx.meta?.isRentExemptFallback) {
+                                    title = 'Rent Fallback Credit';
+                                    desc = 'Game payout auto-credited due to wallet rent limits';
+                                    val = `+$${((tx.amount || 0) * (tx.meta.solPrice || 64)).toFixed(2)}`;
+                                    color = 'var(--accent)';
+                                } else if (tx.meta?.event === 'free_ticket_join') {
+                                    title = 'Free Ticket Used';
+                                    desc = `Joined $${tx.meta.entryFeeUsd || 10} match using free ticket`;
+                                    val = 'FREE';
+                                    color = 'var(--blue)';
+                                }
+
+                                return (
+                                    <div key={tx._id} className="panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
+                                        <div>
+                                            <h4 style={{ margin: '0 0 4px', fontSize: '0.95rem', color: 'var(--text-h)', fontWeight: '600' }}>{title}</h4>
+                                            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-2)' }}>{desc}</p>
+                                        </div>
+                                        <div style={{ fontSize: '1.05rem', fontWeight: '700', color }}>
+                                            {val}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </section>
+
+                {/* Custom Modal/Alert System */}
+                {claimStatus && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        zIndex: 9999, padding: '20px', backdropFilter: 'blur(8px)'
+                    }}>
+                        <div className="panel" style={{
+                            maxWidth: '400px', width: '100%', padding: '30px', textAlign: 'center',
+                            border: claimStatus.type === 'error' ? '1px solid rgba(239, 68, 68, 0.4)' : claimStatus.type === 'success' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--border)'
+                        }}>
+                            <div style={{ marginBottom: '20px' }}>
+                                {claimStatus.type === 'loading' && <div className="spinner" style={{ margin: '0 auto' }} />}
+                                {claimStatus.type === 'success' && (
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" style={{ margin: '0 auto' }}>
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <polyline points="22 4 12 14.01 9 11.01" />
+                                    </svg>
+                                )}
+                                {claimStatus.type === 'error' && (
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" style={{ margin: '0 auto' }}>
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <line x1="15" y1="9" x2="9" y2="15"/>
+                                        <line x1="9" y1="9" x2="15" y2="15"/>
+                                    </svg>
+                                )}
+                            </div>
+                            
+                            <h3 style={{ margin: '0 0 10px', color: 'var(--text-h)', fontSize: '1.25rem', fontWeight: '700' }}>
+                                {claimStatus.type === 'loading' ? 'Claiming Rewards' : claimStatus.type === 'success' ? 'Success!' : 'Failed'}
+                            </h3>
+                            
+                            <p style={{ margin: '0 0 24px', color: 'var(--text-2)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                                {claimStatus.message}
+                            </p>
+                            
+                            {claimStatus.type !== 'loading' && (
+                                <button 
+                                    className="gm-btn gm-btn--secondary" 
+                                    onClick={() => setClaimStatus(null)}
+                                    style={{ padding: '10px 24px', fontSize: '0.9rem' }}
+                                >
+                                    Dismiss
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
 
             </div>
         </div>
