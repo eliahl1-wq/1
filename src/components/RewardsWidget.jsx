@@ -1,40 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function RewardsWidget() {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const [expanded, setExpanded] = useState(false);
+    const [expanded, setExpanded] = useState(true);
+    const [isInitialized, setIsInitialized] = useState(false);
 
-    if (!user) return null;
+    useEffect(() => {
+        const storedState = localStorage.getItem('rewards_widget_expanded');
+        if (storedState !== null) {
+            setExpanded(storedState === 'true');
+        }
+        setIsInitialized(true);
+    }, []);
 
-    // Only show if there's an active ticket, locked rewards, or incomplete challenges
+    if (!user || !isInitialized) return null;
+
     const hasUnusedTicket = user.hasFreeTicket && !user.freeTicketUsed;
     const hasBalance = (user.sponsoredRewardsBalance || 0) > 0;
     const isCompleted = user.sponsoredRewardsCompleted || user.sponsoredRewardsUnlocked;
     
-    // If they have no ticket, no balance, and already completed, hide widget or show mini version?
-    // Let's show it if they have anything related to rewards going on.
-    if (!hasUnusedTicket && !hasBalance && isCompleted) return null;
+    // Notifications: Needs attention if ticket unused or balance > 0 and not fully completed/cashed out
+    const hasNotification = hasUnusedTicket || (hasBalance && !isCompleted);
 
     const normal5Progress = Math.min(3, user.completedFiveDollarNormalGames ?? 0);
     const normal10Progress = Math.min(1, user.completedTenDollarNormalGames ?? 0);
 
     const toggleExpand = (e) => {
         e.stopPropagation();
-        setExpanded(!expanded);
+        const newState = !expanded;
+        setExpanded(newState);
+        localStorage.setItem('rewards_widget_expanded', String(newState));
     };
 
     const goToRewards = () => {
-        setExpanded(false);
         navigate('/rewards');
     };
 
     return (
         <div style={{
             position: 'fixed',
-            bottom: '24px',
+            bottom: '80px',
             right: '24px',
             zIndex: 9999,
             display: 'flex',
@@ -60,7 +68,7 @@ export default function RewardsWidget() {
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                     <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-h)', fontWeight: '700' }}>
-                        Sponsored Rewards
+                        Rewards
                     </h3>
                     <button 
                         onClick={toggleExpand}
@@ -79,30 +87,58 @@ export default function RewardsWidget() {
                     </div>
                 )}
 
-                <div style={{ marginBottom: '16px' }}>
-                    <p style={{ margin: '0 0 4px', color: 'var(--text-2)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Locked Balance
-                    </p>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-h)' }}>
-                        ${(user.sponsoredRewardsBalance || 0).toFixed(2)}
+                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <p style={{ margin: '0 0 4px', color: 'var(--text-2)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            To Claim
+                        </p>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-h)' }}>
+                            ${(user.sponsoredRewardsBalance || 0).toFixed(2)}
+                        </div>
                     </div>
+                    {hasNotification && (
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                    )}
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>
-                    <p style={{ margin: '0 0 8px', color: 'var(--text-2)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <p style={{ margin: '0 0 12px', color: 'var(--text-2)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         Challenges
                     </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', fontSize: '0.85rem' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={normal5Progress >= 3 ? '#4ade80' : 'var(--text-2)'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            {normal5Progress >= 3 && <polyline points="20 6 9 17 4 12"></polyline>}
-                        </svg>
-                        <span style={{ color: normal5Progress >= 3 ? '#4ade80' : 'var(--text-h)' }}>{normal5Progress}/3 $5 Games</span>
+                    {/* $5 Challenge Bar */}
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
+                            <span style={{ color: normal5Progress >= 3 ? '#4ade80' : 'var(--text-2)' }}>
+                                {normal5Progress >= 3 ? '✓ ' : ''}3 × $5 Games
+                            </span>
+                            <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / 3</span>
+                        </div>
+                        <div style={{ height: '4px', background: 'var(--bg-3)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ 
+                                height: '100%', 
+                                width: `${(normal5Progress / 3) * 100}%`, 
+                                background: normal5Progress >= 3 ? '#4ade80' : 'var(--accent)',
+                                transition: 'width 0.5s ease-out'
+                            }} />
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={normal10Progress >= 1 ? '#4ade80' : 'var(--text-2)'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            {normal10Progress >= 1 && <polyline points="20 6 9 17 4 12"></polyline>}
-                        </svg>
-                        <span style={{ color: normal10Progress >= 1 ? '#4ade80' : 'var(--text-h)' }}>{normal10Progress}/1 $10 Game</span>
+                    
+                    {/* $10 Challenge Bar */}
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
+                            <span style={{ color: normal10Progress >= 1 ? '#4ade80' : 'var(--text-2)' }}>
+                                {normal10Progress >= 1 ? '✓ ' : ''}1 × $10 Game
+                            </span>
+                            <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / 1</span>
+                        </div>
+                        <div style={{ height: '4px', background: 'var(--bg-3)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ 
+                                height: '100%', 
+                                width: `${(normal10Progress / 1) * 100}%`, 
+                                background: normal10Progress >= 1 ? '#4ade80' : 'var(--accent)',
+                                transition: 'width 0.5s ease-out'
+                            }} />
+                        </div>
                     </div>
                 </div>
 
@@ -115,33 +151,45 @@ export default function RewardsWidget() {
                 </button>
             </div>
 
-            {/* Floating Button */}
+            {/* Toggle Button */}
             <button
                 onClick={toggleExpand}
                 style={{
-                    background: 'linear-gradient(135deg, #4ade80 0%, #10b981 100%)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '56px',
-                    height: '56px',
+                    background: 'linear-gradient(135deg, #2a2d36 0%, #1e2026 100%)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    padding: '10px 16px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: '8px',
                     cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
-                    color: '#064e3b',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    color: 'var(--text-1)',
+                    transition: 'transform 0.2s, background 0.2s',
+                    position: 'relative',
+                    fontFamily: 'inherit',
+                    fontWeight: '600',
+                    fontSize: '0.9rem'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #323640 0%, #262932 100%)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #2a2d36 0%, #1e2026 100%)'}
             >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 12v10H4V12" />
-                    <path d="M2 7h20v5H2z" />
-                    <path d="M12 22V7" />
-                    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-                    <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
+                Challenges
+                {hasNotification && !expanded && (
+                    <div style={{
+                        position: 'absolute',
+                        top: '-4px',
+                        right: '-4px',
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: '#ef4444',
+                        border: '2px solid #1e2026'
+                    }} />
+                )}
             </button>
         </div>
     );
