@@ -59,10 +59,10 @@ export default function Rewards() {
                     </div>
                     
                     <div className="panel" style={{ padding: '20px', background: 'rgba(20, 24, 30, 0.6)' }}>
-                        <p style={{ margin: '0 0 4px', color: 'var(--text-2)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
+                        <p style={{ margin: '0 0 4px', color: 'var(--green)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
                             To Claim
                         </p>
-                        <div style={{ fontSize: '2rem', fontWeight: '800', color: isCompleted ? '#4ade80' : 'var(--accent)' }}>
+                        <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--green)' }}>
                             ${isCompleted ? '0.00' : balance.toFixed(2)}
                         </div>
                         <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>
