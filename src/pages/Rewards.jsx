@@ -42,10 +42,15 @@ export default function Rewards() {
             <AppTopbar />
             <div className="page-content" style={{ maxWidth: '800px', width: '100%' }}>
                 
-                <div className="page-header-row">
-                    <h1 className="page-title">Rewards</h1>
+                <div className="page-header-row" style={{ marginBottom: '16px' }}>
+                    <div>
+                        <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
+                        <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)', lineHeight: 1 }}>
+                            Rewards
+                        </h1>
+                    </div>
                 </div>
-                <p style={{ color: 'var(--text-2)', marginBottom: '32px', fontSize: '1rem' }}>
+                <p style={{ margin: '0 0 32px', color: 'var(--text-1)', fontSize: '1.05rem', lineHeight: '1.5' }}>
                     Complete challenges to unlock your earned rewards and claim free tickets.
                 </p>
 
@@ -126,8 +131,7 @@ export default function Rewards() {
                                 }}>
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
-                                        <path d="M12 8v8"/>
-                                        <path d="M14.5 9.5a1.5 1.5 0 0 0-3 0 1.5 1.5 0 0 0 3 3 1.5 1.5 0 0 1 0 3 1.5 1.5 0 0 1-3 0"/>
+                                        <text x="12" y="16.5" textAnchor="middle" fontSize="13" fontWeight="bold" fill="currentColor" stroke="none">$</text>
                                     </svg>
                                 </div>
                                 <div>
@@ -142,16 +146,16 @@ export default function Rewards() {
                             
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 <button 
-                                    className="gm-btn gm-btn--primary"
+                                    className="btn btn-primary"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
-                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem' }}
+                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >
                                     Use on Agar
                                 </button>
                                 <button 
-                                    className="gm-btn gm-btn--secondary"
+                                    className="btn btn-secondary"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
-                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem' }}
+                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >
                                     Use on Slither
                                 </button>
@@ -190,11 +194,11 @@ export default function Rewards() {
                                 borderRadius: '20px', 
                                 fontSize: '0.85rem', 
                                 fontWeight: '700',
-                                background: isCompleted ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                color: isCompleted ? '#4ade80' : '#ef4444',
-                                border: `1px solid ${isCompleted ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                                background: 'rgba(139, 92, 246, 0.1)',
+                                color: '#a78bfa',
+                                border: '1px solid rgba(139, 92, 246, 0.2)'
                             }}>
-                                {isCompleted ? 'Unlocked' : 'Locked'}
+                                Reward: ${balance.toFixed(2)}
                             </div>
                         </div>
 
@@ -252,10 +256,10 @@ export default function Rewards() {
                             How Rewards Work
                         </h3>
                         <p style={{ margin: '0 0 8px', color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                            New players receive one Free Ticket to play a sponsored $5 match. If you win and cash out during this match, your earnings are stored as a <strong>Locked Balance</strong> in To Claim.
+                            Complete challenges to earn and unlock rewards. By participating in games and fulfilling challenge requirements, you build up your Rewards balance.
                         </p>
                         <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                            To unlock and withdraw this balance, you must complete the beginner challenges. Once the challenges are finished, the locked balance will automatically be deposited into your account as real SOL!
+                            Once a challenge is fully completed, your locked rewards become available to claim. When you claim your rewards, the SOL is securely deposited into your wallet!
                         </p>
                     </div>
                 </section>
