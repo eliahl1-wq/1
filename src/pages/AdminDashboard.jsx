@@ -874,6 +874,40 @@ export default function AdminDashboard() {
                             </div>
                         </div>
 
+                        {/* Section: Sponsored Rewards & Tickets */}
+                        <div>
+                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Sponsored Rewards & Tickets
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                <StatCard
+                                    label="Total Sponsored Rewards"
+                                    value={formatUsd(overview?.totalSponsoredRewards)}
+                                    sub={`${overview?.activeSponsoredPlayers ?? 0} active sponsored players`}
+                                />
+                                <StatCard
+                                    label="Completed Challenges"
+                                    value={overview?.completedBeginnerChallenges ?? 0}
+                                    sub="Players fully unlocked"
+                                />
+                                <StatCard
+                                    label="Unused Free Tickets"
+                                    value={overview?.unusedFreeTickets ?? 0}
+                                    sub="Ready to play"
+                                />
+                                <StatCard
+                                    label="Used Free Tickets"
+                                    value={overview?.usedFreeTickets ?? 0}
+                                    sub="Matches claimed"
+                                />
+                                <StatCard
+                                    label="Reward Pool Balance"
+                                    value={formatUsd(overview?.rewardPoolBalanceUsd)}
+                                    sub={wallets?.rewardWallet ? `Wallet: ${wallets.rewardWallet.address.slice(0, 4)}...${wallets.rewardWallet.address.slice(-4)}` : 'Internal tracking'}
+                                />
+                            </div>
+                        </div>
+
                         {/* Section: General Operations */}
                         <div>
                             <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

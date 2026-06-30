@@ -348,7 +348,9 @@ export default function PreGame() {
     const balanceUsd = user?.balanceUsd ?? (balanceSol * solPrice);
     const freePlay = !!user?.freePlay;
 
-    const canJoin = freePlay || balanceUsd >= entryFeeForSession;
+    const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
+    const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+    const canJoin = freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession;
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -674,6 +676,15 @@ export default function PreGame() {
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
         localStorage.setItem('selected_entry_fee', String(entryFeeForSession));
+
+        // Use Free Ticket check
+        const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
+        const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+        if (!isAlreadyInGame && isNormal5 && hasFreeTicket) {
+            localStorage.setItem('use_free_ticket', 'true');
+        } else {
+            localStorage.removeItem('use_free_ticket');
+        }
 
         const activeMode = (isAlreadyInGame && currentGameMode) ? currentGameMode : selectedMode;
         markGamemodePlayed(activeMode);
@@ -1288,6 +1299,10 @@ export default function PreGame() {
                                 {tierOptions.map(tier => {
                                     const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
                                     const active = entryFeeForSession === tier;
+                                    const isNormal5 = tier === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
+                                    const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+                                    const isFreeTicketButton = isNormal5 && hasFreeTicket;
+
                                     return (
                                         <button
                                             key={tier}
@@ -1296,11 +1311,16 @@ export default function PreGame() {
                                             disabled={locked || isMatchmaking}
                                             onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
                                         >
-                                            {freePlay ? 'FREE' : `$${tier}`}
+                                            {freePlay ? 'FREE' : (isFreeTicketButton ? 'Free Ticket' : `$${tier}`)}
                                         </button>
                                     );
                                 })}
                             </div>
+                            {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && user?.hasFreeTicket && !user?.freeTicketUsed) && (
+                                <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
+                                    ✨ free ticket available
+                                </div>
+                            )}
                         </div>
 
                         <button

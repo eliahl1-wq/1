@@ -25,6 +25,11 @@ export default function AppTopbar({ children }) {
                 Modes
             </button>
             {user && (
+                <button type="button" className={linkClass('/rewards')} onClick={() => navigate('/rewards')}>
+                    Rewards
+                </button>
+            )}
+            {user && (
                 <button type="button" className={linkClass('/transactions')} onClick={() => navigate('/transactions')}>
                     History
                 </button>

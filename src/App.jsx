@@ -15,6 +15,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminSandbox from './pages/AdminSandbox';
 import HowItWorks from './pages/HowItWorks';
 import Faq from './pages/Faq';
+import Rewards from './pages/Rewards';
+import RewardsWidget from './components/RewardsWidget';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
@@ -114,6 +116,7 @@ function App() {
           <Router>
             <AuthProvider>
               <SitePresenceRunner />
+              <RewardsWidget />
               <Routes>
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -133,6 +136,7 @@ function App() {
                 <Route path="/admin/sandbox" element={<AdminRoute><AdminSandbox /></AdminRoute>} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/faq" element={<Faq />} />
+                <Route path="/rewards" element={<PrivateRoute><Rewards /></PrivateRoute>} />
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>
             </AuthProvider>
