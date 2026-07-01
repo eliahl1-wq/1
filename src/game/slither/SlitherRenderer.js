@@ -1772,11 +1772,16 @@ export class SlitherRenderer {
         const q = this._quality;
         const holdActive = this._holdActive;
         const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);
-        let arcLen = 0;
-        if (segs.length > 1) {
-            const dx0 = segs[1].x - segs[0].x;
-            const dy0 = segs[1].y - segs[0].y;
-            arcLen = Math.sqrt(dx0 * dx0 + dy0 * dy0) * (segs.length - 1);
+        // Use the complete visual arc. Estimating it from only the first edge
+        // makes a turning snake look shorter because that edge compresses on a
+        // bend, reducing maxStamps and cutting the rendered tail off early.
+        let arcLen = s?.visualArcLen || 0;
+        if (!arcLen && segs.length > 1) {
+            for (let i = 1; i < segs.length; i++) {
+                const dx = segs[i].x - segs[i - 1].x;
+                const dy = segs[i].y - segs[i - 1].y;
+                arcLen += Math.sqrt(dx * dx + dy * dy);
+            }
         }
         const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
         // Boost must never change how much of the body is rendered.
