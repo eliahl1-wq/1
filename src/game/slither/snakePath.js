@@ -407,49 +407,20 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     }
     syncSegmentCount(state, spineLen, 1, serverHead, serverAngle ?? state.angle ?? 0);
 
-    const snapKey = `${serverHead.x}|${serverHead.y}|${spineLen}|${serverAngle || 0}`;
-    if (state._lastSnapKey !== snapKey) {
-        state._lastSnapKey = snapKey;
-        if (!state._snapA || state._snapA.length !== state.segments.length) {
-            state._snapA = state.segments.map(s => ({ x: s.x, y: s.y }));
-        } else {
-            for (let i = 0; i < state.segments.length; i++) {
-                state._snapA[i].x = state.segments[i].x;
-                state._snapA[i].y = state.segments[i].y;
-            }
-        }
-        state._snapAAngle = state.angle || 0;
-        state._snapB = copySpineSnapshot(serverSegments, spineLen);
-        state._snapBAngle = serverAngle || 0;
-        
-        const lastBT = state._snapBT || nowMs;
-        state._snapBT = nowMs;
-        const gap = nowMs - lastBT;
-        if (gap > 8 && gap < 500) {
-            state._tickMs = state._tickMs ? state._tickMs * 0.82 + gap * 0.18 : gap;
-        } else {
-            state._tickMs = 125;
-        }
-    }
-
-    let t = 1;
-    const duration = state._tickMs || 125;
-    if (state._snapBT) {
-        t = (nowMs - state._snapBT) / duration;
-        if (t < 0) t = 0;
-        else if (t > 1.5) t = 1.5;
-    }
-
-    const snapA = state._snapA || state._snapB;
-    const snapB = state._snapB;
+    // Follow the newest spine continuously at display rate. Restarting a
+    // snapshot lerp on every 40 Hz server update left zero-movement frames;
+    // visualArcLen still grew on those frames, so the tail crept backwards and
+    // then jumped forwards again. A time-based follow has no per-tick reset and
+    // keeps the existing gradual growth easing independent of frame rate.
+    const frameDt = Math.min(Math.max(dt || 0, 0), 0.1);
+    const follow = 1 - Math.exp(-frameDt / 0.045);
     for (let i = 0; i < spineLen; i++) {
-        const a = spinePointAt(snapA, i);
-        const b = spinePointAt(snapB, i);
+        const target = serverSegments[i];
         const seg = state.segments[i];
-        seg.x = a.x + (b.x - a.x) * t;
-        seg.y = a.y + (b.y - a.y) * t;
+        seg.x += (target.x - seg.x) * follow;
+        seg.y += (target.y - seg.y) * follow;
     }
-    state.angle = lerpAngle(state._snapAAngle ?? state._snapBAngle, state._snapBAngle, t);
+    state.angle = lerpAngle(state.angle || 0, serverAngle || 0, follow);
 
     if (options.skipDensify) return;
 
