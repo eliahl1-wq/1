@@ -18,7 +18,7 @@ export default function RewardsWidget() {
     const [expanded, setExpanded] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [hasSeen, setHasSeen] = useState(false);
-    const [claimState, setClaimState] = useState({ loading: false, error: '' });
+    const [claimStatus, setClaimStatus] = useState(null); // { type: 'success'|'error'|'loading', message: string }
     const [hoveredKey, setHoveredKey] = useState(() => localStorage.getItem('challenges_hovered_key'));
     const claimLockRef = useRef(false);
 
@@ -81,7 +81,7 @@ export default function RewardsWidget() {
 
     const challengeKey = `${normal5Progress}_${req5}_${normal10Progress}_${req10}_${user.freeTicketUsed}`;
     const hasUnhoveredChallenge = hasActiveChallenge && (hoveredKey !== challengeKey);
-    const hasNotification = ((hasUnusedTicket || hasBalance) && !hasSeen) || hasUnhoveredChallenge;
+    const hasNotification = ((hasUnusedTicket || hasBalance) && !hasSeen) || hasUnhoveredChallenge || canClaim;
 
     const handleChallengeHover = () => {
         if (hasUnhoveredChallenge) {
@@ -114,17 +114,17 @@ export default function RewardsWidget() {
             const data = await res.json();
             if (data.claim?.status === 'confirmed') {
                 await refreshUser();
-                return;
+                return data.claim;
             }
             if (data.claim?.status === 'failed') throw new Error(data.claim.error || 'Reward claim failed.');
         }
-        throw new Error('Claim is still processing. Check Rewards again shortly.');
+        throw new Error('Claim is still processing. It is safe to close this page and check again later.');
     };
 
     const handleClaim = async () => {
-        if (claimLockRef.current || claimState.loading || !canClaim) return;
+        if (claimLockRef.current || claimStatus?.type === 'loading' || !canClaim) return;
         claimLockRef.current = true;
-        setClaimState({ loading: true, error: '' });
+        setClaimStatus({ type: 'loading', message: 'Reserving and processing your claim… Please wait.' });
         try {
             const res = await fetch(`${API_URL}/api/user/claim-rewards`, {
                 method: 'POST',
@@ -132,13 +132,16 @@ export default function RewardsWidget() {
             });
             const data = await res.json();
             if (res.status === 202 && data.processing) {
-                await waitForClaim();
+                setClaimStatus({ type: 'loading', message: 'Payment submitted. Waiting for blockchain confirmation…' });
+                const confirmedClaim = await waitForClaim();
+                setClaimStatus({ type: 'success', message: `Successfully claimed $${confirmedClaim.amountUsd.toFixed(2)}!` });
                 return;
             }
-            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to claim reward.');
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to claim rewards.');
             await refreshUser();
+            setClaimStatus({ type: 'success', message: `Successfully claimed $${data.amount.toFixed(2)}!` });
         } catch (err) {
-            setClaimState({ loading: false, error: err.message || 'Failed to claim reward.' });
+            setClaimStatus({ type: 'error', message: err.message || 'Error claiming rewards. Try again later.' });
         } finally {
             claimLockRef.current = false;
         }
@@ -174,7 +177,7 @@ export default function RewardsWidget() {
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>
                             Challenges
                         </span>
-                        {hasUnhoveredChallenge && (
+                        {(hasUnhoveredChallenge || canClaim) && (
                             <div style={{
                                 width: '8px',
                                 height: '8px',
@@ -268,16 +271,13 @@ export default function RewardsWidget() {
                 {(canClaim || user.rewardClaimInProgress) && (
                     <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn btn-green"
                         onClick={handleClaim}
-                        disabled={claimState.loading || user.rewardClaimInProgress}
-                        style={{ width: '100%', padding: '11px', marginBottom: claimState.error ? '8px' : '12px' }}
+                        disabled={claimStatus?.type === 'loading' || user.rewardClaimInProgress}
+                        style={{ width: '100%', padding: '11px', marginBottom: '12px' }}
                     >
-                        {claimState.loading || user.rewardClaimInProgress ? 'CLAIMING...' : 'CLAIM REWARD'}
+                        {claimStatus?.type === 'loading' || user.rewardClaimInProgress ? 'CLAIMING...' : 'CLAIM REWARD'}
                     </button>
-                )}
-                {claimState.error && (
-                    <p style={{ margin: '0 0 12px', color: 'var(--red)', fontSize: '0.78rem' }}>{claimState.error}</p>
                 )}
                 <button
                     onClick={goToRewards}
@@ -362,6 +362,53 @@ export default function RewardsWidget() {
                     )}
                 </button>
             </div>
+            {claimStatus && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    zIndex: 9999, padding: '20px', backdropFilter: 'blur(8px)'
+                }}>
+                    <div className="panel" style={{
+                        maxWidth: '400px', width: '100%', padding: '30px', textAlign: 'center',
+                        border: claimStatus.type === 'error' ? '1px solid rgba(239, 68, 68, 0.4)' : claimStatus.type === 'success' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--border)'
+                    }}>
+                        <div style={{ marginBottom: '20px' }}>
+                            {claimStatus.type === 'loading' && <div className="spinner" style={{ margin: '0 auto' }} />}
+                            {claimStatus.type === 'success' && (
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" style={{ margin: '0 auto' }}>
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="22 4 12 14.01 9 11.01" />
+                                </svg>
+                            )}
+                            {claimStatus.type === 'error' && (
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" style={{ margin: '0 auto' }}>
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                </svg>
+                            )}
+                        </div>
+
+                        <h3 style={{ margin: '0 0 10px', color: 'var(--text-h)', fontSize: '1.25rem', fontWeight: '700' }}>
+                            {claimStatus.type === 'loading' ? 'Claiming Rewards' : claimStatus.type === 'success' ? 'Success!' : 'Failed'}
+                        </h3>
+
+                        <p style={{ margin: '0 0 24px', color: 'var(--text-2)', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                            {claimStatus.message}
+                        </p>
+
+                        {claimStatus.type !== 'loading' && (
+                            <button
+                                className="btn btn-green"
+                                onClick={() => setClaimStatus(null)}
+                                style={{ padding: '10px 24px', fontSize: '0.9rem' }}
+                            >
+                                Dismiss
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

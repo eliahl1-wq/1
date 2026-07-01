@@ -98,6 +98,9 @@ export default function Rewards() {
     const latestClaim = history.find(tx => tx.meta?.event === 'sponsored_rewards_claim');
     const claimedRewardAmount = Number(latestClaim?.meta?.amountUsd) || 0;
     const challengeRewardAmount = promoBalance > 0 ? promoBalance : (isCompleted ? claimedRewardAmount : 0);
+    const totalClaimedAllTime = history
+        .filter(tx => tx.meta?.event === 'sponsored_rewards_claim')
+        .reduce((sum, tx) => sum + (Number(tx.meta?.amountUsd) || 0), 0);
     const challengeRewardLabel = isCompleted && promoBalance <= 0 && !historyLoaded
         ? '--'
         : `$${challengeRewardAmount.toFixed(2)}`;
@@ -169,27 +172,37 @@ export default function Rewards() {
                 </p>
 
                 {/* Top Rewards Summary */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
-                    <div className="panel" style={{ padding: '20px', background: 'rgba(20, 24, 30, 0.6)' }}>
-                        <p style={{ margin: '0 0 4px', color: 'var(--text-2)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
+                <div className="profile-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '40px' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
+                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700' }}>
                             Current Reward Balance
-                        </p>
-                        <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-h)' }}>
+                        </div>
+                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em' }}>
                             ${currentBalance.toFixed(2)}
                         </div>
-                        <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>Locked promo rewards and retained game winnings</p>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>Locked promo + winnings</div>
                     </div>
 
-                    <div className="panel" style={{ padding: '20px', background: 'rgba(20, 24, 30, 0.6)' }}>
-                        <p style={{ margin: '0 0 4px', color: 'var(--green)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
-                            To Claim
-                        </p>
-                        <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--green)', marginBottom: '8px' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
+                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700', color: 'var(--green)' }}>
+                            Ready To Claim
+                        </div>
+                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--green)', letterSpacing: '-0.03em' }}>
                             ${claimableBalance.toFixed(2)}
                         </div>
-                        <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.8rem' }}>
-                            {user.rewardClaimInProgress ? 'Claim is processing' : canClaim ? 'Ready to claim below' : isCompleted && currentBalance === 0 ? 'All rewards claimed!' : 'Requires challenges to be completed'}
-                        </p>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>
+                            {user.rewardClaimInProgress ? 'Claim processing' : canClaim ? 'Unlocked & ready' : 'Complete challenges first'}
+                        </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
+                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700' }}>
+                            Total Claimed (All-Time)
+                        </div>
+                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em' }}>
+                            ${totalClaimedAllTime.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>Successfully paid out in SOL</div>
                     </div>
                 </div>
 
@@ -325,7 +338,7 @@ export default function Rewards() {
 
                         <button
                             type="button"
-                            className="btn btn-primary"
+                            className="btn btn-green"
                             onClick={handleClaim}
                             disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}
                             style={{
@@ -447,7 +460,7 @@ export default function Rewards() {
 
                             {claimStatus.type !== 'loading' && (
                                 <button
-                                    className="btn btn-primary"
+                                    className="btn btn-green"
                                     onClick={() => setClaimStatus(null)}
                                     style={{ padding: '10px 24px', fontSize: '0.9rem' }}
                                 >
