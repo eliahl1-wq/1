@@ -1372,47 +1372,19 @@ export default function AdminDashboard() {
                             />
                         </div>
                         <Panel
-                            title="Reward owner surplus"
-                            sub="Surplus is calculated dynamically as the physical reward wallet balance minus player liabilities and a 5% safety buffer."
+                            title="Reward Pool Management"
+                            sub="Factory reset clears all player reward balances and sweeps available funds."
                         >
-                            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap' }}>
-                                    <div>
-                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Last sweep attempt</p>
-                                        <p style={{ margin: '5px 0 0', color: 'var(--green)', fontSize: '1.35rem', fontWeight: 800 }}>{formatUsd(overview?.rewardOwnerSurplusSweep?.amountUsd)}</p>
-                                    </div>
-                                    <div>
-                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Reserved / processing</p>
-                                        <p style={{ margin: '5px 0 0', color: 'var(--text-h)', fontSize: '1.35rem', fontWeight: 800 }}>{formatUsd(overview?.rewardOwnerSurplusReservedUsd)}</p>
-                                    </div>
-                                    <div>
-                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Total swept</p>
-                                        <p style={{ margin: '5px 0 0', color: 'var(--text-h)', fontSize: '1.35rem', fontWeight: 800 }}>{formatUsd(overview?.rewardOwnerSurplusSweptUsd)}</p>
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        disabled={actionLoading || ['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status)}
-                                        onClick={() => runAdminAction(
-                                            '/api/admin/reward-owner-surplus/sweep',
-                                            `Sweep all available physical surplus to the owner vault?\n\nPlayer liabilities, Solana rent/fees, and a 5% safety buffer will remain in the reward wallet.`
-                                        )}
-                                        style={{ padding: '11px 18px', fontSize: '0.8rem' }}
-                                    >
-                                        {['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status) ? 'SWEEP PROCESSING...' : 'SWEEP SURPLUS TO OWNER VAULT'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-ghost"
-                                        disabled={actionLoading}
-                                        onClick={factoryResetRewardPool}
-                                        style={{ padding: '11px 18px', fontSize: '0.8rem', color: 'var(--red)', borderColor: 'rgba(239,68,68,0.45)' }}
-                                    >
-                                        FACTORY RESET REWARD POOL
-                                    </button>
-                                </div>
+                            <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-start' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    disabled={actionLoading}
+                                    onClick={factoryResetRewardPool}
+                                    style={{ padding: '11px 18px', fontSize: '0.8rem', color: 'var(--red)', borderColor: 'rgba(239,68,68,0.45)' }}
+                                >
+                                    FACTORY RESET REWARD POOL
+                                </button>
                             </div>
                         </Panel>
                         <Panel title="On-chain wallets" sub={`Live Solana balances · SOL @ $${wallets?.solPrice?.toFixed(2) ?? '—'}`}>
