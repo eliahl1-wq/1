@@ -1571,12 +1571,6 @@ export default function PreGame() {
 
             {/* SOL price + footer */}
             <div className="pregame-bottom-bar">
-                <div className="sol-price-pill">
-                    <SolLogo size={14} />
-                    <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
-                        ${solPrice.toFixed(2)}
-                    </span>
-                </div>
                 <AppFooter />
             </div>
 

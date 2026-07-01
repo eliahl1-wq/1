@@ -298,7 +298,7 @@ export default function Rewards() {
                                     <div style={{
                                         height: '100%',
                                         width: `${(normal5Progress / req5) * 100}%`,
-                                        background: normal5Progress >= req5 ? '#4ade80' : 'var(--accent)',
+                                        background: normal5Progress >= req5 ? '#4ade80' : '#ffffff',
                                         transition: 'width 0.5s ease-out'
                                     }} />
                                 </div>
@@ -316,7 +316,7 @@ export default function Rewards() {
                                     <div style={{
                                         height: '100%',
                                         width: `${(normal10Progress / req10) * 100}%`,
-                                        background: normal10Progress >= req10 ? '#4ade80' : 'var(--accent)',
+                                        background: normal10Progress >= req10 ? '#4ade80' : '#ffffff',
                                         transition: 'width 0.5s ease-out'
                                     }} />
                                 </div>

@@ -98,7 +98,7 @@ function formatDuration(ms) {
 function classifyTxCategory(tx) {
     const m = tx.meta || {};
     if (tx.type === 'deposit') return 'deposit';
-    if (m.event === 'pool_sweep' || m.event === 'br_owner_sweep') return 'sweep';
+    if (['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep'].includes(m.event)) return 'sweep';
     if (tx.type === 'game') {
         if (m.event === 'join' || m.event === 'br_join') return 'entry';
         if (m.reason === 'Arena Death' || m.reason === 'BR Eliminated') return 'death';
@@ -937,14 +937,19 @@ export default function AdminDashboard() {
                                     sub="Shared external funding wallets"
                                 />
                                 <StatCard
-                                    label="Reward Pool Balance"
+                                    label="Pending Reward Funding"
                                     value={formatUsd(overview?.rewardPoolBalanceUsd)}
-                                    sub={wallets?.rewardWallet ? `Wallet: ${wallets.rewardWallet.address.slice(0, 4)}...${wallets.rewardWallet.address.slice(-4)}` : 'Internal tracking'}
+                                    sub="Still awaiting house → reward settlement"
                                 />
                                 <StatCard
                                     label="Reward Pool (On-Chain)"
                                     value={wallets?.rewardWallet?.balanceUsd != null ? formatUsd(wallets.rewardWallet.balanceUsd) : 'Loading...'}
                                     sub={wallets?.rewardWallet?.balanceSol != null ? `${wallets.rewardWallet.balanceSol.toFixed(4)} SOL via RPC` : 'Fetching real balance...'}
+                                />
+                                <StatCard
+                                    label="Owner Reward Surplus"
+                                    value={formatUsd((overview?.rewardOwnerSurplusUsd || 0) + (overview?.rewardOwnerSurplusReservedUsd || 0))}
+                                    sub={overview?.rewardOwnerSurplusReservedUsd > 0 ? 'Manual sweep processing' : 'Tracked excess from completed challenges'}
                                 />
                             </div>
                         </div>
@@ -1341,6 +1346,39 @@ export default function AdminDashboard() {
                                 sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'}
                             />
                         </div>
+                        <Panel
+                            title="Reward owner surplus"
+                            sub="Challenge contributions above the player's actual reward stay in the reward wallet until you sweep them manually."
+                        >
+                            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap' }}>
+                                    <div>
+                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Available surplus</p>
+                                        <p style={{ margin: '5px 0 0', color: 'var(--green)', fontSize: '1.35rem', fontWeight: 800 }}>{formatUsd(overview?.rewardOwnerSurplusUsd)}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Reserved / processing</p>
+                                        <p style={{ margin: '5px 0 0', color: 'var(--text-h)', fontSize: '1.35rem', fontWeight: 800 }}>{formatUsd(overview?.rewardOwnerSurplusReservedUsd)}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Already swept</p>
+                                        <p style={{ margin: '5px 0 0', color: 'var(--text-h)', fontSize: '1.35rem', fontWeight: 800 }}>{formatUsd(overview?.rewardOwnerSurplusSweptUsd)}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    disabled={actionLoading || !(overview?.rewardOwnerSurplusUsd > 0) || ['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status)}
+                                    onClick={() => runAdminAction(
+                                        '/api/admin/reward-owner-surplus/sweep',
+                                        `Sweep ${formatUsd(overview?.rewardOwnerSurplusUsd)} tracked reward surplus to the owner vault?\n\nPlayer liabilities, Solana rent/fees, and a ${formatUsd(overview?.rewardOwnerSurplusBufferUsd ?? 0.5)} safety buffer will remain in the reward wallet.`
+                                    )}
+                                    style={{ padding: '11px 18px', fontSize: '0.8rem' }}
+                                >
+                                    {['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status) ? 'SWEEP PROCESSING...' : 'SWEEP SURPLUS TO OWNER VAULT'}
+                                </button>
+                            </div>
+                        </Panel>
                         <Panel title="On-chain wallets" sub={`Live Solana balances · SOL @ $${wallets?.solPrice?.toFixed(2) ?? '—'}`}>
                             <DataTable
                                 columns={[
@@ -1348,11 +1386,12 @@ export default function AdminDashboard() {
                                     { key: 'address', label: 'Address', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.address}>{truncateAddr(r.address)}</span> },
                                     { key: 'balanceSol', label: 'Balance', render: r => formatSol(r.balanceSol) },
                                     { key: 'balanceUsd', label: 'USD', render: r => formatUsd(r.balanceUsd) },
-                                    { key: 'sweptOnReset', label: 'Sweep rule', render: r => r.sweptOnReset === false ? '2.5% after BR match' : r.sweptOnReset ? 'On arena reset' : '—' },
+                                    { key: 'sweptOnReset', label: 'Sweep rule', render: r => typeof r.sweptOnReset === 'string' ? r.sweptOnReset : r.sweptOnReset === false ? '2.5% after BR match' : r.sweptOnReset ? 'On arena reset' : '—' },
                                 ]}
                                 rows={[
                                     ...(wallets?.mainHouse ? [wallets.mainHouse] : []),
                                     ...(wallets?.brWallets ?? []),
+                                    ...(wallets?.rewardWallet ? [{ ...wallets.rewardWallet, sweptOnReset: 'Manual surplus only' }] : []),
                                     ...(wallets?.ownerVault ? [wallets.ownerVault] : []),
                                 ]}
                                 loading={loading}
@@ -1373,7 +1412,7 @@ export default function AdminDashboard() {
                                 emptyMessage="No active rooms"
                             />
                         </Panel>
-                        <Panel title="Sweep history" sub="House wallets → owner vault">
+                        <Panel title="Sweep history" sub="House/reward wallets → owner vault">
                             <DataTable
                                 columns={[
                                     { key: 'solAmount', label: 'SOL', render: r => r.solAmount != null ? formatSol(r.solAmount) : '—' },

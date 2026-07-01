@@ -3,6 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
 
+const SolLogo = ({ size = 13, style }) => (
+    <img
+        src="/solana-sol-logo.png"
+        alt="SOL"
+        style={{ height: size, width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, ...style }}
+    />
+);
+
 export default function RewardsWidget() {
     const { user, refreshUser } = useAuth();
     const navigate = useNavigate();
@@ -223,8 +231,8 @@ export default function RewardsWidget() {
                             <div style={{
                                 height: '100%',
                                 width: `${(normal5Progress / req5) * 100}%`,
-                                background: normal5Progress >= req5 ? 'var(--green)' : 'var(--accent)',
-                                boxShadow: normal5Progress >= req5 ? '0 0 8px rgba(34, 197, 94, 0.4)' : '0 0 8px rgba(139, 92, 246, 0.3)',
+                                background: normal5Progress >= req5 ? 'var(--green)' : '#ffffff',
+                                boxShadow: normal5Progress >= req5 ? '0 0 8px rgba(34, 197, 94, 0.4)' : '0 0 8px rgba(255, 255, 255, 0.2)',
                                 transition: 'width 0.5s ease-out'
                             }} />
                         </div>
@@ -242,8 +250,8 @@ export default function RewardsWidget() {
                             <div style={{
                                 height: '100%',
                                 width: `${(normal10Progress / req10) * 100}%`,
-                                background: normal10Progress >= req10 ? 'var(--green)' : 'var(--accent)',
-                                boxShadow: normal10Progress >= req10 ? '0 0 8px rgba(34, 197, 94, 0.4)' : '0 0 8px rgba(139, 92, 246, 0.3)',
+                                background: normal10Progress >= req10 ? 'var(--green)' : '#ffffff',
+                                boxShadow: normal10Progress >= req10 ? '0 0 8px rgba(34, 197, 94, 0.4)' : '0 0 8px rgba(255, 255, 255, 0.2)',
                                 transition: 'width 0.5s ease-out'
                             }} />
                         </div>
@@ -290,58 +298,70 @@ export default function RewardsWidget() {
                 </button>
             </div>
 
-            {/* Toggle Button */}
-            <button
-                onClick={toggleExpand}
-                style={{
-                    background: 'var(--bg-2)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '20px',
-                    padding: '5px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--shadow-md)',
-                    color: 'var(--text)',
-                    position: 'relative',
-                    fontFamily: 'inherit',
-                    fontWeight: '700',
-                    fontSize: '0.72rem',
-                    lineHeight: '1.2',
-                    transition: 'all 0.15s ease'
-                }}
-                onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-3)';
-                    e.currentTarget.style.borderColor = 'var(--border-2)';
-                    e.currentTarget.style.color = 'var(--text-h)';
-                }}
-                onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-2)';
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.color = 'var(--text)';
-                }}
-            >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
-                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
-                </svg>
-                Challenges
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)', transition: 'transform 0.2s ease', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-                {hasNotification && !expanded && (
-                    <div style={{
-                        position: 'absolute',
-                        top: '-2px',
-                        right: '-2px',
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: 'var(--green)',
-                        border: '2px solid #000'
-                    }} />
+            {/* Toggle Button Container */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {location.pathname === '/pre-game' && (
+                    <div className="sol-price-pill" style={{ position: 'static', margin: 0, height: '28px', display: 'flex', alignItems: 'center', gap: '6px', boxSizing: 'border-box' }}>
+                        <SolLogo size={14} />
+                        <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
+                            ${(user?.solPrice || 64).toFixed(2)}
+                        </span>
+                    </div>
                 )}
-            </button>
+                <button
+                    onClick={toggleExpand}
+                    style={{
+                        background: 'var(--bg-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '20px',
+                        padding: '5px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        boxShadow: 'var(--shadow-md)',
+                        color: 'var(--text)',
+                        position: 'relative',
+                        fontFamily: 'inherit',
+                        fontWeight: '700',
+                        fontSize: '0.72rem',
+                        lineHeight: '1.2',
+                        transition: 'all 0.15s ease',
+                        height: '28px',
+                        boxSizing: 'border-box'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--bg-3)';
+                        e.currentTarget.style.borderColor = 'var(--border-2)';
+                        e.currentTarget.style.color = 'var(--text-h)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--bg-2)';
+                        e.currentTarget.style.borderColor = 'var(--border)';
+                        e.currentTarget.style.color = 'var(--text)';
+                    }}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
+                        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+                    </svg>
+                    Challenges
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)', transition: 'transform 0.2s ease', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                    {hasNotification && !expanded && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '-2px',
+                            right: '-2px',
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: 'var(--green)',
+                            border: '2px solid #000'
+                        }} />
+                    )}
+                </button>
+            </div>
         </div>
     );
 }
