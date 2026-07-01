@@ -654,7 +654,7 @@ export default function AdminDashboard() {
 
     const factoryResetRewardPool = async () => {
         const confirmation = window.prompt(
-            'DANGER: This sweeps the reward wallet to the owner vault (leaving about $0.50), resets all reward-pool accounting and resets challenge progress.\n\nIt is blocked if any player funds, claims, joins, or arena players are active. Transaction history is preserved.\n\nType RESET REWARD POOL to continue.'
+            'DANGER: This permanently deletes every account reward and retained winning, restores eligible accounts to an unused free ticket, resets all reward-pool accounting, and sweeps the reward wallet to the owner vault while leaving about $0.50.\n\nIt is blocked only by active blockchain claims, joins, or arena players. Transaction history is preserved.\n\nType RESET REWARD POOL to continue.'
         );
         if (confirmation == null) return;
         if (confirmation !== 'RESET REWARD POOL') {
