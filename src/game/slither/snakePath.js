@@ -437,7 +437,10 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     if (state._snapBT) {
         t = (nowMs - state._snapBT) / duration;
         if (t < 0) t = 0;
-        else if (t > 1.5) t = 1.5;
+        // Never run the body past the latest authoritative spine. Extrapolating
+        // every segment makes the tail overshoot, then jump backwards when the
+        // next server tick arrives (most visible while its visual arc grows).
+        else if (t > 1) t = 1;
     }
 
     const snapA = state._snapA || state._snapB;
