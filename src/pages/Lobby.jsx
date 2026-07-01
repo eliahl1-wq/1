@@ -120,13 +120,14 @@ export default function Lobby() {
         return () => { if (qrRef.current) qrRef.current.innerHTML = ''; };
     }, [depositAddress, depositMethod, connected]);
 
-    // Leave lobby once the user can enter the arena (funded or free-play)
+    // Leave lobby once the user can enter the arena (funded, free-play, or free ticket available)
     useEffect(() => {
         const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
-        if (user?.freePlay || balanceUsd >= MIN_ENTRY_FEE) {
+        const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+        if (user?.freePlay || hasFreeTicket || balanceUsd >= MIN_ENTRY_FEE) {
             navigate('/pre-game');
         }
-    }, [user?.freePlay, user?.balanceUsd, user?.balanceSol, user?.solPrice, navigate, solPrice]);
+    }, [user?.freePlay, user?.hasFreeTicket, user?.freeTicketUsed, user?.balanceUsd, user?.balanceSol, user?.solPrice, navigate, solPrice]);
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect your wallet first.'); return; }
@@ -244,7 +245,11 @@ export default function Lobby() {
                         Fund Your Arena
                     </h1>
                     <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 500 }}>
-                        Deposit ${MIN_ENTRY_FEE} minimum to enter the arena.
+                        {user?.hasFreeTicket && !user?.freeTicketUsed ? (
+                            <span style={{ color: 'var(--green)', fontWeight: 700 }}>✨ Free Ticket available! Enter the arena below.</span>
+                        ) : (
+                            `Deposit $${MIN_ENTRY_FEE} minimum to enter the arena.`
+                        )}
                     </p>
                 </div>
 
@@ -408,7 +413,8 @@ export default function Lobby() {
                     onClick={() => {
                         if (!connected) { setArenaError('Connect your wallet first.'); return; }
                         const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
-                        if (!isAlreadyInGame && balanceUsd < MIN_ENTRY_FEE) {
+                        const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+                        if (!isAlreadyInGame && !hasFreeTicket && balanceUsd < MIN_ENTRY_FEE) {
                             setArenaError(`Deposit at least $${MIN_ENTRY_FEE} to enter.`); return;
                         }
                         setArenaError('');

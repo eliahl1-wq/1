@@ -3212,7 +3212,7 @@
 
   .sol-price-pill {
     position: fixed;
-    right: 150px;
+    right: 220px;
     bottom: 16px;
     margin: 0;
   }
@@ -3730,4 +3730,20 @@
 
 .btn-primary:hover {
   filter: brightness(1.1);
+}
+
+@keyframes challenge-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.challenge-pulse-animation {
+  animation: challenge-pulse 2s infinite ease-in-out;
 }

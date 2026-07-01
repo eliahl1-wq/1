@@ -11,6 +11,7 @@ export default function RewardsWidget() {
     const [isInitialized, setIsInitialized] = useState(false);
     const [hasSeen, setHasSeen] = useState(false);
     const [claimState, setClaimState] = useState({ loading: false, error: '' });
+    const [hoveredKey, setHoveredKey] = useState(() => localStorage.getItem('challenges_hovered_key'));
     const claimLockRef = useRef(false);
 
     useEffect(() => {
@@ -59,9 +60,6 @@ export default function RewardsWidget() {
 
     const shouldShowWidget = hasUnusedTicket || totalBalance > 0 || (user.freeTicketUsed && !isCompleted);
     // if (!shouldShowWidget) return null; // Always show widget button if on allowed path
-    // Notifications: Needs attention if ticket unused or balance > 0 and not fully completed/cashed out
-    // and if they haven't explicitly opened the widget in this session.
-    const hasNotification = (hasUnusedTicket || hasBalance) && !hasSeen;
 
     const requiredContribution = Math.max(5, promoBalance);
     const multiplier = Math.ceil(requiredContribution / 5);
@@ -72,6 +70,17 @@ export default function RewardsWidget() {
     const hasActiveChallenge = user.freeTicketUsed && !isCompleted && !user.rewardsDisabled;
     const showReward = user.freeTicketUsed && (totalBalance > 0 || !isCompleted);
     const hasAnyContent = hasUnusedTicket || showReward || hasActiveChallenge || canClaim || user.rewardClaimInProgress;
+
+    const challengeKey = `${normal5Progress}_${req5}_${normal10Progress}_${req10}_${user.freeTicketUsed}`;
+    const hasUnhoveredChallenge = hasActiveChallenge && (hoveredKey !== challengeKey);
+    const hasNotification = ((hasUnusedTicket || hasBalance) && !hasSeen) || hasUnhoveredChallenge;
+
+    const handleChallengeHover = () => {
+        if (hasUnhoveredChallenge) {
+            localStorage.setItem('challenges_hovered_key', challengeKey);
+            setHoveredKey(challengeKey);
+        }
+    };
 
     const toggleExpand = (e) => {
         e.stopPropagation();
@@ -144,7 +153,7 @@ export default function RewardsWidget() {
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--r-xl)',
                 padding: '16px',
-                boxShadow: 'var(--shadow-xl)',
+                boxShadow: location.pathname === '/pre-game' ? 'none' : 'var(--shadow-xl)',
                 marginBottom: '10px',
                 transform: expanded ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
                 opacity: expanded ? 1 : 0,
@@ -153,9 +162,20 @@ export default function RewardsWidget() {
                 transformOrigin: 'bottom right'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>
-                        Challenges
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>
+                            Challenges
+                        </span>
+                        {hasUnhoveredChallenge && (
+                            <div style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: 'var(--green)',
+                                boxShadow: '0 0 10px rgba(34,197,94,0.5)'
+                            }} />
+                        )}
+                    </div>
                     <button
                         onClick={toggleExpand}
                         aria-label="Close challenges"
@@ -184,7 +204,13 @@ export default function RewardsWidget() {
                 )}
 
                 {hasActiveChallenge && (
-                <div style={{ marginBottom: '20px' }}>
+                <div
+                    onMouseEnter={handleChallengeHover}
+                    onTouchStart={handleChallengeHover}
+                    onClick={handleChallengeHover}
+                    className={hasUnhoveredChallenge ? 'challenge-pulse-animation' : ''}
+                    style={{ marginBottom: '20px' }}
+                >
                     {/* $5 Challenge Bar */}
                     <div style={{ marginBottom: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
@@ -271,18 +297,18 @@ export default function RewardsWidget() {
                     background: 'var(--bg-2)',
                     border: '1px solid var(--border)',
                     borderRadius: '20px',
-                    padding: '6px 14px',
+                    padding: '5px 12px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '6px',
                     cursor: 'pointer',
                     boxShadow: 'var(--shadow-md)',
                     color: 'var(--text)',
                     position: 'relative',
                     fontFamily: 'inherit',
                     fontWeight: '700',
-                    fontSize: '0.8rem',
-                    lineHeight: '1.5',
+                    fontSize: '0.72rem',
+                    lineHeight: '1.2',
                     transition: 'all 0.15s ease'
                 }}
                 onMouseEnter={(e) => {

@@ -78,7 +78,8 @@ function ArenaRoute({ children }) {
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
   if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
-  if (user && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
+  const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+  if (user && !hasFreeTicket && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
   return children;
 }
 
@@ -87,7 +88,8 @@ function PublicRoute({ children }) {
   if (loading) return <AppLoadingScreen />;
   if (isAuthenticated) {
     const balanceUsd = user?.balanceUsd || (user?.balanceSol * (user?.solPrice || 57)) || 0;
-    if (user?.freePlay || balanceUsd >= MIN_ENTRY_FEE) return <Navigate to="/pre-game" />;
+    const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+    if (user?.freePlay || hasFreeTicket || balanceUsd >= MIN_ENTRY_FEE) return <Navigate to="/pre-game" />;
     return <Navigate to="/lobby" />;
   }
   return children;
