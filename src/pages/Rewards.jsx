@@ -221,8 +221,7 @@ export default function Rewards() {
                                 }}>
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
-                                        <path d="M12 11v6" />
-                                        <path d="M10 13a2 2 0 1 0 0-4h2a2 2 0 1 1 0 4h-2a2 2 0 1 0 0 4" />
+                                        <path d="M12 9v6" strokeDasharray="2 2" />
                                     </svg>
                                 </div>
                                 <div>
@@ -237,14 +236,14 @@ export default function Rewards() {
 
                             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 <button
-                                    className="btn btn-primary"
+                                    className="btn btn-green"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
                                     style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >
                                     Use on Agar
                                 </button>
                                 <button
-                                    className="btn btn-primary"
+                                    className="btn btn-green"
                                     onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
                                     style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
                                 >
