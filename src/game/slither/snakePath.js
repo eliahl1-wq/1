@@ -389,6 +389,7 @@ export function resetSnakeBodyTick(state) {
     delete state._snapBAngle;
     delete state._tickMs;
     delete state._lastSnapKey;
+    delete state._segmentVel;
 }
 
 /**
@@ -407,19 +408,36 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     }
     syncSegmentCount(state, spineLen, 1, serverHead, serverAngle ?? state.angle ?? 0);
 
-    // Follow the newest spine continuously at display rate. Restarting a
-    // snapshot lerp on every 40 Hz server update left zero-movement frames;
-    // visualArcLen still grew on those frames, so the tail crept backwards and
-    // then jumped forwards again. A time-based follow has no per-tick reset and
-    // keeps the existing gradual growth easing independent of frame rate.
+    // Follow the newest spine continuously at display rate. A critically
+    // damped follow preserves velocity across server updates, so bends do not
+    // produce the speed pulses that a plain position lerp creates in the tail.
     const frameDt = Math.min(Math.max(dt || 0, 0), 0.1);
-    const follow = 1 - Math.exp(-frameDt / 0.045);
+    const smoothTime = 0.06;
+    const omega = 2 / smoothTime;
+    const x = omega * frameDt;
+    const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    let velocities = state._segmentVel;
+    if (!velocities) {
+        velocities = [];
+        state._segmentVel = velocities;
+    }
+    while (velocities.length < spineLen) velocities.push({ x: 0, y: 0 });
+    if (velocities.length > spineLen) velocities.length = spineLen;
+
     for (let i = 0; i < spineLen; i++) {
         const target = serverSegments[i];
         const seg = state.segments[i];
-        seg.x += (target.x - seg.x) * follow;
-        seg.y += (target.y - seg.y) * follow;
+        const velocity = velocities[i];
+        const changeX = seg.x - target.x;
+        const changeY = seg.y - target.y;
+        const tempX = (velocity.x + omega * changeX) * frameDt;
+        const tempY = (velocity.y + omega * changeY) * frameDt;
+        velocity.x = (velocity.x - omega * tempX) * decay;
+        velocity.y = (velocity.y - omega * tempY) * decay;
+        seg.x = target.x + (changeX + tempX) * decay;
+        seg.y = target.y + (changeY + tempY) * decay;
     }
+    const follow = 1 - Math.exp(-frameDt / 0.045);
     state.angle = lerpAngle(state.angle || 0, serverAngle || 0, follow);
 
     if (options.skipDensify) return;
