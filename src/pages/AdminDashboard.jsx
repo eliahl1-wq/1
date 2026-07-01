@@ -98,7 +98,7 @@ function formatDuration(ms) {
 function classifyTxCategory(tx) {
     const m = tx.meta || {};
     if (tx.type === 'deposit') return 'deposit';
-    if (['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep'].includes(m.event)) return 'sweep';
+    if (['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset'].includes(m.event)) return 'sweep';
     if (tx.type === 'game') {
         if (m.event === 'join' || m.event === 'br_join') return 'entry';
         if (m.reason === 'Arena Death' || m.reason === 'BR Eliminated') return 'death';
@@ -644,6 +644,31 @@ export default function AdminDashboard() {
                 body: body ? JSON.stringify(body) : undefined,
             });
             setActionMsg(`✅ ${result.message || 'Done'}`);
+            await Promise.all([loadData(), fetchServerStatus()]);
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const factoryResetRewardPool = async () => {
+        const confirmation = window.prompt(
+            'DANGER: This sweeps the reward wallet to the owner vault (leaving about $0.50), resets all reward-pool accounting and resets challenge progress.\n\nIt is blocked if any player funds, claims, joins, or arena players are active. Transaction history is preserved.\n\nType RESET REWARD POOL to continue.'
+        );
+        if (confirmation == null) return;
+        if (confirmation !== 'RESET REWARD POOL') {
+            setActionMsg('❌ Reset cancelled: confirmation phrase did not match.');
+            return;
+        }
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            const result = await fetchAdmin('/api/admin/reward-pool/factory-reset', {
+                method: 'POST',
+                body: JSON.stringify({ confirmation }),
+            });
+            setActionMsg(`✅ ${result.message}`);
             await Promise.all([loadData(), fetchServerStatus()]);
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
@@ -1365,18 +1390,29 @@ export default function AdminDashboard() {
                                         <p style={{ margin: '5px 0 0', color: 'var(--text-h)', fontSize: '1.35rem', fontWeight: 800 }}>{formatUsd(overview?.rewardOwnerSurplusSweptUsd)}</p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    disabled={actionLoading || !(overview?.rewardOwnerSurplusUsd > 0) || ['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status)}
-                                    onClick={() => runAdminAction(
-                                        '/api/admin/reward-owner-surplus/sweep',
-                                        `Sweep ${formatUsd(overview?.rewardOwnerSurplusUsd)} tracked reward surplus to the owner vault?\n\nPlayer liabilities, Solana rent/fees, and a ${formatUsd(overview?.rewardOwnerSurplusBufferUsd ?? 0.5)} safety buffer will remain in the reward wallet.`
-                                    )}
-                                    style={{ padding: '11px 18px', fontSize: '0.8rem' }}
-                                >
-                                    {['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status) ? 'SWEEP PROCESSING...' : 'SWEEP SURPLUS TO OWNER VAULT'}
-                                </button>
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        disabled={actionLoading || !(overview?.rewardOwnerSurplusUsd > 0) || ['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status)}
+                                        onClick={() => runAdminAction(
+                                            '/api/admin/reward-owner-surplus/sweep',
+                                            `Sweep ${formatUsd(overview?.rewardOwnerSurplusUsd)} tracked reward surplus to the owner vault?\n\nPlayer liabilities, Solana rent/fees, and a ${formatUsd(overview?.rewardOwnerSurplusBufferUsd ?? 0.5)} safety buffer will remain in the reward wallet.`
+                                        )}
+                                        style={{ padding: '11px 18px', fontSize: '0.8rem' }}
+                                    >
+                                        {['reserved', 'broadcast'].includes(overview?.rewardOwnerSurplusSweep?.status) ? 'SWEEP PROCESSING...' : 'SWEEP SURPLUS TO OWNER VAULT'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost"
+                                        disabled={actionLoading}
+                                        onClick={factoryResetRewardPool}
+                                        style={{ padding: '11px 18px', fontSize: '0.8rem', color: 'var(--red)', borderColor: 'rgba(239,68,68,0.45)' }}
+                                    >
+                                        FACTORY RESET REWARD POOL
+                                    </button>
+                                </div>
                             </div>
                         </Panel>
                         <Panel title="On-chain wallets" sub={`Live Solana balances · SOL @ $${wallets?.solPrice?.toFixed(2) ?? '—'}`}>
