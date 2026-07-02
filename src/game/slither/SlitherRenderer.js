@@ -2167,13 +2167,44 @@ export class SlitherRenderer {
             this._sortDirty = false;
         }
 
-        const viewPad = 900;
+        const isCompetitive = this.state.competitiveSlither;
+        const viewPad = isCompetitive ? Infinity : 2500;
         for (const snake of sorted) {
+            if (snake.isYou) {
+                this._drawSnake(snake, toScreen, zoom);
+                continue;
+            }
             const head = snake.segments?.[0];
-            if (head && !snake.isYou) {
-                const dx = head.x - cx;
-                const dy = head.y - cy;
-                if (dx * dx + dy * dy > viewPad * viewPad) continue;
+            if (!head) continue;
+
+            if (viewPad !== Infinity) {
+                let inView = false;
+                // Check head first (common case)
+                const dxHead = head.x - cx;
+                const dyHead = head.y - cy;
+                if (dxHead * dxHead + dyHead * dyHead <= viewPad * viewPad) {
+                    inView = true;
+                } else {
+                    // Check other segments (step by 8 to keep it fast, plus the last segment)
+                    for (let i = 8; i < snake.segments.length; i += 8) {
+                        const seg = snake.segments[i];
+                        const dx = seg.x - cx;
+                        const dy = seg.y - cy;
+                        if (dx * dx + dy * dy <= viewPad * viewPad) {
+                            inView = true;
+                            break;
+                        }
+                    }
+                    if (!inView && snake.segments.length > 1) {
+                        const last = snake.segments[snake.segments.length - 1];
+                        const dx = last.x - cx;
+                        const dy = last.y - cy;
+                        if (dx * dx + dy * dy <= viewPad * viewPad) {
+                            inView = true;
+                        }
+                    }
+                }
+                if (!inView) continue;
             }
             this._drawSnake(snake, toScreen, zoom);
         }
