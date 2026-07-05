@@ -1751,8 +1751,8 @@ export default function PreGame() {
 
                     {/* Right Column */}
                     {tournamentId ? (
-                        <div className="right-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div className="leaderboard-card tournament-pulse-glow" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+                        <div className="right-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignSelf: 'stretch' }}>
+                            <div className="leaderboard-card tournament-pulse-glow" style={{ flex: '1 1 auto', minHeight: 340, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
                                 <div style={{ padding: '20px 20px 16px', background: 'rgba(249, 115, 22, 0.03)', borderBottom: '1px solid var(--border)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                         <span className="tournament-panel-label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textAlign: 'center' }}>Total Prize Pot</span>

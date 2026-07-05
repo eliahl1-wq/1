@@ -72,9 +72,9 @@
 }
 
 .tournament-card {
-    flex: 0 0 430px;
+    flex: 0 0 380px;
     max-width: 92vw;
-    min-height: 690px;
+    min-height: 560px;
     scroll-snap-align: start;
     display: flex;
     flex-direction: column;
@@ -85,6 +85,7 @@
     box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
     backdrop-filter: blur(18px);
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .tournament-card:hover {
@@ -94,10 +95,9 @@
 }
 
 .tournament-card-media {
-    position: absolute;
-    inset: 0;
+    position: relative;
     width: 100%;
-    height: 100%;
+    height: 180px;
     overflow: hidden;
     background: #08090c;
     z-index: 1;
@@ -107,7 +107,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, rgba(14, 16, 22, 0.2) 0%, rgba(14, 16, 22, 0.85) 60%, rgba(14, 16, 22, 0.98) 100%);
+    background: linear-gradient(to bottom, rgba(14, 16, 22, 0) 0%, rgba(14, 16, 22, 0.5) 100%);
     z-index: 2;
     pointer-events: none;
 }
@@ -147,11 +147,10 @@
 .tournament-card-content {
     position: relative;
     z-index: 3;
-    padding: 24px;
+    padding: 20px 24px 24px;
     display: flex;
     flex-direction: column;
     flex-grow: 1;
-    justify-content: flex-end;
     box-sizing: border-box;
 }
 
@@ -528,8 +527,73 @@
     grid-template-columns: 310px minmax(340px, 440px) 310px !important;
     gap: 36px !important;
     max-width: 1280px !important;
+    align-items: stretch !important;
 }
 
 .pre-game-grid--tournament .main-card {
     max-width: none !important;
 }
+
+.pre-game-grid--tournament .right-panel-stack {
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.pre-game-grid--tournament .leaderboard-card {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* Custom Highlighted Prize Hero Box for Tournament Cards */
+.tournament-prize-hero-box {
+    margin: 8px 0 16px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.tournament-prize-hero-box--live {
+    background: rgba(249, 115, 22, 0.08);
+    border-color: rgba(249, 115, 22, 0.3);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.04);
+}
+
+.prize-hero-label {
+    font-size: 0.65rem;
+    font-weight: 850;
+    color: var(--text-3);
+    letter-spacing: 0.08em;
+}
+
+.live-prize-pulse-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #f97316;
+}
+
+.live-prize-pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #f97316;
+    box-shadow: 0 0 8px #f97316;
+    animation: orange-pulse 1.6s infinite alternate;
+}
+
+.prize-hero-amount {
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: var(--text-h);
+}
+
+.tournament-prize-hero-box--live .prize-hero-amount {
+    color: #f97316;
+    text-shadow: 0 0 12px rgba(249, 115, 22, 0.25);
+}
+

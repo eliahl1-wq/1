@@ -123,6 +123,17 @@ export default function Tournaments() {
                             <div className="tournament-card-content">
                                 <div className="tournament-mode-label">Balance Grab · Slither</div>
                                 <h2>{tournament.name}</h2>
+
+                                <div className={`tournament-prize-hero-box ${tournament.status === 'live' ? 'tournament-prize-hero-box--live' : ''}`}>
+                                    <span className="prize-hero-label">
+                                        {tournament.status === 'live' ? (
+                                            <span className="live-prize-pulse-container">
+                                                <span className="live-prize-pulse-dot" /> LIVE Prize Pool
+                                            </span>
+                                        ) : 'Prize Pool'}
+                                    </span>
+                                    <strong className="prize-hero-amount">${tournament.prizePotUsd.toFixed(2)}</strong>
+                                </div>
                                 
                                 <div className="tournament-details-grid">
                                     <div className="tournament-detail-item">
@@ -130,15 +141,11 @@ export default function Tournaments() {
                                         <strong>$1.00</strong>
                                     </div>
                                     <div className="tournament-detail-item">
-                                        <span className="label">Prize Pool</span>
-                                        <strong style={{ color: '#f97316' }}>${tournament.prizePotUsd.toFixed(2)}</strong>
-                                    </div>
-                                    <div className="tournament-detail-item">
                                         <span className="label">Players</span>
                                         <strong>{tournament.participantCount}</strong>
                                     </div>
-                                    <div className="tournament-detail-item">
-                                        <span className="label">Attempts</span>
+                                    <div className="tournament-detail-item" style={{ gridColumn: 'span 2' }}>
+                                        <span className="label">Total Attempts</span>
                                         <strong>{tournament.totalAttempts}</strong>
                                     </div>
                                 </div>
