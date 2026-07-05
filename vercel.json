@@ -82,6 +82,14 @@
     {
       "source": "/faq",
       "destination": "/index.html"
+    },
+    {
+      "source": "/tournaments",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tournaments/:tournamentId/lobby",
+      "destination": "/index.html"
     }
   ],
   "headers": [

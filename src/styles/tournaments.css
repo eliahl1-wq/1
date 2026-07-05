@@ -74,6 +74,7 @@
 .tournament-card {
     flex: 0 0 560px;
     max-width: 92vw;
+    min-height: 580px;
     scroll-snap-align: start;
     display: flex;
     flex-direction: column;
@@ -94,7 +95,7 @@
 
 .tournament-card-media {
     position: relative;
-    height: 230px;
+    height: 290px;
     overflow: hidden;
     background: #08090c;
 }

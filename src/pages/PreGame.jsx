@@ -1380,7 +1380,7 @@ export default function PreGame() {
 
                     {/* Center Column */}
                     {tournamentId ? (
-                        <div className="center-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minHeight: centerPanelMinHeight }}>
+                        <div className="center-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
                             {tournamentError && (
                                 <div className="tournament-ended-callout" style={{ borderColor: 'rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#fecaca', margin: 0 }}>
                                     {tournamentError}
