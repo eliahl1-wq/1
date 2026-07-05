@@ -1316,437 +1316,532 @@ export default function PreGame() {
                 />
             )}
 
-            {tournamentId ? (
-                tournamentLoading ? (
-                    <div className="tournament-empty" style={{ margin: '15vh auto', maxWidth: 520, textAlign: 'center', color: 'var(--text-2)' }}>
-                        <span className="spinner" style={{ marginRight: 8 }} />
-                        Loading tournament lobby…
-                    </div>
-                ) : (
-                    <main className="tournament-page" style={{ width: '100%', maxWidth: 1180, margin: '20px auto 0', padding: '0 16px', boxSizing: 'border-box' }}>
-                        <div className="tournament-lobby-header">
-                            <div>
-                                <p className="tournament-kicker">Tournament · Balance Grab</p>
-                                <h1 className="tournament-title" style={{ fontSize: 'clamp(1.9rem, 5vw, 3.35rem)', margin: '4px 0 8px' }}>{tournament?.name || 'Tournament'}</h1>
-                                <p className="tournament-subtitle" style={{ margin: 0 }}>{tournamentStatusText}</p>
-                            </div>
-                            <button className="tournament-secondary-btn" onClick={() => navigate('/tournaments')}>← All tournaments</button>
-                        </div>
-
-                        {tournamentError && <div className="tournament-ended-callout" style={{ borderColor: 'rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#fecaca', margin: '20px 0' }}>{tournamentError}</div>}
-
-                        {tournament?.status === 'ended' && (
-                            <div className="tournament-ended-callout" style={{ margin: '20px 0' }}>
-                                <strong>Tournament ended.</strong>{' '}
-                                {tournament.me?.winningsUsd > 0
-                                    ? `You placed #${tournament.me.placement} and have $${tournament.me.winningsUsd.toFixed(2)} ready in Rewards.`
-                                    : `Your final tournament balance was $${tournament.me?.balanceUsd?.toFixed(2) || '0.00'}.`}
-                                {tournament.me?.winningsUsd > 0 && (
-                                    <button className="tournament-secondary-btn" style={{ marginLeft: 14 }} onClick={() => navigate('/rewards')}>
-                                        Claim in Rewards
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="tournament-balance-banner" style={{ margin: '20px 0' }}>
-                            <div>
-                                <span>Your tournament balance</span>
-                                <div style={{ marginTop: 4, color: 'var(--text-2)', fontSize: '.78rem' }}>
-                                    All successful cashouts across this tournament
-                                </div>
-                            </div>
-                            <strong>${(tournament?.me?.balanceUsd || 0).toFixed(2)}</strong>
-                        </div>
-
-                        <div className="tournament-lobby-grid">
-                            <section className="tournament-panel tournament-play-card">
-                                <div className="tournament-preview">
-                                    <GamemodePreview mode="slither" fit />
-                                </div>
-                                <div className="tournament-play-copy">
-                                    <span className="tournament-panel-label">Tournament mode</span>
-                                    <h2>Balance Grab</h2>
-                                    <p>
-                                        Every run starts at $1 in-game balance with the $10 Slither food economy.
-                                        Food and bots are score only—your $1 entry goes entirely into the prize pot.
-                                    </p>
-                                    <div className="tournament-attempts" aria-label={`${attemptsUsed} of 5 attempts used`}>
-                                        {[0, 1, 2, 3, 4].map(index => (
-                                            <span key={index} className={`tournament-attempt-dot${index < attemptsUsed ? ' tournament-attempt-dot--used' : ''}`} />
-                                        ))}
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, color: 'var(--text-2)', fontSize: '.78rem' }}>
-                                        <span>{attemptsRemaining} attempts left</span>
-                                        <strong style={{ color: 'var(--text-h)' }}>$1.00 per run</strong>
-                                    </div>
-                                    <button className="tournament-primary-btn tournament-play-btn" disabled={!canPlayTournament} onClick={playTournament}>
-                                        {tournament?.status === 'scheduled'
-                                            ? `Starts in ${formatCountdown(tournament.startAt, tournamentNow)}`
-                                            : tournament?.status === 'ended'
-                                                ? 'Tournament ended'
-                                                : attemptsRemaining <= 0 ? 'All 5 attempts used' : `Play attempt ${attemptsUsed + 1} · $1`}
-                                    </button>
-                                </div>
-                            </section>
-
-                            <aside className="tournament-panel">
-                                <span className="tournament-panel-label">Live tournament</span>
-                                <h2>Prize pot</h2>
-                                <div className="tournament-prize-amount">${(tournament?.prizePotUsd || 0).toFixed(2)}</div>
-                                <div className="tournament-splits">
-                                    <div className="tournament-split">1st<strong>60%</strong></div>
-                                    <div className="tournament-split">2nd<strong>30%</strong></div>
-                                    <div className="tournament-split">3rd<strong>10%</strong></div>
-                                </div>
-                                <span className="tournament-panel-label">Leaderboard</span>
-                                <div className="tournament-leaderboard" style={{ marginTop: 8 }}>
-                                    {(tournament?.leaderboard || []).length === 0 && (
-                                        <div style={{ color: 'var(--text-3)', fontSize: '.78rem', padding: '18px 8px' }}>No banked cashouts yet.</div>
-                                    )}
-                                    {(tournament?.leaderboard || []).map((entry, index) => (
-                                        <div key={`${entry.username}-${index}`} className="tournament-leaderboard-row">
-                                            <span>#{entry.rank || index + 1}</span>
-                                            <span>{entry.username}</span>
-                                            <strong>${entry.balanceUsd.toFixed(2)}</strong>
-                                        </div>
-                                    ))}
-                                </div>
-                            </aside>
-                        </div>
-                    </main>
-                )
+            {tournamentId && tournamentLoading ? (
+                <div className="tournament-empty" style={{ margin: '15vh auto', maxWidth: 520, textAlign: 'center', color: 'var(--text-2)' }}>
+                    <span className="spinner" style={{ marginRight: 8 }} />
+                    Loading tournament lobby…
+                </div>
             ) : (
                 <div className="pre-game-grid">
-                <div className="mode-card" ref={modeCardRef}>
-                    <GamemodePreview mode={selectedMode} className="mode-card-preview" />
-                    <div className="mode-card-overlay">
-                        <div className="mode-card-header">
-                            <span className="mode-card-label">Gamemode</span>
-                            <div className="mode-card-title mode-card-title--stacked">
-                                {modeCardTitle.toUpperCase()}
+                    {/* Left Column */}
+                    {tournamentId ? (
+                        <div className="mode-card" ref={modeCardRef}>
+                            <GamemodePreview mode="slither" className="mode-card-preview" />
+                            <div className="mode-card-overlay">
+                                <div className="mode-card-header">
+                                    <span className="mode-card-label">Tournament</span>
+                                    <div className="mode-card-title mode-card-title--stacked">
+                                        {(tournament?.name || 'Tournament').toUpperCase()}
+                                    </div>
+                                    <div className="mode-card-subtitle">{tournamentStatusText}</div>
+                                </div>
+
+                                <div className="mode-card-footer">
+                                    <button
+                                        type="button"
+                                        className="mode-card-action"
+                                        onClick={() => navigate('/tournaments')}
+                                    >
+                                        Change Tournament
+                                    </button>
+                                </div>
                             </div>
-                            <div className="mode-card-subtitle">{modeSubtitle}</div>
                         </div>
+                    ) : (
+                        <div className="mode-card" ref={modeCardRef}>
+                            <GamemodePreview mode={selectedMode} className="mode-card-preview" />
+                            <div className="mode-card-overlay">
+                                <div className="mode-card-header">
+                                    <span className="mode-card-label">Gamemode</span>
+                                    <div className="mode-card-title mode-card-title--stacked">
+                                        {modeCardTitle.toUpperCase()}
+                                    </div>
+                                    <div className="mode-card-subtitle">{modeSubtitle}</div>
+                                </div>
 
-                        <div className="mode-card-footer">
-                            <div className="mode-playing-count">
-                                <span className="live-dot" aria-hidden="true" />
-                                <span>
-                                    Playing: <span className="mono">{siteUsersOnline}</span>
-                                </span>
+                                <div className="mode-card-footer">
+                                    <div className="mode-playing-count">
+                                        <span className="live-dot" aria-hidden="true" />
+                                        <span>
+                                            Playing: <span className="mono">{siteUsersOnline}</span>
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="mode-card-action"
+                                        onClick={() => navigate('/gamemodes', { state: { selectedMode: isBattleRoyaleMode ? brVariant : selectedMode } })}
+                                    >
+                                        Change
+                                    </button>
+                                </div>
                             </div>
-                            <button
-                                type="button"
-                                className="mode-card-action"
-                                onClick={() => navigate('/gamemodes', { state: { selectedMode: isBattleRoyaleMode ? brVariant : selectedMode } })}
-                            >
-                                Change
-                            </button>
                         </div>
-                    </div>
-                </div>
+                    )}
 
-                <div className="center-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-                    <div className="game-card main-card">
-                        {/* Nickname field */}
-                        <div style={{ marginBottom: '18px' }}>
-                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
-                                Nickname
-                            </label>
-                            <input
-                                type="text"
-                                value={nickname}
-                                onChange={e => setNickname(e.target.value)}
-                                maxLength={15}
-                                placeholder="Enter name…"
-                                className="nickname-input"
-                            />
-                        </div>
+                    {/* Center Column */}
+                    {tournamentId ? (
+                        <div className="center-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', minHeight: centerPanelMinHeight }}>
+                            {tournamentError && (
+                                <div className="tournament-ended-callout" style={{ borderColor: 'rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#fecaca', margin: 0 }}>
+                                    {tournamentError}
+                                </div>
+                            )}
 
-                        <div className="divider" style={{ marginBottom: '14px' }} />
-
-                        <div className="entry-row" style={{ marginBottom: '14px' }}>
-                            <span className="label">Entry Fee</span>
-                            <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                                {freePlay ? 'FREE (Test)' : formatUsd(entryFeeForSession)}
-                            </span>
-                        </div>
-
-                        {/* Stake Selection Selector */}
-                        <div className="lobby-stake-selection" style={{ marginBottom: '18px' }}>
-                            <label className="label" style={{ display: 'block', marginBottom: '8px' }}>
-                                {isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake'}
-                            </label>
-                            <div className="lobby-tier-row">
-                                {tierOptions.map(tier => {
-                                    const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
-                                    const active = entryFeeForSession === tier;
-                                    const isNormal5 = tier === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
-                                    const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
-                                    const isFreeTicketButton = isNormal5 && hasFreeTicket;
-
-                                    return (
-                                        <button
-                                            key={tier}
-                                            type="button"
-                                            className={`lobby-tier-btn${active ? ' lobby-tier-btn--active' : ''}${locked ? ' lobby-tier-btn--locked' : ''}`}
-                                            disabled={locked || isMatchmaking}
-                                            onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
-                                        >
-                                            {freePlay ? 'FREE' : (isFreeTicketButton ? 'Free Ticket' : `$${tier}`)}
+                            {tournament?.status === 'ended' && (
+                                <div className="tournament-ended-callout" style={{ margin: 0 }}>
+                                    <strong>Tournament ended.</strong>{' '}
+                                    {tournament.me?.winningsUsd > 0
+                                        ? `You placed #${tournament.me.placement} and have $${tournament.me.winningsUsd.toFixed(2)} ready in Rewards.`
+                                        : `Your final tournament balance was $${tournament.me?.balanceUsd?.toFixed(2) || '0.00'}.`}
+                                    {tournament.me?.winningsUsd > 0 && (
+                                        <button className="tournament-secondary-btn" style={{ marginLeft: 14, border: '1px solid rgba(34, 197, 94, 0.4)', background: 'rgba(255,255,255,0.04)' }} onClick={() => navigate('/rewards')}>
+                                            Claim in Rewards
                                         </button>
-                                    );
-                                })}
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="game-card main-card" style={{ flexGrow: 1 }}>
+                                <div style={{ marginBottom: '18px' }}>
+                                    <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                                        Nickname
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={nickname}
+                                        onChange={e => setNickname(e.target.value)}
+                                        maxLength={15}
+                                        placeholder="Enter name…"
+                                        className="nickname-input"
+                                    />
+                                </div>
+
+                                <div className="divider" style={{ marginBottom: '14px' }} />
+
+                                <div className="entry-row" style={{ marginBottom: '14px' }}>
+                                    <span className="label">Entry fee</span>
+                                    <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
+                                        $1.00 per attempt
+                                    </span>
+                                </div>
+
+                                <div style={{ marginBottom: '18px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.72rem' }}>
+                                        <span className="label">Attempts Tracker</span>
+                                        <span className="mono" style={{ color: 'var(--text-2)' }}>{attemptsRemaining} left</span>
+                                    </div>
+                                    <div className="tournament-attempts" style={{ margin: 0, gap: '6px' }}>
+                                        {[0, 1, 2, 3, 4].map(index => (
+                                            <span key={index} className={`tournament-attempt-dot${index < attemptsUsed ? ' tournament-attempt-dot--used' : ''}`} style={{ height: '8px' }} />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="divider" style={{ marginBottom: '20px' }} />
+
+                                <button
+                                    className="play-button"
+                                    disabled={!canPlayTournament}
+                                    onClick={playTournament}
+                                >
+                                    {tournament?.status === 'scheduled'
+                                        ? `Starts in ${formatCountdown(tournament.startAt, tournamentNow)}`
+                                        : tournament?.status === 'ended'
+                                            ? 'Tournament ended'
+                                            : attemptsRemaining <= 0 ? 'All 5 attempts used' : `Play attempt ${attemptsUsed + 1} · $1.00`}
+                                </button>
                             </div>
-                            {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && user?.hasFreeTicket && !user?.freeTicketUsed) && (
-                                <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
-                                    ✨ free ticket available
+
+                            {/* Customize Skin Card */}
+                            {isAuthenticated && (
+                                <div
+                                    className="leaderboard-card customize-lobby-card"
+                                    onClick={() => setShowCustomizer(true)}
+                                    style={{ cursor: 'pointer', marginTop: 0 }}
+                                >
+                                    <div className="customize-lobby-card-header">
+                                        <div className="customize-lobby-card-title-group">
+                                            <svg className="customize-lobby-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.94-.92 1.94-2 0-.49-.18-.95-.5-1.3-.32-.34-.5-.81-.5-1.3 0-1.03.87-1.9 1.9-1.9H17c3.31 0 6-2.69 6-6 0-4.97-4.92-9-11-9z" />
+                                                <circle cx="6.5" cy="11.5" r="1.5" fill="currentColor" />
+                                                <circle cx="10" cy="7" r="1.5" fill="currentColor" />
+                                                <circle cx="15" cy="7" r="1.5" fill="currentColor" />
+                                                <circle cx="18.5" cy="11.5" r="1.5" fill="currentColor" />
+                                            </svg>
+                                            <span className="customize-lobby-title">Customize Appearance</span>
+                                        </div>
+                                        <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
+                                            {selectedSkin === 'random' ? 'Rainbow' : getChromaName(selectedSkin)}
+                                        </span>
+                                    </div>
+
+                                    <div className="customize-lobby-preview-box">
+                                        <SnakeSkinPreview color={selectedSkin} isLarge={false} />
+                                    </div>
+
+                                    <div className="customize-lobby-footer">
+                                        <span>Click to Customize Skin</span>
+                                    </div>
                                 </div>
                             )}
                         </div>
+                    ) : (
+                        <div className="center-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+                            <div className="game-card main-card">
+                                {/* Nickname field */}
+                                <div style={{ marginBottom: '18px' }}>
+                                    <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                                        Nickname
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={nickname}
+                                        onChange={e => setNickname(e.target.value)}
+                                        maxLength={15}
+                                        placeholder="Enter name…"
+                                        className="nickname-input"
+                                    />
+                                </div>
 
-                        <button
-                            className={playBtnClass}
-                            onClick={handleStartMatch}
-                            disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode)}
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                        >
-                            {playBtnLabel}
-                        </button>
+                                <div className="divider" style={{ marginBottom: '14px' }} />
 
-                        {isAlreadyInGame && currentGameMode && (
-                            <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
-                                Active session: {currentGameMode.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}
-                                {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} entry`}
-                                {activeGameBalance != null && !currentGameMode.startsWith('br-') && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
-                            </div>
-                        )}
+                                <div className="entry-row" style={{ marginBottom: '14px' }}>
+                                    <span className="label">Entry Fee</span>
+                                    <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
+                                        {freePlay ? 'FREE (Test)' : formatUsd(entryFeeForSession)}
+                                    </span>
+                                </div>
 
-                        <div className="hiw-wrap">
-                            <div
-                                className="hiw-toggle"
-                                onClick={() => setShowHowItWorks(v => !v)}
-                            >
-                                <span>How it works</span>
-                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-                                    style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
-                                    <path d="M6 9l6 6 6-6" />
-                                </svg>
-                            </div>
-                            <div className={`hiw-dropdown${showHowItWorks ? ' hiw-dropdown--open' : ''}`}>
-                                <div className="hiw-content">
-                                    {isSurvivMode ? (
-                                        <>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Entry fee</span>
-                                                <span className="mono">{formatUsd(entryFeeForSession)}</span>
-                                            </div>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Starting balance</span>
-                                                <span className="mono">{formatUsd(economy.dollarStart)}</span>
-                                            </div>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Map loot pool</span>
-                                                <span className="mono">{formatUsd(economy.lootPoolOnJoin)}</span>
-                                            </div>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Cashout fee</span>
-                                                <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
-                                            </div>
-                                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                Top-down battle royale shooter. Your entry seeds cash across the map while you start at $0.
-                                                Loot weapons, armor, medkits, and cash from chests. Fight players and bots. Cash out anytime, or risk it all for more.
-                                            </div>
-                                        </>
-                                    ) : isCompetitiveSlitherMode ? (
-                                        <>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Entry fee</span>
-                                                <span className="mono">{formatUsd(entryFeeForSession)}</span>
-                                            </div>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Starting dollars</span>
-                                                <span className="mono">{formatUsd(economy.dollarStart)}</span>
-                                            </div>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Cashout fee</span>
-                                                <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
-                                            </div>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>You keep on cashout</span>
-                                                <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
-                                            </div>
-                                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                Real players only — ${entryFeeForSession} matches are a separate pool from other stakes.
-                                                Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
-                                                Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
-                                                Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Entry fee</span>
-                                                <span className="mono">{formatUsd(entryFeeForSession)}</span>
-                                            </div>
-                                            <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                <span>Starting balance</span>
-                                                <span className="mono">{formatUsd(economy.startBalance)}</span>
-                                            </div>
-                                            <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
-                                                Eat food & other players. Cash out anytime.
-                                            </div>
-                                            <div className="divider" style={{ margin: '6px 0' }} />
-                                            <div className="stat-row">
-                                                <span>Golden Blob value</span>
-                                                <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
-                                            </div>
-                                        </>
+                                {/* Stake Selection Selector */}
+                                <div className="lobby-stake-selection" style={{ marginBottom: '18px' }}>
+                                    <label className="label" style={{ display: 'block', marginBottom: '8px' }}>
+                                        {isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake'}
+                                    </label>
+                                    <div className="lobby-tier-row">
+                                        {tierOptions.map(tier => {
+                                            const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
+                                            const active = entryFeeForSession === tier;
+                                            const isNormal5 = tier === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
+                                            const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+                                            const isFreeTicketButton = isNormal5 && hasFreeTicket;
+
+                                            return (
+                                                <button
+                                                    key={tier}
+                                                    type="button"
+                                                    className={`lobby-tier-btn${active ? ' lobby-tier-btn--active' : ''}${locked ? ' lobby-tier-btn--locked' : ''}`}
+                                                    disabled={locked || isMatchmaking}
+                                                    onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
+                                                >
+                                                    {freePlay ? 'FREE' : (isFreeTicketButton ? 'Free Ticket' : `$${tier}`)}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && user?.hasFreeTicket && !user?.freeTicketUsed) && (
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
+                                            ✨ free ticket available
+                                        </div>
                                     )}
                                 </div>
+
+                                <button
+                                    className={playBtnClass}
+                                    onClick={handleStartMatch}
+                                    disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode)}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                >
+                                    {playBtnLabel}
+                                </button>
+
+                                {isAlreadyInGame && currentGameMode && (
+                                    <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
+                                        Active session: {currentGameMode.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}
+                                        {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} entry`}
+                                        {activeGameBalance != null && !currentGameMode.startsWith('br-') && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
+                                    </div>
+                                )}
+
+                                <div className="hiw-wrap">
+                                    <div
+                                        className="hiw-toggle"
+                                        onClick={() => setShowHowItWorks(v => !v)}
+                                    >
+                                        <span>How it works</span>
+                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                                            style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
+                                            <path d="M6 9l6 6 6-6" />
+                                        </svg>
+                                    </div>
+                                    <div className={`hiw-dropdown${showHowItWorks ? ' hiw-dropdown--open' : ''}`}>
+                                        <div className="hiw-content">
+                                            {isSurvivMode ? (
+                                                <>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Entry fee</span>
+                                                        <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Starting balance</span>
+                                                        <span className="mono">{formatUsd(economy.dollarStart)}</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Map loot pool</span>
+                                                        <span className="mono">{formatUsd(economy.lootPoolOnJoin)}</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Cashout fee</span>
+                                                        <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
+                                                    </div>
+                                                    <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
+                                                        Top-down battle royale shooter. Your entry seeds cash across the map while you start at $0.
+                                                        Loot weapons, armor, medkits, and cash from chests. Fight players and bots. Cash out anytime, or risk it all for more.
+                                                    </div>
+                                                </>
+                                            ) : isCompetitiveSlitherMode ? (
+                                                <>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Entry fee</span>
+                                                        <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Starting dollars</span>
+                                                        <span className="mono">{formatUsd(economy.dollarStart)}</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Cashout fee</span>
+                                                        <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>You keep on cashout</span>
+                                                        <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
+                                                    </div>
+                                                    <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
+                                                        Real players only — ${entryFeeForSession} matches are a separate pool from other stakes.
+                                                        Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
+                                                        Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
+                                                        Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Entry fee</span>
+                                                        <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>Starting balance</span>
+                                                        <span className="mono">{formatUsd(economy.startBalance)}</span>
+                                                    </div>
+                                                    <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
+                                                        Eat food & other players. Cash out anytime.
+                                                    </div>
+                                                    <div className="divider" style={{ margin: '6px 0' }} />
+                                                    <div className="stat-row">
+                                                        <span>Golden Blob value</span>
+                                                        <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Customize Lobby Card */}
+                            {isAuthenticated && (isSlitherFamily || isAgarFamily || isSurvivFamily) && (
+                                <div
+                                    className="leaderboard-card customize-lobby-card"
+                                    onClick={() => setShowCustomizer(true)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <div className="customize-lobby-card-header">
+                                        <div className="customize-lobby-card-title-group">
+                                            <svg className="customize-lobby-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.94-.92 1.94-2 0-.49-.18-.95-.5-1.3-.32-.34-.5-.81-.5-1.3 0-1.03.87-1.9 1.9-1.9H17c3.31 0 6-2.69 6-6 0-4.97-4.92-9-11-9z" />
+                                                <circle cx="6.5" cy="11.5" r="1.5" fill="currentColor" />
+                                                <circle cx="10" cy="7" r="1.5" fill="currentColor" />
+                                                <circle cx="15" cy="7" r="1.5" fill="currentColor" />
+                                                <circle cx="18.5" cy="11.5" r="1.5" fill="currentColor" />
+                                            </svg>
+                                            <span className="customize-lobby-title">Customize Appearance</span>
+                                        </div>
+                                        {isSurvivFamily ? (
+                                            <span className="customize-lobby-status-pill" style={selectedSkinSurviv === 'random' ? { backgroundImage: 'linear-gradient(135deg, #80d0d0, #c080ff, #ffa060)' } : { backgroundColor: selectedSkinSurviv }}>
+                                                {selectedSkinSurviv === 'random' ? 'Random' : getChromaName(selectedSkinSurviv)}
+                                            </span>
+                                        ) : isSlitherFamily ? (
+                                            <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
+                                                {getChromaName(selectedSkin)}
+                                            </span>
+                                        ) : (
+                                            <span className="customize-lobby-status-pill" style={selectedSkinAgar === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkinAgar }}>
+                                                {getChromaName(selectedSkinAgar)}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="customize-lobby-preview-box">
+                                        {isSurvivFamily ? (
+                                            <SurvivSkinPreview color={selectedSkinSurviv} isLarge={false} nickname={nickname} />
+                                        ) : isSlitherFamily ? (
+                                            <SnakeSkinPreview color={selectedSkin} isLarge={false} />
+                                        ) : (
+                                            <AgarBlobPreview color={selectedSkinAgar} isLarge={false} nickname={nickname} />
+                                        )}
+                                    </div>
+
+                                    <div className="customize-lobby-footer">
+                                        <span>Click to Customize Skin</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Right Column */}
+                    {tournamentId ? (
+                        <div className="right-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            {/* Personal Tournament Balance Banner */}
+                            <div className="leaderboard-card" style={{ padding: '20px', background: 'linear-gradient(120deg, rgba(91, 33, 182, .20), rgba(14, 116, 144, .12)), rgba(14, 16, 22, .86)', borderColor: 'rgba(167, 139, 250, .28)' }}>
+                                <span className="tournament-panel-label" style={{ fontSize: '0.62rem', letterSpacing: '0.08em' }}>Your tournament balance</span>
+                                <div style={{ color: 'var(--text-h)', fontSize: '1.8rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0' }}>
+                                    ${(tournament?.me?.balanceUsd || 0).toFixed(2)}
+                                </div>
+                                <div style={{ color: 'var(--text-3)', fontSize: '0.62rem', lineHeight: '1.45' }}>
+                                    All successful cashouts across this tournament.
+                                </div>
+                            </div>
+
+                            {/* Prize Pot Card */}
+                            <div className="leaderboard-card" style={{ padding: '20px' }}>
+                                <span className="tournament-panel-label" style={{ fontSize: '0.62rem', letterSpacing: '0.08em' }}>Prize Pool</span>
+                                <div style={{ color: 'var(--text-h)', fontSize: '1.8rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0' }}>
+                                    ${(tournament?.prizePotUsd || 0).toFixed(2)}
+                                </div>
+                                <div className="tournament-splits" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: 0 }}>
+                                    <div className="tournament-split" style={{ padding: '8px 4px' }}>1st<strong>60%</strong></div>
+                                    <div className="tournament-split" style={{ padding: '8px 4px' }}>2nd<strong>30%</strong></div>
+                                    <div className="tournament-split" style={{ padding: '8px 4px' }}>3rd<strong>10%</strong></div>
+                                </div>
+                            </div>
+
+                            {/* Leaderboard Card */}
+                            <div className="leaderboard-card" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                                <div className="tab-bar leaderboard-tab-bar">
+                                    <button className="tab-btn active">Leaderboard</button>
+                                </div>
+
+                                {(tournament?.leaderboard || []).length === 0 ? (
+                                    <div className="empty-state" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                        <div className="empty-state-icon" aria-hidden="true" style={{ fontSize: '1.4rem', marginBottom: '8px' }}>🏆</div>
+                                        <p className="empty-state-title" style={{ fontSize: '0.78rem' }}>No cashouts yet</p>
+                                        <p className="empty-state-sub" style={{ fontSize: '0.68rem' }}>Be the first to bank a cashout!</p>
+                                    </div>
+                                ) : (
+                                    <div className="leaderboard-list" style={{ flexGrow: 1, overflowY: 'auto' }}>
+                                        {(tournament?.leaderboard || []).map((entry, index) => (
+                                            <div key={`${entry.username}-${index}`} className="leaderboard-entry">
+                                                <span style={{ color: index === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: index === 0 ? 700 : 500 }}>
+                                                    {index + 1}. {entry.username}
+                                                </span>
+                                                <span className="mono" style={{ fontSize: '0.72rem', color: '#a3e635' }}>
+                                                    ${entry.balanceUsd.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
-
-                    {/* Customize Lobby Card */}
-                    {isAuthenticated && (isSlitherFamily || isAgarFamily || isSurvivFamily) && (
-                        <div
-                            className="leaderboard-card customize-lobby-card"
-                            onClick={() => setShowCustomizer(true)}
-                            style={{ cursor: 'pointer' }}
-                        >
-                            <div className="customize-lobby-card-header">
-                                <div className="customize-lobby-card-title-group">
-                                    <svg className="customize-lobby-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.94-.92 1.94-2 0-.49-.18-.95-.5-1.3-.32-.34-.5-.81-.5-1.3 0-1.03.87-1.9 1.9-1.9H17c3.31 0 6-2.69 6-6 0-4.97-4.92-9-11-9z" />
-                                        <circle cx="6.5" cy="11.5" r="1.5" fill="currentColor" />
-                                        <circle cx="10" cy="7" r="1.5" fill="currentColor" />
-                                        <circle cx="15" cy="7" r="1.5" fill="currentColor" />
-                                        <circle cx="18.5" cy="11.5" r="1.5" fill="currentColor" />
-                                    </svg>
-                                    <span className="customize-lobby-title">Customize Appearance</span>
+                    ) : (
+                        <div className="right-panel-stack">
+                            <div className="leaderboard-card" style={{ height: leaderboardHeight }}>
+                                <div className="tab-bar leaderboard-tab-bar">
+                                    {[{ id: 'alltime', label: 'Leaderboard' }, { id: 'live', label: 'LIVE', dot: true }].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setLeaderboardTab(tab.id)}
+                                            className={[
+                                                'tab-btn',
+                                                leaderboardTab === tab.id ? 'active' : '',
+                                                tab.id === 'live' ? 'tab-btn--live' : '',
+                                                tab.id === 'live' && liveTabPulse ? 'tab-btn-live-pulse' : '',
+                                            ].filter(Boolean).join(' ')}
+                                        >
+                                            {tab.dot && <span className="live-dot live-dot--tab" aria-hidden="true" />}
+                                            {tab.label}
+                                        </button>
+                                    ))}
                                 </div>
-                                {isSurvivFamily ? (
-                                    <span className="customize-lobby-status-pill" style={selectedSkinSurviv === 'random' ? { backgroundImage: 'linear-gradient(135deg, #80d0d0, #c080ff, #ffa060)' } : { backgroundColor: selectedSkinSurviv }}>
-                                        {selectedSkinSurviv === 'random' ? 'Random' : getChromaName(selectedSkinSurviv)}
-                                    </span>
-                                ) : isSlitherFamily ? (
-                                    <span className="customize-lobby-status-pill" style={selectedSkin === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkin }}>
-                                        {getChromaName(selectedSkin)}
-                                    </span>
-                                ) : (
-                                    <span className="customize-lobby-status-pill" style={selectedSkinAgar === 'random' ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' } : { backgroundColor: selectedSkinAgar }}>
-                                        {getChromaName(selectedSkinAgar)}
-                                    </span>
-                                )}
-                            </div>
 
-                            <div className="customize-lobby-preview-box">
-                                {isSurvivFamily ? (
-                                    <SurvivSkinPreview color={selectedSkinSurviv} isLarge={false} nickname={nickname} />
-                                ) : isSlitherFamily ? (
-                                    <SnakeSkinPreview color={selectedSkin} isLarge={false} />
+                                {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
+                                    <div className="empty-state">
+                                        <div className="empty-state-icon" aria-hidden="true">🏆</div>
+                                        <p className="empty-state-title">No champions yet</p>
+                                        <p className="empty-state-sub">Be the first to cash out big — your name goes here.</p>
+                                    </div>
                                 ) : (
-                                    <AgarBlobPreview color={selectedSkinAgar} isLarge={false} nickname={nickname} />
+                                    <div
+                                        ref={leaderboardListRef}
+                                        className={`leaderboard-list${leaderboardTab === 'live' ? ' leaderboard-list--live' : ''}`}
+                                        onScroll={handleLeaderboardScroll}
+                                    >
+                                        {leaderboardTab === 'alltime' ? (
+                                            leaderboardData.alltime.map((entry, i) => (
+                                                <div key={i} className="leaderboard-entry">
+                                                    <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
+                                                        {i + 1}. {entry.username}
+                                                    </span>
+                                                    <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
+                                                        ${Number(entry.amount || entry.balance || 0).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            liveLeaderboardEvents.map((event, i) => (
+                                                <div key={event.id || i} className={`live-feed-item live-feed-item--${event.type}`}>
+                                                    <div className="live-feed-icon" aria-hidden="true">
+                                                        {event.type === 'cashout' ? (
+                                                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                                                <path d="M6 9V3M6 3L3.5 5.5M6 3L8.5 5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                                            </svg>
+                                                        ) : (
+                                                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                                                                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <div className="live-feed-body">
+                                                        <span className="live-feed-name">{event.username}</span>
+                                                        <span className="live-feed-action">
+                                                            {event.type === 'cashout' ? 'Cashed out' : 'Died with'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="live-feed-right">
+                                                        <span className="live-feed-amount mono">${Number(event.amountUsd || 0).toFixed(2)}</span>
+                                                        {event.createdAt && (
+                                                            <span className="live-feed-time">{formatLiveTime(event.createdAt)}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
                                 )}
-                            </div>
-
-                            <div className="customize-lobby-footer">
-                                <span>Click to Customize Skin</span>
+                                <div className="leaderboard-footer">
+                                    <div className="divider" style={{ margin: '10px 0 8px' }} />
+                                    <div className="leaderboard-total">
+                                        <span className="leaderboard-total-label">Global earnings</span>
+                                        <span className="mono leaderboard-total-value">
+                                            ${Math.round(Number(globalCashoutTotalUsd))}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
-
-                <div className="right-panel-stack">
-
-
-                    <div className="leaderboard-card" style={{ height: leaderboardHeight }}>
-                        <div className="tab-bar leaderboard-tab-bar">
-                            {[{ id: 'alltime', label: 'Leaderboard' }, { id: 'live', label: 'LIVE', dot: true }].map(tab => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setLeaderboardTab(tab.id)}
-                                    className={[
-                                        'tab-btn',
-                                        leaderboardTab === tab.id ? 'active' : '',
-                                        tab.id === 'live' ? 'tab-btn--live' : '',
-                                        tab.id === 'live' && liveTabPulse ? 'tab-btn-live-pulse' : '',
-                                    ].filter(Boolean).join(' ')}
-                                >
-                                    {tab.dot && <span className="live-dot live-dot--tab" aria-hidden="true" />}
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
-                            <div className="empty-state">
-                                <div className="empty-state-icon" aria-hidden="true">🏆</div>
-                                <p className="empty-state-title">No champions yet</p>
-                                <p className="empty-state-sub">Be the first to cash out big — your name goes here.</p>
-                            </div>
-                        ) : (
-                            <div
-                                ref={leaderboardListRef}
-                                className={`leaderboard-list${leaderboardTab === 'live' ? ' leaderboard-list--live' : ''}`}
-                                onScroll={handleLeaderboardScroll}
-                            >
-                                {leaderboardTab === 'alltime' ? (
-                                    leaderboardData.alltime.map((entry, i) => (
-                                        <div key={i} className="leaderboard-entry">
-                                            <span style={{ color: i === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: i === 0 ? 700 : 500 }}>
-                                                {i + 1}. {entry.username}
-                                            </span>
-                                            <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-bright)' }}>
-                                                ${Number(entry.amount || entry.balance || 0).toFixed(2)}
-                                            </span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    liveLeaderboardEvents.map((event, i) => (
-                                        <div key={event.id || i} className={`live-feed-item live-feed-item--${event.type}`}>
-                                            <div className="live-feed-icon" aria-hidden="true">
-                                                {event.type === 'cashout' ? (
-                                                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                                                        <path d="M6 9V3M6 3L3.5 5.5M6 3L8.5 5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                                                    </svg>
-                                                ) : (
-                                                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                                                        <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <div className="live-feed-body">
-                                                <span className="live-feed-name">{event.username}</span>
-                                                <span className="live-feed-action">
-                                                    {event.type === 'cashout' ? 'Cashed out' : 'Died with'}
-                                                </span>
-                                            </div>
-                                            <div className="live-feed-right">
-                                                <span className="live-feed-amount mono">${Number(event.amountUsd || 0).toFixed(2)}</span>
-                                                {event.createdAt && (
-                                                    <span className="live-feed-time">{formatLiveTime(event.createdAt)}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
-                        <div className="leaderboard-footer">
-                            <div className="divider" style={{ margin: '10px 0 8px' }} />
-                            <div className="leaderboard-total">
-                                <span className="leaderboard-total-label">Global earnings</span>
-                                <span className="mono leaderboard-total-value">
-                                    ${Math.round(Number(globalCashoutTotalUsd))}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
             )}
 
             {/* SOL price + footer */}
