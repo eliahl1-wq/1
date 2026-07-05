@@ -1364,7 +1364,7 @@ export default function PreGame() {
                             }} />
 
                             <div className="mode-card-overlay" style={{ zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', padding: '24px' }}>
-                                <div className="mode-card-header" style={{ marginBottom: 'auto' }}>
+                                <div className="mode-card-header">
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span className="tournament-live-badge-orange">
                                             <span className="tournament-live-dot-orange" />
@@ -1379,7 +1379,7 @@ export default function PreGame() {
                                     </div>
                                 </div>
 
-                                <div style={{ marginTop: '28px' }}>
+                                <div style={{ margin: 'auto 0', padding: '16px 0' }}>
                                     <span className="mode-card-label" style={{ fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--text-3)' }}>Your tournament balance</span>
                                     <div style={{ color: '#34d399', fontSize: '2.5rem', fontWeight: 950, letterSpacing: '-.05em', margin: '4px 0 2px', textShadow: '0 0 15px rgba(16, 185, 129, 0.25)' }}>
                                         ${(tournament?.me?.balanceUsd || 0).toFixed(2)}
@@ -1389,7 +1389,7 @@ export default function PreGame() {
                                     </p>
                                 </div>
 
-                                <div className="mode-card-footer" style={{ marginTop: '28px' }}>
+                                <div className="mode-card-footer" style={{ marginTop: 'auto' }}>
                                     <button
                                         type="button"
                                         className="mode-card-action"
@@ -1780,12 +1780,53 @@ export default function PreGame() {
                                 ) : (
                                     <div className="leaderboard-list" style={{ flexGrow: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
                                         {(tournament?.leaderboard || []).map((entry, index) => {
-                                            const rankColor = index === 0 ? '#ffd700' : index === 1 ? '#cbd5e1' : index === 2 ? '#cd7f32' : 'inherit';
-                                            const rankWeight = index < 3 ? 800 : 500;
+                                            const isTop3 = index < 3;
+                                            
+                                            // Assign background & border styling based on placement
+                                            let bg = 'transparent';
+                                            let border = '1px solid transparent';
+                                            let digitColor = '#94a3b8'; // default gray for 4+
+                                            
+                                            if (index === 0) {
+                                                bg = 'rgba(255, 215, 0, 0.08)';
+                                                border = '1px solid rgba(255, 215, 0, 0.22)';
+                                                digitColor = '#ffd700'; // Gold
+                                            } else if (index === 1) {
+                                                bg = 'rgba(203, 213, 225, 0.08)';
+                                                border = '1px solid rgba(203, 213, 225, 0.22)';
+                                                digitColor = '#cbd5e1'; // Silver
+                                            } else if (index === 2) {
+                                                bg = 'rgba(205, 127, 50, 0.08)';
+                                                border = '1px solid rgba(205, 127, 50, 0.22)';
+                                                digitColor = '#cd7f32'; // Bronze
+                                            }
+                                            
                                             return (
-                                                <div key={`${entry.username}-${index}`} className="leaderboard-entry" style={{ margin: '0 8px 4px', padding: '8px 10px', borderRadius: '8px', background: index < 3 ? 'rgba(255, 255, 255, 0.02)' : 'transparent', border: index < 3 ? '1px solid rgba(255,255,255,0.02)' : '1px solid transparent' }}>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: index < 3 ? 'var(--text-h)' : 'var(--text-bright)', fontWeight: index < 3 ? 700 : 500 }}>
-                                                        <span style={{ width: '18px', textAlign: 'center', color: rankColor, fontWeight: rankWeight }}>{index + 1}.</span>
+                                                <div 
+                                                    key={`${entry.username}-${index}`} 
+                                                    className="leaderboard-entry" 
+                                                    style={{ 
+                                                        margin: '0 8px 6px', 
+                                                        padding: '10px 12px', 
+                                                        borderRadius: '10px', 
+                                                        background: bg, 
+                                                        border: border,
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                >
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isTop3 ? 'var(--text-h)' : 'var(--text-bright)', fontWeight: isTop3 ? 750 : 500 }}>
+                                                        <span style={{ 
+                                                            width: '20px', 
+                                                            textAlign: 'center', 
+                                                            color: digitColor, 
+                                                            fontWeight: 900,
+                                                            fontSize: '0.82rem',
+                                                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                                            textShadow: 'none',
+                                                            WebkitTextStroke: '0px transparent'
+                                                        }}>
+                                                            {index + 1}
+                                                        </span>
                                                         {entry.username}
                                                     </span>
                                                     <span className="mono" style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 700 }}>

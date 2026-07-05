@@ -110,6 +110,16 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
+    // Auto-poll balance every 8 seconds so deposits and tournament deductions
+    // appear quickly without requiring manual navigation
+    useEffect(() => {
+        if (!token) return;
+        const interval = setInterval(() => {
+            refreshUser();
+        }, 8000);
+        return () => clearInterval(interval);
+    }, [token, refreshUser]);
+
     const login = (userData, newToken) => {
         localStorage.setItem('token', newToken);
         
