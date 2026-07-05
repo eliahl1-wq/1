@@ -173,7 +173,7 @@ export default function PreGame() {
     const [leaderboardHeight, setLeaderboardHeight] = useState('auto');
 
     useEffect(() => {
-        const targetRef = tournamentId ? mainCardRef : modeCardRef;
+        const targetRef = modeCardRef;
         if (!targetRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (let entry of entries) {
@@ -277,9 +277,10 @@ export default function PreGame() {
     const [selectedMode, setSelectedMode] = useState(
         () => resolvePreGameMode(location.pathname, location.state?.selectedMode)
     );
-    const [selectedEntryFee, setSelectedEntryFee] = useState(
-        () => Number(localStorage.getItem('selected_entry_fee')) || DEFAULT_ENTRY_FEE
-    );
+    const [selectedEntryFee, setSelectedEntryFee] = useState(() => {
+        const stored = localStorage.getItem('selected_entry_fee');
+        return (stored && stored !== 'null') ? Number(stored) : null;
+    });
     const [activeEntryFee, setActiveEntryFee] = useState(null);
     const [currentGameMode, setCurrentGameMode] = useState(
         () => localStorage.getItem('current_game_mode') || null
@@ -290,7 +291,11 @@ export default function PreGame() {
     }, [selectedMode]);
 
     useEffect(() => {
-        localStorage.setItem('selected_entry_fee', String(selectedEntryFee));
+        if (selectedEntryFee !== null && !isNaN(selectedEntryFee)) {
+            localStorage.setItem('selected_entry_fee', String(selectedEntryFee));
+        } else {
+            localStorage.removeItem('selected_entry_fee');
+        }
     }, [selectedEntryFee]);
 
     useEffect(() => {
@@ -334,11 +339,20 @@ export default function PreGame() {
         && (brAvailable || (isAlreadyInGame && isBRGamemode(currentGameMode)));
     const isCompetitiveSlitherMode = selectedMode === 'competitive-slither';
     const isSurvivMode = selectedMode === 'surviv';
+    const economyFeeForDisplay = entryFeeForSession || (
+        isSurvivMode
+            ? DEFAULT_SURVIV_ENTRY_FEE
+            : isCompetitiveSlitherMode
+                ? DEFAULT_COMPETITIVE_ENTRY_FEE
+                : isBattleRoyaleMode
+                    ? DEFAULT_BR_ENTRY_FEE
+                    : DEFAULT_ENTRY_FEE
+    );
     const economy = isSurvivMode
-        ? survivTierEconomy(entryFeeForSession)
+        ? survivTierEconomy(economyFeeForDisplay)
         : isCompetitiveSlitherMode
-            ? competitiveTierEconomy(entryFeeForSession)
-            : tierEconomy(entryFeeForSession);
+            ? competitiveTierEconomy(economyFeeForDisplay)
+            : tierEconomy(economyFeeForDisplay);
     const brVariant = isBattleRoyaleMode ? selectedMode.replace(/^br-/, '') : null;
     const isSlitherFamily = selectedMode === 'slither'
         || selectedMode === 'competitive-slither'
@@ -362,14 +376,16 @@ export default function PreGame() {
             : (isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS);
 
     useEffect(() => {
-        if (isSurvivMode && !SURVIV_ENTRY_TIERS.includes(selectedEntryFee)) {
-            setSelectedEntryFee(DEFAULT_SURVIV_ENTRY_FEE);
-        }
-        if (isCompetitiveSlitherMode && !COMPETITIVE_ENTRY_TIERS.includes(selectedEntryFee)) {
-            setSelectedEntryFee(DEFAULT_COMPETITIVE_ENTRY_FEE);
-        }
-        if (isBattleRoyaleMode && !BR_ENTRY_TIERS.includes(selectedEntryFee)) {
-            setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
+        if (selectedEntryFee !== null) {
+            if (isSurvivMode && !SURVIV_ENTRY_TIERS.includes(selectedEntryFee)) {
+                setSelectedEntryFee(DEFAULT_SURVIV_ENTRY_FEE);
+            }
+            if (isCompetitiveSlitherMode && !COMPETITIVE_ENTRY_TIERS.includes(selectedEntryFee)) {
+                setSelectedEntryFee(DEFAULT_COMPETITIVE_ENTRY_FEE);
+            }
+            if (isBattleRoyaleMode && !BR_ENTRY_TIERS.includes(selectedEntryFee)) {
+                setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
+            }
         }
     }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, isSurvivMode, selectedEntryFee]);
 
@@ -406,7 +422,7 @@ export default function PreGame() {
 
     const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
     const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
-    const canJoin = freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession;
+    const canJoin = selectedEntryFee !== null && (freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -899,8 +915,9 @@ export default function PreGame() {
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
         : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
             : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
-                : canJoin ? 'play-btn play-btn-ready'
-                    : 'play-btn play-btn-disabled';
+                : selectedEntryFee === null ? 'play-btn play-btn-disabled'
+                    : canJoin ? 'play-btn play-btn-ready'
+                        : 'play-btn play-btn-disabled';
 
     const modeCardTitle = isSurvivFamily ? 'Surviv' : isSlitherFamily ? 'Slither' : 'Agar';
     const modeSubtitle = isBattleRoyaleMode
@@ -919,8 +936,10 @@ export default function PreGame() {
                 ? 'Rejoin'
                 : (isAlreadyInGame && !canRejoinThisMode)
                     ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'surviv' ? 'Surviv' : currentGameMode === 'slither' || currentGameMode === 'competitive-slither' ? 'Slither' : 'Agar')} — switch mode`
-                    : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
-                        : 'Deposit to Play';
+                    : selectedEntryFee === null
+                        ? (isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake')
+                        : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
+                            : 'Deposit to Play';
 
     const panelOpen = isWalletExpanded || isWithdrawExpanded;
 
@@ -1329,7 +1348,7 @@ export default function PreGame() {
                 <div className={tournamentId ? "pre-game-grid pre-game-grid--tournament" : "pre-game-grid"}>
                     {/* Left Column */}
                     {tournamentId ? (
-                        <div className="mode-card" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden', height: leaderboardHeight }}>
+                        <div className="mode-card" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden', height: 'auto' }}>
                             <img
                                 src="/normal slither.png"
                                 alt=""
@@ -1539,7 +1558,7 @@ export default function PreGame() {
                                 <div className="entry-row" style={{ marginBottom: '14px' }}>
                                     <span className="label">Entry Fee</span>
                                     <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                                        {freePlay ? 'FREE (Test)' : formatUsd(entryFeeForSession)}
+                                        {freePlay ? 'FREE (Test)' : (entryFeeForSession != null ? formatUsd(entryFeeForSession) : '—')}
                                     </span>
                                 </div>
 
@@ -1579,7 +1598,7 @@ export default function PreGame() {
                                 <button
                                     className={playBtnClass}
                                     onClick={handleStartMatch}
-                                    disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode)}
+                                    disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode) || (isAuthenticated && !isAlreadyInGame && selectedEntryFee === null)}
                                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                                 >
                                     {playBtnLabel}
@@ -1610,7 +1629,7 @@ export default function PreGame() {
                                                 <>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Entry fee</span>
-                                                        <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                                        <span className="mono">{formatUsd(economyFeeForDisplay)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Starting balance</span>
@@ -1633,7 +1652,7 @@ export default function PreGame() {
                                                 <>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Entry fee</span>
-                                                        <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                                        <span className="mono">{formatUsd(economyFeeForDisplay)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Starting dollars</span>
@@ -1648,7 +1667,7 @@ export default function PreGame() {
                                                         <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
                                                     </div>
                                                     <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                        Real players only — ${entryFeeForSession} matches are a separate pool from other stakes.
+                                                        Real players only — ${economyFeeForDisplay} matches are a separate pool from other stakes.
                                                         Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
                                                         Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
                                                         Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
@@ -1658,7 +1677,7 @@ export default function PreGame() {
                                                 <>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Entry fee</span>
-                                                        <span className="mono">{formatUsd(entryFeeForSession)}</span>
+                                                        <span className="mono">{formatUsd(economyFeeForDisplay)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Starting balance</span>
@@ -1733,7 +1752,7 @@ export default function PreGame() {
                     {/* Right Column */}
                     {tournamentId ? (
                         <div className="right-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div className="leaderboard-card tournament-pulse-glow" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', flexGrow: 1, padding: 0, overflow: 'hidden' }}>
+                            <div className="leaderboard-card tournament-pulse-glow" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
                                 <div style={{ padding: '20px 20px 16px', background: 'rgba(249, 115, 22, 0.03)', borderBottom: '1px solid var(--border)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                         <span className="tournament-panel-label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textAlign: 'center' }}>Total Prize Pot</span>

@@ -920,6 +920,11 @@ export default function AdminDashboard() {
                                     sub={wallets?.mainHouse ? `${formatUsd(wallets.mainHouse.balanceUsd)} float balance` : 'Arena deposit pool'}
                                 />
                                 <StatCard
+                                    label="Tournament Wallet"
+                                    value={wallets?.tournamentWallet ? formatSol(wallets.tournamentWallet.balanceSol) : '—'}
+                                    sub={wallets?.tournamentWallet ? `${formatUsd(wallets.tournamentWallet.balanceUsd)} accumulated fees` : 'Not configured'}
+                                />
+                                <StatCard
                                     label="Total Deposits"
                                     value={formatUsd(overview?.totalDepositsUsd)}
                                     sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} deposits` : ''}
@@ -1321,6 +1326,18 @@ export default function AdminDashboard() {
                                     style={{ padding: '12px 20px', fontSize: '0.82rem' }}
                                 >
                                     Full Reset + Sweep Wallet
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    disabled={actionLoading}
+                                    onClick={() => runAdminAction(
+                                        '/api/admin/tournaments/trigger-sweep',
+                                        'Sweep Tournament Wallet to Owner Vault?\n\n- This will withdraw all accumulated SOL entry fees (retaining a minor rent exemption buffer) and send it directly to your OWNER_VAULT_ADDRESS on-chain.'
+                                    )}
+                                    style={{ padding: '12px 20px', fontSize: '0.82rem', borderColor: '#f97316', color: '#f97316' }}
+                                >
+                                    {actionLoading ? 'Working…' : 'Sweep Tournament Wallet'}
                                 </button>
                             </div>
                         </Panel>
