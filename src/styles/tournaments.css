@@ -72,9 +72,9 @@
 }
 
 .tournament-card {
-    flex: 0 0 560px;
+    flex: 0 0 360px;
     max-width: 92vw;
-    min-height: 580px;
+    min-height: 600px;
     scroll-snap-align: start;
     display: flex;
     flex-direction: column;
@@ -95,7 +95,7 @@
 
 .tournament-card-media {
     position: relative;
-    height: 290px;
+    height: 250px;
     overflow: hidden;
     background: #08090c;
 }
@@ -171,7 +171,7 @@
 .tournament-card h2 {
     margin: 8px 0 16px;
     color: var(--text-h);
-    font-size: 1.65rem;
+    font-size: 1.45rem;
     font-weight: 850;
     letter-spacing: -.03em;
     line-height: 1.25;
@@ -453,6 +453,20 @@
     box-shadow: 0 0 30px rgba(249, 115, 22, 0.12), inset 0 0 15px rgba(249, 115, 22, 0.03);
 }
 
+.tournament-pulse-glow {
+    border-color: rgba(249, 115, 22, 0.35) !important;
+    animation: card-glow-pulse 3s infinite alternate ease-in-out;
+}
+
+@keyframes card-glow-pulse {
+    0% {
+        box-shadow: 0 0 15px rgba(249, 115, 22, 0.08), inset 0 0 10px rgba(249, 115, 22, 0.02);
+    }
+    100% {
+        box-shadow: 0 0 35px rgba(249, 115, 22, 0.25), inset 0 0 15px rgba(249, 115, 22, 0.05);
+    }
+}
+
 .tournament-live-badge-orange {
     display: inline-flex;
     align-items: center;
@@ -480,4 +494,15 @@
 @keyframes orange-pulse {
     0% { opacity: 0.45; transform: scale(0.9); }
     100% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 12px #f97316; }
+}
+
+.tournament-card--ended {
+    opacity: 0.55;
+    filter: grayscale(85%);
+    transition: all 0.25s ease;
+}
+
+.tournament-card--ended:hover {
+    opacity: 0.82;
+    filter: grayscale(35%);
 }

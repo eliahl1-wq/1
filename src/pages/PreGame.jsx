@@ -1325,7 +1325,7 @@ export default function PreGame() {
                 <div className="pre-game-grid">
                     {/* Left Column */}
                     {tournamentId ? (
-                        <div className="mode-card tournament-orange-glow" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden' }}>
+                        <div className="mode-card" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden', height: '100%', minHeight: '380px' }}>
                             <img
                                 src="/normal slither.png"
                                 alt=""
@@ -1729,13 +1729,12 @@ export default function PreGame() {
                     {/* Right Column */}
                     {tournamentId ? (
                         <div className="right-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div className="leaderboard-card tournament-orange-glow" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', flexGrow: 1, padding: 0, overflow: 'hidden' }}>
+                            <div className="leaderboard-card tournament-pulse-glow" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', flexGrow: 1, padding: 0, overflow: 'hidden' }}>
                                 <div style={{ padding: '20px 20px 16px', background: 'rgba(249, 115, 22, 0.03)', borderBottom: '1px solid var(--border)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span className="tournament-panel-label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em' }}>Total Prize Pot</span>
-                                        <span style={{ fontSize: '0.6rem', color: '#f97316', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Split Pool</span>
+                                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                        <span className="tournament-panel-label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textAlign: 'center' }}>Total Prize Pot</span>
                                     </div>
-                                    <div style={{ color: 'var(--text-h)', fontSize: '2rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0 12px', background: 'linear-gradient(135deg, #fff 40%, #ffedd5 70%, #ff9d43 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                    <div style={{ color: '#f97316', textShadow: '0 0 15px rgba(249, 115, 22, 0.3)', fontSize: '2rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0 12px', textAlign: 'center' }}>
                                         ${(tournament?.prizePotUsd || 0).toFixed(2)}
                                     </div>
                                     <div className="tournament-splits" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: 0 }}>
