@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import TournamentAdminPanel from '../components/TournamentAdminPanel';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
 
@@ -11,6 +12,7 @@ const API_BASE = API_URL;
 const TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'live', label: 'Live' },
+    { id: 'tournaments', label: 'Tournaments' },
     { id: 'transactions', label: 'Transactions' },
     { id: 'users', label: 'Users' },
     { id: 'finances', label: 'Finances' },
@@ -1065,6 +1067,13 @@ export default function AdminDashboard() {
                             </div>
                         </Panel>
                     </div>
+                )}
+
+                {tab === 'tournaments' && (
+                    <TournamentAdminPanel
+                        fetchAdmin={fetchAdmin}
+                        setActionMsg={setActionMsg}
+                    />
                 )}
 
                 {tab === 'live' && (

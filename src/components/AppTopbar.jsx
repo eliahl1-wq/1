@@ -24,16 +24,15 @@ export default function AppTopbar({ children }) {
             <button type="button" className={linkClass('/gamemodes')} onClick={() => navigate('/gamemodes')}>
                 Modes
             </button>
+            <button type="button" className={linkClass('/tournaments')} onClick={() => navigate('/tournaments')}>
+                Tournaments
+            </button>
             {user && (
                 <button type="button" className={linkClass('/rewards')} onClick={() => navigate('/rewards')}>
                     Rewards
                 </button>
             )}
-            {user && (
-                <button type="button" className={linkClass('/transactions')} onClick={() => navigate('/transactions')}>
-                    History
-                </button>
-            )}
+
             {user && (
                 <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
                     Performance

@@ -20,6 +20,26 @@ const TYPE_ICON = {
     game:     '⚔',
 };
 
+const REWARD_CLAIM_EVENTS = new Set(['sponsored_rewards_claim', 'tournament_reward_claim']);
+
+function getTransactionPresentation(tx) {
+    if (tx.meta?.event === 'sponsored_rewards_claim') {
+        return { label: 'Reward Claim', color: 'var(--green)', icon: 'R', isPositive: true };
+    }
+    if (tx.meta?.event === 'tournament_reward_claim') {
+        return { label: 'Tournament Reward Claim', color: 'var(--green)', icon: 'T', isPositive: true };
+    }
+    if (tx.type === 'deposit') {
+        return { label: 'Deposit', color: TYPE_COLOR.deposit, icon: TYPE_ICON.deposit, isPositive: true };
+    }
+    return { label: 'Withdrawal', color: TYPE_COLOR.withdraw, icon: TYPE_ICON.withdraw, isPositive: false };
+}
+
+function getTransactionAmountUsd(tx) {
+    const amount = Number(tx.meta?.amountUsd ?? tx.amount);
+    return Number.isFinite(amount) ? amount : 0;
+}
+
 export default function Transactions() {
     const { token } = useAuth();
     const navigate  = useNavigate();
@@ -46,11 +66,14 @@ export default function Transactions() {
                     if (tx.type === 'withdraw') {
                         const reason = tx.meta?.reason || '';
                         const event = tx.meta?.event || '';
-                        const isGameWithdrawal = 
+                        const isGameWithdrawal =
                             /Arena Cashout|Admin Forced Cashout|Auto Room Reset|BR Victory|BR Refund/i.test(reason) ||
-                            ['pool_sweep', 'br_owner_sweep'].includes(event);
+                            ['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset'].includes(event);
                         if (isGameWithdrawal) return false;
                         return !!tx.meta?.destination;
+                    }
+                    if (tx.type === 'game') {
+                        return REWARD_CLAIM_EVENTS.has(tx.meta?.event);
                     }
                     return false;
                 });
@@ -79,7 +102,7 @@ export default function Transactions() {
                             Transaction History
                         </h1>
                         <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-2)' }}>
-                            Deposits and withdrawals
+                            Personal deposits, withdrawals, and reward claims
                         </p>
                     </div>
                     <button
@@ -124,9 +147,8 @@ export default function Transactions() {
                             </thead>
                             <tbody>
                                 {txs.map((tx, i) => {
-                                    const color  = TYPE_COLOR[tx.type] || 'var(--text)';
-                                    const icon   = TYPE_ICON[tx.type]  || '·';
-                                    const isDeposit = tx.type === 'deposit';
+                                    const { color, icon, label, isPositive } = getTransactionPresentation(tx);
+                                    const amountUsd = getTransactionAmountUsd(tx);
                                     return (
                                         <tr
                                             key={tx._id}
@@ -153,15 +175,15 @@ export default function Transactions() {
                                                         {icon}
                                                     </div>
                                                     <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-h)', textTransform: 'capitalize' }}>
-                                                        {tx.type}
+                                                        {label}
                                                     </span>
                                                 </div>
                                             </td>
 
                                             {/* Amount */}
                                             <td style={{ padding: '14px 16px' }}>
-                                                <span className="mono" style={{ fontWeight: 700, fontSize: '0.85rem', color: isDeposit ? 'var(--green)' : 'var(--text-h)' }}>
-                                                    {isDeposit ? '+' : '-'}${(tx.meta?.amountUsd ?? tx.amount).toFixed(2)}
+                                                <span className="mono" style={{ fontWeight: 700, fontSize: '0.85rem', color: isPositive ? 'var(--green)' : 'var(--text-h)' }}>
+                                                    {isPositive ? '+' : '-'}${amountUsd.toFixed(2)}
                                                 </span>
                                             </td>
 
@@ -212,9 +234,8 @@ export default function Transactions() {
                         </div>
                         <div className="tx-card-list">
                             {txs.map((tx) => {
-                                const color = TYPE_COLOR[tx.type] || 'var(--text)';
-                                const icon = TYPE_ICON[tx.type] || '·';
-                                const isDeposit = tx.type === 'deposit';
+                                const { color, icon, label, isPositive } = getTransactionPresentation(tx);
+                                const amountUsd = getTransactionAmountUsd(tx);
                                 return (
                                     <div key={tx._id} className="tx-card">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -229,13 +250,13 @@ export default function Transactions() {
                                                 {icon}
                                             </div>
                                             <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-h)', textTransform: 'capitalize' }}>
-                                                {tx.type}
+                                                {label}
                                             </span>
                                         </div>
                                         <div className="tx-card-row">
                                             <span className="tx-card-label">Amount</span>
-                                            <span className="mono" style={{ fontWeight: 700, color: isDeposit ? 'var(--green)' : 'var(--text-h)' }}>
-                                                {isDeposit ? '+' : '-'}${(tx.meta?.amountUsd ?? tx.amount).toFixed(2)}
+                                            <span className="mono" style={{ fontWeight: 700, color: isPositive ? 'var(--green)' : 'var(--text-h)' }}>
+                                                {isPositive ? '+' : '-'}${amountUsd.toFixed(2)}
                                             </span>
                                         </div>
                                         <div className="tx-card-row">

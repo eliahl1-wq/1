@@ -140,9 +140,12 @@ export default function SlitherGame() {
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
+    const tournamentId = location.state?.tournamentId || localStorage.getItem('current_tournament_id');
+    const isTournamentMode = gameModeStored === 'tournament-slither'
+        || location.state?.selectedMode === 'tournament-slither';
     const isBRMode = gameModeStored.startsWith('br-') || !!location.state?.battleRoyale;
     const isCompetitiveMode = gameModeStored === 'competitive-slither' || location.state?.selectedMode === 'competitive-slither';
-    const entryFeeUsd = isBRMode
+    const entryFeeUsd = isTournamentMode ? 1 : isBRMode
         ? normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))
         : isCompetitiveMode
             ? normalizeCompetitiveEntryFee(localStorage.getItem('selected_entry_fee'))
@@ -153,6 +156,8 @@ export default function SlitherGame() {
         entryFeeUsd,
         isBR: isBRMode,
         isCompetitive: isCompetitiveMode,
+        isTournament: isTournamentMode,
+        tournamentId,
     };
 
     const { camRef: specCamRef, seed: seedSpecCam } = useSpectatorCamera({
@@ -197,6 +202,11 @@ export default function SlitherGame() {
     }, []);
 
     const handlePlayAgain = useCallback(() => {
+        if (joinParamsRef.current.isTournament) {
+            clearPendingResult('slither');
+            navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+            return;
+        }
         const { nickname, entryFeeUsd: fee, isCompetitive } = joinParamsRef.current;
         const modeKey = isCompetitive ? 'competitive-slither' : 'slither';
         localStorage.setItem('current_game_mode', modeKey);
@@ -240,11 +250,15 @@ export default function SlitherGame() {
                 useFreeTicket,
             });
         }
-    }, [authToken, liveSession]);
+    }, [authToken, liveSession, navigate]);
 
     const handleLobby = useCallback(() => {
         clearPendingResult('slither');
         blockAutoJoinRef.current = false;
+        if (joinParamsRef.current.isTournament) {
+            navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+            return;
+        }
         const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
         navigate('/pre-game', { state: { selectedMode: mode } });
     }, [navigate]);
@@ -470,7 +484,14 @@ export default function SlitherGame() {
             setIsConnected(true);
             if (!hasJoinedRef.current && !blockAutoJoinRef.current) {
                 const { nickname, entryFeeUsd: fee, isBR: br } = joinParamsRef.current;
-                if (br) {
+                if (joinParamsRef.current.isTournament) {
+                    socket.emit('joinTournamentGame', {
+                        username: nickname,
+                        token: authToken,
+                        tournamentId: joinParamsRef.current.tournamentId,
+                        skinColor: localStorage.getItem('selected_skin') || 'random',
+                    });
+                } else if (br) {
                     socket.emit('brRejoinMatch', { token: authToken });
                 } else {
                     const joinMode = joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither';
@@ -496,13 +517,17 @@ export default function SlitherGame() {
             clearPendingResult('slither');
             const mode = gameSizes?.mode || lobbyModeForSession(joinParamsRef.current.isCompetitive);
             const expectedMode = lobbyModeForSession(joinParamsRef.current.isCompetitive);
-            if (!joinParamsRef.current.isBR && mode !== expectedMode) {
+            if (!joinParamsRef.current.isBR && !joinParamsRef.current.isTournament && mode !== expectedMode) {
                 alert(`You still have an active ${mode === 'agar' ? 'Agar' : mode} game. Finish or cash out before starting Slither.`);
                 navigate('/pre-game', { state: { selectedMode: mode === 'agar' ? 'agar' : expectedMode } });
                 return;
             }
-            localStorage.setItem('current_game_mode', mode);
-            localStorage.setItem('selected_gamemode', mode);
+            const persistedMode = gameSizes?.tournament ? 'tournament-slither' : mode;
+            localStorage.setItem('current_game_mode', persistedMode);
+            localStorage.setItem('selected_gamemode', persistedMode);
+            if (gameSizes?.tournamentId) {
+                localStorage.setItem('current_tournament_id', gameSizes.tournamentId);
+            }
             if (gameSizes?.entryFeeUsd) {
                 localStorage.setItem('selected_entry_fee', String(gameSizes.entryFeeUsd));
             }
@@ -652,7 +677,11 @@ export default function SlitherGame() {
             setLocalTimer(0);
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             rendererRef.current?.pause();
-            persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+            if (joinParamsRef.current.isTournament) {
+                localStorage.setItem('current_game_mode', 'tournament-slither');
+            } else {
+                persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+            }
             const startedAt = sessionStartAtRef.current || Date.now();
             const stats = {
                 timeSurvivedMs: Date.now() - startedAt,
@@ -721,7 +750,11 @@ export default function SlitherGame() {
             });
             const wasBR = joinParamsRef.current.isBR
                 || localStorage.getItem('current_game_mode')?.startsWith('br-');
-            persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+            if (joinParamsRef.current.isTournament) {
+                localStorage.setItem('current_game_mode', 'tournament-slither');
+            } else {
+                persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+            }
             if (wasBR) {
                 setTimeout(() => {
                     navigate('/gamemodes', { state: { selectedMode: 'slither' } });
@@ -731,7 +764,17 @@ export default function SlitherGame() {
 
 
 
+        socket.on('tournamentEnded', () => {
+            clearPendingResult('slither');
+            rendererRef.current?.pause();
+            navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+        });
+
         socket.on('forcedDisconnect', () => {
+            if (joinParamsRef.current.isTournament) {
+                navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+                return;
+            }
             const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
             navigate('/pre-game', { state: { selectedMode: mode } });
         });
@@ -750,6 +793,12 @@ export default function SlitherGame() {
                     timerIntervalRef.current = null;
                 }
                 rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
+            }
+
+            if (joinParamsRef.current.isTournament && typeof msg === 'string') {
+                alert(msg);
+                navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+                return;
             }
 
             if (typeof msg === 'string' && (msg.includes('balance') || msg.includes('Account'))) {

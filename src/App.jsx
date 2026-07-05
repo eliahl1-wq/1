@@ -16,6 +16,8 @@ import AdminSandbox from './pages/AdminSandbox';
 import HowItWorks from './pages/HowItWorks';
 import Faq from './pages/Faq';
 import Rewards from './pages/Rewards';
+import Tournaments from './pages/Tournaments';
+import TournamentLobby from './pages/TournamentLobby';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
@@ -28,6 +30,9 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 import { MIN_ENTRY_FEE } from './constants/economy';
 import { isBattleRoyaleAvailable } from './constants/features';
 import useSitePresence from './hooks/useSitePresence';
+
+const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL?.trim()
+  || 'https://api.mainnet.solana.com';
 
 function SitePresenceRunner() {
   useSitePresence();
@@ -72,12 +77,19 @@ function isBattleRoyaleSession(isAdmin = false) {
   return mode.startsWith('br-');
 }
 
+function isTournamentSession() {
+  if (typeof window === 'undefined') return false;
+  const mode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || '';
+  return mode === 'tournament-slither' && !!localStorage.getItem('current_tournament_id');
+}
+
 function ArenaRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return <AppLoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
   if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
+  if (isTournamentSession()) return children;
   const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
   if (user && !hasFreeTicket && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
   return children;
@@ -104,9 +116,7 @@ function AdminRoute({ children }) {
 }
 
 function App() {
-  // TIPS: Ersätt clusterApiUrl med din personliga RPC-länk från Helius för bättre stabilitet
-  const endpoint = useMemo(() => 
-    "https://mainnet.helius-rpc.com/?api-key=b83e640e-2370-4f65-bc06-efe5166084a4", []);
+  const endpoint = useMemo(() => SOLANA_RPC_URL, []);
 
   const wallets = useMemo(() => buildWalletAdapters(), []);
 
@@ -130,6 +140,8 @@ function App() {
                 <Route path="/gamemodes" element={<Gamemodes />} />
                 <Route path="/agar" element={<PreGame />} />
                 <Route path="/slither" element={<PreGame />} />
+                <Route path="/tournaments" element={<Tournaments />} />
+                <Route path="/tournaments/:tournamentId/lobby" element={<PrivateRoute><TournamentLobby /></PrivateRoute>} />
                 <Route path="/surviv" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
