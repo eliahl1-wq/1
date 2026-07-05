@@ -1325,22 +1325,53 @@ export default function PreGame() {
                 <div className="pre-game-grid">
                     {/* Left Column */}
                     {tournamentId ? (
-                        <div className="mode-card" ref={modeCardRef}>
-                            <GamemodePreview mode="slither" className="mode-card-preview" />
-                            <div className="mode-card-overlay">
-                                <div className="mode-card-header">
-                                    <span className="mode-card-label">Tournament</span>
-                                    <div className="mode-card-title mode-card-title--stacked">
-                                        {(tournament?.name || 'Tournament').toUpperCase()}
+                        <div className="mode-card tournament-orange-glow" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden' }}>
+                            <img
+                                src="/normal slither.png"
+                                alt=""
+                                style={{
+                                    position: 'absolute', inset: 0, width: '100%', height: '100%',
+                                    objectFit: 'cover', opacity: 0.15, filter: 'blur(2px)', pointerEvents: 'none'
+                                }}
+                            />
+                            <div style={{
+                                position: 'absolute', bottom: '-40px', left: '50%', transform: 'translateX(-50%)',
+                                width: '240px', height: '240px', background: 'radial-gradient(circle, rgba(249, 115, 22, 0.18) 0%, rgba(249, 115, 22, 0) 70%)',
+                                zIndex: 0, pointerEvents: 'none'
+                            }} />
+
+                            <div className="mode-card-overlay" style={{ zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', padding: '24px' }}>
+                                <div className="mode-card-header" style={{ marginBottom: 'auto' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span className="tournament-live-badge-orange">
+                                            <span className="tournament-live-dot-orange" />
+                                            {tournament?.status === 'live' ? 'Live now' : tournament?.status === 'ended' ? 'Ended' : 'Scheduled'}
+                                        </span>
                                     </div>
-                                    <div className="mode-card-subtitle">{tournamentStatusText}</div>
+                                    <h1 style={{ fontSize: '1.45rem', fontWeight: 900, color: 'var(--text-h)', marginTop: '16px', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                        {tournament?.name || 'Tournament'}
+                                    </h1>
+                                    <div style={{ color: 'var(--text-3)', fontSize: '0.72rem', marginTop: '4px' }}>
+                                        {tournamentStatusText}
+                                    </div>
                                 </div>
 
-                                <div className="mode-card-footer">
+                                <div style={{ marginTop: '28px' }}>
+                                    <span className="mode-card-label" style={{ fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--text-3)' }}>Your tournament balance</span>
+                                    <div style={{ color: '#34d399', fontSize: '2.5rem', fontWeight: 950, letterSpacing: '-.05em', margin: '4px 0 2px', textShadow: '0 0 15px rgba(16, 185, 129, 0.25)' }}>
+                                        ${(tournament?.me?.balanceUsd || 0).toFixed(2)}
+                                    </div>
+                                    <p style={{ color: 'var(--text-3)', fontSize: '0.65rem', lineHeight: '1.4', margin: 0 }}>
+                                        Banked cashouts across all 5 runs are accumulated here.
+                                    </p>
+                                </div>
+
+                                <div className="mode-card-footer" style={{ marginTop: '28px' }}>
                                     <button
                                         type="button"
                                         className="mode-card-action"
                                         onClick={() => navigate('/tournaments')}
+                                        style={{ width: '100%', borderColor: 'rgba(249, 115, 22, 0.4)', background: 'rgba(249, 115, 22, 0.05)', color: 'var(--text-h)' }}
                                     >
                                         Change Tournament
                                     </button>
@@ -1440,15 +1471,11 @@ export default function PreGame() {
                                 <div className="divider" style={{ marginBottom: '20px' }} />
 
                                 <button
-                                    className="play-button"
+                                    className={canPlayTournament ? "play-btn play-btn-ready" : "play-btn play-btn-disabled"}
                                     disabled={!canPlayTournament}
                                     onClick={playTournament}
                                 >
-                                    {tournament?.status === 'scheduled'
-                                        ? `Starts in ${formatCountdown(tournament.startAt, tournamentNow)}`
-                                        : tournament?.status === 'ended'
-                                            ? 'Tournament ended'
-                                            : attemptsRemaining <= 0 ? 'All 5 attempts used' : `Play attempt ${attemptsUsed + 1} · $1.00`}
+                                    Play $1
                                 </button>
                             </div>
 
@@ -1702,54 +1729,48 @@ export default function PreGame() {
                     {/* Right Column */}
                     {tournamentId ? (
                         <div className="right-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {/* Personal Tournament Balance Banner */}
-                            <div className="leaderboard-card" style={{ padding: '20px', background: 'linear-gradient(120deg, rgba(91, 33, 182, .20), rgba(14, 116, 144, .12)), rgba(14, 16, 22, .86)', borderColor: 'rgba(167, 139, 250, .28)' }}>
-                                <span className="tournament-panel-label" style={{ fontSize: '0.62rem', letterSpacing: '0.08em' }}>Your tournament balance</span>
-                                <div style={{ color: 'var(--text-h)', fontSize: '1.8rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0' }}>
-                                    ${(tournament?.me?.balanceUsd || 0).toFixed(2)}
+                            <div className="leaderboard-card tournament-orange-glow" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', flexGrow: 1, padding: 0, overflow: 'hidden' }}>
+                                <div style={{ padding: '20px 20px 16px', background: 'rgba(249, 115, 22, 0.03)', borderBottom: '1px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span className="tournament-panel-label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em' }}>Total Prize Pot</span>
+                                        <span style={{ fontSize: '0.6rem', color: '#f97316', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Split Pool</span>
+                                    </div>
+                                    <div style={{ color: 'var(--text-h)', fontSize: '2rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0 12px', background: 'linear-gradient(135deg, #fff 40%, #ffedd5 70%, #ff9d43 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                        ${(tournament?.prizePotUsd || 0).toFixed(2)}
+                                    </div>
+                                    <div className="tournament-splits" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: 0 }}>
+                                        <div className="tournament-split" style={{ padding: '8px 4px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.03)' }}>1st<strong>60%</strong></div>
+                                        <div className="tournament-split" style={{ padding: '8px 4px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.03)' }}>2nd<strong>30%</strong></div>
+                                        <div className="tournament-split" style={{ padding: '8px 4px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.03)' }}>3rd<strong>10%</strong></div>
+                                    </div>
                                 </div>
-                                <div style={{ color: 'var(--text-3)', fontSize: '0.62rem', lineHeight: '1.45' }}>
-                                    All successful cashouts across this tournament.
-                                </div>
-                            </div>
 
-                            {/* Prize Pot Card */}
-                            <div className="leaderboard-card" style={{ padding: '20px' }}>
-                                <span className="tournament-panel-label" style={{ fontSize: '0.62rem', letterSpacing: '0.08em' }}>Prize Pool</span>
-                                <div style={{ color: 'var(--text-h)', fontSize: '1.8rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0' }}>
-                                    ${(tournament?.prizePotUsd || 0).toFixed(2)}
-                                </div>
-                                <div className="tournament-splits" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: 0 }}>
-                                    <div className="tournament-split" style={{ padding: '8px 4px' }}>1st<strong>60%</strong></div>
-                                    <div className="tournament-split" style={{ padding: '8px 4px' }}>2nd<strong>30%</strong></div>
-                                    <div className="tournament-split" style={{ padding: '8px 4px' }}>3rd<strong>10%</strong></div>
-                                </div>
-                            </div>
-
-                            {/* Leaderboard Card */}
-                            <div className="leaderboard-card" style={{ height: leaderboardHeight, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-                                <div className="tab-bar leaderboard-tab-bar">
-                                    <button className="tab-btn active">Leaderboard</button>
+                                <div className="tab-bar leaderboard-tab-bar" style={{ background: 'transparent', padding: '12px 20px 4px' }}>
+                                    <span className="tournament-panel-label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', color: 'var(--text-h)' }}>Live Standings</span>
                                 </div>
 
                                 {(tournament?.leaderboard || []).length === 0 ? (
-                                    <div className="empty-state" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                        <div className="empty-state-icon" aria-hidden="true" style={{ fontSize: '1.4rem', marginBottom: '8px' }}>🏆</div>
+                                    <div className="empty-state" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px' }}>
+                                        <div className="empty-state-icon" aria-hidden="true" style={{ fontSize: '1.4rem', marginBottom: '8px', color: '#f97316' }}>🏆</div>
                                         <p className="empty-state-title" style={{ fontSize: '0.78rem' }}>No cashouts yet</p>
                                         <p className="empty-state-sub" style={{ fontSize: '0.68rem' }}>Be the first to bank a cashout!</p>
                                     </div>
                                 ) : (
-                                    <div className="leaderboard-list" style={{ flexGrow: 1, overflowY: 'auto' }}>
-                                        {(tournament?.leaderboard || []).map((entry, index) => (
-                                            <div key={`${entry.username}-${index}`} className="leaderboard-entry">
-                                                <span style={{ color: index === 0 ? '#FFD700' : 'var(--text-bright)', fontWeight: index === 0 ? 700 : 500 }}>
-                                                    {index + 1}. {entry.username}
-                                                </span>
-                                                <span className="mono" style={{ fontSize: '0.72rem', color: '#a3e635' }}>
-                                                    ${entry.balanceUsd.toFixed(2)}
-                                                </span>
-                                            </div>
-                                        ))}
+                                    <div className="leaderboard-list" style={{ flexGrow: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
+                                        {(tournament?.leaderboard || []).map((entry, index) => {
+                                            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null;
+                                            return (
+                                                <div key={`${entry.username}-${index}`} className="leaderboard-entry" style={{ margin: '0 8px 4px', padding: '8px 10px', borderRadius: '8px', background: index < 3 ? 'rgba(255, 255, 255, 0.02)' : 'transparent', border: index < 3 ? '1px solid rgba(255,255,255,0.02)' : '1px solid transparent' }}>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: index < 3 ? 'var(--text-h)' : 'var(--text-bright)', fontWeight: index < 3 ? 700 : 500 }}>
+                                                        <span style={{ width: '18px', textAlign: 'center' }}>{medal || `${index + 1}.`}</span>
+                                                        {entry.username}
+                                                    </span>
+                                                    <span className="mono" style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 700 }}>
+                                                        ${entry.balanceUsd.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

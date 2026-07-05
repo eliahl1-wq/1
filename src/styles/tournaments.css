@@ -447,3 +447,37 @@
         min-height: 220px;
     }
 }
+
+.tournament-orange-glow {
+    border-color: rgba(249, 115, 22, 0.35) !important;
+    box-shadow: 0 0 30px rgba(249, 115, 22, 0.12), inset 0 0 15px rgba(249, 115, 22, 0.03);
+}
+
+.tournament-live-badge-orange {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #f97316;
+    background: rgba(249, 115, 22, 0.08);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+    padding: 5px 10px;
+    border-radius: 99px;
+    font-size: 0.65rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.tournament-live-dot-orange {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #f97316;
+    box-shadow: 0 0 8px #f97316;
+    animation: orange-pulse 1.6s infinite alternate;
+}
+
+@keyframes orange-pulse {
+    0% { opacity: 0.45; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 12px #f97316; }
+}
