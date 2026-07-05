@@ -124,21 +124,22 @@ export default function Tournaments() {
                                 <div className="tournament-mode-label">Balance Grab · Slither</div>
                                 <h2>{tournament.name}</h2>
                                 
-                                <div className="tournament-details-row">
+                                <div className="tournament-details-grid">
                                     <div className="tournament-detail-item">
                                         <span className="label">Entry fee</span>
-                                        <strong>$1.00 entry fee</strong>
+                                        <strong>$1.00</strong>
                                     </div>
                                     <div className="tournament-detail-item">
                                         <span className="label">Prize Pool</span>
-                                        <strong style={{ color: 'var(--green)' }}>${tournament.prizePotUsd.toFixed(2)}</strong>
+                                        <strong style={{ color: '#f97316' }}>${tournament.prizePotUsd.toFixed(2)}</strong>
                                     </div>
-                                </div>
-
-                                <div className="tournament-details-row" style={{ borderTop: 'none', paddingTop: 0, marginTop: -4 }}>
                                     <div className="tournament-detail-item">
-                                        <span className="label">Players / Entries</span>
-                                        <strong>{tournament.participantCount} / {tournament.totalAttempts}</strong>
+                                        <span className="label">Players</span>
+                                        <strong>{tournament.participantCount}</strong>
+                                    </div>
+                                    <div className="tournament-detail-item">
+                                        <span className="label">Attempts</span>
+                                        <strong>{tournament.totalAttempts}</strong>
                                     </div>
                                 </div>
 

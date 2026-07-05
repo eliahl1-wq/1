@@ -201,12 +201,13 @@
     letter-spacing: .08em;
 }
 
-.tournament-details-row {
+.tournament-details-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    padding: 12px 0;
-    border-top: 1px solid var(--border);
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px 20px;
+    padding: 20px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 8px;
 }
 
 .tournament-detail-item {
