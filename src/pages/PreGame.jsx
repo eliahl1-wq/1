@@ -177,12 +177,14 @@ export default function PreGame() {
         if (!targetRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (let entry of entries) {
-                setLeaderboardHeight(entry.target.offsetHeight);
+                if (entry.target.offsetHeight > 100) {
+                    setLeaderboardHeight(entry.target.offsetHeight);
+                }
             }
         });
         observer.observe(targetRef.current);
         return () => observer.disconnect();
-    }, [tournamentId]);
+    }, [tournamentId, tournamentLoading]);
 
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
