@@ -28,3 +28,6 @@
 /admin/sandbox  /index.html  200
 /how-it-works  /index.html  200
 /faq  /index.html  200
+/tournaments  /index.html  200
+/tournaments/*  /index.html  200
+
