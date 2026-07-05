@@ -169,18 +169,20 @@ export default function PreGame() {
 
     // ── State ──────────────────────────────────────────
     const modeCardRef = useRef(null);
+    const mainCardRef = useRef(null);
     const [leaderboardHeight, setLeaderboardHeight] = useState('auto');
 
     useEffect(() => {
-        if (!modeCardRef.current) return;
+        const targetRef = tournamentId ? mainCardRef : modeCardRef;
+        if (!targetRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (let entry of entries) {
                 setLeaderboardHeight(entry.target.offsetHeight);
             }
         });
-        observer.observe(modeCardRef.current);
+        observer.observe(targetRef.current);
         return () => observer.disconnect();
-    }, []);
+    }, [tournamentId]);
 
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
@@ -1322,10 +1324,10 @@ export default function PreGame() {
                     Loading tournament lobby…
                 </div>
             ) : (
-                <div className="pre-game-grid">
+                <div className={tournamentId ? "pre-game-grid pre-game-grid--tournament" : "pre-game-grid"}>
                     {/* Left Column */}
                     {tournamentId ? (
-                        <div className="mode-card" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden', height: '100%', minHeight: '380px' }}>
+                        <div className="mode-card" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden', height: leaderboardHeight }}>
                             <img
                                 src="/normal slither.png"
                                 alt=""
@@ -1432,7 +1434,7 @@ export default function PreGame() {
                                 </div>
                             )}
 
-                            <div className="game-card main-card" style={{ flexGrow: 1 }}>
+                            <div className="game-card main-card" ref={mainCardRef} style={{ flexGrow: 1 }}>
                                 <div style={{ marginBottom: '18px' }}>
                                     <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
                                         Nickname
@@ -1757,11 +1759,12 @@ export default function PreGame() {
                                 ) : (
                                     <div className="leaderboard-list" style={{ flexGrow: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
                                         {(tournament?.leaderboard || []).map((entry, index) => {
-                                            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null;
+                                            const rankColor = index === 0 ? '#ffd700' : index === 1 ? '#cbd5e1' : index === 2 ? '#cd7f32' : 'inherit';
+                                            const rankWeight = index < 3 ? 800 : 500;
                                             return (
                                                 <div key={`${entry.username}-${index}`} className="leaderboard-entry" style={{ margin: '0 8px 4px', padding: '8px 10px', borderRadius: '8px', background: index < 3 ? 'rgba(255, 255, 255, 0.02)' : 'transparent', border: index < 3 ? '1px solid rgba(255,255,255,0.02)' : '1px solid transparent' }}>
                                                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: index < 3 ? 'var(--text-h)' : 'var(--text-bright)', fontWeight: index < 3 ? 700 : 500 }}>
-                                                        <span style={{ width: '18px', textAlign: 'center' }}>{medal || `${index + 1}.`}</span>
+                                                        <span style={{ width: '18px', textAlign: 'center', color: rankColor, fontWeight: rankWeight }}>{index + 1}.</span>
                                                         {entry.username}
                                                     </span>
                                                     <span className="mono" style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 700 }}>
