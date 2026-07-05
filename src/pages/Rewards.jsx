@@ -28,7 +28,9 @@ export default function Rewards() {
                     const rewardTxs = data.filter(tx =>
                         tx.meta?.event === 'sponsored_rewards_claim' ||
                         tx.meta?.isRentExemptFallback === true ||
-                        tx.meta?.event === 'free_ticket_join'
+                        tx.meta?.event === 'free_ticket_join' ||
+                        tx.meta?.event === 'tournament_reward' ||
+                        tx.meta?.event === 'tournament_reward_claim'
                     );
                     setHistory(rewardTxs);
                 }
@@ -70,6 +72,33 @@ export default function Rewards() {
         const id = setInterval(poll, 3000);
         return () => { cancelled = true; clearInterval(id); };
     }, [user?.rewardClaimInProgress, refreshUser]);
+
+    useEffect(() => {
+        if (!user?.tournamentRewardClaimInProgress) return undefined;
+        let cancelled = false;
+        setClaimStatus({ type: 'loading', message: 'Waiting for tournament reward confirmation…' });
+        const poll = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/user/tournament-reward-claim-status`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await res.json();
+                if (cancelled) return;
+                if (data.claim?.status === 'confirmed') {
+                    await refreshUser();
+                    setClaimStatus({ type: 'success', message: `Successfully claimed $${Number(data.claim.amountUsd).toFixed(2)} of tournament winnings!` });
+                } else if (data.claim?.status === 'failed') {
+                    await refreshUser();
+                    setClaimStatus({ type: 'error', message: data.claim.error || 'Tournament reward claim failed.' });
+                }
+            } catch {
+                // Keep the claim locked; the server reconciler remains authoritative.
+            }
+        };
+        poll();
+        const id = setInterval(poll, 3000);
+        return () => { cancelled = true; clearInterval(id); };
+    }, [user?.tournamentRewardClaimInProgress, refreshUser]);
     if (loading) {
         return (
             <div className="page-shell page-shell--with-topbar page-shell--scroll">
@@ -153,6 +182,31 @@ export default function Rewards() {
             claimLockRef.current = false;
         }
     };
+
+    const handleTournamentClaim = async () => {
+        if (claimLockRef.current || claimStatus?.type === 'loading' || !(user.tournamentRewardsBalance > 0)) return;
+        claimLockRef.current = true;
+        setClaimStatus({ type: 'loading', message: 'Reserving and processing your tournament claim… Please wait.' });
+        try {
+            const res = await fetch(`${API_URL}/api/user/claim-tournament-rewards`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            if (res.status === 202 && data.processing) {
+                setClaimStatus({ type: 'loading', message: 'Tournament payment submitted. Waiting for blockchain confirmation…' });
+                await refreshUser();
+                return;
+            }
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to claim tournament rewards.');
+            await refreshUser();
+            setClaimStatus({ type: 'success', message: `Successfully claimed $${data.amount.toFixed(2)} in tournament rewards!` });
+        } catch (err) {
+            setClaimStatus({ type: 'error', message: err.message || 'Error claiming tournament rewards. Try again later.' });
+        } finally {
+            claimLockRef.current = false;
+        }
+    };
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
@@ -172,7 +226,7 @@ export default function Rewards() {
                 </p>
 
                 {/* Top Rewards Summary */}
-                <div className="profile-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '40px' }}>
+                <div className="profile-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '40px' }}>
                     <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
                         <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700' }}>
                             Current Reward Balance
@@ -192,6 +246,18 @@ export default function Rewards() {
                         </div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>
                             {user.rewardClaimInProgress ? 'Claim processing' : canClaim ? 'Unlocked & ready' : 'Complete challenges first'}
+                        </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
+                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700', color: 'var(--yellow)' }}>
+                            Tournament Winnings
+                        </div>
+                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--yellow)', letterSpacing: '-0.03em' }}>
+                            ${(user.tournamentRewardsBalance || 0).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>
+                            {user.tournamentRewardClaimInProgress ? 'Claim processing' : (user.tournamentRewardsBalance > 0 ? 'Ready to claim' : 'No unclaimed winnings')}
                         </div>
                     </div>
 
@@ -352,6 +418,54 @@ export default function Rewards() {
                 </section>
                 )}
 
+                {/* Section 2.5: Tournament Winnings */}
+                {(user.tournamentRewardsBalance > 0 || user.tournamentRewardClaimInProgress) && (
+                    <section style={{ marginBottom: '40px' }}>
+                        <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
+                            Tournament Winnings
+                        </h2>
+
+                        <div className="panel" style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.05) 0%, rgba(234, 179, 8, 0.02) 100%)', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                                <div>
+                                    <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-h)', fontWeight: '600' }}>
+                                        Unclaimed Tournament Prize
+                                    </h4>
+                                    <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.85rem' }}>
+                                        Winnings from finishing in the top 3 of a tournament match.
+                                    </p>
+                                </div>
+                                <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--yellow)' }}>
+                                    ${Number(user.tournamentRewardsBalance || 0).toFixed(2)}
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="btn btn-yellow"
+                                onClick={handleTournamentClaim}
+                                disabled={!(user.tournamentRewardsBalance > 0) || claimStatus?.type === 'loading' || user.tournamentRewardClaimInProgress}
+                                style={{
+                                    width: '100%',
+                                    padding: '13px 20px',
+                                    fontSize: '0.95rem',
+                                    background: 'var(--yellow)',
+                                    color: '#000',
+                                    border: 'none',
+                                    fontWeight: '700',
+                                    boxShadow: '0 4px 14px rgba(234, 179, 8, 0.2)',
+                                    cursor: 'pointer',
+                                    borderRadius: 'var(--r-md)',
+                                    transition: 'all 0.15s ease',
+                                    ...(!(user.tournamentRewardsBalance > 0) && !user.tournamentRewardClaimInProgress ? { background: '#374151', color: '#9ca3af', boxShadow: 'none', opacity: 0.7, cursor: 'default' } : {})
+                                }}
+                            >
+                                {user.tournamentRewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING WINNINGS...' : 'CLAIM TOURNAMENT WINNINGS'}
+                            </button>
+                        </div>
+                    </section>
+                )}
+
                 {/* Section 3: Information */}
                 <section style={{ marginBottom: '40px' }}>
                     <div className="panel" style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)' }}>
@@ -404,6 +518,16 @@ export default function Rewards() {
                                     desc = `Joined $${tx.meta.entryFeeUsd || 10} match using free ticket`;
                                     val = 'FREE';
                                     color = 'var(--blue)';
+                                } else if (tx.meta?.event === 'tournament_reward') {
+                                    title = 'Tournament Prize';
+                                    desc = `Placed #${tx.meta.placement} in ${tx.meta.tournamentName || 'Tournament'}`;
+                                    val = `+$${(tx.meta.amountUsd || 0).toFixed(2)}`;
+                                    color = 'var(--yellow)';
+                                } else if (tx.meta?.event === 'tournament_reward_claim') {
+                                    title = 'Tournament Claim Payout';
+                                    desc = `Claimed via Solana: ${tx.meta.signature ? tx.meta.signature.slice(0, 8) + '...' : 'Pending'}`;
+                                    val = `-$${(tx.meta.amountUsd || 0).toFixed(2)}`;
+                                    color = 'var(--green)';
                                 }
 
                                 return (

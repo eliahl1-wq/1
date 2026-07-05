@@ -25,6 +25,7 @@ export default function Tournaments() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [now, setNow] = useState(Date.now());
+    const [selectedRulesTournament, setSelectedRulesTournament] = useState(null);
 
     useEffect(() => {
         document.title = 'AgarStake | Tournaments';
@@ -78,14 +79,10 @@ export default function Tournaments() {
             <Background />
             <AppTopbar />
             <main className="page-content tournament-page" style={{ maxWidth: 1160 }}>
-                <section className="tournament-hero">
+                <section className="tournament-hero" style={{ marginBottom: 36 }}>
                     <div>
                         <p className="tournament-kicker">Live competition</p>
                         <h1 className="tournament-title">Tournaments</h1>
-                        <p className="tournament-subtitle">
-                            Five $1 attempts. Cash out to bank each run, build your tournament balance,
-                            and finish in the top three to share the complete entry pot.
-                        </p>
                     </div>
                     <button className="tournament-secondary-btn" onClick={() => navigate('/rewards')}>
                         View rewards
@@ -104,37 +101,140 @@ export default function Tournaments() {
                     )}
                     {ordered.map(tournament => (
                         <article key={tournament.id} className={`tournament-card tournament-card--${tournament.status}`}>
-                            <div className="tournament-status-row">
-                                <span className={`tournament-status tournament-status--${tournament.status}`}>
-                                    <span className="tournament-status-dot" />
-                                    {tournament.status === 'live' ? 'Live now' : tournament.status === 'ended' ? 'Tournament ended' : 'Scheduled'}
-                                </span>
-                                <span className="tournament-countdown">
-                                    {tournament.status === 'scheduled' && `Starts in ${formatCountdown(tournament.startAt, now)}`}
+                            <div className="tournament-card-media">
+                                <img
+                                    src="/normal slither.png"
+                                    alt="Slither Normal"
+                                    className="tournament-card-img"
+                                    draggable={false}
+                                />
+                                <div className="tournament-status-badge">
+                                    <span className={`tournament-status tournament-status--${tournament.status}`}>
+                                        <span className="tournament-status-dot" />
+                                        {tournament.status === 'live' ? 'Live' : tournament.status === 'ended' ? 'Ended' : 'Scheduled'}
+                                    </span>
+                                </div>
+                                <div className="tournament-time-badge">
+                                    {tournament.status === 'scheduled' && formatCountdown(tournament.startAt, now)}
                                     {tournament.status === 'live' && `${formatCountdown(tournament.endAt, now)} left`}
-                                    {tournament.status === 'ended' && 'Results final'}
-                                </span>
+                                    {tournament.status === 'ended' && 'Ended'}
+                                </div>
                             </div>
-                            <h2>{tournament.name}</h2>
-                            <div className="tournament-mode-label">Balance Grab · Slither</div>
-                            <p className="tournament-card-copy">
-                                Bank as much balance as possible across five runs. Death banks $0;
-                                every successful cashout is added to your tournament total.
-                            </p>
-                            <div className="tournament-stat-row"><span>Prize pot</span><strong>${tournament.prizePotUsd.toFixed(2)}</strong></div>
-                            <div className="tournament-stat-row"><span>Entry per run</span><strong>$1.00 · max 5</strong></div>
-                            <div className="tournament-stat-row"><span>Players / entries</span><strong>{tournament.participantCount} / {tournament.totalAttempts}</strong></div>
-                            <div className="tournament-card-actions">
-                                <button className="tournament-primary-btn" onClick={() => enter(tournament)}>
-                                    {tournament.status === 'ended'
-                                        ? tournament.me?.winningsUsd > 0 ? 'Claim in Rewards' : 'View results'
-                                        : 'Enter tournament'}
-                                </button>
+                            <div className="tournament-card-content">
+                                <div className="tournament-mode-label">Balance Grab · Slither</div>
+                                <h2>{tournament.name}</h2>
+                                
+                                <div className="tournament-details-row">
+                                    <div className="tournament-detail-item">
+                                        <span className="label">Entry fee</span>
+                                        <strong>$1.00 entry fee</strong>
+                                    </div>
+                                    <div className="tournament-detail-item">
+                                        <span className="label">Prize Pool</span>
+                                        <strong style={{ color: 'var(--green)' }}>${tournament.prizePotUsd.toFixed(2)}</strong>
+                                    </div>
+                                </div>
+
+                                <div className="tournament-details-row" style={{ borderTop: 'none', paddingTop: 0, marginTop: -4 }}>
+                                    <div className="tournament-detail-item">
+                                        <span className="label">Players / Entries</span>
+                                        <strong>{tournament.participantCount} / {tournament.totalAttempts}</strong>
+                                    </div>
+                                </div>
+
+                                <div className="tournament-card-actions">
+                                    <button className="tournament-primary-btn" onClick={() => enter(tournament)}>
+                                        {tournament.status === 'ended'
+                                            ? tournament.me?.winningsUsd > 0 ? 'Claim Winnings' : 'View results'
+                                            : 'Enter tournament'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="tournament-secondary-btn"
+                                        style={{ padding: '12px 14px', flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        onClick={() => setSelectedRulesTournament(tournament)}
+                                        title="Tournament Rules"
+                                    >
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <path d="M12 16v-4"/>
+                                            <path d="M12 8h.01"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </article>
                     ))}
                 </section>
             </main>
+
+            {/* Rules Info Modal */}
+            {selectedRulesTournament && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    zIndex: 9999, padding: '20px', GxBackdropFilter: 'blur(8px)', backdropFilter: 'blur(8px)'
+                }} onClick={() => setSelectedRulesTournament(null)}>
+                    <div className="panel" style={{
+                        maxWidth: '480px', width: '100%', padding: '30px',
+                        border: '1px solid var(--border)', background: 'var(--bg-2)', borderRadius: 'var(--r-xl)',
+                        position: 'relative'
+                    }} onClick={e => e.stopPropagation()}>
+                        <button
+                            onClick={() => setSelectedRulesTournament(null)}
+                            style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '1.2rem', cursor: 'pointer' }}
+                        >
+                            ✕
+                        </button>
+                        
+                        <h3 style={{ margin: '0 0 8px', color: 'var(--text-h)', fontSize: '1.4rem', fontWeight: 800 }}>
+                            {selectedRulesTournament.name}
+                        </h3>
+                        <p style={{ color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 20px' }}>
+                            Balance Grab Rules & Info
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-2)', fontSize: '0.92rem', lineHeight: '1.6' }}>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
+                                <span>Start fee is <strong>$1.00</strong> per attempt. You can play a maximum of <strong>5 attempts</strong>.</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
+                                <span>Each run starts at a $1.00 stake. You can cash out at any point to save your current balance to the tournament leaderboard.</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
+                                <span>If you die during a run, you bank <strong>$0.00</strong> for that attempt.</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
+                                <span>Your total score is the sum of all your banked cashouts across the 5 runs.</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
+                                <span>The <strong>top 3 players</strong> on the leaderboard at the end of the tournament split the entire prize pot:
+                                    <br />
+                                    - 1st Place: <strong>60%</strong>
+                                    <br />
+                                    - 2nd Place: <strong>30%</strong>
+                                    <br />
+                                    - 3rd Place: <strong>10%</strong>
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            className="btn btn-green"
+                            onClick={() => setSelectedRulesTournament(null)}
+                            style={{ width: '100%', marginTop: '30px', padding: '12px', fontSize: '0.92rem', fontWeight: 700 }}
+                        >
+                            Got it
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <AppFooter />
         </div>
     );

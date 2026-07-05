@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { createQR } from '@solana/pay';
 import '../styles/ui.css';
+import '../styles/tournaments.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
@@ -43,6 +44,16 @@ function formatLiveTime(iso) {
     const hr = Math.floor(min / 60);
     if (hr < 24) return `${hr}h`;
     return `${Math.floor(hr / 24)}d`;
+}
+
+function formatCountdown(target, now) {
+    const total = Math.max(0, Math.ceil((new Date(target).getTime() - now) / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    return hours > 0
+        ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        : `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 const WalletIcon = ({ size = 14, style }) => (
@@ -109,6 +120,46 @@ export default function PreGame() {
     const location = useLocation();
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
+
+    // ── Tournament States ───────────────────────────────
+    const { tournamentId } = useParams();
+    const [tournament, setTournament] = useState(null);
+    const [tournamentLoading, setTournamentLoading] = useState(true);
+    const [tournamentError, setTournamentError] = useState('');
+    const [tournamentNow, setTournamentNow] = useState(Date.now());
+
+    useEffect(() => {
+        if (!tournamentId) return undefined;
+        const timer = setInterval(() => setTournamentNow(Date.now()), 1000);
+        return () => clearInterval(timer);
+    }, [tournamentId]);
+
+    useEffect(() => {
+        if (!tournamentId) return undefined;
+        let active = true;
+        setTournamentLoading(true);
+        const load = async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/tournaments/${tournamentId}?t=${Date.now()}`, {
+                    headers: token ? { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-cache' } : { 'Cache-Control': 'no-cache' },
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.error || 'Could not load tournament');
+                if (active) {
+                    setTournament(data.tournament);
+                    setTournamentError('');
+                    document.title = `AgarStake | ${data.tournament.name}`;
+                }
+            } catch (err) {
+                if (active) setTournamentError(err.message);
+            } finally {
+                if (active) setTournamentLoading(false);
+            }
+        };
+        load();
+        const poll = setInterval(load, 3000);
+        return () => { active = false; clearInterval(poll); };
+    }, [token, tournamentId]);
 
     // Reaching the lobby means the previous result screen was intentionally
     // left (including via the browser Back button). It must not reopen on Play.
@@ -656,6 +707,33 @@ export default function PreGame() {
         dragOffsetRef.current = { x: cx - rect.left, y: cy - rect.top };
         setIsDragging(true);
     }, []);
+
+    const attemptsUsed = tournament?.me?.entries || 0;
+    const attemptsRemaining = tournament?.me?.attemptsRemaining ?? 5;
+    const canPlayTournament = tournament?.status === 'live' && attemptsRemaining > 0;
+    const tournamentStatusText = (() => {
+        if (!tournament) return '';
+        if (tournament.status === 'scheduled') return `Tournament starting in ${formatCountdown(tournament.startAt, tournamentNow)}`;
+        if (tournament.status === 'live') return `Tournament ends in ${formatCountdown(tournament.endAt, tournamentNow)}`;
+        if (tournament.status === 'ended') return 'Tournament ended';
+        return tournament.status;
+    })();
+
+    const playTournament = () => {
+        if (!canPlayTournament) return;
+        clearAllPendingResults();
+        localStorage.setItem('current_game_mode', 'tournament-slither');
+        localStorage.setItem('selected_gamemode', 'tournament-slither');
+        localStorage.setItem('selected_entry_fee', '1');
+        localStorage.setItem('current_tournament_id', tournament.id);
+        navigate('/slither-game', {
+            state: {
+                selectedMode: 'tournament-slither',
+                tournamentId: tournament.id,
+                nickname: user?.username || nickname,
+            },
+        });
+    };
 
     // ── Handlers ───────────────────────────────────────
     const handleStartMatch = () => {
@@ -1238,7 +1316,108 @@ export default function PreGame() {
                 />
             )}
 
-            <div className="pre-game-grid">
+            {tournamentId ? (
+                tournamentLoading ? (
+                    <div className="tournament-empty" style={{ margin: '15vh auto', maxWidth: 520, textAlign: 'center', color: 'var(--text-2)' }}>
+                        <span className="spinner" style={{ marginRight: 8 }} />
+                        Loading tournament lobby…
+                    </div>
+                ) : (
+                    <main className="tournament-page" style={{ width: '100%', maxWidth: 1180, margin: '20px auto 0', padding: '0 16px', boxSizing: 'border-box' }}>
+                        <div className="tournament-lobby-header">
+                            <div>
+                                <p className="tournament-kicker">Tournament · Balance Grab</p>
+                                <h1 className="tournament-title" style={{ fontSize: 'clamp(1.9rem, 5vw, 3.35rem)', margin: '4px 0 8px' }}>{tournament?.name || 'Tournament'}</h1>
+                                <p className="tournament-subtitle" style={{ margin: 0 }}>{tournamentStatusText}</p>
+                            </div>
+                            <button className="tournament-secondary-btn" onClick={() => navigate('/tournaments')}>← All tournaments</button>
+                        </div>
+
+                        {tournamentError && <div className="tournament-ended-callout" style={{ borderColor: 'rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#fecaca', margin: '20px 0' }}>{tournamentError}</div>}
+
+                        {tournament?.status === 'ended' && (
+                            <div className="tournament-ended-callout" style={{ margin: '20px 0' }}>
+                                <strong>Tournament ended.</strong>{' '}
+                                {tournament.me?.winningsUsd > 0
+                                    ? `You placed #${tournament.me.placement} and have $${tournament.me.winningsUsd.toFixed(2)} ready in Rewards.`
+                                    : `Your final tournament balance was $${tournament.me?.balanceUsd?.toFixed(2) || '0.00'}.`}
+                                {tournament.me?.winningsUsd > 0 && (
+                                    <button className="tournament-secondary-btn" style={{ marginLeft: 14 }} onClick={() => navigate('/rewards')}>
+                                        Claim in Rewards
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="tournament-balance-banner" style={{ margin: '20px 0' }}>
+                            <div>
+                                <span>Your tournament balance</span>
+                                <div style={{ marginTop: 4, color: 'var(--text-2)', fontSize: '.78rem' }}>
+                                    All successful cashouts across this tournament
+                                </div>
+                            </div>
+                            <strong>${(tournament?.me?.balanceUsd || 0).toFixed(2)}</strong>
+                        </div>
+
+                        <div className="tournament-lobby-grid">
+                            <section className="tournament-panel tournament-play-card">
+                                <div className="tournament-preview">
+                                    <GamemodePreview mode="slither" fit />
+                                </div>
+                                <div className="tournament-play-copy">
+                                    <span className="tournament-panel-label">Tournament mode</span>
+                                    <h2>Balance Grab</h2>
+                                    <p>
+                                        Every run starts at $1 in-game balance with the $10 Slither food economy.
+                                        Food and bots are score only—your $1 entry goes entirely into the prize pot.
+                                    </p>
+                                    <div className="tournament-attempts" aria-label={`${attemptsUsed} of 5 attempts used`}>
+                                        {[0, 1, 2, 3, 4].map(index => (
+                                            <span key={index} className={`tournament-attempt-dot${index < attemptsUsed ? ' tournament-attempt-dot--used' : ''}`} />
+                                        ))}
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, color: 'var(--text-2)', fontSize: '.78rem' }}>
+                                        <span>{attemptsRemaining} attempts left</span>
+                                        <strong style={{ color: 'var(--text-h)' }}>$1.00 per run</strong>
+                                    </div>
+                                    <button className="tournament-primary-btn tournament-play-btn" disabled={!canPlayTournament} onClick={playTournament}>
+                                        {tournament?.status === 'scheduled'
+                                            ? `Starts in ${formatCountdown(tournament.startAt, tournamentNow)}`
+                                            : tournament?.status === 'ended'
+                                                ? 'Tournament ended'
+                                                : attemptsRemaining <= 0 ? 'All 5 attempts used' : `Play attempt ${attemptsUsed + 1} · $1`}
+                                    </button>
+                                </div>
+                            </section>
+
+                            <aside className="tournament-panel">
+                                <span className="tournament-panel-label">Live tournament</span>
+                                <h2>Prize pot</h2>
+                                <div className="tournament-prize-amount">${(tournament?.prizePotUsd || 0).toFixed(2)}</div>
+                                <div className="tournament-splits">
+                                    <div className="tournament-split">1st<strong>60%</strong></div>
+                                    <div className="tournament-split">2nd<strong>30%</strong></div>
+                                    <div className="tournament-split">3rd<strong>10%</strong></div>
+                                </div>
+                                <span className="tournament-panel-label">Leaderboard</span>
+                                <div className="tournament-leaderboard" style={{ marginTop: 8 }}>
+                                    {(tournament?.leaderboard || []).length === 0 && (
+                                        <div style={{ color: 'var(--text-3)', fontSize: '.78rem', padding: '18px 8px' }}>No banked cashouts yet.</div>
+                                    )}
+                                    {(tournament?.leaderboard || []).map((entry, index) => (
+                                        <div key={`${entry.username}-${index}`} className="tournament-leaderboard-row">
+                                            <span>#{entry.rank || index + 1}</span>
+                                            <span>{entry.username}</span>
+                                            <strong>${entry.balanceUsd.toFixed(2)}</strong>
+                                        </div>
+                                    ))}
+                                </div>
+                            </aside>
+                        </div>
+                    </main>
+                )
+            ) : (
+                <div className="pre-game-grid">
                 <div className="mode-card" ref={modeCardRef}>
                     <GamemodePreview mode={selectedMode} className="mode-card-preview" />
                     <div className="mode-card-overlay">
@@ -1568,6 +1747,7 @@ export default function PreGame() {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* SOL price + footer */}
             <div className="pregame-bottom-bar">

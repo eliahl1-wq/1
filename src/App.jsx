@@ -17,7 +17,6 @@ import HowItWorks from './pages/HowItWorks';
 import Faq from './pages/Faq';
 import Rewards from './pages/Rewards';
 import Tournaments from './pages/Tournaments';
-import TournamentLobby from './pages/TournamentLobby';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
@@ -141,7 +140,7 @@ function App() {
                 <Route path="/agar" element={<PreGame />} />
                 <Route path="/slither" element={<PreGame />} />
                 <Route path="/tournaments" element={<Tournaments />} />
-                <Route path="/tournaments/:tournamentId/lobby" element={<PrivateRoute><TournamentLobby /></PrivateRoute>} />
+                <Route path="/tournaments/:tournamentId/lobby" element={<PrivateRoute><PreGame /></PrivateRoute>} />
                 <Route path="/surviv" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
