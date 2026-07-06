@@ -788,14 +788,39 @@ export default function SurvivGame() {
             )}
 
             {leaderboard.length > 0 && gameReady && !showResultModal && (
-                <div className="game-leaderboard-panel">
-                    <div className="game-leaderboard-title">Top Earners</div>
-                    {leaderboard.slice(0, 5).map((entry, i) => (
-                        <div key={`${entry.username}-${i}`} className="game-leaderboard-row">
-                            <span>{entry.username}</span>
-                            <span>{formatUsd(entry.balance)}</span>
-                        </div>
-                    ))}
+                <div className="game-leaderboard" style={{
+                    position: 'absolute',
+                    top: '120px',
+                    right: '30px',
+                    width: '180px',
+                    background: 'rgba(16, 17, 24, 0.85)',
+                    backdropFilter: 'blur(20px)',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    border: '1px solid var(--border)',
+                    color: 'white',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                    zIndex: 100,
+                }}>
+                    <h4 className="game-leaderboard-title" style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>
+                        Leaderboard
+                    </h4>
+                    <div className="game-leaderboard-list" style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {leaderboard.map((entry, i) => (
+                            <div key={entry.id || `${entry.username}-${i}`} style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                opacity: entry.id === myIdRef.current ? 1 : 0.6,
+                                color: entry.id === myIdRef.current ? 'var(--accent)' : 'var(--text-bright)',
+                                fontWeight: entry.id === myIdRef.current ? '700' : '400',
+                            }}>
+                                <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {entry.username}</span>
+                                <span style={{ fontFamily: 'ui-monospace, monospace' }}>
+                                    {formatUsd(entry.balance)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 

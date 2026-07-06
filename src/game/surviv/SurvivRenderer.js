@@ -38,8 +38,8 @@ const WEAPON_FIRE_RATE = {
 };
 
 const WEAPON_SHAKE = {
-    fists: 0, pistol: 1.8, revolver: 4, smg: 0.8, shotgun: 5,
-    assault: 1.5, dmr: 3, sniper: 7, lmg: 1.2,
+    fists: 0, pistol: 0.3, revolver: 0.8, smg: 0.15, shotgun: 1.0,
+    assault: 0.3, dmr: 0.6, sniper: 1.4, lmg: 0.25,
 };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -255,16 +255,26 @@ export class SurvivRenderer {
     updateState(tick) {
         if (!tick) return;
         const receivedAt = Date.now();
-        const withLocalReloadClock = (player) => player ? {
-            ...player,
-            reloadEndAtLocal: player.reloading
-                ? receivedAt + Math.max(0, Number(player.reloadRemainingMs) || 0)
-                : 0,
-        } : null;
+        const withLocalClocks = (player) => {
+            if (!player) return null;
+            const meleeRemainingMs = Number(player.meleeRemainingMs) || 0;
+            return {
+                ...player,
+                reloadEndAtLocal: player.reloading
+                    ? receivedAt + Math.max(0, Number(player.reloadRemainingMs) || 0)
+                    : 0,
+                meleeStartedAt: meleeRemainingMs > 0
+                    ? receivedAt - Math.max(0, 280 - meleeRemainingMs)
+                    : player.meleeStartedAt || 0,
+                meleeUntil: meleeRemainingMs > 0
+                    ? receivedAt + meleeRemainingMs
+                    : player.meleeUntil || 0,
+            };
+        };
 
         const rawMe = tick.you || (tick.players || []).find(p => p.isYou || p.id === this.myId);
-        const me = withLocalReloadClock(rawMe);
-        const rawPlayers = (tick.players || []).map(withLocalReloadClock);
+        const me = withLocalClocks(rawMe);
+        const rawPlayers = (tick.players || []).map(withLocalClocks);
         this.players = me
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
             : rawPlayers;
@@ -614,7 +624,7 @@ export class SurvivRenderer {
     }
 
     rebuildObstacleRenderCache() {
-        const surfaceKinds = new Set(['road', 'houseFloor', 'field', 'water']);
+        const surfaceKinds = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'bridge']);
         this.houseFloors = this.obstacles.filter(o => o.kind === 'houseFloor');
         this.roomZones = this.obstacles.filter(o => o.kind === 'roomZone');
         this.doorways = this.obstacles.filter(o => o.kind === 'door');
@@ -679,9 +689,13 @@ export class SurvivRenderer {
         const playerDist = Math.hypot(room.x - playerX, room.y - playerY);
         const touches = Math.abs(dx) < (room.w + currentRoom.w) * 0.56
             && Math.abs(dy) < (room.h + currentRoom.h) * 0.56;
-        if (touches && centerDist < Math.max(room.w + currentRoom.w, room.h + currentRoom.h) * 0.82) return 0.42;
-        if (playerDist < 230) return 0.24;
-        return 0;
+        // Adjacent rooms get good visibility
+        if (touches && centerDist < Math.max(room.w + currentRoom.w, room.h + currentRoom.h) * 0.82) return 0.55;
+        // Nearby rooms get partial visibility based on distance
+        if (playerDist < 320) return 0.32;
+        if (playerDist < 500) return 0.22;
+        // All rooms get minimum ambient visibility (can see contours/walls, not pitch black)
+        return 0.15;
     }
 
     isPointHiddenByRooms(x, y, currentHouse, currentRoom) {
@@ -724,25 +738,46 @@ export class SurvivRenderer {
         const zones = this.roomZones.filter(r => r.houseId === currentHouse.id);
         if (!zones.length || !currentRoom || !this.me) return;
         ctx.save();
-        ctx.fillStyle = 'rgba(3, 4, 5, 0.74)';
+
+        // Softer base shadow (dimmed, not pitch black)
+        ctx.fillStyle = 'rgba(8, 10, 14, 0.42)';
         roundRect(ctx, currentHouse.x - currentHouse.w / 2 + 8, currentHouse.y - currentHouse.h / 2 + 8, currentHouse.w - 16, currentHouse.h - 16, 7);
         ctx.fill();
 
+        // Cut out visible rooms with smooth edges
         ctx.globalCompositeOperation = 'destination-out';
         for (const room of zones) {
             const strength = this.roomVisibilityStrength(room, currentRoom, this.me.x, this.me.y);
             if (strength <= 0) continue;
-            const pad = room.id === currentRoom.id ? 34 : 14;
+            const pad = room.id === currentRoom.id ? 38 : 18;
             ctx.globalAlpha = strength;
-            roundRect(ctx, room.x - room.w / 2 - pad, room.y - room.h / 2 - pad, room.w + pad * 2, room.h + pad * 2, 20);
+            // Use softer rounded rectangles for room cutouts
+            roundRect(ctx, room.x - room.w / 2 - pad, room.y - room.h / 2 - pad, room.w + pad * 2, room.h + pad * 2, 24);
             ctx.fill();
         }
-        ctx.globalAlpha = 0.92;
-        const r = currentHouse.variant === 'mansion' ? 310 : 255;
-        const glow = ctx.createRadialGradient(this.me.x, this.me.y, 24, this.me.x, this.me.y, r);
+
+        // Doorway light leaks — cut light around all doorways in the house
+        for (const door of this.doorways) {
+            if (door.houseId !== currentHouse.id) continue;
+            const doorGlow = ctx.createRadialGradient(door.x, door.y, 8, door.x, door.y, 110);
+            doorGlow.addColorStop(0, 'rgba(0,0,0,0.6)');
+            doorGlow.addColorStop(0.5, 'rgba(0,0,0,0.25)');
+            doorGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.globalAlpha = 0.65;
+            ctx.fillStyle = doorGlow;
+            ctx.beginPath();
+            ctx.arc(door.x, door.y, 110, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Player glow — larger, softer radius so you can see around yourself
+        const r = currentHouse.variant === 'mansion' ? 380 : 310;
+        const glow = ctx.createRadialGradient(this.me.x, this.me.y, 20, this.me.x, this.me.y, r);
         glow.addColorStop(0, 'rgba(0,0,0,1)');
-        glow.addColorStop(0.62, 'rgba(0,0,0,0.72)');
+        glow.addColorStop(0.35, 'rgba(0,0,0,0.85)');
+        glow.addColorStop(0.65, 'rgba(0,0,0,0.45)');
         glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = 0.88;
         ctx.fillStyle = glow;
         ctx.beginPath();
         ctx.arc(this.me.x, this.me.y, r, 0, Math.PI * 2);
@@ -750,9 +785,11 @@ export class SurvivRenderer {
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = 'rgba(255, 230, 170, 0.12)';
-        ctx.lineWidth = 2;
-        roundRect(ctx, currentRoom.x - currentRoom.w / 2, currentRoom.y - currentRoom.h / 2, currentRoom.w, currentRoom.h, 10);
+
+        // Subtle warm border on current room (softer, not harsh)
+        ctx.strokeStyle = 'rgba(255, 230, 170, 0.08)';
+        ctx.lineWidth = 1.5;
+        roundRect(ctx, currentRoom.x - currentRoom.w / 2, currentRoom.y - currentRoom.h / 2, currentRoom.w, currentRoom.h, 12);
         ctx.stroke();
         ctx.restore();
     }
@@ -1053,17 +1090,140 @@ export class SurvivRenderer {
         ctx.shadowBlur = 7;
         ctx.shadowOffsetY = 6;
 
-        if (kind === 'road') {
+        if (kind === 'river') {
             ctx.shadowBlur = 0;
-            ctx.fillStyle = o.variant === 'asphalt' ? 'rgba(61, 65, 58, 0.76)' : 'rgba(117, 104, 76, 0.64)';
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 12);
+            // Animated water surface
+            const t = Date.now() / 1200;
+            const waterGrad = ctx.createLinearGradient(-o.w / 2, 0, o.w / 2, 0);
+            waterGrad.addColorStop(0, 'rgba(38, 82, 108, 0.62)');
+            waterGrad.addColorStop(0.3, 'rgba(44, 98, 128, 0.58)');
+            waterGrad.addColorStop(0.7, 'rgba(38, 88, 118, 0.60)');
+            waterGrad.addColorStop(1, 'rgba(34, 78, 104, 0.62)');
+            ctx.fillStyle = waterGrad;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, o.h * 0.35);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+            // Subtle wave highlights
+            ctx.strokeStyle = 'rgba(160, 210, 230, 0.14)';
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < 5; i++) {
+                const waveY = -o.h * 0.3 + i * o.h * 0.15;
+                const wavePhase = t + i * 0.7;
+                ctx.beginPath();
+                ctx.moveTo(-o.w * 0.4, waveY);
+                ctx.quadraticCurveTo(
+                    -o.w * 0.15, waveY + Math.sin(wavePhase) * 6,
+                    0, waveY + Math.sin(wavePhase + 1) * 4
+                );
+                ctx.quadraticCurveTo(
+                    o.w * 0.15, waveY + Math.sin(wavePhase + 2) * 6,
+                    o.w * 0.4, waveY
+                );
+                ctx.stroke();
+            }
+            // Soft edge glow
+            ctx.strokeStyle = 'rgba(120, 180, 200, 0.12)';
+            ctx.lineWidth = 4;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, o.h * 0.35);
+            ctx.stroke();
+        } else if (kind === 'bridge') {
+            ctx.shadowBlur = 3;
+            ctx.shadowOffsetY = 4;
+            // Wooden plank surface
+            const bridgeGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            bridgeGrad.addColorStop(0, '#7a6347');
+            bridgeGrad.addColorStop(0.5, '#6b5539');
+            bridgeGrad.addColorStop(1, '#5c482e');
+            ctx.fillStyle = bridgeGrad;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
+            ctx.fill();
+            // Plank lines
+            ctx.strokeStyle = 'rgba(30, 22, 14, 0.28)';
+            ctx.lineWidth = 1;
+            const plankStep = 22;
+            for (let px = -o.w / 2 + plankStep; px < o.w / 2; px += plankStep) {
+                ctx.beginPath();
+                ctx.moveTo(px, -o.h / 2 + 4);
+                ctx.lineTo(px, o.h / 2 - 4);
+                ctx.stroke();
+            }
+            // Highlight on top edge
+            ctx.strokeStyle = 'rgba(255, 240, 200, 0.12)';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-o.w / 2 + 14, 0);
-            ctx.lineTo(o.w / 2 - 14, 0);
+            ctx.moveTo(-o.w / 2 + 6, -o.h / 2 + 3);
+            ctx.lineTo(o.w / 2 - 6, -o.h / 2 + 3);
             ctx.stroke();
+            // Border
+            ctx.strokeStyle = 'rgba(20, 16, 10, 0.42)';
+            ctx.lineWidth = 2.5;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
+            ctx.stroke();
+        } else if (kind === 'road') {
+            ctx.shadowBlur = 0;
+            if (o.variant === 'asphalt') {
+                // Asphalt road with gradient
+                const roadGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+                roadGrad.addColorStop(0, 'rgba(55, 58, 52, 0.78)');
+                roadGrad.addColorStop(0.5, 'rgba(65, 68, 60, 0.76)');
+                roadGrad.addColorStop(1, 'rgba(55, 58, 52, 0.78)');
+                ctx.fillStyle = roadGrad;
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 8);
+                ctx.fill();
+                // Center dashed line
+                ctx.strokeStyle = 'rgba(255, 220, 80, 0.16)';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([18, 14]);
+                ctx.beginPath();
+                if (o.w > o.h) {
+                    ctx.moveTo(-o.w / 2 + 20, 0);
+                    ctx.lineTo(o.w / 2 - 20, 0);
+                } else {
+                    ctx.moveTo(0, -o.h / 2 + 20);
+                    ctx.lineTo(0, o.h / 2 - 20);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // Edge lines
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                ctx.lineWidth = 1.5;
+                if (o.w > o.h) {
+                    ctx.beginPath();
+                    ctx.moveTo(-o.w / 2 + 10, -o.h / 2 + 8);
+                    ctx.lineTo(o.w / 2 - 10, -o.h / 2 + 8);
+                    ctx.moveTo(-o.w / 2 + 10, o.h / 2 - 8);
+                    ctx.lineTo(o.w / 2 - 10, o.h / 2 - 8);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(-o.w / 2 + 8, -o.h / 2 + 10);
+                    ctx.lineTo(-o.w / 2 + 8, o.h / 2 - 10);
+                    ctx.moveTo(o.w / 2 - 8, -o.h / 2 + 10);
+                    ctx.lineTo(o.w / 2 - 8, o.h / 2 - 10);
+                    ctx.stroke();
+                }
+            } else {
+                // Dirt road
+                ctx.fillStyle = 'rgba(117, 104, 76, 0.58)';
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 14);
+                ctx.fill();
+                // Tire tracks
+                ctx.strokeStyle = 'rgba(80, 68, 44, 0.18)';
+                ctx.lineWidth = 3;
+                const trackOff = Math.min(o.w, o.h) * 0.18;
+                ctx.beginPath();
+                if (o.w > o.h) {
+                    ctx.moveTo(-o.w / 2 + 12, -trackOff);
+                    ctx.lineTo(o.w / 2 - 12, -trackOff);
+                    ctx.moveTo(-o.w / 2 + 12, trackOff);
+                    ctx.lineTo(o.w / 2 - 12, trackOff);
+                } else {
+                    ctx.moveTo(-trackOff, -o.h / 2 + 12);
+                    ctx.lineTo(-trackOff, o.h / 2 - 12);
+                    ctx.moveTo(trackOff, -o.h / 2 + 12);
+                    ctx.lineTo(trackOff, o.h / 2 - 12);
+                }
+                ctx.stroke();
+            }
         } else if (kind === 'field') {
             ctx.shadowBlur = 0;
             const colors = {
@@ -1079,46 +1239,83 @@ export class SurvivRenderer {
                 ruins: 'rgba(88, 86, 76, 0.28)',
                 village: 'rgba(75, 94, 62, 0.22)',
                 'snow-woods': 'rgba(186, 205, 202, 0.18)',
+                'snow-lab': 'rgba(170, 190, 195, 0.22)',
             };
             ctx.fillStyle = colors[o.variant] || 'rgba(68, 92, 61, 0.22)';
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 18);
             ctx.fill();
         } else if (kind === 'water') {
             ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(56, 104, 122, 0.58)';
+            // Water body with depth gradient
+            const waterGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(o.w, o.h) / 2);
+            waterGrad.addColorStop(0, 'rgba(36, 78, 104, 0.65)');
+            waterGrad.addColorStop(0.6, 'rgba(48, 96, 118, 0.55)');
+            waterGrad.addColorStop(1, 'rgba(56, 104, 122, 0.42)');
+            ctx.fillStyle = waterGrad;
             ctx.beginPath();
             ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(194,228,225,0.18)';
+            // Shore highlight
+            ctx.strokeStyle = 'rgba(170, 210, 200, 0.16)';
             ctx.lineWidth = 3;
+            ctx.stroke();
+            // Subtle inner ripple
+            ctx.strokeStyle = 'rgba(140, 200, 220, 0.10)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, o.w * 0.35, o.h * 0.35, 0, 0, Math.PI * 2);
             ctx.stroke();
         } else if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
-            const fill = o.variant === 'mansion' ? '#665c50' : o.variant === 'warehouse' ? '#566268' : '#75664f';
-            ctx.fillStyle = fill;
+            // Floor with gradient for depth
+            const floorColors = {
+                mansion: { main: '#665c50', dark: '#584e44', line: 'rgba(255,240,200,0.06)' },
+                warehouse: { main: '#566268', dark: '#48545a', line: 'rgba(200,220,240,0.06)' },
+            };
+            const fc = floorColors[o.variant] || { main: '#75664f', dark: '#655840', line: 'rgba(255,240,210,0.06)' };
+            const floorGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            floorGrad.addColorStop(0, fc.main);
+            floorGrad.addColorStop(1, fc.dark);
+            ctx.fillStyle = floorGrad;
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-            ctx.lineWidth = 2;
-            for (let ix = -o.w / 2 + 46; ix < o.w / 2; ix += 46) {
+            // Plank/tile lines
+            ctx.strokeStyle = fc.line;
+            ctx.lineWidth = 1;
+            const tileStep = o.variant === 'warehouse' ? 52 : 46;
+            for (let ix = -o.w / 2 + tileStep; ix < o.w / 2; ix += tileStep) {
                 ctx.beginPath();
                 ctx.moveTo(ix, -o.h / 2 + 8);
                 ctx.lineTo(ix, o.h / 2 - 8);
                 ctx.stroke();
             }
-            ctx.strokeStyle = 'rgba(25, 20, 15, 0.18)';
-            for (let iy = -o.h / 2 + 46; iy < o.h / 2; iy += 46) {
+            ctx.strokeStyle = 'rgba(25, 20, 15, 0.14)';
+            for (let iy = -o.h / 2 + tileStep; iy < o.h / 2; iy += tileStep) {
                 ctx.beginPath();
                 ctx.moveTo(-o.w / 2 + 8, iy);
                 ctx.lineTo(o.w / 2 - 8, iy);
                 ctx.stroke();
             }
+            // Subtle inner border
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
+            ctx.lineWidth = 1;
+            roundRect(ctx, -o.w / 2 + 3, -o.h / 2 + 3, o.w - 6, o.h - 6, 4);
+            ctx.stroke();
         } else if (kind === 'door') {
             ctx.shadowBlur = 0;
             const frame = o.variant === 'warehouse' ? '#2f3b40' : o.variant === 'mansion' ? '#4c3828' : '#543722';
-            ctx.fillStyle = 'rgba(8, 7, 5, 0.88)';
+            // Light spill from inside
+            const lightGrad = ctx.createRadialGradient(0, -o.h * 0.15, 4, 0, 0, Math.max(o.w, o.h) * 0.8);
+            lightGrad.addColorStop(0, 'rgba(255, 220, 140, 0.18)');
+            lightGrad.addColorStop(0.5, 'rgba(255, 200, 100, 0.06)');
+            lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = lightGrad;
+            ctx.fillRect(-o.w * 0.7, -o.h * 0.7, o.w * 1.4, o.h * 1.4);
+            // Dark doorway opening
+            ctx.fillStyle = 'rgba(6, 5, 3, 0.85)';
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
             ctx.fill();
+            // Frame
             ctx.strokeStyle = frame;
             ctx.lineWidth = 5;
             ctx.beginPath();
@@ -1127,148 +1324,397 @@ export class SurvivRenderer {
             ctx.lineTo(o.w / 2 - 3, -o.h / 2 + 5);
             ctx.lineTo(o.w / 2 - 3, o.h / 2 - 3);
             ctx.stroke();
-            ctx.fillStyle = 'rgba(238, 205, 138, 0.24)';
+            // Threshold warm light
+            ctx.fillStyle = 'rgba(238, 205, 138, 0.28)';
             roundRect(ctx, -o.w / 2 + 10, o.h / 2 - 8, o.w - 20, 8, 3);
             ctx.fill();
+            // Top highlight
             ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(-o.w / 2 + 10, -o.h / 2 + 9);
             ctx.lineTo(o.w / 2 - 10, -o.h / 2 + 9);
             ctx.stroke();
         } else if (kind === 'wall' || kind === 'interiorWall') {
-            const wallFill = o.variant === 'stone' ? '#80796b' : o.variant === 'warehouse' ? '#425159' : '#70583f';
-            ctx.fillStyle = wallFill;
+            // Wall with gradient and brick/stone texture
+            const wallColors = {
+                stone: { main: '#807a6c', dark: '#6a6558', highlight: 'rgba(200,195,180,0.12)' },
+                warehouse: { main: '#48565e', dark: '#374249', highlight: 'rgba(160,185,200,0.10)' },
+            };
+            const wc = wallColors[o.variant] || { main: '#70583f', dark: '#5a4630', highlight: 'rgba(200,180,140,0.10)' };
+            const wallGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            wallGrad.addColorStop(0, wc.main);
+            wallGrad.addColorStop(1, wc.dark);
+            ctx.fillStyle = wallGrad;
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
             ctx.fill();
-            ctx.fillStyle = 'rgba(255,255,255,0.08)';
-            if (o.w > o.h) ctx.fillRect(-o.w / 2 + 3, -o.h / 2 + 2, o.w - 6, Math.max(2, o.h * 0.22));
-            else ctx.fillRect(-o.w / 2 + 2, -o.h / 2 + 3, Math.max(2, o.w * 0.22), o.h - 6);
-            ctx.strokeStyle = 'rgba(24,20,16,0.48)';
+            // Top highlight edge
+            ctx.fillStyle = wc.highlight;
+            if (o.w > o.h) ctx.fillRect(-o.w / 2 + 3, -o.h / 2 + 2, o.w - 6, Math.max(2, o.h * 0.18));
+            else ctx.fillRect(-o.w / 2 + 2, -o.h / 2 + 3, Math.max(2, o.w * 0.18), o.h - 6);
+            // Stone/brick texture
+            if (o.variant === 'stone') {
+                ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+                ctx.lineWidth = 0.8;
+                const brickH = 14;
+                const brickW = 22;
+                if (o.w > o.h) {
+                    for (let by = -o.h / 2 + brickH; by < o.h / 2; by += brickH) {
+                        ctx.beginPath();
+                        ctx.moveTo(-o.w / 2 + 3, by);
+                        ctx.lineTo(o.w / 2 - 3, by);
+                        ctx.stroke();
+                    }
+                } else {
+                    for (let bx = -o.w / 2 + brickW; bx < o.w / 2; bx += brickW) {
+                        ctx.beginPath();
+                        ctx.moveTo(bx, -o.h / 2 + 3);
+                        ctx.lineTo(bx, o.h / 2 - 3);
+                        ctx.stroke();
+                    }
+                }
+            }
+            // Outline
+            ctx.strokeStyle = 'rgba(24,20,16,0.42)';
             ctx.lineWidth = 2;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
             ctx.stroke();
         } else if (kind === 'furniture') {
             ctx.shadowBlur = 0;
-            ctx.fillStyle = o.variant === 'bed' ? '#4f6f82' : '#6d4a2f';
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
-            ctx.fill();
+            if (o.variant === 'bed') {
+                // Bed frame
+                ctx.fillStyle = '#5a4a36';
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
+                ctx.fill();
+                // Mattress/blanket
+                const bedGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+                bedGrad.addColorStop(0, '#4a6878');
+                bedGrad.addColorStop(1, '#3d5868');
+                ctx.fillStyle = bedGrad;
+                roundRect(ctx, -o.w / 2 + 3, -o.h / 2 + 3, o.w - 6, o.h - 6, 3);
+                ctx.fill();
+                // Pillow
+                ctx.fillStyle = '#c8bfae';
+                roundRect(ctx, -o.w / 2 + 6, -o.h / 2 + 5, o.w - 12, Math.max(8, o.h * 0.25), 4);
+                ctx.fill();
+                // Blanket fold line
+                ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-o.w / 2 + 8, o.h * 0.05);
+                ctx.lineTo(o.w / 2 - 8, o.h * 0.05);
+                ctx.stroke();
+            } else {
+                // Table
+                ctx.fillStyle = '#6d4a2f';
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+                ctx.fill();
+                // Table surface highlight
+                const tableGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+                tableGrad.addColorStop(0, 'rgba(255,240,200,0.12)');
+                tableGrad.addColorStop(0.5, 'rgba(255,240,200,0.04)');
+                tableGrad.addColorStop(1, 'rgba(0,0,0,0.06)');
+                ctx.fillStyle = tableGrad;
+                roundRect(ctx, -o.w / 2 + 2, -o.h / 2 + 2, o.w - 4, o.h - 4, 2);
+                ctx.fill();
+                // Legs (corner dots)
+                ctx.fillStyle = 'rgba(40, 28, 16, 0.55)';
+                const legR = 3;
+                ctx.beginPath();
+                ctx.arc(-o.w / 2 + 6, -o.h / 2 + 6, legR, 0, Math.PI * 2);
+                ctx.arc(o.w / 2 - 6, -o.h / 2 + 6, legR, 0, Math.PI * 2);
+                ctx.arc(-o.w / 2 + 6, o.h / 2 - 6, legR, 0, Math.PI * 2);
+                ctx.arc(o.w / 2 - 6, o.h / 2 - 6, legR, 0, Math.PI * 2);
+                ctx.fill();
+                // Outline
+                ctx.strokeStyle = 'rgba(30, 20, 10, 0.25)';
+                ctx.lineWidth = 1;
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+                ctx.stroke();
+            }
         } else if (kind === 'tree') {
             const r = Math.max(o.w, o.h) / 2;
-            ctx.fillStyle = '#684321';
-            roundRect(ctx, -r * 0.16, -r * 0.1, r * 0.32, r * 0.58, r * 0.08);
-            ctx.fill();
-            ctx.fillStyle = `hsl(${o.hue ?? 118}, 38%, 30%)`;
+            // Ground shadow
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(10, 18, 8, 0.22)';
             ctx.beginPath();
-            ctx.arc(0, -r * 0.1, r * 0.82, 0, Math.PI * 2);
+            ctx.ellipse(r * 0.05, r * 0.35, r * 0.72, r * 0.32, 0.15, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = `hsl(${(o.hue ?? 118) + 8}, 44%, 38%)`;
-            ctx.beginPath();
-            ctx.arc(-r * 0.18, -r * 0.28, r * 0.36, 0, Math.PI * 2);
+            // Trunk
+            ctx.fillStyle = '#5c3a1e';
+            roundRect(ctx, -r * 0.14, -r * 0.05, r * 0.28, r * 0.52, r * 0.07);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(20, 35, 19, 0.36)';
-            ctx.lineWidth = 3;
+            ctx.fillStyle = 'rgba(90, 65, 35, 0.45)';
+            roundRect(ctx, -r * 0.06, 0, r * 0.12, r * 0.38, r * 0.04);
+            ctx.fill();
+            // Main canopy (bottom layer, darker)
+            ctx.fillStyle = `hsl(${o.hue ?? 118}, 36%, 26%)`;
             ctx.beginPath();
-            ctx.arc(0, -r * 0.1, r * 0.82, 0, Math.PI * 2);
+            ctx.arc(0, -r * 0.12, r * 0.82, 0, Math.PI * 2);
+            ctx.fill();
+            // Mid canopy layer
+            ctx.fillStyle = `hsl(${(o.hue ?? 118) + 4}, 40%, 32%)`;
+            ctx.beginPath();
+            ctx.arc(-r * 0.08, -r * 0.18, r * 0.62, 0, Math.PI * 2);
+            ctx.fill();
+            // Top highlight canopy
+            ctx.fillStyle = `hsl(${(o.hue ?? 118) + 10}, 44%, 38%)`;
+            ctx.beginPath();
+            ctx.arc(-r * 0.16, -r * 0.28, r * 0.38, 0, Math.PI * 2);
+            ctx.fill();
+            // Light highlight spot
+            ctx.fillStyle = `hsl(${(o.hue ?? 118) + 14}, 48%, 44%)`;
+            ctx.beginPath();
+            ctx.arc(-r * 0.22, -r * 0.34, r * 0.16, 0, Math.PI * 2);
+            ctx.fill();
+            // Canopy outline
+            ctx.strokeStyle = 'rgba(16, 30, 14, 0.32)';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, -r * 0.12, r * 0.82, 0, Math.PI * 2);
             ctx.stroke();
         } else if (kind === 'bush') {
             const r = Math.max(o.w, o.h) / 2;
-            ctx.shadowBlur = 4;
-            ctx.fillStyle = 'hsl(' + (o.hue ?? 105) + ', 34%, 30%)';
+            ctx.shadowBlur = 3;
+            // Ground shadow
+            ctx.fillStyle = 'rgba(10, 18, 8, 0.18)';
             ctx.beginPath();
-            ctx.arc(-r * 0.18, -r * 0.02, r * 0.55, 0, Math.PI * 2);
-            ctx.arc(r * 0.2, r * 0.02, r * 0.52, 0, Math.PI * 2);
-            ctx.arc(0, -r * 0.22, r * 0.48, 0, Math.PI * 2);
+            ctx.ellipse(0, r * 0.18, r * 0.58, r * 0.24, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Dark base blobs
+            ctx.fillStyle = `hsl(${(o.hue ?? 105)}, 32%, 24%)`;
+            ctx.beginPath();
+            ctx.arc(-r * 0.2, r * 0.02, r * 0.48, 0, Math.PI * 2);
+            ctx.arc(r * 0.18, r * 0.04, r * 0.46, 0, Math.PI * 2);
+            ctx.arc(-r * 0.02, -r * 0.18, r * 0.42, 0, Math.PI * 2);
+            ctx.fill();
+            // Lighter top blobs
+            ctx.fillStyle = `hsl(${(o.hue ?? 105) + 6}, 36%, 32%)`;
+            ctx.beginPath();
+            ctx.arc(-r * 0.14, -r * 0.06, r * 0.34, 0, Math.PI * 2);
+            ctx.arc(r * 0.12, -r * 0.04, r * 0.32, 0, Math.PI * 2);
+            ctx.fill();
+            // Highlight spot
+            ctx.fillStyle = `hsl(${(o.hue ?? 105) + 12}, 40%, 38%)`;
+            ctx.beginPath();
+            ctx.arc(-r * 0.08, -r * 0.18, r * 0.18, 0, Math.PI * 2);
             ctx.fill();
         } else if (kind === 'barrel') {
             const r = Math.max(o.w, o.h) / 2;
-            ctx.fillStyle = 'hsl(' + (o.hue ?? 22) + ', 44%, 37%)';
+            // Metallic body gradient
+            const barrelGrad = ctx.createRadialGradient(-r * 0.25, -r * 0.2, 0, 0, 0, r);
+            barrelGrad.addColorStop(0, `hsl(${o.hue ?? 22}, 48%, 48%)`);
+            barrelGrad.addColorStop(0.5, `hsl(${o.hue ?? 22}, 44%, 37%)`);
+            barrelGrad.addColorStop(1, `hsl(${o.hue ?? 22}, 40%, 28%)`);
+            ctx.fillStyle = barrelGrad;
             ctx.beginPath();
             ctx.arc(0, 0, r, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(20,18,15,0.45)';
+            // Metal rim
+            ctx.strokeStyle = 'rgba(20,18,15,0.5)';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            // Metal bands
+            ctx.strokeStyle = 'rgba(200,195,180,0.18)';
             ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,255,255,0.16)';
             ctx.beginPath();
-            ctx.moveTo(-r * 0.7, -r * 0.2);
-            ctx.lineTo(r * 0.7, -r * 0.2);
-            ctx.moveTo(-r * 0.7, r * 0.22);
-            ctx.lineTo(r * 0.7, r * 0.22);
+            ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
             ctx.stroke();
-        } else if (kind === 'sandbag') {
-            ctx.fillStyle = '#9b8a5e';
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 8);
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+            ctx.stroke();
+            // Rivet highlights
+            ctx.fillStyle = 'rgba(255,255,255,0.22)';
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.arc(Math.cos(a) * r * 0.72, Math.sin(a) * r * 0.72, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            // Top highlight
+            ctx.fillStyle = 'rgba(255,255,255,0.10)';
+            ctx.beginPath();
+            ctx.ellipse(-r * 0.15, -r * 0.2, r * 0.35, r * 0.22, -0.3, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(48,40,24,0.36)';
+        } else if (kind === 'sandbag') {
+            // Stacked sandbags look
+            const bagH = Math.max(10, o.h / 3);
+            const bags = Math.max(2, Math.round(o.h / bagH));
+            for (let i = 0; i < bags; i++) {
+                const by = -o.h / 2 + i * (o.h / bags);
+                const bh = o.h / bags;
+                const offset = (i % 2) * 4 - 2;
+                ctx.fillStyle = i % 2 === 0 ? '#a3926a' : '#96855c';
+                roundRect(ctx, -o.w / 2 + offset, by, o.w - Math.abs(offset), bh - 1, 5);
+                ctx.fill();
+                // Bag stitching line
+                ctx.strokeStyle = 'rgba(60, 48, 24, 0.22)';
+                ctx.lineWidth = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(-o.w / 4 + offset, by + bh * 0.5);
+                ctx.lineTo(o.w / 4 + offset, by + bh * 0.5);
+                ctx.stroke();
+            }
+            // Overall outline
+            ctx.strokeStyle = 'rgba(48,40,24,0.32)';
             ctx.lineWidth = 2;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 6);
             ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+            // Highlight on top edge
+            ctx.strokeStyle = 'rgba(255,240,200,0.10)';
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(0, -o.h / 2 + 3);
-            ctx.lineTo(0, o.h / 2 - 3);
+            ctx.moveTo(-o.w / 2 + 6, -o.h / 2 + 2);
+            ctx.lineTo(o.w / 2 - 6, -o.h / 2 + 2);
             ctx.stroke();
         } else if (kind === 'tent') {
-            ctx.fillStyle = 'hsl(' + (o.hue ?? 82) + ', 30%, 34%)';
+            // Canvas tent with ridge
+            const tentGrad = ctx.createLinearGradient(-o.w / 2, 0, o.w / 2, 0);
+            tentGrad.addColorStop(0, `hsl(${o.hue ?? 82}, 28%, 30%)`);
+            tentGrad.addColorStop(0.5, `hsl(${o.hue ?? 82}, 32%, 38%)`);
+            tentGrad.addColorStop(1, `hsl(${o.hue ?? 82}, 28%, 30%)`);
+            ctx.fillStyle = tentGrad;
             ctx.beginPath();
             ctx.moveTo(-o.w / 2, o.h / 2);
-            ctx.lineTo(0, -o.h / 2);
+            ctx.lineTo(-o.w * 0.05, -o.h / 2);
+            ctx.lineTo(o.w * 0.05, -o.h / 2);
             ctx.lineTo(o.w / 2, o.h / 2);
             ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = 'rgba(18,20,16,0.45)';
+            // Outline
+            ctx.strokeStyle = 'rgba(18,20,16,0.42)';
             ctx.lineWidth = 2;
             ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+            // Ridge pole
+            ctx.strokeStyle = 'rgba(255,240,200,0.18)';
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
-            ctx.moveTo(0, -o.h / 2 + 6);
-            ctx.lineTo(0, o.h / 2 - 5);
+            ctx.moveTo(0, -o.h / 2 + 4);
+            ctx.lineTo(0, o.h / 2 - 3);
             ctx.stroke();
-        } else if (kind === 'rock') {
-            ctx.fillStyle = `hsl(${o.hue ?? 218}, 12%, 42%)`;
+            // Canvas fold lines
+            ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+            ctx.lineWidth = 0.8;
             ctx.beginPath();
-            ctx.moveTo(-o.w * 0.42, -o.h * 0.08);
-            ctx.lineTo(-o.w * 0.18, -o.h * 0.42);
-            ctx.lineTo(o.w * 0.3, -o.h * 0.36);
-            ctx.lineTo(o.w * 0.46, o.h * 0.12);
-            ctx.lineTo(o.w * 0.12, o.h * 0.42);
-            ctx.lineTo(-o.w * 0.36, o.h * 0.28);
+            ctx.moveTo(-o.w * 0.28, o.h * 0.1);
+            ctx.lineTo(-o.w * 0.03, -o.h * 0.38);
+            ctx.moveTo(o.w * 0.28, o.h * 0.1);
+            ctx.lineTo(o.w * 0.03, -o.h * 0.38);
+            ctx.stroke();
+            // Guy rope dots (ground stakes)
+            ctx.fillStyle = 'rgba(80, 70, 50, 0.45)';
+            ctx.beginPath();
+            ctx.arc(-o.w / 2 - 6, o.h / 2 + 4, 3, 0, Math.PI * 2);
+            ctx.arc(o.w / 2 + 6, o.h / 2 + 4, 3, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (kind === 'rock') {
+            // More natural irregular rock shape
+            const hw = o.w / 2;
+            const hh = o.h / 2;
+            // Base rock shape
+            const rockGrad = ctx.createLinearGradient(-hw, -hh, hw * 0.6, hh * 0.6);
+            rockGrad.addColorStop(0, `hsl(${o.hue ?? 218}, 14%, 48%)`);
+            rockGrad.addColorStop(0.6, `hsl(${o.hue ?? 218}, 12%, 38%)`);
+            rockGrad.addColorStop(1, `hsl(${o.hue ?? 218}, 10%, 30%)`);
+            ctx.fillStyle = rockGrad;
+            ctx.beginPath();
+            ctx.moveTo(-hw * 0.78, -hh * 0.12);
+            ctx.lineTo(-hw * 0.52, -hh * 0.68);
+            ctx.quadraticCurveTo(-hw * 0.2, -hh * 0.82, hw * 0.08, -hh * 0.72);
+            ctx.lineTo(hw * 0.58, -hh * 0.48);
+            ctx.quadraticCurveTo(hw * 0.82, -hh * 0.14, hw * 0.72, hh * 0.24);
+            ctx.lineTo(hw * 0.38, hh * 0.62);
+            ctx.quadraticCurveTo(hw * 0.1, hh * 0.78, -hw * 0.22, hh * 0.56);
+            ctx.lineTo(-hw * 0.64, hh * 0.32);
+            ctx.quadraticCurveTo(-hw * 0.86, hh * 0.08, -hw * 0.78, -hh * 0.12);
             ctx.closePath();
             ctx.fill();
-            ctx.strokeStyle = 'rgba(20,24,27,0.36)';
+            // Outline
+            ctx.strokeStyle = 'rgba(20,24,27,0.32)';
             ctx.lineWidth = 2;
             ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.13)';
-            ctx.fillRect(-o.w * 0.2, -o.h * 0.24, o.w * 0.28, 3);
-        } else {
-            const isHouse = kind === 'house';
-            const isContainer = kind === 'container';
-            const fill = isHouse ? `hsl(${o.hue ?? 18}, 30%, 42%)` : isContainer ? `hsl(${o.hue ?? 205}, 42%, 34%)` : `hsl(${o.hue ?? 30}, 38%, 34%)`;
-            ctx.fillStyle = fill;
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, isHouse ? 4 : 3);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(22,20,18,0.38)';
-            ctx.lineWidth = 3;
+            // Crack/vein line
+            ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-hw * 0.3, -hh * 0.4);
+            ctx.quadraticCurveTo(hw * 0.05, -hh * 0.1, hw * 0.2, hh * 0.3);
             ctx.stroke();
-            ctx.shadowBlur = 0;
-            if (isHouse) {
-                ctx.fillStyle = 'rgba(68,38,30,0.65)';
-                ctx.fillRect(-o.w / 2 + 8, -o.h / 2 + 8, o.w - 16, 10);
-                ctx.fillStyle = 'rgba(18,24,26,0.45)';
-                ctx.fillRect(-o.w * 0.18, o.h * 0.05, o.w * 0.26, o.h * 0.35);
-                ctx.fillStyle = 'rgba(239,209,124,0.55)';
-                ctx.fillRect(o.w * 0.18, -o.h * 0.2, o.w * 0.18, o.h * 0.14);
-            } else {
-                ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-                ctx.lineWidth = 2;
+            // Top highlight
+            ctx.fillStyle = 'rgba(255,255,255,0.12)';
+            ctx.beginPath();
+            ctx.ellipse(-hw * 0.2, -hh * 0.35, hw * 0.22, hh * 0.12, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+            // Moss spot
+            ctx.fillStyle = 'rgba(58, 82, 48, 0.18)';
+            ctx.beginPath();
+            ctx.ellipse(hw * 0.15, hh * 0.28, hw * 0.16, hh * 0.1, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (kind === 'container') {
+            // Shipping container with corrugated texture
+            const contGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            contGrad.addColorStop(0, `hsl(${o.hue ?? 205}, 46%, 40%)`);
+            contGrad.addColorStop(0.5, `hsl(${o.hue ?? 205}, 42%, 34%)`);
+            contGrad.addColorStop(1, `hsl(${o.hue ?? 205}, 38%, 28%)`);
+            ctx.fillStyle = contGrad;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+            ctx.fill();
+            // Corrugated lines
+            ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+            ctx.lineWidth = 0.8;
+            const corrStep = 8;
+            for (let cx = -o.w / 2 + corrStep; cx < o.w / 2; cx += corrStep) {
                 ctx.beginPath();
-                const lines = isContainer ? 4 : 2;
-                for (let i = 1; i <= lines; i++) {
-                    const xx = -o.w / 2 + (o.w / (lines + 1)) * i;
-                    ctx.moveTo(xx, -o.h / 2 + 5);
-                    ctx.lineTo(xx, o.h / 2 - 5);
-                }
+                ctx.moveTo(cx, -o.h / 2 + 4);
+                ctx.lineTo(cx, o.h / 2 - 4);
                 ctx.stroke();
             }
+            // Outline
+            ctx.strokeStyle = 'rgba(10,14,18,0.52)';
+            ctx.lineWidth = 2.5;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+            ctx.stroke();
+            // Corner reinforcements
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            roundRect(ctx, -o.w / 2, -o.h / 2, 10, o.h, 2);
+            ctx.fill();
+            roundRect(ctx, o.w / 2 - 10, -o.h / 2, 10, o.h, 2);
+            ctx.fill();
+            // ID plate
+            ctx.fillStyle = 'rgba(255,255,255,0.14)';
+            roundRect(ctx, -o.w * 0.15, -o.h / 2 + 4, o.w * 0.3, 10, 2);
+            ctx.fill();
+            // Top highlight
+            ctx.fillStyle = 'rgba(255,255,255,0.06)';
+            ctx.fillRect(-o.w / 2 + 12, -o.h / 2 + 3, o.w - 24, 3);
+        } else {
+            // Fallback: generic crate
+            const crateGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            crateGrad.addColorStop(0, `hsl(${o.hue ?? 30}, 40%, 40%)`);
+            crateGrad.addColorStop(1, `hsl(${o.hue ?? 30}, 36%, 28%)`);
+            ctx.fillStyle = crateGrad;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+            ctx.fill();
+            // Outline
+            ctx.strokeStyle = 'rgba(22,20,18,0.42)';
+            ctx.lineWidth = 2.5;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            // Cross-brace pattern
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-o.w / 2 + 6, -o.h / 2 + 6);
+            ctx.lineTo(o.w / 2 - 6, o.h / 2 - 6);
+            ctx.moveTo(o.w / 2 - 6, -o.h / 2 + 6);
+            ctx.lineTo(-o.w / 2 + 6, o.h / 2 - 6);
+            ctx.stroke();
+            // Center nail/bolt
+            ctx.fillStyle = 'rgba(180,170,140,0.28)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
         }
         ctx.restore();
     }
@@ -1872,63 +2318,109 @@ export class SurvivRenderer {
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
         const palette = o.variant === 'mansion'
-            ? { main: '#74614a', dark: '#46382c', ridge: '#8b7659', trim: '#2f261f' }
+            ? { main: '#74614a', dark: '#46382c', ridge: '#8b7659', trim: '#2f261f', chimney: '#5a4a3a' }
             : o.variant === 'warehouse'
-                ? { main: '#59686e', dark: '#344249', ridge: '#78878c', trim: '#263238' }
+                ? { main: '#59686e', dark: '#344249', ridge: '#78878c', trim: '#263238', chimney: '#445058' }
                 : o.variant === 'barn'
-                    ? { main: '#783f32', dark: '#4a241f', ridge: '#985747', trim: '#2c1714' }
-                    : { main: '#6c513b', dark: '#3c2b22', ridge: '#80664c', trim: '#2c211b' };
+                    ? { main: '#783f32', dark: '#4a241f', ridge: '#985747', trim: '#2c1714', chimney: '#5c3020' }
+                    : { main: '#6c513b', dark: '#3c2b22', ridge: '#80664c', trim: '#2c211b', chimney: '#504030' };
 
-        ctx.shadowColor = 'rgba(10, 14, 10, 0.42)';
-        ctx.shadowBlur = 13;
-        ctx.shadowOffsetY = 9;
+        // Drop shadow
+        ctx.shadowColor = 'rgba(10, 14, 10, 0.48)';
+        ctx.shadowBlur = 16;
+        ctx.shadowOffsetY = 10;
         ctx.fillStyle = palette.trim;
         roundRect(ctx, -o.w / 2 - 9, -o.h / 2 - 7, o.w + 18, o.h + 16, 8);
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        const grad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+        // Roof body with gradient
+        const grad = ctx.createLinearGradient(-o.w / 2, -o.h / 2, o.w / 2, o.h / 2);
         grad.addColorStop(0, palette.main);
-        grad.addColorStop(1, palette.dark);
+        grad.addColorStop(0.5, palette.dark);
+        grad.addColorStop(1, palette.main);
         ctx.fillStyle = grad;
         roundRect(ctx, -o.w / 2 - 4, -o.h / 2 - 4, o.w + 8, o.h + 8, 7);
         ctx.fill();
 
-        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        // Roof pitch shadow overlay
+        ctx.fillStyle = 'rgba(0,0,0,0.14)';
         ctx.beginPath();
         ctx.moveTo(-o.w / 2 - 4, -o.h / 2 - 4);
-        ctx.lineTo(0, -o.h / 2 - 32);
+        ctx.lineTo(0, -o.h / 2 - 28);
         ctx.lineTo(o.w / 2 + 4, -o.h / 2 - 4);
         ctx.lineTo(o.w / 2 + 2, o.h / 2 + 4);
-        ctx.lineTo(0, o.h / 2 + 24);
+        ctx.lineTo(0, o.h / 2 + 22);
         ctx.lineTo(-o.w / 2 - 2, o.h / 2 + 4);
         ctx.closePath();
         ctx.fill();
 
-        ctx.strokeStyle = 'rgba(255,255,255,0.11)';
-        ctx.lineWidth = 2;
-        const shingleStep = o.variant === 'mansion' ? 54 : 42;
+        // Shingle/tile lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1.5;
+        const shingleStep = o.variant === 'mansion' ? 48 : 38;
         for (let yy = -o.h / 2 + shingleStep; yy < o.h / 2; yy += shingleStep) {
             ctx.beginPath();
             ctx.moveTo(-o.w / 2 + 10, yy);
-            ctx.lineTo(o.w / 2 - 10, yy - 8);
+            ctx.lineTo(o.w / 2 - 10, yy - 6);
             ctx.stroke();
         }
 
+        // Ridge line
         ctx.strokeStyle = palette.ridge;
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(0, -o.h / 2 - 28);
-        ctx.lineTo(0, o.h / 2 + 20);
+        ctx.moveTo(0, -o.h / 2 - 24);
+        ctx.lineTo(0, o.h / 2 + 18);
+        ctx.stroke();
+        // Ridge highlight
+        ctx.strokeStyle = 'rgba(255,240,200,0.10)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-1, -o.h / 2 - 22);
+        ctx.lineTo(-1, o.h / 2 + 16);
         ctx.stroke();
 
+        // Window hints (faint rectangles showing rooms underneath)
+        if (o.w > 200) {
+            ctx.fillStyle = 'rgba(255, 220, 120, 0.12)';
+            const winW = Math.min(22, o.w * 0.08);
+            const winH = Math.min(18, o.h * 0.08);
+            roundRect(ctx, -o.w * 0.3, -o.h * 0.2, winW, winH, 2);
+            ctx.fill();
+            roundRect(ctx, -o.w * 0.3, o.h * 0.08, winW, winH, 2);
+            ctx.fill();
+            roundRect(ctx, o.w * 0.22, -o.h * 0.2, winW, winH, 2);
+            ctx.fill();
+            roundRect(ctx, o.w * 0.22, o.h * 0.08, winW, winH, 2);
+            ctx.fill();
+        }
+
+        // Chimney (on mansions and larger houses)
+        if (o.variant === 'mansion' || (o.w > 300 && o.variant !== 'warehouse')) {
+            const chX = o.w * 0.28;
+            const chY = -o.h / 2 - 12;
+            const chW = 18;
+            const chH = 26;
+            ctx.fillStyle = palette.chimney;
+            roundRect(ctx, chX - chW / 2, chY - chH, chW, chH, 3);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, chX - chW / 2, chY - chH, chW, chH, 3);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            ctx.fillRect(chX - chW / 2 - 2, chY - chH, chW + 4, 4);
+        }
+
+        // Door on the roof
         const door = this.doorways.find(d => d.houseId === o.id);
         if (door) {
             const doorX = door.x - o.x;
             const doorY = door.y - o.y;
             const doorW = Math.max(door.w, 86);
             const lipH = Math.max(28, door.h * 1.15);
-            ctx.fillStyle = 'rgba(12, 10, 8, 0.82)';
+            ctx.fillStyle = 'rgba(10, 8, 5, 0.84)';
             roundRect(ctx, doorX - doorW / 2, doorY - lipH / 2, doorW, lipH, 6);
             ctx.fill();
             ctx.fillStyle = palette.trim;
@@ -1936,18 +2428,25 @@ export class SurvivRenderer {
             ctx.fill();
             roundRect(ctx, doorX + doorW / 2, doorY - lipH / 2 - 5, 10, lipH + 7, 3);
             ctx.fill();
+            const entryGlow = ctx.createRadialGradient(doorX, doorY, 4, doorX, doorY, lipH * 1.2);
+            entryGlow.addColorStop(0, 'rgba(255, 210, 120, 0.22)');
+            entryGlow.addColorStop(0.5, 'rgba(255, 200, 100, 0.08)');
+            entryGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = entryGlow;
+            ctx.fillRect(doorX - doorW, doorY - lipH, doorW * 2, lipH * 2);
             ctx.fillStyle = 'rgba(236, 205, 140, 0.28)';
             roundRect(ctx, doorX - doorW / 2 + 10, doorY + lipH / 2 - 9, doorW - 20, 8, 3);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 238, 180, 0.34)';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255, 238, 180, 0.30)';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(doorX - doorW / 2 + 11, doorY - lipH / 2 + 5);
             ctx.lineTo(doorX + doorW / 2 - 11, doorY - lipH / 2 + 5);
             ctx.stroke();
         }
 
-        ctx.strokeStyle = 'rgba(12, 10, 8, 0.42)';
+        // Roof outline
+        ctx.strokeStyle = 'rgba(12, 10, 8, 0.38)';
         ctx.lineWidth = 2;
         roundRect(ctx, -o.w / 2 - 4, -o.h / 2 - 4, o.w + 8, o.h + 8, 7);
         ctx.stroke();
