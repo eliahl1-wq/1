@@ -731,7 +731,8 @@ export default function PreGame() {
     }, []);
 
     const attemptsUsed = tournament?.me?.entries || 0;
-    const attemptsRemaining = tournament?.me?.attemptsRemaining ?? 5;
+    const maxTournamentAttempts = tournament?.maxAttempts ?? 3;
+    const attemptsRemaining = tournament?.me?.attemptsRemaining ?? maxTournamentAttempts;
     const canPlayTournament = tournament?.status === 'live' && attemptsRemaining > 0;
     const tournamentStatusText = (() => {
         if (!tournament) return '';
@@ -1487,7 +1488,7 @@ export default function PreGame() {
                                         <span className="mono" style={{ color: 'var(--text-2)' }}>{attemptsRemaining} left</span>
                                     </div>
                                     <div className="tournament-attempts" style={{ margin: 0, gap: '6px' }}>
-                                        {[0, 1, 2, 3, 4].map(index => (
+                                        {Array.from({ length: maxTournamentAttempts }, (_, index) => (
                                             <span key={index} className={`tournament-attempt-dot${index < attemptsUsed ? ' tournament-attempt-dot--used' : ''}`} style={{ height: '8px' }} />
                                         ))}
                                     </div>

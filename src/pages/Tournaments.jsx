@@ -205,7 +205,7 @@ export default function Tournaments() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-2)', fontSize: '0.92rem', lineHeight: '1.6' }}>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
-                                <span>Start fee is <strong>$1.00</strong> per attempt. You can play a maximum of <strong>5 attempts</strong>.</span>
+                                <span>Start fee is <strong>$1.00</strong> per attempt. You can play a maximum of <strong>{selectedRulesTournament.maxAttempts} attempts</strong>.</span>
                             </div>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
@@ -217,7 +217,7 @@ export default function Tournaments() {
                             </div>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
-                                <span>Your total score is the sum of all your banked cashouts across the 5 runs.</span>
+                                <span>Your total score is the sum of all your banked cashouts across the {selectedRulesTournament.maxAttempts} runs.</span>
                             </div>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
