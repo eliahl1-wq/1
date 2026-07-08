@@ -907,37 +907,37 @@ export class SurvivRenderer {
      * plus sweep rays for smooth edges.
      */
     _buildVisibilityPolygon(px, py, segments, maxDist) {
-        // Collect unique angles to all segment endpoints
+        // All angles normalized to [0, 2π]
+        const normalize = a => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         const angles = new Set();
 
-        // Add sweep rays for smooth coverage
-        const sweepCount = 128;
+        // Add sweep rays for smooth coverage between wall corners
+        const sweepCount = 256;
         for (let i = 0; i < sweepCount; i++) {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
 
-        // Cast toward each segment endpoint (with tiny offsets for precision)
+        // Cast toward each nearby segment endpoint (with tiny offsets for precision)
         const epsilon = 0.00005;
         const epRangeSq = (maxDist + 200) * (maxDist + 200);
         for (const s of segments) {
-            // Only cast toward endpoints within vision range
             const d1sq = (s.ax - px) * (s.ax - px) + (s.ay - py) * (s.ay - py);
             const d2sq = (s.bx - px) * (s.bx - px) + (s.by - py) * (s.by - py);
             if (d1sq < epRangeSq) {
-                const a1 = Math.atan2(s.ay - py, s.ax - px);
-                angles.add(a1 - epsilon);
+                const a1 = normalize(Math.atan2(s.ay - py, s.ax - px));
+                angles.add(normalize(a1 - epsilon));
                 angles.add(a1);
-                angles.add(a1 + epsilon);
+                angles.add(normalize(a1 + epsilon));
             }
             if (d2sq < epRangeSq) {
-                const a2 = Math.atan2(s.by - py, s.bx - px);
-                angles.add(a2 - epsilon);
+                const a2 = normalize(Math.atan2(s.by - py, s.bx - px));
+                angles.add(normalize(a2 - epsilon));
                 angles.add(a2);
-                angles.add(a2 + epsilon);
+                angles.add(normalize(a2 + epsilon));
             }
         }
 
-        // Cast rays and sort by angle
+        // Sort all angles 0 → 2π, then cast rays
         const sortedAngles = [...angles].sort((a, b) => a - b);
         const polygon = [];
         for (const angle of sortedAngles) {
@@ -948,62 +948,51 @@ export class SurvivRenderer {
     }
 
     /**
-     * Draw Among Us-style line-of-sight shadows.
-     * Covers everything outside the player's visibility polygon with darkness.
+     * Draw Among Us-style line-of-sight shadows using even-odd fill.
+     * A large outer rectangle + the visibility polygon are drawn with 'evenodd'
+     * fill rule, so only the area OUTSIDE the polygon is filled with darkness.
      */
     drawLineOfSightShadow(ctx, camX, camY, viewW, viewH, z) {
         if (!this.me) return;
 
         const px = this.me.x;
         const py = this.me.y;
-        const maxDist = 900; // Max vision radius
+        const maxDist = 900;
 
-        // Gather wall segments near camera
         const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z);
-
-        // Build visibility polygon
         const polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
         if (polygon.length < 3) return;
 
         ctx.save();
 
-        // Draw full-screen shadow overlay
-        const ext = viewW / z + viewH / z + 500;
-        ctx.fillStyle = 'rgba(8, 10, 14, 0.82)';
-        ctx.fillRect(camX - ext, camY - ext, ext * 2, ext * 2);
+        // Shadow color — dark but not pitch black, like Among Us
+        ctx.fillStyle = 'rgba(8, 10, 14, 0.78)';
 
-        // Cut out the visibility polygon
-        ctx.globalCompositeOperation = 'destination-out';
-
-        // Create a radial gradient for soft edges (fades at vision limit)
-        const grad = ctx.createRadialGradient(px, py, 0, px, py, maxDist);
-        grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-        grad.addColorStop(0.55, 'rgba(0, 0, 0, 1)');
-        grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.7)');
-        grad.addColorStop(0.92, 'rgba(0, 0, 0, 0.35)');
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = grad;
-
-        // Draw visibility polygon as path
+        // Build a single path: big outer rect + visibility polygon
+        // Even-odd fill rule means the overlap (the polygon) punches a hole in the rect
+        const ext = (viewW + viewH) / z + 1000;
         ctx.beginPath();
+        // Outer rectangle (the dark overlay covering the whole world)
+        ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
+        // Visibility polygon (wound opposite direction — but evenodd handles it regardless)
         ctx.moveTo(polygon[0].x, polygon[0].y);
         for (let i = 1; i < polygon.length; i++) {
             ctx.lineTo(polygon[i].x, polygon[i].y);
         }
         ctx.closePath();
-        ctx.fill();
+        ctx.fill('evenodd');
 
-        // Add a small bright glow right around the player for extra visibility
-        ctx.globalCompositeOperation = 'destination-out';
-        const innerGlow = ctx.createRadialGradient(px, py, 0, px, py, 120);
-        innerGlow.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
-        innerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = innerGlow;
+        // Soft radial fade at the edge of vision
+        // Use destination-out on a SEPARATE save so it only erases from what we just drew
+        // Instead, draw an additive dark ring just outside the polygon edge
+        const edgeGrad = ctx.createRadialGradient(px, py, maxDist * 0.7, px, py, maxDist * 1.1);
+        edgeGrad.addColorStop(0, 'rgba(8, 10, 14, 0)');
+        edgeGrad.addColorStop(1, 'rgba(8, 10, 14, 0.5)');
+        ctx.fillStyle = edgeGrad;
         ctx.beginPath();
-        ctx.arc(px, py, 120, 0, Math.PI * 2);
+        ctx.arc(px, py, maxDist * 1.1, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
     }
 
@@ -1109,7 +1098,7 @@ export class SurvivRenderer {
         for (const o of this.sortedWorldObstacles) {
             if (this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
-        this.drawRoomShadows(ctx, currentHouse, currentRoom);
+        // Only use the new LOS shadow system (replaces old room shadows)
         this.drawLineOfSightShadow(ctx, camX, camY, W, H, z);
 
         // Draw zone (gas circle)
