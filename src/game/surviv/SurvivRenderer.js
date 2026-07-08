@@ -703,6 +703,9 @@ export class SurvivRenderer {
         if (!house) return false;
         if (!currentHouse || house.id !== currentHouse.id) return true;
         if (!this.usesInteriorFog(currentHouse)) return false;
+        // Houses with no rooms — never hide anything
+        const hasRooms = this.roomZones.some(r => r.houseId === currentHouse.id);
+        if (!hasRooms) return false;
         if (!currentRoom) return false;
         const room = this.findRoomContainingPoint(x, y, house);
         if (!room || room.id === currentRoom.id) return false;
@@ -719,7 +722,9 @@ export class SurvivRenderer {
         if (o.kind === 'furniture') {
             if (!o._insideHouseId) return true;
             if (!currentHouse || currentHouse.id !== o._insideHouseId) return false;
-            return !currentRoom || !o._insideRoomId || o._insideRoomId === currentRoom.id;
+            // Small houses have no rooms — always show all contents
+            if (!o._insideRoomId) return true;
+            return !currentRoom || o._insideRoomId === currentRoom.id;
         }
         return true;
     }
@@ -791,6 +796,214 @@ export class SurvivRenderer {
         ctx.lineWidth = 1.5;
         roundRect(ctx, currentRoom.x - currentRoom.w / 2, currentRoom.y - currentRoom.h / 2, currentRoom.w, currentRoom.h, 12);
         ctx.stroke();
+        ctx.restore();
+    }
+
+    // ── Among Us-style Line-of-Sight Shadow System ──────────────────────────
+
+    /**
+     * Gather wall segments (edges of rectangles) from all solid obstacles
+     * that should block line of sight.
+     */
+    _gatherWallSegments(camX, camY, viewW, viewH, z) {
+        const margin = 200;
+        const halfW = viewW / z / 2 + margin;
+        const halfH = viewH / z / 2 + margin;
+        const minX = camX - halfW;
+        const maxX = camX + halfW;
+        const minY = camY - halfH;
+        const maxY = camY + halfH;
+
+        const segments = [];
+        const blockingKinds = new Set(['wall', 'interiorWall', 'container', 'crate']);
+
+        for (const o of this.obstacles) {
+            if (!blockingKinds.has(o.kind)) continue;
+            // Cull obstacles far from camera
+            if (o.x + o.w / 2 < minX || o.x - o.w / 2 > maxX) continue;
+            if (o.y + o.h / 2 < minY || o.y - o.h / 2 > maxY) continue;
+
+            const hw = o.w / 2;
+            const hh = o.h / 2;
+            const corners = [
+                { x: o.x - hw, y: o.y - hh },
+                { x: o.x + hw, y: o.y - hh },
+                { x: o.x + hw, y: o.y + hh },
+                { x: o.x - hw, y: o.y + hh },
+            ];
+            // 4 edges of the rectangle
+            segments.push(
+                { ax: corners[0].x, ay: corners[0].y, bx: corners[1].x, by: corners[1].y },
+                { ax: corners[1].x, ay: corners[1].y, bx: corners[2].x, by: corners[2].y },
+                { ax: corners[2].x, ay: corners[2].y, bx: corners[3].x, by: corners[3].y },
+                { ax: corners[3].x, ay: corners[3].y, bx: corners[0].x, by: corners[0].y },
+            );
+        }
+
+        // Also add tree trunks as blocking segments (approximate as octagon)
+        for (const o of this.obstacles) {
+            if (o.kind !== 'tree') continue;
+            if (o.x + o.w / 2 < minX || o.x - o.w / 2 > maxX) continue;
+            if (o.y + o.h / 2 < minY || o.y - o.h / 2 > maxY) continue;
+            const r = Math.min(o.w, o.h) * 0.32; // trunk radius (smaller than visual canopy)
+            const sides = 6;
+            for (let i = 0; i < sides; i++) {
+                const a1 = (Math.PI * 2 * i) / sides;
+                const a2 = (Math.PI * 2 * (i + 1)) / sides;
+                segments.push({
+                    ax: o.x + Math.cos(a1) * r,
+                    ay: o.y + Math.sin(a1) * r,
+                    bx: o.x + Math.cos(a2) * r,
+                    by: o.y + Math.sin(a2) * r,
+                });
+            }
+        }
+
+        // Add world border segments
+        const wh = this.worldHalf;
+        segments.push(
+            { ax: -wh, ay: -wh, bx: wh, by: -wh },
+            { ax: wh, ay: -wh, bx: wh, by: wh },
+            { ax: wh, ay: wh, bx: -wh, by: wh },
+            { ax: -wh, ay: wh, bx: -wh, by: -wh },
+        );
+
+        return segments;
+    }
+
+    /**
+     * Ray-segment intersection.
+     * Returns parameter t along the ray (0 = origin, 1+ = distance).
+     * Returns Infinity if no intersection.
+     */
+    _raySegmentIntersect(rx, ry, rdx, rdy, ax, ay, bx, by) {
+        const dx = bx - ax;
+        const dy = by - ay;
+        const denom = rdx * dy - rdy * dx;
+        if (Math.abs(denom) < 1e-10) return Infinity;
+        const t = ((ax - rx) * dy - (ay - ry) * dx) / denom;
+        const u = ((ax - rx) * rdy - (ay - ry) * rdx) / denom;
+        if (t >= 0 && u >= 0 && u <= 1) return t;
+        return Infinity;
+    }
+
+    /**
+     * Cast a single ray from (px,py) at angle, returning the closest intersection point.
+     */
+    _castRay(px, py, angle, segments, maxDist) {
+        const rdx = Math.cos(angle);
+        const rdy = Math.sin(angle);
+        let closest = maxDist;
+        for (let i = 0; i < segments.length; i++) {
+            const s = segments[i];
+            const t = this._raySegmentIntersect(px, py, rdx, rdy, s.ax, s.ay, s.bx, s.by);
+            if (t < closest) closest = t;
+        }
+        return { x: px + rdx * closest, y: py + rdy * closest };
+    }
+
+    /**
+     * Build the visibility polygon by casting rays toward all wall endpoints
+     * plus sweep rays for smooth edges.
+     */
+    _buildVisibilityPolygon(px, py, segments, maxDist) {
+        // Collect unique angles to all segment endpoints
+        const angles = new Set();
+
+        // Add sweep rays for smooth coverage
+        const sweepCount = 128;
+        for (let i = 0; i < sweepCount; i++) {
+            angles.add((Math.PI * 2 * i) / sweepCount);
+        }
+
+        // Cast toward each segment endpoint (with tiny offsets for precision)
+        const epsilon = 0.00005;
+        const epRangeSq = (maxDist + 200) * (maxDist + 200);
+        for (const s of segments) {
+            // Only cast toward endpoints within vision range
+            const d1sq = (s.ax - px) * (s.ax - px) + (s.ay - py) * (s.ay - py);
+            const d2sq = (s.bx - px) * (s.bx - px) + (s.by - py) * (s.by - py);
+            if (d1sq < epRangeSq) {
+                const a1 = Math.atan2(s.ay - py, s.ax - px);
+                angles.add(a1 - epsilon);
+                angles.add(a1);
+                angles.add(a1 + epsilon);
+            }
+            if (d2sq < epRangeSq) {
+                const a2 = Math.atan2(s.by - py, s.bx - px);
+                angles.add(a2 - epsilon);
+                angles.add(a2);
+                angles.add(a2 + epsilon);
+            }
+        }
+
+        // Cast rays and sort by angle
+        const sortedAngles = [...angles].sort((a, b) => a - b);
+        const polygon = [];
+        for (const angle of sortedAngles) {
+            polygon.push(this._castRay(px, py, angle, segments, maxDist));
+        }
+
+        return polygon;
+    }
+
+    /**
+     * Draw Among Us-style line-of-sight shadows.
+     * Covers everything outside the player's visibility polygon with darkness.
+     */
+    drawLineOfSightShadow(ctx, camX, camY, viewW, viewH, z) {
+        if (!this.me) return;
+
+        const px = this.me.x;
+        const py = this.me.y;
+        const maxDist = 900; // Max vision radius
+
+        // Gather wall segments near camera
+        const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z);
+
+        // Build visibility polygon
+        const polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
+        if (polygon.length < 3) return;
+
+        ctx.save();
+
+        // Draw full-screen shadow overlay
+        const ext = viewW / z + viewH / z + 500;
+        ctx.fillStyle = 'rgba(8, 10, 14, 0.82)';
+        ctx.fillRect(camX - ext, camY - ext, ext * 2, ext * 2);
+
+        // Cut out the visibility polygon
+        ctx.globalCompositeOperation = 'destination-out';
+
+        // Create a radial gradient for soft edges (fades at vision limit)
+        const grad = ctx.createRadialGradient(px, py, 0, px, py, maxDist);
+        grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        grad.addColorStop(0.55, 'rgba(0, 0, 0, 1)');
+        grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.7)');
+        grad.addColorStop(0.92, 'rgba(0, 0, 0, 0.35)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+
+        // Draw visibility polygon as path
+        ctx.beginPath();
+        ctx.moveTo(polygon[0].x, polygon[0].y);
+        for (let i = 1; i < polygon.length; i++) {
+            ctx.lineTo(polygon[i].x, polygon[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Add a small bright glow right around the player for extra visibility
+        ctx.globalCompositeOperation = 'destination-out';
+        const innerGlow = ctx.createRadialGradient(px, py, 0, px, py, 120);
+        innerGlow.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+        innerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = innerGlow;
+        ctx.beginPath();
+        ctx.arc(px, py, 120, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
     }
 
@@ -897,6 +1110,7 @@ export class SurvivRenderer {
             if (this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
         this.drawRoomShadows(ctx, currentHouse, currentRoom);
+        this.drawLineOfSightShadow(ctx, camX, camY, W, H, z);
 
         // Draw zone (gas circle)
         this.drawZone(ctx);
@@ -1092,39 +1306,70 @@ export class SurvivRenderer {
 
         if (kind === 'river') {
             ctx.shadowBlur = 0;
-            // Animated water surface
             const t = Date.now() / 1200;
-            const waterGrad = ctx.createLinearGradient(-o.w / 2, 0, o.w / 2, 0);
-            waterGrad.addColorStop(0, 'rgba(38, 82, 108, 0.62)');
-            waterGrad.addColorStop(0.3, 'rgba(44, 98, 128, 0.58)');
-            waterGrad.addColorStop(0.7, 'rgba(38, 88, 118, 0.60)');
-            waterGrad.addColorStop(1, 'rgba(34, 78, 104, 0.62)');
-            ctx.fillStyle = waterGrad;
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, o.h * 0.35);
+            const capR = o.h * 0.35;
+
+            // 1. Draw Sandy Shoreline Bank (slightly wider than water body)
+            ctx.fillStyle = '#dbbf8a'; // Natural sand color
+            ctx.strokeStyle = '#2c461d'; // Dark grass-edge outline
+            ctx.lineWidth = 2.5;
+            roundRect(ctx, -o.w / 2 - 8, -o.h / 2 - 12, o.w + 16, o.h + 24, capR + 12);
             ctx.fill();
-            // Subtle wave highlights
-            ctx.strokeStyle = 'rgba(160, 210, 230, 0.14)';
+            ctx.stroke();
+
+            // 2. Draw River Water Body
+            const waterGrad = ctx.createLinearGradient(-o.w / 2, 0, o.w / 2, 0);
+            waterGrad.addColorStop(0, 'rgba(28, 72, 98, 0.95)');
+            waterGrad.addColorStop(0.3, 'rgba(34, 88, 118, 0.92)');
+            waterGrad.addColorStop(0.7, 'rgba(32, 84, 112, 0.94)');
+            waterGrad.addColorStop(1, 'rgba(28, 72, 98, 0.95)');
+            ctx.fillStyle = waterGrad;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, capR);
+            ctx.fill();
+
+            // 3. Shoreline Foam FX (animated dashed ripples)
+            ctx.save();
+            ctx.setLineDash([22, 34]);
+            
+            // Outer foam layer (close to edge)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+            ctx.lineWidth = 2.5;
+            ctx.lineDashOffset = (Date.now() / 60) % 56;
+            roundRect(ctx, -o.w / 2 + 5, -o.h / 2 + 5, o.w - 10, o.h - 10, Math.max(2, capR - 5));
+            ctx.stroke();
+
+            // Inner foam layer (drifting opposite)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
             ctx.lineWidth = 1.5;
-            for (let i = 0; i < 5; i++) {
-                const waveY = -o.h * 0.3 + i * o.h * 0.15;
-                const wavePhase = t + i * 0.7;
+            ctx.lineDashOffset = -(Date.now() / 90) % 56;
+            roundRect(ctx, -o.w / 2 + 15, -o.h / 2 + 15, o.w - 30, o.h - 30, Math.max(2, capR - 15));
+            ctx.stroke();
+            ctx.restore();
+
+            // 4. Flowing River Waves (clipped inside water body)
+            ctx.save();
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, capR);
+            ctx.clip();
+
+            ctx.strokeStyle = 'rgba(165, 220, 240, 0.18)';
+            ctx.lineWidth = 2;
+            const flowT = Date.now() / 1000;
+            // Draw multiple Bezier wave segments drifting along the river
+            for (let i = 0; i < 4; i++) {
+                const waveY = -o.h * 0.28 + i * o.h * 0.19;
+                const phase = flowT * 1.4 + i * 1.8;
+                const slideX = ((Date.now() / 24 + i * 220) % (o.w * 0.95)) - o.w * 0.48;
+                
                 ctx.beginPath();
-                ctx.moveTo(-o.w * 0.4, waveY);
-                ctx.quadraticCurveTo(
-                    -o.w * 0.15, waveY + Math.sin(wavePhase) * 6,
-                    0, waveY + Math.sin(wavePhase + 1) * 4
-                );
-                ctx.quadraticCurveTo(
-                    o.w * 0.15, waveY + Math.sin(wavePhase + 2) * 6,
-                    o.w * 0.4, waveY
+                ctx.moveTo(slideX, waveY);
+                ctx.bezierCurveTo(
+                    slideX + o.w * 0.08, waveY + Math.sin(phase) * 5,
+                    slideX + o.w * 0.16, waveY + Math.cos(phase) * 5,
+                    slideX + o.w * 0.24, waveY
                 );
                 ctx.stroke();
             }
-            // Soft edge glow
-            ctx.strokeStyle = 'rgba(120, 180, 200, 0.12)';
-            ctx.lineWidth = 4;
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, o.h * 0.35);
-            ctx.stroke();
+            ctx.restore();
         } else if (kind === 'bridge') {
             ctx.shadowBlur = 3;
             ctx.shadowOffsetY = 4;
@@ -1160,67 +1405,185 @@ export class SurvivRenderer {
             ctx.stroke();
         } else if (kind === 'road') {
             ctx.shadowBlur = 0;
+            
+            const isHorizontal = o.w > o.h;
+            let leftCut = 0;
+            let rightCut = 0;
+            let topCut = 0;
+            let bottomCut = 0;
+
+            if (this.surfaceObstacles) {
+                const myLeft = o.x - o.w / 2;
+                const myRight = o.x + o.w / 2;
+                const myTop = o.y - o.h / 2;
+                const myBottom = o.y + o.h / 2;
+
+                for (const other of this.surfaceObstacles) {
+                    if (other.kind !== 'road' || other.id === o.id) continue;
+                    const otherH = other.w > other.h;
+                    
+                    if (isHorizontal && !otherH) { // Horizontal intersecting vertical
+                        const otherLeft = other.x - other.w / 2;
+                        const otherRight = other.x + other.w / 2;
+                        const otherTop = other.y - other.h / 2;
+                        const otherBottom = other.y + other.h / 2;
+
+                        if (myLeft >= otherLeft - 10 && myLeft <= otherRight + 10 && o.y >= otherTop && o.y <= otherBottom) {
+                            leftCut = Math.max(leftCut, otherRight - myLeft);
+                        }
+                        if (myRight >= otherLeft - 10 && myRight <= otherRight + 10 && o.y >= otherTop && o.y <= otherBottom) {
+                            rightCut = Math.max(rightCut, myRight - otherLeft);
+                        }
+                    } else if (!isHorizontal && otherH) { // Vertical intersecting horizontal
+                        const otherLeft = other.x - other.w / 2;
+                        const otherRight = other.x + other.w / 2;
+                        const otherTop = other.y - other.h / 2;
+                        const otherBottom = other.y + other.h / 2;
+
+                        if (myTop >= otherTop - 10 && myTop <= otherBottom + 10 && o.x >= otherLeft && o.x <= otherRight) {
+                            topCut = Math.max(topCut, otherBottom - myTop);
+                        }
+                        if (myBottom >= otherTop - 10 && myBottom <= otherBottom + 10 && o.x >= otherLeft && o.x <= otherRight) {
+                            bottomCut = Math.max(bottomCut, myBottom - otherTop);
+                        }
+                    }
+                }
+            }
+
             if (o.variant === 'asphalt') {
-                // Asphalt road with gradient
-                const roadGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
-                roadGrad.addColorStop(0, 'rgba(55, 58, 52, 0.78)');
-                roadGrad.addColorStop(0.5, 'rgba(65, 68, 60, 0.76)');
-                roadGrad.addColorStop(1, 'rgba(55, 58, 52, 0.78)');
-                ctx.fillStyle = roadGrad;
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 8);
+                // 1. Draw Gravel/Dirt Shoulder (slightly wider than road)
+                ctx.fillStyle = '#655745';
+                if (isHorizontal) {
+                    roundRect(ctx, -o.w / 2, -o.h / 2 - 12, o.w, o.h + 24, 10);
+                } else {
+                    roundRect(ctx, -o.w / 2 - 12, -o.h / 2, o.w + 24, o.h, 10);
+                }
                 ctx.fill();
-                // Center dashed line
-                ctx.strokeStyle = 'rgba(255, 220, 80, 0.16)';
+
+                // 2. Draw Asphalt Surface
+                ctx.fillStyle = '#2b2c28'; // Dark asphalt gray
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
+                ctx.fill();
+
+                // Faint asphalt cracks
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+                ctx.lineWidth = 1;
+                const seedVal = Math.round(o.x + o.y);
+                if (seedVal % 3 === 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(-o.w * 0.25, -o.h * 0.1);
+                    ctx.lineTo(-o.w * 0.2, o.h * 0.1);
+                    ctx.lineTo(-o.w * 0.18, o.h * 0.05);
+                    ctx.stroke();
+                }
+                if (seedVal % 5 === 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(o.w * 0.15, o.h * 0.25);
+                    ctx.lineTo(o.w * 0.22, o.h * 0.18);
+                    ctx.lineTo(o.w * 0.26, o.h * 0.32);
+                    ctx.stroke();
+                }
+
+                // 3. Center Yellow Dashed Line
+                ctx.strokeStyle = 'rgba(235, 185, 60, 0.72)';
                 ctx.lineWidth = 2.5;
                 ctx.setLineDash([18, 14]);
                 ctx.beginPath();
-                if (o.w > o.h) {
-                    ctx.moveTo(-o.w / 2 + 20, 0);
-                    ctx.lineTo(o.w / 2 - 20, 0);
+                if (isHorizontal) {
+                    const startX = -o.w / 2 + Math.max(20, leftCut);
+                    const endX = o.w / 2 - Math.max(20, rightCut);
+                    if (startX < endX) {
+                        ctx.moveTo(startX, 0);
+                        ctx.lineTo(endX, 0);
+                    }
                 } else {
-                    ctx.moveTo(0, -o.h / 2 + 20);
-                    ctx.lineTo(0, o.h / 2 - 20);
+                    const startY = -o.h / 2 + Math.max(20, topCut);
+                    const endY = o.h / 2 - Math.max(20, bottomCut);
+                    if (startY < endY) {
+                        ctx.moveTo(0, startY);
+                        ctx.lineTo(0, endY);
+                    }
                 }
                 ctx.stroke();
                 ctx.setLineDash([]);
-                // Edge lines
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+
+                // 4. White Edge Lines
+                ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
                 ctx.lineWidth = 1.5;
-                if (o.w > o.h) {
-                    ctx.beginPath();
-                    ctx.moveTo(-o.w / 2 + 10, -o.h / 2 + 8);
-                    ctx.lineTo(o.w / 2 - 10, -o.h / 2 + 8);
-                    ctx.moveTo(-o.w / 2 + 10, o.h / 2 - 8);
-                    ctx.lineTo(o.w / 2 - 10, o.h / 2 - 8);
-                    ctx.stroke();
+                ctx.beginPath();
+                if (isHorizontal) {
+                    const startX = -o.w / 2 + Math.max(10, leftCut);
+                    const endX = o.w / 2 - Math.max(10, rightCut);
+                    if (startX < endX) {
+                        ctx.moveTo(startX, -o.h / 2 + 8);
+                        ctx.lineTo(endX, -o.h / 2 + 8);
+                        ctx.moveTo(startX, o.h / 2 - 8);
+                        ctx.lineTo(endX, o.h / 2 - 8);
+                    }
                 } else {
-                    ctx.beginPath();
-                    ctx.moveTo(-o.w / 2 + 8, -o.h / 2 + 10);
-                    ctx.lineTo(-o.w / 2 + 8, o.h / 2 - 10);
-                    ctx.moveTo(o.w / 2 - 8, -o.h / 2 + 10);
-                    ctx.lineTo(o.w / 2 - 8, o.h / 2 - 10);
-                    ctx.stroke();
+                    const startY = -o.h / 2 + Math.max(10, topCut);
+                    const endY = o.h / 2 - Math.max(10, bottomCut);
+                    if (startY < endY) {
+                        ctx.moveTo(-o.w / 2 + 8, startY);
+                        ctx.lineTo(-o.w / 2 + 8, endY);
+                        ctx.moveTo(o.w / 2 - 8, startY);
+                        ctx.lineTo(o.w / 2 - 8, endY);
+                    }
                 }
+                ctx.stroke();
+
             } else {
-                // Dirt road
-                ctx.fillStyle = 'rgba(117, 104, 76, 0.58)';
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 14);
+                // --- DIRT ROAD WITH IRREGULAR EDGES & TIRE TRACKS ---
+                ctx.fillStyle = '#7a684c';
+                ctx.beginPath();
+                const step = 28;
+                const roadId = Math.round(o.x + o.y);
+                
+                if (isHorizontal) {
+                    ctx.moveTo(-o.w / 2, -o.h / 2);
+                    for (let xx = -o.w / 2 + step; xx <= o.w / 2; xx += step) {
+                        const wobble = Math.sin(xx * 0.05 + roadId) * 5 + Math.cos(xx * 0.12) * 3;
+                        ctx.lineTo(xx, -o.h / 2 + wobble);
+                    }
+                    ctx.lineTo(o.w / 2, o.h / 2);
+                    for (let xx = o.w / 2 - step; xx >= -o.w / 2; xx -= step) {
+                        const wobble = Math.sin(xx * 0.05 - roadId) * 5 + Math.cos(xx * 0.12) * 3;
+                        ctx.lineTo(xx, o.h / 2 + wobble);
+                    }
+                    ctx.closePath();
+                } else {
+                    ctx.moveTo(o.w / 2, -o.h / 2);
+                    for (let yy = -o.h / 2 + step; yy <= o.h / 2; yy += step) {
+                        const wobble = Math.sin(yy * 0.05 + roadId) * 5 + Math.cos(yy * 0.12) * 3;
+                        ctx.lineTo(o.w / 2 + wobble, yy);
+                    }
+                    ctx.lineTo(-o.w / 2, o.h / 2);
+                    for (let yy = o.h / 2 - step; yy >= -o.h / 2; yy -= step) {
+                        const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
+                        ctx.lineTo(-o.w / 2 + wobble, yy);
+                    }
+                    ctx.closePath();
+                }
                 ctx.fill();
-                // Tire tracks
-                ctx.strokeStyle = 'rgba(80, 68, 44, 0.18)';
-                ctx.lineWidth = 3;
+
+                ctx.strokeStyle = '#524330';
+                ctx.lineWidth = 3.5;
                 const trackOff = Math.min(o.w, o.h) * 0.18;
                 ctx.beginPath();
-                if (o.w > o.h) {
-                    ctx.moveTo(-o.w / 2 + 12, -trackOff);
-                    ctx.lineTo(o.w / 2 - 12, -trackOff);
-                    ctx.moveTo(-o.w / 2 + 12, trackOff);
-                    ctx.lineTo(o.w / 2 - 12, trackOff);
+                if (isHorizontal) {
+                    const startX = -o.w / 2 + 12;
+                    const endX = o.w / 2 - 12;
+                    ctx.moveTo(startX, -trackOff);
+                    ctx.lineTo(endX, -trackOff);
+                    ctx.moveTo(startX, trackOff);
+                    ctx.lineTo(endX, trackOff);
                 } else {
-                    ctx.moveTo(-trackOff, -o.h / 2 + 12);
-                    ctx.lineTo(-trackOff, o.h / 2 - 12);
-                    ctx.moveTo(trackOff, -o.h / 2 + 12);
-                    ctx.lineTo(trackOff, o.h / 2 - 12);
+                    const startY = -o.h / 2 + 12;
+                    const endY = o.h / 2 - 12;
+                    ctx.moveTo(-trackOff, startY);
+                    ctx.lineTo(-trackOff, endY);
+                    ctx.moveTo(trackOff, startY);
+                    ctx.lineTo(trackOff, endY);
                 }
                 ctx.stroke();
             }
@@ -1246,25 +1609,65 @@ export class SurvivRenderer {
             ctx.fill();
         } else if (kind === 'water') {
             ctx.shadowBlur = 0;
-            // Water body with depth gradient
+            
+            // 1. Draw Sandy Shoreline Bank (slightly larger ellipse)
+            ctx.fillStyle = '#dbbf8a';
+            ctx.strokeStyle = '#2c461d';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, o.w / 2 + 12, o.h / 2 + 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 2. Draw Lake Water Body
             const waterGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(o.w, o.h) / 2);
-            waterGrad.addColorStop(0, 'rgba(36, 78, 104, 0.65)');
-            waterGrad.addColorStop(0.6, 'rgba(48, 96, 118, 0.55)');
-            waterGrad.addColorStop(1, 'rgba(56, 104, 122, 0.42)');
+            waterGrad.addColorStop(0, 'rgba(28, 72, 98, 0.95)');
+            waterGrad.addColorStop(0.6, 'rgba(34, 88, 118, 0.90)');
+            waterGrad.addColorStop(1, 'rgba(32, 84, 112, 0.85)');
             ctx.fillStyle = waterGrad;
             ctx.beginPath();
             ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
             ctx.fill();
-            // Shore highlight
-            ctx.strokeStyle = 'rgba(170, 210, 200, 0.16)';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            // Subtle inner ripple
-            ctx.strokeStyle = 'rgba(140, 200, 220, 0.10)';
-            ctx.lineWidth = 1;
+
+            // 3. Lake Foam FX (animated dashed ripples)
+            ctx.save();
+            ctx.setLineDash([20, 32]);
+            
+            // Outer foam circle
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+            ctx.lineWidth = 2.5;
+            ctx.lineDashOffset = (Date.now() / 70) % 52;
             ctx.beginPath();
-            ctx.ellipse(0, 0, o.w * 0.35, o.h * 0.35, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, Math.max(2, o.w / 2 - 6), Math.max(2, o.h / 2 - 6), 0, 0, Math.PI * 2);
             ctx.stroke();
+
+            // Inner foam circle
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+            ctx.lineWidth = 1.5;
+            ctx.lineDashOffset = -(Date.now() / 110) % 52;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, Math.max(2, o.w / 2 - 16), Math.max(2, o.h / 2 - 16), 0, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.restore();
+
+            // 4. Shimmering waves inside lake
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
+            ctx.clip();
+
+            ctx.strokeStyle = 'rgba(165, 220, 240, 0.14)';
+            ctx.lineWidth = 2;
+            const shimmerT = Date.now() / 1400;
+            for (let i = 0; i < 3; i++) {
+                const rx = (i - 1) * o.w * 0.2;
+                const ry = (i - 1) * o.h * 0.2 + Math.sin(shimmerT + i) * 10;
+                ctx.beginPath();
+                ctx.arc(rx, ry, Math.min(o.w, o.h) * 0.25, 0.2, 2.2);
+                ctx.stroke();
+            }
+            ctx.restore();
         } else if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
             // Floor with gradient for depth
@@ -2317,127 +2720,563 @@ export class SurvivRenderer {
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
-        const palette = o.variant === 'mansion'
-            ? { main: '#74614a', dark: '#46382c', ridge: '#8b7659', trim: '#2f261f', chimney: '#5a4a3a' }
-            : o.variant === 'warehouse'
-                ? { main: '#59686e', dark: '#344249', ridge: '#78878c', trim: '#263238', chimney: '#445058' }
-                : o.variant === 'barn'
-                    ? { main: '#783f32', dark: '#4a241f', ridge: '#985747', trim: '#2c1714', chimney: '#5c3020' }
-                    : { main: '#6c513b', dark: '#3c2b22', ridge: '#80664c', trim: '#2c211b', chimney: '#504030' };
 
-        // Drop shadow
-        ctx.shadowColor = 'rgba(10, 14, 10, 0.48)';
-        ctx.shadowBlur = 16;
-        ctx.shadowOffsetY = 10;
-        ctx.fillStyle = palette.trim;
-        roundRect(ctx, -o.w / 2 - 9, -o.h / 2 - 7, o.w + 18, o.h + 16, 8);
+        const variant = o.variant || 'house';
+        const hw = o.w / 2;
+        const hh = o.h / 2;
+        
+        // Drop shadow for the entire roof
+        ctx.shadowColor = 'rgba(10, 14, 10, 0.45)';
+        ctx.shadowBlur = 18;
+        ctx.shadowOffsetY = 12;
+        ctx.fillStyle = 'rgba(15, 12, 10, 0.6)';
+        roundRect(ctx, -hw - 10, -hh - 8, o.w + 20, o.h + 18, 9);
         ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.shadowBlur = 0; // Turn off shadows for interior details
 
-        // Roof body with gradient
-        const grad = ctx.createLinearGradient(-o.w / 2, -o.h / 2, o.w / 2, o.h / 2);
-        grad.addColorStop(0, palette.main);
-        grad.addColorStop(0.5, palette.dark);
-        grad.addColorStop(1, palette.main);
-        ctx.fillStyle = grad;
-        roundRect(ctx, -o.w / 2 - 4, -o.h / 2 - 4, o.w + 8, o.h + 8, 7);
-        ctx.fill();
+        if (variant === 'warehouse') {
+            // --- WAREHOUSE: Corrugated sheet metal roof ---
+            const mainColor = '#5c6b73';
+            const shadowColor = '#3a444a';
+            const grad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            grad.addColorStop(0, mainColor);
+            grad.addColorStop(0.5, shadowColor);
+            grad.addColorStop(1, mainColor);
+            ctx.fillStyle = grad;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 6);
+            ctx.fill();
 
-        // Roof pitch shadow overlay
-        ctx.fillStyle = 'rgba(0,0,0,0.14)';
-        ctx.beginPath();
-        ctx.moveTo(-o.w / 2 - 4, -o.h / 2 - 4);
-        ctx.lineTo(0, -o.h / 2 - 28);
-        ctx.lineTo(o.w / 2 + 4, -o.h / 2 - 4);
-        ctx.lineTo(o.w / 2 + 2, o.h / 2 + 4);
-        ctx.lineTo(0, o.h / 2 + 22);
-        ctx.lineTo(-o.w / 2 - 2, o.h / 2 + 4);
-        ctx.closePath();
-        ctx.fill();
+            // Corrugation seams (vertical sheets)
+            ctx.lineWidth = 1.5;
+            const seamStep = 18;
+            for (let xx = -hw + 6; xx < hw - 6; xx += seamStep) {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
+                ctx.beginPath();
+                ctx.moveTo(xx, -hh - 2);
+                ctx.lineTo(xx, hh + 2);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.beginPath();
+                ctx.moveTo(xx + 1.5, -hh - 2);
+                ctx.lineTo(xx + 1.5, hh + 2);
+                ctx.stroke();
+            }
 
-        // Shingle/tile lines
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        ctx.lineWidth = 1.5;
-        const shingleStep = o.variant === 'mansion' ? 48 : 38;
-        for (let yy = -o.h / 2 + shingleStep; yy < o.h / 2; yy += shingleStep) {
+            // Rust patches (grunge)
+            const rustSpots = [
+                { x: -hw * 0.4, y: -hh * 0.5, r: 24 },
+                { x: hw * 0.55, y: hh * 0.3, r: 32 },
+                { x: -hw * 0.6, y: hh * 0.4, r: 18 }
+            ];
+            rustSpots.forEach(s => {
+                const rx = s.x;
+                const ry = s.y;
+                const rr = Math.min(s.r, o.w * 0.15, o.h * 0.15);
+                if (rr > 5) {
+                    const rustGrad = ctx.createRadialGradient(rx, ry, rr * 0.1, rx, ry, rr);
+                    rustGrad.addColorStop(0, 'rgba(142, 78, 48, 0.35)');
+                    rustGrad.addColorStop(0.5, 'rgba(112, 58, 32, 0.18)');
+                    rustGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = rustGrad;
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, rr, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // Skylights (steel-framed glass panels)
+            const skyW = Math.min(60, o.w * 0.22);
+            const skyH = Math.min(40, o.h * 0.22);
+            const skylightPositions = [
+                { x: -hw * 0.45, y: -hh * 0.1 },
+                { x: hw * 0.45, y: -hh * 0.1 }
+            ];
+            skylightPositions.forEach(pos => {
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+                ctx.fillStyle = 'rgba(68, 122, 148, 0.75)';
+                roundRect(ctx, -skyW/2, -skyH/2, skyW, skyH, 3);
+                ctx.fill();
+                ctx.strokeStyle = '#2d373c';
+                ctx.lineWidth = 3;
+                roundRect(ctx, -skyW/2, -skyH/2, skyW, skyH, 3);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(-skyW/2 + 8, -skyH/2 + 4);
+                ctx.lineTo(skyW/2 - 12, skyH/2 - 4);
+                ctx.moveTo(-skyW/2 + 20, -skyH/2 + 4);
+                ctx.lineTo(skyW/2 - 4, skyH/2 - 10);
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            // Rotating Ventilation Turbines
+            const turbineRad = 16;
+            const turbinePositions = [];
+            if (o.w > 400) {
+                turbinePositions.push({ x: -hw * 0.2, y: -hh * 0.4 });
+                turbinePositions.push({ x: hw * 0.2, y: hh * 0.4 });
+            } else {
+                turbinePositions.push({ x: 0, y: -hh * 0.3 });
+            }
+            const fanAngle = (Date.now() / 420) % (Math.PI * 2);
+            turbinePositions.forEach(pos => {
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.24)';
+                ctx.beginPath();
+                ctx.arc(4, 5, turbineRad, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#414d54';
+                ctx.strokeStyle = '#22292c';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, turbineRad, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = '#181e20';
+                ctx.lineWidth = 3.5;
+                for (let b = 0; b < 5; b++) {
+                    const bladeAngle = fanAngle + (b * Math.PI * 2 / 5);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(Math.cos(bladeAngle) * (turbineRad - 3), Math.sin(bladeAngle) * (turbineRad - 3));
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#6f808a';
+                ctx.strokeStyle = '#22292c';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            ctx.strokeStyle = '#252e32';
+            ctx.lineWidth = 3.5;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 6);
+            ctx.stroke();
+
+        } else if (variant === 'mansion' || variant === 'guesthouse') {
+            // --- MANSION & GUESTHOUSE: Elegant Slate Tiles ---
+            const baseColor = variant === 'mansion' ? '#434c54' : '#495b6c';
+            const shadowColor = variant === 'mansion' ? '#2b3137' : '#313e4b';
+
+            const grad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            grad.addColorStop(0, baseColor);
+            grad.addColorStop(0.5, shadowColor);
+            grad.addColorStop(1, baseColor);
+            ctx.fillStyle = grad;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 7);
+            ctx.fill();
+
+            const tileH = 18;
+            const tileW = 22;
+            ctx.save();
+            roundRect(ctx, -hw - 2, -hh - 2, o.w + 4, o.h + 4, 6);
+            ctx.clip();
+            for (let yy = -hh + tileH; yy < hh + tileH; yy += tileH) {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(-hw, yy);
+                ctx.lineTo(hw, yy);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-hw, yy - tileH + 1);
+                ctx.lineTo(hw, yy - tileH + 1);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+                ctx.lineWidth = 1.5;
+                const shift = (Math.round((yy + hh) / tileH) % 2) * (tileW / 2);
+                for (let xx = -hw - tileW + shift; xx < hw + tileW; xx += tileW) {
+                    ctx.beginPath();
+                    ctx.moveTo(xx, yy - tileH);
+                    ctx.lineTo(xx, yy);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+
+            if (variant === 'mansion' && o.w > 300) {
+                ctx.save();
+                const domeW = o.w * 0.18;
+                const domeH = o.h * 0.25;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                roundRect(ctx, -domeW/2 + 6, -domeH/2 + 8, domeW, domeH, 6);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(48, 86, 102, 0.85)';
+                roundRect(ctx, -domeW/2, -domeH/2, domeW, domeH, 6);
+                ctx.fill();
+                ctx.strokeStyle = '#1e2428';
+                ctx.lineWidth = 3;
+                roundRect(ctx, -domeW/2, -domeH/2, domeW, domeH, 6);
+                ctx.stroke();
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-domeW/2, -domeH/2); ctx.lineTo(domeW/2, domeH/2);
+                ctx.moveTo(domeW/2, -domeH/2); ctx.lineTo(-domeW/2, domeH/2);
+                ctx.moveTo(0, -domeH/2); ctx.lineTo(0, domeH/2);
+                ctx.moveTo(-domeW/2, 0); ctx.lineTo(domeW/2, 0);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(-domeW * 0.15, -domeH * 0.15, domeW * 0.2, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            const chimPositions = [
+                { x: -hw * 0.58, y: -hh - 6 },
+                { x: hw * 0.58, y: -hh - 6 }
+            ];
+            chimPositions.forEach(pos => {
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+                const cw = 20;
+                const ch = 26;
+                ctx.fillStyle = '#8f4f3b';
+                ctx.strokeStyle = '#2b1915';
+                ctx.lineWidth = 2.5;
+                roundRect(ctx, -cw/2, -ch, cw, ch, 3);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#5c5450';
+                ctx.fillRect(-cw/2 - 3, -ch, cw + 6, 5);
+                ctx.strokeRect(-cw/2 - 3, -ch, cw + 6, 5);
+                ctx.fillStyle = '#1a1816';
+                ctx.beginPath();
+                ctx.arc(-cw * 0.22, -ch + 2.5, 3.5, 0, Math.PI * 2);
+                ctx.arc(cw * 0.22, -ch + 2.5, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            ctx.strokeStyle = variant === 'mansion' ? '#8f654b' : '#313e4b';
+            ctx.lineWidth = 3.5;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 7);
+            ctx.stroke();
+
+        } else if (variant === 'barn') {
+            // --- BARN: Gambrel Red Roof Panels ---
+            const redMain = '#883b2d';
+            const redDark = '#5c2219';
+            const redLight = '#b25745';
+
+            ctx.fillStyle = redMain;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 5);
+            ctx.fill();
+
+            const gGradLeft = ctx.createLinearGradient(-hw, 0, -hw * 0.45, 0);
+            gGradLeft.addColorStop(0, redDark);
+            gGradLeft.addColorStop(1, redMain);
+            ctx.fillStyle = gGradLeft;
+            ctx.fillRect(-hw, -hh, hw * 0.55, o.h);
+
+            const gGradRight = ctx.createLinearGradient(hw * 0.45, 0, hw, 0);
+            gGradRight.addColorStop(0, redMain);
+            gGradRight.addColorStop(1, redDark);
+            ctx.fillStyle = gGradRight;
+            ctx.fillRect(hw * 0.45, -hh, hw * 0.55, o.h);
+
+            const gGradCenter = ctx.createLinearGradient(0, -hh, 0, hh);
+            gGradCenter.addColorStop(0, redLight);
+            gGradCenter.addColorStop(0.5, redMain);
+            gGradCenter.addColorStop(1, redDark);
+            ctx.fillStyle = gGradCenter;
+            ctx.fillRect(-hw * 0.45, -hh, o.w * 0.9, o.h);
+
+            ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(-o.w / 2 + 10, yy);
-            ctx.lineTo(o.w / 2 - 10, yy - 6);
+            ctx.moveTo(-hw * 0.45, -hh); ctx.lineTo(-hw * 0.45, hh);
+            ctx.moveTo(hw * 0.45, -hh); ctx.lineTo(hw * 0.45, hh);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-hw * 0.45 + 1.5, -hh); ctx.lineTo(-hw * 0.45 + 1.5, hh);
+            ctx.moveTo(hw * 0.45 - 1.5, -hh); ctx.lineTo(hw * 0.45 - 1.5, hh);
+            ctx.stroke();
+
+            ctx.save();
+            const cupW = 32;
+            const cupH = 32;
+            ctx.fillStyle = 'rgba(0,0,0,0.28)';
+            roundRect(ctx, -cupW/2 + 4, -cupH/2 + 5, cupW, cupH, 3);
+            ctx.fill();
+            ctx.fillStyle = redDark;
+            ctx.strokeStyle = '#2b100b';
+            ctx.lineWidth = 2.5;
+            roundRect(ctx, -cupW/2, -cupH/2, cupW, cupH, 3);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#ece8e5';
+            ctx.beginPath();
+            ctx.moveTo(-cupW/2 - 3, -cupH/2);
+            ctx.lineTo(0, -cupH/2 - 12);
+            ctx.lineTo(cupW/2 + 3, -cupH/2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.strokeStyle = '#f8f5f2';
+            ctx.lineWidth = 4;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 5);
+            ctx.stroke();
+
+        } else if (variant === 'cabin') {
+            // --- CABIN: Rustic Wood Shingles & Log Corners ---
+            const mainWood = '#704f32';
+            const darkWood = '#4a321d';
+            
+            const grad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            grad.addColorStop(0, mainWood);
+            grad.addColorStop(0.5, darkWood);
+            grad.addColorStop(1, mainWood);
+            ctx.fillStyle = grad;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 4);
+            ctx.fill();
+
+            const rowH = 15;
+            const shingleW = 20;
+            ctx.save();
+            roundRect(ctx, -hw - 2, -hh - 2, o.w + 4, o.h + 4, 3);
+            ctx.clip();
+            for (let yy = -hh + rowH; yy < hh + rowH; yy += rowH) {
+                ctx.strokeStyle = 'rgba(25, 14, 6, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-hw, yy);
+                ctx.lineTo(hw, yy);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-hw, yy - rowH + 1);
+                ctx.lineTo(hw, yy - rowH + 1);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(20, 10, 5, 0.28)';
+                ctx.lineWidth = 1.5;
+                const shift = (Math.round((yy + hh) / rowH) % 2) * (shingleW / 2);
+                for (let xx = -hw - shingleW + shift; xx < hw + shingleW; xx += shingleW) {
+                    ctx.beginPath();
+                    ctx.moveTo(xx, yy - rowH);
+                    ctx.lineTo(xx, yy);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+
+            const logRad = 8;
+            const logOffset = 2;
+            const logPositions = [
+                { x: -hw - logOffset, y: -hh + logOffset },
+                { x: hw + logOffset, y: -hh + logOffset },
+                { x: -hw - logOffset, y: hh - logOffset },
+                { x: hw + logOffset, y: hh - logOffset }
+            ];
+            ctx.fillStyle = '#55371c';
+            ctx.strokeStyle = '#2b1b0d';
+            ctx.lineWidth = 1.8;
+            logPositions.forEach(pos => {
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, logRad, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, logRad * 0.5, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            const mossPatches = [
+                { x: -hw * 0.35, y: -hh * 0.32, r: 20 },
+                { x: hw * 0.22, y: hh * 0.42, r: 24 }
+            ];
+            mossPatches.forEach(m => {
+                ctx.save();
+                ctx.translate(m.x, m.y);
+                const mossGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, m.r);
+                mossGrad.addColorStop(0, 'rgba(74, 114, 52, 0.52)');
+                mossGrad.addColorStop(0.6, 'rgba(56, 92, 38, 0.28)');
+                mossGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = mossGrad;
+                ctx.beginPath();
+                ctx.arc(0, 0, m.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            ctx.strokeStyle = '#321f10';
+            ctx.lineWidth = 3.5;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 4);
+            ctx.stroke();
+
+        } else if (variant === 'garage') {
+            // --- GARAGE: Flat Tar & Gravel Roof ---
+            ctx.fillStyle = '#2d2e30';
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 5);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            for (let i = 0; i < 40; i++) {
+                const rx = -hw + seededNoise(i, 1) * o.w;
+                const ry = -hh + seededNoise(i, 2) * o.h;
+                ctx.beginPath();
+                ctx.arc(rx, ry, 1.5 + seededNoise(i, 3) * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+            for (let i = 0; i < 40; i++) {
+                const rx = -hw + seededNoise(i, 4) * o.w;
+                const ry = -hh + seededNoise(i, 5) * o.h;
+                ctx.beginPath();
+                ctx.arc(rx, ry, 1.5 + seededNoise(i, 6) * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const pipePositions = [
+                { x: -hw * 0.45, y: -hh * 0.4 },
+                { x: hw * 0.35, y: hh * 0.4 }
+            ];
+            pipePositions.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+                ctx.beginPath(); ctx.arc(3, 4, 8, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#8e989f';
+                ctx.strokeStyle = '#32373a';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#0f1011';
+                ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            });
+
+            ctx.strokeStyle = '#4e5154';
+            ctx.lineWidth = 3.5;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 5);
+            ctx.stroke();
+
+        } else {
+            // --- DEFAULT HOUSE / VILLAGE / FARM / CAMP: Terracotta Clay Tiles ---
+            const tileColor = '#c85e3a';
+            const tileShadow = '#8a3a22';
+
+            const grad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            grad.addColorStop(0, tileColor);
+            grad.addColorStop(0.5, tileShadow);
+            grad.addColorStop(1, tileColor);
+            ctx.fillStyle = grad;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 7);
+            ctx.fill();
+
+            const rowH = 14;
+            const tileW = 16;
+            ctx.save();
+            roundRect(ctx, -hw - 2, -hh - 2, o.w + 4, o.h + 4, 6);
+            ctx.clip();
+            for (let yy = -hh + rowH; yy < hh + rowH; yy += rowH) {
+                ctx.strokeStyle = 'rgba(50, 16, 8, 0.32)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-hw, yy);
+                ctx.lineTo(hw, yy);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-hw, yy - rowH + 1);
+                ctx.lineTo(hw, yy - rowH + 1);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(40, 10, 5, 0.22)';
+                ctx.lineWidth = 1.2;
+                const shift = (Math.round((yy + hh) / rowH) % 2) * (tileW / 2);
+                for (let xx = -hw - tileW + shift; xx < hw + tileW; xx += tileW) {
+                    ctx.beginPath();
+                    ctx.arc(xx + tileW/2, yy - rowH, tileW/2, 0, Math.PI);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+
+            ctx.save();
+            const chX = hw * 0.32;
+            const chY = -hh - 8;
+            const chW = 16;
+            const chH = 22;
+            ctx.fillStyle = 'rgba(0,0,0,0.22)';
+            ctx.fillRect(chX - chW/2 + 4, chY - chH + 5, chW, chH);
+            ctx.fillStyle = '#b44e32';
+            ctx.strokeStyle = '#2b1008';
+            ctx.lineWidth = 2;
+            roundRect(ctx, chX - chW/2, chY - chH, chW, chH, 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#443f3c';
+            ctx.fillRect(chX - chW/2 - 2, chY - chH, chW + 4, 3.5);
+            ctx.strokeRect(chX - chW/2 - 2, chY - chH, chW + 4, 3.5);
+            ctx.restore();
+
+            ctx.strokeStyle = '#4e1c0d';
+            ctx.lineWidth = 3.5;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 7);
             ctx.stroke();
         }
 
-        // Ridge line
-        ctx.strokeStyle = palette.ridge;
+        // --- RIDGE LINE ---
+        const ridgeColor = variant === 'warehouse' ? '#78878c' : variant === 'mansion' ? '#8b7659' : variant === 'barn' ? '#ece8e5' : '#b25032';
+        ctx.strokeStyle = ridgeColor;
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(0, -o.h / 2 - 24);
-        ctx.lineTo(0, o.h / 2 + 18);
+        ctx.moveTo(-hw + 12, 0);
+        ctx.lineTo(hw - 12, 0);
         ctx.stroke();
-        // Ridge highlight
-        ctx.strokeStyle = 'rgba(255,240,200,0.10)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(-1, -o.h / 2 - 22);
-        ctx.lineTo(-1, o.h / 2 + 16);
+        ctx.moveTo(-hw + 14, -1);
+        ctx.lineTo(hw - 14, -1);
         ctx.stroke();
 
-        // Window hints (faint rectangles showing rooms underneath)
-        if (o.w > 200) {
-            ctx.fillStyle = 'rgba(255, 220, 120, 0.12)';
-            const winW = Math.min(22, o.w * 0.08);
-            const winH = Math.min(18, o.h * 0.08);
-            roundRect(ctx, -o.w * 0.3, -o.h * 0.2, winW, winH, 2);
-            ctx.fill();
-            roundRect(ctx, -o.w * 0.3, o.h * 0.08, winW, winH, 2);
-            ctx.fill();
-            roundRect(ctx, o.w * 0.22, -o.h * 0.2, winW, winH, 2);
-            ctx.fill();
-            roundRect(ctx, o.w * 0.22, o.h * 0.08, winW, winH, 2);
-            ctx.fill();
-        }
-
-        // Chimney (on mansions and larger houses)
-        if (o.variant === 'mansion' || (o.w > 300 && o.variant !== 'warehouse')) {
-            const chX = o.w * 0.28;
-            const chY = -o.h / 2 - 12;
-            const chW = 18;
-            const chH = 26;
-            ctx.fillStyle = palette.chimney;
-            roundRect(ctx, chX - chW / 2, chY - chH, chW, chH, 3);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-            ctx.lineWidth = 1.5;
-            roundRect(ctx, chX - chW / 2, chY - chH, chW, chH, 3);
-            ctx.stroke();
-            ctx.fillStyle = 'rgba(0,0,0,0.18)';
-            ctx.fillRect(chX - chW / 2 - 2, chY - chH, chW + 4, 4);
-        }
-
-        // Door on the roof
+        // --- DOORWAY HIGHLIGHT ---
         const door = this.doorways.find(d => d.houseId === o.id);
         if (door) {
             const doorX = door.x - o.x;
             const doorY = door.y - o.y;
             const doorW = Math.max(door.w, 86);
             const lipH = Math.max(28, door.h * 1.15);
-            ctx.fillStyle = 'rgba(10, 8, 5, 0.84)';
+            
+            ctx.fillStyle = 'rgba(10, 8, 5, 0.88)';
             roundRect(ctx, doorX - doorW / 2, doorY - lipH / 2, doorW, lipH, 6);
             ctx.fill();
-            ctx.fillStyle = palette.trim;
+            
+            const trimColor = variant === 'warehouse' ? '#252e32' : variant === 'mansion' ? '#2f261f' : '#2c211b';
+            ctx.fillStyle = trimColor;
             roundRect(ctx, doorX - doorW / 2 - 10, doorY - lipH / 2 - 5, 10, lipH + 7, 3);
             ctx.fill();
             roundRect(ctx, doorX + doorW / 2, doorY - lipH / 2 - 5, 10, lipH + 7, 3);
             ctx.fill();
-            const entryGlow = ctx.createRadialGradient(doorX, doorY, 4, doorX, doorY, lipH * 1.2);
-            entryGlow.addColorStop(0, 'rgba(255, 210, 120, 0.22)');
-            entryGlow.addColorStop(0.5, 'rgba(255, 200, 100, 0.08)');
+
+            const entryGlow = ctx.createRadialGradient(doorX, doorY, 4, doorX, doorY, lipH * 1.25);
+            entryGlow.addColorStop(0, 'rgba(255, 215, 130, 0.24)');
+            entryGlow.addColorStop(0.5, 'rgba(255, 200, 110, 0.08)');
             entryGlow.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = entryGlow;
             ctx.fillRect(doorX - doorW, doorY - lipH, doorW * 2, lipH * 2);
-            ctx.fillStyle = 'rgba(236, 205, 140, 0.28)';
+
+            ctx.fillStyle = 'rgba(236, 205, 140, 0.32)';
             roundRect(ctx, doorX - doorW / 2 + 10, doorY + lipH / 2 - 9, doorW - 20, 8, 3);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 238, 180, 0.30)';
+            ctx.strokeStyle = 'rgba(255, 238, 180, 0.35)';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(doorX - doorW / 2 + 11, doorY - lipH / 2 + 5);
@@ -2445,11 +3284,6 @@ export class SurvivRenderer {
             ctx.stroke();
         }
 
-        // Roof outline
-        ctx.strokeStyle = 'rgba(12, 10, 8, 0.38)';
-        ctx.lineWidth = 2;
-        roundRect(ctx, -o.w / 2 - 4, -o.h / 2 - 4, o.w + 8, o.h + 8, 7);
-        ctx.stroke();
         ctx.restore();
     }
 
