@@ -146,6 +146,8 @@ export class SurvivRenderer {
         // Previous player states for interpolation & tracking
         this._prevPlayers = new Map();
         this._interpPlayers = new Map();
+        this._currentVisibilityPolygon = null;
+        this._currentVisibilityHouseId = null;
         // Previous HP for detecting damage
         this._prevHp = 100;
         // Previous ammo for detecting shots fired
@@ -214,6 +216,8 @@ export class SurvivRenderer {
         this.houseFloors = [];
         this.roomZones = [];
         this.doorways = [];
+        this._currentVisibilityPolygon = null;
+        this._currentVisibilityHouseId = null;
         this.surfaceObstacles = [];
         this.sortedWorldObstacles = [];
         this.myId = null;
@@ -769,10 +773,32 @@ export class SurvivRenderer {
         return this.isPointHiddenByRooms(l.x, l.y, currentHouse, currentRoom);
     }
 
+    pointInPolygon(x, y, polygon) {
+        if (!polygon || polygon.length < 3) return false;
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i].x;
+            const yi = polygon[i].y;
+            const xj = polygon[j].x;
+            const yj = polygon[j].y;
+            const intersects = ((yi > y) !== (yj > y))
+                && x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-9) + xi;
+            if (intersects) inside = !inside;
+        }
+        return inside;
+    }
+
+    isPointHiddenByLineOfSight(x, y, currentHouse) {
+        if (!currentHouse || !this.usesInteriorFog(currentHouse)) return false;
+        if (!this._currentVisibilityPolygon || this._currentVisibilityHouseId !== currentHouse.id) return false;
+        return !this.pointInPolygon(x, y, this._currentVisibilityPolygon);
+    }
+
     isPlayerHidden(p, currentHouse, currentRoom) {
         if (p.isYou || p.id === this.myId) return false;
         if (currentHouse && this.usesInteriorFog(currentHouse) && !this.findHouseContainingPoint(p.x, p.y)) return true;
-        return this.isPointHiddenByRooms(p.x, p.y, currentHouse, currentRoom);
+        if (this.isPointHiddenByRooms(p.x, p.y, currentHouse, currentRoom)) return true;
+        return this.isPointHiddenByLineOfSight(p.x, p.y, currentHouse);
     }
 
     drawRoomShadows(ctx, currentHouse, currentRoom) {
@@ -990,6 +1016,8 @@ export class SurvivRenderer {
      * fill rule, so only the area OUTSIDE the polygon is filled with darkness.
      */
     drawLineOfSightShadow(ctx, camX, camY, viewW, viewH, z) {
+        this._currentVisibilityPolygon = null;
+        this._currentVisibilityHouseId = null;
         if (!this.me) return;
         // Only apply shadows inside large houses (mansion, warehouse, hospital, etc.)
         const currentHouse = this.getCurrentHouse();
@@ -1002,6 +1030,8 @@ export class SurvivRenderer {
         const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z);
         const polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
         if (polygon.length < 3) return;
+        this._currentVisibilityPolygon = polygon;
+        this._currentVisibilityHouseId = currentHouse.id;
 
         ctx.save();
 
@@ -1259,10 +1289,10 @@ export class SurvivRenderer {
         }
         // Draw players with interpolation
         for (const p of this.players) {
-            if (this.isPlayerHidden(p, currentHouse, currentRoom)) continue;
             const isMe = p.isYou || p.id === this.myId;
             if (!isMe) {
-                // Apply interpolated positions for remote players
+                // Apply interpolated positions before visibility checks so enemies do not
+                // leak through house shadows from an older server position.
                 const ip = this._interpPlayers.get(p.id);
                 if (ip) {
                     p.x = ip.x;
@@ -1270,6 +1300,7 @@ export class SurvivRenderer {
                     p.angle = ip.angle;
                 }
             }
+            if (this.isPlayerHidden(p, currentHouse, currentRoom)) continue;
             this.drawPlayer(ctx, p);
         }
 
@@ -2473,37 +2504,46 @@ export class SurvivRenderer {
         ctx.translate(b.x, b.y);
         ctx.rotate(tail);
 
-        let trailLen = 70;
-        let thickness = 4;
+        let trailLen = 82;
+        let thickness = 5;
         let isPellet = false;
         
         const wt = b.weaponType;
         if (wt === 'shotgun') {
-            trailLen = 35;
-            thickness = 2.5;
+            trailLen = 44;
+            thickness = 3.2;
             isPellet = true;
         } else if (wt === 'sniper') {
-            trailLen = 140;
-            thickness = 4.5;
+            trailLen = 155;
+            thickness = 5.4;
         } else if (wt === 'assault' || wt === 'dmr') {
-            trailLen = 90;
-            thickness = 3.5;
+            trailLen = 105;
+            thickness = 4.4;
         } else if (wt === 'smg' || wt === 'lmg') {
-            trailLen = 65;
-            thickness = 3;
+            trailLen = 78;
+            thickness = 3.9;
         }
 
-        const redAlpha = isPellet ? 0.26 : 0.38;
-        const slugLen = isPellet ? 7 : 16;
+        const redAlpha = isPellet ? 0.42 : 0.58;
+        const slugLen = isPellet ? 10 : 20;
+
+        // Soft contrast underlay so the white/gray tracer stays readable on bright floors.
+        ctx.beginPath();
+        ctx.strokeStyle = isPellet ? 'rgba(42, 48, 50, 0.28)' : 'rgba(36, 42, 45, 0.34)';
+        ctx.lineWidth = thickness + 2.2;
+        ctx.lineCap = 'round';
+        ctx.moveTo(-trailLen * 0.72, 0);
+        ctx.lineTo(slugLen * 0.22, 0);
+        ctx.stroke();
 
         // Soft outer motion blur, mostly white/gray so the bullet sits inside the trail.
         const smokeGrad = ctx.createLinearGradient(-trailLen, 0, slugLen * 0.15, 0);
         smokeGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        smokeGrad.addColorStop(0.55, 'rgba(214, 220, 222, 0.13)');
-        smokeGrad.addColorStop(1, 'rgba(248, 252, 255, 0.42)');
+        smokeGrad.addColorStop(0.45, 'rgba(214, 220, 222, 0.22)');
+        smokeGrad.addColorStop(1, 'rgba(248, 252, 255, 0.72)');
         ctx.beginPath();
         ctx.strokeStyle = smokeGrad;
-        ctx.lineWidth = thickness + 2.4;
+        ctx.lineWidth = thickness + 3.2;
         ctx.lineCap = 'round';
         ctx.moveTo(-trailLen, 0);
         ctx.lineTo(slugLen * 0.1, 0);
@@ -2512,11 +2552,11 @@ export class SurvivRenderer {
         // Subtle red heat streak that blends into the white trail.
         const heatGrad = ctx.createLinearGradient(-trailLen * 0.46, 0, slugLen * 0.2, 0);
         heatGrad.addColorStop(0, 'rgba(255, 88, 64, 0)');
-        heatGrad.addColorStop(0.72, 'rgba(255, 92, 74, ' + (redAlpha * 0.42) + ')');
+        heatGrad.addColorStop(0.64, 'rgba(255, 92, 74, ' + (redAlpha * 0.5) + ')');
         heatGrad.addColorStop(1, 'rgba(255, 112, 92, ' + redAlpha + ')');
         ctx.beginPath();
         ctx.strokeStyle = heatGrad;
-        ctx.lineWidth = Math.max(1.2, thickness * 0.46);
+        ctx.lineWidth = Math.max(1.8, thickness * 0.62);
         ctx.lineCap = 'round';
         ctx.moveTo(-trailLen * 0.46, 0);
         ctx.lineTo(slugLen * 0.15, 0);
@@ -2524,12 +2564,12 @@ export class SurvivRenderer {
 
         // Bright front slug: no black pill, just a pale metal core with a tiny red edge.
         const slugGrad = ctx.createLinearGradient(-slugLen, 0, slugLen * 0.25, 0);
-        slugGrad.addColorStop(0, 'rgba(178, 187, 190, 0.22)');
-        slugGrad.addColorStop(0.45, 'rgba(231, 237, 238, 0.72)');
-        slugGrad.addColorStop(0.78, 'rgba(255, 255, 255, 0.92)');
-        slugGrad.addColorStop(1, 'rgba(255, 128, 105, 0.68)');
-        ctx.shadowColor = 'rgba(255, 122, 100, ' + (redAlpha * 0.55) + ')';
-        ctx.shadowBlur = isPellet ? 3 : 5;
+        slugGrad.addColorStop(0, 'rgba(178, 187, 190, 0.42)');
+        slugGrad.addColorStop(0.38, 'rgba(231, 237, 238, 0.92)');
+        slugGrad.addColorStop(0.76, 'rgba(255, 255, 255, 1)');
+        slugGrad.addColorStop(1, 'rgba(255, 118, 94, 0.9)');
+        ctx.shadowColor = 'rgba(255, 122, 100, ' + (redAlpha * 0.72) + ')';
+        ctx.shadowBlur = isPellet ? 4 : 7;
         ctx.beginPath();
         ctx.strokeStyle = slugGrad;
         ctx.lineWidth = thickness;
@@ -2539,9 +2579,18 @@ export class SurvivRenderer {
         ctx.stroke();
         ctx.shadowBlur = 0;
 
+        // Crisp center tracer: bright enough to read as the actual shot, not only blur.
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.lineWidth = Math.max(1.3, thickness * 0.28);
+        ctx.lineCap = 'round';
+        ctx.moveTo(-slugLen * 0.55, 0);
+        ctx.lineTo(slugLen * 0.32, 0);
+        ctx.stroke();
+
         ctx.fillStyle = 'rgba(255, 82, 62, ' + redAlpha + ')';
         ctx.beginPath();
-        ctx.arc(slugLen * 0.2, 0, Math.max(1.2, thickness * 0.34), 0, Math.PI * 2);
+        ctx.arc(slugLen * 0.28, 0, Math.max(1.7, thickness * 0.42), 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
@@ -2695,9 +2744,10 @@ export class SurvivRenderer {
             const thrust = punching ? Math.sin(progress * Math.PI) : 0;
             const leadTop = Math.floor(meleeStartedAt / 430) % 2 === 0;
             
-            // Fists bob forward/backward alternately when running
-            const topReach = r * (0.76 + (leadTop ? 0.92 * thrust : 0.08 * thrust)) + walkBob * 3.2;
-            const bottomReach = r * (0.76 + (!leadTop ? 0.92 * thrust : 0.08 * thrust)) - walkBob * 3.2;
+            // Keep idle fists stable while walking; only melee punches extend a hand.
+            const idleReach = r * 0.76;
+            const topReach = idleReach + r * (leadTop ? 0.92 * thrust : 0.08 * thrust);
+            const bottomReach = idleReach + r * (!leadTop ? 0.92 * thrust : 0.08 * thrust);
 
             if (punching && thrust > 0.12) {
                 ctx.save();

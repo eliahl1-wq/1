@@ -1037,15 +1037,15 @@ export default function SurvivGame() {
                                                 >
                                                     <div className="slot-number">{slotIdx + 1}</div>
                                                     {weaponId ? (
-                                                        <div className="weapon-card-content-flex" style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '100%' }}>
-                                                            <div className="weapon-card-icon-wrap" style={{ flexShrink: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
-                                                                {renderWeaponIcon(weaponId, isActive ? '#14F195' : 'rgba(255,255,255,0.7)', 28)}
+                                                        <div className="weapon-card-content-flex" style={{ display: 'flex', alignItems: 'center', gap: '7px', height: '100%', minWidth: 0, overflow: 'hidden' }}>
+                                                            <div className="weapon-card-icon-wrap" style={{ flexShrink: 0, width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+                                                                {renderWeaponIcon(weaponId, isActive ? '#14F195' : 'rgba(255,255,255,0.7)', 24)}
                                                             </div>
-                                                            <div className="weapon-card-details" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-                                                                <span className="weapon-name" style={{ fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{weaponLabel}</span>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                                            <div className="weapon-card-details" style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, overflow: 'hidden' }}>
+                                                                <span className="weapon-name" style={{ fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{weaponLabel}</span>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px', minWidth: 0, overflow: 'hidden' }}>
                                                                     <span className={`weapon-rarity-badge ${weaponRarity}`}>{weaponRarity.toUpperCase()}</span>
-                                                                    {isActive && <span className="equipped-badge" style={{ fontSize: '0.52rem', color: '#14F195', fontWeight: 900 }}>EQUIPPED</span>}
+                                                                    {isActive && <span className="equipped-badge" style={{ fontSize: '0.46rem', color: '#14F195', fontWeight: 900 }}>EQ</span>}
                                                                 </div>
                                                             </div>
                                                             {weaponId !== 'fists' && (
@@ -1056,8 +1056,8 @@ export default function SurvivGame() {
                                                                         border: '1px solid rgba(255, 59, 48, 0.3)',
                                                                         borderRadius: '3px',
                                                                         color: '#ff6b6b',
-                                                                        fontSize: '0.52rem',
-                                                                        padding: '2px 5px',
+                                                                        fontSize: '0.46rem',
+                                                                        padding: '1px 3px',
                                                                         cursor: 'pointer',
                                                                         fontWeight: 800,
                                                                         alignSelf: 'center',

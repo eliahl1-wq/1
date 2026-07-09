@@ -887,8 +887,8 @@
 
 .surviv-inventory-container {
     width: 100%;
-    max-width: 680px;
-    max-height: 450px;
+    max-width: 760px;
+    max-height: min(560px, calc(100% - 24px));
     background: rgba(8, 10, 9, 0.82);
     border: 1px solid rgba(213, 193, 142, 0.22);
     border-radius: var(--r-xl);
@@ -904,11 +904,11 @@
 
 
 .surviv-inventory-container.backpack-only {
-    max-width: 380px;
+    max-width: 460px;
 }
 
 .surviv-inventory-container.has-chest {
-    max-width: 780px;
+    max-width: 880px;
 }
 
 @keyframes inventorySlideUp {
@@ -917,7 +917,7 @@
 }
 
 .surviv-inventory-header {
-    padding: 12px 18px 10px;
+    padding: 10px 18px 8px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -967,7 +967,7 @@
 .surviv-inventory-body {
     display: flex;
     gap: 14px;
-    padding: 14px 18px;
+    padding: 12px 18px;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -1020,18 +1020,21 @@
 
 .weapons-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
 }
 
 .weapon-slot-card {
-    height: 52px;
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
     border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
     position: relative;
-    padding: 6px 10px;
+    padding: 5px 8px;
     display: flex;
+    overflow: hidden;
     flex-direction: column;
     justify-content: center;
     cursor: pointer;
@@ -1065,8 +1068,14 @@
     color: var(--text-3);
 }
 
-.weapon-card-content {
+.weapon-card-content,
+.weapon-card-content-flex {
     display: flex;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.weapon-card-content {
     flex-direction: column;
     height: 100%;
     justify-content: space-between;
@@ -1076,23 +1085,25 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .weapon-name {
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     font-weight: 700;
     color: var(--text-bright);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-right: 12px;
 }
 
 .weapon-rarity-badge {
     align-self: flex-start;
-    font-size: 0.54rem;
+    font-size: 0.46rem;
     font-weight: 800;
-    padding: 0px 3px;
+    padding: 0px 2px;
+    line-height: 1.2;
     border-radius: var(--r-xs);
 }
 
@@ -1102,7 +1113,7 @@
 
 .equipped-badge {
     align-self: flex-start;
-    font-size: 0.55rem;
+    font-size: 0.46rem;
     font-weight: 900;
     color: var(--green);
     letter-spacing: 0.5px;
@@ -1115,7 +1126,7 @@
 }
 
 .empty-slot-label {
-    font-size: 0.7rem;
+    font-size: 0.58rem;
     font-weight: 600;
     color: var(--text-3);
 }
@@ -1127,12 +1138,14 @@
 /* Consumables Grid (Tighter) */
 .items-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 }
 
 .item-slot-card {
-    height: 44px;
+    height: 42px;
+    min-height: 42px;
+    max-height: 42px;
     border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.04);
@@ -1174,6 +1187,8 @@
     display: flex;
     flex-direction: column;
     gap: 0px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .item-slot-name {
@@ -1229,7 +1244,9 @@
 }
 
 .chest-item-card {
-    height: 48px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
     border-radius: var(--r-sm);
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.04);
@@ -1269,12 +1286,17 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .chest-item-label {
-    font-size: 0.75rem;
+    font-size: 0.66rem;
     font-weight: 700;
     color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .chest-item-action {
@@ -2208,10 +2230,17 @@
         padding: 6px 12px 8px;
     }
 
-    .game-viewport--mobile.surviv-game-page .weapon-slot-card,
+    .game-viewport--mobile.surviv-game-page .weapon-slot-card {
+        height: 44px;
+        min-height: 44px;
+        max-height: 44px;
+    }
+
     .game-viewport--mobile.surviv-game-page .item-slot-card,
     .game-viewport--mobile.surviv-game-page .chest-item-card {
-        min-height: 44px;
+        height: 40px;
+        min-height: 40px;
+        max-height: 40px;
     }
 
     .game-viewport--mobile.surviv-game-page > div[style*="left: 14px"] {
