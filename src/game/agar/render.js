@@ -229,7 +229,7 @@ const drawGrid = (global, player, screen, graph, viewZoom = 1) => {
     graph.globalAlpha = 0.08;
     graph.beginPath();
 
-    const step = screen.height / 18 / viewZoom;
+    const step = 70;
     const halfW = screen.width / (2 * viewZoom);
     const halfH = screen.height / (2 * viewZoom);
     const startX = Math.floor((player.x - halfW) / step) * step;

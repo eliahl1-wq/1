@@ -5,7 +5,6 @@
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawCashoutProgressRing } from '../cashoutRing.js';
 import { drawGameMinimap } from '../minimap.js';
-import { playWeaponShootSound } from '../../audio/synthSounds.js';
 
 const WEAPON_LABELS = {
     fists: 'Fists',
@@ -275,11 +274,6 @@ export class SurvivRenderer {
             };
         };
 
-        // Track melee starts before updating players
-        const prevMeleeStarts = new Map();
-        for (const p of this.players || []) {
-            prevMeleeStarts.set(p.id, p.meleeStartedAt || 0);
-        }
 
         const rawMe = tick.you || (tick.players || []).find(p => p.isYou || p.id === this.myId);
         const me = withLocalClocks(rawMe);
@@ -301,24 +295,6 @@ export class SurvivRenderer {
                 if (Math.abs(p.walkBob) < 0.01) p.walkBob = 0;
             }
             this._prevPlayers.set(p.id, { x: p.x, y: p.y });
-        }
-
-        // Play sounds for newly triggered melee attacks
-        for (const p of this.players || []) {
-            const prevStart = prevMeleeStarts.get(p.id) || 0;
-            if (p.meleeStartedAt > prevStart) {
-                playWeaponShootSound('fists');
-            }
-        }
-
-        // Play sounds for newly spawned bullets (fired by local player, remote players, or bots)
-        const prevBulletIds = new Set((this.bullets || []).map(b => b.id));
-        if (tick.bullets) {
-            for (const b of tick.bullets) {
-                if (!prevBulletIds.has(b.id)) {
-                    playWeaponShootSound(b.weaponType || 'pistol');
-                }
-            }
         }
 
         // Track disappeared bullets for impact particles

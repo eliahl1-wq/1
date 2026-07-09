@@ -11,7 +11,6 @@ import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import MobileGameSession from '../../components/MobileGameSession';
 import SurvivMobileControls from '../../components/SurvivMobileControls';
 import { isTouchDevice } from '../../utils/mobile';
-import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
 import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
 import { stopSessionRecording } from '../../utils/mixpanel';
@@ -433,7 +432,6 @@ export default function SurvivGame() {
                 });
                 return;
             }
-            unlockGameAudio();
             if (k === 'i' || k === 'e') {
                 setIsInventoryOpen(prev => {
                     if (prev) {
@@ -465,7 +463,6 @@ export default function SurvivGame() {
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            unlockGameAudio();
             if (IS_MOBILE && e.pointerType !== 'mouse') return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
