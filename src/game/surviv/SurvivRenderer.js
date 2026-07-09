@@ -954,6 +954,9 @@ export class SurvivRenderer {
      */
     drawLineOfSightShadow(ctx, camX, camY, viewW, viewH, z) {
         if (!this.me) return;
+        // Only apply shadows inside large houses (mansion, warehouse, hospital, etc.)
+        const currentHouse = this.getCurrentHouse();
+        if (!currentHouse || !this.usesInteriorFog(currentHouse)) return;
 
         const px = this.me.x;
         const py = this.me.y;
@@ -1295,70 +1298,20 @@ export class SurvivRenderer {
 
         if (kind === 'river') {
             ctx.shadowBlur = 0;
-            const t = Date.now() / 1200;
-            const capR = o.h * 0.35;
 
-            // 1. Draw Sandy Shoreline Bank (slightly wider than water body)
-            ctx.fillStyle = '#dbbf8a'; // Natural sand color
-            ctx.strokeStyle = '#2c461d'; // Dark grass-edge outline
-            ctx.lineWidth = 2.5;
-            roundRect(ctx, -o.w / 2 - 8, -o.h / 2 - 12, o.w + 16, o.h + 24, capR + 12);
-            ctx.fill();
-            ctx.stroke();
+            // Sandy shore bank — drawn slightly wider/taller so it peeks out behind water.
+            // Plain rect (no rounding) so adjacent segments merge cleanly.
+            ctx.fillStyle = '#c9aa72';
+            ctx.fillRect(-o.w / 2 - 10, -o.h / 2 - 14, o.w + 20, o.h + 28);
 
-            // 2. Draw River Water Body
-            const waterGrad = ctx.createLinearGradient(-o.w / 2, 0, o.w / 2, 0);
-            waterGrad.addColorStop(0, 'rgba(28, 72, 98, 0.95)');
-            waterGrad.addColorStop(0.3, 'rgba(34, 88, 118, 0.92)');
-            waterGrad.addColorStop(0.7, 'rgba(32, 84, 112, 0.94)');
-            waterGrad.addColorStop(1, 'rgba(28, 72, 98, 0.95)');
-            ctx.fillStyle = waterGrad;
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, capR);
-            ctx.fill();
+            // Water body — solid flat color. Using fillRect (no rounding) so every
+            // segment blends seamlessly with its neighbours.
+            ctx.fillStyle = '#2a5e7a';
+            ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h);
 
-            // 3. Shoreline Foam FX (animated dashed ripples)
-            ctx.save();
-            ctx.setLineDash([22, 34]);
-            
-            // Outer foam layer (close to edge)
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
-            ctx.lineWidth = 2.5;
-            ctx.lineDashOffset = (Date.now() / 60) % 56;
-            roundRect(ctx, -o.w / 2 + 5, -o.h / 2 + 5, o.w - 10, o.h - 10, Math.max(2, capR - 5));
-            ctx.stroke();
-
-            // Inner foam layer (drifting opposite)
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-            ctx.lineWidth = 1.5;
-            ctx.lineDashOffset = -(Date.now() / 90) % 56;
-            roundRect(ctx, -o.w / 2 + 15, -o.h / 2 + 15, o.w - 30, o.h - 30, Math.max(2, capR - 15));
-            ctx.stroke();
-            ctx.restore();
-
-            // 4. Flowing River Waves (clipped inside water body)
-            ctx.save();
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, capR);
-            ctx.clip();
-
-            ctx.strokeStyle = 'rgba(165, 220, 240, 0.18)';
-            ctx.lineWidth = 2;
-            const flowT = Date.now() / 1000;
-            // Draw multiple Bezier wave segments drifting along the river
-            for (let i = 0; i < 4; i++) {
-                const waveY = -o.h * 0.28 + i * o.h * 0.19;
-                const phase = flowT * 1.4 + i * 1.8;
-                const slideX = ((Date.now() / 24 + i * 220) % (o.w * 0.95)) - o.w * 0.48;
-                
-                ctx.beginPath();
-                ctx.moveTo(slideX, waveY);
-                ctx.bezierCurveTo(
-                    slideX + o.w * 0.08, waveY + Math.sin(phase) * 5,
-                    slideX + o.w * 0.16, waveY + Math.cos(phase) * 5,
-                    slideX + o.w * 0.24, waveY
-                );
-                ctx.stroke();
-            }
-            ctx.restore();
+            // Subtle centerline highlight to give water depth without animation
+            ctx.fillStyle = 'rgba(80, 160, 200, 0.12)';
+            ctx.fillRect(-o.w / 2 + 4, -o.h / 2 + o.h * 0.3, o.w - 8, o.h * 0.4);
         } else if (kind === 'bridge') {
             ctx.shadowBlur = 3;
             ctx.shadowOffsetY = 4;
@@ -1598,65 +1551,25 @@ export class SurvivRenderer {
             ctx.fill();
         } else if (kind === 'water') {
             ctx.shadowBlur = 0;
-            
-            // 1. Draw Sandy Shoreline Bank (slightly larger ellipse)
-            ctx.fillStyle = '#dbbf8a';
-            ctx.strokeStyle = '#2c461d';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2 + 12, o.h / 2 + 12, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
 
-            // 2. Draw Lake Water Body
-            const waterGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(o.w, o.h) / 2);
-            waterGrad.addColorStop(0, 'rgba(28, 72, 98, 0.95)');
-            waterGrad.addColorStop(0.6, 'rgba(34, 88, 118, 0.90)');
-            waterGrad.addColorStop(1, 'rgba(32, 84, 112, 0.85)');
-            ctx.fillStyle = waterGrad;
+            // Sandy shoreline (slightly larger ellipse behind water)
+            ctx.fillStyle = '#c9aa72';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, o.w / 2 + 14, o.h / 2 + 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Water body — solid flat color matching the rivers
+            ctx.fillStyle = '#2a5e7a';
             ctx.beginPath();
             ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // 3. Lake Foam FX (animated dashed ripples)
-            ctx.save();
-            ctx.setLineDash([20, 32]);
-            
-            // Outer foam circle
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-            ctx.lineWidth = 2.5;
-            ctx.lineDashOffset = (Date.now() / 70) % 52;
+            // Subtle inner highlight ring (lighter center)
+            ctx.strokeStyle = 'rgba(80, 160, 200, 0.14)';
+            ctx.lineWidth = Math.max(2, Math.min(o.w, o.h) * 0.06);
             ctx.beginPath();
-            ctx.ellipse(0, 0, Math.max(2, o.w / 2 - 6), Math.max(2, o.h / 2 - 6), 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, o.w / 2 * 0.6, o.h / 2 * 0.6, 0, 0, Math.PI * 2);
             ctx.stroke();
-
-            // Inner foam circle
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
-            ctx.lineWidth = 1.5;
-            ctx.lineDashOffset = -(Date.now() / 110) % 52;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, Math.max(2, o.w / 2 - 16), Math.max(2, o.h / 2 - 16), 0, 0, Math.PI * 2);
-            ctx.stroke();
-            
-            ctx.restore();
-
-            // 4. Shimmering waves inside lake
-            ctx.save();
-            ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
-            ctx.clip();
-
-            ctx.strokeStyle = 'rgba(165, 220, 240, 0.14)';
-            ctx.lineWidth = 2;
-            const shimmerT = Date.now() / 1400;
-            for (let i = 0; i < 3; i++) {
-                const rx = (i - 1) * o.w * 0.2;
-                const ry = (i - 1) * o.h * 0.2 + Math.sin(shimmerT + i) * 10;
-                ctx.beginPath();
-                ctx.arc(rx, ry, Math.min(o.w, o.h) * 0.25, 0.2, 2.2);
-                ctx.stroke();
-            }
-            ctx.restore();
         } else if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
             // Floor with gradient for depth
