@@ -275,6 +275,7 @@ export class SurvivRenderer {
                 meleeUntil: meleeRemainingMs > 0
                     ? receivedAt + meleeRemainingMs
                     : player.meleeUntil || 0,
+                meleeHand: player.meleeHand || 'top',
             };
         };
 
@@ -1082,22 +1083,9 @@ export class SurvivRenderer {
         ctx.arc(px, py, maxDist * 1.1, 0, Math.PI * 2);
         ctx.fill();
 
-        // Dynamic muzzle flash light bloom inside dark houses
-        if (this._muzzleFlash > 0.05) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'destination-out';
-            const flashRadius = 140 + this._muzzleFlash * 220;
-            const flashGrad = ctx.createRadialGradient(px, py, 0, px, py, flashRadius);
-            // Strong cutout in center, fading at edges
-            flashGrad.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
-            flashGrad.addColorStop(0.4, 'rgba(0, 0, 0, 0.4)');
-            flashGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = flashGrad;
-            ctx.beginPath();
-            ctx.arc(px, py, flashRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
+        // Keep gunfire visuals separate from the house shadow mask. The weapon
+        // muzzle flash is drawn on the player, but shooting should not carve a
+        // circular light/dark bloom into indoor fog around the character.
 
         ctx.restore();
     }
@@ -1621,67 +1609,84 @@ export class SurvivRenderer {
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
 
-        // Roads are always wide (o.w is length, o.h is width) due to how addRoad works
-        const inset = o.h / 2 + 8; // Pull markings back from the ends to prevent intersection overlap
+        const isHorizontal = o.w >= o.h;
+        const length = isHorizontal ? o.w : o.h;
+        const width = isHorizontal ? o.h : o.w;
+        const inset = Math.min(68, Math.max(18, width * 0.52));
+        const start = -length / 2 + inset;
+        const end = length / 2 - inset;
+
+        const line = (a, b, offset = 0) => {
+            if (isHorizontal) {
+                ctx.moveTo(a, offset);
+                ctx.lineTo(b, offset);
+            } else {
+                ctx.moveTo(offset, a);
+                ctx.lineTo(offset, b);
+            }
+        };
 
         if (o.variant === 'asphalt') {
-            // Faint asphalt cracks
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+            // Faint asphalt cracks, rotated with the road direction.
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.34)';
             ctx.lineWidth = 1;
             const seedVal = Math.round(o.x + o.y);
+            const crackA = -length * 0.22;
+            const crackB = length * 0.18;
             if (seedVal % 3 === 0) {
                 ctx.beginPath();
-                ctx.moveTo(-o.w * 0.25, -o.h * 0.1);
-                ctx.lineTo(-o.w * 0.2, o.h * 0.1);
-                ctx.lineTo(-o.w * 0.18, o.h * 0.05);
+                if (isHorizontal) {
+                    ctx.moveTo(crackA, -width * 0.12);
+                    ctx.lineTo(crackA + 18, width * 0.08);
+                    ctx.lineTo(crackA + 28, width * 0.02);
+                } else {
+                    ctx.moveTo(-width * 0.12, crackA);
+                    ctx.lineTo(width * 0.08, crackA + 18);
+                    ctx.lineTo(width * 0.02, crackA + 28);
+                }
                 ctx.stroke();
             }
             if (seedVal % 5 === 0) {
                 ctx.beginPath();
-                ctx.moveTo(o.w * 0.15, o.h * 0.25);
-                ctx.lineTo(o.w * 0.22, o.h * 0.18);
-                ctx.lineTo(o.w * 0.26, o.h * 0.32);
+                if (isHorizontal) {
+                    ctx.moveTo(crackB, width * 0.18);
+                    ctx.lineTo(crackB + 18, width * 0.08);
+                    ctx.lineTo(crackB + 28, width * 0.22);
+                } else {
+                    ctx.moveTo(width * 0.18, crackB);
+                    ctx.lineTo(width * 0.08, crackB + 18);
+                    ctx.lineTo(width * 0.22, crackB + 28);
+                }
                 ctx.stroke();
             }
 
-            // 3. Center Yellow Dashed Line
-            const startX = -o.w / 2 + inset;
-            const endX = o.w / 2 - inset;
-            
-            if (startX < endX) {
-                ctx.strokeStyle = 'rgba(235, 185, 60, 0.72)';
+            if (start < end) {
+                // Center yellow dashed line follows the actual road direction.
+                ctx.strokeStyle = 'rgba(235, 185, 60, 0.76)';
                 ctx.lineWidth = 2.5;
-                ctx.setLineDash([18, 14]);
+                ctx.setLineDash([18, 18]);
                 ctx.beginPath();
-                ctx.moveTo(startX, 0);
-                ctx.lineTo(endX, 0);
+                line(start, end, 0);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                
-                // 4. White Edge Lines
+
+                // White edge lines on both sides, also direction-aware.
                 ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
                 ctx.lineWidth = 1.5;
+                const edge = width / 2 - 8;
                 ctx.beginPath();
-                ctx.moveTo(startX, -o.h / 2 + 8);
-                ctx.lineTo(endX, -o.h / 2 + 8);
-                ctx.moveTo(startX, o.h / 2 - 8);
-                ctx.lineTo(endX, o.h / 2 - 8);
+                line(start, end, -edge);
+                line(start, end, edge);
                 ctx.stroke();
             }
         } else {
-            // --- DIRT ROAD TIRE TRACKS ---
-            const startX = -o.w / 2 + inset;
-            const endX = o.w / 2 - inset;
-            
-            if (startX < endX) {
+            if (start < end) {
                 ctx.strokeStyle = '#524330';
                 ctx.lineWidth = 3.5;
-                const trackOff = o.h * 0.18;
+                const trackOff = width * 0.18;
                 ctx.beginPath();
-                ctx.moveTo(startX, -trackOff);
-                ctx.lineTo(endX, -trackOff);
-                ctx.moveTo(startX, trackOff);
-                ctx.lineTo(endX, trackOff);
+                line(start, end, -trackOff);
+                line(start, end, trackOff);
                 ctx.stroke();
             }
         }
@@ -2638,7 +2643,7 @@ export class SurvivRenderer {
         ctx.arc(0, 3, r * 0.7, 0.3, Math.PI - 0.3);
         ctx.fill();
 
-        this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color, p.walkBob || 0);
+        this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color, p.walkBob || 0, p.meleeHand);
 
         // Muzzle flash on self
         if (isMe && this._muzzleFlash > 0.1) {
@@ -2729,7 +2734,7 @@ export class SurvivRenderer {
         }
     }
 
-    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8', walkBob = 0) {
+    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8', walkBob = 0, meleeHand = 'top') {
         ctx.fillStyle = '#222823';
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
@@ -2742,12 +2747,14 @@ export class SurvivRenderer {
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const thrust = punching ? Math.sin(progress * Math.PI) : 0;
-            const leadTop = Math.floor(meleeStartedAt / 430) % 2 === 0;
+            const leadTop = meleeHand !== 'bottom';
             
-            // Keep idle fists stable while walking; only melee punches extend a hand.
+            // Keep one fist planted while the other punches; each melee attack
+            // alternates hands on the server so it reads as one clean swing.
             const idleReach = r * 0.76;
-            const topReach = idleReach + r * (leadTop ? 0.92 * thrust : 0.08 * thrust);
-            const bottomReach = idleReach + r * (!leadTop ? 0.92 * thrust : 0.08 * thrust);
+            const punchReach = idleReach + r * 0.98 * thrust;
+            const topReach = leadTop ? punchReach : idleReach;
+            const bottomReach = leadTop ? idleReach : punchReach;
 
             if (punching && thrust > 0.12) {
                 ctx.save();

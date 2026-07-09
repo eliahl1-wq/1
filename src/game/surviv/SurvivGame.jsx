@@ -36,6 +36,8 @@ const WEAPON_LABELS = {
     lmg: 'M249 LMG',
 };
 
+const SURVIV_WEAPON_SLOTS = [0, 1];
+
 const WEAPON_CLIP_SIZES = {
     fists: 0,
     pistol: 15,
@@ -866,7 +868,7 @@ export default function SurvivGame() {
             {/* Weapons Vertical Hotbar */}
             {gameReady && me && !showResultModal && (
                 <div className="surviv-weapons-hotbar">
-                    {[0, 1, 2, 3].map((slotIdx) => {
+                    {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
                         const weaponId = me.inventory?.weapons?.[slotIdx];
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const isActive = weaponId && weaponId === me.weapon;
@@ -1012,7 +1014,7 @@ export default function SurvivGame() {
                                 <div className="weapons-section">
                                     <h4 className="section-subtitle">WEAPONS</h4>
                                     <div className="weapons-grid">
-                                        {[0, 1, 2, 3].map((slotIdx) => {
+                                        {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
                                             const weaponId = me.inventory?.weapons?.[slotIdx];
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                                             const isActive = weaponId && weaponId === me.weapon;
