@@ -1028,8 +1028,8 @@ export class SurvivRenderer {
 
         ctx.save();
 
-        // Shadow color — dark but not pitch black, like Among Us
-        ctx.fillStyle = 'rgba(8, 10, 14, 0.78)';
+        // Shadow color - lighter and more atmospheric for the interior
+        ctx.fillStyle = 'rgba(12, 15, 22, 0.65)';
 
         // Build a single path: big outer rect + visibility polygon
         // Even-odd fill rule means the overlap (the polygon) punches a hole in the rect
@@ -1037,12 +1037,28 @@ export class SurvivRenderer {
         ctx.beginPath();
         // Outer rectangle (the dark overlay covering the whole world)
         ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
-        // Visibility polygon (wound opposite direction — but evenodd handles it regardless)
+        // Visibility polygon
         ctx.moveTo(polygon[0].x, polygon[0].y);
         for (let i = 1; i < polygon.length; i++) {
             ctx.lineTo(polygon[i].x, polygon[i].y);
         }
         ctx.closePath();
+        ctx.fill('evenodd');
+
+        // Secondary mask: Pitch black outside the house bounds!
+        // This prevents seeing out of the door when inside.
+        ctx.fillStyle = '#050608'; // Very dark outside
+        ctx.beginPath();
+        // Massive outer rectangle
+        ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
+        
+        // Hole for the house floor
+        ctx.save();
+        ctx.translate(currentHouse.x, currentHouse.y);
+        ctx.rotate(currentHouse.rotation || 0);
+        ctx.rect(-currentHouse.w / 2, -currentHouse.h / 2, currentHouse.w, currentHouse.h);
+        ctx.restore();
+        
         ctx.fill('evenodd');
 
         // Soft radial fade at the edge of vision
@@ -1199,7 +1215,7 @@ export class SurvivRenderer {
 
         // Pass 2: Draw river & lake sandy shore bases
         for (const o of this.surfaceObstacles) {
-            if ((o.kind === 'river' || o.kind === 'water') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+            if ((o.kind === 'river' || o.kind === 'water' || o.kind === 'river_path') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawObstacleShore(ctx, o);
             }
         }
@@ -1213,7 +1229,7 @@ export class SurvivRenderer {
 
         // Pass 4: Draw river & lake water bodies (seamlessly on top of shores)
         for (const o of this.surfaceObstacles) {
-            if ((o.kind === 'river' || o.kind === 'water') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+            if ((o.kind === 'river' || o.kind === 'water' || o.kind === 'river_path') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawObstacleBody(ctx, o);
             }
         }
@@ -1442,7 +1458,24 @@ export class SurvivRenderer {
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
 
-        if (kind === 'river') {
+        if (kind === 'river_path') {
+            if (o.points && o.points.length > 0) {
+                ctx.strokeStyle = '#c9aa72';
+                ctx.lineWidth = o.width + 28;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                for (let i = 0; i < o.points.length; i++) {
+                    const pt = o.points[i];
+                    // Points are in world coordinates, but we translated to o.x, o.y
+                    const lx = pt.x - o.x;
+                    const ly = pt.y - o.y;
+                    if (i === 0) ctx.moveTo(lx, ly);
+                    else ctx.lineTo(lx, ly);
+                }
+                ctx.stroke();
+            }
+        } else if (kind === 'river') {
             ctx.fillStyle = '#c9aa72';
             ctx.fillRect(-o.w / 2 - 10, -o.h / 2 - 14, o.w + 20, o.h + 28);
         } else if (kind === 'water') {
@@ -1478,7 +1511,29 @@ export class SurvivRenderer {
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
 
-        if (kind === 'river') {
+        if (kind === 'river_path') {
+            if (o.points && o.points.length > 0) {
+                // Water body
+                ctx.strokeStyle = '#2a5e7a';
+                ctx.lineWidth = o.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                for (let i = 0; i < o.points.length; i++) {
+                    const pt = o.points[i];
+                    const lx = pt.x - o.x;
+                    const ly = pt.y - o.y;
+                    if (i === 0) ctx.moveTo(lx, ly);
+                    else ctx.lineTo(lx, ly);
+                }
+                ctx.stroke();
+
+                // Centerline highlight
+                ctx.strokeStyle = 'rgba(80, 160, 200, 0.12)';
+                ctx.lineWidth = o.width * 0.4;
+                ctx.stroke();
+            }
+        } else if (kind === 'river') {
             ctx.fillStyle = '#2a5e7a';
             ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h);
 
@@ -2357,55 +2412,48 @@ export class SurvivRenderer {
         ctx.translate(b.x, b.y);
         ctx.rotate(tail);
 
-        let length = 22;
-        let thickness = 3.2;
-        let color = '#fcd04c'; // Default standard ammo yellow
+        let trailLen = 70;
+        let thickness = 4;
         let isPellet = false;
-
+        
         const wt = b.weaponType;
         if (wt === 'shotgun') {
-            length = 9;
-            thickness = 3.6;
-            color = '#e07328';
+            trailLen = 35;
+            thickness = 2.5;
             isPellet = true;
         } else if (wt === 'sniper') {
-            length = 46;
-            thickness = 4.6;
-            color = '#e23131'; // Sniper red caliber
+            trailLen = 140;
+            thickness = 4.5;
         } else if (wt === 'assault' || wt === 'dmr') {
-            length = 34;
-            thickness = 3.6;
-            color = '#fce277'; // 5.56 yellow caliber
+            trailLen = 90;
+            thickness = 3.5;
         } else if (wt === 'smg' || wt === 'lmg') {
-            length = 24;
-            thickness = 2.8;
-            color = '#ff9100'; // 9mm orange caliber
+            trailLen = 65;
+            thickness = 3;
         }
 
-        // Draw clean tracers without performance-heavy dropshadows/glows
-        if (isPellet) {
-            // Colored outer shell
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(0, 0, thickness, 0, Math.PI * 2);
-            ctx.fill();
+        // 1. Draw the white/smoke motion blur trail
+        const trailGrad = ctx.createLinearGradient(-trailLen, 0, 0, 0);
+        trailGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        trailGrad.addColorStop(1, 'rgba(255, 255, 255, 0.35)');
+        
+        ctx.beginPath();
+        ctx.strokeStyle = trailGrad;
+        ctx.lineWidth = thickness + 1;
+        ctx.lineCap = 'round';
+        ctx.moveTo(-trailLen, 0);
+        ctx.lineTo(0, 0);
+        ctx.stroke();
 
-            // White inner core
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(0, 0, thickness * 0.58, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            // Outer colored trace border
-            ctx.fillStyle = color;
-            roundRect(ctx, -length, -thickness / 2, length + 2, thickness, thickness / 2);
-            ctx.fill();
-
-            // Inner white core trace (makes it pop, like in surviv.io)
-            ctx.fillStyle = '#ffffff';
-            roundRect(ctx, -length + 2, -thickness * 0.28, length - 1, thickness * 0.56, thickness * 0.28);
-            ctx.fill();
-        }
+        // 2. Draw the actual bullet slug (dark pill at the front)
+        const slugLen = isPellet ? 6 : 14;
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(20, 20, 20, 0.85)';
+        ctx.lineWidth = thickness;
+        ctx.lineCap = 'round';
+        ctx.moveTo(-slugLen, 0);
+        ctx.lineTo(0, 0);
+        ctx.stroke();
 
         ctx.restore();
     }
