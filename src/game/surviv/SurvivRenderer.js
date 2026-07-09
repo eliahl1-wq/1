@@ -1538,8 +1538,6 @@ export class SurvivRenderer {
                     ctx.lineTo(o.w / 2 + wobble, yy);
                 }
                 ctx.lineTo(-o.w / 2, o.h / 2);
-                for (let yy = o.h / 2 - step; yy >= -o.h / 2; yy -= step) {
-                    const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
                     ctx.lineTo(-o.w / 2 + wobble, yy);
                 }
                 ctx.closePath();
@@ -1555,52 +1553,10 @@ export class SurvivRenderer {
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
 
-        const isHorizontal = o.w > o.h;
+        // Roads are always wide (o.w is length, o.h is width) due to how addRoad works
+        const inset = o.h / 2 + 8; // Pull markings back from the ends to prevent intersection overlap
 
         if (o.variant === 'asphalt') {
-            let leftCut = 0;
-            let rightCut = 0;
-            let topCut = 0;
-            let bottomCut = 0;
-
-            if (this.surfaceObstacles) {
-                const myLeft = o.x - o.w / 2;
-                const myRight = o.x + o.w / 2;
-                const myTop = o.y - o.h / 2;
-                const myBottom = o.y + o.h / 2;
-
-                for (const other of this.surfaceObstacles) {
-                    if (other.kind !== 'road' || other.id === o.id) continue;
-                    const otherH = other.w > other.h;
-                    
-                    if (isHorizontal && !otherH) { // Horizontal intersecting vertical
-                        const otherLeft = other.x - other.w / 2;
-                        const otherRight = other.x + other.w / 2;
-                        const otherTop = other.y - other.h / 2;
-                        const otherBottom = other.y + other.h / 2;
-
-                        if (myLeft >= otherLeft - 10 && myLeft <= otherRight + 10 && o.y >= otherTop && o.y <= otherBottom) {
-                            leftCut = Math.max(leftCut, otherRight - myLeft);
-                        }
-                        if (myRight >= otherLeft - 10 && myRight <= otherRight + 10 && o.y >= otherTop && o.y <= otherBottom) {
-                            rightCut = Math.max(rightCut, myRight - otherLeft);
-                        }
-                    } else if (!isHorizontal && otherH) { // Vertical intersecting horizontal
-                        const otherLeft = other.x - other.w / 2;
-                        const otherRight = other.x + other.w / 2;
-                        const otherTop = other.y - other.h / 2;
-                        const otherBottom = other.y + other.h / 2;
-
-                        if (myTop >= otherTop - 10 && myTop <= otherBottom + 10 && o.x >= otherLeft && o.x <= otherRight) {
-                            topCut = Math.max(topCut, otherBottom - myTop);
-                        }
-                        if (myBottom >= otherTop - 10 && myBottom <= otherBottom + 10 && o.x >= otherLeft && o.x <= otherRight) {
-                            bottomCut = Math.max(bottomCut, myBottom - otherTop);
-                        }
-                    }
-                }
-            }
-
             // Faint asphalt cracks
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
             ctx.lineWidth = 1;
@@ -1621,75 +1577,45 @@ export class SurvivRenderer {
             }
 
             // 3. Center Yellow Dashed Line
-            ctx.strokeStyle = 'rgba(235, 185, 60, 0.72)';
-            ctx.lineWidth = 2.5;
-            ctx.setLineDash([18, 14]);
-            ctx.beginPath();
-            if (isHorizontal) {
-                const startX = -o.w / 2 + Math.max(20, leftCut);
-                const endX = o.w / 2 - Math.max(20, rightCut);
-                if (startX < endX) {
-                    ctx.moveTo(startX, 0);
-                    ctx.lineTo(endX, 0);
-                }
-            } else {
-                const startY = -o.h / 2 + Math.max(20, topCut);
-                const endY = o.h / 2 - Math.max(20, bottomCut);
-                if (startY < endY) {
-                    ctx.moveTo(0, startY);
-                    ctx.lineTo(0, endY);
-                }
+            const startX = -o.w / 2 + inset;
+            const endX = o.w / 2 - inset;
+            
+            if (startX < endX) {
+                ctx.strokeStyle = 'rgba(235, 185, 60, 0.72)';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([18, 14]);
+                ctx.beginPath();
+                ctx.moveTo(startX, 0);
+                ctx.lineTo(endX, 0);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 4. White Edge Lines
+                ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(startX, -o.h / 2 + 8);
+                ctx.lineTo(endX, -o.h / 2 + 8);
+                ctx.moveTo(startX, o.h / 2 - 8);
+                ctx.lineTo(endX, o.h / 2 - 8);
+                ctx.stroke();
             }
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // 4. White Edge Lines
-            ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            if (isHorizontal) {
-                const startX = -o.w / 2 + Math.max(10, leftCut);
-                const endX = o.w / 2 - Math.max(10, rightCut);
-                if (startX < endX) {
-                    ctx.moveTo(startX, -o.h / 2 + 8);
-                    ctx.lineTo(endX, -o.h / 2 + 8);
-                    ctx.moveTo(startX, o.h / 2 - 8);
-                    ctx.lineTo(endX, o.h / 2 - 8);
-                }
-            } else {
-                const startY = -o.h / 2 + Math.max(10, topCut);
-                const endY = o.h / 2 - Math.max(10, bottomCut);
-                if (startY < endY) {
-                    ctx.moveTo(-o.w / 2 + 8, startY);
-                    ctx.lineTo(-o.w / 2 + 8, endY);
-                    ctx.moveTo(o.w / 2 - 8, startY);
-                    ctx.lineTo(o.w / 2 - 8, endY);
-                }
-            }
-            ctx.stroke();
-
         } else {
             // --- DIRT ROAD TIRE TRACKS ---
-            ctx.strokeStyle = '#524330';
-            ctx.lineWidth = 3.5;
-            const trackOff = Math.min(o.w, o.h) * 0.18;
-            ctx.beginPath();
-            if (isHorizontal) {
-                const startX = -o.w / 2 + 12;
-                const endX = o.w / 2 - 12;
+            const startX = -o.w / 2 + inset;
+            const endX = o.w / 2 - inset;
+            
+            if (startX < endX) {
+                ctx.strokeStyle = '#524330';
+                ctx.lineWidth = 3.5;
+                const trackOff = o.h * 0.18;
+                ctx.beginPath();
                 ctx.moveTo(startX, -trackOff);
                 ctx.lineTo(endX, -trackOff);
                 ctx.moveTo(startX, trackOff);
                 ctx.lineTo(endX, trackOff);
-            } else {
-                const startY = -o.h / 2 + 12;
-                const endY = o.h / 2 - 12;
-                ctx.moveTo(-trackOff, startY);
-                ctx.lineTo(-trackOff, endY);
-                ctx.moveTo(trackOff, startY);
-                ctx.lineTo(trackOff, endY);
+                ctx.stroke();
             }
-            ctx.stroke();
         }
         ctx.restore();
     }
@@ -2128,6 +2054,30 @@ export class SurvivRenderer {
             // Top highlight
             ctx.fillStyle = 'rgba(255,255,255,0.06)';
             ctx.fillRect(-o.w / 2 + 12, -o.h / 2 + 3, o.w - 24, 3);
+        } else if (kind === 'field') {
+            ctx.shadowBlur = 0;
+            // Fields are drawn without outlines so they merge seamlessly
+            // Background patches under POIs
+            let fillGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            if (o.variant === 'quarry') {
+                fillGrad.addColorStop(0, '#756852');
+                fillGrad.addColorStop(1, '#665943');
+            } else if (o.variant === 'industrial') {
+                fillGrad.addColorStop(0, '#5a544c');
+                fillGrad.addColorStop(1, '#4e4942');
+            } else if (o.variant === 'estate' || o.variant === 'mansion') {
+                fillGrad.addColorStop(0, '#4a6042');
+                fillGrad.addColorStop(1, '#3f5238');
+            } else if (o.variant === 'woods' || o.variant === 'camp') {
+                fillGrad.addColorStop(0, '#384d32');
+                fillGrad.addColorStop(1, '#2d4028');
+            } else {
+                fillGrad.addColorStop(0, '#586b4e');
+                fillGrad.addColorStop(1, '#4d5e44');
+            }
+            ctx.fillStyle = fillGrad;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 25);
+            ctx.fill();
         } else {
             // Fallback: generic crate
             const crateGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);

@@ -156,116 +156,114 @@ export function playWeaponShootSound(weaponType) {
 
     const t = ctx.currentTime;
     const bus = ctx.createGain();
-    bus.connect(ctx.destination);
+    
+    // Slight compression/distortion for the loud blast
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-24, t);
+    compressor.knee.setValueAtTime(10, t);
+    compressor.ratio.setValueAtTime(12, t);
+    compressor.attack.setValueAtTime(0, t);
+    compressor.release.setValueAtTime(0.25, t);
+    
+    bus.connect(compressor);
+    compressor.connect(ctx.destination);
 
-    // Default configuration values
-    let noiseDecay = 0.12;
-    let noiseVolume = 0.25;
-    let synthDecay = 0.12;
-    let synthVolume = 0.45;
-    let startHz = 240;
-    let endHz = 60;
-    let type = 'triangle';
+    let blastLen = 0.2;
+    let punchHz = 150;
+    let lowHz = 40;
+    let filterHz = 1200;
+    let isSuppressed = false;
 
     if (weaponType === 'fists') {
-        // Melee swing: soft whoosh/punch
-        noiseDecay = 0.05;
-        noiseVolume = 0.03;
-        synthDecay = 0.08;
-        synthVolume = 0.18;
-        startHz = 120;
-        endHz = 40;
-        type = 'sine';
+        blastLen = 0.08; punchHz = 120; lowHz = 40; filterHz = 300;
     } else if (weaponType === 'pistol' || weaponType === 'revolver') {
-        const isRev = weaponType === 'revolver';
-        noiseDecay = isRev ? 0.18 : 0.10;
-        noiseVolume = isRev ? 0.35 : 0.20;
-        synthDecay = isRev ? 0.16 : 0.10;
-        synthVolume = isRev ? 0.55 : 0.35;
-        startHz = isRev ? 280 : 320;
-        endHz = isRev ? 50 : 70;
-        type = 'triangle';
+        blastLen = 0.25; punchHz = 350; lowHz = 50; filterHz = 2800;
     } else if (weaponType === 'smg') {
-        noiseDecay = 0.08;
-        noiseVolume = 0.15;
-        synthDecay = 0.08;
-        synthVolume = 0.28;
-        startHz = 380;
-        endHz = 85;
-        type = 'sawtooth';
+        blastLen = 0.18; punchHz = 400; lowHz = 60; filterHz = 3200;
     } else if (weaponType === 'shotgun') {
-        noiseDecay = 0.26;
-        noiseVolume = 0.65;
-        synthDecay = 0.22;
-        synthVolume = 0.70;
-        startHz = 180;
-        endHz = 35;
-        type = 'triangle';
+        blastLen = 0.45; punchHz = 200; lowHz = 35; filterHz = 1800;
     } else if (weaponType === 'assault' || weaponType === 'dmr') {
-        const isDmr = weaponType === 'dmr';
-        noiseDecay = isDmr ? 0.22 : 0.18;
-        noiseVolume = isDmr ? 0.48 : 0.40;
-        synthDecay = isDmr ? 0.18 : 0.15;
-        synthVolume = isDmr ? 0.60 : 0.52;
-        startHz = isDmr ? 220 : 250;
-        endHz = isDmr ? 45 : 55;
-        type = 'sawtooth';
+        blastLen = 0.35; punchHz = 250; lowHz = 45; filterHz = 2400;
     } else if (weaponType === 'sniper') {
-        noiseDecay = 0.42;
-        noiseVolume = 0.78;
-        synthDecay = 0.32;
-        synthVolume = 0.85;
-        startHz = 160;
-        endHz = 30;
-        type = 'sawtooth';
+        blastLen = 0.60; punchHz = 180; lowHz = 30; filterHz = 1500;
     } else if (weaponType === 'lmg') {
-        noiseDecay = 0.16;
-        noiseVolume = 0.38;
-        synthDecay = 0.14;
-        synthVolume = 0.48;
-        startHz = 280;
-        endHz = 65;
-        type = 'sawtooth';
+        blastLen = 0.35; punchHz = 300; lowHz = 50; filterHz = 2600;
     }
 
-    // --- Noise Channel (gunshot blast crack/crackle) ---
-    if (noiseVolume > 0 && noiseDecay > 0) {
-        const noiseNode = ctx.createBufferSource();
-        noiseNode.buffer = getNoiseBuffer(ctx, Math.max(0.5, noiseDecay));
-        
-        const noiseG = ctx.createGain();
-        noiseG.gain.setValueAtTime(noiseVolume, t);
-        noiseG.gain.exponentialRampToValueAtTime(0.0001, t + noiseDecay);
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(weaponType === 'sniper' ? 2200 : weaponType === 'shotgun' ? 700 : 1200, t);
-
-        noiseNode.connect(filter);
-        filter.connect(noiseG);
-        noiseG.connect(bus);
-        
-        noiseNode.start(t);
-        noiseNode.stop(t + noiseDecay + 0.05);
-    }
-
-    // --- Synth Channel (explosive low-end thud) ---
-    if (synthVolume > 0 && synthDecay > 0) {
+    if (weaponType === 'fists') {
+        // Just a simple whoosh for fists
         const osc = ctx.createOscillator();
-        osc.type = type;
-        
-        const oscG = ctx.createGain();
-        oscG.gain.setValueAtTime(synthVolume, t);
-        oscG.gain.exponentialRampToValueAtTime(0.0001, t + synthDecay);
-
-        osc.frequency.setValueAtTime(startHz, t);
-        osc.frequency.exponentialRampToValueAtTime(Math.max(endHz, 20), t + synthDecay * 0.7);
-
-        osc.connect(oscG);
-        oscG.connect(bus);
-        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(120, t);
+        osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+        osc.connect(gain);
+        gain.connect(bus);
         osc.start(t);
-        osc.stop(t + synthDecay + 0.05);
+        osc.stop(t + 0.15);
+        return;
     }
+
+    // 1. Mechanical Firing Pin Click
+    const clickOsc = ctx.createOscillator();
+    clickOsc.type = 'square';
+    clickOsc.frequency.setValueAtTime(4000, t);
+    clickOsc.frequency.exponentialRampToValueAtTime(1000, t + 0.02);
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.15, t);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
+    clickOsc.connect(clickGain);
+    clickGain.connect(bus);
+    clickOsc.start(t);
+    clickOsc.stop(t + 0.03);
+
+    // 2. High-Pressure Transient Punch (the physical impact)
+    const punchOsc = ctx.createOscillator();
+    punchOsc.type = weaponType === 'shotgun' || weaponType === 'sniper' ? 'sawtooth' : 'triangle';
+    punchOsc.frequency.setValueAtTime(punchHz * 3, t);
+    punchOsc.frequency.exponentialRampToValueAtTime(lowHz, t + 0.08);
+    const punchGain = ctx.createGain();
+    punchGain.gain.setValueAtTime(1.2, t);
+    punchGain.gain.exponentialRampToValueAtTime(0.01, t + (weaponType === 'shotgun' ? 0.2 : 0.1));
+    punchOsc.connect(punchGain);
+    punchGain.connect(bus);
+    punchOsc.start(t);
+    punchOsc.stop(t + 0.25);
+
+    // 3. Expanding Gas Blast (Noise)
+    const noiseNode = ctx.createBufferSource();
+    noiseNode.buffer = getNoiseBuffer(ctx, blastLen + 0.2);
+    
+    // Add distortion to the noise for a harsh crack
+    const waveShaper = ctx.createWaveShaper();
+    const curve = new Float32Array(400);
+    for (let i = 0; i < 400; i++) {
+        const x = (i * 2) / 400 - 1;
+        curve[i] = (Math.PI + 5) * x / (Math.PI + 5 * Math.abs(x));
+    }
+    waveShaper.curve = curve;
+
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(filterHz, t);
+    noiseFilter.Q.setValueAtTime(0.8, t);
+    noiseFilter.frequency.exponentialRampToValueAtTime(filterHz * 0.2, t + blastLen);
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(weaponType === 'sniper' ? 1.5 : weaponType === 'shotgun' ? 1.2 : 0.8, t);
+    // Sharp crack envelope
+    noiseGain.gain.setTargetAtTime(0, t, blastLen / 4);
+
+    noiseNode.connect(noiseFilter);
+    noiseFilter.connect(waveShaper);
+    waveShaper.connect(noiseGain);
+    noiseGain.connect(bus);
+    
+    noiseNode.start(t);
+    noiseNode.stop(t + blastLen + 0.1);
+
+
 }
 
