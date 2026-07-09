@@ -771,6 +771,7 @@ export class SurvivRenderer {
 
     isPlayerHidden(p, currentHouse, currentRoom) {
         if (p.isYou || p.id === this.myId) return false;
+        if (currentHouse && this.usesInteriorFog(currentHouse) && !this.findHouseContainingPoint(p.x, p.y)) return true;
         return this.isPointHiddenByRooms(p.x, p.y, currentHouse, currentRoom);
     }
 
@@ -1021,14 +1022,17 @@ export class SurvivRenderer {
         ctx.closePath();
         ctx.fill('evenodd');
 
-        // Secondary mask: Pitch black outside the house bounds!
-        // This prevents seeing out of the door when inside.
-        ctx.fillStyle = '#050608'; // Very dark outside
+        // Outside the current building stays visible as a map, but muted enough
+        // that the interior still feels separated from the world.
+        const outsideGrad = ctx.createRadialGradient(px, py, 120, px, py, maxDist * 1.45);
+        outsideGrad.addColorStop(0, 'rgba(6, 9, 12, 0.22)');
+        outsideGrad.addColorStop(0.55, 'rgba(8, 11, 16, 0.40)');
+        outsideGrad.addColorStop(1, 'rgba(8, 11, 16, 0.54)');
+        ctx.fillStyle = outsideGrad;
         ctx.beginPath();
-        // Massive outer rectangle
         ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
         
-        // Hole for the house floor
+        // Keep the current house floor clear so the LOS polygon handles room darkness.
         ctx.save();
         ctx.translate(currentHouse.x, currentHouse.y);
         ctx.rotate(currentHouse.rotation || 0);
@@ -1653,6 +1657,107 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    getFieldPalette(variant) {
+        const palettes = {
+            quarry: { base: 'rgba(122, 109, 84, 0.46)', detail: 'rgba(90, 78, 58, 0.24)', line: 'rgba(58, 49, 35, 0.18)' },
+            industrial: { base: 'rgba(98, 92, 82, 0.34)', detail: 'rgba(68, 63, 56, 0.20)', line: 'rgba(46, 42, 36, 0.16)' },
+            ruins: { base: 'rgba(105, 99, 82, 0.30)', detail: 'rgba(74, 67, 52, 0.18)', line: 'rgba(45, 39, 30, 0.14)' },
+            crop: { base: 'rgba(78, 103, 45, 0.32)', detail: 'rgba(58, 86, 35, 0.22)', line: 'rgba(35, 67, 25, 0.22)' },
+            farm: { base: 'rgba(67, 93, 40, 0.24)', detail: 'rgba(86, 88, 43, 0.18)', line: 'rgba(44, 72, 27, 0.16)' },
+            estate: { base: 'rgba(55, 82, 50, 0.22)', detail: 'rgba(78, 101, 58, 0.14)', line: 'rgba(30, 59, 28, 0.10)' },
+            mansion: { base: 'rgba(55, 82, 50, 0.22)', detail: 'rgba(78, 101, 58, 0.14)', line: 'rgba(30, 59, 28, 0.10)' },
+            town: { base: 'rgba(58, 87, 50, 0.20)', detail: 'rgba(87, 94, 59, 0.12)', line: 'rgba(32, 62, 28, 0.10)' },
+            village: { base: 'rgba(59, 91, 48, 0.19)', detail: 'rgba(92, 101, 58, 0.12)', line: 'rgba(31, 63, 28, 0.10)' },
+            camp: { base: 'rgba(48, 76, 40, 0.20)', detail: 'rgba(73, 94, 48, 0.14)', line: 'rgba(25, 52, 23, 0.10)' },
+            woods: { base: 'rgba(42, 72, 36, 0.20)', detail: 'rgba(30, 62, 28, 0.15)', line: 'rgba(18, 45, 18, 0.08)' },
+            scrub: { base: 'rgba(62, 87, 43, 0.18)', detail: 'rgba(79, 91, 44, 0.13)', line: 'rgba(39, 64, 26, 0.08)' },
+            wetlands: { base: 'rgba(45, 76, 55, 0.20)', detail: 'rgba(40, 87, 68, 0.12)', line: 'rgba(22, 56, 45, 0.10)' },
+            'snow-woods': { base: 'rgba(118, 132, 122, 0.20)', detail: 'rgba(92, 117, 108, 0.13)', line: 'rgba(65, 91, 83, 0.10)' },
+            'snow-lab': { base: 'rgba(118, 132, 122, 0.22)', detail: 'rgba(88, 105, 101, 0.14)', line: 'rgba(62, 81, 78, 0.10)' },
+        };
+        return palettes[variant] || { base: 'rgba(58, 88, 48, 0.18)', detail: 'rgba(84, 98, 56, 0.12)', line: 'rgba(30, 60, 26, 0.09)' };
+    }
+
+    drawOrganicField(ctx, o) {
+        const hw = o.w / 2;
+        const hh = o.h / 2;
+        const palette = this.getFieldPalette(o.variant);
+        const variantSeed = String(o.variant || 'field').split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+        const steps = 10;
+
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = -hw + t * o.w;
+            const wobble = (seededNoise((o.x + x) * 0.013, (o.y - hh) * 0.013 + variantSeed) - 0.5) * 72;
+            const y = -hh + wobble;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const y = -hh + t * o.h;
+            const wobble = (seededNoise((o.x + hw) * 0.013 + variantSeed, (o.y + y) * 0.013) - 0.5) * 72;
+            ctx.lineTo(hw + wobble, y);
+        }
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const x = hw - t * o.w;
+            const wobble = (seededNoise((o.x + x) * 0.013, (o.y + hh) * 0.013 - variantSeed) - 0.5) * 72;
+            ctx.lineTo(x, hh + wobble);
+        }
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const y = hh - t * o.h;
+            const wobble = (seededNoise((o.x - hw) * 0.013 - variantSeed, (o.y + y) * 0.013) - 0.5) * 72;
+            ctx.lineTo(-hw + wobble, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = palette.base;
+        ctx.fill();
+        ctx.clip();
+
+        const detailCount = Math.max(5, Math.min(18, Math.round((o.w * o.h) / 85000)));
+        for (let i = 0; i < detailCount; i++) {
+            const n1 = seededNoise(o.x * 0.019 + i * 17.31, o.y * 0.019 + variantSeed);
+            const n2 = seededNoise(o.x * 0.017 - i * 9.77, o.y * 0.017 - variantSeed);
+            const x = -hw + n1 * o.w;
+            const y = -hh + n2 * o.h;
+            const rw = 70 + seededNoise(i + variantSeed, o.x * 0.01) * 150;
+            const rh = 20 + seededNoise(o.y * 0.01, i - variantSeed) * 56;
+            ctx.fillStyle = i % 3 === 0 ? palette.line : palette.detail;
+            ctx.beginPath();
+            ctx.ellipse(x, y, rw, rh, n1 * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        if (o.variant === 'crop') {
+            ctx.strokeStyle = palette.line;
+            ctx.lineWidth = 2.2;
+            for (let x = -hw + 18; x < hw; x += 28) {
+                ctx.beginPath();
+                ctx.moveTo(x, -hh + 10);
+                ctx.lineTo(x + 12 * Math.sin((o.y + x) * 0.01), hh - 10);
+                ctx.stroke();
+            }
+        }
+
+        if (o.variant === 'quarry' || o.variant === 'industrial' || o.variant === 'ruins') {
+            ctx.fillStyle = palette.line;
+            for (let i = 0; i < detailCount; i++) {
+                const n1 = seededNoise(o.x * 0.021 + i * 5.7, o.y * 0.021);
+                const n2 = seededNoise(o.x * 0.015, o.y * 0.015 + i * 11.2);
+                ctx.beginPath();
+                ctx.arc(-hw + n1 * o.w, -hh + n2 * o.h, 4 + n1 * 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        ctx.restore();
+    }
+
     drawObstacle(ctx, o) {
         const kind = o.kind || 'crate';
         
@@ -2088,29 +2193,7 @@ export class SurvivRenderer {
             ctx.fillStyle = 'rgba(255,255,255,0.06)';
             ctx.fillRect(-o.w / 2 + 12, -o.h / 2 + 3, o.w - 24, 3);
         } else if (kind === 'field') {
-            ctx.shadowBlur = 0;
-            // Fields are drawn without outlines so they merge seamlessly
-            // Background patches under POIs
-            let fillGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
-            if (o.variant === 'quarry') {
-                fillGrad.addColorStop(0, '#756852');
-                fillGrad.addColorStop(1, '#665943');
-            } else if (o.variant === 'industrial') {
-                fillGrad.addColorStop(0, '#5a544c');
-                fillGrad.addColorStop(1, '#4e4942');
-            } else if (o.variant === 'estate' || o.variant === 'mansion') {
-                fillGrad.addColorStop(0, '#4a6042');
-                fillGrad.addColorStop(1, '#3f5238');
-            } else if (o.variant === 'woods' || o.variant === 'camp') {
-                fillGrad.addColorStop(0, '#384d32');
-                fillGrad.addColorStop(1, '#2d4028');
-            } else {
-                fillGrad.addColorStop(0, '#586b4e');
-                fillGrad.addColorStop(1, '#4d5e44');
-            }
-            ctx.fillStyle = fillGrad;
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 25);
-            ctx.fill();
+            this.drawOrganicField(ctx, o);
         } else {
             // Fallback: generic crate
             const crateGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
@@ -2410,28 +2493,56 @@ export class SurvivRenderer {
             thickness = 3;
         }
 
-        // 1. Draw the white/smoke motion blur trail
-        const trailGrad = ctx.createLinearGradient(-trailLen, 0, 0, 0);
-        trailGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        trailGrad.addColorStop(1, 'rgba(255, 255, 255, 0.35)');
-        
+        const redAlpha = isPellet ? 0.26 : 0.38;
+        const slugLen = isPellet ? 7 : 16;
+
+        // Soft outer motion blur, mostly white/gray so the bullet sits inside the trail.
+        const smokeGrad = ctx.createLinearGradient(-trailLen, 0, slugLen * 0.15, 0);
+        smokeGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        smokeGrad.addColorStop(0.55, 'rgba(214, 220, 222, 0.13)');
+        smokeGrad.addColorStop(1, 'rgba(248, 252, 255, 0.42)');
         ctx.beginPath();
-        ctx.strokeStyle = trailGrad;
-        ctx.lineWidth = thickness + 1;
+        ctx.strokeStyle = smokeGrad;
+        ctx.lineWidth = thickness + 2.4;
         ctx.lineCap = 'round';
         ctx.moveTo(-trailLen, 0);
-        ctx.lineTo(0, 0);
+        ctx.lineTo(slugLen * 0.1, 0);
         ctx.stroke();
 
-        // 2. Draw the actual bullet slug (dark pill at the front)
-        const slugLen = isPellet ? 6 : 14;
+        // Subtle red heat streak that blends into the white trail.
+        const heatGrad = ctx.createLinearGradient(-trailLen * 0.46, 0, slugLen * 0.2, 0);
+        heatGrad.addColorStop(0, 'rgba(255, 88, 64, 0)');
+        heatGrad.addColorStop(0.72, 'rgba(255, 92, 74, ' + (redAlpha * 0.42) + ')');
+        heatGrad.addColorStop(1, 'rgba(255, 112, 92, ' + redAlpha + ')');
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(20, 20, 20, 0.85)';
+        ctx.strokeStyle = heatGrad;
+        ctx.lineWidth = Math.max(1.2, thickness * 0.46);
+        ctx.lineCap = 'round';
+        ctx.moveTo(-trailLen * 0.46, 0);
+        ctx.lineTo(slugLen * 0.15, 0);
+        ctx.stroke();
+
+        // Bright front slug: no black pill, just a pale metal core with a tiny red edge.
+        const slugGrad = ctx.createLinearGradient(-slugLen, 0, slugLen * 0.25, 0);
+        slugGrad.addColorStop(0, 'rgba(178, 187, 190, 0.22)');
+        slugGrad.addColorStop(0.45, 'rgba(231, 237, 238, 0.72)');
+        slugGrad.addColorStop(0.78, 'rgba(255, 255, 255, 0.92)');
+        slugGrad.addColorStop(1, 'rgba(255, 128, 105, 0.68)');
+        ctx.shadowColor = 'rgba(255, 122, 100, ' + (redAlpha * 0.55) + ')';
+        ctx.shadowBlur = isPellet ? 3 : 5;
+        ctx.beginPath();
+        ctx.strokeStyle = slugGrad;
         ctx.lineWidth = thickness;
         ctx.lineCap = 'round';
         ctx.moveTo(-slugLen, 0);
-        ctx.lineTo(0, 0);
+        ctx.lineTo(slugLen * 0.2, 0);
         ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = 'rgba(255, 82, 62, ' + redAlpha + ')';
+        ctx.beginPath();
+        ctx.arc(slugLen * 0.2, 0, Math.max(1.2, thickness * 0.34), 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.restore();
     }
