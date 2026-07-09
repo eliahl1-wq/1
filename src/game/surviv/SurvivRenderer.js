@@ -1091,9 +1091,55 @@ export class SurvivRenderer {
         const currentHouse = this.getCurrentHouse();
         const currentRoom = this.getCurrentRoom(currentHouse);
         this.hoveredChestId = this.findInteractChest()?.id || null;
+        // Pass 1: Draw fields (grass overlays, crops, dirt field bases)
         for (const o of this.surfaceObstacles) {
-            if (this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
+            if (o.kind === 'field' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+                this.drawObstacle(ctx, o);
+            }
         }
+
+        // Pass 2: Draw river & lake sandy shore bases
+        for (const o of this.surfaceObstacles) {
+            if ((o.kind === 'river' || o.kind === 'water') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+                this.drawObstacleShore(ctx, o);
+            }
+        }
+
+        // Pass 3: Draw road gravel/dirt shoulders (under the asphalt)
+        for (const o of this.surfaceObstacles) {
+            if (o.kind === 'road' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+                this.drawRoadShoulder(ctx, o);
+            }
+        }
+
+        // Pass 4: Draw river & lake water bodies (seamlessly on top of shores)
+        for (const o of this.surfaceObstacles) {
+            if ((o.kind === 'river' || o.kind === 'water') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+                this.drawObstacleBody(ctx, o);
+            }
+        }
+
+        // Pass 5: Draw road asphalt & dirt bodies (seamlessly on top of shoulders)
+        for (const o of this.surfaceObstacles) {
+            if (o.kind === 'road' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+                this.drawRoadBody(ctx, o);
+            }
+        }
+
+        // Pass 6: Draw road markings (yellow centerlines, white borders) & tire tracks
+        for (const o of this.surfaceObstacles) {
+            if (o.kind === 'road' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+                this.drawRoadMarkings(ctx, o);
+            }
+        }
+
+        // Pass 7: Draw bridges (go on top of road/river intersections)
+        for (const o of this.surfaceObstacles) {
+            if (o.kind === 'bridge' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+                this.drawObstacle(ctx, o);
+            }
+        }
+
         this.drawWorldBorder(ctx);
         for (const o of this.houseFloors) {
             if (!currentHouse || currentHouse.id !== o.id) this.drawHouseRoof(ctx, o);
@@ -1287,68 +1333,129 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawObstacle(ctx, o) {
+    drawObstacleShore(ctx, o) {
         const kind = o.kind || 'crate';
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
-        ctx.shadowColor = 'rgba(18, 22, 18, 0.35)';
-        ctx.shadowBlur = 7;
-        ctx.shadowOffsetY = 6;
+        ctx.shadowBlur = 0;
 
         if (kind === 'river') {
-            ctx.shadowBlur = 0;
-
-            // Sandy shore bank — drawn slightly wider/taller so it peeks out behind water.
-            // Plain rect (no rounding) so adjacent segments merge cleanly.
             ctx.fillStyle = '#c9aa72';
             ctx.fillRect(-o.w / 2 - 10, -o.h / 2 - 14, o.w + 20, o.h + 28);
+        } else if (kind === 'water') {
+            ctx.fillStyle = '#c9aa72';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, o.w / 2 + 14, o.h / 2 + 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
 
-            // Water body — solid flat color. Using fillRect (no rounding) so every
-            // segment blends seamlessly with its neighbours.
+    drawRoadShoulder(ctx, o) {
+        if (o.variant !== 'asphalt') return;
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.rotation || 0);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#655745';
+        const isHorizontal = o.w > o.h;
+        if (isHorizontal) {
+            roundRect(ctx, -o.w / 2, -o.h / 2 - 12, o.w, o.h + 24, 10);
+        } else {
+            roundRect(ctx, -o.w / 2 - 12, -o.h / 2, o.w + 24, o.h, 10);
+        }
+        ctx.fill();
+        ctx.restore();
+    }
+
+    drawObstacleBody(ctx, o) {
+        const kind = o.kind || 'crate';
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.rotation || 0);
+        ctx.shadowBlur = 0;
+
+        if (kind === 'river') {
             ctx.fillStyle = '#2a5e7a';
             ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h);
 
             // Subtle centerline highlight to give water depth without animation
             ctx.fillStyle = 'rgba(80, 160, 200, 0.12)';
             ctx.fillRect(-o.w / 2 + 4, -o.h / 2 + o.h * 0.3, o.w - 8, o.h * 0.4);
-        } else if (kind === 'bridge') {
-            ctx.shadowBlur = 3;
-            ctx.shadowOffsetY = 4;
-            // Wooden plank surface
-            const bridgeGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
-            bridgeGrad.addColorStop(0, '#7a6347');
-            bridgeGrad.addColorStop(0.5, '#6b5539');
-            bridgeGrad.addColorStop(1, '#5c482e');
-            ctx.fillStyle = bridgeGrad;
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
-            ctx.fill();
-            // Plank lines
-            ctx.strokeStyle = 'rgba(30, 22, 14, 0.28)';
-            ctx.lineWidth = 1;
-            const plankStep = 22;
-            for (let px = -o.w / 2 + plankStep; px < o.w / 2; px += plankStep) {
-                ctx.beginPath();
-                ctx.moveTo(px, -o.h / 2 + 4);
-                ctx.lineTo(px, o.h / 2 - 4);
-                ctx.stroke();
-            }
-            // Highlight on top edge
-            ctx.strokeStyle = 'rgba(255, 240, 200, 0.12)';
-            ctx.lineWidth = 2;
+        } else if (kind === 'water') {
+            ctx.fillStyle = '#2a5e7a';
             ctx.beginPath();
-            ctx.moveTo(-o.w / 2 + 6, -o.h / 2 + 3);
-            ctx.lineTo(o.w / 2 - 6, -o.h / 2 + 3);
+            ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Subtle inner highlight ring (lighter center)
+            ctx.strokeStyle = 'rgba(80, 160, 200, 0.14)';
+            ctx.lineWidth = Math.max(2, Math.min(o.w, o.h) * 0.06);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, o.w / 2 * 0.6, o.h / 2 * 0.6, 0, 0, Math.PI * 2);
             ctx.stroke();
-            // Border
-            ctx.strokeStyle = 'rgba(20, 16, 10, 0.42)';
-            ctx.lineWidth = 2.5;
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
-            ctx.stroke();
-        } else if (kind === 'road') {
-            ctx.shadowBlur = 0;
-            
+        }
+        ctx.restore();
+    }
+
+    drawRoadBody(ctx, o) {
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.rotation || 0);
+        ctx.shadowBlur = 0;
+
+        if (o.variant === 'asphalt') {
+            ctx.fillStyle = '#2b2c28'; // Dark asphalt gray
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
+            ctx.fill();
+        } else {
+            // --- DIRT ROAD WITH IRREGULAR EDGES ---
+            ctx.fillStyle = '#7a684c';
+            ctx.beginPath();
+            const step = 28;
+            const roadId = Math.round(o.x + o.y);
             const isHorizontal = o.w > o.h;
+            
+            if (isHorizontal) {
+                ctx.moveTo(-o.w / 2, -o.h / 2);
+                for (let xx = -o.w / 2 + step; xx <= o.w / 2; xx += step) {
+                    const wobble = Math.sin(xx * 0.05 + roadId) * 5 + Math.cos(xx * 0.12) * 3;
+                    ctx.lineTo(xx, -o.h / 2 + wobble);
+                }
+                ctx.lineTo(o.w / 2, o.h / 2);
+                for (let xx = o.w / 2 - step; xx >= -o.w / 2; xx -= step) {
+                    const wobble = Math.sin(xx * 0.05 - roadId) * 5 + Math.cos(xx * 0.12) * 3;
+                    ctx.lineTo(xx, o.h / 2 + wobble);
+                }
+                ctx.closePath();
+            } else {
+                ctx.moveTo(o.w / 2, -o.h / 2);
+                for (let yy = -o.h / 2 + step; yy <= o.h / 2; yy += step) {
+                    const wobble = Math.sin(yy * 0.05 + roadId) * 5 + Math.cos(yy * 0.12) * 3;
+                    ctx.lineTo(o.w / 2 + wobble, yy);
+                }
+                ctx.lineTo(-o.w / 2, o.h / 2);
+                for (let yy = o.h / 2 - step; yy >= -o.h / 2; yy -= step) {
+                    const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
+                    ctx.lineTo(-o.w / 2 + wobble, yy);
+                }
+                ctx.closePath();
+            }
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    drawRoadMarkings(ctx, o) {
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.rotation || 0);
+        ctx.shadowBlur = 0;
+
+        const isHorizontal = o.w > o.h;
+
+        if (o.variant === 'asphalt') {
             let leftCut = 0;
             let rightCut = 0;
             let topCut = 0;
@@ -1392,185 +1499,112 @@ export class SurvivRenderer {
                 }
             }
 
-            if (o.variant === 'asphalt') {
-                // 1. Draw Gravel/Dirt Shoulder (slightly wider than road)
-                ctx.fillStyle = '#655745';
-                if (isHorizontal) {
-                    roundRect(ctx, -o.w / 2, -o.h / 2 - 12, o.w, o.h + 24, 10);
-                } else {
-                    roundRect(ctx, -o.w / 2 - 12, -o.h / 2, o.w + 24, o.h, 10);
-                }
-                ctx.fill();
-
-                // 2. Draw Asphalt Surface
-                ctx.fillStyle = '#2b2c28'; // Dark asphalt gray
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
-                ctx.fill();
-
-                // Faint asphalt cracks
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-                ctx.lineWidth = 1;
-                const seedVal = Math.round(o.x + o.y);
-                if (seedVal % 3 === 0) {
-                    ctx.beginPath();
-                    ctx.moveTo(-o.w * 0.25, -o.h * 0.1);
-                    ctx.lineTo(-o.w * 0.2, o.h * 0.1);
-                    ctx.lineTo(-o.w * 0.18, o.h * 0.05);
-                    ctx.stroke();
-                }
-                if (seedVal % 5 === 0) {
-                    ctx.beginPath();
-                    ctx.moveTo(o.w * 0.15, o.h * 0.25);
-                    ctx.lineTo(o.w * 0.22, o.h * 0.18);
-                    ctx.lineTo(o.w * 0.26, o.h * 0.32);
-                    ctx.stroke();
-                }
-
-                // 3. Center Yellow Dashed Line
-                ctx.strokeStyle = 'rgba(235, 185, 60, 0.72)';
-                ctx.lineWidth = 2.5;
-                ctx.setLineDash([18, 14]);
+            // Faint asphalt cracks
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.lineWidth = 1;
+            const seedVal = Math.round(o.x + o.y);
+            if (seedVal % 3 === 0) {
                 ctx.beginPath();
-                if (isHorizontal) {
-                    const startX = -o.w / 2 + Math.max(20, leftCut);
-                    const endX = o.w / 2 - Math.max(20, rightCut);
-                    if (startX < endX) {
-                        ctx.moveTo(startX, 0);
-                        ctx.lineTo(endX, 0);
-                    }
-                } else {
-                    const startY = -o.h / 2 + Math.max(20, topCut);
-                    const endY = o.h / 2 - Math.max(20, bottomCut);
-                    if (startY < endY) {
-                        ctx.moveTo(0, startY);
-                        ctx.lineTo(0, endY);
-                    }
-                }
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // 4. White Edge Lines
-                ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                if (isHorizontal) {
-                    const startX = -o.w / 2 + Math.max(10, leftCut);
-                    const endX = o.w / 2 - Math.max(10, rightCut);
-                    if (startX < endX) {
-                        ctx.moveTo(startX, -o.h / 2 + 8);
-                        ctx.lineTo(endX, -o.h / 2 + 8);
-                        ctx.moveTo(startX, o.h / 2 - 8);
-                        ctx.lineTo(endX, o.h / 2 - 8);
-                    }
-                } else {
-                    const startY = -o.h / 2 + Math.max(10, topCut);
-                    const endY = o.h / 2 - Math.max(10, bottomCut);
-                    if (startY < endY) {
-                        ctx.moveTo(-o.w / 2 + 8, startY);
-                        ctx.lineTo(-o.w / 2 + 8, endY);
-                        ctx.moveTo(o.w / 2 - 8, startY);
-                        ctx.lineTo(o.w / 2 - 8, endY);
-                    }
-                }
-                ctx.stroke();
-
-            } else {
-                // --- DIRT ROAD WITH IRREGULAR EDGES & TIRE TRACKS ---
-                ctx.fillStyle = '#7a684c';
-                ctx.beginPath();
-                const step = 28;
-                const roadId = Math.round(o.x + o.y);
-                
-                if (isHorizontal) {
-                    ctx.moveTo(-o.w / 2, -o.h / 2);
-                    for (let xx = -o.w / 2 + step; xx <= o.w / 2; xx += step) {
-                        const wobble = Math.sin(xx * 0.05 + roadId) * 5 + Math.cos(xx * 0.12) * 3;
-                        ctx.lineTo(xx, -o.h / 2 + wobble);
-                    }
-                    ctx.lineTo(o.w / 2, o.h / 2);
-                    for (let xx = o.w / 2 - step; xx >= -o.w / 2; xx -= step) {
-                        const wobble = Math.sin(xx * 0.05 - roadId) * 5 + Math.cos(xx * 0.12) * 3;
-                        ctx.lineTo(xx, o.h / 2 + wobble);
-                    }
-                    ctx.closePath();
-                } else {
-                    ctx.moveTo(o.w / 2, -o.h / 2);
-                    for (let yy = -o.h / 2 + step; yy <= o.h / 2; yy += step) {
-                        const wobble = Math.sin(yy * 0.05 + roadId) * 5 + Math.cos(yy * 0.12) * 3;
-                        ctx.lineTo(o.w / 2 + wobble, yy);
-                    }
-                    ctx.lineTo(-o.w / 2, o.h / 2);
-                    for (let yy = o.h / 2 - step; yy >= -o.h / 2; yy -= step) {
-                        const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
-                        ctx.lineTo(-o.w / 2 + wobble, yy);
-                    }
-                    ctx.closePath();
-                }
-                ctx.fill();
-
-                ctx.strokeStyle = '#524330';
-                ctx.lineWidth = 3.5;
-                const trackOff = Math.min(o.w, o.h) * 0.18;
-                ctx.beginPath();
-                if (isHorizontal) {
-                    const startX = -o.w / 2 + 12;
-                    const endX = o.w / 2 - 12;
-                    ctx.moveTo(startX, -trackOff);
-                    ctx.lineTo(endX, -trackOff);
-                    ctx.moveTo(startX, trackOff);
-                    ctx.lineTo(endX, trackOff);
-                } else {
-                    const startY = -o.h / 2 + 12;
-                    const endY = o.h / 2 - 12;
-                    ctx.moveTo(-trackOff, startY);
-                    ctx.lineTo(-trackOff, endY);
-                    ctx.moveTo(trackOff, startY);
-                    ctx.lineTo(trackOff, endY);
-                }
+                ctx.moveTo(-o.w * 0.25, -o.h * 0.1);
+                ctx.lineTo(-o.w * 0.2, o.h * 0.1);
+                ctx.lineTo(-o.w * 0.18, o.h * 0.05);
                 ctx.stroke();
             }
-        } else if (kind === 'field') {
-            ctx.shadowBlur = 0;
-            const colors = {
-                estate: 'rgba(75, 100, 62, 0.28)',
-                industrial: 'rgba(86, 88, 78, 0.32)',
-                quarry: 'rgba(112, 108, 96, 0.34)',
-                crop: 'rgba(134, 122, 59, 0.32)',
-                woods: 'rgba(44, 80, 45, 0.26)',
-                farm: 'rgba(118, 105, 54, 0.24)',
-                camp: 'rgba(73, 92, 62, 0.26)',
-                scrub: 'rgba(119, 106, 63, 0.24)',
-                wetlands: 'rgba(46, 86, 74, 0.22)',
-                ruins: 'rgba(88, 86, 76, 0.28)',
-                village: 'rgba(75, 94, 62, 0.22)',
-                'snow-woods': 'rgba(186, 205, 202, 0.18)',
-                'snow-lab': 'rgba(170, 190, 195, 0.22)',
-            };
-            ctx.fillStyle = colors[o.variant] || 'rgba(68, 92, 61, 0.22)';
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 18);
-            ctx.fill();
-        } else if (kind === 'water') {
-            ctx.shadowBlur = 0;
+            if (seedVal % 5 === 0) {
+                ctx.beginPath();
+                ctx.moveTo(o.w * 0.15, o.h * 0.25);
+                ctx.lineTo(o.w * 0.22, o.h * 0.18);
+                ctx.lineTo(o.w * 0.26, o.h * 0.32);
+                ctx.stroke();
+            }
 
-            // Sandy shoreline (slightly larger ellipse behind water)
-            ctx.fillStyle = '#c9aa72';
+            // 3. Center Yellow Dashed Line
+            ctx.strokeStyle = 'rgba(235, 185, 60, 0.72)';
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([18, 14]);
             ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2 + 14, o.h / 2 + 14, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Water body — solid flat color matching the rivers
-            ctx.fillStyle = '#2a5e7a';
-            ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Subtle inner highlight ring (lighter center)
-            ctx.strokeStyle = 'rgba(80, 160, 200, 0.14)';
-            ctx.lineWidth = Math.max(2, Math.min(o.w, o.h) * 0.06);
-            ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2 * 0.6, o.h / 2 * 0.6, 0, 0, Math.PI * 2);
+            if (isHorizontal) {
+                const startX = -o.w / 2 + Math.max(20, leftCut);
+                const endX = o.w / 2 - Math.max(20, rightCut);
+                if (startX < endX) {
+                    ctx.moveTo(startX, 0);
+                    ctx.lineTo(endX, 0);
+                }
+            } else {
+                const startY = -o.h / 2 + Math.max(20, topCut);
+                const endY = o.h / 2 - Math.max(20, bottomCut);
+                if (startY < endY) {
+                    ctx.moveTo(0, startY);
+                    ctx.lineTo(0, endY);
+                }
+            }
             ctx.stroke();
-        } else if (kind === 'houseFloor') {
+            ctx.setLineDash([]);
+
+            // 4. White Edge Lines
+            ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            if (isHorizontal) {
+                const startX = -o.w / 2 + Math.max(10, leftCut);
+                const endX = o.w / 2 - Math.max(10, rightCut);
+                if (startX < endX) {
+                    ctx.moveTo(startX, -o.h / 2 + 8);
+                    ctx.lineTo(endX, -o.h / 2 + 8);
+                    ctx.moveTo(startX, o.h / 2 - 8);
+                    ctx.lineTo(endX, o.h / 2 - 8);
+                }
+            } else {
+                const startY = -o.h / 2 + Math.max(10, topCut);
+                const endY = o.h / 2 - Math.max(10, bottomCut);
+                if (startY < endY) {
+                    ctx.moveTo(-o.w / 2 + 8, startY);
+                    ctx.lineTo(-o.w / 2 + 8, endY);
+                    ctx.moveTo(o.w / 2 - 8, startY);
+                    ctx.lineTo(o.w / 2 - 8, endY);
+                }
+            }
+            ctx.stroke();
+
+        } else {
+            // --- DIRT ROAD TIRE TRACKS ---
+            ctx.strokeStyle = '#524330';
+            ctx.lineWidth = 3.5;
+            const trackOff = Math.min(o.w, o.h) * 0.18;
+            ctx.beginPath();
+            if (isHorizontal) {
+                const startX = -o.w / 2 + 12;
+                const endX = o.w / 2 - 12;
+                ctx.moveTo(startX, -trackOff);
+                ctx.lineTo(endX, -trackOff);
+                ctx.moveTo(startX, trackOff);
+                ctx.lineTo(endX, trackOff);
+            } else {
+                const startY = -o.h / 2 + 12;
+                const endY = o.h / 2 - 12;
+                ctx.moveTo(-trackOff, startY);
+                ctx.lineTo(-trackOff, endY);
+                ctx.moveTo(trackOff, startY);
+                ctx.lineTo(trackOff, endY);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    drawObstacle(ctx, o) {
+        const kind = o.kind || 'crate';
+        
+        // Roads and water are now handled via layered passes
+        if (kind === 'road' || kind === 'river' || kind === 'water') return;
+
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.rotation || 0);
+        ctx.shadowColor = 'rgba(18, 22, 18, 0.35)';
+        ctx.shadowBlur = 7;
+        ctx.shadowOffsetY = 6;
+        if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
             // Floor with gradient for depth
             const floorColors = {
