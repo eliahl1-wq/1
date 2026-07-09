@@ -145,3 +145,127 @@ export function playFoodEatSound() {
     spark.start(t);
     spark.stop(t + 0.028);
 }
+
+/**
+ * Synthesizes a realistic gunshot sound dynamically using Web Audio API oscillators and noise.
+ * Generates an explosive base thud/pop (sine/triangle/sawtooth) and a high-velocity crack (white noise).
+ */
+export function playWeaponShootSound(weaponType) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return;
+
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.connect(ctx.destination);
+
+    // Default configuration values
+    let noiseDecay = 0.12;
+    let noiseVolume = 0.25;
+    let synthDecay = 0.12;
+    let synthVolume = 0.45;
+    let startHz = 240;
+    let endHz = 60;
+    let type = 'triangle';
+
+    if (weaponType === 'fists') {
+        // Melee swing: soft whoosh/punch
+        noiseDecay = 0.05;
+        noiseVolume = 0.03;
+        synthDecay = 0.08;
+        synthVolume = 0.18;
+        startHz = 120;
+        endHz = 40;
+        type = 'sine';
+    } else if (weaponType === 'pistol' || weaponType === 'revolver') {
+        const isRev = weaponType === 'revolver';
+        noiseDecay = isRev ? 0.18 : 0.10;
+        noiseVolume = isRev ? 0.35 : 0.20;
+        synthDecay = isRev ? 0.16 : 0.10;
+        synthVolume = isRev ? 0.55 : 0.35;
+        startHz = isRev ? 280 : 320;
+        endHz = isRev ? 50 : 70;
+        type = 'triangle';
+    } else if (weaponType === 'smg') {
+        noiseDecay = 0.08;
+        noiseVolume = 0.15;
+        synthDecay = 0.08;
+        synthVolume = 0.28;
+        startHz = 380;
+        endHz = 85;
+        type = 'sawtooth';
+    } else if (weaponType === 'shotgun') {
+        noiseDecay = 0.26;
+        noiseVolume = 0.65;
+        synthDecay = 0.22;
+        synthVolume = 0.70;
+        startHz = 180;
+        endHz = 35;
+        type = 'triangle';
+    } else if (weaponType === 'assault' || weaponType === 'dmr') {
+        const isDmr = weaponType === 'dmr';
+        noiseDecay = isDmr ? 0.22 : 0.18;
+        noiseVolume = isDmr ? 0.48 : 0.40;
+        synthDecay = isDmr ? 0.18 : 0.15;
+        synthVolume = isDmr ? 0.60 : 0.52;
+        startHz = isDmr ? 220 : 250;
+        endHz = isDmr ? 45 : 55;
+        type = 'sawtooth';
+    } else if (weaponType === 'sniper') {
+        noiseDecay = 0.42;
+        noiseVolume = 0.78;
+        synthDecay = 0.32;
+        synthVolume = 0.85;
+        startHz = 160;
+        endHz = 30;
+        type = 'sawtooth';
+    } else if (weaponType === 'lmg') {
+        noiseDecay = 0.16;
+        noiseVolume = 0.38;
+        synthDecay = 0.14;
+        synthVolume = 0.48;
+        startHz = 280;
+        endHz = 65;
+        type = 'sawtooth';
+    }
+
+    // --- Noise Channel (gunshot blast crack/crackle) ---
+    if (noiseVolume > 0 && noiseDecay > 0) {
+        const noiseNode = ctx.createBufferSource();
+        noiseNode.buffer = getNoiseBuffer(ctx, Math.max(0.5, noiseDecay));
+        
+        const noiseG = ctx.createGain();
+        noiseG.gain.setValueAtTime(noiseVolume, t);
+        noiseG.gain.exponentialRampToValueAtTime(0.0001, t + noiseDecay);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(weaponType === 'sniper' ? 2200 : weaponType === 'shotgun' ? 700 : 1200, t);
+
+        noiseNode.connect(filter);
+        filter.connect(noiseG);
+        noiseG.connect(bus);
+        
+        noiseNode.start(t);
+        noiseNode.stop(t + noiseDecay + 0.05);
+    }
+
+    // --- Synth Channel (explosive low-end thud) ---
+    if (synthVolume > 0 && synthDecay > 0) {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        
+        const oscG = ctx.createGain();
+        oscG.gain.setValueAtTime(synthVolume, t);
+        oscG.gain.exponentialRampToValueAtTime(0.0001, t + synthDecay);
+
+        osc.frequency.setValueAtTime(startHz, t);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(endHz, 20), t + synthDecay * 0.7);
+
+        osc.connect(oscG);
+        oscG.connect(bus);
+        
+        osc.start(t);
+        osc.stop(t + synthDecay + 0.05);
+    }
+}
+

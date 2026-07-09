@@ -5,6 +5,7 @@
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawCashoutProgressRing } from '../cashoutRing.js';
 import { drawGameMinimap } from '../minimap.js';
+import { playWeaponShootSound } from '../../audio/synthSounds.js';
 
 const WEAPON_LABELS = {
     fists: 'Fists',
@@ -141,6 +142,8 @@ export class SurvivRenderer {
         this.cameraShake = { x: 0, y: 0, intensity: 0, decay: 0.88 };
         // Kill feed
         this.killFeed = [];
+        // Blood decals on the ground
+        this.bloodDecals = [];
         // Previous player states for interpolation & tracking
         this._prevPlayers = new Map();
         this._interpPlayers = new Map();
@@ -272,6 +275,12 @@ export class SurvivRenderer {
             };
         };
 
+        // Track melee starts before updating players
+        const prevMeleeStarts = new Map();
+        for (const p of this.players || []) {
+            prevMeleeStarts.set(p.id, p.meleeStartedAt || 0);
+        }
+
         const rawMe = tick.you || (tick.players || []).find(p => p.isYou || p.id === this.myId);
         const me = withLocalClocks(rawMe);
         const rawPlayers = (tick.players || []).map(withLocalClocks);
@@ -279,6 +288,38 @@ export class SurvivRenderer {
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
             : rawPlayers;
         this.loot = tick.loot || [];
+
+        // Accumulate walk cycle & bob for each player
+        for (const p of this.players) {
+            const prevPos = this._prevPlayers.get(p.id) || { x: p.x, y: p.y };
+            const distMoved = Math.hypot(p.x - prevPos.x, p.y - prevPos.y);
+            if (distMoved > 0.05 && distMoved < 40) {
+                p.walkCycle = (p.walkCycle || 0) + distMoved * 0.16;
+                p.walkBob = Math.sin(p.walkCycle);
+            } else {
+                p.walkBob = (p.walkBob || 0) * 0.85;
+                if (Math.abs(p.walkBob) < 0.01) p.walkBob = 0;
+            }
+            this._prevPlayers.set(p.id, { x: p.x, y: p.y });
+        }
+
+        // Play sounds for newly triggered melee attacks
+        for (const p of this.players || []) {
+            const prevStart = prevMeleeStarts.get(p.id) || 0;
+            if (p.meleeStartedAt > prevStart) {
+                playWeaponShootSound('fists');
+            }
+        }
+
+        // Play sounds for newly spawned bullets (fired by local player, remote players, or bots)
+        const prevBulletIds = new Set((this.bullets || []).map(b => b.id));
+        if (tick.bullets) {
+            for (const b of tick.bullets) {
+                if (!prevBulletIds.has(b.id)) {
+                    playWeaponShootSound(b.weaponType || 'pistol');
+                }
+            }
+        }
 
         // Track disappeared bullets for impact particles
         const prevBullets = this.bullets || [];
@@ -295,6 +336,7 @@ export class SurvivRenderer {
                 if (hitPlayer) {
                     hitType = 'blood';
                     hitColor = '#ef544f';
+                    this.spawnBloodDecal(b.x, b.y);
                 } else {
                     // Check if near any obstacle
                     const hitObstacle = this.obstacles.find(o => o.collidable !== false && this.pointInsideRect(o, b.x, b.y, 18));
@@ -432,6 +474,24 @@ export class SurvivRenderer {
                         type: 'muzzle',
                     });
                 }
+                // Spawn brass shell casing particle (ejects to the side/back)
+                const ejectAngle = angle - Math.PI / 2.3 + (Math.random() - 0.5) * 0.4;
+                const sx = me.x - Math.cos(angle) * 2;
+                const sy = me.y - Math.sin(angle) * 2;
+                this.particles.push({
+                    x: sx,
+                    y: sy,
+                    vx: Math.cos(ejectAngle) * (42 + Math.random() * 28) - Math.cos(angle) * 8,
+                    vy: Math.sin(ejectAngle) * (42 + Math.random() * 28) - Math.sin(angle) * 8,
+                    life: 0.65 + Math.random() * 0.25,
+                    maxLife: 0.9,
+                    size: 3.5,
+                    color: '#d4af37', // Brass gold color
+                    type: 'shell',
+                    rotation: Math.random() * Math.PI * 2,
+                    rotSpeed: 22 + Math.random() * 18,
+                    bounceCount: 0,
+                });
             }
             this._prevAmmo = me.ammo ?? this._prevAmmo;
 
@@ -996,6 +1056,23 @@ export class SurvivRenderer {
         ctx.arc(px, py, maxDist * 1.1, 0, Math.PI * 2);
         ctx.fill();
 
+        // Dynamic muzzle flash light bloom inside dark houses
+        if (this._muzzleFlash > 0.05) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-out';
+            const flashRadius = 140 + this._muzzleFlash * 220;
+            const flashGrad = ctx.createRadialGradient(px, py, 0, px, py, flashRadius);
+            // Strong cutout in center, fading at edges
+            flashGrad.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+            flashGrad.addColorStop(0.4, 'rgba(0, 0, 0, 0.4)');
+            flashGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = flashGrad;
+            ctx.beginPath();
+            ctx.arc(px, py, flashRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
         ctx.restore();
     }
 
@@ -1056,11 +1133,33 @@ export class SurvivRenderer {
 
         // Update particles
         this.particles = this.particles.filter(p => {
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            p.life -= dt;
-            p.vx *= 0.92;
-            p.vy *= 0.92;
+            if (p.type === 'shell') {
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                p.vx *= 0.94; // Less air friction than dust/sparks
+                p.vy *= 0.94;
+                if (p.rotation !== undefined) {
+                    p.rotation += p.rotSpeed * dt;
+                    p.rotSpeed *= 0.91; // Slow down rotational spin
+                }
+                // Simulate a tiny brass bounce on the ground
+                if (p.bounceCount !== undefined && p.bounceCount < 2) {
+                    const speed = Math.hypot(p.vx, p.vy);
+                    if (speed < 12 && p.bounceCount === 0) {
+                        p.bounceCount = 1;
+                        const bAngle = Math.random() * Math.PI * 2;
+                        p.vx = Math.cos(bAngle) * 25;
+                        p.vy = Math.sin(bAngle) * 25;
+                    }
+                }
+            } else {
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                p.vx *= 0.92;
+                p.vy *= 0.92;
+            }
             return p.life > 0;
         });
 
@@ -1132,6 +1231,9 @@ export class SurvivRenderer {
                 this.drawRoadMarkings(ctx, o);
             }
         }
+
+        // Draw blood decals on the ground
+        this.drawBloodDecals(ctx);
 
         // Pass 7: Draw bridges (go on top of road/river intersections)
         for (const o of this.surfaceObstacles) {
@@ -2305,53 +2407,53 @@ export class SurvivRenderer {
         ctx.translate(b.x, b.y);
         ctx.rotate(tail);
 
-        let length = 20;
-        let thickness = 3;
-        let color = '#ffd45a';
-        let glowColor = 'rgba(255, 212, 90, 0.4)';
+        let length = 22;
+        let thickness = 3.2;
+        let color = '#fcd04c'; // Default standard ammo yellow
         let isPellet = false;
 
         const wt = b.weaponType;
         if (wt === 'shotgun') {
-            length = 8;
-            thickness = 3.5;
-            color = '#ff8c3b';
-            glowColor = 'rgba(255, 140, 59, 0.5)';
+            length = 9;
+            thickness = 3.6;
+            color = '#e07328';
             isPellet = true;
         } else if (wt === 'sniper') {
-            length = 42;
-            thickness = 4.5;
-            color = '#ff3b3b';
-            glowColor = 'rgba(255, 59, 59, 0.6)';
+            length = 46;
+            thickness = 4.6;
+            color = '#e23131'; // Sniper red caliber
         } else if (wt === 'assault' || wt === 'dmr') {
-            length = 32;
-            thickness = 3.2;
-            color = '#ffe38b';
-            glowColor = 'rgba(255, 227, 139, 0.5)';
+            length = 34;
+            thickness = 3.6;
+            color = '#fce277'; // 5.56 yellow caliber
         } else if (wt === 'smg' || wt === 'lmg') {
-            length = 22;
+            length = 24;
             thickness = 2.8;
-            color = '#ffb03b';
-            glowColor = 'rgba(255, 176, 59, 0.45)';
+            color = '#ff9100'; // 9mm orange caliber
         }
 
-        ctx.shadowColor = color;
-        ctx.shadowBlur = isPellet ? 6 : 10;
-        
+        // Draw clean tracers without performance-heavy dropshadows/glows
         if (isPellet) {
+            // Colored outer shell
             ctx.fillStyle = color;
             ctx.beginPath();
             ctx.arc(0, 0, thickness, 0, Math.PI * 2);
             ctx.fill();
+
+            // White inner core
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, thickness * 0.58, 0, Math.PI * 2);
+            ctx.fill();
         } else {
-            const grad = ctx.createLinearGradient(-length, 0, 4, 0);
-            grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-            grad.addColorStop(0.3, glowColor);
-            grad.addColorStop(0.8, color);
-            grad.addColorStop(1, '#ffffff');
-            
-            ctx.fillStyle = grad;
-            roundRect(ctx, -length, -thickness / 2, length + 4, thickness, thickness / 2);
+            // Outer colored trace border
+            ctx.fillStyle = color;
+            roundRect(ctx, -length, -thickness / 2, length + 2, thickness, thickness / 2);
+            ctx.fill();
+
+            // Inner white core trace (makes it pop, like in surviv.io)
+            ctx.fillStyle = '#ffffff';
+            roundRect(ctx, -length + 2, -thickness * 0.28, length - 1, thickness * 0.56, thickness * 0.28);
             ctx.fill();
         }
 
@@ -2400,7 +2502,7 @@ export class SurvivRenderer {
         ctx.arc(0, 3, r * 0.7, 0.3, Math.PI - 0.3);
         ctx.fill();
 
-        this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color);
+        this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color, p.walkBob || 0);
 
         // Muzzle flash on self
         if (isMe && this._muzzleFlash > 0.1) {
@@ -2491,7 +2593,7 @@ export class SurvivRenderer {
         }
     }
 
-    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8') {
+    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8', walkBob = 0) {
         ctx.fillStyle = '#222823';
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
@@ -2505,8 +2607,10 @@ export class SurvivRenderer {
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const thrust = punching ? Math.sin(progress * Math.PI) : 0;
             const leadTop = Math.floor(meleeStartedAt / 430) % 2 === 0;
-            const topReach = r * (0.76 + (leadTop ? 0.92 * thrust : 0.08 * thrust));
-            const bottomReach = r * (0.76 + (!leadTop ? 0.92 * thrust : 0.08 * thrust));
+            
+            // Fists bob forward/backward alternately when running
+            const topReach = r * (0.76 + (leadTop ? 0.92 * thrust : 0.08 * thrust)) + walkBob * 3.2;
+            const bottomReach = r * (0.76 + (!leadTop ? 0.92 * thrust : 0.08 * thrust)) - walkBob * 3.2;
 
             if (punching && thrust > 0.12) {
                 ctx.save();
@@ -2537,7 +2641,17 @@ export class SurvivRenderer {
                 ctx.fill();
                 ctx.stroke();
             }
-        } else if (weapon === 'shotgun') {
+            return;
+        }
+
+        // Apply a gentle walk-bob sway to gun weapons & hands
+        const bobAngle = walkBob * 0.055;
+        const bobX = Math.abs(walkBob) * 0.7;
+        ctx.save();
+        ctx.translate(bobX, 0);
+        ctx.rotate(bobAngle);
+
+        if (weapon === 'shotgun') {
             roundRect(ctx, r * 0.25, -3, r * 1.35, 6, 2);
             ctx.fill();
             ctx.stroke();
@@ -2603,6 +2717,8 @@ export class SurvivRenderer {
                 ctx.stroke();
             }
         }
+
+        ctx.restore();
     }
 
     drawMobileAimGuide(ctx) {
@@ -3419,12 +3535,26 @@ export class SurvivRenderer {
         for (const p of this.particles) {
             const alpha = clamp(p.life / (p.maxLife || 0.2), 0, 1);
             ctx.globalAlpha = alpha;
-            ctx.fillStyle = p.color || '#ffdd44';
-            ctx.shadowColor = p.color || '#ffdd44';
-            ctx.shadowBlur = 4;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
-            ctx.fill();
+
+            if (p.type === 'shell') {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation || 0);
+                ctx.fillStyle = p.color || '#d4af37';
+                // Draw a tiny gold cylinder shell casing
+                ctx.fillRect(-2.5, -0.9, 5, 1.8);
+                // Draw a slightly darker rim for texture
+                ctx.fillStyle = 'rgba(0,0,0,0.18)';
+                ctx.fillRect(-2.5, -0.9, 1, 1.8);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = p.color || '#ffdd44';
+                ctx.shadowColor = p.color || '#ffdd44';
+                ctx.shadowBlur = 4;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
         ctx.restore();
     }
@@ -3592,5 +3722,62 @@ export class SurvivRenderer {
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
+    }
+
+    spawnBloodDecal(x, y) {
+        this.bloodDecals.push({
+            x: x + (Math.random() - 0.5) * 8,
+            y: y + (Math.random() - 0.5) * 8,
+            size: 10 + Math.random() * 10,
+            rotation: Math.random() * Math.PI * 2,
+            opacity: 0.85,
+            bornAt: Date.now(),
+            fadeStartAt: Date.now() + 18000, // Stay solid for 18 seconds
+            fadeDuration: 4000,             // Fade out over 4 seconds
+        });
+        // Cap to prevent memory leaks
+        if (this.bloodDecals.length > 180) {
+            this.bloodDecals.shift();
+        }
+    }
+
+    drawBloodDecals(ctx) {
+        const now = Date.now();
+        for (let i = this.bloodDecals.length - 1; i >= 0; i--) {
+            const d = this.bloodDecals[i];
+            let alpha = d.opacity;
+            if (now > d.fadeStartAt) {
+                const elapsed = now - d.fadeStartAt;
+                alpha = Math.max(0, d.opacity * (1 - elapsed / d.fadeDuration));
+            }
+            if (alpha <= 0) {
+                this.bloodDecals.splice(i, 1);
+                continue;
+            }
+
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            ctx.rotate(d.rotation);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#9b1e1a'; // Deep organic blood red
+
+            // Primary splatter circle
+            ctx.beginPath();
+            ctx.arc(0, 0, d.size * 0.44, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Satellite droplets (splatter spray)
+            const droplets = 3 + Math.floor(d.size * 0.12);
+            for (let s = 0; s < droplets; s++) {
+                const dist = d.size * (0.42 + Math.random() * 0.45);
+                const a = (s * Math.PI * 2) / droplets + (Math.random() - 0.5) * 0.6;
+                const sx = Math.cos(a) * dist;
+                const sy = Math.sin(a) * dist;
+                ctx.beginPath();
+                ctx.arc(sx, sy, d.size * (0.10 + Math.random() * 0.1), 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
     }
 }

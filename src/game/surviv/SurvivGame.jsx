@@ -433,6 +433,16 @@ export default function SurvivGame() {
                 });
                 return;
             }
+            unlockGameAudio();
+            if (k === 'i' || k === 'e') {
+                setIsInventoryOpen(prev => {
+                    if (prev) {
+                        closeChestPendingRef.current = true;
+                    }
+                    return false;
+                });
+                return;
+            }
             if (k === 'escape') {
                 setIsInventoryOpen(prev => {
                     if (prev) {
@@ -455,6 +465,7 @@ export default function SurvivGame() {
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
+            unlockGameAudio();
             if (IS_MOBILE && e.pointerType !== 'mouse') return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
