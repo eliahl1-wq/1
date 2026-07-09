@@ -1593,6 +1593,8 @@ export class SurvivRenderer {
                     ctx.lineTo(o.w / 2 + wobble, yy);
                 }
                 ctx.lineTo(-o.w / 2, o.h / 2);
+                for (let yy = o.h / 2 - step; yy >= -o.h / 2; yy -= step) {
+                    const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
                     ctx.lineTo(-o.w / 2 + wobble, yy);
                 }
                 ctx.closePath();
