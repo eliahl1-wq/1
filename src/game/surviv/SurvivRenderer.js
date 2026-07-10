@@ -42,6 +42,38 @@ const WEAPON_SHAKE = {
     assault: 0.3, dmr: 0.6, sniper: 1.4, lmg: 0.25,
 };
 
+const SURFACE_KINDS = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
+const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
+
+function obstacleRenderSignature(obstacles) {
+    let hash = 2166136261;
+    const mixString = (value) => {
+        const text = String(value ?? '');
+        for (let i = 0; i < text.length; i++) {
+            hash ^= text.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+    };
+    const mixNumber = (value) => {
+        hash ^= Math.round((Number(value) || 0) * 10);
+        hash = Math.imul(hash, 16777619);
+    };
+
+    for (const o of obstacles) {
+        mixString(o.id);
+        mixString(o.kind);
+        mixString(o.variant);
+        mixString(o.houseId);
+        mixNumber(o.x);
+        mixNumber(o.y);
+        mixNumber(o.w);
+        mixNumber(o.h);
+        mixNumber(o.rotation);
+        mixNumber(o.collidable === false ? 0 : 1);
+    }
+    return `${obstacles.length}:${hash >>> 0}`;
+}
+
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const lerpAngle = (a, b, t) => {
@@ -93,7 +125,22 @@ export class SurvivRenderer {
         this.doorways = [];
 
         this.surfaceObstacles = [];
+        this.fieldObstacles = [];
+        this.waterObstacles = [];
+        this.roadObstacles = [];
+        this.bridgeObstacles = [];
         this.sortedWorldObstacles = [];
+        this._roomZonesByHouseId = new Map();
+        this._doorwayByHouseId = new Map();
+        this._interiorFogHouseIds = new Set();
+        this._obstacleRenderSignature = '';
+        this._obstacleRevision = 0;
+        this._viewLeft = -Infinity;
+        this._viewRight = Infinity;
+        this._viewTop = -Infinity;
+        this._viewBottom = Infinity;
+        this._terrainTexture = null;
+        this._terrainPattern = null;
         this.zone = null;
         this.me = null;
         this.hoveredChestId = null;
@@ -148,6 +195,8 @@ export class SurvivRenderer {
         this._interpPlayers = new Map();
         this._currentVisibilityPolygon = null;
         this._currentVisibilityHouseId = null;
+        this._losCacheKey = '';
+        this._losCachedPolygon = null;
         // Previous HP for detecting damage
         this._prevHp = 100;
         // Previous ammo for detecting shots fired
@@ -167,10 +216,13 @@ export class SurvivRenderer {
     }
 
     resize() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const parent = this.canvas.parentElement;
         const w = parent?.clientWidth || window.innerWidth;
         const h = parent?.clientHeight || window.innerHeight;
+        // Surviv can be raster-heavy. A restrained adaptive cap keeps Retina
+        // canvases sharp without paying the old 4x pixel cost at DPR 2.
+        const dprCap = w < 760 || w * h >= 1600000 ? 1.5 : 1.75;
+        const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
@@ -178,6 +230,7 @@ export class SurvivRenderer {
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.viewW = w;
         this.viewH = h;
+        this._terrainPattern = null;
         this.targetZoom = w < 760 ? 0.86 : 1.08;
         if (!this.spectatorMode) this.zoom = this.targetZoom;
     }
@@ -218,8 +271,19 @@ export class SurvivRenderer {
         this.doorways = [];
         this._currentVisibilityPolygon = null;
         this._currentVisibilityHouseId = null;
+        this._losCacheKey = '';
+        this._losCachedPolygon = null;
         this.surfaceObstacles = [];
+        this.fieldObstacles = [];
+        this.waterObstacles = [];
+        this.roadObstacles = [];
+        this.bridgeObstacles = [];
         this.sortedWorldObstacles = [];
+        this._roomZonesByHouseId.clear();
+        this._doorwayByHouseId.clear();
+        this._interiorFogHouseIds.clear();
+        this._obstacleRenderSignature = '';
+        this._obstacleRevision++;
         this.myId = null;
     }
 
@@ -356,13 +420,19 @@ export class SurvivRenderer {
             }
         }
         this.bullets = tick.bullets || [];
-        const nextObstacles = tick.obstacles || [];
-        if (nextObstacles !== this.obstacles) {
-            this.obstacles = nextObstacles;
-            this.rebuildObstacleRenderCache();
+        // Static world snapshots may arrive less frequently than movement
+        // ticks. Retain the last snapshot when omitted, and only rebuild the
+        // expensive render cache when its actual contents changed.
+        if (Array.isArray(tick.obstacles)) {
+            const nextSignature = obstacleRenderSignature(tick.obstacles);
+            if (nextSignature !== this._obstacleRenderSignature) {
+                this.obstacles = tick.obstacles;
+                this._obstacleRenderSignature = nextSignature;
+                this.rebuildObstacleRenderCache();
+            }
         }
         this.zone = tick.zone || null;
-        this.minimap = tick.minimap || { players: [], food: [], obstacles: [] };
+        if (tick.minimap) this.minimap = tick.minimap;
 
         // Count alive players
         this.aliveCount = tick.aliveCount ?? rawPlayers.filter(p => (p.hp || 0) > 0).length;
@@ -665,28 +735,103 @@ export class SurvivRenderer {
     }
 
     rebuildObstacleRenderCache() {
-        const surfaceKinds = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'bridge']);
-        this.houseFloors = this.obstacles.filter(o => o.kind === 'houseFloor');
-        this.roomZones = this.obstacles.filter(o => o.kind === 'roomZone');
-        this.doorways = this.obstacles.filter(o => o.kind === 'door');
+        this.houseFloors = [];
+        this.roomZones = [];
+        this.doorways = [];
         this.surfaceObstacles = [];
+        this.fieldObstacles = [];
+        this.waterObstacles = [];
+        this.roadObstacles = [];
+        this.bridgeObstacles = [];
+        this._roomZonesByHouseId.clear();
+        this._doorwayByHouseId.clear();
+        this._interiorFogHouseIds.clear();
+
+        for (const o of this.obstacles) {
+            if (o.kind === 'houseFloor') this.houseFloors.push(o);
+            else if (o.kind === 'roomZone') {
+                this.roomZones.push(o);
+                if (o.houseId) {
+                    let rooms = this._roomZonesByHouseId.get(o.houseId);
+                    if (!rooms) {
+                        rooms = [];
+                        this._roomZonesByHouseId.set(o.houseId, rooms);
+                    }
+                    rooms.push(o);
+                }
+            } else if (o.kind === 'door') {
+                this.doorways.push(o);
+                if (o.houseId && !this._doorwayByHouseId.has(o.houseId)) {
+                    this._doorwayByHouseId.set(o.houseId, o);
+                }
+            }
+        }
+
+        const housesById = new Map(this.houseFloors.map(h => [h.id, h]));
         const solid = [];
         for (const o of this.obstacles) {
             if (o.kind === 'roomZone') continue;
+            const rotation = Number(o.rotation) || 0;
+            const cos = Math.abs(Math.cos(rotation));
+            const sin = Math.abs(Math.sin(rotation));
+            const halfW = Math.abs(Number(o.w) || 0) / 2;
+            const halfH = Math.abs(Number(o.h) || 0) / 2;
+            o._renderHalfW = cos * halfW + sin * halfH;
+            o._renderHalfH = sin * halfW + cos * halfH;
+
             if (o.kind === 'furniture' || o.kind === 'interiorWall' || o.kind === 'wall' || o.kind === 'door') {
                 const house = o.houseId
-                    ? this.houseFloors.find(h => h.id === o.houseId)
+                    ? housesById.get(o.houseId)
                     : this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
                 o._insideHouseId = house?.id || null;
+                const houseRooms = house ? (this._roomZonesByHouseId.get(house.id) || []) : [];
                 const room = house
-                    ? this.roomZones.find(r => r.houseId === house.id && this.pointInsideRect(r, o.x, o.y, 1))
+                    ? houseRooms.find(r => this.pointInsideRect(r, o.x, o.y, 1))
                     : null;
                 o._insideRoomId = room?.id || null;
             }
-            if (surfaceKinds.has(o.kind)) this.surfaceObstacles.push(o);
-            else solid.push(o);
+            if (SURFACE_KINDS.has(o.kind)) {
+                this.surfaceObstacles.push(o);
+                if (o.kind === 'field') this.fieldObstacles.push(o);
+                else if (o.kind === 'road') this.roadObstacles.push(o);
+                else if (o.kind === 'bridge') this.bridgeObstacles.push(o);
+                else if (o.kind === 'water' || o.kind === 'river' || o.kind === 'river_path') this.waterObstacles.push(o);
+            } else {
+                solid.push(o);
+            }
         }
         this.sortedWorldObstacles = solid.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+
+        for (const house of this.houseFloors) {
+            const huge = house.w >= 430 || house.h >= 330;
+            const hasHallway = (this._roomZonesByHouseId.get(house.id) || []).some(r => r.variant === 'hallway');
+            if (huge && hasHallway && (house.variant === 'mansion' || house.variant === 'warehouse')) {
+                this._interiorFogHouseIds.add(house.id);
+            }
+        }
+        this._obstacleRevision++;
+        this._losCacheKey = '';
+    }
+
+    setViewBounds(camX, camY, viewW, viewH, z, pad = 160) {
+        const halfW = viewW / (2 * z) + pad;
+        const halfH = viewH / (2 * z) + pad;
+        this._viewLeft = camX - halfW;
+        this._viewRight = camX + halfW;
+        this._viewTop = camY - halfH;
+        this._viewBottom = camY + halfH;
+    }
+
+    isObstacleInView(o, pad = 0) {
+        const halfW = (o._renderHalfW ?? Math.abs(Number(o.w) || 0) / 2) + pad;
+        const halfH = (o._renderHalfH ?? Math.abs(Number(o.h) || 0) / 2) + pad;
+        return o.x + halfW >= this._viewLeft && o.x - halfW <= this._viewRight
+            && o.y + halfH >= this._viewTop && o.y - halfH <= this._viewBottom;
+    }
+
+    isPointInView(x, y, pad = 0) {
+        return x + pad >= this._viewLeft && x - pad <= this._viewRight
+            && y + pad >= this._viewTop && y - pad <= this._viewBottom;
     }
 
     pointInsideRect(o, x, y, pad = 0) {
@@ -706,7 +851,7 @@ export class SurvivRenderer {
     findRoomContainingPoint(x, y, house = null) {
         const houseId = house?.id || this.findHouseContainingPoint(x, y)?.id;
         if (!houseId) return null;
-        return this.roomZones.find(r => r.houseId === houseId && this.pointInsideRect(r, x, y, -1)) || null;
+        return (this._roomZonesByHouseId.get(houseId) || []).find(r => this.pointInsideRect(r, x, y, -1)) || null;
     }
 
     getCurrentRoom(currentHouse) {
@@ -715,10 +860,7 @@ export class SurvivRenderer {
     }
 
     usesInteriorFog(house) {
-        if (!house) return false;
-        const huge = house.w >= 430 || house.h >= 330;
-        const corridorHouse = this.roomZones.some(r => r.houseId === house.id && r.variant === 'hallway');
-        return huge && corridorHouse && (house.variant === 'mansion' || house.variant === 'warehouse');
+        return !!house && this._interiorFogHouseIds.has(house.id);
     }
 
     roomVisibilityStrength(room, currentRoom, playerX, playerY) {
@@ -804,7 +946,7 @@ export class SurvivRenderer {
 
     drawRoomShadows(ctx, currentHouse, currentRoom) {
         if (!currentHouse || !this.usesInteriorFog(currentHouse)) return;
-        const zones = this.roomZones.filter(r => r.houseId === currentHouse.id);
+        const zones = this._roomZonesByHouseId.get(currentHouse.id) || [];
         if (!zones.length || !currentRoom || !this.me) return;
         ctx.save();
 
@@ -879,47 +1021,36 @@ export class SurvivRenderer {
         const maxY = camY + halfH;
 
         const segments = [];
-        const blockingKinds = new Set(['wall', 'interiorWall', 'container', 'crate']);
-
         for (const o of this.obstacles) {
-            if (!blockingKinds.has(o.kind)) continue;
+            if (!LOS_BLOCKING_KINDS.has(o.kind) && o.kind !== 'tree') continue;
             // Cull obstacles far from camera
             if (o.x + o.w / 2 < minX || o.x - o.w / 2 > maxX) continue;
             if (o.y + o.h / 2 < minY || o.y - o.h / 2 > maxY) continue;
 
-            const hw = o.w / 2;
-            const hh = o.h / 2;
-            const corners = [
-                { x: o.x - hw, y: o.y - hh },
-                { x: o.x + hw, y: o.y - hh },
-                { x: o.x + hw, y: o.y + hh },
-                { x: o.x - hw, y: o.y + hh },
-            ];
-            // 4 edges of the rectangle
-            segments.push(
-                { ax: corners[0].x, ay: corners[0].y, bx: corners[1].x, by: corners[1].y },
-                { ax: corners[1].x, ay: corners[1].y, bx: corners[2].x, by: corners[2].y },
-                { ax: corners[2].x, ay: corners[2].y, bx: corners[3].x, by: corners[3].y },
-                { ax: corners[3].x, ay: corners[3].y, bx: corners[0].x, by: corners[0].y },
-            );
-        }
-
-        // Also add tree trunks as blocking segments (approximate as octagon)
-        for (const o of this.obstacles) {
-            if (o.kind !== 'tree') continue;
-            if (o.x + o.w / 2 < minX || o.x - o.w / 2 > maxX) continue;
-            if (o.y + o.h / 2 < minY || o.y - o.h / 2 > maxY) continue;
-            const r = Math.min(o.w, o.h) * 0.32; // trunk radius (smaller than visual canopy)
-            const sides = 6;
-            for (let i = 0; i < sides; i++) {
-                const a1 = (Math.PI * 2 * i) / sides;
-                const a2 = (Math.PI * 2 * (i + 1)) / sides;
-                segments.push({
-                    ax: o.x + Math.cos(a1) * r,
-                    ay: o.y + Math.sin(a1) * r,
-                    bx: o.x + Math.cos(a2) * r,
-                    by: o.y + Math.sin(a2) * r,
-                });
+            if (LOS_BLOCKING_KINDS.has(o.kind)) {
+                const minOx = o.x - o.w / 2;
+                const maxOx = o.x + o.w / 2;
+                const minOy = o.y - o.h / 2;
+                const maxOy = o.y + o.h / 2;
+                segments.push(
+                    { ax: minOx, ay: minOy, bx: maxOx, by: minOy },
+                    { ax: maxOx, ay: minOy, bx: maxOx, by: maxOy },
+                    { ax: maxOx, ay: maxOy, bx: minOx, by: maxOy },
+                    { ax: minOx, ay: maxOy, bx: minOx, by: minOy },
+                );
+            } else {
+                const r = Math.min(o.w, o.h) * 0.32;
+                const sides = 6;
+                for (let i = 0; i < sides; i++) {
+                    const a1 = (Math.PI * 2 * i) / sides;
+                    const a2 = (Math.PI * 2 * (i + 1)) / sides;
+                    segments.push({
+                        ax: o.x + Math.cos(a1) * r,
+                        ay: o.y + Math.sin(a1) * r,
+                        bx: o.x + Math.cos(a2) * r,
+                        by: o.y + Math.sin(a2) * r,
+                    });
+                }
             }
         }
 
@@ -976,7 +1107,10 @@ export class SurvivRenderer {
         const angles = new Set();
 
         // Add sweep rays for smooth coverage between wall corners
-        const sweepCount = 256;
+        // Exact endpoint rays keep corners crisp; 96 sweep rays make the open
+        // 900px-radius edge sub-pixel smooth without the old O(256 * segments)
+        // intersection cost every animation frame.
+        const sweepCount = 96;
         for (let i = 0; i < sweepCount; i++) {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
@@ -1016,20 +1150,26 @@ export class SurvivRenderer {
      * A large outer rectangle + the visibility polygon are drawn with 'evenodd'
      * fill rule, so only the area OUTSIDE the polygon is filled with darkness.
      */
-    drawLineOfSightShadow(ctx, camX, camY, viewW, viewH, z) {
+    drawLineOfSightShadow(ctx, camX, camY, viewW, viewH, z, knownCurrentHouse = null) {
         this._currentVisibilityPolygon = null;
         this._currentVisibilityHouseId = null;
         if (!this.me) return;
         // Only apply shadows inside large houses (mansion, warehouse, hospital, etc.)
-        const currentHouse = this.getCurrentHouse();
+        const currentHouse = knownCurrentHouse || this.getCurrentHouse();
         if (!currentHouse || !this.usesInteriorFog(currentHouse)) return;
 
         const px = this.me.x;
         const py = this.me.y;
         const maxDist = 900;
 
-        const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z);
-        const polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
+        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px * 2)}:${Math.round(py * 2)}:${Math.round(camX / 64)}:${Math.round(camY / 64)}`;
+        let polygon = this._losCachedPolygon;
+        if (cacheKey !== this._losCacheKey || !polygon) {
+            const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z);
+            polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
+            this._losCacheKey = cacheKey;
+            this._losCachedPolygon = polygon;
+        }
         if (polygon.length < 3) return;
         this._currentVisibilityPolygon = polygon;
         this._currentVisibilityHouseId = currentHouse.id;
@@ -1146,7 +1286,9 @@ export class SurvivRenderer {
         if (this._lowAmmoPulse > 0) this._lowAmmoPulse = Math.max(0, this._lowAmmoPulse - dt * 2);
 
         // Update particles
-        this.particles = this.particles.filter(p => {
+        let liveParticleCount = 0;
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
             if (p.type === 'shell') {
                 p.x += p.vx * dt;
                 p.y += p.vy * dt;
@@ -1174,8 +1316,9 @@ export class SurvivRenderer {
                 p.vx *= 0.92;
                 p.vy *= 0.92;
             }
-            return p.life > 0;
-        });
+            if (p.life > 0) this.particles[liveParticleCount++] = p;
+        }
+        this.particles.length = liveParticleCount;
 
         // Interpolate remote players
         const interpSpeed = clamp(dt * 12, 0.05, 0.6);
@@ -1191,6 +1334,7 @@ export class SurvivRenderer {
         const camX = this.camera.x + this.cameraShake.x;
         const camY = this.camera.y + this.cameraShake.y;
         const z = this.zoom;
+        this.setViewBounds(camX, camY, W, H, z);
 
         ctx.fillStyle = '#2d5426';
         ctx.fillRect(0, 0, W, H);
@@ -1205,43 +1349,43 @@ export class SurvivRenderer {
         const currentRoom = this.getCurrentRoom(currentHouse);
         this.hoveredChestId = this.findInteractChest()?.id || null;
         // Pass 1: Draw fields (grass overlays, crops, dirt field bases)
-        for (const o of this.surfaceObstacles) {
-            if (o.kind === 'field' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+        for (const o of this.fieldObstacles) {
+            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawObstacle(ctx, o);
             }
         }
 
         // Pass 2: Draw river & lake sandy shore bases
-        for (const o of this.surfaceObstacles) {
-            if ((o.kind === 'river' || o.kind === 'water' || o.kind === 'river_path') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+        for (const o of this.waterObstacles) {
+            if (this.isObstacleInView(o, 40) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawObstacleShore(ctx, o);
             }
         }
 
         // Pass 3: Draw road gravel/dirt shoulders (under the asphalt)
-        for (const o of this.surfaceObstacles) {
-            if (o.kind === 'road' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+        for (const o of this.roadObstacles) {
+            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawRoadShoulder(ctx, o);
             }
         }
 
         // Pass 4: Draw river & lake water bodies (seamlessly on top of shores)
-        for (const o of this.surfaceObstacles) {
-            if ((o.kind === 'river' || o.kind === 'water' || o.kind === 'river_path') && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+        for (const o of this.waterObstacles) {
+            if (this.isObstacleInView(o, 40) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawObstacleBody(ctx, o);
             }
         }
 
         // Pass 5: Draw road asphalt & dirt bodies (seamlessly on top of shoulders)
-        for (const o of this.surfaceObstacles) {
-            if (o.kind === 'road' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+        for (const o of this.roadObstacles) {
+            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawRoadBody(ctx, o);
             }
         }
 
         // Pass 6: Draw road markings (yellow centerlines, white borders) & tire tracks
-        for (const o of this.surfaceObstacles) {
-            if (o.kind === 'road' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+        for (const o of this.roadObstacles) {
+            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawRoadMarkings(ctx, o);
             }
         }
@@ -1250,30 +1394,30 @@ export class SurvivRenderer {
         this.drawBloodDecals(ctx);
 
         // Pass 7: Draw bridges (go on top of road/river intersections)
-        for (const o of this.surfaceObstacles) {
-            if (o.kind === 'bridge' && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
+        for (const o of this.bridgeObstacles) {
+            if (this.isObstacleInView(o, 48) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
                 this.drawObstacle(ctx, o);
             }
         }
 
         this.drawWorldBorder(ctx);
         for (const o of this.houseFloors) {
-            if (!currentHouse || currentHouse.id !== o.id) this.drawHouseRoof(ctx, o);
+            if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
         }
         for (const o of this.sortedWorldObstacles) {
-            if (this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
+            if (this.isObstacleInView(o, 48) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
         // Only use the new LOS shadow system (replaces old room shadows)
-        this.drawLineOfSightShadow(ctx, camX, camY, W, H, z);
+        this.drawLineOfSightShadow(ctx, camX, camY, W, H, z, currentHouse);
 
         // Draw zone (gas circle)
         this.drawZone(ctx);
 
         for (const l of this.loot) {
-            if (!this.isLootHidden(l, currentHouse, currentRoom)) this.drawLoot(ctx, l);
+            if (this.isPointInView(l.x, l.y, 70) && !this.isLootHidden(l, currentHouse, currentRoom)) this.drawLoot(ctx, l);
         }
         for (const b of this.bullets) {
-            if (!this.isPointHiddenByRooms(b.x, b.y, currentHouse, currentRoom)) this.drawBullet(ctx, b);
+            if (this.isPointInView(b.x, b.y, 110) && !this.isPointHiddenByRooms(b.x, b.y, currentHouse, currentRoom)) this.drawBullet(ctx, b);
         }
         // Draw players with interpolation
         for (const p of this.players) {
@@ -1288,6 +1432,7 @@ export class SurvivRenderer {
                     p.angle = ip.angle;
                 }
             }
+            if (!this.isPointInView(p.x, p.y, 90)) continue;
             if (this.isPlayerHidden(p, currentHouse, currentRoom)) continue;
             this.drawPlayer(ctx, p);
         }
@@ -1312,10 +1457,43 @@ export class SurvivRenderer {
         this.drawLootToast(ctx, W, H);
     }
 
-    drawTerrain(ctx, camX, camY, viewW, viewH, z) {
+    getTerrainPattern(ctx) {
+        if (this._terrainPattern) return this._terrainPattern;
+        if (typeof document === 'undefined' || typeof ctx.createPattern !== 'function') return null;
+
+        try {
+            if (!this._terrainTexture) {
+                const tile = 96;
+                const size = tile * 8;
+                const texture = document.createElement('canvas');
+                texture.width = size;
+                texture.height = size;
+                const textureCtx = texture.getContext('2d');
+                if (!textureCtx) return null;
+                this._terrainTexture = texture;
+                this.drawTerrain(textureCtx, size / 2, size / 2, size, size, 1, false);
+            }
+            this._terrainPattern = ctx.createPattern(this._terrainTexture, 'repeat');
+        } catch {
+            this._terrainPattern = null;
+        }
+        return this._terrainPattern;
+    }
+
+    drawTerrain(ctx, camX, camY, viewW, viewH, z, allowPattern = true) {
         const tile = 96;
         const halfW = viewW / z / 2 + tile;
         const halfH = viewH / z / 2 + tile;
+
+        if (allowPattern) {
+            const terrainPattern = this.getTerrainPattern(ctx);
+            if (terrainPattern) {
+                ctx.fillStyle = terrainPattern;
+                ctx.fillRect(camX - halfW, camY - halfH, halfW * 2, halfH * 2);
+                return;
+            }
+        }
+
         const startX = Math.floor((camX - halfW) / tile) * tile;
         const endX = Math.ceil((camX + halfW) / tile) * tile;
         const startY = Math.floor((camY - halfH) / tile) * tile;
@@ -3677,6 +3855,7 @@ export class SurvivRenderer {
         if (this.particles.length === 0) return;
         ctx.save();
         for (const p of this.particles) {
+            if (!this.isPointInView(p.x, p.y, 24)) continue;
             const alpha = clamp(p.life / (p.maxLife || 0.2), 0, 1);
             ctx.globalAlpha = alpha;
 
@@ -3709,6 +3888,7 @@ export class SurvivRenderer {
         if (this.damageNumbers.length === 0) return;
         ctx.save();
         for (const d of this.damageNumbers) {
+            if (!this.isPointInView(d.x, d.y, 48)) continue;
             const age = now - d.spawnedAt;
             const t = age / d.duration;
             const alpha = t < 0.2 ? t / 0.2 : Math.max(0, 1 - (t - 0.5) / 0.5);
@@ -3869,15 +4049,28 @@ export class SurvivRenderer {
     }
 
     spawnBloodDecal(x, y) {
+        const size = 10 + Math.random() * 10;
+        const dropletCount = 3 + Math.floor(size * 0.12);
+        const droplets = [];
+        for (let i = 0; i < dropletCount; i++) {
+            const dist = size * (0.42 + Math.random() * 0.45);
+            const angle = (i * Math.PI * 2) / dropletCount + (Math.random() - 0.5) * 0.6;
+            droplets.push({
+                x: Math.cos(angle) * dist,
+                y: Math.sin(angle) * dist,
+                radius: size * (0.10 + Math.random() * 0.1),
+            });
+        }
         this.bloodDecals.push({
             x: x + (Math.random() - 0.5) * 8,
             y: y + (Math.random() - 0.5) * 8,
-            size: 10 + Math.random() * 10,
+            size,
             rotation: Math.random() * Math.PI * 2,
             opacity: 0.85,
             bornAt: Date.now(),
             fadeStartAt: Date.now() + 18000, // Stay solid for 18 seconds
             fadeDuration: 4000,             // Fade out over 4 seconds
+            droplets,
         });
         // Cap to prevent memory leaks
         if (this.bloodDecals.length > 180) {
@@ -3898,6 +4091,7 @@ export class SurvivRenderer {
                 this.bloodDecals.splice(i, 1);
                 continue;
             }
+            if (!this.isPointInView(d.x, d.y, d.size + 8)) continue;
 
             ctx.save();
             ctx.translate(d.x, d.y);
@@ -3911,14 +4105,9 @@ export class SurvivRenderer {
             ctx.fill();
 
             // Satellite droplets (splatter spray)
-            const droplets = 3 + Math.floor(d.size * 0.12);
-            for (let s = 0; s < droplets; s++) {
-                const dist = d.size * (0.42 + Math.random() * 0.45);
-                const a = (s * Math.PI * 2) / droplets + (Math.random() - 0.5) * 0.6;
-                const sx = Math.cos(a) * dist;
-                const sy = Math.sin(a) * dist;
+            for (const droplet of d.droplets || []) {
                 ctx.beginPath();
-                ctx.arc(sx, sy, d.size * (0.10 + Math.random() * 0.1), 0, Math.PI * 2);
+                ctx.arc(droplet.x, droplet.y, droplet.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
             ctx.restore();

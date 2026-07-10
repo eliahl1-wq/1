@@ -50,6 +50,30 @@ const WEAPON_CLIP_SIZES = {
     lmg: 45,
 };
 
+const SURVIV_RELOAD_UI_STEP_MS = 100;
+
+function createSurvivUiSnapshot(player) {
+    const reloadRemaining = Math.max(0, Number(player?.reloadRemainingMs) || 0);
+    return {
+        hp: player?.hp,
+        maxHp: player?.maxHp,
+        armor: player?.armor,
+        weapon: player?.weapon,
+        ammo: player?.ammo,
+        clipSize: player?.clipSize,
+        reloading: !!player?.reloading,
+        reloadRemainingMs: player?.reloading
+            ? Math.ceil(reloadRemaining / SURVIV_RELOAD_UI_STEP_MS) * SURVIV_RELOAD_UI_STEP_MS
+            : 0,
+        reloadMs: player?.reloadMs,
+        dollarBalance: player?.dollarBalance,
+        kills: player?.kills,
+        weaponsAmmo: player?.weaponsAmmo || {},
+        inventory: player?.inventory || null,
+        openedContainer: player?.openedContainer || null,
+    };
+}
+
 function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
     switch (weaponId) {
         case 'fists':
@@ -168,17 +192,16 @@ export default function SurvivGame() {
     const closeChestPendingRef = useRef(false);
     const putChestItemPendingRef = useRef(null);
     const dropItemPendingRef = useRef(null);
-
-    const handleCloseInventory = useCallback(() => {
-        setIsInventoryOpen(false);
-        closeChestPendingRef.current = true;
-    }, []);
+    const meUiSignatureRef = useRef('');
+    const resetCountdownValueRef = useRef(null);
+    const aliveCountValueRef = useRef(0);
 
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
     const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
     const [currentBalance, setCurrentBalanceState] = useState(0);
     const currentBalanceRef = useRef(0);
     const setCurrentBalance = useCallback((val) => {
+        if (Object.is(currentBalanceRef.current, val)) return;
         currentBalanceRef.current = val;
         setCurrentBalanceState(val);
     }, []);
@@ -218,6 +241,13 @@ export default function SurvivGame() {
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
     const [resetCountdown, setResetCountdown] = useState(null);
     const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+    const inventoryOpenRef = useRef(false);
+    inventoryOpenRef.current = isInventoryOpen;
+    const handleCloseInventory = useCallback(() => {
+        inventoryOpenRef.current = false;
+        setIsInventoryOpen(false);
+        closeChestPendingRef.current = true;
+    }, []);
     const [me, setMe] = useState(null);
     const [canMobileInteract, setCanMobileInteract] = useState(false);
     const [aliveCount, setAliveCount] = useState(0);
@@ -423,10 +453,12 @@ export default function SurvivGame() {
         const onKeyDown = (e) => {
             if (blockInputRef.current) return;
             const k = e.key.toLowerCase();
-            if (k === 'tab') {
+            if (k === 'tab' || k === 'i') {
                 e.preventDefault();
+                if (e.repeat) return;
                 setIsInventoryOpen(prev => {
                     const next = !prev;
+                    inventoryOpenRef.current = next;
                     if (!next) {
                         closeChestPendingRef.current = true;
                     }
@@ -434,22 +466,19 @@ export default function SurvivGame() {
                 });
                 return;
             }
-            if (k === 'i' || k === 'e') {
-                setIsInventoryOpen(prev => {
-                    if (prev) {
-                        closeChestPendingRef.current = true;
-                    }
-                    return false;
-                });
+            if (k === 'e') {
+                e.preventDefault();
+                if (e.repeat) return;
+                if (inventoryOpenRef.current) {
+                    handleCloseInventory();
+                    return;
+                }
+                const chest = renderer.getNearbyChest();
+                if (chest?.id) openChestPendingRef.current = chest.id;
                 return;
             }
             if (k === 'escape') {
-                setIsInventoryOpen(prev => {
-                    if (prev) {
-                        closeChestPendingRef.current = true;
-                    }
-                    return false;
-                });
+                if (inventoryOpenRef.current) handleCloseInventory();
                 return;
             }
             const action = renderer.handleKeyDown(e);
@@ -506,9 +535,15 @@ export default function SurvivGame() {
                 setCanMobileInteract(previous => previous === nearby ? previous : nearby);
             }
             if (tick.you) {
-                setMe(tick.you);
-                const chestId = tick.you.openedContainer?.id || null;
+                const nextMe = createSurvivUiSnapshot(tick.you);
+                const nextMeSignature = JSON.stringify(nextMe);
+                if (nextMeSignature !== meUiSignatureRef.current) {
+                    meUiSignatureRef.current = nextMeSignature;
+                    setMe(nextMe);
+                }
+                const chestId = nextMe.openedContainer?.id || null;
                 if (chestId && chestId !== prevOpenedContainerIdRef.current) {
+                    inventoryOpenRef.current = true;
                     setIsInventoryOpen(true);
                 }
                 prevOpenedContainerIdRef.current = chestId;
@@ -518,11 +553,17 @@ export default function SurvivGame() {
             }
             if (tick.resetTime) {
                 const left = Math.max(0, Math.floor((tick.resetTime - Date.now()) / 1000));
-                setResetCountdown(left);
+                if (left !== resetCountdownValueRef.current) {
+                    resetCountdownValueRef.current = left;
+                    setResetCountdown(left);
+                }
             }
             // Track alive player count
             const alive = tick.aliveCount ?? renderer.aliveCount ?? (tick.players || []).filter(p => (p.hp || 0) > 0).length;
-            setAliveCount(alive);
+            if (alive !== aliveCountValueRef.current) {
+                aliveCountValueRef.current = alive;
+                setAliveCount(alive);
+            }
         });
 
         socket.on('leaderboard', (data) => {
@@ -646,7 +687,7 @@ export default function SurvivGame() {
             socket.off();
             socket.disconnect();
         };
-    }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser]);
+    }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser, handleCloseInventory]);
 
     const handleHoldStart = useCallback(() => {
         rendererRef.current?.setHoldStart(Date.now());
@@ -667,7 +708,9 @@ export default function SurvivGame() {
     const handleMobileInventory = useCallback(() => {
         setIsInventoryOpen(previous => {
             if (previous) closeChestPendingRef.current = true;
-            return !previous;
+            const next = !previous;
+            inventoryOpenRef.current = next;
+            return next;
         });
     }, []);
 
@@ -695,6 +738,16 @@ export default function SurvivGame() {
     }, [authToken]);
 
     const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
+    const healthRatio = me ? Math.max(0, Math.min(1, (Number(me.hp) || 0) / (Number(me.maxHp) || 100))) : 0;
+    const armorRatio = me ? Math.max(0, Math.min(1, (Number(me.armor) || 0) / 100)) : 0;
+    const canMobileReload = !!me
+        && me.weapon !== 'fists'
+        && !me.reloading
+        && (Number(me.clipSize) || 0) > 0
+        && (Number(me.ammo) || 0) < (Number(me.clipSize) || 0);
+    const canMobileHeal = !!me
+        && (Number(me.inventory?.medkits) || 0) > 0
+        && (Number(me.hp) || 0) < (Number(me.maxHp) || 100);
 
     return (
         <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}`} style={{
@@ -720,6 +773,9 @@ export default function SurvivGame() {
                     onHeal={handleMobileHeal}
                     onInteract={handleMobileInteract}
                     canInteract={canMobileInteract}
+                    canReload={canMobileReload}
+                    canHeal={canMobileHeal}
+                    isReloading={!!me?.reloading}
                 />
             )}
 
@@ -798,34 +854,19 @@ export default function SurvivGame() {
             )}
 
             {leaderboard.length > 0 && gameReady && !showResultModal && (
-                <div className="game-leaderboard" style={{
-                    position: 'absolute',
-                    top: '120px',
-                    right: '30px',
-                    width: '180px',
-                    background: 'rgba(16, 17, 24, 0.85)',
-                    backdropFilter: 'blur(20px)',
-                    padding: '16px',
-                    borderRadius: '16px',
-                    border: '1px solid var(--border)',
-                    color: 'white',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                    zIndex: 100,
-                }}>
-                    <h4 className="game-leaderboard-title" style={{ margin: '0 0 12px 0', fontSize: '0.65rem', opacity: 0.3, letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '800' }}>
+                <div className="game-leaderboard-panel surviv-leaderboard" aria-label="Leaderboard">
+                    <h4 className="game-leaderboard-title">
                         Leaderboard
                     </h4>
-                    <div className="game-leaderboard-list" style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="game-leaderboard-list">
                         {leaderboard.map((entry, i) => (
-                            <div key={entry.id || `${entry.username}-${i}`} style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                opacity: entry.id === myIdRef.current ? 1 : 0.6,
-                                color: entry.id === myIdRef.current ? 'var(--accent)' : 'var(--text-bright)',
-                                fontWeight: entry.id === myIdRef.current ? '700' : '400',
-                            }}>
-                                <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {entry.username}</span>
-                                <span style={{ fontFamily: 'ui-monospace, monospace' }}>
+                            <div
+                                key={entry.id || `${entry.username}-${i}`}
+                                className={`game-leaderboard-row${entry.id === myIdRef.current ? ' is-me' : ''}`}
+                                aria-current={entry.id === myIdRef.current ? 'true' : undefined}
+                            >
+                                <span className="game-leaderboard-name">{i + 1}. {entry.username}</span>
+                                <span className="game-leaderboard-value">
                                     {formatUsd(entry.balance)}
                                 </span>
                             </div>
@@ -837,7 +878,7 @@ export default function SurvivGame() {
             {/* HP and Armor Progress Bars */}
             {gameReady && me && !showResultModal && (
                 <div className="surviv-hud-status-bars">
-                    <div className="hud-bar-wrapper health">
+                    <div className={`hud-bar-wrapper health${healthRatio <= 0.25 ? ' is-critical' : ''}`}>
                         <div className="hud-bar-header">
                             <span className="hud-bar-title-row">
                                 <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
@@ -845,8 +886,8 @@ export default function SurvivGame() {
                             </span>
                             <span className="hud-bar-value">{Math.round(me.hp || 0)} / {Math.round(me.maxHp || 100)}</span>
                         </div>
-                        <div className="hud-bar-track">
-                            <div className="hud-bar-fill health-fill" style={{ width: `${Math.max(0, Math.min(1, (me.hp || 0) / (me.maxHp || 100))) * 100}%` }} />
+                        <div className="hud-bar-track" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax={Math.round(me.maxHp || 100)} aria-valuenow={Math.round(me.hp || 0)}>
+                            <div className="hud-bar-fill health-fill" style={{ width: `${healthRatio * 100}%` }} />
                         </div>
                     </div>
 
@@ -858,8 +899,8 @@ export default function SurvivGame() {
                             </span>
                             <span className="hud-bar-value">{Math.round(me.armor || 0)}%</span>
                         </div>
-                        <div className="hud-bar-track">
-                            <div className="hud-bar-fill armor-fill" style={{ width: `${Math.max(0, Math.min(1, (me.armor || 0) / 100)) * 100}%` }} />
+                        <div className="hud-bar-track" role="progressbar" aria-label="Armor" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(me.armor || 0)}>
+                            <div className="hud-bar-fill armor-fill" style={{ width: `${armorRatio * 100}%` }} />
                         </div>
                     </div>
                 </div>
@@ -882,9 +923,14 @@ export default function SurvivGame() {
                         const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
                         
                         return (
-                            <div 
+                            <button
+                                type="button"
                                 key={`hotbar-slot-${slotIdx}`}
                                 className={`hotbar-slot ${isActive ? 'active-slot' : ''} ${weaponId ? 'has-item' : 'empty-slot'} ${borderRarityClass}`}
+                                disabled={!weaponId}
+                                aria-pressed={!!isActive}
+                                aria-label={weaponId ? `Equip ${weaponLabel}` : `Weapon slot ${slotIdx + 1}, empty`}
+                                title={weaponLabel || `Empty weapon slot ${slotIdx + 1}`}
                                 onClick={() => {
                                     if (weaponId) {
                                         equipSlotPendingRef.current = slotIdx;
@@ -911,33 +957,34 @@ export default function SurvivGame() {
                                 ) : (
                                     <span className="hotbar-slot-empty-label">-</span>
                                 )}
-                            </div>
+                            </button>
                         );
                     })}
                 </div>
             )}
 
-            {/* Eliminations Badge */}
-            {gameReady && me && me.kills > 0 && !showResultModal && (
-                <div className="surviv-kills-badge">
-                    <svg className="elim-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M9 12h.01M15 12h.01M12 2a8 8 0 0 0-8 8v3a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-3a8 8 0 0 0-8-8z"/>
-                        <path d="M10 22v-3h4v3"/>
-                    </svg>
-                    <span>{me.kills} {me.kills === 1 ? 'ELIM' : 'ELIMS'}</span>
-                </div>
-            )}
-
-            {/* Alive Players Count */}
-            {gameReady && !showResultModal && aliveCount > 0 && (
-                <div className="surviv-alive-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                    </svg>
-                    <span>{aliveCount} ALIVE</span>
+            {gameReady && !showResultModal && ((me?.kills || 0) > 0 || aliveCount > 0) && (
+                <div className="surviv-match-stats" aria-label="Match status" aria-live="polite">
+                    {(me?.kills || 0) > 0 && (
+                        <div className="surviv-kills-badge">
+                            <svg className="elim-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                <path d="M9 12h.01M15 12h.01M12 2a8 8 0 0 0-8 8v3a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-3a8 8 0 0 0-8-8z"/>
+                                <path d="M10 22v-3h4v3"/>
+                            </svg>
+                            <span>{me.kills} {me.kills === 1 ? 'ELIM' : 'ELIMS'}</span>
+                        </div>
+                    )}
+                    {aliveCount > 0 && (
+                        <div className="surviv-alive-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            <span>{aliveCount} ALIVE</span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -963,6 +1010,9 @@ export default function SurvivGame() {
             {isInventoryOpen && me && (
                 <div 
                     className="surviv-inventory-modal" 
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="surviv-inventory-title"
                     onClick={handleCloseInventory}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
@@ -983,12 +1033,12 @@ export default function SurvivGame() {
                         {/* Header */}
                         <div className="surviv-inventory-header">
                             <div className="surviv-inventory-title-row">
-                                <span className="surviv-inventory-title">INVENTORY</span>
-                                <button className="surviv-inventory-close-btn" onClick={handleCloseInventory}>
+                                <span id="surviv-inventory-title" className="surviv-inventory-title">INVENTORY</span>
+                                <button type="button" className="surviv-inventory-close-btn" aria-label="Close inventory" onClick={handleCloseInventory}>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                                 </button>
                             </div>
-                            <div className="surviv-inventory-subtitle">Backpack & chest</div>
+                            <div className="surviv-inventory-subtitle">{me.openedContainer ? 'Backpack & open chest' : 'Backpack · Tab to close'}</div>
                         </div>
 
                         {/* Side-by-side grids */}
@@ -1364,4 +1414,3 @@ export default function SurvivGame() {
         </div>
     );
 }
-

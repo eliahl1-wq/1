@@ -40,6 +40,7 @@ function VirtualJoystick({ label, variant, onChange }) {
     }, [onChange]);
 
     const release = useCallback((event) => {
+        if (pointerIdRef.current !== event.pointerId) return;
         stopPointer(event);
         pointerIdRef.current = null;
         setKnob({ x: 0, y: 0, active: false });
@@ -53,7 +54,9 @@ function VirtualJoystick({ label, variant, onChange }) {
             className={`surviv-mobile-stick surviv-mobile-stick--${variant}${knob.active ? ' is-active' : ''}`}
             role="application"
             aria-label={label}
+            aria-roledescription="virtual joystick"
             onPointerDown={(event) => {
+                if (pointerIdRef.current != null && pointerIdRef.current !== event.pointerId) return;
                 stopPointer(event);
                 pointerIdRef.current = event.pointerId;
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -90,15 +93,22 @@ function ActionIcon({ type }) {
     return <><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="5" /></>;
 }
 
-function ActionButton({ label, type, onPress, accent }) {
+function ActionButton({ label, type, onPress, accent, disabled = false }) {
     return (
         <button
             type="button"
             className={`surviv-mobile-action${accent ? ' is-accent' : ''}`}
             aria-label={label}
             title={label}
+            disabled={disabled}
             onPointerDown={(event) => {
                 stopPointer(event);
+                onPress?.();
+            }}
+            onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                event.stopPropagation();
                 onPress?.();
             }}
         >
@@ -109,7 +119,7 @@ function ActionButton({ label, type, onPress, accent }) {
     );
 }
 
-export default function SurvivMobileControls({
+function SurvivMobileControls({
     onMove,
     onAim,
     onInventory,
@@ -117,6 +127,9 @@ export default function SurvivMobileControls({
     onHeal,
     onInteract,
     canInteract,
+    canReload,
+    canHeal,
+    isReloading,
 }) {
     if (!IS_MOBILE) return null;
 
@@ -125,11 +138,13 @@ export default function SurvivMobileControls({
             <VirtualJoystick label="Move" variant="move" onChange={onMove} />
             <div className="surviv-mobile-actions">
                 <ActionButton label="Inventory" type="inventory" onPress={onInventory} />
-                <ActionButton label="Reload" type="reload" onPress={onReload} />
-                <ActionButton label="Use medkit" type="heal" onPress={onHeal} />
-                <ActionButton label="Open nearby chest" type="interact" onPress={onInteract} accent={canInteract} />
+                <ActionButton label={isReloading ? 'Reloading' : 'Reload weapon'} type="reload" onPress={onReload} disabled={!canReload} />
+                <ActionButton label="Use medkit" type="heal" onPress={onHeal} disabled={!canHeal} />
+                <ActionButton label={canInteract ? 'Open nearby chest' : 'No chest nearby'} type="interact" onPress={onInteract} accent={canInteract} disabled={!canInteract} />
             </div>
             <VirtualJoystick label="Aim and fire" variant="aim" onChange={onAim} />
         </div>
     );
 }
+
+export default React.memo(SurvivMobileControls);

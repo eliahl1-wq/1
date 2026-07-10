@@ -2277,3 +2277,138 @@
         height: 36px;
     }
 }
+
+/* Surviv HUD clarity, input feedback, and low-cost mobile compositing */
+.surviv-game-page .surviv-leaderboard {
+    color: #fff;
+}
+
+.surviv-game-page .surviv-leaderboard .game-leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.surviv-game-page .surviv-leaderboard .game-leaderboard-row {
+    gap: 10px;
+    opacity: 0.62;
+}
+
+.surviv-game-page .surviv-leaderboard .game-leaderboard-row.is-me {
+    opacity: 1;
+    font-weight: 800;
+}
+
+.surviv-game-page .surviv-leaderboard .game-leaderboard-row.is-me span {
+    color: #14f195;
+}
+
+.surviv-game-page .surviv-leaderboard .game-leaderboard-name {
+    min-width: 0;
+}
+
+.surviv-game-page .surviv-leaderboard .game-leaderboard-value {
+    flex-shrink: 0;
+}
+
+.surviv-game-page .surviv-match-stats {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.surviv-game-page .surviv-match-stats .surviv-kills-badge,
+.surviv-game-page .surviv-match-stats .surviv-alive-badge {
+    position: static;
+    inset: auto;
+    transform: none;
+}
+
+.surviv-game-page .hud-bar-wrapper.health.is-critical .hud-bar-title-row,
+.surviv-game-page .hud-bar-wrapper.health.is-critical .hud-bar-value {
+    color: #ff6b6b;
+    text-shadow: 0 0 5px rgba(255, 59, 48, 0.32);
+}
+
+.surviv-game-page .hud-bar-wrapper.health.is-critical .health-fill {
+    background: linear-gradient(90deg, #d93d3d, #ff6b6b);
+    box-shadow: 0 0 9px rgba(255, 59, 48, 0.42);
+}
+
+.surviv-game-page .surviv-weapons-hotbar .hotbar-slot {
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    color: inherit;
+    font: inherit;
+}
+
+.surviv-game-page .surviv-weapons-hotbar .hotbar-slot:focus-visible,
+.surviv-game-page .surviv-inventory-close-btn:focus-visible,
+.surviv-mobile-action:focus-visible {
+    outline: 2px solid #14f195;
+    outline-offset: 2px;
+}
+
+.surviv-mobile-action:disabled,
+.surviv-mobile-action.is-disabled {
+    opacity: 0.34;
+    color: rgba(255, 255, 255, 0.42);
+    border-color: rgba(235, 220, 176, 0.1);
+    box-shadow: none;
+    filter: saturate(0.45);
+}
+
+.surviv-mobile-action:disabled:active {
+    transform: none;
+    background: rgba(8, 12, 9, 0.64);
+}
+
+@media (pointer: coarse), (max-width: 900px) and (max-height: 520px) {
+    .game-viewport--mobile.surviv-game-page .surviv-match-stats {
+        top: max(8px, calc(env(safe-area-inset-top, 0px) + 4px));
+        right: max(134px, calc(env(safe-area-inset-right, 0px) + 128px));
+        left: auto;
+        transform: none;
+    }
+
+    .surviv-mobile-stick,
+    .surviv-mobile-action,
+    .game-viewport--mobile.surviv-game-page .surviv-hud-status-bars,
+    .game-viewport--mobile.surviv-game-page .surviv-weapons-hotbar .hotbar-slot,
+    .game-viewport--mobile.surviv-game-page .surviv-leaderboard {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    .surviv-mobile-stick {
+        background: rgba(7, 10, 8, 0.56);
+    }
+
+    .surviv-mobile-action {
+        background: rgba(8, 12, 9, 0.82);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .surviv-game-page .surviv-inventory-modal,
+    .surviv-game-page .surviv-inventory-container,
+    .surviv-game-page .surviv-kills-badge,
+    .surviv-game-page .surviv-alive-badge,
+    .surviv-game-page .hotbar-slot-ammo.reloading,
+    .surviv-game-page .elim-icon,
+    .surviv-game-page .hud-bar-fill,
+    .surviv-game-page .hotbar-slot,
+    .surviv-mobile-stick-knob,
+    .surviv-mobile-action {
+        animation: none !important;
+        transition: none !important;
+    }
+}
