@@ -109,6 +109,46 @@ function seededNoise(x, y) {
     return n - Math.floor(n);
 }
 
+function traceSmoothWaterPath(ctx, points, originX = 0, originY = 0) {
+    if (!points?.length) return;
+    const local = points.map(point => ({ x: point.x - originX, y: point.y - originY }));
+    ctx.beginPath();
+    ctx.moveTo(local[0].x, local[0].y);
+    for (let i = 1; i < local.length - 1; i++) {
+        const current = local[i];
+        const next = local[i + 1];
+        ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+    }
+    const last = local[local.length - 1];
+    ctx.lineTo(last.x, last.y);
+}
+
+function traceOrganicPond(ctx, obstacle, padding = 0) {
+    const count = 24;
+    const rx = obstacle.w / 2 + padding;
+    const ry = obstacle.h / 2 + padding;
+    const points = [];
+    for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const wobble = 1
+            + Math.sin(angle * 3 + obstacle.x * 0.007) * 0.055
+            + Math.sin(angle * 5 + obstacle.y * 0.009) * 0.035;
+        points.push({ x: Math.cos(angle) * rx * wobble, y: Math.sin(angle) * ry * wobble });
+    }
+    ctx.beginPath();
+    const firstMid = {
+        x: (points[count - 1].x + points[0].x) / 2,
+        y: (points[count - 1].y + points[0].y) / 2,
+    };
+    ctx.moveTo(firstMid.x, firstMid.y);
+    for (let i = 0; i < count; i++) {
+        const point = points[i];
+        const next = points[(i + 1) % count];
+        ctx.quadraticCurveTo(point.x, point.y, (point.x + next.x) / 2, (point.y + next.y) / 2);
+    }
+    ctx.closePath();
+}
+
 function biomeAt() {
     return { base: '#3d6b35', alt: '#4a7a42', grass: 'rgba(45,88,38,0.22)' };
 }
@@ -140,6 +180,7 @@ export class SurvivRenderer {
         this._roomZonesByHouseId = new Map();
         this._doorwaysByHouseId = new Map();
         this._interiorFogHouseIds = new Set();
+        this._collisionBuckets = new Map();
         this._obstacleRenderSignature = '';
         this._obstacleRevision = 0;
         this._viewLeft = -Infinity;
@@ -207,6 +248,8 @@ export class SurvivRenderer {
         this._minimapCanvas = null;
         this._minimapCtx = null;
         this._nextMinimapRenderAt = 0;
+        this._roofSpriteCache = new Map();
+        this._roofCacheBuildsThisFrame = 0;
         // Previous HP for detecting damage
         this._prevHp = 100;
         // Previous ammo for detecting shots fired
@@ -231,7 +274,7 @@ export class SurvivRenderer {
         const h = parent?.clientHeight || window.innerHeight;
         // Surviv can be raster-heavy. A restrained adaptive cap keeps Retina
         // canvases sharp without paying the old 4x pixel cost at DPR 2.
-        const dprCap = w * h >= 1600000 ? 1.25 : (w < 760 ? 1.25 : 1.5);
+        const dprCap = w * h >= 1500000 ? 1 : (w < 760 ? 1 : 1.25);
         const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
@@ -294,6 +337,7 @@ export class SurvivRenderer {
         this._interiorFogHouseIds.clear();
         this._obstacleRenderSignature = '';
         this._obstacleRevision++;
+        this._roofSpriteCache.clear();
         this.myId = null;
     }
 
@@ -394,7 +438,7 @@ export class SurvivRenderer {
                     this.spawnBloodDecal(b.x, b.y);
                 } else {
                     // Check if near any obstacle
-                    const hitObstacle = this.obstacles.find(o => o.collidable !== false && this.pointInsideRect(o, b.x, b.y, 18));
+                    const hitObstacle = this.findCollisionObstacleAt(b.x, b.y, 18);
                     if (hitObstacle) {
                         if (hitObstacle.kind === 'tree' || hitObstacle.variant === 'wood' || hitObstacle.kind === 'crate') {
                             hitType = 'wood';
@@ -706,7 +750,7 @@ export class SurvivRenderer {
         }
         if (k === 'r') return 'reload';
         if (k === 'q') return 'useMedkit';
-        if (['1', '2', '3'].includes(k)) return `equipSlot:${Number(k) - 1}`;
+        if (['1', '2'].includes(k)) return `equipSlot:${Number(k) - 1}`;
         return null;
     }
 
@@ -756,7 +800,9 @@ export class SurvivRenderer {
         this._roomZonesByHouseId.clear();
         this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
+        this._collisionBuckets.clear();
 
+        const hasSplineRiver = this.obstacles.some(obstacle => obstacle.kind === 'river_path');
         for (const o of this.obstacles) {
             if (o.kind === 'houseFloor') this.houseFloors.push(o);
             else if (o.kind === 'roomZone') {
@@ -810,12 +856,30 @@ export class SurvivRenderer {
                 if (o.kind === 'field') this.fieldObstacles.push(o);
                 else if (o.kind === 'road') this.roadObstacles.push(o);
                 else if (o.kind === 'bridge') this.bridgeObstacles.push(o);
-                else if (o.kind === 'water' || o.kind === 'river' || o.kind === 'river_path') this.waterObstacles.push(o);
+                else if (o.kind === 'water' || o.kind === 'river_path' || (o.kind === 'river' && !hasSplineRiver)) {
+                    this.waterObstacles.push(o);
+                }
             } else {
                 solid.push(o);
             }
         }
         this.sortedWorldObstacles = solid.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+        const collisionCell = 400;
+        for (const obstacle of solid) {
+            if (obstacle.collidable === false || !obstacle.w || !obstacle.h) continue;
+            const minX = Math.floor((obstacle.x - obstacle.w / 2) / collisionCell);
+            const maxX = Math.floor((obstacle.x + obstacle.w / 2) / collisionCell);
+            const minY = Math.floor((obstacle.y - obstacle.h / 2) / collisionCell);
+            const maxY = Math.floor((obstacle.y + obstacle.h / 2) / collisionCell);
+            for (let gx = minX; gx <= maxX; gx++) {
+                for (let gy = minY; gy <= maxY; gy++) {
+                    const key = gx + ',' + gy;
+                    const bucket = this._collisionBuckets.get(key);
+                    if (bucket) bucket.push(obstacle);
+                    else this._collisionBuckets.set(key, [obstacle]);
+                }
+            }
+        }
 
         for (const house of this.houseFloors) {
             const huge = house.w >= 430 || house.h >= 330;
@@ -826,6 +890,26 @@ export class SurvivRenderer {
         }
         this._obstacleRevision++;
         this._losCacheKey = '';
+        this._roofSpriteCache.clear();
+    }
+
+    findCollisionObstacleAt(x, y, padding = 0) {
+        const cell = 400;
+        const gx = Math.floor(x / cell);
+        const gy = Math.floor(y / cell);
+        const seen = new Set();
+        for (let ox = -1; ox <= 1; ox++) {
+            for (let oy = -1; oy <= 1; oy++) {
+                const bucket = this._collisionBuckets.get((gx + ox) + ',' + (gy + oy));
+                if (!bucket) continue;
+                for (const obstacle of bucket) {
+                    if (seen.has(obstacle.id)) continue;
+                    seen.add(obstacle.id);
+                    if (this.pointInsideRect(obstacle, x, y, padding)) return obstacle;
+                }
+            }
+        }
+        return null;
     }
 
     setViewBounds(camX, camY, viewW, viewH, z, pad = 160) {
@@ -1271,6 +1355,7 @@ export class SurvivRenderer {
     }
 
     draw(dt = 1 / 60) {
+        this._roofCacheBuildsThisFrame = 0;
         if (this.externalCameraGetter) {
             const cam = this.externalCameraGetter();
             if (cam) {
@@ -1659,15 +1744,7 @@ export class SurvivRenderer {
                 ctx.lineWidth = o.width + 28;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.beginPath();
-                for (let i = 0; i < o.points.length; i++) {
-                    const pt = o.points[i];
-                    // Points are in world coordinates, but we translated to o.x, o.y
-                    const lx = pt.x - o.x;
-                    const ly = pt.y - o.y;
-                    if (i === 0) ctx.moveTo(lx, ly);
-                    else ctx.lineTo(lx, ly);
-                }
+                traceSmoothWaterPath(ctx, o.points, o.x, o.y);
                 ctx.stroke();
             }
         } else if (kind === 'river') {
@@ -1675,8 +1752,7 @@ export class SurvivRenderer {
             ctx.fillRect(-o.w / 2 - 10, -o.h / 2 - 14, o.w + 20, o.h + 28);
         } else if (kind === 'water') {
             ctx.fillStyle = '#c9aa72';
-            ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2 + 14, o.h / 2 + 14, 0, 0, Math.PI * 2);
+            traceOrganicPond(ctx, o, 16);
             ctx.fill();
         }
         ctx.restore();
@@ -1713,14 +1789,7 @@ export class SurvivRenderer {
                 ctx.lineWidth = o.width;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.beginPath();
-                for (let i = 0; i < o.points.length; i++) {
-                    const pt = o.points[i];
-                    const lx = pt.x - o.x;
-                    const ly = pt.y - o.y;
-                    if (i === 0) ctx.moveTo(lx, ly);
-                    else ctx.lineTo(lx, ly);
-                }
+                traceSmoothWaterPath(ctx, o.points, o.x, o.y);
                 ctx.stroke();
 
                 // Centerline highlight
@@ -1737,8 +1806,7 @@ export class SurvivRenderer {
             ctx.fillRect(-o.w / 2 + 4, -o.h / 2 + o.h * 0.3, o.w - 8, o.h * 0.4);
         } else if (kind === 'water') {
             ctx.fillStyle = '#2a5e7a';
-            ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2, o.h / 2, 0, 0, Math.PI * 2);
+            traceOrganicPond(ctx, o);
             ctx.fill();
 
             // Subtle inner highlight ring (lighter center)
@@ -2832,33 +2900,33 @@ export class SurvivRenderer {
         ctx.translate(b.x, b.y);
         ctx.rotate(tail);
 
-        let trailLen = 48;
-        let thickness = 2.6;
+        let trailLen = 36;
+        let thickness = 1.8;
         let isPellet = false;
         
         const wt = b.weaponType;
         if (wt === 'shotgun') {
-            trailLen = 24;
-            thickness = 1.7;
+            trailLen = 17;
+            thickness = 1.15;
             isPellet = true;
         } else if (wt === 'sniper') {
-            trailLen = 88;
-            thickness = 3;
+            trailLen = 64;
+            thickness = 2.05;
         } else if (wt === 'assault' || wt === 'dmr') {
-            trailLen = 60;
-            thickness = 2.5;
+            trailLen = 44;
+            thickness = 1.75;
         } else if (wt === 'smg' || wt === 'lmg') {
-            trailLen = 43;
-            thickness = 2.1;
+            trailLen = 31;
+            thickness = 1.45;
         }
 
         const redAlpha = isPellet ? 0.42 : 0.58;
-        const slugLen = isPellet ? 5 : 10;
+        const slugLen = isPellet ? 3.5 : 7;
 
         // Soft contrast underlay so the white/gray tracer stays readable on bright floors.
         ctx.beginPath();
         ctx.strokeStyle = isPellet ? 'rgba(42, 48, 50, 0.28)' : 'rgba(36, 42, 45, 0.34)';
-        ctx.lineWidth = thickness + 1.2;
+        ctx.lineWidth = thickness + 0.8;
         ctx.lineCap = 'round';
         ctx.moveTo(-trailLen * 0.72, 0);
         ctx.lineTo(slugLen * 0.22, 0);
@@ -2871,7 +2939,7 @@ export class SurvivRenderer {
         smokeGrad.addColorStop(1, 'rgba(248, 252, 255, 0.72)');
         ctx.beginPath();
         ctx.strokeStyle = smokeGrad;
-        ctx.lineWidth = thickness + 1.8;
+        ctx.lineWidth = thickness + 1.1;
         ctx.lineCap = 'round';
         ctx.moveTo(-trailLen, 0);
         ctx.lineTo(slugLen * 0.1, 0);
@@ -2897,7 +2965,7 @@ export class SurvivRenderer {
         slugGrad.addColorStop(0.76, 'rgba(255, 255, 255, 1)');
         slugGrad.addColorStop(1, 'rgba(255, 118, 94, 0.9)');
         ctx.shadowColor = 'rgba(255, 122, 100, ' + (redAlpha * 0.72) + ')';
-        ctx.shadowBlur = isPellet ? 2 : 4;
+        ctx.shadowBlur = isPellet ? 1 : 2.5;
         ctx.beginPath();
         ctx.strokeStyle = slugGrad;
         ctx.lineWidth = thickness;
@@ -3235,7 +3303,8 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawHouseRoof(ctx, o) {
+    drawHouseRoof(ctx, o, allowCache = true) {
+        if (allowCache && this.drawCachedHouseRoof(ctx, o)) return;
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
@@ -3927,6 +3996,44 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawCachedHouseRoof(ctx, o) {
+        if (typeof document === 'undefined' || !o?.id) return false;
+        // Huge landmarks would create multi-megabyte single sprites. Their
+        // custom roof is uncommon, while normal houses gain most from caching.
+        if (o.w > 1400 || o.h > 1100) return false;
+
+        const key = o.id + ':' + this._obstacleRevision;
+        let sprite = this._roofSpriteCache.get(key);
+        if (!sprite) {
+            // Spread cache creation across frames to avoid an entry stutter
+            // when several roofs enter the viewport at the same time.
+            if (this._roofCacheBuildsThisFrame >= 2) return false;
+            this._roofCacheBuildsThisFrame++;
+
+            const rotated = Math.abs(o.rotation || 0) > 0.001;
+            const extent = rotated ? Math.hypot(o.w, o.h) : 0;
+            const width = Math.ceil((rotated ? extent : o.w) + 72);
+            const height = Math.ceil((rotated ? extent : o.h) + 72);
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const cacheCtx = canvas.getContext('2d', { alpha: true });
+            if (!cacheCtx) return false;
+            cacheCtx.translate(width / 2 - o.x, height / 2 - o.y);
+            this.drawHouseRoof(cacheCtx, o, false);
+            sprite = { canvas, width, height };
+
+            if (this._roofSpriteCache.size >= 72) {
+                const oldestKey = this._roofSpriteCache.keys().next().value;
+                this._roofSpriteCache.delete(oldestKey);
+            }
+            this._roofSpriteCache.set(key, sprite);
+        }
+
+        ctx.drawImage(sprite.canvas, o.x - sprite.width / 2, o.y - sprite.height / 2);
+        return true;
+    }
+
     drawVignette(ctx, W, H) {
         ctx.save();
         const radius = Math.max(W, H) * 0.72;
@@ -4346,7 +4453,7 @@ export class SurvivRenderer {
             droplets,
         });
         // Cap to prevent memory leaks
-        if (this.bloodDecals.length > 180) {
+        if (this.bloodDecals.length > 90) {
             this.bloodDecals.shift();
         }
     }

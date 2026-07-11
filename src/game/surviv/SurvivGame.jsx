@@ -910,7 +910,8 @@ export default function SurvivGame() {
             {gameReady && me && !showResultModal && (
                 <div className="surviv-weapons-hotbar">
                     {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                        const weaponId = me.inventory?.weapons?.[slotIdx];
+                        const weaponId = me.inventory?.weapons?.[slotIdx]
+                            || (slotIdx === 0 && !(me.inventory?.weapons?.length) ? 'fists' : null);
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const isActive = weaponId && weaponId === me.weapon;
                         const isReloading = isActive && me.reloading;
@@ -960,21 +961,6 @@ export default function SurvivGame() {
                             </button>
                         );
                     })}
-                    <button
-                        type="button"
-                        className={'hotbar-slot melee-slot has-item ' + (me.weapon === 'fists' ? 'active-slot' : '')}
-                        aria-pressed={me.weapon === 'fists'}
-                        aria-label="Equip melee"
-                        title="Melee - always available"
-                        onClick={() => { equipSlotPendingRef.current = 2; }}
-                    >
-                        <span className="hotbar-slot-key">3</span>
-                        <div className="hotbar-weapon-icon-wrap">
-                            {renderWeaponIcon('fists', me.weapon === 'fists' ? '#14F195' : 'rgba(255,255,255,0.72)', 32)}
-                        </div>
-                        <span className="hotbar-slot-name-compact">Melee</span>
-                        <span className="hotbar-slot-ammo">ALWAYS</span>
-                    </button>
                 </div>
             )}
 
@@ -1080,7 +1066,8 @@ export default function SurvivGame() {
                                     <h4 className="section-subtitle">WEAPONS</h4>
                                     <div className="weapons-grid">
                                         {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                                            const weaponId = me.inventory?.weapons?.[slotIdx];
+                                            const weaponId = me.inventory?.weapons?.[slotIdx]
+                                                || (slotIdx === 0 && !(me.inventory?.weapons?.length) ? 'fists' : null);
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                                             const isActive = weaponId && weaponId === me.weapon;
                                             
