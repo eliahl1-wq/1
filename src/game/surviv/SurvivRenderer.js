@@ -45,6 +45,10 @@ const WEAPON_SHAKE = {
 const SURFACE_KINDS = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
 const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
+const CACHEABLE_PROP_KINDS = new Set([
+    'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
+    'door', 'furniture', 'machine', 'sandbag',
+]);
 
 function obstacleRenderSignature(obstacles) {
     let hash = 2166136261;
@@ -156,7 +160,9 @@ function biomeAt() {
 export class SurvivRenderer {
     constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+        // The game paints every pixel each frame, so an opaque low-latency
+        // context avoids unnecessary alpha compositing with the DOM.
+        this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
         this.targetZoom = 1.08;
@@ -250,6 +256,8 @@ export class SurvivRenderer {
         this._nextMinimapRenderAt = 0;
         this._roofSpriteCache = new Map();
         this._roofCacheBuildsThisFrame = 0;
+        this._obstacleSpriteCache = new Map();
+        this._obstacleCacheBuildsThisFrame = 0;
         // Previous HP for detecting damage
         this._prevHp = 100;
         // Previous ammo for detecting shots fired
@@ -338,6 +346,7 @@ export class SurvivRenderer {
         this._obstacleRenderSignature = '';
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
+        this._obstacleSpriteCache.clear();
         this.myId = null;
     }
 
@@ -472,6 +481,9 @@ export class SurvivRenderer {
                     });
                 }
             }
+        }
+        if (this.particles.length > 120) {
+            this.particles.splice(0, this.particles.length - 120);
         }
         this.bullets = tick.bullets || [];
         // Static world snapshots may arrive less frequently than movement
@@ -891,6 +903,7 @@ export class SurvivRenderer {
         this._obstacleRevision++;
         this._losCacheKey = '';
         this._roofSpriteCache.clear();
+        this._obstacleSpriteCache.clear();
     }
 
     findCollisionObstacleAt(x, y, padding = 0) {
@@ -1356,6 +1369,7 @@ export class SurvivRenderer {
 
     draw(dt = 1 / 60) {
         this._roofCacheBuildsThisFrame = 0;
+        this._obstacleCacheBuildsThisFrame = 0;
         if (this.externalCameraGetter) {
             const cam = this.externalCameraGetter();
             if (cam) {
@@ -1836,27 +1850,28 @@ export class SurvivRenderer {
             const step = 28;
             const roadId = Math.round(o.x + o.y);
             const isHorizontal = o.w > o.h;
+            const visible = this.getVisibleRoadAxisRange(o, isHorizontal, 220);
             
             if (isHorizontal) {
-                ctx.moveTo(-o.w / 2, -o.h / 2);
-                for (let xx = -o.w / 2 + step; xx <= o.w / 2; xx += step) {
+                ctx.moveTo(visible.start, -o.h / 2);
+                for (let xx = visible.start + step; xx <= visible.end; xx += step) {
                     const wobble = Math.sin(xx * 0.05 + roadId) * 5 + Math.cos(xx * 0.12) * 3;
                     ctx.lineTo(xx, -o.h / 2 + wobble);
                 }
-                ctx.lineTo(o.w / 2, o.h / 2);
-                for (let xx = o.w / 2 - step; xx >= -o.w / 2; xx -= step) {
+                ctx.lineTo(visible.end, o.h / 2);
+                for (let xx = visible.end - step; xx >= visible.start; xx -= step) {
                     const wobble = Math.sin(xx * 0.05 - roadId) * 5 + Math.cos(xx * 0.12) * 3;
                     ctx.lineTo(xx, o.h / 2 + wobble);
                 }
                 ctx.closePath();
             } else {
-                ctx.moveTo(o.w / 2, -o.h / 2);
-                for (let yy = -o.h / 2 + step; yy <= o.h / 2; yy += step) {
+                ctx.moveTo(o.w / 2, visible.start);
+                for (let yy = visible.start + step; yy <= visible.end; yy += step) {
                     const wobble = Math.sin(yy * 0.05 + roadId) * 5 + Math.cos(yy * 0.12) * 3;
                     ctx.lineTo(o.w / 2 + wobble, yy);
                 }
-                ctx.lineTo(-o.w / 2, o.h / 2);
-                for (let yy = o.h / 2 - step; yy >= -o.h / 2; yy -= step) {
+                ctx.lineTo(-o.w / 2, visible.end);
+                for (let yy = visible.end - step; yy >= visible.start; yy -= step) {
                     const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
                     ctx.lineTo(-o.w / 2 + wobble, yy);
                 }
@@ -1877,8 +1892,9 @@ export class SurvivRenderer {
         const length = isHorizontal ? o.w : o.h;
         const width = isHorizontal ? o.h : o.w;
         const inset = Math.min(68, Math.max(18, width * 0.52));
-        const start = -length / 2 + inset;
-        const end = length / 2 - inset;
+        const visible = this.getVisibleRoadAxisRange(o, isHorizontal, 180);
+        const start = Math.max(-length / 2 + inset, visible.start);
+        const end = Math.min(length / 2 - inset, visible.end);
 
         const line = (a, b, offset = 0) => {
             if (isHorizontal) {
@@ -1955,6 +1971,34 @@ export class SurvivRenderer {
             }
         }
         ctx.restore();
+    }
+
+    getVisibleRoadAxisRange(o, isHorizontal, padding = 160) {
+        const angle = -(o.rotation || 0);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const corners = [
+            [this._viewLeft, this._viewTop],
+            [this._viewRight, this._viewTop],
+            [this._viewRight, this._viewBottom],
+            [this._viewLeft, this._viewBottom],
+        ];
+        let min = Infinity;
+        let max = -Infinity;
+        for (const [worldX, worldY] of corners) {
+            const dx = worldX - o.x;
+            const dy = worldY - o.y;
+            const localX = dx * cos - dy * sin;
+            const localY = dx * sin + dy * cos;
+            const axis = isHorizontal ? localX : localY;
+            min = Math.min(min, axis);
+            max = Math.max(max, axis);
+        }
+        const halfLength = (isHorizontal ? o.w : o.h) / 2;
+        return {
+            start: Math.max(-halfLength, min - padding),
+            end: Math.min(halfLength, max + padding),
+        };
     }
 
     getFieldPalette(variant) {
@@ -2058,8 +2102,9 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawObstacle(ctx, o) {
+    drawObstacle(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
+        if (allowCache && this.drawCachedObstacle(ctx, o, kind)) return;
         
         // Roads and water are now handled via layered passes
         if (kind === 'road' || kind === 'river' || kind === 'water') return;
@@ -2651,6 +2696,44 @@ export class SurvivRenderer {
             ctx.fill();
         }
         ctx.restore();
+    }
+
+    drawCachedObstacle(ctx, o, kind) {
+        if (typeof document === 'undefined' || !o?.id || !CACHEABLE_PROP_KINDS.has(kind)) return false;
+        if (o.w > 320 || o.h > 320 || !o.w || !o.h) return false;
+
+        const key = o.id + ':' + this._obstacleRevision;
+        let sprite = this._obstacleSpriteCache.get(key);
+        if (!sprite) {
+            if (this._obstacleCacheBuildsThisFrame >= 4) return false;
+            this._obstacleCacheBuildsThisFrame++;
+
+            const rotated = Math.abs(o.rotation || 0) > 0.001;
+            const extent = rotated ? Math.hypot(o.w, o.h) : 0;
+            const width = Math.ceil((rotated ? extent : o.w) + 40);
+            const height = Math.ceil((rotated ? extent : o.h) + 46);
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const cacheCtx = canvas.getContext('2d', { alpha: true });
+            if (!cacheCtx) return false;
+            cacheCtx.translate(width / 2 - o.x, height / 2 - o.y);
+            this.drawObstacle(cacheCtx, o, false);
+            sprite = { canvas, width, height };
+
+            if (this._obstacleSpriteCache.size >= 192) {
+                const oldestKey = this._obstacleSpriteCache.keys().next().value;
+                this._obstacleSpriteCache.delete(oldestKey);
+            }
+            this._obstacleSpriteCache.set(key, sprite);
+        }
+
+        ctx.drawImage(
+            sprite.canvas,
+            Math.round(o.x - sprite.width / 2),
+            Math.round(o.y - sprite.height / 2),
+        );
+        return true;
     }
 
     drawLoot(ctx, l) {
@@ -4030,7 +4113,11 @@ export class SurvivRenderer {
             this._roofSpriteCache.set(key, sprite);
         }
 
-        ctx.drawImage(sprite.canvas, o.x - sprite.width / 2, o.y - sprite.height / 2);
+        ctx.drawImage(
+            sprite.canvas,
+            Math.round(o.x - sprite.width / 2),
+            Math.round(o.y - sprite.height / 2),
+        );
         return true;
     }
 
