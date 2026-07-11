@@ -260,7 +260,6 @@ export class SurvivRenderer {
         this._minimapCanvas = null;
         this._minimapCtx = null;
         this._nextMinimapRenderAt = 0;
-        this._vignetteCanvas = null;
         this._roofSpriteCache = new Map();
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleSpriteCache = new Map();
@@ -289,7 +288,7 @@ export class SurvivRenderer {
         const h = parent?.clientHeight || window.innerHeight;
         // Surviv can be raster-heavy. A restrained adaptive cap keeps Retina
         // canvases sharp without paying the old 4x pixel cost at DPR 2.
-        const dprCap = 1;
+        const dprCap = w * h >= 1500000 ? 1 : (w < 760 ? 1 : 1.25);
         const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
@@ -1982,15 +1981,13 @@ export class SurvivRenderer {
                 // Center yellow dashed line follows the actual road direction.
                 ctx.strokeStyle = 'rgba(235, 185, 60, 0.76)';
                 ctx.lineWidth = 2.5;
+                ctx.setLineDash([18, 18]);
                 ctx.beginPath();
-                // Build dashes on fixed road-local coordinates. Starting the
-                // dash pattern at the camera-clipped edge made it follow players.
-                const dashStep = 36;
-                const firstDash = Math.floor(start / dashStep) * dashStep;
-                for (let dashStart = firstDash; dashStart < end; dashStart += dashStep) {
-                    line(Math.max(start, dashStart), Math.min(end, dashStart + 18), 0);
-                }
+                // Use the road's fixed local endpoints so the dash phase stays
+                // world-anchored without emitting dozens of segments per frame.
+                line(-length / 2 + inset, length / 2 - inset, 0);
                 ctx.stroke();
+                ctx.setLineDash([]);
 
                 // White edge lines on both sides, also direction-aware.
                 ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
@@ -4116,33 +4113,18 @@ export class SurvivRenderer {
         return true;
     }
 
-    getVignetteCanvas(W, H) {
-        if (typeof document === 'undefined') return null;
-        if (this._vignetteCanvas?.width === W && this._vignetteCanvas?.height === H) return this._vignetteCanvas;
-        const canvas = document.createElement('canvas');
-        canvas.width = W;
-        canvas.height = H;
-        const cacheCtx = canvas.getContext('2d', { alpha: true });
-        if (!cacheCtx) return null;
+    drawVignette(ctx, W, H) {
+        ctx.save();
         const radius = Math.max(W, H) * 0.72;
-        const grad = cacheCtx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
+        const grad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
         grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
         grad.addColorStop(0.64, 'rgba(0, 0, 0, 0.08)');
         grad.addColorStop(1, 'rgba(0, 0, 0, 0.34)');
-        cacheCtx.fillStyle = grad;
-        cacheCtx.fillRect(0, 0, W, H);
-        this._vignetteCanvas = canvas;
-        return canvas;
-    }
-
-    drawVignette(ctx, W, H) {
-        ctx.save();
-        const cachedVignette = this.getVignetteCanvas(W, H);
-        if (cachedVignette) ctx.drawImage(cachedVignette, 0, 0);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
 
         const hpPct = clamp((this.hud.hp || 0) / (this.hud.maxHp || 100), 0, 1);
         if (hpPct > 0 && hpPct < 0.34) {
-            const radius = Math.max(W, H) * 0.72;
             ctx.globalAlpha = clamp((0.34 - hpPct) / 0.34, 0, 1) * 0.28;
             const danger = ctx.createRadialGradient(W / 2, H / 2, radius * 0.38, W / 2, H / 2, radius * 0.96);
             danger.addColorStop(0, 'rgba(120, 0, 0, 0)');
