@@ -586,7 +586,7 @@ export class SurvivRenderer {
                 const by = me.y + Math.sin(angle) * barrelDist;
                 // Predict a short local tracer immediately. A close-range shot can
                 // hit between server snapshots and otherwise never be rendered.
-                const pelletCount = me.weapon === 'shotgun' ? 5 : 1;
+                const pelletCount = me.weapon === 'shotgun' ? 3 : 1;
                 const speed = (WEAPON_BULLET_SPEED[me.weapon] || 38) * 40;
                 for (let i = 0; i < pelletCount; i++) {
                     const spread = pelletCount > 1 ? (i - (pelletCount - 1) / 2) * 0.1 : 0;
@@ -600,7 +600,7 @@ export class SurvivRenderer {
                         life: 0.11,
                     });
                 }
-                for (let i = 0; i < 4; i++) {
+                for (let i = 0; i < 2; i++) {
                     const spread = (Math.random() - 0.5) * 0.6;
                     const speed = 60 + Math.random() * 80;
                     this.particles.push({
@@ -614,24 +614,6 @@ export class SurvivRenderer {
                         type: 'muzzle',
                     });
                 }
-                // Spawn brass shell casing particle (ejects to the side/back)
-                const ejectAngle = angle - Math.PI / 2.3 + (Math.random() - 0.5) * 0.4;
-                const sx = me.x - Math.cos(angle) * 2;
-                const sy = me.y - Math.sin(angle) * 2;
-                this.particles.push({
-                    x: sx,
-                    y: sy,
-                    vx: Math.cos(ejectAngle) * (42 + Math.random() * 28) - Math.cos(angle) * 8,
-                    vy: Math.sin(ejectAngle) * (42 + Math.random() * 28) - Math.sin(angle) * 8,
-                    life: 0.65 + Math.random() * 0.25,
-                    maxLife: 0.9,
-                    size: 3.5,
-                    color: '#d4af37', // Brass gold color
-                    type: 'shell',
-                    rotation: Math.random() * Math.PI * 2,
-                    rotSpeed: 22 + Math.random() * 18,
-                    bounceCount: 0,
-                });
             }
             this._prevAmmo = me.ammo ?? this._prevAmmo;
 
@@ -785,6 +767,7 @@ export class SurvivRenderer {
         }
         if (k === 'r') return 'reload';
         if (k === 'q') return 'useMedkit';
+        if (k === 'f') return 'pickupWeapon';
         if (['1', '2'].includes(k)) return `equipSlot:${Number(k) - 1}`;
         return null;
     }
@@ -1244,31 +1227,26 @@ export class SurvivRenderer {
         const angles = new Set();
 
         // Add sweep rays for smooth coverage between wall corners
-        // Exact endpoint rays keep corners crisp; 32 sweep rays keep indoor
+        // Exact endpoint rays keep corners crisp; 16 sweep rays keep indoor
         // 900px-radius edge sub-pixel smooth without the old O(256 * segments)
         // intersection cost every animation frame.
-        const sweepCount = 32;
+        const sweepCount = 16;
         for (let i = 0; i < sweepCount; i++) {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
 
-        // Cast toward each nearby segment endpoint (with tiny offsets for precision)
-        const epsilon = 0.00005;
+        // Cast one ray toward each nearby segment endpoint.
         const epRangeSq = (maxDist + 200) * (maxDist + 200);
         for (const s of segments) {
             const d1sq = (s.ax - px) * (s.ax - px) + (s.ay - py) * (s.ay - py);
             const d2sq = (s.bx - px) * (s.bx - px) + (s.by - py) * (s.by - py);
             if (d1sq < epRangeSq) {
                 const a1 = normalize(Math.atan2(s.ay - py, s.ax - px));
-                angles.add(normalize(a1 - epsilon));
                 angles.add(a1);
-                angles.add(normalize(a1 + epsilon));
             }
             if (d2sq < epRangeSq) {
                 const a2 = normalize(Math.atan2(s.by - py, s.bx - px));
-                angles.add(normalize(a2 - epsilon));
                 angles.add(a2);
-                angles.add(normalize(a2 + epsilon));
             }
         }
 
@@ -1299,7 +1277,7 @@ export class SurvivRenderer {
         const py = this.me.y;
         const maxDist = 900;
 
-        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 16)}:${Math.round(py / 16)}`;
+        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 12)}:${Math.round(py / 12)}`;
         let polygon = this._losCachedPolygon;
         if (cacheKey !== this._losCacheKey || !polygon) {
             const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse);
@@ -1330,39 +1308,7 @@ export class SurvivRenderer {
         ctx.closePath();
         ctx.fill('evenodd');
 
-        // Outside the current building stays visible as a map, but muted enough
-        // that the interior still feels separated from the world.
-        const outsideGrad = ctx.createRadialGradient(px, py, 120, px, py, maxDist * 1.45);
-        outsideGrad.addColorStop(0, 'rgba(6, 9, 12, 0.22)');
-        outsideGrad.addColorStop(0.55, 'rgba(8, 11, 16, 0.40)');
-        outsideGrad.addColorStop(1, 'rgba(8, 11, 16, 0.54)');
-        ctx.fillStyle = outsideGrad;
-        ctx.beginPath();
-        ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
-        
-        // Keep the current house floor clear so the LOS polygon handles room darkness.
-        ctx.save();
-        ctx.translate(currentHouse.x, currentHouse.y);
-        ctx.rotate(currentHouse.rotation || 0);
-        ctx.rect(-currentHouse.w / 2, -currentHouse.h / 2, currentHouse.w, currentHouse.h);
-        ctx.restore();
-        
-        ctx.fill('evenodd');
-
-        // Soft radial fade at the edge of vision
-        // Use destination-out on a SEPARATE save so it only erases from what we just drew
-        // Instead, draw an additive dark ring just outside the polygon edge
-        const edgeGrad = ctx.createRadialGradient(px, py, maxDist * 0.7, px, py, maxDist * 1.1);
-        edgeGrad.addColorStop(0, 'rgba(8, 10, 14, 0)');
-        edgeGrad.addColorStop(1, 'rgba(8, 10, 14, 0.5)');
-        ctx.fillStyle = edgeGrad;
-        ctx.beginPath();
-        ctx.arc(px, py, maxDist * 1.1, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Keep gunfire visuals separate from the house shadow mask. The weapon
-        // muzzle flash is drawn on the player, but shooting should not carve a
-        // circular light/dark bloom into indoor fog around the character.
+        // One polygon mask is enough; extra full-screen gradients made large interiors expensive.
 
         ctx.restore();
     }
@@ -1386,6 +1332,21 @@ export class SurvivRenderer {
             }
         }
         return best;
+    }
+
+    getNearbyGroundWeapon() {
+        if (!this.me) return null;
+        let nearest = null;
+        let nearestDist = 58;
+        for (const item of this.loot) {
+            if (item.type !== 'weapon' || !item.weaponType) continue;
+            const distance = Math.hypot(this.me.x - item.x, this.me.y - item.y);
+            if (distance < nearestDist) {
+                nearest = item;
+                nearestDist = distance;
+            }
+        }
+        return nearest;
     }
 
     getNearbyChest() {
@@ -3011,6 +2972,16 @@ export class SurvivRenderer {
                     ctx.arc(0, 0, 22, 0, Math.PI * 2);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                    if (l.type === 'weapon') {
+                        ctx.fillStyle = 'rgba(8, 10, 9, 0.92)';
+                        roundRect(ctx, -24, 35, 48, 16, 4);
+                        ctx.fill();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '900 9px system-ui, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('F  SWAP', 0, 43);
+                    }
                 }
             }
         }
@@ -3026,18 +2997,18 @@ export class SurvivRenderer {
         const wt = b.weaponType;
         const isPellet = wt === 'shotgun';
         let trailLen = 34;
-        let thickness = 1.2;
+        let thickness = 1.5;
         if (isPellet) {
             trailLen = 16;
-            thickness = 0.82;
+            thickness = 1.05;
         } else if (wt === 'sniper') {
             trailLen = 58;
-            thickness = 1.42;
+            thickness = 1.7;
         } else if (wt === 'assault' || wt === 'dmr') {
             trailLen = 42;
         } else if (wt === 'smg' || wt === 'lmg') {
             trailLen = 29;
-            thickness = 1.0;
+            thickness = 1.3;
         }
         const slugLen = isPellet ? 3 : 6;
 
@@ -4331,8 +4302,8 @@ export class SurvivRenderer {
                 ctx.restore();
             } else {
                 ctx.fillStyle = p.color || '#ffdd44';
-                ctx.shadowColor = p.color || '#ffdd44';
-                ctx.shadowBlur = 4;
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
                 ctx.fill();

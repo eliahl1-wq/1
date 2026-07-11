@@ -54,6 +54,7 @@ const SURVIV_RELOAD_UI_STEP_MS = 100;
 
 function createSurvivUiSnapshot(player) {
     const reloadRemaining = Math.max(0, Number(player?.reloadRemainingMs) || 0);
+    const medkitRemaining = Math.max(0, Number(player?.medkitRemainingMs) || 0);
     return {
         hp: player?.hp,
         maxHp: player?.maxHp,
@@ -66,6 +67,10 @@ function createSurvivUiSnapshot(player) {
             ? Math.ceil(reloadRemaining / SURVIV_RELOAD_UI_STEP_MS) * SURVIV_RELOAD_UI_STEP_MS
             : 0,
         reloadMs: player?.reloadMs,
+        medkitRemainingMs: medkitRemaining > 0
+            ? Math.ceil(medkitRemaining / SURVIV_RELOAD_UI_STEP_MS) * SURVIV_RELOAD_UI_STEP_MS
+            : 0,
+        medkitUseMs: player?.medkitUseMs,
         dollarBalance: player?.dollarBalance,
         kills: player?.kills,
         weaponsAmmo: player?.weaponsAmmo || {},
@@ -185,6 +190,7 @@ export default function SurvivGame() {
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 5 });
     const reloadPendingRef = useRef(false);
     const useMedkitPendingRef = useRef(false);
+    const pickupWeaponPendingRef = useRef(false);
     const equipSlotPendingRef = useRef(null);
     const openChestPendingRef = useRef(null);
     const takeChestItemPendingRef = useRef(null);
@@ -484,6 +490,7 @@ export default function SurvivGame() {
             const action = renderer.handleKeyDown(e);
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
+            if (action === 'pickupWeapon') pickupWeaponPendingRef.current = true;
             if (typeof action === 'string' && action.startsWith('equipSlot:')) {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
             }
@@ -634,6 +641,10 @@ export default function SurvivGame() {
                 payload.useMedkit = true;
                 useMedkitPendingRef.current = false;
             }
+            if (pickupWeaponPendingRef.current) {
+                payload.pickupWeapon = true;
+                pickupWeaponPendingRef.current = false;
+            }
             if (equipSlotPendingRef.current != null) {
                 payload.equipSlot = equipSlotPendingRef.current;
                 equipSlotPendingRef.current = null;
@@ -723,6 +734,11 @@ export default function SurvivGame() {
     }, []);
 
     const handleMobileInteract = useCallback(() => {
+        const weapon = rendererRef.current?.getNearbyGroundWeapon();
+        if (weapon?.id) {
+            pickupWeaponPendingRef.current = true;
+            return;
+        }
         const chest = rendererRef.current?.getNearbyChest();
         if (chest?.id) openChestPendingRef.current = chest.id;
     }, []);
@@ -740,6 +756,9 @@ export default function SurvivGame() {
     const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
     const healthRatio = me ? Math.max(0, Math.min(1, (Number(me.hp) || 0) / (Number(me.maxHp) || 100))) : 0;
     const armorRatio = me ? Math.max(0, Math.min(1, (Number(me.armor) || 0) / 100)) : 0;
+    const medkitRemainingMs = Math.max(0, Number(me?.medkitRemainingMs) || 0);
+    const medkitUseMs = Math.max(1, Number(me?.medkitUseMs) || 2500);
+    const medkitProgress = medkitRemainingMs > 0 ? Math.max(0, Math.min(1, 1 - medkitRemainingMs / medkitUseMs)) : 0;
     const canMobileReload = !!me
         && me.weapon !== 'fists'
         && !me.reloading
@@ -903,6 +922,17 @@ export default function SurvivGame() {
                             <div className="hud-bar-fill armor-fill" style={{ width: `${armorRatio * 100}%` }} />
                         </div>
                     </div>
+                    {medkitRemainingMs > 0 && (
+                        <div className="surviv-medkit-timer" role="progressbar" aria-label="Using medkit" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(medkitProgress * 100)}>
+                            <div className="surviv-medkit-timer-header">
+                                <span>USING MEDKIT</span>
+                                <span>{(medkitRemainingMs / 1000).toFixed(1)}s</span>
+                            </div>
+                            <div className="surviv-medkit-timer-track">
+                                <div className="surviv-medkit-timer-fill" style={{ width: `${medkitProgress * 100}%` }} />
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

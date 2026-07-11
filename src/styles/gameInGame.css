@@ -1,4 +1,4 @@
-/* In-game HUD + overlays — mobile (touch) layout tweaks */
+﻿/* In-game HUD + overlays — mobile (touch) layout tweaks */
 
 .game-viewport--mobile .modern-overlay-card {
     padding: 28px 22px;
@@ -424,7 +424,7 @@
     margin-top: 2px !important;
 }
 
-/* ─── Mobile landscape (phone held sideways) ─── */
+/* --- Mobile landscape (phone held sideways) --- */
 @media (orientation: landscape) and (max-height: 520px) {
     .game-viewport--mobile .game-br-hud {
         top: max(4px, env(safe-area-inset-top, 0px));
@@ -1479,6 +1479,7 @@
     display: flex;
     gap: 12px;
     width: 100%;
+    flex-wrap: wrap;
 }
 
 .hud-bar-wrapper {
@@ -1548,6 +1549,36 @@
     box-shadow: 0 0 8px rgba(0, 194, 255, 0.45);
 }
 
+.surviv-medkit-timer {
+    flex: 0 0 100%;
+    padding-top: 2px;
+    color: #5fe08a;
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+}
+
+.surviv-medkit-timer-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.surviv-medkit-timer-track {
+    height: 7px;
+    overflow: hidden;
+    border: 1px solid rgba(95, 224, 138, 0.28);
+    border-radius: 4px;
+    background: rgba(4, 18, 10, 0.78);
+}
+
+.surviv-medkit-timer-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2dbd6e, #7dffa9);
+    transition: width 0.1s linear;
+}
 .surviv-weapons-hotbar {
     display: flex;
     gap: 6px;
