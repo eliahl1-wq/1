@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Lobby from './pages/Lobby';
@@ -84,6 +84,7 @@ function isTournamentSession() {
 
 function ArenaRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <AppLoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
@@ -91,7 +92,8 @@ function ArenaRoute({ children }) {
   if (isTournamentSession()) return children;
   const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
   // The server consumes the ticket during join, so the auth refresh can set freeTicketUsed before the game route renders.
-  const hasFreeTicketSession = typeof window !== 'undefined' && localStorage.getItem('use_free_ticket') === 'true';
+  const hasFreeTicketSession = location.state?.useFreeTicket === true
+    || (typeof window !== 'undefined' && localStorage.getItem('use_free_ticket') === 'true');
   if (user && !hasFreeTicket && !hasFreeTicketSession && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
   return children;
 }

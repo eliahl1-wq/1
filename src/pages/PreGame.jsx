@@ -824,6 +824,7 @@ export default function PreGame() {
             state: {
                 nickname,
                 selectedMode: baseMode,
+                useFreeTicket: !isAlreadyInGame && isNormal5 && hasFreeTicket,
             },
         }), 1200);
     };

@@ -11,13 +11,11 @@ const API_BASE = API_URL;
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
-    { id: 'live', label: 'Live' },
-    { id: 'tournaments', label: 'Tournaments' },
-    { id: 'transactions', label: 'Transactions' },
     { id: 'users', label: 'Users' },
-    { id: 'finances', label: 'Finances' },
-    { id: 'security', label: 'Reward Alerts' },
-    { id: 'server', label: 'Server' },
+    { id: 'activity', label: 'Activity' },
+    { id: 'tournaments', label: 'Tournaments' },
+    { id: 'rewards', label: 'Rewards' },
+    { id: 'operations', label: 'Operations' },
 ];
 
 const USER_SORT_OPTIONS = [
@@ -340,6 +338,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
 
     const u = detail?.user;
     const stats = detail?.stats;
+    const rewards = detail?.rewards;
 
     return (
         <div className="admin-user-modal-backdrop" onClick={onClose}>
@@ -373,11 +372,12 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                     <>
                         <div className="admin-user-modal-stats">
                             <StatCard label="Balance" value={formatUsd(u.balanceUsd)} sub={formatSol(u.balanceSol)} />
-                            <StatCard label="Total deposited" value={formatUsd(stats.totalDepositedUsd)} sub={`${stats.depositCount} deposits`} />
-                            <StatCard label="Total withdrawn" value={formatUsd(stats.totalWithdrawnUsd)} sub={`${stats.withdrawalCount} withdrawals`} />
-                            <StatCard label="Games played" value={stats.gamesPlayed} sub={`${stats.wins}W · ${stats.losses}L · ${stats.brWins} BR wins`} />
+                            <StatCard label="Available rewards" value={formatUsd(rewards?.totalAvailableUsd)} sub={u.rewardsDisabled ? 'Rewards blocked' : 'Sponsored + retained + tournament'} />
+                            <StatCard label="Playtime" value={formatDuration(u.playtime ?? 0)} sub={`Last active ${formatRelativeTime(u.latestActivityAt)}`} />
+                            <StatCard label="Games played" value={stats.gamesPlayed} sub={`${stats.wins}W · ${stats.losses}L · ${stats.deaths} deaths`} />
+                            <StatCard label="Deposited" value={formatUsd(stats.totalDepositedUsd)} sub={`${stats.depositCount} deposits`} />
+                            <StatCard label="Withdrawn" value={formatUsd(stats.totalWithdrawnUsd)} sub={`${stats.withdrawalCount} withdrawals`} />
                         </div>
-
                         <div style={{ padding: '0 20px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                             <div className="admin-tabs" style={{ marginBottom: 0, flex: 1 }}>
                                 {['overview', 'transactions', 'games'].map(id => (
@@ -417,15 +417,55 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
 
                         <div className="admin-user-modal-body">
                             {subTab === 'overview' && (
-                                <div style={{ display: 'grid', gap: '12px', fontSize: '0.82rem' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                                        <div><span style={{ color: 'var(--text-2)' }}>Deposit wallet</span><br /><span className="mono" style={{ fontSize: '0.72rem' }}>{u.depositAddress}</span></div>
-                                        <div><span style={{ color: 'var(--text-2)' }}>Withdraw address</span><br /><span className="mono" style={{ fontSize: '0.72rem' }}>{u.wallet}</span></div>
-                                        <div><span style={{ color: 'var(--text-2)' }}>Email</span><br />{u.email || '—'}</div>
-                                        <div><span style={{ color: 'var(--text-2)' }}>Playtime</span><br />{formatDuration(u.playtime ?? 0)}</div>
-                                        <div><span style={{ color: 'var(--text-2)' }}>Deaths</span><br />{stats.deaths}</div>
-                                        <div><span style={{ color: 'var(--text-2)' }}>Net result (withdraw − deposit)</span><br />{formatUsd(stats.netGameResultUsd)}</div>
-                                    </div>
+                                <div style={{ display: 'grid', gap: '16px', fontSize: '0.82rem' }}>
+                                    <section style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', background: 'rgba(255,255,255,0.02)' }}>
+                                        <p className="label" style={{ marginBottom: '12px' }}>Account & access</p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Email</span><br />{u.email || '—'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Joined</span><br />{formatDate(u.createdAt)}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Last activity</span><br />{formatDate(u.latestActivityAt)}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Reporting</span><br />{u.excludedFromReports ? 'Excluded' : 'Included'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Deposit wallet</span><br /><span className="mono" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>{u.depositAddress}</span></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Withdraw address</span><br /><span className="mono" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>{u.wallet}</span></div>
+                                        </div>
+                                    </section>
+
+                                    <section style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', background: 'rgba(255,255,255,0.02)' }}>
+                                        <p className="label" style={{ marginBottom: '12px' }}>Rewards & tickets</p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Sponsored balance</span><br /><strong>{formatUsd(rewards?.sponsoredBalanceUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Retained winnings</span><br /><strong>{formatUsd(rewards?.retainedWinningsUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Tournament balance</span><br /><strong>{formatUsd(rewards?.tournamentBalanceUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Sponsored claimed</span><br /><strong>{formatUsd(rewards?.sponsoredClaimedUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Tournament earned</span><br /><strong>{formatUsd(rewards?.tournamentEarnedUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Tournament claimed</span><br /><strong>{formatUsd(rewards?.tournamentClaimedUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Free ticket</span><br />{rewards?.hasFreeTicket && !rewards?.freeTicketUsed ? 'Available' : rewards?.freeTicketUsed ? 'Used' : 'None'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>$5 challenge games</span><br />{rewards?.completedFiveDollarGames ?? 0}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>$10 challenge games</span><br />{rewards?.completedTenDollarGames ?? 0}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Challenge</span><br />{rewards?.challengeCompleted ? 'Completed' : rewards?.challengeUnlocked ? 'Unlocked' : 'In progress'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Claim status</span><br />{rewards?.claimInProgress || rewards?.tournamentClaimInProgress ? 'Processing' : 'Idle'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Reward access</span><br />{u.rewardsDisabled ? `Blocked${u.rewardsDisabledReason ? ` · ${u.rewardsDisabledReason}` : ''}` : 'Enabled'}</div>
+                                        </div>
+                                    </section>
+
+                                    <section style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', overflow: 'hidden' }}>
+                                        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                                            <p className="label" style={{ margin: 0 }}>Played modes</p>
+                                        </div>
+                                        <DataTable
+                                            columns={[
+                                                { key: 'mode', label: 'Mode', render: r => String(r.mode).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) },
+                                                { key: 'games', label: 'Entries' },
+                                                { key: 'deaths', label: 'Deaths' },
+                                                { key: 'cashouts', label: 'Cashouts' },
+                                                { key: 'entryUsd', label: 'Entry value', render: r => formatUsd(r.entryUsd) },
+                                                { key: 'payoutUsd', label: 'Payouts', render: r => formatUsd(r.payoutUsd) },
+                                            ]}
+                                            rows={stats.modeBreakdown || []}
+                                            loading={false}
+                                            emptyMessage="No recorded game modes"
+                                        />
+                                    </section>
                                 </div>
                             )}
                             {subTab === 'transactions' && (
@@ -602,14 +642,14 @@ export default function AdminDashboard() {
     }, [fetchServerStatus]);
 
     useEffect(() => {
-        if (tab !== 'live' && tab !== 'overview') return undefined;
+        if (tab !== 'activity' && tab !== 'overview') return undefined;
         fetchLiveFeed(true);
         const id = setInterval(() => fetchLiveFeed(true), 3000);
         return () => clearInterval(id);
     }, [tab, fetchLiveFeed]);
 
     useEffect(() => {
-        if (tab !== 'transactions') return undefined;
+        if (tab !== 'activity') return undefined;
         const id = setInterval(() => {
             fetchTransactions(txFilter, showExcluded).catch(() => {});
         }, 5000);
@@ -817,7 +857,7 @@ export default function AdminDashboard() {
                         </h1>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <LiveIndicator active={tab === 'live' || tab === 'overview'} />
+                        <LiveIndicator active={tab === 'activity' || tab === 'overview'} />
                         <button className="btn btn-primary" onClick={() => navigate('/admin/sandbox')} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
                             Sandbox Studio
                         </button>
@@ -874,185 +914,20 @@ export default function AdminDashboard() {
 
                 {tab === 'overview' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {/* Section: Realtime Presence */}
                         <div>
                             <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Realtime Presence
+                                At a glance
                             </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                                <StatCard
-                                    label="Website Visitors"
-                                    value={activeUsers?.sitePresence?.length ?? 0}
-                                    sub="Browsing or in lobbies"
-                                />
-                                <StatCard
-                                    label="Active Players (Humans)"
-                                    value={activeUsers?.currentlyInGame ?? 0}
-                                    sub="Playing in arenas & BR"
-                                />
-                                <StatCard
-                                    label="Active Bots"
-                                    value={activeUsers?.currentlyBots ?? 0}
-                                    sub="Simulating players in arenas"
-                                />
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
+                                <StatCard label="Online now" value={(activeUsers?.sitePresence?.length ?? 0) + (activeUsers?.currentlyInGame ?? 0)} sub={`${activeUsers?.currentlyInGame ?? 0} playing · ${activeUsers?.sitePresence?.length ?? 0} browsing`} />
+                                <StatCard label="Registered users" value={overview?.totalAccounts ?? '—'} sub={`${formatUsd(overview?.totalUserBalanceUsd)} held in balances`} />
+                                <StatCard label="Total deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={`${overview?.depositCount ?? 0} deposits`} />
+                                <StatCard label="Platform earnings" value={formatUsd(overview?.ownerEarningsUsd)} sub={`${overview?.ownerSweepCount ?? 0} completed sweeps`} />
+                                <StatCard label="Rewards owed" value={formatUsd((overview?.totalSponsoredRewards ?? 0) + (overview?.totalRetainedWinnings ?? 0))} sub={`${overview?.activeSponsoredPlayers ?? 0} sponsored users`} />
+                                <StatCard label="Needs attention" value={rewardAlerts.filter(alert => alert.status === 'pending').length + pendingRewardClaims.length} sub="Reward alerts and unsettled claims" />
                             </div>
                         </div>
-
-                        {/* Section: Platform Finances */}
-                        <div>
-                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Financial Health
-                            </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                                <StatCard
-                                    label="Total Platform Earnings"
-                                    value={formatUsd(overview?.ownerEarningsUsd)}
-                                    sub={overview ? `${overview.ownerEarningsSol?.toFixed(4)} SOL · ${overview.ownerSweepCount ?? 0} sweeps` : ''}
-                                />
-                                <StatCard
-                                    label="Owner Vault (On-Chain)"
-                                    value={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'}
-                                    sub={wallets?.ownerVault ? `${formatUsd(wallets.ownerVault.balanceUsd)} current balance` : 'Sweep destination'}
-                                />
-                                <StatCard
-                                    label="Main House Wallet"
-                                    value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'}
-                                    sub={wallets?.mainHouse ? `${formatUsd(wallets.mainHouse.balanceUsd)} float balance` : 'Arena deposit pool'}
-                                />
-                                <StatCard
-                                    label="Tournament Wallet"
-                                    value={wallets?.tournamentWallet ? formatSol(wallets.tournamentWallet.balanceSol) : '—'}
-                                    sub={wallets?.tournamentWallet ? `${formatUsd(wallets.tournamentWallet.balanceUsd)} accumulated fees` : 'Not configured'}
-                                />
-                                <StatCard
-                                    label="Total Deposits"
-                                    value={formatUsd(overview?.totalDepositsUsd)}
-                                    sub={overview ? `${overview.totalDepositsSol?.toFixed(4)} SOL · ${overview.depositCount} deposits` : ''}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Section: Sponsored Rewards & Tickets */}
-                        <div>
-                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Sponsored Rewards & Tickets
-                            </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                                <StatCard
-                                    label="Total Sponsored Rewards"
-                                    value={formatUsd(overview?.totalSponsoredRewards)}
-                                    sub={`${overview?.activeSponsoredPlayers ?? 0} active sponsored players`}
-                                />
-                                <StatCard
-                                    label="Retained Game Winnings"
-                                    value={formatUsd(overview?.totalRetainedWinnings)}
-                                    sub="Below-rent cashouts still owed to players"
-                                />
-                                <StatCard
-                                    label="Completed Challenges"
-                                    value={overview?.completedBeginnerChallenges ?? 0}
-                                    sub="Players fully unlocked"
-                                />
-                                <StatCard
-                                    label="Unused Free Tickets"
-                                    value={overview?.unusedFreeTickets ?? 0}
-                                    sub="Ready to play"
-                                />
-                                <StatCard
-                                    label="Used Free Tickets"
-                                    value={overview?.usedFreeTickets ?? 0}
-                                    sub="Matches claimed"
-                                />
-                                <StatCard
-                                    label="Pending Reward Alerts"
-                                    value={rewardAlerts.filter(alert => alert.status === 'pending').length}
-                                    sub="Shared external funding wallets"
-                                />
-                                <StatCard
-                                    label="Pending Reward Funding"
-                                    value={formatUsd(overview?.rewardPoolBalanceUsd)}
-                                    sub="Still awaiting house → reward settlement"
-                                />
-                                <StatCard
-                                    label="Reward Pool (On-Chain)"
-                                    value={wallets?.rewardWallet?.balanceUsd != null ? formatUsd(wallets.rewardWallet.balanceUsd) : 'Loading...'}
-                                    sub={wallets?.rewardWallet?.balanceSol != null ? `${wallets.rewardWallet.balanceSol.toFixed(4)} SOL via RPC` : 'Fetching real balance...'}
-                                />
-                                <StatCard
-                                    label="Owner Reward Surplus"
-                                    value={formatUsd((overview?.rewardOwnerSurplusUsd || 0) + (overview?.rewardOwnerSurplusReservedUsd || 0))}
-                                    sub={overview?.rewardOwnerSurplusReservedUsd > 0 ? 'Manual sweep processing' : 'Tracked excess from completed challenges'}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Section: General Operations */}
-                        <div>
-                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Operations & Status
-                            </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                                <StatCard
-                                    label="Arena Reset Timer"
-                                    value={serverStatus?.isResetting ? 'Resetting…' : formatCountdown(serverStatus?.msUntilReset)}
-                                    sub={serverStatus ? `Cycle: ${formatDuration(serverStatus.arenaDurationMs)} · Next: ${formatDate(serverStatus.arenaResetAt)}` : ''}
-                                />
-                                <StatCard
-                                    label="Registered Accounts"
-                                    value={overview?.totalAccounts ?? '—'}
-                                    sub={`Total balance held: ${formatUsd(overview?.totalUserBalanceUsd)}`}
-                                />
-                                <StatCard
-                                    label="Withdrawals (Users)"
-                                    value={formatUsd(overview?.totalWithdrawalsUsd)}
-                                    sub={overview ? `${overview.withdrawalCount} txs (excluding sweeps)` : ''}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Excluded Stats (only if present) */}
-                        {((overview?.excludedTxCount ?? 0) > 0 || (overview?.excludedUsersCount ?? 0) > 0) && (
-                            <div>
-                                <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Excluded Reports
-                                </h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                                    {(overview?.excludedTxCount ?? 0) > 0 && (
-                                        <StatCard label="Excluded Transactions" value={overview.excludedTxCount} sub="Filtered out from earnings totals" />
-                                    )}
-                                    {(overview?.excludedUsersCount ?? 0) > 0 && (
-                                        <StatCard label="Excluded Accounts" value={overview.excludedUsersCount} sub="All transactions hidden from reports" />
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {overview && (
-                            <Panel
-                                title="Earnings breakdown"
-                                sub="Actual platform profit = SOL transferred from house wallets to your owner vault"
-                            >
-                                <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', fontSize: '0.82rem' }}>
-                                    <div>
-                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Arena reset sweeps</p>
-                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--green)' }}>{formatSol(overview.ownerEarningsArenaSol)}</p>
-                                    </div>
-                                    <div>
-                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>BR owner cut (2.5%)</p>
-                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--green)' }}>{formatSol(overview.ownerEarningsBrSol)}</p>
-                                    </div>
-                                    <div>
-                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>All user balances combined</p>
-                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--text-h)' }}>{formatUsd(overview.totalUserBalanceUsd)}</p>
-                                    </div>
-                                    <div>
-                                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.72rem' }}>Total accounts</p>
-                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--text-h)' }}>{overview.totalAccounts}</p>
-                                    </div>
-                                </div>
-                            </Panel>
-                        )}
-                        <Panel title="Recent activity" sub="Auto-updates every 3s · full feed in Live tab">
+                        <Panel title="Recent activity" sub="Auto-updates every 3s · full feed in Activity">
                             <DataTable
                                 columns={[
                                     { key: 'time', label: 'When', render: r => formatRelativeTime(r.createdAt) },
@@ -1066,8 +941,8 @@ export default function AdminDashboard() {
                                 emptyMessage="No activity yet"
                             />
                             <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--border)' }}>
-                                <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: '0.78rem' }} onClick={() => setTab('live')}>
-                                    Open live feed →
+                                <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: '0.78rem' }} onClick={() => setTab('activity')}>
+                                    Open activity →
                                 </button>
                             </div>
                         </Panel>
@@ -1081,7 +956,7 @@ export default function AdminDashboard() {
                     />
                 )}
 
-                {tab === 'live' && (
+                {tab === 'activity' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                             <StatCard
@@ -1199,7 +1074,7 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {tab === 'security' && (
+                {tab === 'rewards' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <Panel
                             title={`Shared deposit-wallet alerts (${rewardAlerts.filter(alert => alert.status === 'pending').length} pending)`}
@@ -1248,7 +1123,7 @@ export default function AdminDashboard() {
                             />
                         </Panel>                    </div>
                 )}
-                {tab === 'server' && (
+                {tab === 'operations' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                             <StatCard
@@ -1378,7 +1253,7 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {tab === 'finances' && (
+                {tab === 'operations' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
                             <StatCard
@@ -1513,13 +1388,11 @@ export default function AdminDashboard() {
                                             </th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Username</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Joined</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposit wallet</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Withdraw addr</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Balance</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Total deposited</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposits</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Status</th>
-                                        </tr>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Rewards</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Playtime</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposited</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Status</th>                                        </tr>
                                     </thead>
                                     <tbody>
                                         {filteredUsers.map(u => {
@@ -1544,19 +1417,16 @@ export default function AdminDashboard() {
                                                             onChange={() => toggleUserSelection(id)}
                                                         />
                                                     </td>
-                                                    <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-h)' }}>{u.username}</td>
+                                                    <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-h)' }}>
+                                                        {u.username}
+                                                        {u.email && <div style={{ marginTop: '3px', color: 'var(--text-3)', fontSize: '0.68rem', fontWeight: 400 }}>{u.email}</div>}
+                                                    </td>
                                                     <td style={{ padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.78rem' }}>{u.createdAt ? formatDate(u.createdAt) : '—'}</td>
-                                                    <td style={{ padding: '12px 16px' }}>
-                                                        <span className="mono" style={{ fontSize: '0.72rem' }} title={u.depositAddress}>{truncateAddr(u.depositAddress)}</span>
-                                                    </td>
-                                                    <td style={{ padding: '12px 16px' }}>
-                                                        <span className="mono" style={{ fontSize: '0.72rem' }} title={u.wallet}>{truncateAddr(u.wallet)}</span>
-                                                    </td>
-                                                    <td style={{ padding: '12px 16px' }}>{formatUsd(u.balanceUsd)} ({formatSol(u.balanceSol)})</td>
-                                                    <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalDepositedUsd)}</td>
-                                                    <td style={{ padding: '12px 16px' }}>{u.depositCount}</td>
-                                                    <td style={{ padding: '12px 16px' }}>
-                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : 'Active'}
+                                                    <td style={{ padding: '12px 16px' }}>{formatUsd(u.balanceUsd)}<div style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{formatSol(u.balanceSol)}</div></td>
+                                                    <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalRewardsBalance)}{u.rewardsDisabled && <div style={{ color: '#ef4444', fontSize: '0.68rem' }}>Blocked</div>}</td>
+                                                    <td style={{ padding: '12px 16px' }}>{formatDuration(u.playtime)}</td>
+                                                    <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalDepositedUsd)}<div style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{u.depositCount} deposits</div></td>
+                                                    <td style={{ padding: '12px 16px' }}>                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : 'Active'}
                                                     </td>
                                                 </tr>
                                             );
@@ -1568,7 +1438,7 @@ export default function AdminDashboard() {
                     </Panel>
                 )}
 
-                {tab === 'transactions' && (
+                {tab === 'activity' && (
                     <Panel
                         title={`${transactions.length} transactions`}
                         sub="Filter by category, user, or search · auto-refreshes every 5s on this tab"
