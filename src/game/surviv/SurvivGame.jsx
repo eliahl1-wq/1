@@ -491,6 +491,11 @@ export default function SurvivGame() {
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
             if (action === 'pickupWeapon') pickupWeaponPendingRef.current = true;
+            if (action === 'dropWeapon') {
+                const activeWeapon = renderer.me?.weapon;
+                const activeSlot = renderer.me?.inventory?.weapons?.indexOf(activeWeapon) ?? -1;
+                if (activeSlot >= 0) dropItemPendingRef.current = { itemKey: 'weapon', slotIdx: activeSlot };
+            }
             if (typeof action === 'string' && action.startsWith('equipSlot:')) {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
             }
@@ -940,8 +945,7 @@ export default function SurvivGame() {
             {gameReady && me && !showResultModal && (
                 <div className="surviv-weapons-hotbar">
                     {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                        const weaponId = me.inventory?.weapons?.[slotIdx]
-                            || (slotIdx === 0 && !(me.inventory?.weapons?.length) ? 'fists' : null);
+                        const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const isActive = weaponId && weaponId === me.weapon;
                         const isReloading = isActive && me.reloading;
@@ -1096,8 +1100,7 @@ export default function SurvivGame() {
                                     <h4 className="section-subtitle">WEAPONS</h4>
                                     <div className="weapons-grid">
                                         {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                                            const weaponId = me.inventory?.weapons?.[slotIdx]
-                                                || (slotIdx === 0 && !(me.inventory?.weapons?.length) ? 'fists' : null);
+                                            const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                                             const isActive = weaponId && weaponId === me.weapon;
                                             

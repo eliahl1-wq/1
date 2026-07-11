@@ -90,7 +90,9 @@ function ArenaRoute({ children }) {
   if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
   if (isTournamentSession()) return children;
   const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
-  if (user && !hasFreeTicket && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
+  // The server consumes the ticket during join, so the auth refresh can set freeTicketUsed before the game route renders.
+  const hasFreeTicketSession = typeof window !== 'undefined' && localStorage.getItem('use_free_ticket') === 'true';
+  if (user && !hasFreeTicket && !hasFreeTicketSession && (user.balanceUsd || (user.balanceSol * (user.solPrice || 57)) || 0) < MIN_ENTRY_FEE) return <Navigate to="/lobby" />;
   return children;
 }
 

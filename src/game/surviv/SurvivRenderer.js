@@ -768,6 +768,7 @@ export class SurvivRenderer {
         if (k === 'r') return 'reload';
         if (k === 'q') return 'useMedkit';
         if (k === 'f') return 'pickupWeapon';
+        if (k === 'g') return 'dropWeapon';
         if (['1', '2'].includes(k)) return `equipSlot:${Number(k) - 1}`;
         return null;
     }
@@ -1235,18 +1236,23 @@ export class SurvivRenderer {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
 
-        // Cast one ray toward each nearby segment endpoint.
+        // Cast around each nearby segment endpoint so corners stay sealed and stable.
+        const epsilon = 0.00005;
         const epRangeSq = (maxDist + 200) * (maxDist + 200);
         for (const s of segments) {
             const d1sq = (s.ax - px) * (s.ax - px) + (s.ay - py) * (s.ay - py);
             const d2sq = (s.bx - px) * (s.bx - px) + (s.by - py) * (s.by - py);
             if (d1sq < epRangeSq) {
                 const a1 = normalize(Math.atan2(s.ay - py, s.ax - px));
+                angles.add(normalize(a1 - epsilon));
                 angles.add(a1);
+                angles.add(normalize(a1 + epsilon));
             }
             if (d2sq < epRangeSq) {
                 const a2 = normalize(Math.atan2(s.by - py, s.bx - px));
+                angles.add(normalize(a2 - epsilon));
                 angles.add(a2);
+                angles.add(normalize(a2 + epsilon));
             }
         }
 
@@ -1277,7 +1283,7 @@ export class SurvivRenderer {
         const py = this.me.y;
         const maxDist = 900;
 
-        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 12)}:${Math.round(py / 12)}`;
+        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 4)}:${Math.round(py / 4)}`;
         let polygon = this._losCachedPolygon;
         if (cacheKey !== this._losCacheKey || !polygon) {
             const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse);
@@ -2751,13 +2757,15 @@ export class SurvivRenderer {
             const tierColor = isDeathCrate ? '#a855f7' : (RARITY_COLORS[l.tier] || '#d7c396');
             const glowRad = 34 + Math.sin(Date.now() / 260 + l.x * 0.035) * 5;
 
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+            // Base shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
             ctx.beginPath();
-            ctx.ellipse(0, 9, 23, 10, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 11, 23, 7, 0, 0, Math.PI * 2);
             ctx.fill();
 
+            // Glow Aura
             const glowGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, glowRad);
-            glowGrad.addColorStop(0, tierColor + '42');
+            glowGrad.addColorStop(0, tierColor + '46');
             glowGrad.addColorStop(0.5, tierColor + '18');
             glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = glowGrad;
@@ -2765,83 +2773,286 @@ export class SurvivRenderer {
             ctx.arc(0, 0, glowRad, 0, Math.PI * 2);
             ctx.fill();
 
-            if (hovered) {
-                ctx.save();
-                ctx.shadowColor = '#ffffff';
-                ctx.shadowBlur = 15;
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 3.2;
-                roundRect(ctx, -23, -18, 46, 34, 8);
-                ctx.stroke();
-                ctx.restore();
-            }
-
             const palette = isDeathCrate
-                ? { lid: '#3b2654', body: '#271b35', trim: '#a855f7', dark: '#120b1d', lock: '#f5d0fe' }
+                ? { lid: '#442e5d', body: '#2d203b', trim: '#a855f7', dark: '#150e1c', lock: '#f5d0fe', glow: '#bf7afc' }
                 : l.tier === 'military'
-                    ? { lid: '#4f5d38', body: '#2f3b25', trim: '#20291a', dark: '#10170d', lock: '#c8ff86' }
+                    ? { lid: '#485735', body: '#2f3b25', trim: '#1b2416', dark: '#0c120a', lock: '#a3e635', glow: '#bef264' }
                     : l.tier === 'rare'
-                        ? { lid: '#7a3f23', body: '#4d2919', trim: '#d29a36', dark: '#261208', lock: '#ffe08a' }
-                        : { lid: '#8a5730', body: '#5b351f', trim: '#2f2018', dark: '#20120b', lock: '#ffd45a' };
+                        ? { lid: '#22488a', body: '#162e5c', trim: '#fbbf24', dark: '#0a1730', lock: '#fef08a', glow: '#60a5fa' }
+                        : { lid: '#7c3a27', body: '#502315', trim: '#ca8a04', dark: '#2b1008', lock: '#fbbf24', glow: '#f59e0b' };
 
             ctx.save();
-            ctx.rotate(isDeathCrate ? 0.04 : -0.055);
+            ctx.rotate(isDeathCrate ? 0.045 : -0.055);
 
-            ctx.fillStyle = 'rgba(18, 11, 6, 0.55)';
-            roundRect(ctx, -18, 7, 36, 5, 3);
-            ctx.fill();
+            // Apply interactive glow when hovered
+            if (hovered) {
+                ctx.shadowColor = palette.glow;
+                ctx.shadowBlur = 12 + Math.sin(Date.now() / 110) * 3;
+            }
 
-            const bodyGrad = ctx.createLinearGradient(0, -5, 0, 15);
-            bodyGrad.addColorStop(0, palette.body);
-            bodyGrad.addColorStop(1, palette.dark);
-            ctx.fillStyle = bodyGrad;
-            ctx.strokeStyle = 'rgba(9, 10, 8, 0.95)';
-            ctx.lineWidth = 2;
-            roundRect(ctx, -20, -4, 40, 21, 5);
-            ctx.fill();
-            ctx.stroke();
+            if (isDeathCrate) {
+                // Death Crate: Gothic Obsidian/Skull Coffin
+                // Body (lower part)
+                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
+                bodyGrad.addColorStop(0, palette.body);
+                bodyGrad.addColorStop(1, palette.dark);
+                ctx.fillStyle = bodyGrad;
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2.2;
+                roundRect(ctx, -19, 0, 38, 12, 3);
+                ctx.fill();
+                ctx.stroke();
 
-            const lidGrad = ctx.createLinearGradient(0, -19, 0, 3);
-            lidGrad.addColorStop(0, palette.lid);
-            lidGrad.addColorStop(0.72, palette.body);
-            lidGrad.addColorStop(1, palette.dark);
-            ctx.fillStyle = lidGrad;
-            ctx.beginPath();
-            ctx.moveTo(-20, -3);
-            ctx.lineTo(-20, -8);
-            ctx.quadraticCurveTo(-15, -19, 0, -19);
-            ctx.quadraticCurveTo(15, -19, 20, -8);
-            ctx.lineTo(20, -3);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+                // Lid (upper part)
+                const lidGrad = ctx.createLinearGradient(0, -15, 0, -1);
+                lidGrad.addColorStop(0, palette.lid);
+                lidGrad.addColorStop(1, palette.body);
+                ctx.fillStyle = lidGrad;
+                roundRect(ctx, -20, -15, 40, 14, 4);
+                ctx.fill();
+                ctx.stroke();
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(-14, -13);
-            ctx.quadraticCurveTo(0, -17, 14, -13);
-            ctx.stroke();
+                // Bone/silver corners
+                ctx.fillStyle = '#94a3b8';
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 1;
+                // Top corners
+                roundRect(ctx, -20.5, -15.5, 6, 6, 1); ctx.fill(); ctx.stroke();
+                roundRect(ctx, 14.5, -15.5, 6, 6, 1); ctx.fill(); ctx.stroke();
+                // Bottom corners
+                roundRect(ctx, -19.5, 7, 5, 5.5, 1); ctx.fill(); ctx.stroke();
+                roundRect(ctx, 14.5, 7, 5, 5.5, 1); ctx.fill(); ctx.stroke();
 
-            ctx.fillStyle = palette.trim;
-            roundRect(ctx, -21, -5, 42, 4, 2);
-            ctx.fill();
-            ctx.fillStyle = isDeathCrate ? '#1a1026' : palette.trim;
-            roundRect(ctx, -13, -18, 5, 34, 2);
-            ctx.fill();
-            roundRect(ctx, 8, -18, 5, 34, 2);
-            ctx.fill();
+                // Glowing purple runes/skull on lid
+                ctx.save();
+                ctx.shadowColor = '#d8b4fe';
+                ctx.shadowBlur = 8;
+                ctx.strokeStyle = '#c084fc';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                // Draw a simple glowing stylized runic cross/emblem
+                ctx.moveTo(-7, -8); ctx.lineTo(7, -8);
+                ctx.moveTo(0, -12); ctx.lineTo(0, -4);
+                ctx.stroke();
+                ctx.restore();
 
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
-            roundRect(ctx, -17, -2, 34, 3, 2);
-            ctx.fill();
+                // Neon trim line dividing lid & body
+                ctx.fillStyle = palette.trim;
+                roundRect(ctx, -21, -1, 42, 2.5, 1);
+                ctx.fill();
 
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-            roundRect(ctx, -5, -2, 10, 10, 3);
-            ctx.fill();
-            ctx.fillStyle = palette.lock;
-            roundRect(ctx, -3, 0, 6, 6, 2);
-            ctx.fill();
+                // Mystic Lock Gem
+                ctx.fillStyle = '#ec4899';
+                ctx.beginPath();
+                ctx.moveTo(0, -3);
+                ctx.lineTo(4, 1);
+                ctx.lineTo(0, 5);
+                ctx.lineTo(-4, 1);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+            else if (l.tier === 'military') {
+                // Military Container Crate
+                // Body (lower container)
+                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
+                bodyGrad.addColorStop(0, palette.body);
+                bodyGrad.addColorStop(1, palette.dark);
+                ctx.fillStyle = bodyGrad;
+                ctx.strokeStyle = '#0c120a';
+                ctx.lineWidth = 2.2;
+                roundRect(ctx, -19, 0, 38, 12, 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Hazard stripes on body
+                ctx.strokeStyle = '#a3e635';
+                ctx.lineWidth = 2.2;
+                ctx.beginPath();
+                ctx.moveTo(-10, 1); ctx.lineTo(-6, 11);
+                ctx.moveTo(-3, 1); ctx.lineTo(1, 11);
+                ctx.moveTo(4, 1); ctx.lineTo(8, 11);
+                ctx.stroke();
+
+                // Lid (armored top)
+                const lidGrad = ctx.createLinearGradient(0, -14, 0, -1);
+                lidGrad.addColorStop(0, '#5c6f44'); // highlight
+                lidGrad.addColorStop(0.5, palette.lid);
+                lidGrad.addColorStop(1, palette.body);
+                ctx.fillStyle = lidGrad;
+                ctx.strokeStyle = '#0c120a';
+                ctx.lineWidth = 2.2;
+                roundRect(ctx, -20, -14, 40, 13, 3);
+                ctx.fill();
+                ctx.stroke();
+
+                // Reinforcing structural ribs (vertical lines on lid)
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(-13, -13, 3, 11);
+                ctx.fillRect(-5, -13, 3, 11);
+                ctx.fillRect(3, -13, 3, 11);
+                ctx.fillRect(11, -13, 3, 11);
+
+                // Heavy black corner bindings
+                ctx.fillStyle = palette.trim;
+                ctx.fillRect(-20.5, -14.5, 4.5, 13.5);
+                ctx.fillRect(16, -14.5, 4.5, 13.5);
+                ctx.fillRect(-19.5, 0, 4, 12);
+                ctx.fillRect(15.5, 0, 4, 12);
+
+                // Lid lip / seal
+                ctx.fillStyle = '#1b2416';
+                roundRect(ctx, -21, -1.5, 42, 2.5, 1);
+                ctx.fill();
+                ctx.stroke();
+
+                // Center digital keypad / status LED
+                ctx.fillStyle = '#1e293b';
+                roundRect(ctx, -4, -3, 8, 8, 1.5);
+                ctx.fill();
+                ctx.stroke();
+                // Glowing LED
+                ctx.fillStyle = hovered ? '#22c55e' : '#ef4444';
+                ctx.beginPath();
+                ctx.arc(0, 1, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            else if (l.tier === 'rare') {
+                // Rare Blue/Gold Chest
+                // Body (lower chest)
+                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
+                bodyGrad.addColorStop(0, palette.body);
+                bodyGrad.addColorStop(1, palette.dark);
+                ctx.fillStyle = bodyGrad;
+                ctx.strokeStyle = '#050f24';
+                ctx.lineWidth = 2.2;
+                roundRect(ctx, -19, 0, 38, 12, 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Lid (slanted/curved metallic blue)
+                const lidGrad = ctx.createLinearGradient(0, -14, 0, -1);
+                lidGrad.addColorStop(0, '#3b82f6'); // light blue highlight
+                lidGrad.addColorStop(0.5, palette.lid);
+                lidGrad.addColorStop(1, palette.body);
+                ctx.fillStyle = lidGrad;
+                ctx.strokeStyle = '#050f24';
+                ctx.lineWidth = 2.2;
+                roundRect(ctx, -20, -14, 40, 13, 3);
+                ctx.fill();
+                ctx.stroke();
+
+                // Diagonal metallic gloss lines
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-12, -13); ctx.lineTo(-4, -2);
+                ctx.moveTo(4, -13); ctx.lineTo(12, -2);
+                ctx.stroke();
+
+                // Gold trim bands
+                ctx.fillStyle = palette.trim;
+                // Corner protectors
+                ctx.beginPath();
+                ctx.moveTo(-20, -14); ctx.lineTo(-14, -14); ctx.lineTo(-14, -11);
+                ctx.lineTo(-17, -11); ctx.lineTo(-17, -1); ctx.lineTo(-20, -1);
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(20, -14); ctx.lineTo(14, -14); ctx.lineTo(14, -11);
+                ctx.lineTo(17, -11); ctx.lineTo(17, -1); ctx.lineTo(20, -1);
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+                // Bottom corners
+                ctx.fillRect(-19, 0, 4, 12); ctx.strokeRect(-19, 0, 4, 12);
+                ctx.fillRect(15, 0, 4, 12); ctx.strokeRect(15, 0, 4, 12);
+
+                // Lid dividing gold lip
+                ctx.fillStyle = palette.trim;
+                roundRect(ctx, -20.5, -1.5, 41, 2.5, 1);
+                ctx.fill();
+                ctx.stroke();
+
+                // Ornate silver plate with glowing cyan lock core
+                ctx.fillStyle = '#cbd5e1';
+                roundRect(ctx, -5, -4, 10, 9, 2);
+                ctx.fill();
+                ctx.stroke();
+                // Cyan energy core
+                ctx.save();
+                ctx.shadowColor = '#22d3ee';
+                ctx.shadowBlur = 8;
+                ctx.fillStyle = '#06b6d4';
+                ctx.beginPath();
+                ctx.arc(0, 0.5, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            else {
+                // Common Wooden Chest
+                // Body (lower wood panel)
+                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
+                bodyGrad.addColorStop(0, palette.body);
+                bodyGrad.addColorStop(1, palette.dark);
+                ctx.fillStyle = bodyGrad;
+                ctx.strokeStyle = '#1a0802';
+                ctx.lineWidth = 2.2;
+                roundRect(ctx, -18, 0, 36, 12, 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Wood grain lines on body
+                ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-17, 4); ctx.lineTo(17, 4);
+                ctx.moveTo(-17, 8); ctx.lineTo(17, 8);
+                ctx.stroke();
+
+                // Lid (curved wood top)
+                const lidGrad = ctx.createLinearGradient(0, -14, 0, -1);
+                lidGrad.addColorStop(0, '#92400e'); // rich warm wood highlight
+                lidGrad.addColorStop(0.48, palette.lid);
+                lidGrad.addColorStop(1, palette.body);
+                ctx.fillStyle = lidGrad;
+                ctx.strokeStyle = '#1a0802';
+                ctx.lineWidth = 2.2;
+                roundRect(ctx, -20, -14, 40, 13, 3);
+                ctx.fill();
+                ctx.stroke();
+
+                // Wood grain lines on lid
+                ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+                ctx.beginPath();
+                ctx.moveTo(-19, -9); ctx.lineTo(19, -9);
+                ctx.moveTo(-19, -5); ctx.lineTo(19, -5);
+                ctx.stroke();
+
+                // Dark rusty iron bands
+                ctx.fillStyle = '#374151';
+                ctx.fillRect(-13, -14, 4, 26);
+                ctx.fillRect(9, -14, 4, 26);
+                ctx.strokeStyle = '#111827';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(-13, -14, 4, 26);
+                ctx.strokeRect(9, -14, 4, 26);
+
+                // Lid dividing trim
+                ctx.fillStyle = '#5c3116';
+                roundRect(ctx, -20.5, -1.5, 41, 2.5, 1);
+                ctx.fill();
+                ctx.stroke();
+
+                // Brass Lock hasp & padlock
+                ctx.fillStyle = palette.trim; // Golden brass
+                roundRect(ctx, -4, -3, 8, 8, 2);
+                ctx.fill();
+                ctx.stroke();
+                // Keyhole
+                ctx.fillStyle = '#111827';
+                ctx.fillRect(-0.8, 0, 1.6, 4);
+                ctx.beginPath();
+                ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             ctx.restore();
         } else {
@@ -2862,19 +3073,380 @@ export class SurvivRenderer {
             ctx.translate(0, -2);
             ctx.fillStyle = color;
             ctx.strokeStyle = 'rgba(8, 11, 9, 0.9)';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.8;
             ctx.shadowColor = color;
-            ctx.shadowBlur = 7;
+            ctx.shadowBlur = 6;
 
             if (l.type === 'weapon') {
-                ctx.rotate(-0.22);
-                const longGun = ['assault', 'dmr', 'sniper', 'lmg', 'shotgun'].includes(l.weaponType);
-                roundRect(ctx, -15, -5, longGun ? 29 : 22, 9, 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillRect(longGun ? 12 : 6, -2, longGun ? 13 : 10, 4);
-                ctx.fillStyle = '#252b27';
-                ctx.fillRect(-8, 4, 7, 7);
+                if (l.weaponType === 'pistol') {
+                    // M9 Pistol
+                    ctx.rotate(-0.22);
+                    
+                    // Gunmetal gray slide
+                    ctx.fillStyle = '#4b5563';
+                    roundRect(ctx, -6, -4, 14, 4.5, 1);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Grip
+                    ctx.save();
+                    ctx.translate(-3, 0);
+                    ctx.rotate(0.35);
+                    ctx.fillStyle = '#1f2937';
+                    roundRect(ctx, -2, 0, 4.5, 8.5, 1.2);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Tan grip panel
+                    ctx.fillStyle = '#a16207';
+                    roundRect(ctx, -1, 1.5, 2.5, 5.5, 0.8);
+                    ctx.fill();
+                    ctx.restore();
+
+                    // Trigger guard
+                    ctx.strokeStyle = 'rgba(8, 11, 9, 0.95)';
+                    ctx.beginPath();
+                    ctx.arc(0.5, 1.2, 2.2, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Barrel tip
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(8, -3, 2, 2.5);
+                } else if (l.weaponType === 'revolver') {
+                    // R8 Revolver
+                    ctx.rotate(-0.15);
+                    
+                    // Steel cylinder
+                    ctx.fillStyle = '#9ca3af';
+                    ctx.beginPath();
+                    ctx.ellipse(-1, -1.5, 4.2, 4.2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Cylinder detail
+                    ctx.fillStyle = '#374151';
+                    for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+                        ctx.beginPath();
+                        ctx.arc(-1 + Math.cos(a) * 2.2, -1.5 + Math.sin(a) * 2.2, 0.9, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Steel frame
+                    ctx.fillStyle = '#cbd5e1';
+                    roundRect(ctx, -6, -3.8, 8, 4, 1);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Long barrel
+                    roundRect(ctx, 2, -3.8, 12, 3, 0.8);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Ejector rod
+                    ctx.fillStyle = '#4b5563';
+                    ctx.fillRect(3, -0.8, 8, 1);
+
+                    // Wooden grip
+                    ctx.save();
+                    ctx.translate(-4, 0);
+                    ctx.rotate(0.55);
+                    ctx.fillStyle = '#7c2d12'; // Mahogany wood
+                    roundRect(ctx, -2.2, 1, 4.5, 9, 1.8);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                } else if (l.weaponType === 'smg') {
+                    // Vector SMG
+                    ctx.rotate(-0.25);
+                    
+                    // Skeletal stock
+                    ctx.fillStyle = '#1f2937';
+                    ctx.beginPath();
+                    ctx.moveTo(-9, -2);
+                    ctx.lineTo(-18, -4);
+                    ctx.lineTo(-18, 4);
+                    ctx.lineTo(-14, 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Main receiver
+                    ctx.fillStyle = '#374151';
+                    roundRect(ctx, -9, -5.5, 18, 9.5, 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Muzzle shroud
+                    ctx.fillStyle = '#111827';
+                    roundRect(ctx, 9, -3.5, 7, 3, 1);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Curved magazine
+                    ctx.save();
+                    ctx.translate(1, 4);
+                    ctx.rotate(-0.2);
+                    ctx.fillStyle = '#111827';
+                    roundRect(ctx, -2, 0, 3.8, 11, 1);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // Pistol grip
+                    ctx.save();
+                    ctx.translate(-5, 3.5);
+                    ctx.rotate(0.4);
+                    ctx.fillStyle = '#1f2937';
+                    roundRect(ctx, -2, 0, 4, 7, 1);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                } else if (l.weaponType === 'shotgun') {
+                    // Pump Shotgun
+                    ctx.rotate(-0.18);
+
+                    // Wooden Stock
+                    ctx.fillStyle = '#78350f';
+                    ctx.beginPath();
+                    ctx.moveTo(-14, -2);
+                    ctx.lineTo(-24, 0);
+                    ctx.lineTo(-24, 6);
+                    ctx.lineTo(-14, 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Steel Receiver
+                    ctx.fillStyle = '#4b5563';
+                    roundRect(ctx, -14, -3.5, 14, 6.5, 1);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Long dual barrel tube
+                    ctx.fillStyle = '#1f2937';
+                    ctx.fillRect(0, -3, 23, 2.5); // Barrel
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(0, -0.5, 21, 2.2); // Mag tube
+
+                    // Wooden slide pump
+                    ctx.fillStyle = '#92400e';
+                    roundRect(ctx, 1, 1, 9, 3.5, 1);
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (l.weaponType === 'assault') {
+                    // Scout Rifle
+                    ctx.rotate(-0.2);
+
+                    // Composite stock
+                    ctx.fillStyle = '#273024';
+                    ctx.beginPath();
+                    ctx.moveTo(-13, -2);
+                    ctx.lineTo(-22, -1);
+                    ctx.lineTo(-22, 6);
+                    ctx.lineTo(-13, 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Receiver
+                    ctx.fillStyle = '#374151';
+                    roundRect(ctx, -13, -4.2, 18, 7.5, 1.5);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Green handguard
+                    ctx.fillStyle = '#273024';
+                    roundRect(ctx, 5, -3.5, 10, 5.5, 1);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Barrel & muzzle
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(15, -2.5, 15, 2.2);
+                    ctx.fillRect(29, -3.5, 2.5, 4.2);
+
+                    // Curved magazine
+                    ctx.save();
+                    ctx.translate(1.5, 3.3);
+                    ctx.rotate(-0.12);
+                    ctx.fillStyle = '#111827';
+                    roundRect(ctx, -2, 0, 4, 8, 1);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // Scope
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(-5, -6.8, 10, 2.6); // Scope body
+                    ctx.fillRect(-6, -7.8, 1.8, 4.6);
+                    ctx.fillRect(3.5, -7.8, 1.8, 4.6);
+                } else if (l.weaponType === 'dmr') {
+                    // Falcon DMR
+                    ctx.rotate(-0.18);
+
+                    // Tan Crane stock
+                    ctx.fillStyle = '#b45309';
+                    ctx.beginPath();
+                    ctx.moveTo(-14, -2.5);
+                    ctx.lineTo(-24, -1.5);
+                    ctx.lineTo(-24, 6);
+                    ctx.lineTo(-17, 5);
+                    ctx.lineTo(-14, 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Tan Receiver
+                    ctx.fillStyle = '#d97706';
+                    roundRect(ctx, -14, -4.5, 20, 8.2, 1.5);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Tan Handguard
+                    ctx.fillStyle = '#b45309';
+                    roundRect(ctx, 6, -4, 12, 7, 1);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Long precision barrel
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(18, -2.5, 18, 2.2);
+                    ctx.fillRect(35, -3.5, 3, 4.2);
+
+                    // Bipod (folded)
+                    ctx.fillStyle = '#6b7280';
+                    ctx.fillRect(12, 3, 11, 1.5);
+
+                    // Straight magazine
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(0, 3.7, 4.5, 8.5);
+                    ctx.stroke();
+
+                    // Large sniper scope
+                    ctx.fillStyle = '#1f2937';
+                    ctx.fillRect(-7, -8, 12, 3.5);
+                    ctx.fillRect(-8.5, -9, 2, 5.5);
+                    ctx.fillRect(3.5, -9, 2, 5.5);
+                    ctx.fillStyle = '#3b82f6'; // lens reflect
+                    ctx.fillRect(-8, -8.5, 1, 4.5);
+                } else if (l.weaponType === 'sniper') {
+                    // AWM Sniper
+                    ctx.rotate(-0.2);
+
+                    // Olive stock
+                    ctx.fillStyle = '#166534';
+                    ctx.beginPath();
+                    ctx.moveTo(-16, -3);
+                    ctx.lineTo(-28, -1);
+                    ctx.lineTo(-28, 6.5);
+                    ctx.lineTo(-19, 5);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Thumbhole cut
+                    ctx.fillStyle = 'rgba(8, 11, 9, 0.9)';
+                    ctx.beginPath();
+                    ctx.ellipse(-23, 2, 2.5, 1.8, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Long Receiver (Olive green)
+                    ctx.fillStyle = '#166534';
+                    roundRect(ctx, -16, -4.5, 22, 9, 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Handguard shroud
+                    roundRect(ctx, 6, -4, 11, 7, 1);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Ultra long Match Barrel
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(17, -2.5, 24, 2.5);
+                    ctx.fillRect(40, -4, 4, 5.5);
+
+                    // Bolt handle
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillRect(-8, -7.5, 2, 3);
+                    ctx.beginPath();
+                    ctx.arc(-7, -7.5, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Box magazine
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(-1, 4.5, 5.5, 6);
+                    ctx.stroke();
+
+                    // Sniper scope
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(-9, -9.5, 16, 4.2);
+                    ctx.fillRect(-11, -11, 2.5, 7.2);
+                    ctx.fillRect(5, -11, 2.5, 7.2);
+                    ctx.fillStyle = '#60a5fa'; // lens glint
+                    ctx.fillRect(-10.2, -10.3, 1, 5.8);
+                } else if (l.weaponType === 'lmg') {
+                    // M249 LMG
+                    ctx.rotate(-0.16);
+
+                    // Skeletal stock
+                    ctx.strokeStyle = 'rgba(8, 11, 9, 0.9)';
+                    ctx.lineWidth = 2.2;
+                    ctx.beginPath();
+                    ctx.moveTo(-12, -2.5);
+                    ctx.lineTo(-24, -1);
+                    ctx.lineTo(-24, 7);
+                    ctx.lineTo(-16, 4);
+                    ctx.closePath();
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(-16, 1);
+                    ctx.lineTo(-24, 3);
+                    ctx.stroke();
+
+                    // Heavy Receiver
+                    ctx.fillStyle = '#4b5563';
+                    roundRect(ctx, -12, -5.8, 20, 10.5, 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Green handguard heat shield
+                    ctx.fillStyle = '#3f4f39';
+                    roundRect(ctx, 8, -5, 12, 8.5, 1.5);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Heavy barrel
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(20, -3.2, 14, 3.2);
+                    ctx.fillRect(34, -4.2, 3, 5.2);
+                    
+                    // Carry handle
+                    ctx.beginPath();
+                    ctx.arc(3, -7.5, 3.5, Math.PI, 0);
+                    ctx.stroke();
+
+                    // Folded bipod
+                    ctx.fillStyle = '#4b5563';
+                    ctx.fillRect(10, 3.5, 15, 1.8);
+
+                    // Ammo Box Magazine
+                    ctx.fillStyle = '#2c3727';
+                    roundRect(ctx, -2.5, 4.7, 10.5, 11.5, 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Gold ammo links
+                    ctx.fillStyle = '#eab308';
+                    ctx.fillRect(-2, 2.5, 2, 4);
+                    ctx.fillRect(0, 1.5, 2, 4);
+                } else {
+                    // Fallback
+                    ctx.rotate(-0.22);
+                    roundRect(ctx, -15, -5, 22, 9, 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
             } else if (l.type === 'medkit') {
                 roundRect(ctx, -11, -10, 22, 20, 4);
                 ctx.fill();
@@ -2974,13 +3546,13 @@ export class SurvivRenderer {
                     ctx.setLineDash([]);
                     if (l.type === 'weapon') {
                         ctx.fillStyle = 'rgba(8, 10, 9, 0.92)';
-                        roundRect(ctx, -24, 35, 48, 16, 4);
+                        roundRect(ctx, -34, 35, 68, 16, 4);
                         ctx.fill();
                         ctx.fillStyle = '#ffffff';
                         ctx.font = '900 9px system-ui, sans-serif';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText('F  SWAP', 0, 43);
+                        ctx.fillText(this.me.weapon === 'fists' ? 'F  PICK UP' : 'F  SWAP', 0, 43);
                     }
                 }
             }
