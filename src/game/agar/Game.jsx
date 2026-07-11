@@ -26,7 +26,7 @@ import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
 
 const IS_MOBILE = isTouchDevice();
-const CASHOUT_SECONDS = 10;
+const CASHOUT_SECONDS = 5;
 
 /** True when the local player's cell overlaps this pellet (we ate it or are eating it). */
 function foodEatenByPlayer(f, myId, users) {

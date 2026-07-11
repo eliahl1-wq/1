@@ -19,7 +19,7 @@ import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
 
 const IS_MOBILE = isTouchDevice();
-const CASHOUT_SECONDS = 10;
+const CASHOUT_SECONDS = 5;
 const WORLD_HALF = 10000;
 
 const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
