@@ -3026,18 +3026,18 @@ export class SurvivRenderer {
         const wt = b.weaponType;
         const isPellet = wt === 'shotgun';
         let trailLen = 34;
-        let thickness = 0.95;
+        let thickness = 1.2;
         if (isPellet) {
             trailLen = 16;
-            thickness = 0.62;
+            thickness = 0.82;
         } else if (wt === 'sniper') {
             trailLen = 58;
-            thickness = 1.15;
+            thickness = 1.42;
         } else if (wt === 'assault' || wt === 'dmr') {
             trailLen = 42;
         } else if (wt === 'smg' || wt === 'lmg') {
             trailLen = 29;
-            thickness = 0.78;
+            thickness = 1.0;
         }
         const slugLen = isPellet ? 3 : 6;
 
