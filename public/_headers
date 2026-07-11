@@ -64,7 +64,3 @@
 
 /tournaments*
   Cache-Control: no-store, no-cache, must-revalidate
-
-/assets/*
-  Cache-Control: public, max-age=31536000, immutable
-  X-Content-Type-Options: nosniff
