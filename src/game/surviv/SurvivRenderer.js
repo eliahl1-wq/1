@@ -42,6 +42,11 @@ const WEAPON_SHAKE = {
     assault: 0.3, dmr: 0.6, sniper: 1.4, lmg: 0.25,
 };
 
+const WEAPON_BULLET_SPEED = {
+    pistol: 34, revolver: 44, smg: 38, shotgun: 30,
+    assault: 42, dmr: 48, sniper: 58, lmg: 40,
+};
+
 const SURFACE_KINDS = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
 const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
@@ -171,6 +176,7 @@ export class SurvivRenderer {
         this.players = [];
         this.loot = [];
         this.bullets = [];
+        this.localShotTracers = [];
         this.obstacles = [];
         this.minimap = { players: [], food: [], obstacles: [] };
         this.houseFloors = [];
@@ -254,6 +260,7 @@ export class SurvivRenderer {
         this._minimapCanvas = null;
         this._minimapCtx = null;
         this._nextMinimapRenderAt = 0;
+        this._vignetteCanvas = null;
         this._roofSpriteCache = new Map();
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleSpriteCache = new Map();
@@ -282,7 +289,7 @@ export class SurvivRenderer {
         const h = parent?.clientHeight || window.innerHeight;
         // Surviv can be raster-heavy. A restrained adaptive cap keeps Retina
         // canvases sharp without paying the old 4x pixel cost at DPR 2.
-        const dprCap = w * h >= 1500000 ? 1 : (w < 760 ? 1 : 1.25);
+        const dprCap = 1;
         const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
@@ -325,6 +332,7 @@ export class SurvivRenderer {
         this.players = [];
         this.loot = [];
         this.bullets = [];
+        this.localShotTracers = [];
         this.obstacles = [];
         this.minimap = { players: [], food: [], obstacles: [] };
         this.houseFloors = [];
@@ -568,7 +576,7 @@ export class SurvivRenderer {
             this._prevHp = me.hp || 0;
 
             // Detect shots fired → muzzle flash + camera recoil
-            if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && me.weapon !== 'fists' && !me.reloading) {
+            if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && me.weapon === this._prevWeapon && me.weapon !== 'fists' && !me.reloading) {
                 this._muzzleFlash = 1.0;
                 const shakeAmt = WEAPON_SHAKE[me.weapon] || 1;
                 this.cameraShake.intensity += shakeAmt;
@@ -577,6 +585,22 @@ export class SurvivRenderer {
                 const barrelDist = me.weapon === 'sniper' ? 38 : me.weapon === 'shotgun' ? 30 : 24;
                 const bx = me.x + Math.cos(angle) * barrelDist;
                 const by = me.y + Math.sin(angle) * barrelDist;
+                // Predict a short local tracer immediately. A close-range shot can
+                // hit between server snapshots and otherwise never be rendered.
+                const pelletCount = me.weapon === 'shotgun' ? 5 : 1;
+                const speed = (WEAPON_BULLET_SPEED[me.weapon] || 38) * 40;
+                for (let i = 0; i < pelletCount; i++) {
+                    const spread = pelletCount > 1 ? (i - (pelletCount - 1) / 2) * 0.1 : 0;
+                    this.localShotTracers.push({
+                        id: `local:${receivedAt}:${i}`,
+                        x: bx,
+                        y: by,
+                        vx: Math.cos(angle + spread) * speed,
+                        vy: Math.sin(angle + spread) * speed,
+                        weaponType: me.weapon,
+                        life: 0.11,
+                    });
+                }
                 for (let i = 0; i < 4; i++) {
                     const spread = (Math.random() - 0.5) * 0.6;
                     const speed = 60 + Math.random() * 80;
@@ -1122,7 +1146,7 @@ export class SurvivRenderer {
      * Gather wall segments (edges of rectangles) from all solid obstacles
      * that should block line of sight.
      */
-    _gatherWallSegments(camX, camY, viewW, viewH, z) {
+    _gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse) {
         const margin = 200;
         const halfW = viewW / z / 2 + margin;
         const halfH = viewH / z / 2 + margin;
@@ -1134,7 +1158,9 @@ export class SurvivRenderer {
         const segments = [];
         for (const o of this.obstacles) {
             const solidFurniture = (o.kind === 'furniture' || o.kind === 'machine') && o.collidable !== false;
-            if (!LOS_BLOCKING_KINDS.has(o.kind) && !solidFurniture && o.kind !== 'tree') continue;
+            if (!LOS_BLOCKING_KINDS.has(o.kind) && !solidFurniture) continue;
+            // Indoor LOS only needs blockers belonging to the current building.
+            if (currentHouse && o._insideHouseId !== currentHouse.id && o.houseId !== currentHouse.id) continue;
             // Cull obstacles far from camera
             if (o.x + o.w / 2 < minX || o.x - o.w / 2 > maxX) continue;
             if (o.y + o.h / 2 < minY || o.y - o.h / 2 > maxY) continue;
@@ -1219,10 +1245,10 @@ export class SurvivRenderer {
         const angles = new Set();
 
         // Add sweep rays for smooth coverage between wall corners
-        // Exact endpoint rays keep corners crisp; 64 sweep rays keep indoor
+        // Exact endpoint rays keep corners crisp; 32 sweep rays keep indoor
         // 900px-radius edge sub-pixel smooth without the old O(256 * segments)
         // intersection cost every animation frame.
-        const sweepCount = 64;
+        const sweepCount = 32;
         for (let i = 0; i < sweepCount; i++) {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
@@ -1274,10 +1300,10 @@ export class SurvivRenderer {
         const py = this.me.y;
         const maxDist = 900;
 
-        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 8)}:${Math.round(py / 8)}:${Math.round(camX / 64)}:${Math.round(camY / 64)}`;
+        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 16)}:${Math.round(py / 16)}`;
         let polygon = this._losCachedPolygon;
         if (cacheKey !== this._losCacheKey || !polygon) {
-            const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z);
+            const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse);
             polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
             this._losCacheKey = cacheKey;
             this._losCachedPolygon = polygon;
@@ -1434,6 +1460,15 @@ export class SurvivRenderer {
         }
         this.particles.length = liveParticleCount;
 
+        let liveTracerCount = 0;
+        for (const tracer of this.localShotTracers) {
+            tracer.x += tracer.vx * dt;
+            tracer.y += tracer.vy * dt;
+            tracer.life -= dt;
+            if (tracer.life > 0) this.localShotTracers[liveTracerCount++] = tracer;
+        }
+        this.localShotTracers.length = liveTracerCount;
+
         // Interpolate remote players
         const interpSpeed = clamp(dt * 12, 0.05, 0.6);
         for (const [id, ip] of this._interpPlayers) {
@@ -1535,6 +1570,9 @@ export class SurvivRenderer {
         }
         for (const b of this.bullets) {
             if (this.isPointInView(b.x, b.y, 110) && !this.isPointHiddenByRooms(b.x, b.y, currentHouse, currentRoom)) this.drawBullet(ctx, b);
+        }
+        for (const b of this.localShotTracers) {
+            if (this.isPointInView(b.x, b.y, 110)) this.drawBullet(ctx, b);
         }
         // Draw players with interpolation
         for (const p of this.players) {
@@ -1944,11 +1982,15 @@ export class SurvivRenderer {
                 // Center yellow dashed line follows the actual road direction.
                 ctx.strokeStyle = 'rgba(235, 185, 60, 0.76)';
                 ctx.lineWidth = 2.5;
-                ctx.setLineDash([18, 18]);
                 ctx.beginPath();
-                line(start, end, 0);
+                // Build dashes on fixed road-local coordinates. Starting the
+                // dash pattern at the camera-clipped edge made it follow players.
+                const dashStep = 36;
+                const firstDash = Math.floor(start / dashStep) * dashStep;
+                for (let dashStart = firstDash; dashStart < end; dashStart += dashStep) {
+                    line(Math.max(start, dashStart), Math.min(end, dashStart + 18), 0);
+                }
                 ctx.stroke();
-                ctx.setLineDash([]);
 
                 // White edge lines on both sides, also direction-aware.
                 ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
@@ -2112,9 +2154,10 @@ export class SurvivRenderer {
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
-        ctx.shadowColor = 'rgba(18, 22, 18, 0.35)';
-        ctx.shadowBlur = 7;
-        ctx.shadowOffsetY = 6;
+        const useSoftShadow = kind === 'tree' || kind === 'bush' || kind === 'rock';
+        ctx.shadowColor = useSoftShadow ? 'rgba(18, 22, 18, 0.32)' : 'transparent';
+        ctx.shadowBlur = useSoftShadow ? 5 : 0;
+        ctx.shadowOffsetY = useSoftShadow ? 4 : 0;
         if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
@@ -2978,100 +3021,52 @@ export class SurvivRenderer {
     }
 
     drawBullet(ctx, b) {
-        const tail = Math.atan2(b.vy || 0, b.vx || 1);
+        const angle = Math.atan2(b.vy || 0, b.vx || 1);
         ctx.save();
         ctx.translate(b.x, b.y);
-        ctx.rotate(tail);
+        ctx.rotate(angle);
 
-        let trailLen = 36;
-        let thickness = 1.8;
-        let isPellet = false;
-        
         const wt = b.weaponType;
-        if (wt === 'shotgun') {
-            trailLen = 17;
-            thickness = 1.15;
-            isPellet = true;
+        const isPellet = wt === 'shotgun';
+        let trailLen = 34;
+        let thickness = 0.95;
+        if (isPellet) {
+            trailLen = 16;
+            thickness = 0.62;
         } else if (wt === 'sniper') {
-            trailLen = 64;
-            thickness = 2.05;
+            trailLen = 58;
+            thickness = 1.15;
         } else if (wt === 'assault' || wt === 'dmr') {
-            trailLen = 44;
-            thickness = 1.75;
+            trailLen = 42;
         } else if (wt === 'smg' || wt === 'lmg') {
-            trailLen = 31;
-            thickness = 1.45;
+            trailLen = 29;
+            thickness = 0.78;
         }
+        const slugLen = isPellet ? 3 : 6;
 
-        const redAlpha = isPellet ? 0.42 : 0.58;
-        const slugLen = isPellet ? 3.5 : 7;
-
-        // Soft contrast underlay so the white/gray tracer stays readable on bright floors.
-        ctx.beginPath();
-        ctx.strokeStyle = isPellet ? 'rgba(42, 48, 50, 0.28)' : 'rgba(36, 42, 45, 0.34)';
-        ctx.lineWidth = thickness + 0.8;
+        // Two inexpensive strokes stay crisp and visible without the old stack
+        // of per-projectile gradients and blur filters.
         ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(30, 35, 38, 0.38)';
+        ctx.lineWidth = thickness + 0.45;
         ctx.moveTo(-trailLen * 0.72, 0);
-        ctx.lineTo(slugLen * 0.22, 0);
+        ctx.lineTo(slugLen * 0.2, 0);
         ctx.stroke();
 
-        // Soft outer motion blur, mostly white/gray so the bullet sits inside the trail.
-        const smokeGrad = ctx.createLinearGradient(-trailLen, 0, slugLen * 0.15, 0);
-        smokeGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        smokeGrad.addColorStop(0.45, 'rgba(214, 220, 222, 0.22)');
-        smokeGrad.addColorStop(1, 'rgba(248, 252, 255, 0.72)');
         ctx.beginPath();
-        ctx.strokeStyle = smokeGrad;
-        ctx.lineWidth = thickness + 1.1;
-        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(235, 241, 243, 0.72)';
+        ctx.lineWidth = thickness;
         ctx.moveTo(-trailLen, 0);
         ctx.lineTo(slugLen * 0.1, 0);
         ctx.stroke();
 
-        // Subtle red heat streak that blends into the white trail.
-        const heatGrad = ctx.createLinearGradient(-trailLen * 0.46, 0, slugLen * 0.2, 0);
-        heatGrad.addColorStop(0, 'rgba(255, 88, 64, 0)');
-        heatGrad.addColorStop(0.64, 'rgba(255, 92, 74, ' + (redAlpha * 0.5) + ')');
-        heatGrad.addColorStop(1, 'rgba(255, 112, 92, ' + redAlpha + ')');
         ctx.beginPath();
-        ctx.strokeStyle = heatGrad;
-        ctx.lineWidth = Math.max(0.9, thickness * 0.58);
-        ctx.lineCap = 'round';
-        ctx.moveTo(-trailLen * 0.46, 0);
-        ctx.lineTo(slugLen * 0.15, 0);
-        ctx.stroke();
-
-        // Bright front slug: no black pill, just a pale metal core with a tiny red edge.
-        const slugGrad = ctx.createLinearGradient(-slugLen, 0, slugLen * 0.25, 0);
-        slugGrad.addColorStop(0, 'rgba(178, 187, 190, 0.42)');
-        slugGrad.addColorStop(0.38, 'rgba(231, 237, 238, 0.92)');
-        slugGrad.addColorStop(0.76, 'rgba(255, 255, 255, 1)');
-        slugGrad.addColorStop(1, 'rgba(255, 118, 94, 0.9)');
-        ctx.shadowColor = 'rgba(255, 122, 100, ' + (redAlpha * 0.72) + ')';
-        ctx.shadowBlur = isPellet ? 1 : 2.5;
-        ctx.beginPath();
-        ctx.strokeStyle = slugGrad;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
         ctx.lineWidth = thickness;
-        ctx.lineCap = 'round';
         ctx.moveTo(-slugLen, 0);
-        ctx.lineTo(slugLen * 0.2, 0);
+        ctx.lineTo(slugLen * 0.25, 0);
         ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Crisp center tracer: bright enough to read as the actual shot, not only blur.
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
-        ctx.lineWidth = Math.max(0.7, thickness * 0.3);
-        ctx.lineCap = 'round';
-        ctx.moveTo(-slugLen * 0.55, 0);
-        ctx.lineTo(slugLen * 0.32, 0);
-        ctx.stroke();
-
-        ctx.fillStyle = 'rgba(255, 82, 62, ' + redAlpha + ')';
-        ctx.beginPath();
-        ctx.arc(slugLen * 0.28, 0, Math.max(0.8, thickness * 0.34), 0, Math.PI * 2);
-        ctx.fill();
-
         ctx.restore();
     }
 
@@ -4121,18 +4116,33 @@ export class SurvivRenderer {
         return true;
     }
 
-    drawVignette(ctx, W, H) {
-        ctx.save();
+    getVignetteCanvas(W, H) {
+        if (typeof document === 'undefined') return null;
+        if (this._vignetteCanvas?.width === W && this._vignetteCanvas?.height === H) return this._vignetteCanvas;
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const cacheCtx = canvas.getContext('2d', { alpha: true });
+        if (!cacheCtx) return null;
         const radius = Math.max(W, H) * 0.72;
-        const grad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
+        const grad = cacheCtx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
         grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
         grad.addColorStop(0.64, 'rgba(0, 0, 0, 0.08)');
         grad.addColorStop(1, 'rgba(0, 0, 0, 0.34)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
+        cacheCtx.fillStyle = grad;
+        cacheCtx.fillRect(0, 0, W, H);
+        this._vignetteCanvas = canvas;
+        return canvas;
+    }
+
+    drawVignette(ctx, W, H) {
+        ctx.save();
+        const cachedVignette = this.getVignetteCanvas(W, H);
+        if (cachedVignette) ctx.drawImage(cachedVignette, 0, 0);
 
         const hpPct = clamp((this.hud.hp || 0) / (this.hud.maxHp || 100), 0, 1);
         if (hpPct > 0 && hpPct < 0.34) {
+            const radius = Math.max(W, H) * 0.72;
             ctx.globalAlpha = clamp((0.34 - hpPct) / 0.34, 0, 1) * 0.28;
             const danger = ctx.createRadialGradient(W / 2, H / 2, radius * 0.38, W / 2, H / 2, radius * 0.96);
             danger.addColorStop(0, 'rgba(120, 0, 0, 0)');
