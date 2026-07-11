@@ -960,6 +960,21 @@ export default function SurvivGame() {
                             </button>
                         );
                     })}
+                    <button
+                        type="button"
+                        className={'hotbar-slot melee-slot has-item ' + (me.weapon === 'fists' ? 'active-slot' : '')}
+                        aria-pressed={me.weapon === 'fists'}
+                        aria-label="Equip melee"
+                        title="Melee - always available"
+                        onClick={() => { equipSlotPendingRef.current = 2; }}
+                    >
+                        <span className="hotbar-slot-key">3</span>
+                        <div className="hotbar-weapon-icon-wrap">
+                            {renderWeaponIcon('fists', me.weapon === 'fists' ? '#14F195' : 'rgba(255,255,255,0.72)', 32)}
+                        </div>
+                        <span className="hotbar-slot-name-compact">Melee</span>
+                        <span className="hotbar-slot-ammo">ALWAYS</span>
+                    </button>
                 </div>
             )}
 
