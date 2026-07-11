@@ -103,6 +103,7 @@ export function drawGameMinimap(ctx, opts) {
     }
 
     const obstacleFill = (o) => {
+        if (o.kind === 'houseFloor' && o.variant === 'ironworks') return 'rgba(72, 98, 107, 0.95)';
         if (o.kind === 'houseFloor') return 'rgba(196, 169, 117, 0.72)';
         if (o.kind === 'wall' || o.kind === 'interiorWall') return 'rgba(38, 31, 24, 0.9)';
         if (o.kind === 'road') return 'rgba(120, 113, 95, 0.42)';
@@ -134,6 +135,11 @@ export function drawGameMinimap(ctx, opts) {
             ctx.fill();
         } else {
             ctx.fillRect(-mw / 2, -mh / 2, mw, mh);
+        }
+        if (o.kind === 'houseFloor' && o.variant === 'ironworks') {
+            ctx.strokeStyle = 'rgba(239, 181, 55, 0.95)';
+            ctx.lineWidth = isMobile ? 1.2 : 1.8;
+            ctx.strokeRect(-mw / 2, -mh / 2, mw, mh);
         }
         ctx.restore();
         obstacleDrawn++;

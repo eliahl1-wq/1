@@ -44,6 +44,7 @@ const WEAPON_SHAKE = {
 
 const SURFACE_KINDS = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
 const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
+const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
 
 function obstacleRenderSignature(obstacles) {
     let hash = 2166136261;
@@ -64,11 +65,17 @@ function obstacleRenderSignature(obstacles) {
         mixString(o.kind);
         mixString(o.variant);
         mixString(o.houseId);
+        mixString(o.role);
+        mixString(o.orientation);
+        mixString(o.entranceRole);
+        mixString(o.landmarkType);
+        mixString(o.label);
         mixNumber(o.x);
         mixNumber(o.y);
         mixNumber(o.w);
         mixNumber(o.h);
         mixNumber(o.rotation);
+        mixNumber(o.width);
         mixNumber(o.collidable === false ? 0 : 1);
     }
     return `${obstacles.length}:${hash >>> 0}`;
@@ -131,7 +138,7 @@ export class SurvivRenderer {
         this.bridgeObstacles = [];
         this.sortedWorldObstacles = [];
         this._roomZonesByHouseId = new Map();
-        this._doorwayByHouseId = new Map();
+        this._doorwaysByHouseId = new Map();
         this._interiorFogHouseIds = new Set();
         this._obstacleRenderSignature = '';
         this._obstacleRevision = 0;
@@ -280,7 +287,7 @@ export class SurvivRenderer {
         this.bridgeObstacles = [];
         this.sortedWorldObstacles = [];
         this._roomZonesByHouseId.clear();
-        this._doorwayByHouseId.clear();
+        this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
         this._obstacleRenderSignature = '';
         this._obstacleRevision++;
@@ -744,7 +751,7 @@ export class SurvivRenderer {
         this.roadObstacles = [];
         this.bridgeObstacles = [];
         this._roomZonesByHouseId.clear();
-        this._doorwayByHouseId.clear();
+        this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
 
         for (const o of this.obstacles) {
@@ -761,8 +768,13 @@ export class SurvivRenderer {
                 }
             } else if (o.kind === 'door') {
                 this.doorways.push(o);
-                if (o.houseId && !this._doorwayByHouseId.has(o.houseId)) {
-                    this._doorwayByHouseId.set(o.houseId, o);
+                if (o.houseId) {
+                    let doors = this._doorwaysByHouseId.get(o.houseId);
+                    if (!doors) {
+                        doors = [];
+                        this._doorwaysByHouseId.set(o.houseId, doors);
+                    }
+                    doors.push(o);
                 }
             }
         }
@@ -779,7 +791,7 @@ export class SurvivRenderer {
             o._renderHalfW = cos * halfW + sin * halfH;
             o._renderHalfH = sin * halfW + cos * halfH;
 
-            if (o.kind === 'furniture' || o.kind === 'interiorWall' || o.kind === 'wall' || o.kind === 'door') {
+            if (HOUSE_BOUND_PROP_KINDS.has(o.kind) || o.kind === 'interiorWall' || o.kind === 'wall' || o.kind === 'door') {
                 const house = o.houseId
                     ? housesById.get(o.houseId)
                     : this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
@@ -805,7 +817,7 @@ export class SurvivRenderer {
         for (const house of this.houseFloors) {
             const huge = house.w >= 430 || house.h >= 330;
             const hasHallway = (this._roomZonesByHouseId.get(house.id) || []).some(r => r.variant === 'hallway');
-            if (huge && hasHallway && (house.variant === 'mansion' || house.variant === 'warehouse')) {
+            if (huge && hasHallway && (house.variant === 'mansion' || house.variant === 'warehouse' || house.variant === 'ironworks')) {
                 this._interiorFogHouseIds.add(house.id);
             }
         }
@@ -902,7 +914,7 @@ export class SurvivRenderer {
         if (o.kind === 'wall' || o.kind === 'interiorWall' || o.kind === 'door') {
             return !o._insideHouseId || (currentHouse && currentHouse.id === o._insideHouseId);
         }
-        if (o.kind === 'furniture') {
+        if (HOUSE_BOUND_PROP_KINDS.has(o.kind)) {
             if (!o._insideHouseId) return true;
             if (!currentHouse || currentHouse.id !== o._insideHouseId) return false;
             // Small houses have no rooms — always show all contents
@@ -939,7 +951,6 @@ export class SurvivRenderer {
 
     isPlayerHidden(p, currentHouse, currentRoom) {
         if (p.isYou || p.id === this.myId) return false;
-        if (currentHouse && this.usesInteriorFog(currentHouse) && !this.findHouseContainingPoint(p.x, p.y)) return true;
         if (this.isPointHiddenByRooms(p.x, p.y, currentHouse, currentRoom)) return true;
         return this.isPointHiddenByLineOfSight(p.x, p.y, currentHouse);
     }
@@ -1022,12 +1033,13 @@ export class SurvivRenderer {
 
         const segments = [];
         for (const o of this.obstacles) {
-            if (!LOS_BLOCKING_KINDS.has(o.kind) && o.kind !== 'tree') continue;
+            const solidFurniture = (o.kind === 'furniture' || o.kind === 'machine') && o.collidable !== false;
+            if (!LOS_BLOCKING_KINDS.has(o.kind) && !solidFurniture && o.kind !== 'tree') continue;
             // Cull obstacles far from camera
             if (o.x + o.w / 2 < minX || o.x - o.w / 2 > maxX) continue;
             if (o.y + o.h / 2 < minY || o.y - o.h / 2 > maxY) continue;
 
-            if (LOS_BLOCKING_KINDS.has(o.kind)) {
+            if (LOS_BLOCKING_KINDS.has(o.kind) || solidFurniture) {
                 const minOx = o.x - o.w / 2;
                 const maxOx = o.x + o.w / 2;
                 const minOy = o.y - o.h / 2;
@@ -1401,6 +1413,9 @@ export class SurvivRenderer {
         }
 
         this.drawWorldBorder(ctx);
+        if (currentHouse && this.isObstacleInView(currentHouse, 80)) {
+            this.drawObstacle(ctx, currentHouse);
+        }
         for (const o of this.houseFloors) {
             if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
         }
@@ -1986,10 +2001,14 @@ export class SurvivRenderer {
         ctx.shadowOffsetY = 6;
         if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
             // Floor with gradient for depth
             const floorColors = {
                 mansion: { main: '#665c50', dark: '#584e44', line: 'rgba(255,240,200,0.06)' },
                 warehouse: { main: '#566268', dark: '#48545a', line: 'rgba(200,220,240,0.06)' },
+                ironworks: { main: '#3f4a4f', dark: '#293237', line: 'rgba(190,218,226,0.11)' },
             };
             const fc = floorColors[o.variant] || { main: '#75664f', dark: '#655840', line: 'rgba(255,240,210,0.06)' };
             const floorGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
@@ -2001,7 +2020,7 @@ export class SurvivRenderer {
             // Plank/tile lines
             ctx.strokeStyle = fc.line;
             ctx.lineWidth = 1;
-            const tileStep = o.variant === 'warehouse' ? 52 : 46;
+            const tileStep = o.variant === 'ironworks' ? 64 : o.variant === 'warehouse' ? 52 : 46;
             for (let ix = -o.w / 2 + tileStep; ix < o.w / 2; ix += tileStep) {
                 ctx.beginPath();
                 ctx.moveTo(ix, -o.h / 2 + 8);
@@ -2015,6 +2034,31 @@ export class SurvivRenderer {
                 ctx.lineTo(o.w / 2 - 8, iy);
                 ctx.stroke();
             }
+            if (o.variant === 'ironworks') {
+                // Broad central combat lane with readable steel plates and hazard borders.
+                const laneW = Math.min(560, o.w * 0.34);
+                ctx.fillStyle = 'rgba(12, 18, 21, 0.18)';
+                ctx.fillRect(-laneW / 2, -o.h / 2 + 16, laneW, o.h - 32);
+                ctx.strokeStyle = 'rgba(232, 174, 48, 0.58)';
+                ctx.lineWidth = 7;
+                ctx.setLineDash([22, 18]);
+                ctx.beginPath();
+                ctx.moveTo(-laneW / 2, -o.h / 2 + 22);
+                ctx.lineTo(-laneW / 2, o.h / 2 - 22);
+                ctx.moveTo(laneW / 2, -o.h / 2 + 22);
+                ctx.lineTo(laneW / 2, o.h / 2 - 22);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = 'rgba(186, 205, 211, 0.32)';
+                for (let i = 0; i < 18; i++) {
+                    const rx = -o.w / 2 + 28 + seededNoise(o.x * 0.01 + i, o.y * 0.01) * (o.w - 56);
+                    const ry = -o.h / 2 + 28 + seededNoise(o.y * 0.01 + i, o.x * 0.01 + 11) * (o.h - 56);
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
             // Subtle inner border
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
             ctx.lineWidth = 1;
@@ -2022,11 +2066,15 @@ export class SurvivRenderer {
             ctx.stroke();
         } else if (kind === 'door') {
             ctx.shadowBlur = 0;
-            const frame = o.variant === 'warehouse' ? '#2f3b40' : o.variant === 'mansion' ? '#4c3828' : '#543722';
+            ctx.shadowColor = 'transparent';
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            const industrial = o.variant === 'ironworks' || o.variant === 'metal';
+            const frame = industrial ? '#11191d' : o.variant === 'warehouse' ? '#2f3b40' : o.variant === 'mansion' ? '#4c3828' : '#543722';
             // Light spill from inside
             const lightGrad = ctx.createRadialGradient(0, -o.h * 0.15, 4, 0, 0, Math.max(o.w, o.h) * 0.8);
-            lightGrad.addColorStop(0, 'rgba(255, 220, 140, 0.18)');
-            lightGrad.addColorStop(0.5, 'rgba(255, 200, 100, 0.06)');
+            lightGrad.addColorStop(0, industrial ? 'rgba(157, 220, 235, 0.22)' : 'rgba(255, 220, 140, 0.18)');
+            lightGrad.addColorStop(0.5, industrial ? 'rgba(95, 180, 205, 0.08)' : 'rgba(255, 200, 100, 0.06)');
             lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = lightGrad;
             ctx.fillRect(-o.w * 0.7, -o.h * 0.7, o.w * 1.4, o.h * 1.4);
@@ -2037,15 +2085,19 @@ export class SurvivRenderer {
             // Frame
             ctx.strokeStyle = frame;
             ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.moveTo(-o.w / 2 + 3, o.h / 2 - 3);
-            ctx.lineTo(-o.w / 2 + 3, -o.h / 2 + 5);
-            ctx.lineTo(o.w / 2 - 3, -o.h / 2 + 5);
-            ctx.lineTo(o.w / 2 - 3, o.h / 2 - 3);
+            roundRect(ctx, -o.w / 2 + 2, -o.h / 2 + 2, o.w - 4, o.h - 4, 4);
             ctx.stroke();
             // Threshold warm light
-            ctx.fillStyle = 'rgba(238, 205, 138, 0.28)';
-            roundRect(ctx, -o.w / 2 + 10, o.h / 2 - 8, o.w - 20, 8, 3);
+            ctx.fillStyle = industrial ? 'rgba(118, 205, 224, 0.32)' : 'rgba(238, 205, 138, 0.28)';
+            const doorSide = o.orientation || o.role;
+            const verticalDoor = doorSide === 'east' || doorSide === 'west';
+            if (verticalDoor) {
+                const thresholdX = doorSide === 'west' ? -o.w / 2 : o.w / 2 - 8;
+                roundRect(ctx, thresholdX, -o.h / 2 + 10, 8, o.h - 20, 3);
+            } else {
+                const thresholdY = doorSide === 'north' ? -o.h / 2 : o.h / 2 - 8;
+                roundRect(ctx, -o.w / 2 + 10, thresholdY, o.w - 20, 8, 3);
+            }
             ctx.fill();
             // Top highlight
             ctx.strokeStyle = 'rgba(255,255,255,0.14)';
@@ -2059,6 +2111,8 @@ export class SurvivRenderer {
             const wallColors = {
                 stone: { main: '#807a6c', dark: '#6a6558', highlight: 'rgba(200,195,180,0.12)' },
                 warehouse: { main: '#48565e', dark: '#374249', highlight: 'rgba(160,185,200,0.10)' },
+                metal: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
+                ironworks: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
             };
             const wc = wallColors[o.variant] || { main: '#70583f', dark: '#5a4630', highlight: 'rgba(200,180,140,0.10)' };
             const wallGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
@@ -2092,15 +2146,103 @@ export class SurvivRenderer {
                         ctx.stroke();
                     }
                 }
+            } else if (o.variant === 'metal' || o.variant === 'ironworks') {
+                ctx.strokeStyle = 'rgba(8, 13, 16, 0.34)';
+                ctx.lineWidth = 1.2;
+                const panelStep = 52;
+                if (o.w > o.h) {
+                    for (let px = -o.w / 2 + panelStep; px < o.w / 2; px += panelStep) {
+                        ctx.beginPath();
+                        ctx.moveTo(px, -o.h / 2 + 2);
+                        ctx.lineTo(px, o.h / 2 - 2);
+                        ctx.stroke();
+                    }
+                } else {
+                    for (let py = -o.h / 2 + panelStep; py < o.h / 2; py += panelStep) {
+                        ctx.beginPath();
+                        ctx.moveTo(-o.w / 2 + 2, py);
+                        ctx.lineTo(o.w / 2 - 2, py);
+                        ctx.stroke();
+                    }
+                }
             }
             // Outline
             ctx.strokeStyle = 'rgba(24,20,16,0.42)';
             ctx.lineWidth = 2;
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
             ctx.stroke();
-        } else if (kind === 'furniture') {
+        } else if (kind === 'furniture' || kind === 'machine') {
             ctx.shadowBlur = 0;
-            if (o.variant === 'bed') {
+            ctx.shadowColor = 'transparent';
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            const furnitureVariant = kind === 'machine' ? 'machine' : o.variant;
+            if (furnitureVariant === 'machine' || furnitureVariant === 'industrial') {
+                const machineGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+                machineGrad.addColorStop(0, '#526068');
+                machineGrad.addColorStop(1, '#273136');
+                ctx.fillStyle = machineGrad;
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
+                ctx.fill();
+                ctx.strokeStyle = '#11181c';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.fillStyle = '#141c20';
+                roundRect(ctx, -o.w * 0.32, -o.h * 0.24, o.w * 0.64, o.h * 0.30, 3);
+                ctx.fill();
+                ctx.fillStyle = '#65c5d8';
+                ctx.fillRect(-o.w * 0.24, -o.h * 0.16, o.w * 0.20, 5);
+                ctx.fillStyle = '#e0ad3e';
+                ctx.beginPath();
+                ctx.arc(o.w * 0.18, -o.h * 0.09, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(234, 178, 52, 0.72)';
+                ctx.lineWidth = 5;
+                ctx.setLineDash([9, 7]);
+                ctx.beginPath();
+                ctx.moveTo(-o.w / 2 + 8, o.h / 2 - 9);
+                ctx.lineTo(o.w / 2 - 8, o.h / 2 - 9);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else if (furnitureVariant === 'locker') {
+                ctx.fillStyle = '#43535c';
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+                ctx.fill();
+                ctx.strokeStyle = '#202a2f';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                const columns = Math.max(1, Math.round(o.w / 28));
+                for (let i = 1; i < columns; i++) {
+                    const x = -o.w / 2 + (i / columns) * o.w;
+                    ctx.beginPath();
+                    ctx.moveTo(x, -o.h / 2 + 3);
+                    ctx.lineTo(x, o.h / 2 - 3);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = 'rgba(191, 216, 224, 0.36)';
+                for (let i = 0; i < columns; i++) {
+                    const x = -o.w / 2 + ((i + 0.5) / columns) * o.w;
+                    ctx.fillRect(x - 5, -o.h / 2 + 7, 10, 2);
+                    ctx.fillRect(x - 5, -o.h / 2 + 12, 10, 2);
+                }
+            } else if (furnitureVariant === 'workbench') {
+                ctx.fillStyle = '#29343a';
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+                ctx.fill();
+                ctx.strokeStyle = '#11181b';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.fillStyle = '#8a5a34';
+                ctx.fillRect(-o.w / 2 + 5, -o.h / 2 + 5, o.w - 10, Math.max(8, o.h * 0.32));
+                ctx.fillStyle = '#cf9e3d';
+                ctx.fillRect(-o.w * 0.16, 1, o.w * 0.32, 4);
+                ctx.fillStyle = '#718089';
+                ctx.beginPath();
+                ctx.arc(o.w * 0.27, o.h * 0.12, 5, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (furnitureVariant === 'bed') {
                 // Bed frame
                 ctx.fillStyle = '#5a4a36';
                 roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
@@ -3107,8 +3249,113 @@ export class SurvivRenderer {
         roundRect(ctx, -hw - 10, -hh - 8, o.w + 20, o.h + 18, 9);
         ctx.fill();
         ctx.shadowBlur = 0; // Turn off shadows for interior details
+        ctx.shadowColor = 'transparent';
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
 
-        if (variant === 'warehouse') {
+        if (variant === 'ironworks') {
+            // --- IRONWORKS: giant saw-tooth steel roof for the indoor PvP landmark ---
+            const roofGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            roofGrad.addColorStop(0, '#536168');
+            roofGrad.addColorStop(0.48, '#283238');
+            roofGrad.addColorStop(1, '#46545b');
+            ctx.fillStyle = roofGrad;
+            roundRect(ctx, -hw - 5, -hh - 5, o.w + 10, o.h + 10, 8);
+            ctx.fill();
+
+            ctx.save();
+            roundRect(ctx, -hw - 2, -hh - 2, o.w + 4, o.h + 4, 6);
+            ctx.clip();
+            const bayCount = 5;
+            const bayW = o.w / bayCount;
+            for (let bay = 0; bay < bayCount; bay++) {
+                const bx = -hw + bay * bayW;
+                ctx.fillStyle = bay % 2 === 0 ? 'rgba(167, 190, 198, 0.08)' : 'rgba(4, 9, 12, 0.13)';
+                ctx.fillRect(bx, -hh, bayW, o.h);
+                ctx.strokeStyle = 'rgba(8, 14, 18, 0.48)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(bx, -hh);
+                ctx.lineTo(bx, hh);
+                ctx.stroke();
+
+                if (bay % 2 === 0) {
+                    const skyW = Math.max(42, bayW * 0.24);
+                    ctx.fillStyle = 'rgba(72, 139, 158, 0.58)';
+                    roundRect(ctx, bx + bayW / 2 - skyW / 2, -hh * 0.72, skyW, o.h * 0.54, 4);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(12, 28, 34, 0.82)';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    ctx.strokeStyle = 'rgba(205, 235, 240, 0.18)';
+                    ctx.lineWidth = 1.5;
+                    for (let sy = -hh * 0.58; sy < -hh * 0.18; sy += 42) {
+                        ctx.beginPath();
+                        ctx.moveTo(bx + bayW / 2 - skyW / 2 + 4, sy);
+                        ctx.lineTo(bx + bayW / 2 + skyW / 2 - 4, sy);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // Static vents, exhaust stacks and deterministic rust keep the roof alive
+            // without adding animation work to every frame.
+            const stackPositions = [
+                [-0.39, -0.34], [-0.13, 0.31], [0.13, -0.30], [0.39, 0.33],
+            ];
+            for (const [sx, sy] of stackPositions) {
+                const px = hw * sx * 2;
+                const py = hh * sy * 2;
+                ctx.fillStyle = 'rgba(0,0,0,0.34)';
+                ctx.beginPath();
+                ctx.arc(px + 6, py + 7, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#718087';
+                ctx.strokeStyle = '#1b252a';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(px, py, 19, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#121a1e';
+                ctx.beginPath();
+                ctx.arc(px, py, 10, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            for (let i = 0; i < 12; i++) {
+                const rx = -hw + seededNoise(o.x * 0.01 + i, 17) * o.w;
+                const ry = -hh + seededNoise(o.y * 0.01 + i, 41) * o.h;
+                ctx.fillStyle = 'rgba(126, 64, 35, 0.16)';
+                ctx.beginPath();
+                ctx.arc(rx, ry, 10 + seededNoise(i, 7) * 22, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            ctx.strokeStyle = '#111a1f';
+            ctx.lineWidth = 7;
+            roundRect(ctx, -hw - 5, -hh - 5, o.w + 10, o.h + 10, 8);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(207, 224, 229, 0.20)';
+            ctx.lineWidth = 2;
+            roundRect(ctx, -hw + 5, -hh + 5, o.w - 10, o.h - 10, 5);
+            ctx.stroke();
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(9, 15, 18, 0.66)';
+            roundRect(ctx, -170, -32, 340, 64, 7);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(232, 174, 48, 0.72)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(226, 235, 236, 0.90)';
+            ctx.font = '900 30px ui-sans-serif, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(o.label || 'IRONWORKS', 0, 1);
+            ctx.restore();
+        } else if (variant === 'warehouse') {
             // --- WAREHOUSE: Corrugated sheet metal roof ---
             const mainColor = '#5c6b73';
             const shadowColor = '#3a444a';
@@ -3607,55 +3854,62 @@ export class SurvivRenderer {
         }
 
         // --- RIDGE LINE ---
-        const ridgeColor = variant === 'warehouse' ? '#78878c' : variant === 'mansion' ? '#8b7659' : variant === 'barn' ? '#ece8e5' : '#b25032';
-        ctx.strokeStyle = ridgeColor;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(-hw + 12, 0);
-        ctx.lineTo(hw - 12, 0);
-        ctx.stroke();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-hw + 14, -1);
-        ctx.lineTo(hw - 14, -1);
-        ctx.stroke();
-
-        // --- DOORWAY HIGHLIGHT ---
-        const door = this.doorways.find(d => d.houseId === o.id);
-        if (door) {
-            const doorX = door.x - o.x;
-            const doorY = door.y - o.y;
-            const doorW = Math.max(door.w, 86);
-            const lipH = Math.max(28, door.h * 1.15);
-            
-            ctx.fillStyle = 'rgba(10, 8, 5, 0.88)';
-            roundRect(ctx, doorX - doorW / 2, doorY - lipH / 2, doorW, lipH, 6);
-            ctx.fill();
-            
-            const trimColor = variant === 'warehouse' ? '#252e32' : variant === 'mansion' ? '#2f261f' : '#2c211b';
-            ctx.fillStyle = trimColor;
-            roundRect(ctx, doorX - doorW / 2 - 10, doorY - lipH / 2 - 5, 10, lipH + 7, 3);
-            ctx.fill();
-            roundRect(ctx, doorX + doorW / 2, doorY - lipH / 2 - 5, 10, lipH + 7, 3);
-            ctx.fill();
-
-            const entryGlow = ctx.createRadialGradient(doorX, doorY, 4, doorX, doorY, lipH * 1.25);
-            entryGlow.addColorStop(0, 'rgba(255, 215, 130, 0.24)');
-            entryGlow.addColorStop(0.5, 'rgba(255, 200, 110, 0.08)');
-            entryGlow.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = entryGlow;
-            ctx.fillRect(doorX - doorW, doorY - lipH, doorW * 2, lipH * 2);
-
-            ctx.fillStyle = 'rgba(236, 205, 140, 0.32)';
-            roundRect(ctx, doorX - doorW / 2 + 10, doorY + lipH / 2 - 9, doorW - 20, 8, 3);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 238, 180, 0.35)';
+        if (variant !== 'ironworks') {
+            const ridgeColor = variant === 'warehouse' ? '#78878c' : variant === 'mansion' ? '#8b7659' : variant === 'barn' ? '#ece8e5' : '#b25032';
+            ctx.strokeStyle = ridgeColor;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-hw + 12, 0);
+            ctx.lineTo(hw - 12, 0);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.moveTo(doorX - doorW / 2 + 11, doorY - lipH / 2 + 5);
-            ctx.lineTo(doorX + doorW / 2 - 11, doorY - lipH / 2 + 5);
+            ctx.moveTo(-hw + 14, -1);
+            ctx.lineTo(hw - 14, -1);
             ctx.stroke();
+        }
+
+        // --- DOORWAY HIGHLIGHTS ---
+        // Large landmarks can have several entrances; render every one and keep
+        // vertical service doors aligned with their actual wall orientation.
+        const roofDoors = this._doorwaysByHouseId.get(o.id) || [];
+        for (const door of roofDoors) {
+            const doorX = door.x - o.x;
+            const doorY = door.y - o.y;
+            const doorSide = door.orientation || door.role;
+            const verticalDoor = doorSide === 'east' || doorSide === 'west';
+            const entryW = verticalDoor ? Math.max(28, door.w * 1.15) : Math.max(door.w, 86);
+            const entryH = verticalDoor ? Math.max(door.h, 86) : Math.max(28, door.h * 1.15);
+            const industrialEntry = variant === 'ironworks';
+            
+            ctx.fillStyle = 'rgba(10, 8, 5, 0.88)';
+            roundRect(ctx, doorX - entryW / 2, doorY - entryH / 2, entryW, entryH, 6);
+            ctx.fill();
+            
+            const trimColor = industrialEntry ? '#10181c' : variant === 'warehouse' ? '#252e32' : variant === 'mansion' ? '#2f261f' : '#2c211b';
+            ctx.strokeStyle = trimColor;
+            ctx.lineWidth = industrialEntry ? 9 : 7;
+            roundRect(ctx, doorX - entryW / 2 - 3, doorY - entryH / 2 - 3, entryW + 6, entryH + 6, 7);
+            ctx.stroke();
+
+            const glowRadius = Math.max(entryW, entryH) * 0.9;
+            const entryGlow = ctx.createRadialGradient(doorX, doorY, 4, doorX, doorY, glowRadius);
+            entryGlow.addColorStop(0, industrialEntry ? 'rgba(112, 206, 226, 0.28)' : 'rgba(255, 215, 130, 0.24)');
+            entryGlow.addColorStop(0.5, industrialEntry ? 'rgba(72, 161, 185, 0.10)' : 'rgba(255, 200, 110, 0.08)');
+            entryGlow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = entryGlow;
+            ctx.fillRect(doorX - glowRadius, doorY - glowRadius, glowRadius * 2, glowRadius * 2);
+
+            ctx.fillStyle = industrialEntry ? 'rgba(232, 174, 48, 0.72)' : 'rgba(236, 205, 140, 0.32)';
+            if (verticalDoor) {
+                const thresholdX = doorSide === 'west' ? doorX - entryW / 2 : doorX + entryW / 2 - 8;
+                roundRect(ctx, thresholdX, doorY - entryH / 2 + 10, 8, entryH - 20, 3);
+            } else {
+                const thresholdY = doorSide === 'north' ? doorY - entryH / 2 : doorY + entryH / 2 - 8;
+                roundRect(ctx, doorX - entryW / 2 + 10, thresholdY, entryW - 20, 8, 3);
+            }
+            ctx.fill();
         }
 
         ctx.restore();
@@ -3823,30 +4077,13 @@ export class SurvivRenderer {
             players: minimapPlayers,
             food: lootDots,
             obstacles: this.minimap.obstacles?.length ? this.minimap.obstacles : this.obstacles,
+            zone: this.zone?.radius > 0 ? {
+                cx: this.zone.x,
+                cy: this.zone.y,
+                radius: this.zone.radius,
+            } : null,
             time: performance.now(),
         });
-
-        // Draw zone circle on minimap
-        if (this.zone && this.zone.radius > 0) {
-            const minimapSize = W < 760 ? 90 : 128;
-            const pad = W < 760 ? 8 : 14;
-            const mx = W - pad - minimapSize / 2;
-            const my = H - pad - minimapSize / 2;
-            const scale = minimapSize / (this.worldHalf * 2);
-            const zx = mx + (this.zone.x - this.camera.x) * scale + minimapSize / 2 - (this.camera.x + this.worldHalf) * scale;
-            const zy = my + (this.zone.y - this.camera.y) * scale + minimapSize / 2 - (this.camera.y + this.worldHalf) * scale;
-            // Simplified: draw zone relative to minimap center
-            const zoneR = this.zone.radius * scale;
-            const zoneCx = mx + (this.zone.x + this.worldHalf) * scale;
-            const zoneCy = my + (this.zone.y + this.worldHalf) * scale;
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 80, 40, 0.7)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(zoneCx, zoneCy, Math.max(1, zoneR), 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.restore();
-        }
     }
 
     // ========== NEW VISUAL FEEDBACK METHODS ==========
