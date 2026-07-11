@@ -1,12 +1,70 @@
 # Keep the app shell fresh so it never points at old hashed JS files.
 /
   Cache-Control: no-store, no-cache, must-revalidate
-/*.html
+
+/index.html
   Cache-Control: no-store, no-cache, must-revalidate
-/surviv
+
+/login
   Cache-Control: no-store, no-cache, must-revalidate
+
+/register
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/lobby
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/pre-game
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/game
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/slither-game
+  Cache-Control: no-store, no-cache, must-revalidate
+
 /surviv-game
   Cache-Control: no-store, no-cache, must-revalidate
+
+/transactions
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/profile
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/gamemodes
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/agar
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/slither
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/surviv
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/rewards
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/br-lobby
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/admin
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/admin/sandbox
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/how-it-works
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/faq
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/tournaments*
+  Cache-Control: no-store, no-cache, must-revalidate
+
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
   X-Content-Type-Options: nosniff

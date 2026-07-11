@@ -25,6 +25,21 @@
     <meta name="twitter:description" content="The premier platform for competitive Web3 gaming. Wager Solana, outplay your opponents in Agar and Slither, and cash out instantly." />
     <meta name="twitter:image" content="https://www.agararena.space/logo-512.png" />
     <link rel="canonical" href="https://www.agararena.space/" />
+    <script>
+      // Recover once when route HTML outlives its hashed deployment assets.
+      window.addEventListener('error', function (event) {
+        var target = event.target;
+        if (!target || target.tagName !== 'SCRIPT' || !target.src || target.src.indexOf('/assets/') === -1) return;
+        var refreshKey = 'agarstake-asset-refresh';
+        if (sessionStorage.getItem(refreshKey)) return;
+        sessionStorage.setItem(refreshKey, '1');
+        var separator = location.search ? '&' : '?';
+        location.replace(location.pathname + location.search + separator + 'asset-refresh=' + Date.now() + location.hash);
+      }, true);
+      window.addEventListener('load', function () {
+        sessionStorage.removeItem('agarstake-asset-refresh');
+      });
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
