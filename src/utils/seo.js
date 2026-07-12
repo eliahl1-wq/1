@@ -1,4 +1,4 @@
-const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://www.agararena.space').replace(/\/$/, '');
+const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://agararena.space').replace(/\/$/, '');
 
 export const BASE_KEYWORDS = [
     'agarstake', 'agar stake', 'agararena', 'agar arena',

@@ -47,8 +47,8 @@ function buildWalletAdapters() {
         metadata: {
           name: 'AgarStake',
           description: 'Competitive Agar.io, Slither.io, and Surviv with Solana stakes.',
-          url: 'https://www.agararena.space',
-          icons: ['https://www.agararena.space/logo-512.png'],
+          url: 'https://agararena.space',
+          icons: ['https://agararena.space/logo-512.png'],
         },
       },
     }),
