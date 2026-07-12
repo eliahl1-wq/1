@@ -26,6 +26,11 @@
     <meta name="twitter:image" content="https://agararena.space/logo-512.png" />
     <link rel="canonical" href="https://agararena.space/" />
     <script>
+      // Redirect before loading modules so stale www caches cannot break startup.
+      if (location.hostname === 'www.agararena.space') {
+        location.replace('https://agararena.space' + location.pathname + location.search + location.hash);
+      }
+
       // Recover once when route HTML outlives its hashed deployment assets.
       window.addEventListener('error', function (event) {
         var target = event.target;
