@@ -47,6 +47,117 @@ const WEAPON_BULLET_SPEED = {
     assault: 42, dmr: 48, sniper: 58, lmg: 40,
 };
 
+const WEAPON_BULLET_SPECS = {
+    shotgun: {
+        trailLen: 12,
+        slugLen: 3,
+        thickness: 1.4,
+        glowColorStart: 'rgba(240, 120, 30, 0)',
+        glowColorMid: 'rgba(240, 120, 30, 0.15)',
+        glowColorEnd: 'rgba(240, 120, 30, 0.4)',
+        glowColorTip: 'rgba(255, 200, 100, 0.5)',
+        coreColorStart: 'rgba(255, 200, 100, 0)',
+        coreColorMid: 'rgba(255, 200, 100, 0.3)',
+        coreColorEnd: 'rgba(255, 200, 100, 0.9)'
+    },
+    sniper: {
+        trailLen: 38,
+        slugLen: 6,
+        thickness: 2.8,
+        glowColorStart: 'rgba(0, 140, 255, 0)',
+        glowColorMid: 'rgba(0, 140, 255, 0.18)',
+        glowColorEnd: 'rgba(0, 140, 255, 0.45)',
+        glowColorTip: 'rgba(230, 245, 255, 0.55)',
+        coreColorStart: 'rgba(230, 245, 255, 0)',
+        coreColorMid: 'rgba(230, 245, 255, 0.45)',
+        coreColorEnd: 'rgba(230, 245, 255, 0.95)'
+    },
+    revolver: {
+        trailLen: 22,
+        slugLen: 5,
+        thickness: 2.2,
+        glowColorStart: 'rgba(255, 110, 20, 0)',
+        glowColorMid: 'rgba(255, 110, 20, 0.15)',
+        glowColorEnd: 'rgba(255, 110, 20, 0.4)',
+        glowColorTip: 'rgba(255, 235, 180, 0.5)',
+        coreColorStart: 'rgba(255, 235, 180, 0)',
+        coreColorMid: 'rgba(255, 235, 180, 0.35)',
+        coreColorEnd: 'rgba(255, 235, 180, 0.9)'
+    },
+    pistol: {
+        trailLen: 18,
+        slugLen: 4,
+        thickness: 1.6,
+        glowColorStart: 'rgba(230, 160, 40, 0)',
+        glowColorMid: 'rgba(230, 160, 40, 0.12)',
+        glowColorEnd: 'rgba(230, 160, 40, 0.35)',
+        glowColorTip: 'rgba(255, 245, 200, 0.45)',
+        coreColorStart: 'rgba(255, 245, 200, 0)',
+        coreColorMid: 'rgba(255, 245, 200, 0.3)',
+        coreColorEnd: 'rgba(255, 245, 200, 0.9)'
+    },
+    assault: {
+        trailLen: 26,
+        slugLen: 5,
+        thickness: 2.1,
+        glowColorStart: 'rgba(255, 180, 50, 0)',
+        glowColorMid: 'rgba(255, 180, 50, 0.15)',
+        glowColorEnd: 'rgba(255, 180, 50, 0.38)',
+        glowColorTip: 'rgba(255, 255, 240, 0.5)',
+        coreColorStart: 'rgba(255, 255, 240, 0)',
+        coreColorMid: 'rgba(255, 255, 240, 0.35)',
+        coreColorEnd: 'rgba(255, 255, 240, 0.9)'
+    },
+    dmr: {
+        trailLen: 28,
+        slugLen: 5,
+        thickness: 2.3,
+        glowColorStart: 'rgba(255, 190, 60, 0)',
+        glowColorMid: 'rgba(255, 190, 60, 0.15)',
+        glowColorEnd: 'rgba(255, 190, 60, 0.4)',
+        glowColorTip: 'rgba(255, 255, 245, 0.5)',
+        coreColorStart: 'rgba(255, 255, 245, 0)',
+        coreColorMid: 'rgba(255, 255, 245, 0.35)',
+        coreColorEnd: 'rgba(255, 255, 245, 0.9)'
+    },
+    smg: {
+        trailLen: 16,
+        slugLen: 4,
+        thickness: 1.7,
+        glowColorStart: 'rgba(255, 140, 40, 0)',
+        glowColorMid: 'rgba(255, 140, 40, 0.12)',
+        glowColorEnd: 'rgba(255, 140, 40, 0.35)',
+        glowColorTip: 'rgba(255, 240, 210, 0.45)',
+        coreColorStart: 'rgba(255, 240, 210, 0)',
+        coreColorMid: 'rgba(255, 240, 210, 0.3)',
+        coreColorEnd: 'rgba(255, 240, 210, 0.9)'
+    },
+    lmg: {
+        trailLen: 18,
+        slugLen: 4,
+        thickness: 1.8,
+        glowColorStart: 'rgba(255, 150, 50, 0)',
+        glowColorMid: 'rgba(255, 150, 50, 0.12)',
+        glowColorEnd: 'rgba(255, 150, 50, 0.35)',
+        glowColorTip: 'rgba(255, 235, 200, 0.45)',
+        coreColorStart: 'rgba(255, 235, 200, 0)',
+        coreColorMid: 'rgba(255, 235, 200, 0.3)',
+        coreColorEnd: 'rgba(255, 235, 200, 0.9)'
+    },
+    default: {
+        trailLen: 22,
+        slugLen: 5,
+        thickness: 1.8,
+        glowColorStart: 'rgba(200, 200, 200, 0)',
+        glowColorMid: 'rgba(200, 200, 200, 0.1)',
+        glowColorEnd: 'rgba(200, 200, 200, 0.3)',
+        glowColorTip: 'rgba(255, 255, 255, 0.4)',
+        coreColorStart: 'rgba(255, 255, 255, 0)',
+        coreColorMid: 'rgba(255, 255, 255, 0.3)',
+        coreColorEnd: 'rgba(255, 255, 255, 0.9)'
+    }
+};
+
 const SURFACE_KINDS = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
 const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
@@ -86,6 +197,8 @@ function obstacleRenderSignature(obstacles) {
         mixNumber(o.rotation);
         mixNumber(o.width);
         mixNumber(o.collidable === false ? 0 : 1);
+        mixNumber(o.hp);
+        mixNumber(o.maxHp);
     }
     return `${obstacles.length}:${hash >>> 0}`;
 }
@@ -192,6 +305,8 @@ export class SurvivRenderer {
         this._roomZonesByHouseId = new Map();
         this._doorwaysByHouseId = new Map();
         this._interiorFogHouseIds = new Set();
+        this._losSegmentsByHouseId = new Map();
+        this._renderObstaclesByHouseId = new Map();
         this._collisionBuckets = new Map();
         this._obstacleRenderSignature = '';
         this._obstacleRevision = 0;
@@ -350,6 +465,8 @@ export class SurvivRenderer {
         this._roomZonesByHouseId.clear();
         this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
+        this._losSegmentsByHouseId.clear();
+        this._renderObstaclesByHouseId.clear();
         this._obstacleRenderSignature = '';
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
@@ -819,6 +936,8 @@ export class SurvivRenderer {
         this._roomZonesByHouseId.clear();
         this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
+        this._losSegmentsByHouseId.clear();
+        this._renderObstaclesByHouseId.clear();
         this._collisionBuckets.clear();
 
         const hasSplineRiver = this.obstacles.some(obstacle => obstacle.kind === 'river_path');
@@ -859,7 +978,7 @@ export class SurvivRenderer {
             o._renderHalfW = cos * halfW + sin * halfH;
             o._renderHalfH = sin * halfW + cos * halfH;
 
-            if (HOUSE_BOUND_PROP_KINDS.has(o.kind) || o.kind === 'interiorWall' || o.kind === 'wall' || o.kind === 'door') {
+            if (!SURFACE_KINDS.has(o.kind) && o.kind !== 'roomZone') {
                 const house = o.houseId
                     ? housesById.get(o.houseId)
                     : this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
@@ -883,6 +1002,12 @@ export class SurvivRenderer {
             }
         }
         this.sortedWorldObstacles = solid.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+        for (const obstacle of this.sortedWorldObstacles) {
+            if (!obstacle._insideHouseId) continue;
+            const houseObstacles = this._renderObstaclesByHouseId.get(obstacle._insideHouseId);
+            if (houseObstacles) houseObstacles.push(obstacle);
+            else this._renderObstaclesByHouseId.set(obstacle._insideHouseId, [obstacle]);
+        }
         const collisionCell = 400;
         for (const obstacle of solid) {
             if (obstacle.collidable === false || !obstacle.w || !obstacle.h) continue;
@@ -906,6 +1031,33 @@ export class SurvivRenderer {
             if (huge && hasHallway && (house.variant === 'mansion' || house.variant === 'warehouse' || house.variant === 'ironworks')) {
                 this._interiorFogHouseIds.add(house.id);
             }
+
+            // Build LOS geometry once per static world snapshot. The complete
+            // boundary intentionally seals every doorway while a player is in.
+            const minX = house.x - house.w / 2;
+            const maxX = house.x + house.w / 2;
+            const minY = house.y - house.h / 2;
+            const maxY = house.y + house.h / 2;
+            const segments = [
+                { ax: minX, ay: minY, bx: maxX, by: minY },
+                { ax: maxX, ay: minY, bx: maxX, by: maxY },
+                { ax: maxX, ay: maxY, bx: minX, by: maxY },
+                { ax: minX, ay: maxY, bx: minX, by: minY },
+            ];
+            for (const obstacle of solid) {
+                if (obstacle._insideHouseId !== house.id || !LOS_BLOCKING_KINDS.has(obstacle.kind)) continue;
+                const left = obstacle.x - obstacle.w / 2;
+                const right = obstacle.x + obstacle.w / 2;
+                const top = obstacle.y - obstacle.h / 2;
+                const bottom = obstacle.y + obstacle.h / 2;
+                segments.push(
+                    { ax: left, ay: top, bx: right, by: top },
+                    { ax: right, ay: top, bx: right, by: bottom },
+                    { ax: right, ay: bottom, bx: left, by: bottom },
+                    { ax: left, ay: bottom, bx: left, by: top },
+                );
+            }
+            this._losSegmentsByHouseId.set(house.id, segments);
         }
         this._obstacleRevision++;
         this._losCacheKey = '';
@@ -1001,38 +1153,44 @@ export class SurvivRenderer {
     }
 
     isPointHiddenByRooms(x, y, currentHouse, currentRoom) {
-        const house = this.findHouseContainingPoint(x, y);
+        let house = currentHouse;
+        if (currentHouse) {
+            if (!this.pointInsideRect(currentHouse, x, y, -2)) return true;
+        } else {
+            house = this.findHouseContainingPoint(x, y);
+        }
         if (!house) return false;
         if (!currentHouse || house.id !== currentHouse.id) return true;
         if (!this.usesInteriorFog(currentHouse)) return false;
-        // Houses with no rooms — never hide anything
+        // Houses with no rooms never hide anything.
         const hasRooms = this.roomZones.some(r => r.houseId === currentHouse.id);
-        if (!hasRooms) return false;
-        if (!currentRoom) return false;
+        if (!hasRooms || !currentRoom) return false;
         const room = this.findRoomContainingPoint(x, y, house);
         if (!room || room.id === currentRoom.id) return false;
         const strength = this.roomVisibilityStrength(room, currentRoom, this.me?.x ?? 0, this.me?.y ?? 0);
         return strength <= 0.18;
     }
-
     shouldDrawObstacle(o, currentHouse, currentRoom) {
         if (o.kind === 'roomZone') return false;
         if (o.kind === 'houseFloor') return !!currentHouse && currentHouse.id === o.id;
-        if (o.kind === 'wall' || o.kind === 'interiorWall' || o.kind === 'door') {
-            return !o._insideHouseId || (currentHouse && currentHouse.id === o._insideHouseId);
+        // The exterior is fully shadowed while indoors. Do not spend the frame
+        // drawing outdoor roads, water, roofs and props underneath that mask.
+        if (currentHouse) {
+            const belongsToCurrentHouse = o._insideHouseId === currentHouse.id || o.houseId === currentHouse.id;
+            if (!belongsToCurrentHouse) return false;
+            if (HOUSE_BOUND_PROP_KINDS.has(o.kind) && o._insideRoomId && currentRoom) {
+                return o._insideRoomId === currentRoom.id;
+            }
+            return true;
         }
-        if (HOUSE_BOUND_PROP_KINDS.has(o.kind)) {
-            if (!o._insideHouseId) return true;
-            if (!currentHouse || currentHouse.id !== o._insideHouseId) return false;
-            // Small houses have no rooms — always show all contents
-            if (!o._insideRoomId) return true;
-            return !currentRoom || o._insideRoomId === currentRoom.id;
-        }
+        if (o.kind === 'wall' || o.kind === 'interiorWall' || o.kind === 'door') return !o._insideHouseId;
+        if (HOUSE_BOUND_PROP_KINDS.has(o.kind)) return !o._insideHouseId;
         return true;
     }
-
     isLootHidden(l, currentHouse, currentRoom) {
-        return this.isPointHiddenByRooms(l.x, l.y, currentHouse, currentRoom);
+        if (this.isPointHiddenByRooms(l.x, l.y, currentHouse, currentRoom)) return true;
+        if (this.isPointHiddenByLineOfSight(l.x, l.y, currentHouse)) return true;
+        return false;
     }
 
     pointInPolygon(x, y, polygon) {
@@ -1130,63 +1288,8 @@ export class SurvivRenderer {
      * that should block line of sight.
      */
     _gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse) {
-        const margin = 200;
-        const halfW = viewW / z / 2 + margin;
-        const halfH = viewH / z / 2 + margin;
-        const minX = camX - halfW;
-        const maxX = camX + halfW;
-        const minY = camY - halfH;
-        const maxY = camY + halfH;
-
-        const segments = [];
-        for (const o of this.obstacles) {
-            const solidFurniture = (o.kind === 'furniture' || o.kind === 'machine') && o.collidable !== false;
-            if (!LOS_BLOCKING_KINDS.has(o.kind) && !solidFurniture) continue;
-            // Indoor LOS only needs blockers belonging to the current building.
-            if (currentHouse && o._insideHouseId !== currentHouse.id && o.houseId !== currentHouse.id) continue;
-            // Cull obstacles far from camera
-            if (o.x + o.w / 2 < minX || o.x - o.w / 2 > maxX) continue;
-            if (o.y + o.h / 2 < minY || o.y - o.h / 2 > maxY) continue;
-
-            if (LOS_BLOCKING_KINDS.has(o.kind) || solidFurniture) {
-                const minOx = o.x - o.w / 2;
-                const maxOx = o.x + o.w / 2;
-                const minOy = o.y - o.h / 2;
-                const maxOy = o.y + o.h / 2;
-                segments.push(
-                    { ax: minOx, ay: minOy, bx: maxOx, by: minOy },
-                    { ax: maxOx, ay: minOy, bx: maxOx, by: maxOy },
-                    { ax: maxOx, ay: maxOy, bx: minOx, by: maxOy },
-                    { ax: minOx, ay: maxOy, bx: minOx, by: minOy },
-                );
-            } else {
-                const r = Math.min(o.w, o.h) * 0.32;
-                const sides = 6;
-                for (let i = 0; i < sides; i++) {
-                    const a1 = (Math.PI * 2 * i) / sides;
-                    const a2 = (Math.PI * 2 * (i + 1)) / sides;
-                    segments.push({
-                        ax: o.x + Math.cos(a1) * r,
-                        ay: o.y + Math.sin(a1) * r,
-                        bx: o.x + Math.cos(a2) * r,
-                        by: o.y + Math.sin(a2) * r,
-                    });
-                }
-            }
-        }
-
-        // Add world border segments
-        const wh = this.worldHalf;
-        segments.push(
-            { ax: -wh, ay: -wh, bx: wh, by: -wh },
-            { ax: wh, ay: -wh, bx: wh, by: wh },
-            { ax: wh, ay: wh, bx: -wh, by: wh },
-            { ax: -wh, ay: wh, bx: -wh, by: -wh },
-        );
-
-        return segments;
+        return this._losSegmentsByHouseId.get(currentHouse?.id) || [];
     }
-
     /**
      * Ray-segment intersection.
      * Returns parameter t along the ray (0 = origin, 1+ = distance).
@@ -1231,7 +1334,7 @@ export class SurvivRenderer {
         // Exact endpoint rays keep corners crisp; 16 sweep rays keep indoor
         // 900px-radius edge sub-pixel smooth without the old O(256 * segments)
         // intersection cost every animation frame.
-        const sweepCount = 16;
+        const sweepCount = 12;
         for (let i = 0; i < sweepCount; i++) {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
@@ -1283,7 +1386,7 @@ export class SurvivRenderer {
         const py = this.me.y;
         const maxDist = 900;
 
-        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 4)}:${Math.round(py / 4)}`;
+        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 8)}:${Math.round(py / 8)}`;
         let polygon = this._losCachedPolygon;
         if (cacheKey !== this._losCacheKey || !polygon) {
             const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse);
@@ -1319,6 +1422,23 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawExteriorHouseShadow(ctx, camX, camY, viewW, viewH, z, currentHouse) {
+        if (!currentHouse) return;
+        const ext = (viewW + viewH) / z + 600;
+        const inset = 2;
+        ctx.save();
+        ctx.fillStyle = 'rgba(5, 7, 11, 0.93)';
+        ctx.beginPath();
+        ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
+        ctx.rect(
+            currentHouse.x - currentHouse.w / 2 + inset,
+            currentHouse.y - currentHouse.h / 2 + inset,
+            currentHouse.w - inset * 2,
+            currentHouse.h - inset * 2,
+        );
+        ctx.fill('evenodd');
+        ctx.restore();
+    }
     findInteractChest(requireCursor = true) {
         if (!this.me) return null;
         const currentHouse = this.getCurrentHouse();
@@ -1519,10 +1639,15 @@ export class SurvivRenderer {
         if (currentHouse && this.isObstacleInView(currentHouse, 80)) {
             this.drawObstacle(ctx, currentHouse);
         }
-        for (const o of this.houseFloors) {
-            if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
+        if (!currentHouse) {
+            for (const o of this.houseFloors) {
+                if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
+            }
         }
-        for (const o of this.sortedWorldObstacles) {
+        const visibleWorldObstacles = currentHouse
+            ? (this._renderObstaclesByHouseId.get(currentHouse.id) || [])
+            : this.sortedWorldObstacles;
+        for (const o of visibleWorldObstacles) {
             if (this.isObstacleInView(o, 48) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
         // Only use the new LOS shadow system (replaces old room shadows)
@@ -1563,6 +1688,9 @@ export class SurvivRenderer {
 
         // Draw floating damage numbers (world space)
         this.drawDamageNumbers(ctx);
+
+        // Seal and heavily shade the entire exterior for every house size.
+        this.drawExteriorHouseShadow(ctx, camX, camY, W, H, z, currentHouse);
 
         ctx.restore();
 
@@ -1854,31 +1982,36 @@ export class SurvivRenderer {
             const step = 28;
             const roadId = Math.round(o.x + o.y);
             const isHorizontal = o.w > o.h;
-            const visible = this.getVisibleRoadAxisRange(o, isHorizontal, 220);
-            
+
             if (isHorizontal) {
-                ctx.moveTo(visible.start, -o.h / 2);
-                for (let xx = visible.start + step; xx <= visible.end; xx += step) {
+                const halfW = o.w / 2;
+                ctx.moveTo(-halfW, -o.h / 2);
+                for (let xx = -halfW + step; xx < halfW; xx += step) {
                     const wobble = Math.sin(xx * 0.05 + roadId) * 5 + Math.cos(xx * 0.12) * 3;
                     ctx.lineTo(xx, -o.h / 2 + wobble);
                 }
-                ctx.lineTo(visible.end, o.h / 2);
-                for (let xx = visible.end - step; xx >= visible.start; xx -= step) {
+                ctx.lineTo(halfW, -o.h / 2);
+                ctx.lineTo(halfW, o.h / 2);
+                for (let xx = halfW - step; xx > -halfW; xx -= step) {
                     const wobble = Math.sin(xx * 0.05 - roadId) * 5 + Math.cos(xx * 0.12) * 3;
                     ctx.lineTo(xx, o.h / 2 + wobble);
                 }
+                ctx.lineTo(-halfW, o.h / 2);
                 ctx.closePath();
             } else {
-                ctx.moveTo(o.w / 2, visible.start);
-                for (let yy = visible.start + step; yy <= visible.end; yy += step) {
+                const halfH = o.h / 2;
+                ctx.moveTo(o.w / 2, -halfH);
+                for (let yy = -halfH + step; yy < halfH; yy += step) {
                     const wobble = Math.sin(yy * 0.05 + roadId) * 5 + Math.cos(yy * 0.12) * 3;
                     ctx.lineTo(o.w / 2 + wobble, yy);
                 }
-                ctx.lineTo(-o.w / 2, visible.end);
-                for (let yy = visible.end - step; yy >= visible.start; yy -= step) {
+                ctx.lineTo(o.w / 2, halfH);
+                ctx.lineTo(-o.w / 2, halfH);
+                for (let yy = halfH - step; yy > -halfH; yy -= step) {
                     const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
                     ctx.lineTo(-o.w / 2 + wobble, yy);
                 }
+                ctx.lineTo(-o.w / 2, -halfH);
                 ctx.closePath();
             }
             ctx.fill();
@@ -1966,15 +2099,13 @@ export class SurvivRenderer {
                 ctx.stroke();
             }
         } else {
-            if (start < end) {
-                ctx.strokeStyle = '#524330';
-                ctx.lineWidth = 3.5;
-                const trackOff = width * 0.18;
-                ctx.beginPath();
-                line(start, end, -trackOff);
-                line(start, end, trackOff);
-                ctx.stroke();
-            }
+            ctx.strokeStyle = '#524330';
+            ctx.lineWidth = 3.5;
+            const trackOff = width * 0.18;
+            ctx.beginPath();
+            line(-length / 2, length / 2, -trackOff);
+            line(-length / 2, length / 2, trackOff);
+            ctx.stroke();
         }
         ctx.restore();
     }
@@ -2111,7 +2242,7 @@ export class SurvivRenderer {
     drawObstacle(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
         if (allowCache && this.drawCachedObstacle(ctx, o, kind)) return;
-        
+
         // Roads and water are now handled via layered passes
         if (kind === 'road' || kind === 'river' || kind === 'water') return;
 
@@ -2702,6 +2833,18 @@ export class SurvivRenderer {
             ctx.arc(0, 0, 3, 0, Math.PI * 2);
             ctx.fill();
         }
+        if (o.destructible && o.maxHp > 0 && o.hp < o.maxHp) {
+            const hpPct = clamp(o.hp / o.maxHp, 0, 1);
+            const barW = clamp(Math.max(o.w, o.h) * 0.72, 24, 72);
+            const barY = -Math.max(o.w, o.h) / 2 - 10;
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(15, 18, 16, 0.72)';
+            roundRect(ctx, -barW / 2, barY, barW, 5, 2);
+            ctx.fill();
+            ctx.fillStyle = hpPct > 0.35 ? '#76d56a' : '#ef665c';
+            roundRect(ctx, -barW / 2, barY, barW * hpPct, 5, 2);
+            ctx.fill();
+        }
         ctx.restore();
     }
 
@@ -3081,7 +3224,7 @@ export class SurvivRenderer {
                 if (l.weaponType === 'pistol') {
                     // M9 Pistol
                     ctx.rotate(-0.22);
-                    
+
                     // Gunmetal gray slide
                     ctx.fillStyle = '#4b5563';
                     roundRect(ctx, -6, -4, 14, 4.5, 1);
@@ -3096,7 +3239,7 @@ export class SurvivRenderer {
                     roundRect(ctx, -2, 0, 4.5, 8.5, 1.2);
                     ctx.fill();
                     ctx.stroke();
-                    
+
                     // Tan grip panel
                     ctx.fillStyle = '#a16207';
                     roundRect(ctx, -1, 1.5, 2.5, 5.5, 0.8);
@@ -3115,14 +3258,14 @@ export class SurvivRenderer {
                 } else if (l.weaponType === 'revolver') {
                     // R8 Revolver
                     ctx.rotate(-0.15);
-                    
+
                     // Steel cylinder
                     ctx.fillStyle = '#9ca3af';
                     ctx.beginPath();
                     ctx.ellipse(-1, -1.5, 4.2, 4.2, 0, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.stroke();
-                    
+
                     // Cylinder detail
                     ctx.fillStyle = '#374151';
                     for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
@@ -3136,7 +3279,7 @@ export class SurvivRenderer {
                     roundRect(ctx, -6, -3.8, 8, 4, 1);
                     ctx.fill();
                     ctx.stroke();
-                    
+
                     // Long barrel
                     roundRect(ctx, 2, -3.8, 12, 3, 0.8);
                     ctx.fill();
@@ -3158,7 +3301,7 @@ export class SurvivRenderer {
                 } else if (l.weaponType === 'smg') {
                     // Vector SMG
                     ctx.rotate(-0.25);
-                    
+
                     // Skeletal stock
                     ctx.fillStyle = '#1f2937';
                     ctx.beginPath();
@@ -3343,7 +3486,7 @@ export class SurvivRenderer {
                     ctx.closePath();
                     ctx.fill();
                     ctx.stroke();
-                    
+
                     // Thumbhole cut
                     ctx.fillStyle = 'rgba(8, 11, 9, 0.9)';
                     ctx.beginPath();
@@ -3420,7 +3563,7 @@ export class SurvivRenderer {
                     ctx.fillStyle = '#111827';
                     ctx.fillRect(20, -3.2, 14, 3.2);
                     ctx.fillRect(34, -4.2, 3, 5.2);
-                    
+
                     // Carry handle
                     ctx.beginPath();
                     ctx.arc(3, -7.5, 3.5, Math.PI, 0);
@@ -3435,7 +3578,7 @@ export class SurvivRenderer {
                     roundRect(ctx, -2.5, 4.7, 10.5, 11.5, 2);
                     ctx.fill();
                     ctx.stroke();
-                    
+
                     // Gold ammo links
                     ctx.fillStyle = '#eab308';
                     ctx.fillRect(-2, 2.5, 2, 4);
@@ -3560,53 +3703,62 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    initBulletGradients(ctx) {
+        this.bulletGradients = {};
+        for (const [wt, spec] of Object.entries(WEAPON_BULLET_SPECS)) {
+            const { trailLen, slugLen } = spec;
+
+            // 1. Glow Gradient
+            const glowGrad = ctx.createLinearGradient(-trailLen, 0, slugLen, 0);
+            glowGrad.addColorStop(0, spec.glowColorStart);
+            glowGrad.addColorStop(0.35, spec.glowColorMid);
+            glowGrad.addColorStop(0.75, spec.glowColorEnd);
+            glowGrad.addColorStop(1, spec.glowColorTip);
+
+            // 2. Core Gradient
+            const coreGrad = ctx.createLinearGradient(-trailLen * 0.75, 0, slugLen, 0);
+            coreGrad.addColorStop(0, spec.coreColorStart);
+            coreGrad.addColorStop(0.45, spec.coreColorMid);
+            coreGrad.addColorStop(0.85, spec.coreColorEnd);
+            coreGrad.addColorStop(1, '#ffffff');
+
+            this.bulletGradients[wt] = { glowGrad, coreGrad };
+        }
+    }
+
     drawBullet(ctx, b) {
         const angle = Math.atan2(b.vy || 0, b.vx || 1);
         ctx.save();
         ctx.translate(b.x, b.y);
         ctx.rotate(angle);
 
-        const wt = b.weaponType;
-        const isPellet = wt === 'shotgun';
-        let trailLen = 34;
-        let thickness = 1.5;
-        if (isPellet) {
-            trailLen = 16;
-            thickness = 1.05;
-        } else if (wt === 'sniper') {
-            trailLen = 58;
-            thickness = 1.7;
-        } else if (wt === 'assault' || wt === 'dmr') {
-            trailLen = 42;
-        } else if (wt === 'smg' || wt === 'lmg') {
-            trailLen = 29;
-            thickness = 1.3;
+        // Initialize bullet gradients lazily
+        if (!this.bulletGradients) {
+            this.initBulletGradients(ctx);
         }
-        const slugLen = isPellet ? 3 : 6;
 
-        // Two inexpensive strokes stay crisp and visible without the old stack
-        // of per-projectile gradients and blur filters.
+        const wt = b.weaponType;
+        const spec = WEAPON_BULLET_SPECS[wt] || WEAPON_BULLET_SPECS.default;
+        const grads = this.bulletGradients[wt] || this.bulletGradients.default;
+
         ctx.lineCap = 'round';
+
+        // 1. Outer motion-blur glow (wide stroke)
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(30, 35, 38, 0.38)';
-        ctx.lineWidth = thickness + 0.45;
-        ctx.moveTo(-trailLen * 0.72, 0);
-        ctx.lineTo(slugLen * 0.2, 0);
+        ctx.strokeStyle = grads.glowGrad;
+        ctx.lineWidth = spec.thickness * 2.2;
+        ctx.moveTo(-spec.trailLen, 0);
+        ctx.lineTo(spec.slugLen, 0);
         ctx.stroke();
 
+        // 2. Inner sharp bullet core (narrower stroke)
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(235, 241, 243, 0.72)';
-        ctx.lineWidth = thickness;
-        ctx.moveTo(-trailLen, 0);
-        ctx.lineTo(slugLen * 0.1, 0);
+        ctx.strokeStyle = grads.coreGrad;
+        ctx.lineWidth = spec.thickness;
+        ctx.moveTo(-spec.trailLen * 0.75, 0);
+        ctx.lineTo(spec.slugLen, 0);
         ctx.stroke();
 
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.98)';
-        ctx.lineWidth = thickness;
-        ctx.moveTo(-slugLen, 0);
-        ctx.lineTo(slugLen * 0.25, 0);
-        ctx.stroke();
         ctx.restore();
     }
 
@@ -3684,7 +3836,7 @@ export class SurvivRenderer {
 
                 ctx.save();
                 ctx.lineCap = 'round';
-                
+
                 // Track
                 ctx.beginPath();
                 ctx.arc(ringX, ringY, ringRadius, 0, Math.PI * 2);
@@ -3757,7 +3909,7 @@ export class SurvivRenderer {
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const thrust = punching ? Math.sin(progress * Math.PI) : 0;
             const leadTop = meleeHand !== 'bottom';
-            
+
             // Keep one fist planted while the other punches; each melee attack
             // alternates hands on the server so it reads as one clean swing.
             const idleReach = r * 0.76;
@@ -3930,7 +4082,7 @@ export class SurvivRenderer {
         const variant = o.variant || 'house';
         const hw = o.w / 2;
         const hh = o.h / 2;
-        
+
         // Drop shadow for the entire roof
         ctx.shadowColor = 'rgba(10, 14, 10, 0.45)';
         ctx.shadowBlur = 18;
@@ -4348,7 +4500,7 @@ export class SurvivRenderer {
             // --- CABIN: Rustic Wood Shingles & Log Corners ---
             const mainWood = '#704f32';
             const darkWood = '#4a321d';
-            
+
             const grad = ctx.createLinearGradient(-hw, -hh, hw, hh);
             grad.addColorStop(0, mainWood);
             grad.addColorStop(0.5, darkWood);
@@ -4581,11 +4733,11 @@ export class SurvivRenderer {
             const entryW = verticalDoor ? Math.max(28, door.w * 1.15) : Math.max(door.w, 86);
             const entryH = verticalDoor ? Math.max(door.h, 86) : Math.max(28, door.h * 1.15);
             const industrialEntry = variant === 'ironworks' || variant === 'warehouse' || variant === 'garage';
-            
+
             ctx.fillStyle = 'rgba(10, 8, 5, 0.88)';
             roundRect(ctx, doorX - entryW / 2, doorY - entryH / 2, entryW, entryH, 6);
             ctx.fill();
-            
+
             const trimColor = industrialEntry ? '#10181c' : variant === 'mansion' ? '#263238' : '#29353a';
             ctx.strokeStyle = trimColor;
             ctx.lineWidth = industrialEntry ? 9 : 7;
