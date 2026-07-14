@@ -492,9 +492,10 @@ export default function SurvivGame() {
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
             if (action === 'pickupWeapon') pickupWeaponPendingRef.current = true;
             if (action === 'dropWeapon') {
-                const activeWeapon = renderer.me?.weapon;
-                const activeSlot = renderer.me?.inventory?.weapons?.indexOf(activeWeapon) ?? -1;
-                if (activeSlot >= 0) dropItemPendingRef.current = { itemKey: 'weapon', slotIdx: activeSlot };
+                const activeSlot = renderer.me?.activeWeaponSlot ?? -1;
+                if (activeSlot >= 0 && renderer.me?.inventory?.weapons?.[activeSlot]) {
+                    dropItemPendingRef.current = { itemKey: 'weapon', slotIdx: activeSlot };
+                }
             }
             if (typeof action === 'string' && action.startsWith('equipSlot:')) {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
@@ -947,7 +948,7 @@ export default function SurvivGame() {
                     {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
                         const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
-                        const isActive = weaponId && weaponId === me.weapon;
+                        const isActive = me.activeWeaponSlot === slotIdx;
                         const isReloading = isActive && me.reloading;
                         const reloadDuration = Math.max(1, Number(me.reloadMs) || 1);
                         const reloadRemaining = Math.max(0, Number(me.reloadRemainingMs) || 0);
@@ -980,7 +981,7 @@ export default function SurvivGame() {
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
-                                            {weaponId === 'fists' ? 'MELEE' : (isActive ? (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`) : `${me.weaponsAmmo?.[weaponId] !== undefined ? me.weaponsAmmo[weaponId] : WEAPON_CLIP_SIZES[weaponId] || 0}/${WEAPON_CLIP_SIZES[weaponId] || 0}`)}
+                                            {weaponId === 'fists' ? 'MELEE' : (isActive ? (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`) : `${me.weaponSlotAmmo?.[slotIdx] !== undefined ? me.weaponSlotAmmo[slotIdx] : WEAPON_CLIP_SIZES[weaponId] || 0}/${WEAPON_CLIP_SIZES[weaponId] || 0}`)}
                                         </span>
                                         {isActive && isReloading && (
                                             <div
@@ -1102,7 +1103,7 @@ export default function SurvivGame() {
                                         {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
                                             const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
-                                            const isActive = weaponId && weaponId === me.weapon;
+                                            const isActive = me.activeWeaponSlot === slotIdx;
                                             
                                             const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
                                             const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
@@ -1362,7 +1363,8 @@ export default function SurvivGame() {
                                                     putChestItemPendingRef.current = {
                                                         chestId: me.openedContainer.id,
                                                         itemKey: 'weapon',
-                                                        weaponType: weaponType
+                                                        weaponType: weaponType,
+                                                        slotIdx
                                                     };
                                                 }
                                             } else {

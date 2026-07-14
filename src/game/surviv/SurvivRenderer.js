@@ -361,8 +361,12 @@ export class SurvivRenderer {
         this.damageNumbers = [];
         // Camera shake
         this.cameraShake = { x: 0, y: 0, intensity: 0, decay: 0.88 };
-        // Kill feed
+        // Kill feed and server-synced death presentation
         this.killFeed = [];
+        this.deathMarkers = [];
+        this.killAnimations = [];
+        this._seenDeathMarkerIds = new Set();
+        this._graveFirstSeenAt = new Map();
         // Blood decals on the ground
         this.bloodDecals = [];
         // Previous player states for interpolation & tracking
@@ -447,6 +451,10 @@ export class SurvivRenderer {
         this.loot = [];
         this.bullets = [];
         this.localShotTracers = [];
+        this.deathMarkers = [];
+        this.killAnimations = [];
+        this._seenDeathMarkerIds.clear();
+        this._graveFirstSeenAt.clear();
         this.obstacles = [];
         this.minimap = { players: [], food: [], obstacles: [] };
         this.houseFloors = [];
@@ -538,6 +546,41 @@ export class SurvivRenderer {
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
             : rawPlayers;
         this.loot = tick.loot || [];
+        this.deathMarkers = Array.isArray(tick.deathMarkers) ? tick.deathMarkers : [];
+        const activeMarkerIds = new Set();
+        for (const marker of this.deathMarkers) {
+            activeMarkerIds.add(marker.id);
+            if (!this._graveFirstSeenAt.has(marker.id)) this._graveFirstSeenAt.set(marker.id, receivedAt);
+            if (this._seenDeathMarkerIds.has(marker.id)) continue;
+            this._seenDeathMarkerIds.add(marker.id);
+            if (marker.killerId === this.myId) {
+                this.killAnimations.push({
+                    id: marker.id,
+                    victimName: marker.victimName || 'Player',
+                    weaponType: marker.weaponType || 'fists',
+                    spawnedAt: receivedAt,
+                    duration: 1350,
+                });
+                for (let i = 0; i < 14; i++) {
+                    const angle = (i / 14) * Math.PI * 2 + Math.random() * 0.18;
+                    const speed = 55 + Math.random() * 90;
+                    this.particles.push({
+                        x: marker.x,
+                        y: marker.y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.45 + Math.random() * 0.25,
+                        maxLife: 0.7,
+                        size: 1.8 + Math.random() * 2.2,
+                        color: i % 3 === 0 ? '#ffd166' : '#ef544f',
+                        type: 'killBurst',
+                    });
+                }
+            }
+        }
+        for (const id of this._graveFirstSeenAt.keys()) {
+            if (!activeMarkerIds.has(id)) this._graveFirstSeenAt.delete(id);
+        }
 
         // Accumulate walk cycle & bob for each player
         for (const p of this.players) {
@@ -614,6 +657,14 @@ export class SurvivRenderer {
         // ticks. Retain the last snapshot when omitted, and only rebuild the
         // expensive render cache when its actual contents changed.
         if (Array.isArray(tick.obstacles)) {
+            const previousObstacles = new Map(this.obstacles.map(obstacle => [obstacle.id, obstacle]));
+            for (const obstacle of tick.obstacles) {
+                const previous = previousObstacles.get(obstacle.id);
+                if (previous?._hitAt) obstacle._hitAt = previous._hitAt;
+                if (previous && Number.isFinite(previous.hp) && obstacle.hp < previous.hp) {
+                    obstacle._hitAt = receivedAt;
+                }
+            }
             const nextSignature = obstacleRenderSignature(tick.obstacles);
             if (nextSignature !== this._obstacleRenderSignature) {
                 this.obstacles = tick.obstacles;
@@ -1427,7 +1478,7 @@ export class SurvivRenderer {
         const ext = (viewW + viewH) / z + 600;
         const inset = 2;
         ctx.save();
-        ctx.fillStyle = 'rgba(5, 7, 11, 0.93)';
+        ctx.fillStyle = 'rgba(7, 10, 15, 0.48)';
         ctx.beginPath();
         ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
         ctx.rect(
@@ -1650,6 +1701,7 @@ export class SurvivRenderer {
         for (const o of visibleWorldObstacles) {
             if (this.isObstacleInView(o, 48) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
         }
+        this.drawDeathMarkers(ctx, currentHouse);
         // Only use the new LOS shadow system (replaces old room shadows)
         this.drawLineOfSightShadow(ctx, camX, camY, W, H, z, currentHouse);
 
@@ -1663,7 +1715,9 @@ export class SurvivRenderer {
             if (this.isPointInView(b.x, b.y, 110) && !this.isPointHiddenByRooms(b.x, b.y, currentHouse, currentRoom)) this.drawBullet(ctx, b);
         }
         for (const b of this.localShotTracers) {
-            if (this.isPointInView(b.x, b.y, 110)) this.drawBullet(ctx, b);
+            if (this.isPointInView(b.x, b.y, 110) && !this.isPointHiddenByRooms(b.x, b.y, currentHouse, currentRoom)) {
+                this.drawBullet(ctx, b);
+            }
         }
         // Draw players with interpolation
         for (const p of this.players) {
@@ -1684,12 +1738,12 @@ export class SurvivRenderer {
         }
 
         // Draw particles (world space)
-        this.drawParticles(ctx);
+        this.drawParticles(ctx, currentHouse, currentRoom);
 
         // Draw floating damage numbers (world space)
-        this.drawDamageNumbers(ctx);
+        this.drawDamageNumbers(ctx, currentHouse, currentRoom);
 
-        // Seal and heavily shade the entire exterior for every house size.
+        // Softly shade the exterior while all moving entities stay hidden.
         this.drawExteriorHouseShadow(ctx, camX, camY, W, H, z, currentHouse);
 
         ctx.restore();
@@ -1700,6 +1754,7 @@ export class SurvivRenderer {
         this.drawVignette(ctx, W, H);
         this.drawDamageIndicators(ctx, W, H);
         this.drawHitMarkers(ctx, W, H);
+        this.drawKillAnimation(ctx, W, H);
         this.drawKillFeed(ctx, W, H);
         this.drawLowAmmoWarning(ctx, W, H);
         this.drawMinimapPanel(ctx, W, H);
@@ -2239,6 +2294,17 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    getObstacleHitShake(o) {
+        const elapsed = Date.now() - (o?._hitAt || 0);
+        if (elapsed < 0 || elapsed >= 190) return { x: 0, y: 0 };
+        const strength = (1 - elapsed / 190) * 4.2;
+        const phase = elapsed * 0.11 + String(o.id || '').length;
+        return {
+            x: Math.sin(phase) * strength,
+            y: Math.cos(phase * 1.37) * strength * 0.65,
+        };
+    }
+
     drawObstacle(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
         if (allowCache && this.drawCachedObstacle(ctx, o, kind)) return;
@@ -2246,8 +2312,9 @@ export class SurvivRenderer {
         // Roads and water are now handled via layered passes
         if (kind === 'road' || kind === 'river' || kind === 'water') return;
 
+        const shake = allowCache ? this.getObstacleHitShake(o) : { x: 0, y: 0 };
         ctx.save();
-        ctx.translate(o.x, o.y);
+        ctx.translate(o.x + shake.x, o.y + shake.y);
         ctx.rotate(o.rotation || 0);
         const useSoftShadow = kind === 'tree' || kind === 'bush' || kind === 'rock';
         ctx.shadowColor = useSoftShadow ? 'rgba(18, 22, 18, 0.32)' : 'transparent';
@@ -2833,18 +2900,6 @@ export class SurvivRenderer {
             ctx.arc(0, 0, 3, 0, Math.PI * 2);
             ctx.fill();
         }
-        if (o.destructible && o.maxHp > 0 && o.hp < o.maxHp) {
-            const hpPct = clamp(o.hp / o.maxHp, 0, 1);
-            const barW = clamp(Math.max(o.w, o.h) * 0.72, 24, 72);
-            const barY = -Math.max(o.w, o.h) / 2 - 10;
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(15, 18, 16, 0.72)';
-            roundRect(ctx, -barW / 2, barY, barW, 5, 2);
-            ctx.fill();
-            ctx.fillStyle = hpPct > 0.35 ? '#76d56a' : '#ef665c';
-            roundRect(ctx, -barW / 2, barY, barW * hpPct, 5, 2);
-            ctx.fill();
-        }
         ctx.restore();
     }
 
@@ -2878,10 +2933,11 @@ export class SurvivRenderer {
             this._obstacleSpriteCache.set(key, sprite);
         }
 
+        const shake = this.getObstacleHitShake(o);
         ctx.drawImage(
             sprite.canvas,
-            Math.round(o.x - sprite.width / 2),
-            Math.round(o.y - sprite.height / 2),
+            Math.round(o.x + shake.x - sprite.width / 2),
+            Math.round(o.y + shake.y - sprite.height / 2),
         );
         return true;
     }
@@ -3762,6 +3818,68 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawDeathMarkers(ctx, currentHouse) {
+        const now = Date.now();
+        for (const marker of this.deathMarkers) {
+            if (!this.isPointInView(marker.x, marker.y, 80)) continue;
+            const markerHouse = this.findHouseContainingPoint(marker.x, marker.y);
+            if (markerHouse && (!currentHouse || markerHouse.id !== currentHouse.id)) continue;
+
+            const firstSeenAt = this._graveFirstSeenAt.get(marker.id) || now;
+            const intro = clamp((now - firstSeenAt) / 380, 0, 1);
+            const eased = 1 - Math.pow(1 - intro, 3);
+            const age = Math.max(0, now - (marker.createdAt || firstSeenAt));
+            const fade = age > 25000 ? clamp(1 - (age - 25000) / 5000, 0, 1) : 1;
+            if (fade <= 0) continue;
+
+            ctx.save();
+            ctx.translate(marker.x, marker.y + (1 - eased) * 18);
+            ctx.scale(0.72 + eased * 0.28, 0.72 + eased * 0.28);
+            ctx.globalAlpha = fade;
+
+            ctx.fillStyle = 'rgba(12, 15, 13, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, 10, 19, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#4a4038';
+            ctx.beginPath();
+            ctx.ellipse(0, 8, 15, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowColor = 'rgba(0,0,0,0.34)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetY = 3;
+            ctx.fillStyle = '#737b7d';
+            ctx.strokeStyle = '#343b3d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-10, 8);
+            ctx.lineTo(-9, -11);
+            ctx.quadraticCurveTo(-9, -22, 0, -24);
+            ctx.quadraticCurveTo(9, -22, 9, -11);
+            ctx.lineTo(10, 8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            ctx.strokeStyle = 'rgba(230,235,232,0.72)';
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(0, -17);
+            ctx.lineTo(0, -5);
+            ctx.moveTo(-5, -12);
+            ctx.lineTo(5, -12);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(235,240,237,0.82)';
+            ctx.font = '800 7px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('RIP', 0, 1);
+            ctx.restore();
+        }
+    }
     drawPlayer(ctx, p) {
         const r = 14;
         const isMe = p.isYou || p.id === this.myId;
@@ -3920,7 +4038,7 @@ export class SurvivRenderer {
             if (punching && thrust > 0.12) {
                 ctx.save();
                 ctx.globalAlpha = thrust * 0.48;
-                ctx.strokeStyle = '#f5df9a';
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();
                 ctx.arc(r * 0.66, leadTop ? -7 : 7, r * (0.72 + thrust * 0.35), -0.5, 0.5);
@@ -3938,7 +4056,7 @@ export class SurvivRenderer {
             ctx.lineTo(bottomReach, 6);
             ctx.stroke();
             ctx.fillStyle = playerColor;
-            ctx.strokeStyle = punching ? 'rgba(255, 232, 158, 0.9)' : 'rgba(255,255,255,0.34)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.34)';
             ctx.lineWidth = punching ? 2 : 1.5;
             for (const hand of [{ x: topReach, y: -6 }, { x: bottomReach, y: 6 }]) {
                 ctx.beginPath();
@@ -5005,11 +5123,12 @@ export class SurvivRenderer {
 
     // ========== NEW VISUAL FEEDBACK METHODS ==========
 
-    drawParticles(ctx) {
+    drawParticles(ctx, currentHouse = null, currentRoom = null) {
         if (this.particles.length === 0) return;
         ctx.save();
         for (const p of this.particles) {
             if (!this.isPointInView(p.x, p.y, 24)) continue;
+            if (this.isPointHiddenByRooms(p.x, p.y, currentHouse, currentRoom)) continue;
             const alpha = clamp(p.life / (p.maxLife || 0.2), 0, 1);
             ctx.globalAlpha = alpha;
 
@@ -5036,13 +5155,14 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawDamageNumbers(ctx) {
+    drawDamageNumbers(ctx, currentHouse = null, currentRoom = null) {
         const now = Date.now();
         this.damageNumbers = this.damageNumbers.filter(d => now - d.spawnedAt < d.duration);
         if (this.damageNumbers.length === 0) return;
         ctx.save();
         for (const d of this.damageNumbers) {
             if (!this.isPointInView(d.x, d.y, 48)) continue;
+            if (this.isPointHiddenByRooms(d.x, d.y, currentHouse, currentRoom)) continue;
             const age = now - d.spawnedAt;
             const t = age / d.duration;
             const alpha = t < 0.2 ? t / 0.2 : Math.max(0, 1 - (t - 0.5) / 0.5);
@@ -5143,6 +5263,47 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawKillAnimation(ctx, W, H) {
+        const now = Date.now();
+        this.killAnimations = this.killAnimations.filter(animation => now - animation.spawnedAt < animation.duration);
+        const animation = this.killAnimations[this.killAnimations.length - 1];
+        if (!animation) return;
+
+        const t = clamp((now - animation.spawnedAt) / animation.duration, 0, 1);
+        const alpha = t < 0.12 ? t / 0.12 : t > 0.72 ? (1 - t) / 0.28 : 1;
+        const pop = t < 0.22 ? 0.72 + Math.sin((t / 0.22) * Math.PI / 2) * 0.34 : 1;
+        const cx = W / 2;
+        const y = H * 0.3;
+
+        ctx.save();
+        ctx.globalAlpha = clamp(alpha, 0, 1);
+        ctx.translate(cx, y);
+        ctx.scale(pop, pop);
+
+        const pulse = 30 + t * 42;
+        ctx.strokeStyle = `rgba(239, 84, 79, ${Math.max(0, 0.55 * (1 - t))})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, pulse, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(8, 10, 10, 0.82)';
+        ctx.strokeStyle = 'rgba(239, 84, 79, 0.68)';
+        ctx.lineWidth = 1.5;
+        roundRect(ctx, -112, -27, 224, 54, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ef544f';
+        ctx.font = '900 18px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('☠  ELIMINATED', 0, -7);
+        ctx.fillStyle = 'rgba(255,255,255,0.84)';
+        ctx.font = '700 11px system-ui, sans-serif';
+        ctx.fillText(animation.victimName, 0, 12);
+        ctx.restore();
+    }
     drawKillFeed(ctx, W, H) {
         if (this.killFeed.length === 0) return;
         const now = Date.now();
