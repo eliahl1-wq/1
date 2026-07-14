@@ -697,22 +697,24 @@ input[type=number] {
 
 .skin-cards-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
 }
 
 .skin-card {
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   cursor: pointer;
   transition: all 0.2s;
   color: var(--text-2);
+  font-size: 0.85rem;
+  position: relative;
 }
 
 .skin-card:hover {
@@ -728,8 +730,8 @@ input[type=number] {
 }
 
 .skin-card-icon {
-  width: 48px;
-  height: 48px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
@@ -738,6 +740,19 @@ input[type=number] {
 
 .skin-card:hover .skin-card-icon {
   transform: scale(1.1);
+}
+
+.notify-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  background-color: #ff4040;
+  border-radius: 50%;
+  border: 2px solid var(--bg-1);
+  box-shadow: 0 0 8px rgba(255, 64, 64, 0.6);
+  z-index: 10;
 }
 
 .skin-card.active .skin-card-icon {

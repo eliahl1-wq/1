@@ -255,10 +255,18 @@ export default function PreGame() {
         () => localStorage.getItem('selected_skin_agar') || '#c080ff'
     );
     const [selectedSkinSurviv, setSelectedSkinSurviv] = useState(
-        () => localStorage.getItem('selected_skin_surviv') || 'random'
+        () => localStorage.getItem('selected_skin_surviv') || 'random_color'
+    );
+
+    const [hasSeenRainbow, setHasSeenRainbow] = useState(
+        () => localStorage.getItem('has_seen_rainbow') === 'true'
     );
 
     const [showCustomizer, setShowCustomizer] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('has_seen_rainbow', hasSeenRainbow);
+    }, [hasSeenRainbow]);
 
     useEffect(() => {
         localStorage.setItem('selected_skin', selectedSkin);
@@ -1513,7 +1521,8 @@ export default function PreGame() {
                                     onClick={() => setShowCustomizer(true)}
                                     style={{ cursor: 'pointer', marginTop: 0 }}
                                 >
-                                    <div className="customize-lobby-card-header">
+                                    <div className="customize-lobby-card-header" style={{ position: 'relative' }}>
+                                        {!hasSeenRainbow && <div className="notify-dot" style={{ right: '-8px', top: '-8px' }}></div>}
                                         <div className="customize-lobby-card-title-group">
                                             <svg className="customize-lobby-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.06 0 1.94-.92 1.94-2 0-.49-.18-.95-.5-1.3-.32-.34-.5-.81-.5-1.3 0-1.03.87-1.9 1.9-1.9H17c3.31 0 6-2.69 6-6 0-4.97-4.92-9-11-9z" />
@@ -1957,6 +1966,7 @@ export default function PreGame() {
             {/* Customizer Modal Overlay */}
             {showCustomizer && (() => {
                 const getChromaName = (color) => {
+                    if (color === 'random_color') return 'Random';
                     if (color === 'random') return customizerTab === 'surviv' ? 'Random' : 'Rainbow';
                     switch (color) {
                         case '#c080ff': return 'Lavender Purple';
@@ -1977,8 +1987,9 @@ export default function PreGame() {
                     : customizerTab === 'surviv'
                         ? selectedSkinSurviv
                         : selectedSkinAgar;
-                const isRandomSelection = currentChroma === 'random';
-                const isRainbow = customizerTab !== 'surviv' && isRandomSelection;
+                const isRandomColor = currentChroma === 'random_color';
+                const isRainbow = currentChroma === 'random' && customizerTab !== 'surviv';
+                const isRandomSelection = currentChroma === 'random' || currentChroma === 'random_color';
                 const displayChroma = isRandomSelection ? '#80d0d0' : currentChroma;
 
                 const cycleChroma = (direction) => {
@@ -2005,15 +2016,13 @@ export default function PreGame() {
                 };
 
                 const setSkinStyle = (style) => {
-                    if (style === 'rainbow' || style === 'random') {
-                        if (customizerTab === 'slither') setSelectedSkin('random');
-                        else if (customizerTab === 'surviv') setSelectedSkinSurviv('random');
-                        else setSelectedSkinAgar('random');
-                    } else {
-                        if (customizerTab === 'slither') setSelectedSkin('#c080ff');
-                        else if (customizerTab === 'surviv') setSelectedSkinSurviv('#c080ff');
-                        else setSelectedSkinAgar('#c080ff');
-                    }
+                    let newSkin = style;
+                    if (style === 'rainbow') newSkin = 'random';
+                    else if (style === 'classic') newSkin = '#c080ff';
+                    
+                    if (customizerTab === 'slither') setSelectedSkin(newSkin);
+                    else if (customizerTab === 'surviv') setSelectedSkinSurviv(newSkin);
+                    else setSelectedSkinAgar(newSkin);
                 };
 
                 return (
@@ -2103,7 +2112,7 @@ export default function PreGame() {
                                     <div className="skin-cards-grid">
                                         <button
                                             type="button"
-                                            className={`skin-card ${!isRandomSelection ? 'active' : ''}`}
+                                            className={`skin-card ${(!isRainbow && !isRandomColor) ? 'active' : ''}`}
                                             onClick={() => setSkinStyle('classic')}
                                         >
                                             <div className="skin-card-icon grid-icon">
@@ -2117,12 +2126,28 @@ export default function PreGame() {
 
                                         <button
                                             type="button"
-                                            className={`skin-card ${isRandomSelection ? 'active' : ''}`}
-                                            onClick={() => setSkinStyle(customizerTab === 'surviv' ? 'random' : 'rainbow')}
+                                            className={`skin-card ${isRandomColor ? 'active' : ''}`}
+                                            onClick={() => setSkinStyle('random_color')}
                                         >
-                                            <div className={`skin-card-icon ${customizerTab === 'surviv' ? 'surviv-random-icon' : 'rainbow-icon'}`}></div>
-                                            <span>{customizerTab === 'surviv' ? 'Random' : 'Rainbow'}</span>
+                                            <div className="skin-card-icon surviv-random-icon"></div>
+                                            <span>Random</span>
                                         </button>
+
+                                        {customizerTab !== 'surviv' && (
+                                            <button
+                                                type="button"
+                                                className={`skin-card ${isRainbow ? 'active' : ''}`}
+                                                style={{ position: 'relative' }}
+                                                onClick={() => {
+                                                    setSkinStyle('rainbow');
+                                                    if (!hasSeenRainbow) setHasSeenRainbow(true);
+                                                }}
+                                            >
+                                                {!hasSeenRainbow && <div className="notify-dot"></div>}
+                                                <div className="skin-card-icon rainbow-icon"></div>
+                                                <span>Rainbow</span>
+                                            </button>
+                                        )}
                                     </div>
 
                                     <button
@@ -2144,7 +2169,7 @@ export default function PreGame() {
 }
 
 function SurvivSkinPreview({ color, isLarge, nickname }) {
-    const isRandom = color === 'random';
+    const isRandom = color === 'random' || color === 'random_color';
     const displayColor = isRandom ? '#80d0d0' : color;
     const displayName = (nickname || 'SURVIV').slice(0, 10).toUpperCase();
 
@@ -2223,7 +2248,7 @@ function SnakeSkinPreview({ color, isLarge }) {
                         '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
                         '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
                     ];
-                    const colorIndex = Math.floor((t * 0.15 + i * 0.45) % colors.length);
+                    const colorIndex = Math.floor((t * 0.05 + i * 0.15) % colors.length);
                     segColorHex = colors[colorIndex];
                 }
 
