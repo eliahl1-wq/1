@@ -129,7 +129,7 @@ export class SlitherRenderer {
         // Body sprites are authored at this supersample factor and blitted down,
         // which gives crisp, well-antialiased snake edges instead of upscaled-blurry ones.
         this._bodySS = this.isMobile ? 1.5 : 2;
-        this.state = { snakes: [], food: [], you: null, worldHalf: 3000, zone: null, minimap: [] };
+        this.state = { snakes: [], food: [], you: null, worldHalf: 2400, zone: null, minimap: [], circularMap: true };
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
         this.smooth = new Map();
@@ -1726,7 +1726,8 @@ export class SlitherRenderer {
             // temporary points per large snake every frame.
             const curveEdge = Math.max(2.4, bodyRadiusWorld * 0.55);
             const dense = densifySpine(rawSegs, curveEdge);
-            segs = fitSpineToArcLength(dense, s.visualArcLen);
+            const fractionalTail = Math.max(0, Math.min(1, snake.fam ?? 0)) * (s.visualSpacing || 3.6);
+            segs = fitSpineToArcLength(dense, s.visualArcLen, fractionalTail);
         }
         if (segs.length === 0) {
             ctx.restore();

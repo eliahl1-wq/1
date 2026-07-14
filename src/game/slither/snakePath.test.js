@@ -2,15 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fitSpineToArcLength, updateBodyAlongPath } from './snakePath.js';
 
-test('visual tail growth is split into moving points instead of one rigid edge', () => {
+test('downsampled curve loss cannot become a long rigid tail extension', () => {
     const spine = [{ x: 0, y: 0 }, { x: -4, y: 0 }, { x: -8, y: 0 }];
-    const grown = fitSpineToArcLength(spine, 48);
+    const grown = fitSpineToArcLength(spine, 48, 3.6);
+    const tail = grown[grown.length - 1];
+    const originalTail = spine[spine.length - 1];
+    const extension = Math.hypot(tail.x - originalTail.x, tail.y - originalTail.y);
 
-    assert.ok(grown.length > spine.length + 1, 'long growth should add several tail points');
-    for (let i = 1; i < grown.length; i++) {
-        const edge = Math.hypot(grown[i].x - grown[i - 1].x, grown[i].y - grown[i - 1].y);
-        assert.ok(edge <= 12.001, `tail edge ${i} should remain flexible, got ${edge}`);
-    }
+    assert.ok(extension <= 3.601, `tail may only use fractional segment growth, got ${extension}`);
+    assert.equal(fitSpineToArcLength(spine, 48).length, spine.length,
+        'curve compression alone must not synthesize any tail');
 });
 test('a 1200-segment tail stays distributed when path history must be extended', () => {
     const segments = Array.from({ length: 1200 }, () => ({ x: 0, y: 0 }));

@@ -234,7 +234,7 @@ function spineArcLength(segments) {
 }
 
 /** Trim or extend a spine polyline to an exact arc length (head at index 0). */
-export function fitSpineToArcLength(segments, targetArc) {
+export function fitSpineToArcLength(segments, targetArc, maxExtension = 0) {
     if (!segments?.length || targetArc <= 0) return segments;
     const currentArc = spineArcLength(segments);
     if (Math.abs(currentArc - targetArc) < 0.08) return segments;
@@ -260,7 +260,11 @@ export function fitSpineToArcLength(segments, targetArc) {
         return out.length > 1 ? out : segments;
     }
 
-    const extra = targetArc - currentArc;
+    // Downsampled curved spines are naturally shorter than their authoritative
+    // arc. Never turn that compression into a long, straight synthetic tail;
+    // only permit the caller's fractional between-segment growth.
+    const extra = Math.min(targetArc - currentArc, Math.max(0, maxExtension));
+    if (extra <= 0.0001) return segments;
     const n = segments.length;
     const tail = segments[n - 1];
     const prev = segments[Math.max(0, n - 2)];
@@ -476,5 +480,10 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
 
     const visSpacing = growth.spacing ?? segmentSpacingForSnake({ sc: growth.sc, radius: growth.radius });
     const dense = densifySpine(state.segments, visSpacing * 0.45);
-    state.drawSpine = fitSpineToArcLength(dense, growth.arcLen ?? continuousArcLength(meta.segmentCount || 1, meta.fam ?? 0, visSpacing));
+    const fractionalTail = Math.max(0, Math.min(1, meta.fam ?? 0)) * visSpacing;
+    state.drawSpine = fitSpineToArcLength(
+        dense,
+        growth.arcLen ?? continuousArcLength(meta.segmentCount || 1, meta.fam ?? 0, visSpacing),
+        fractionalTail,
+    );
 }
