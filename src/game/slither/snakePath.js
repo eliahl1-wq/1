@@ -2,12 +2,15 @@
 
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
-const MAX_SC = 6;
+const MAX_RADIUS_SC = 3.15;
+const MAX_LENGTH_SC = 1.65;
 const SPAWN_SEGMENTS = 12;
 const LENGTH_SC_DIV = 106;
-const RADIUS_SC_DIV = 150;
-const MAX_PATH_POINTS = 560;
-const MIN_HEAD_RECORD = 0.14;
+const RADIUS_SC_DIV = 90;
+const RADIUS_LOG_FACTOR = 0.56;
+const SPACING_GROWTH_FACTOR = 0.32;
+const MAX_PATH_POINTS = 3600;
+const MIN_HEAD_RECORD = 0.38;
 
 function distSq(x1, y1, x2, y2) {
     const dx = x1 - x2;
@@ -20,9 +23,13 @@ function dist(x1, y1, x2, y2) {
 }
 
 export function segmentSpacingForSnake(snake) {
-    if (snake?.sc) return SEG_SEP * snake.sc;
-    const r = snake?.radius || BASE_RADIUS;
-    return Math.max(2.6, r * (SEG_SEP / BASE_RADIUS));
+    if (snake?.wsep) return snake.wsep;
+    if (snake?.sc) {
+        const spacingSc = Math.min(MAX_LENGTH_SC, 1 + (snake.sc - 1) * SPACING_GROWTH_FACTOR);
+        return SEG_SEP * spacingSc;
+    }
+    const radiusSc = (snake?.radius || BASE_RADIUS) / BASE_RADIUS;
+    return SEG_SEP * Math.min(MAX_LENGTH_SC, 1 + (radiusSc - 1) * SPACING_GROWTH_FACTOR);
 }
 
 function pathArcLength(path, end = path.length) {
@@ -154,9 +161,19 @@ export function updateBodyAlongPath(state, segments, spacing, headX, headY, angl
         }
 
         if (!placed) {
-            const tail = path[path.length - 1];
-            segments[i].x = tail.x;
-            segments[i].y = tail.y;
+            const pathTail = path[path.length - 1];
+            const pathPrev = path[Math.max(0, path.length - 2)];
+            let dx = pathTail.x - pathPrev.x;
+            let dy = pathTail.y - pathPrev.y;
+            let d = Math.hypot(dx, dy);
+            if (d < 1e-6) {
+                dx = -Math.cos(angle);
+                dy = -Math.sin(angle);
+                d = 1;
+            }
+            const prev = segments[i - 1];
+            segments[i].x = prev.x + (dx / d) * spacing;
+            segments[i].y = prev.y + (dy / d) * spacing;
         }
     }
 
@@ -184,7 +201,7 @@ export function rebuildPathFromSegments(state, segments) {
 
 /** Slither.io continuous scale from segment count + fractional fullness. */
 export function wsepForSc(sc) {
-    return SEG_SEP * (sc || 1);
+    return SEG_SEP * Math.min(MAX_LENGTH_SC, 1 + (Math.max(1, sc || 1) - 1) * SPACING_GROWTH_FACTOR);
 }
 
 export function continuousSc(sct, fam = 0) {
@@ -192,13 +209,15 @@ export function continuousSc(sct, fam = 0) {
     const baseSegments = Math.min(normalized, SPAWN_SEGMENTS);
     const extraSegments = Math.max(0, normalized - SPAWN_SEGMENTS);
     return Math.min(
-        MAX_SC,
-        1 + (baseSegments - 2) / LENGTH_SC_DIV + extraSegments / RADIUS_SC_DIV,
+        MAX_RADIUS_SC,
+        1 + (baseSegments - 2) / LENGTH_SC_DIV
+            + Math.log1p(extraSegments / RADIUS_SC_DIV) * RADIUS_LOG_FACTOR,
     );
 }
 
 function continuousLengthSc(sct, fam = 0) {
-    return Math.min(MAX_SC, 1 + (Math.max(2, sct) - 2 + Math.max(0, fam)) / LENGTH_SC_DIV);
+    const radiusSc = continuousSc(sct, fam);
+    return Math.min(MAX_LENGTH_SC, 1 + (radiusSc - 1) * SPACING_GROWTH_FACTOR);
 }
 
 export function continuousArcLength(sct, fam, spacing) {
@@ -258,7 +277,20 @@ export function fitSpineToArcLength(segments, targetArc) {
     }
     if (d < 1e-4) return segments;
     const out = segments.slice();
-    out.push({ x: tail.x + (dx / d) * extra, y: tail.y + (dy / d) * extra });
+    // Split visual growth across several tail points. One long synthetic edge
+    // looked like a rigid stick and exposed a seam during large-snake turns.
+    const averageEdge = currentArc / Math.max(1, n - 1);
+    const maxTailStep = Math.max(1, Math.min(averageEdge || extra, 12));
+    let remain = extra;
+    let x = tail.x;
+    let y = tail.y;
+    while (remain > 1e-4) {
+        const step = Math.min(maxTailStep, remain);
+        x += (dx / d) * step;
+        y += (dy / d) * step;
+        out.push({ x, y });
+        remain -= step;
+    }
     return out;
 }
 

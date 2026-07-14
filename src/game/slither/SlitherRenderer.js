@@ -1716,11 +1716,16 @@ export class SlitherRenderer {
         ctx.globalCompositeOperation = 'source-over';
 
         const s = this.smooth.get(snake.id);
+        const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
+        const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
         let segs = snake.segments || [];
         if (s && s.visualArcLen) {
             const rawSegs = s.segments || snake.segments || [];
-            const visSpacing = s.visualSpacing || 3.6;
-            const dense = densifySpine(rawSegs, visSpacing * 0.45);
+            // Network spines are downsampled. Smooth only to a radius-relative
+            // resolution; spacing-relative subdivision created thousands of
+            // temporary points per large snake every frame.
+            const curveEdge = Math.max(2.4, bodyRadiusWorld * 0.55);
+            const dense = densifySpine(rawSegs, curveEdge);
             segs = fitSpineToArcLength(dense, s.visualArcLen);
         }
         if (segs.length === 0) {
@@ -1766,8 +1771,6 @@ export class SlitherRenderer {
             return;
         }
 
-        const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
-        const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
         const q = this._quality;
         const holdActive = this._holdActive;
@@ -1783,13 +1786,18 @@ export class SlitherRenderer {
                 arcLen += Math.sqrt(dx * dx + dy * dy);
             }
         }
-        const neededStamps = Math.ceil(arcLen / stampStepWorld) + 1;
+        // Keep the complete tail even when the snake is enormous. Once the
+        // quality cap is reached, distribute still-overlapping stamps over the
+        // full arc instead of cutting the body off at the cap.
+        const mobileCap = 220;
+        const desktopCap = 300;
+        const minCap = this.isMobile ? 205 : 260;
+        const stampCap = Math.max(minCap, Math.round((this.isMobile ? mobileCap : desktopCap) * qMul));
+        const drawStepWorld = Math.max(stampStepWorld, arcLen / Math.max(1, stampCap - 1));
+        const neededStamps = Math.ceil(arcLen / drawStepWorld) + 1;
         // Boost must never change how much of the body is rendered.
-        const mobileCap = 68;
-        const desktopCap = 76;
-        const stampCap = Math.round((this.isMobile ? mobileCap : desktopCap) * qMul);
         const maxStamps = Math.min(Math.max(neededStamps, 6), stampCap);
-        const bumps = this._interpolateSnakeDrawPath(segs, stampStepWorld, maxStamps, this._bumpsBuf);
+        const bumps = this._interpolateSnakeDrawPath(segs, drawStepWorld, maxStamps, this._bumpsBuf);
         if (bumps.length < 1) {
             ctx.restore();
             return;
