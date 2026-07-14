@@ -277,9 +277,9 @@ function WalletCard({ title, label, address, sol, usd, themeColor }) {
     );
 }
 
-function StatCard({ label, value, sub }) {
+function StatCard({ label, value, sub, accent }) {
     return (
-        <div className="admin-stat-card">
+        <div className="admin-stat-card" style={accent ? { background: accent.background, borderColor: accent.border, boxShadow: accent.shadow } : undefined}>
             <p className="label" style={{ marginBottom: '8px' }}>{label}</p>
             <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-1px' }}>
                 {value}
@@ -464,6 +464,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                                             <div><span style={{ color: 'var(--text-2)' }}>Joined</span><br />{formatDate(u.createdAt)}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Last activity</span><br />{formatDate(u.latestActivityAt)}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Reporting</span><br />{u.excludedFromReports ? 'Excluded' : 'Included'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Ownership</span><br />{u.isOwnerAccount ? 'Your account' : 'Player account'}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Deposit wallet</span><br /><span className="mono" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>{u.depositAddress}</span></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Withdraw address</span><br /><span className="mono" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>{u.wallet}</span></div>
                                         </div>
@@ -852,6 +853,17 @@ export default function AdminDashboard() {
         );
     };
 
+    const setSelectedOwnerStatus = (isOwnerAccount) => {
+        const ids = [...selectedUserIds];
+        if (!ids.length) return;
+        runAdminAction(
+            '/api/admin/users/owner-status',
+            isOwnerAccount
+                ? `Mark ${ids.length} selected account(s) as yours?\n\nTheir balances will appear in Your accounts and they will be exempt from shared-wallet reward alerts.`
+                : `Remove ${ids.length} selected account(s) from Your accounts?\n\nTheir deposit-wallet history will be checked against the normal reward alert rules.`,
+            { ids, isOwnerAccount },
+        );
+    };
     const applyTxFilters = (patch) => {
         const next = { ...txFilterRef.current, ...patch };
         setTxFilter(next);
@@ -1004,6 +1016,16 @@ export default function AdminDashboard() {
                                 <StatCard label="Platform earnings" value={formatUsd(overview?.ownerEarningsUsd)} sub={`${overview?.ownerSweepCount ?? 0} completed sweeps`} />
                                 <StatCard label="Rewards owed" value={formatUsd((overview?.totalSponsoredRewards ?? 0) + (overview?.totalRetainedWinnings ?? 0))} sub={`${overview?.activeSponsoredPlayers ?? 0} sponsored users`} />
                                 <StatCard label="Needs attention" value={rewardAlerts.filter(alert => alert.status === 'pending').length + pendingRewardClaims.length} sub="Reward alerts and unsettled claims" />
+                                <StatCard
+                                    label="Your accounts"
+                                    value={formatUsd(overview?.ownerAccountBalanceUsd)}
+                                    sub={`${overview?.ownerAccountCount ?? 0} owned account(s) · ${formatSol(overview?.ownerAccountBalanceSol)}`}
+                                    accent={{
+                                        background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(59,130,246,0.12))',
+                                        border: 'rgba(139,92,246,0.5)',
+                                        shadow: '0 12px 30px rgba(76,29,149,0.14)',
+                                    }}
+                                />
                             </div>
                         </div>
                     </div>
@@ -1410,6 +1432,8 @@ export default function AdminDashboard() {
                         <AdminFilterBar right={
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>{selectedUserIds.size} selected</span>
+                                <button type="button" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={() => setSelectedOwnerStatus(true)}>Add to your accounts</button>
+                                <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={() => setSelectedOwnerStatus(false)}>Remove ownership</button>
                                 <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={bulkExcludeUsers}>Exclude</button>
                                 <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={bulkRestoreUsers}>Restore</button>
                             </>
@@ -1486,7 +1510,9 @@ export default function AdminDashboard() {
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalRewardsBalance)}{u.rewardsDisabled && <div style={{ color: '#ef4444', fontSize: '0.68rem' }}>Blocked</div>}</td>
                                                     <td style={{ padding: '12px 16px' }}>{formatDuration(u.playtime)}</td>
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalDepositedUsd)}<div style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{u.depositCount} deposits</div></td>
-                                                    <td style={{ padding: '12px 16px' }}>                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : 'Active'}
+                                                    <td style={{ padding: '12px 16px' }}>                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : u.isOwnerAccount ? (
+                                                            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 'var(--r-full)', background: 'rgba(139,92,246,0.16)', color: '#a78bfa', fontSize: '0.72rem', fontWeight: 700 }}>Your account</span>
+                                                        ) : 'Active'}
                                                     </td>
                                                 </tr>
                                             );

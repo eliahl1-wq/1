@@ -347,6 +347,20 @@ export class SurvivRenderer {
         this.running = false;
         this._raf = null;
         this._lastFrameAt = performance.now();
+        this._frameNow = Date.now();
+        // Cached gradients to avoid per-frame allocation
+        this._cachedZoneGlowGrad = null;
+        this._cachedZoneGlowKey = '';
+        this._cachedVignetteGrad = null;
+        this._cachedVignetteKey = '';
+        this._cachedDangerGrad = null;
+        this._cachedDangerKey = '';
+        this._cachedLowAmmoGrad = null;
+        this._cachedLowAmmoKey = '';
+        // FPS counter
+        this._fpsFrames = 0;
+        this._fpsLastSampleAt = performance.now();
+        this._fpsDisplay = 0;
         this._onResize = () => this.resize();
         window.addEventListener('resize', this._onResize);
 
@@ -649,8 +663,8 @@ export class SurvivRenderer {
                 }
             }
         }
-        if (this.particles.length > 120) {
-            this.particles.splice(0, this.particles.length - 120);
+        if (this.particles.length > 80) {
+            this.particles.splice(0, this.particles.length - 80);
         }
         this.bullets = tick.bullets || [];
         // Static world snapshots may arrive less frequently than movement
@@ -1437,7 +1451,7 @@ export class SurvivRenderer {
         const py = this.me.y;
         const maxDist = 900;
 
-        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 8)}:${Math.round(py / 8)}`;
+        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 12)}:${Math.round(py / 12)}`;
         let polygon = this._losCachedPolygon;
         if (cacheKey !== this._losCacheKey || !polygon) {
             const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse);
@@ -1531,8 +1545,17 @@ export class SurvivRenderer {
     }
 
     draw(dt = 1 / 60) {
+        this._frameNow = Date.now();
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleCacheBuildsThisFrame = 0;
+        // FPS counter
+        this._fpsFrames++;
+        const fpsSampleElapsed = performance.now() - this._fpsLastSampleAt;
+        if (fpsSampleElapsed >= 500) {
+            this._fpsDisplay = Math.round(this._fpsFrames / (fpsSampleElapsed / 1000));
+            this._fpsFrames = 0;
+            this._fpsLastSampleAt = performance.now();
+        }
         if (this.externalCameraGetter) {
             const cam = this.externalCameraGetter();
             if (cam) {
@@ -1607,7 +1630,7 @@ export class SurvivRenderer {
         this.localShotTracers.length = liveTracerCount;
 
         // Interpolate remote players
-        const interpSpeed = clamp(dt * 12, 0.05, 0.6);
+        const interpSpeed = clamp(dt * 16, 0.05, 0.6);
         for (const [id, ip] of this._interpPlayers) {
             ip.x = lerp(ip.x, ip.targetX, interpSpeed);
             ip.y = lerp(ip.y, ip.targetY, interpSpeed);
@@ -1759,6 +1782,7 @@ export class SurvivRenderer {
         this.drawLowAmmoWarning(ctx, W, H);
         this.drawMinimapPanel(ctx, W, H);
         this.drawLootToast(ctx, W, H);
+        this.drawFpsCounter(ctx, W, H);
     }
 
     getTerrainPattern(ctx) {
@@ -1898,11 +1922,11 @@ export class SurvivRenderer {
         ctx.fill();
 
         // Animated zone border
-        const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.5;
+        const pulse = 0.5 + Math.sin(this._frameNow / 400) * 0.5;
         ctx.strokeStyle = `rgba(255, 80, 40, ${0.5 + pulse * 0.3})`;
         ctx.lineWidth = 3;
         ctx.setLineDash([12, 8]);
-        ctx.lineDashOffset = -(Date.now() / 40) % 20;
+        ctx.lineDashOffset = -(this._frameNow / 40) % 20;
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.stroke();
@@ -2295,7 +2319,7 @@ export class SurvivRenderer {
     }
 
     getObstacleHitShake(o) {
-        const elapsed = Date.now() - (o?._hitAt || 0);
+        const elapsed = this._frameNow - (o?._hitAt || 0);
         if (elapsed < 0 || elapsed >= 190) return { x: 0, y: 0 };
         const strength = (1 - elapsed / 190) * 4.2;
         const phase = elapsed * 0.11 + String(o.id || '').length;
@@ -2316,7 +2340,7 @@ export class SurvivRenderer {
         ctx.save();
         ctx.translate(o.x + shake.x, o.y + shake.y);
         ctx.rotate(o.rotation || 0);
-        const useSoftShadow = kind === 'tree' || kind === 'bush' || kind === 'rock';
+        const useSoftShadow = false; // Shadows baked into sprite cache instead
         ctx.shadowColor = useSoftShadow ? 'rgba(18, 22, 18, 0.32)' : 'transparent';
         ctx.shadowBlur = useSoftShadow ? 5 : 0;
         ctx.shadowOffsetY = useSoftShadow ? 4 : 0;
@@ -2910,7 +2934,7 @@ export class SurvivRenderer {
         const key = o.id + ':' + this._obstacleRevision;
         let sprite = this._obstacleSpriteCache.get(key);
         if (!sprite) {
-            if (this._obstacleCacheBuildsThisFrame >= 4) return false;
+            if (this._obstacleCacheBuildsThisFrame >= 8) return false;
             this._obstacleCacheBuildsThisFrame++;
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
@@ -2926,7 +2950,7 @@ export class SurvivRenderer {
             this.drawObstacle(cacheCtx, o, false);
             sprite = { canvas, width, height };
 
-            if (this._obstacleSpriteCache.size >= 192) {
+            if (this._obstacleSpriteCache.size >= 320) {
                 const oldestKey = this._obstacleSpriteCache.keys().next().value;
                 this._obstacleSpriteCache.delete(oldestKey);
             }
@@ -2945,7 +2969,7 @@ export class SurvivRenderer {
     drawLoot(ctx, l) {
         const color = LOOT_COLORS[l.type] || '#d5d5d5';
         const isChest = l.type === 'chest' || l.type === 'deathCrate';
-        const pulse = isChest ? 1 : (1 + Math.sin(Date.now() / 190 + l.x * 0.03) * 0.06);
+        const pulse = isChest ? 1 : (1 + Math.sin(this._frameNow / 190 + l.x * 0.03) * 0.06);
         ctx.save();
         ctx.translate(l.x, l.y);
         ctx.scale(pulse, pulse);
@@ -2954,7 +2978,7 @@ export class SurvivRenderer {
             const hovered = this.hoveredChestId === l.id;
             const isDeathCrate = l.type === 'deathCrate';
             const tierColor = isDeathCrate ? '#a855f7' : (RARITY_COLORS[l.tier] || '#d7c396');
-            const glowRad = 34 + Math.sin(Date.now() / 260 + l.x * 0.035) * 5;
+            const glowRad = 34 + Math.sin(this._frameNow / 260 + l.x * 0.035) * 5;
 
             // Base shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
@@ -2986,7 +3010,7 @@ export class SurvivRenderer {
             // Apply interactive glow when hovered
             if (hovered) {
                 ctx.shadowColor = palette.glow;
-                ctx.shadowBlur = 12 + Math.sin(Date.now() / 110) * 3;
+                ctx.shadowBlur = 12 + Math.sin(this._frameNow / 110) * 3;
             }
 
             if (isDeathCrate) {
@@ -3738,7 +3762,7 @@ export class SurvivRenderer {
                     ctx.strokeStyle = `rgba(255, 255, 255, ${proximity * 0.5})`;
                     ctx.lineWidth = 1.5;
                     ctx.setLineDash([4, 4]);
-                    ctx.lineDashOffset = -(Date.now() / 60) % 8;
+                    ctx.lineDashOffset = -(this._frameNow / 60) % 8;
                     ctx.beginPath();
                     ctx.arc(0, 0, 22, 0, Math.PI * 2);
                     ctx.stroke();
@@ -3819,7 +3843,7 @@ export class SurvivRenderer {
     }
 
     drawDeathMarkers(ctx, currentHouse) {
-        const now = Date.now();
+        const now = this._frameNow;
         for (const marker of this.deathMarkers) {
             if (!this.isPointInView(marker.x, marker.y, 80)) continue;
             const markerHouse = this.findHouseContainingPoint(marker.x, marker.y);
@@ -3895,10 +3919,11 @@ export class SurvivRenderer {
             ctx.scale(s, s);
         }
 
-        // Shadow
-        ctx.shadowColor = 'rgba(0,0,0,0.35)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 5;
+        // Shadow — cheap opaque ellipse instead of expensive shadowBlur
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(0, 5, r * 0.85, r * 0.35, 0, 0, Math.PI * 2);
+        ctx.fill();
 
         // Body circle — surviv.io style thick outline
         ctx.fillStyle = p.color || '#77c7c8';
@@ -3910,7 +3935,6 @@ export class SurvivRenderer {
         ctx.stroke();
 
         // Body highlight
-        ctx.shadowBlur = 0;
         ctx.fillStyle = 'rgba(255,255,255,0.22)';
         ctx.beginPath();
         ctx.arc(-3, -4, r * 0.32, 0, Math.PI * 2);
@@ -3942,8 +3966,8 @@ export class SurvivRenderer {
         }
 
         // Reload progress ring near weapon
-        if (p.reloading && p.reloadEndAtLocal && p.reloadMs && p.reloadEndAtLocal > Date.now()) {
-            const progress = clamp(1 - (p.reloadEndAtLocal - Date.now()) / p.reloadMs, 0, 1);
+        if (p.reloading && p.reloadEndAtLocal && p.reloadMs && p.reloadEndAtLocal > this._frameNow) {
+            const progress = clamp(1 - (p.reloadEndAtLocal - this._frameNow) / p.reloadMs, 0, 1);
             if (progress > 0 && progress < 1) {
                 const ringX = r + 12;
                 const ringY = -12;
@@ -4004,9 +4028,9 @@ export class SurvivRenderer {
 
         if (isMe) {
             drawBalanceBadge(ctx, p.x, p.y + r + 15, this.hud.balance ?? p.dollarBalance ?? 0, true);
-            if (this.hud.cashoutEndAt > Date.now()) {
+            if (this.hud.cashoutEndAt > this._frameNow) {
                 const total = this.hud.cashoutTotal || 10;
-                const left = Math.max(0, (this.hud.cashoutEndAt - Date.now()) / 1000);
+                const left = Math.max(0, (this.hud.cashoutEndAt - this._frameNow) / 1000);
                 const progress = 1 - left / total;
                 drawCashoutProgressRing(ctx, p.x, p.y, r + 12, progress, { counterClockwise: true });
             }
@@ -4021,7 +4045,7 @@ export class SurvivRenderer {
         let hands = null;
 
         if (weapon === 'fists') {
-            const now = Date.now();
+            const now = this._frameNow;
             const punching = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
@@ -4402,7 +4426,7 @@ export class SurvivRenderer {
             } else {
                 turbinePositions.push({ x: 0, y: -hh * 0.3 });
             }
-            const fanAngle = (Date.now() / 420) % (Math.PI * 2);
+            const fanAngle = (this._frameNow / 420) % (Math.PI * 2);
             turbinePositions.forEach(pos => {
                 ctx.save();
                 ctx.translate(pos.x, pos.y);
@@ -4895,7 +4919,7 @@ export class SurvivRenderer {
         if (!sprite) {
             // Spread cache creation across frames to avoid an entry stutter
             // when several roofs enter the viewport at the same time.
-            if (this._roofCacheBuildsThisFrame >= 2) return false;
+            if (this._roofCacheBuildsThisFrame >= 4) return false;
             this._roofCacheBuildsThisFrame++;
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
@@ -4911,7 +4935,7 @@ export class SurvivRenderer {
             this.drawHouseRoof(cacheCtx, o, false);
             sprite = { canvas, width, height };
 
-            if (this._roofSpriteCache.size >= 72) {
+            if (this._roofSpriteCache.size >= 128) {
                 const oldestKey = this._roofSpriteCache.keys().next().value;
                 this._roofSpriteCache.delete(oldestKey);
             }
@@ -4929,28 +4953,32 @@ export class SurvivRenderer {
     drawVignette(ctx, W, H) {
         ctx.save();
         const radius = Math.max(W, H) * 0.72;
-        const grad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
-        grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        grad.addColorStop(0.64, 'rgba(0, 0, 0, 0.08)');
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0.34)');
-        ctx.fillStyle = grad;
+        const vigKey = `${W}:${H}`;
+        if (vigKey !== this._cachedVignetteKey) {
+            this._cachedVignetteGrad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
+            this._cachedVignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            this._cachedVignetteGrad.addColorStop(0.64, 'rgba(0, 0, 0, 0.08)');
+            this._cachedVignetteGrad.addColorStop(1, 'rgba(0, 0, 0, 0.34)');
+            this._cachedDangerGrad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.38, W / 2, H / 2, radius * 0.96);
+            this._cachedDangerGrad.addColorStop(0, 'rgba(120, 0, 0, 0)');
+            this._cachedDangerGrad.addColorStop(1, 'rgba(220, 32, 32, 0.72)');
+            this._cachedVignetteKey = vigKey;
+        }
+        ctx.fillStyle = this._cachedVignetteGrad;
         ctx.fillRect(0, 0, W, H);
 
         const hpPct = clamp((this.hud.hp || 0) / (this.hud.maxHp || 100), 0, 1);
         if (hpPct > 0 && hpPct < 0.34) {
             ctx.globalAlpha = clamp((0.34 - hpPct) / 0.34, 0, 1) * 0.28;
-            const danger = ctx.createRadialGradient(W / 2, H / 2, radius * 0.38, W / 2, H / 2, radius * 0.96);
-            danger.addColorStop(0, 'rgba(120, 0, 0, 0)');
-            danger.addColorStop(1, 'rgba(220, 32, 32, 0.72)');
-            ctx.fillStyle = danger;
+            ctx.fillStyle = this._cachedDangerGrad;
             ctx.fillRect(0, 0, W, H);
         }
         ctx.restore();
     }
 
     drawLootToast(ctx, W, H) {
-        if (!this.lootToast || this.lootToast.expiresAt < Date.now()) return;
-        const now = Date.now();
+        if (!this.lootToast || this.lootToast.expiresAt < this._frameNow) return;
+        const now = this._frameNow;
         const items = this.lootToast.items || {};
         const lines = [];
         if (items.weaponLabel) lines.push(`+ ${items.weaponLabel}`);
@@ -5156,7 +5184,7 @@ export class SurvivRenderer {
     }
 
     drawDamageNumbers(ctx, currentHouse = null, currentRoom = null) {
-        const now = Date.now();
+        const now = this._frameNow;
         this.damageNumbers = this.damageNumbers.filter(d => now - d.spawnedAt < d.duration);
         if (this.damageNumbers.length === 0) return;
         ctx.save();
@@ -5187,7 +5215,7 @@ export class SurvivRenderer {
     }
 
     drawDamageIndicators(ctx, W, H) {
-        const now = Date.now();
+        const now = this._frameNow;
         this.damageIndicators = this.damageIndicators.filter(d => now - d.spawnedAt < d.duration);
         if (this.damageIndicators.length === 0) return;
         const cx = W / 2;
@@ -5227,7 +5255,7 @@ export class SurvivRenderer {
     }
 
     drawHitMarkers(ctx, W, H) {
-        const now = Date.now();
+        const now = this._frameNow;
         this.hitMarkers = this.hitMarkers.filter(h => now - h.spawnedAt < h.duration);
         if (this.hitMarkers.length === 0) return;
         const cx = W / 2;
@@ -5264,7 +5292,7 @@ export class SurvivRenderer {
     }
 
     drawKillAnimation(ctx, W, H) {
-        const now = Date.now();
+        const now = this._frameNow;
         this.killAnimations = this.killAnimations.filter(animation => now - animation.spawnedAt < animation.duration);
         const animation = this.killAnimations[this.killAnimations.length - 1];
         if (!animation) return;
@@ -5306,7 +5334,7 @@ export class SurvivRenderer {
     }
     drawKillFeed(ctx, W, H) {
         if (this.killFeed.length === 0) return;
-        const now = Date.now();
+        const now = this._frameNow;
         const maxShow = 5;
         const entries = this.killFeed.slice(-maxShow);
 
@@ -5353,13 +5381,30 @@ export class SurvivRenderer {
     drawLowAmmoWarning(ctx, W, H) {
         if (this._lowAmmoPulse <= 0) return;
         ctx.save();
-        const pulse = 0.5 + Math.sin(Date.now() / 200) * 0.5;
+        const pulse = 0.5 + Math.sin(this._frameNow / 200) * 0.5;
         ctx.globalAlpha = this._lowAmmoPulse * pulse * 0.25;
-        const grad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
-        grad.addColorStop(0, 'rgba(255, 160, 0, 0)');
-        grad.addColorStop(1, 'rgba(255, 160, 0, 0.5)');
-        ctx.fillStyle = grad;
+        const lowAmmoKey = `${W}:${H}`;
+        if (lowAmmoKey !== this._cachedLowAmmoKey) {
+            this._cachedLowAmmoGrad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+            this._cachedLowAmmoGrad.addColorStop(0, 'rgba(255, 160, 0, 0)');
+            this._cachedLowAmmoGrad.addColorStop(1, 'rgba(255, 160, 0, 0.5)');
+            this._cachedLowAmmoKey = lowAmmoKey;
+        }
+        ctx.fillStyle = this._cachedLowAmmoGrad;
         ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+    }
+
+    drawFpsCounter(ctx, W, H) {
+        const fps = this._fpsDisplay;
+        if (!fps) return;
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = fps >= 120 ? '#55d875' : fps >= 60 ? '#ffd45a' : '#ef544f';
+        ctx.font = '700 12px "Space Mono", monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`${fps} FPS`, W - 10, H - 22);
         ctx.restore();
     }
 
@@ -5388,13 +5433,13 @@ export class SurvivRenderer {
             droplets,
         });
         // Cap to prevent memory leaks
-        if (this.bloodDecals.length > 90) {
+        if (this.bloodDecals.length > 50) {
             this.bloodDecals.shift();
         }
     }
 
     drawBloodDecals(ctx) {
-        const now = Date.now();
+        const now = this._frameNow;
         for (let i = this.bloodDecals.length - 1; i >= 0; i--) {
             const d = this.bloodDecals[i];
             let alpha = d.opacity;

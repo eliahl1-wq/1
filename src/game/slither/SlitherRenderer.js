@@ -1790,8 +1790,8 @@ export class SlitherRenderer {
         // Keep the complete tail even when the snake is enormous. Once the
         // quality cap is reached, distribute still-overlapping stamps over the
         // full arc instead of cutting the body off at the cap.
-        const mobileCap = 220;
-        const desktopCap = 300;
+        const mobileCap = 1500;
+        const desktopCap = 3000;
         const minCap = this.isMobile ? 205 : 260;
         const stampCap = Math.max(minCap, Math.round((this.isMobile ? mobileCap : desktopCap) * qMul));
         const drawStepWorld = Math.max(stampStepWorld, arcLen / Math.max(1, stampCap - 1));

@@ -91,7 +91,22 @@ const regulatePoint = (point, borders) => ({
     y: valueInRange(borders.top, borders.bottom, point.y)
 });
 
+const cellStates = new Map();
+
 function drawOrganicCell(cell, borders, graph, allCells = [], highQuality = false) {
+    if (!cell.id) return; // Fallback if id is missing
+    let state = cellStates.get(cell.id);
+    if (!state) {
+        state = { radius: cell.radius, wobble: 0 };
+        cellStates.set(cell.id, state);
+    }
+    
+    if (cell.radius > state.radius + 0.1) {
+        state.wobble = Math.min(state.wobble + (cell.radius - state.radius) * 1.5, cell.radius * 0.2);
+    }
+    state.radius = cell.radius;
+    state.wobble *= 0.85; // Decay
+
     // Dynamiskt antal punkter baserat på storlek för prestanda/utseende
     const minPoints = highQuality ? 28 : 24;
     const maxPoints = highQuality ? 68 : 60;
@@ -114,7 +129,9 @@ function drawOrganicCell(cell, borders, graph, allCells = [], highQuality = fals
     for (let i = 0; i < pointCount; i++) {
         let theta = (i / pointCount) * FULL_ANGLE;
         // Wobble skapar den "slimiga" effekten (vibration i kanterna)
-        let wobble = Math.sin(time + theta * 5) * (cell.radius * 0.02);
+        let baseWobble = Math.sin(time + theta * 5) * (cell.radius * 0.02);
+        let eatWobble = Math.sin(time * 4 + theta * 6) * state.wobble;
+        let wobble = baseWobble + eatWobble;
         // Stretch deformerar cirkeln i den riktning den rör sig (dämpad för mindre motion blur)
         let stretch = Math.cos(theta - moveAngle) * (speed * 0.35);
         

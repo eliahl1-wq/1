@@ -470,7 +470,7 @@ export default function SurvivGame() {
 
         const socket = io(API_URL, {
             auth: { token: authToken, presenceId: getOrCreatePresenceId() },
-            transports: ['polling', 'websocket'],
+            transports: ['websocket', 'polling'],
             reconnection: true,
         });
         socketRef.current = socket;
@@ -695,7 +695,7 @@ export default function SurvivGame() {
                 closeChestPendingRef.current = false;
             }
             socket.emit('survivInput', payload);
-        }, 1000 / 20);
+        }, 1000 / 30);
 
         if (!blockAutoJoinRef.current) {
             const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';

@@ -376,6 +376,7 @@ function gameLoop() {
             let borderColor = 'hsl(' + users[i].hue + ', 100%, 45%)';
             for (var j = 0; j < users[i].cells.length; j++) {
                 cellsToDraw.push({
+                    id: users[i].cells[j].id,
                     color: color,
                     borderColor: borderColor,
                     mass: users[i].cells[j].mass,
