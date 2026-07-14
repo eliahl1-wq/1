@@ -1,6 +1,6 @@
-export const ENTRY_TIERS = [5, 10, 20];
+export const ENTRY_TIERS = [2, 5, 10, 20];
 export const BR_ENTRY_TIERS = [5, 10];
-export const COMPETITIVE_ENTRY_TIERS = [2, 5];
+export const COMPETITIVE_ENTRY_TIERS = [1, 2, 5];
 export const SURVIV_ENTRY_TIERS = [5];
 export const DEFAULT_ENTRY_FEE = 10;
 /** Lowest stake tier across all modes — lobby only when balance is below this. */
@@ -45,10 +45,10 @@ export function tierEconomy(entryFeeUsd) {
     };
 }
 
-/** Slither Arena economy for $2 / $5 tiers (separate pools). */
+/** Slither Arena economy for $1 / $2 / $5 tiers (separate pools). */
 export function competitiveTierEconomy(entryFeeUsd) {
     const entry = normalizeCompetitiveEntryFee(entryFeeUsd);
-    const cashoutFeePct = entry === 2 ? 0.05 : 0.035;
+    const cashoutFeePct = entry <= 2 ? 0.05 : 0.035;
     return {
         entryFee: entry,
         dollarStart: entry,
