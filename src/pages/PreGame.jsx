@@ -217,7 +217,7 @@ export default function PreGame() {
         playersByEntryFee: {},
         playersByModeAndFee: { agar: {}, slither: {} },
         brPlayersByFee: {},
-        playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0, competitiveSlither: 0 },
+        playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0, competitiveSlither: 0, surviv: 0 },
         siteUsersOnline: 0,
     });
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
@@ -411,7 +411,14 @@ export default function PreGame() {
     }, [user?.isAdmin, brAvailable, isAlreadyInGame]);
 
 
-    const siteUsersOnline = (liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0) + (liveStats.totalBotsOnline ?? 0);
+    const playingCountKey = selectedMode === 'br-agar'
+        ? 'brAgar'
+        : selectedMode === 'br-slither'
+            ? 'brSlither'
+            : selectedMode === 'competitive-slither'
+                ? 'competitiveSlither'
+                : selectedMode;
+    const modePlayingCount = liveStats.playersByGamemode?.[playingCountKey] ?? 0;
     const globalCashoutTotalUsd =
         liveStats.globalPlayerEarningsUsd
         ?? liveStats.totalUserBalanceUsd
@@ -1421,7 +1428,7 @@ export default function PreGame() {
                                     <div className="mode-playing-count">
                                         <span className="live-dot" aria-hidden="true" />
                                         <span>
-                                            Playing: <span className="mono">{siteUsersOnline}</span>
+                                            Playing: <span className="mono">{modePlayingCount}</span>
                                         </span>
                                     </div>
                                     <button
