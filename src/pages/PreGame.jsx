@@ -411,14 +411,7 @@ export default function PreGame() {
     }, [user?.isAdmin, brAvailable, isAlreadyInGame]);
 
 
-    const playingCountKey = selectedMode === 'br-agar'
-        ? 'brAgar'
-        : selectedMode === 'br-slither'
-            ? 'brSlither'
-            : selectedMode === 'competitive-slither'
-                ? 'competitiveSlither'
-                : selectedMode;
-    const modePlayingCount = liveStats.playersByGamemode?.[playingCountKey] ?? 0;
+    const siteUsersOnline = (liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0) + (liveStats.totalBotsOnline ?? 0);
     const globalCashoutTotalUsd =
         liveStats.globalPlayerEarningsUsd
         ?? liveStats.totalUserBalanceUsd
@@ -1428,7 +1421,7 @@ export default function PreGame() {
                                     <div className="mode-playing-count">
                                         <span className="live-dot" aria-hidden="true" />
                                         <span>
-                                            Playing: <span className="mono">{modePlayingCount}</span>
+                                            Playing: <span className="mono">{siteUsersOnline}</span>
                                         </span>
                                     </div>
                                     <button
