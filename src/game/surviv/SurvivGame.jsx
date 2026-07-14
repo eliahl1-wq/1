@@ -219,6 +219,25 @@ export default function SurvivGame() {
     ));
     const [showResultModal, setShowResultModal] = useState(() => !!pendingAtMount);
     const [isSpectating, setIsSpectating] = useState(false);
+    const [inventoryDrag, setInventoryDrag] = useState(null);
+
+    const beginInventoryDrag = (event, payload) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('application/x-surviv-inventory-item', JSON.stringify(payload));
+        event.dataTransfer.setData('text/plain', 'surviv-inventory-item');
+        setInventoryDrag(payload);
+    };
+
+    const readInventoryDrag = (event) => {
+        try {
+            const raw = event.dataTransfer.getData('application/x-surviv-inventory-item');
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const finishInventoryDrag = () => setInventoryDrag(null);
     const [isRejoining, setIsRejoining] = useState(false);
     const [sessionStats, setSessionStatsState] = useState(() => (
         pendingAtMount
@@ -948,7 +967,10 @@ export default function SurvivGame() {
                     {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
                         const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
-                        const isActive = me.activeWeaponSlot === slotIdx;
+                        const activeSlot = Number.isInteger(me.activeWeaponSlot)
+                            ? me.activeWeaponSlot
+                            : (me.inventory?.weapons?.indexOf(me.weapon) ?? 0);
+                        const isActive = activeSlot === slotIdx;
                         const isReloading = isActive && me.reloading;
                         const reloadDuration = Math.max(1, Number(me.reloadMs) || 1);
                         const reloadRemaining = Math.max(0, Number(me.reloadRemainingMs) || 0);
@@ -1050,19 +1072,18 @@ export default function SurvivGame() {
                     aria-modal="true"
                     aria-labelledby="surviv-inventory-title"
                     onClick={handleCloseInventory}
-                    onDragOver={(e) => e.preventDefault()}
+                    onDragOver={(e) => {
+                        if (readInventoryDrag(e)?.source === 'backpack') e.preventDefault();
+                    }}
                     onDrop={(e) => {
                         e.preventDefault();
-                        const itemData = e.dataTransfer.getData('text/plain');
-                        if (itemData.startsWith('backpack-')) {
-                            const key = itemData.replace('backpack-', '');
-                            if (key.startsWith('weapon-')) {
-                                const slotIdx = parseInt(key.replace('weapon-', ''), 10);
-                                dropItemPendingRef.current = { itemKey: 'weapon', slotIdx };
-                            } else {
-                                dropItemPendingRef.current = { itemKey: key };
-                            }
+                        const dragged = readInventoryDrag(e);
+                        if (dragged?.source === 'backpack') {
+                            dropItemPendingRef.current = dragged.key === 'weapon'
+                                ? { itemKey: 'weapon', slotIdx: dragged.slotIdx }
+                                : { itemKey: dragged.key };
                         }
+                        finishInventoryDrag();
                     }}
                 >
                     <div className={`surviv-inventory-container ${!me.openedContainer ? 'backpack-only' : 'has-chest'}`} onClick={(e) => e.stopPropagation()}>
@@ -1081,14 +1102,18 @@ export default function SurvivGame() {
                         <div className="surviv-inventory-body">
                             {/* Left Column: Player Backpack */}
                             <div 
-                                className="surviv-inventory-panel player-backpack"
-                                onDragOver={(e) => e.preventDefault()}
+                                className={`surviv-inventory-panel player-backpack ${inventoryDrag?.source === 'chest' ? 'is-drop-target' : ''}`}
+                                onDragOver={(e) => {
+                                    if (readInventoryDrag(e)?.source === 'chest') e.preventDefault();
+                                }}
                                 onDrop={(e) => {
                                     e.preventDefault();
-                                    const itemKey = e.dataTransfer.getData('text/plain');
-                                    if (itemKey && me.openedContainer?.id && !itemKey.startsWith('backpack-')) {
-                                        takeChestItemPendingRef.current = { chestId: me.openedContainer.id, itemKey };
+                                    e.stopPropagation();
+                                    const dragged = readInventoryDrag(e);
+                                    if (dragged?.source === 'chest' && me.openedContainer?.id) {
+                                        takeChestItemPendingRef.current = { chestId: me.openedContainer.id, itemKey: dragged.key };
                                     }
+                                    finishInventoryDrag();
                                 }}
                             >
                                 <h3 className="panel-title">
@@ -1103,7 +1128,10 @@ export default function SurvivGame() {
                                         {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
                                             const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
-                                            const isActive = me.activeWeaponSlot === slotIdx;
+                                            const activeSlot = Number.isInteger(me.activeWeaponSlot)
+                                                ? me.activeWeaponSlot
+                                                : (me.inventory?.weapons?.indexOf(me.weapon) ?? 0);
+                                            const isActive = activeSlot === slotIdx;
                                             
                                             const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
                                             const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
@@ -1114,9 +1142,10 @@ export default function SurvivGame() {
                                                     draggable={!!weaponId && weaponId !== 'fists'}
                                                     onDragStart={(e) => {
                                                         if (weaponId && weaponId !== 'fists') {
-                                                            e.dataTransfer.setData('text/plain', `backpack-weapon-${slotIdx}`);
+                                                            beginInventoryDrag(e, { source: 'backpack', key: 'weapon', slotIdx, weaponType: weaponId });
                                                         }
                                                     }}
+                                                    onDragEnd={finishInventoryDrag}
                                                     onClick={() => {
                                                         if (weaponId) {
                                                             equipSlotPendingRef.current = slotIdx;
@@ -1178,12 +1207,15 @@ export default function SurvivGame() {
                                             draggable={(me.inventory?.medkits || 0) > 0}
                                             onDragStart={(e) => {
                                                 if ((me.inventory?.medkits || 0) > 0) {
-                                                    e.dataTransfer.setData('text/plain', 'backpack-medkits');
+                                                    beginInventoryDrag(e, { source: 'backpack', key: 'medkits' });
                                                 }
                                             }}
+                                            onDragEnd={finishInventoryDrag}
                                             onClick={() => {
                                                 const qty = me.inventory?.medkits || 0;
-                                                if (qty > 0) {
+                                                if (qty > 0 && me.openedContainer?.id) {
+                                                    putChestItemPendingRef.current = { chestId: me.openedContainer.id, itemKey: 'medkits' };
+                                                } else if (qty > 0) {
                                                     useMedkitPendingRef.current = true;
                                                 }
                                             }}
@@ -1197,7 +1229,7 @@ export default function SurvivGame() {
                                             </div>
                                             {(me.inventory?.medkits || 0) > 0 && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
-                                                    <span className="item-action-badge" style={{ position: 'static' }}>HEAL</span>
+                                                    <span className="item-action-badge" style={{ position: 'static', color: me.openedContainer ? '#a855f7' : undefined }}>{me.openedContainer ? 'DEPOSIT' : 'HEAL'}</span>
                                                     <button 
                                                         className="slot-drop-btn" 
                                                         style={{
@@ -1227,9 +1259,10 @@ export default function SurvivGame() {
                                             draggable={(me.inventory?.ammoPacks || 0) > 0}
                                             onDragStart={(e) => {
                                                 if ((me.inventory?.ammoPacks || 0) > 0) {
-                                                    e.dataTransfer.setData('text/plain', 'backpack-ammoPacks');
+                                                    beginInventoryDrag(e, { source: 'backpack', key: 'ammoPacks' });
                                                 }
                                             }}
+                                            onDragEnd={finishInventoryDrag}
                                             onClick={() => {
                                                 const qty = me.inventory?.ammoPacks || 0;
                                                 const isChestOpen = !!me.openedContainer;
@@ -1283,9 +1316,10 @@ export default function SurvivGame() {
                                             draggable={(me.armor || 0) > 0}
                                             onDragStart={(e) => {
                                                 if ((me.armor || 0) > 0) {
-                                                    e.dataTransfer.setData('text/plain', 'backpack-armor');
+                                                    beginInventoryDrag(e, { source: 'backpack', key: 'armor' });
                                                 }
                                             }}
+                                            onDragEnd={finishInventoryDrag}
                                             onClick={() => {
                                                 const isChestOpen = !!me.openedContainer;
                                                 if ((me.armor || 0) > 0 && isChestOpen) {
@@ -1349,31 +1383,20 @@ export default function SurvivGame() {
                             {/* Right Column: Chest Inventory */}
                             {me.openedContainer && (
                                 <div 
-                                    className="surviv-inventory-panel chest-loot-panel"
-                                    onDragOver={(e) => e.preventDefault()}
+                                    className={`surviv-inventory-panel chest-loot-panel ${inventoryDrag?.source === 'backpack' ? 'is-drop-target' : ''}`}
+                                    onDragOver={(e) => {
+                                        if (readInventoryDrag(e)?.source === 'backpack') e.preventDefault();
+                                    }}
                                     onDrop={(e) => {
                                         e.preventDefault();
-                                        const itemData = e.dataTransfer.getData('text/plain');
-                                        if (itemData.startsWith('backpack-') && me.openedContainer?.id) {
-                                            const key = itemData.replace('backpack-', '');
-                                            if (key.startsWith('weapon-')) {
-                                                const slotIdx = parseInt(key.replace('weapon-', ''), 10);
-                                                const weaponType = me.inventory?.weapons?.[slotIdx];
-                                                if (weaponType && weaponType !== 'fists') {
-                                                    putChestItemPendingRef.current = {
-                                                        chestId: me.openedContainer.id,
-                                                        itemKey: 'weapon',
-                                                        weaponType: weaponType,
-                                                        slotIdx
-                                                    };
-                                                }
-                                            } else {
-                                                putChestItemPendingRef.current = {
-                                                    chestId: me.openedContainer.id,
-                                                    itemKey: key
-                                                };
-                                            }
+                                        e.stopPropagation();
+                                        const dragged = readInventoryDrag(e);
+                                        if (dragged?.source === 'backpack' && me.openedContainer?.id) {
+                                            putChestItemPendingRef.current = dragged.key === 'weapon'
+                                                ? { chestId: me.openedContainer.id, itemKey: 'weapon', weaponType: dragged.weaponType, slotIdx: dragged.slotIdx }
+                                                : { chestId: me.openedContainer.id, itemKey: dragged.key };
                                         }
+                                        finishInventoryDrag();
                                     }}
                                 >
                                     <h3 className="panel-title">
@@ -1417,8 +1440,9 @@ export default function SurvivGame() {
                                                         className={`chest-item-card rarity-card-${rarityClass}`}
                                                         draggable
                                                         onDragStart={(e) => {
-                                                            e.dataTransfer.setData('text/plain', item.key);
+                                                            beginInventoryDrag(e, { source: 'chest', key: item.key });
                                                         }}
+                                                        onDragEnd={finishInventoryDrag}
                                                         onClick={() => {
                                                             if (me.openedContainer?.id) {
                                                                 takeChestItemPendingRef.current = { chestId: me.openedContainer.id, itemKey: item.key };

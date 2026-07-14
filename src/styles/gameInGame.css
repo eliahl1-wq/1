@@ -1,4 +1,4 @@
-﻿/* In-game HUD + overlays — mobile (touch) layout tweaks */
+/* In-game HUD + overlays — mobile (touch) layout tweaks */
 
 .game-viewport--mobile .modern-overlay-card {
     padding: 28px 22px;
@@ -1805,6 +1805,25 @@
 .surviv-game-page .surviv-inventory-panel {
     background: rgba(15, 18, 14, 0.46);
     border-color: rgba(230, 210, 160, 0.09);
+    transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.surviv-game-page .surviv-inventory-panel.is-drop-target {
+    background: rgba(20, 66, 43, 0.62);
+    border-color: rgba(20, 241, 149, 0.78);
+    box-shadow: inset 0 0 0 1px rgba(20, 241, 149, 0.18), 0 0 18px rgba(20, 241, 149, 0.12);
+}
+
+.surviv-game-page .weapon-slot-card[draggable="true"],
+.surviv-game-page .item-slot-card[draggable="true"],
+.surviv-game-page .chest-item-card[draggable="true"] {
+    cursor: grab;
+}
+
+.surviv-game-page .weapon-slot-card[draggable="true"]:active,
+.surviv-game-page .item-slot-card[draggable="true"]:active,
+.surviv-game-page .chest-item-card[draggable="true"]:active {
+    cursor: grabbing;
 }
 
 .surviv-game-page .weapon-slot-card,
