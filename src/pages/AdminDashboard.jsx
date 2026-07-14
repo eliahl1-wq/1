@@ -229,11 +229,245 @@ function FilterSelect({ label, value, onChange, options, style }) {
     );
 }
 
+    { value: 'sweep', label: 'Owner sweeps' },
+];
+
+const TX_TYPE_OPTIONS = [
+    { value: '', label: 'All types' },
+    { value: 'deposit', label: 'Deposit' },
+    { value: 'withdraw', label: 'Withdraw' },
+    { value: 'game', label: 'Game' },
+];
+
+const LIVE_CATEGORY_FILTERS = [
+    { value: '', label: 'All activity' },
+    { value: 'entry', label: 'Entries' },
+    { value: 'cashout', label: 'Cashouts' },
+    { value: 'death', label: 'Deaths' },
+    { value: 'deposit', label: 'Deposits' },
+    { value: 'withdraw', label: 'Withdrawals' },
+    { value: 'sweep', label: 'Sweeps' },
+];
+
+function formatUsd(n) {
+    return `$${Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatSol(n) {
+    if (n == null) return '—';
+    return `${Number(n).toFixed(4)} SOL`;
+}
+
+function formatDate(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString();
+}
+
+function formatRelativeTime(d) {
+    if (!d) return '—';
+    const ms = Date.now() - new Date(d).getTime();
+    if (ms < 5000) return 'just now';
+    if (ms < 60000) return `${Math.floor(ms / 1000)}s ago`;
+    if (ms < 3600000) return `${Math.floor(ms / 60000)}m ago`;
+    if (ms < 86400000) return `${Math.floor(ms / 3600000)}h ago`;
+    return formatDate(d);
+}
+
+function formatCountdown(ms) {
+    if (ms == null || ms <= 0) return '00:00:00';
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+}
+
+function formatDuration(ms) {
+    if (!ms) return '—';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m} min`;
+}
+
+function classifyTxCategory(tx) {
+    const m = tx.meta || {};
+    if (tx.type === 'deposit') return 'deposit';
+    if (['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset'].includes(m.event)) return 'sweep';
+    if (tx.type === 'game') {
+        if (m.event === 'join' || m.event === 'br_join') return 'entry';
+        if (m.reason === 'Arena Death' || m.reason === 'BR Eliminated') return 'death';
+        if (m.event === 'br_refund') return 'refund';
+        return 'game';
+    }
+    if (tx.type === 'withdraw') {
+        if (/Arena Cashout|Admin Forced|Auto Room Reset|BR Victory/i.test(m.reason || '')) return 'cashout';
+        return 'withdraw';
+    }
+    return 'other';
+}
+
+function txActivityLabelClient(tx) {
+    const m = tx.meta || {};
+    const cat = classifyTxCategory(tx);
+    switch (cat) {
+        case 'deposit': return 'Deposit';
+        case 'withdraw': return 'Withdrawal';
+        case 'entry':
+            if (m.event === 'br_join') return `BR entry · $${m.entryFeeUsd ?? '?'}`;
+            return `Arena entry · ${m.mode || 'agar'} · $${m.entryFeeUsd ?? '?'}`;
+        case 'cashout': return m.reason || 'Cashout';
+        case 'death': return m.reason || 'Eliminated';
+        case 'refund': return 'BR refund';
+        case 'sweep': return m.reason || 'Owner sweep';
+        default: return m.reason || m.event || tx.type;
+    }
+}
+
+function truncateAddr(addr) {
+    if (!addr || addr === '—') return '—';
+    return addr.length > 16 ? `${addr.slice(0, 8)}…${addr.slice(-6)}` : addr;
+}
+
+function OutcomeBadge({ outcome }) {
+    const colors = {
+        Win: { bg: 'rgba(34,197,94,0.12)', color: 'var(--green)' },
+        Loss: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
+        'Break-even': { bg: 'rgba(234,179,8,0.12)', color: 'var(--yellow)' },
+        excluded: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
+    };
+    const style = colors[outcome] || { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-2)' };
+    return (
+        <span style={{
+            display: 'inline-block',
+            padding: '3px 10px',
+            borderRadius: 'var(--r-full)',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            background: style.bg,
+            color: style.color,
+        }}>
+            {outcome}
+        </span>
+    );
+}
+
+function TypeBadge({ type }) {
+    const colors = { deposit: 'var(--green)', withdraw: 'var(--blue)', game: 'var(--yellow)' };
+    return (
+        <span style={{ fontWeight: 700, fontSize: '0.72rem', color: colors[type] || 'var(--text)' }}>
+            {type}
+        </span>
+    );
+}
+
+const CATEGORY_STYLES = {
+    deposit: { bg: 'rgba(34,197,94,0.12)', color: 'var(--green)' },
+    withdraw: { bg: 'rgba(59,130,246,0.12)', color: 'var(--blue)' },
+    entry: { bg: 'rgba(234,179,8,0.12)', color: 'var(--yellow)' },
+    cashout: { bg: 'rgba(34,197,94,0.18)', color: '#22c55e' },
+    death: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
+    sweep: { bg: 'rgba(168,85,247,0.12)', color: '#a855f7' },
+    refund: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
+    game: { bg: 'rgba(234,179,8,0.08)', color: 'var(--yellow)' },
+    other: { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-2)' },
+};
+
+function CategoryBadge({ category }) {
+    const style = CATEGORY_STYLES[category] || CATEGORY_STYLES.other;
+    const labels = {
+        deposit: 'Deposit',
+        withdraw: 'Withdrawal',
+        entry: 'Entry',
+        cashout: 'Cashout',
+        death: 'Death',
+        sweep: 'Sweep',
+        refund: 'Refund',
+        game: 'Game',
+        other: 'Other',
+    };
+    return (
+        <span style={{
+            display: 'inline-block',
+            padding: '3px 10px',
+            borderRadius: 'var(--r-full)',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            background: style.bg,
+            color: style.color,
+        }}>
+            {labels[category] || category}
+        </span>
+    );
+}
+
+function LiveIndicator({ active }) {
+    if (!active) return null;
+    return (
+        <span className="admin-live-dot" title="Auto-refreshing">
+            <span className="admin-live-dot-pulse" />
+            LIVE
+        </span>
+    );
+}
+
+function FilterSelect({ label, value, onChange, options, style }) {
+    return (
+        <label className="admin-filter-field" style={style}>
+            {label && <span className="admin-filter-label">{label}</span>}
+            <select className="admin-filter-select" value={value} onChange={onChange}>
+                {options.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+            </select>
+        </label>
+    );
+}
+
 function AdminFilterBar({ children, right }) {
     return (
         <div className="admin-filter-bar">
             <div className="admin-filter-bar-left">{children}</div>
             {right && <div className="admin-filter-bar-right">{right}</div>}
+        </div>
+    );
+}
+
+function WalletCard({ title, label, address, sol, usd, themeColor }) {
+    return (
+        <div style={{
+            background: `linear-gradient(145deg, ${themeColor}15 0%, ${themeColor}05 100%)`,
+            border: `1px solid ${themeColor}30`,
+            borderRadius: 'var(--r-xl)',
+            padding: '24px',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: `0 8px 32px -8px ${themeColor}20`
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', position: 'relative', zIndex: 2 }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-h)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</p>
+                {label && <span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: '12px', background: `${themeColor}20`, color: themeColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>}
+            </div>
+            {address && <p className="mono" style={{ margin: '0 0 20px', fontSize: '0.75rem', color: 'var(--text-3)', position: 'relative', zIndex: 2 }}>{truncateAddr(address)}</p>}
+            
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', position: 'relative', zIndex: 2 }}>
+                <p style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-1.5px', textShadow: `0 2px 10px ${themeColor}40` }}>{sol}</p>
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-2)', position: 'relative', zIndex: 2 }}>{usd}</p>
+            
+            <div style={{
+                position: 'absolute',
+                right: '-40px',
+                bottom: '-40px',
+                width: '160px',
+                height: '160px',
+                background: themeColor,
+                opacity: 0.15,
+                filter: 'blur(40px)',
+                borderRadius: '50%',
+                pointerEvents: 'none',
+                zIndex: 1
+            }} />
         </div>
     );
 }
@@ -913,10 +1147,50 @@ export default function AdminDashboard() {
                 </div>
 
                 {tab === 'overview' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                         <div>
-                            <h3 style={{ margin: '0 0 12px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                At a glance
+                            <h3 style={{ margin: '0 0 16px', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-h)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                🔗 Actual On-Chain Wallets
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
+                                <WalletCard 
+                                    title="Main House" 
+                                    label="Automated"
+                                    address={wallets?.mainHouse?.address} 
+                                    sol={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} 
+                                    usd={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : '—'} 
+                                    themeColor="#3b82f6"
+                                />
+                                <WalletCard 
+                                    title="Reward Wallet" 
+                                    label="Sponsors & Tourneys"
+                                    address={wallets?.rewardWallet?.address} 
+                                    sol={wallets?.rewardWallet ? formatSol(wallets.rewardWallet.balanceSol) : '—'} 
+                                    usd={wallets?.rewardWallet ? formatUsd(wallets.rewardWallet.balanceUsd) : '—'} 
+                                    themeColor="#a855f7"
+                                />
+                                <WalletCard 
+                                    title="Owner Vault" 
+                                    label="Profits"
+                                    address={wallets?.ownerVault?.address} 
+                                    sol={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'} 
+                                    usd={wallets?.ownerVault ? formatUsd(wallets.ownerVault.balanceUsd) : '—'} 
+                                    themeColor="#22c55e"
+                                />
+                                <WalletCard 
+                                    title="BR Wallets (Sum)" 
+                                    label="Matches"
+                                    address={wallets?.brWallets?.length ? `${wallets.brWallets.length} active wallets` : 'None active'}
+                                    sol={wallets?.brWallets ? formatSol(wallets.brWallets.reduce((acc, w) => acc + w.balanceSol, 0)) : '0.0000 SOL'} 
+                                    usd={wallets?.brWallets ? formatUsd(wallets.brWallets.reduce((acc, w) => acc + w.balanceUsd, 0)) : '$0.00'} 
+                                    themeColor="#f59e0b"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 style={{ margin: '0 0 16px', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-h)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                📊 Bookkeeping & Stats
                             </h3>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
                                 <StatCard label="Online now" value={(activeUsers?.sitePresence?.length ?? 0) + (activeUsers?.currentlyInGame ?? 0)} sub={`${activeUsers?.currentlyInGame ?? 0} playing · ${activeUsers?.sitePresence?.length ?? 0} browsing`} />
@@ -927,30 +1201,6 @@ export default function AdminDashboard() {
                                 <StatCard label="Needs attention" value={rewardAlerts.filter(alert => alert.status === 'pending').length + pendingRewardClaims.length} sub="Reward alerts and unsettled claims" />
                             </div>
                         </div>
-                        <Panel title="Recent activity" sub="Auto-updates every 3s · full feed in Activity">
-                            <DataTable
-                                columns={[
-                                    { key: 'time', label: 'When', render: r => formatRelativeTime(r.createdAt) },
-                                    { key: 'category', label: 'Type', render: r => <CategoryBadge category={r.category} /> },
-                                    { key: 'username', label: 'User', render: r => r.username },
-                                    { key: 'label', label: 'Event', render: r => r.label },
-                                    { key: 'amountUsd', label: 'Amount', render: r => r.amountUsd > 0 ? formatUsd(r.amountUsd) : '—' },
-                                ]}
-                                rows={liveFeed.slice(0, 8)}
-                                loading={false}
-                                emptyMessage="No activity yet"
-                            />
-                            <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--border)' }}>
-                                <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: '0.78rem' }} onClick={() => setTab('activity')}>
-                                    Open activity →
-                                </button>
-                            </div>
-                        </Panel>
-                    </div>
-                )}
-
-                {tab === 'tournaments' && (
-                    <TournamentAdminPanel
                         fetchAdmin={fetchAdmin}
                         setActionMsg={setActionMsg}
                     />
