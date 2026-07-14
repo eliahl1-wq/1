@@ -28,7 +28,7 @@ import { API_URL } from '../../utils/apiBase';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 5;
-const SLITHER_WORLD_HALF = 3000;
+const SLITHER_WORLD_HALF = 2400;
 const COMPETITIVE_WORLD_HALF = SLITHER_WORLD_HALF * 0.3;
 const SLITHER_SPEC_ZOOM = IS_MOBILE ? 2.05 : 2.88;
 const SLITHER_SPEC_MIN_ZOOM = IS_MOBILE ? 0.95 : 1.35;

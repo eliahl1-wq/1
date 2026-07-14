@@ -156,10 +156,10 @@ function drawBalanceBadge(graph, cell, nameY, fontSize) {
 }
 
 function drawPlayerCashoutRing(graph, cell) {
-    const total = global.cashOutTotal || 10;
-    const progress = global.cashOutEndAt
-        ? getCashoutRingProgress(global.cashOutEndAt, total)
-        : Math.max(0, global.cashOutTimer) / total;
+    const total = cell.isMe ? (global.cashOutTotal || 5) : 5;
+    const progress = cell.isMe
+        ? (global.cashOutEndAt ? getCashoutRingProgress(global.cashOutEndAt, total) : Math.max(0, global.cashOutTimer) / total)
+        : (cell.cashOutEndTime ? getCashoutRingProgress(cell.cashOutEndTime, 5) : 0);
     const ringR = cell.radius + 10;
     drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress);
 }
@@ -211,7 +211,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
             drawBalanceBadge(graph, cell, nameY, fontSize);
         }
 
-        if (cell.isMe && global.cashOutTimer > 0) {
+        if (cell.isCashingOut) {
             graph.shadowBlur = 0;
             drawPlayerCashoutRing(graph, cell);
         }

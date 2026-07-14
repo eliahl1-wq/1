@@ -384,6 +384,7 @@ function gameLoop() {
                     vX: users[i].cells[j].vX, // Hastighet för sliminess
                     vY: users[i].cells[j].vY,
                     isCashingOut: users[i].isCashingOut, // Skicka med status till render
+                    cashOutEndTime: users[i].cashOutEndTime, // Skicka med sluttid
                     isMe: users[i].id === player.id,     // Markera om det är jag
                     x: users[i].cells[j].x - player.x + global.screen.width / 2,
                     y: users[i].cells[j].y - player.y + global.screen.height / 2

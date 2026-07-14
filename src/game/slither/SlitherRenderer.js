@@ -1999,6 +1999,12 @@ export class SlitherRenderer {
                     : (snake.dollarBalance ?? snake.balance);
                 drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
             }
+
+            if (snake.isCashingOut && snake.cashOutEndTime && !isYou) {
+                const progress = getCashoutRingProgress(snake.cashOutEndTime, 5);
+                const ringR = headRadius + 10;
+                drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
+            }
         }
 
         // Mobile steering arrow — only while finger is on screen, further ahead of the head.
