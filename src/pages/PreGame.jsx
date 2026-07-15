@@ -772,7 +772,10 @@ export default function PreGame() {
 
         if (isAlreadyInGame && !canRejoinThisMode) return;
 
-        if (!canJoin && !isAlreadyInGame) { navigate('/lobby'); return; }
+        if (!canJoin && !isAlreadyInGame) {
+            navigate('/lobby', { state: { depositIntent: true, selectedMode, requiredBalanceUsd: entryFeeForSession } });
+            return;
+        }
 
         trackMixpanelEvent('game_started', {
             mode: selectedMode,

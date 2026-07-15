@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import CustomDropdown from '../components/CustomDropdown';
@@ -27,6 +27,7 @@ const CUR_OPTIONS = [
 export default function Lobby() {
     const { user, logout, token, login, refreshUser } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
@@ -120,14 +121,18 @@ export default function Lobby() {
         return () => { if (qrRef.current) qrRef.current.innerHTML = ''; };
     }, [depositAddress, depositMethod, connected]);
 
-    // Leave lobby once the user can enter the arena (funded, free-play, or free ticket available)
+    // A free ticket normally skips the deposit lobby. When the player arrived
+    // via "Deposit to play", the selected game cannot use that ticket, so stay
+    // here until the wallet is actually funded.
     useEffect(() => {
         const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
         const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
-        if (user?.freePlay || hasFreeTicket || balanceUsd >= MIN_ENTRY_FEE) {
-            navigate('/pre-game');
+        const depositIntent = location.state?.depositIntent === true;
+        const requiredBalanceUsd = Number(location.state?.requiredBalanceUsd) || MIN_ENTRY_FEE;
+        if (user?.freePlay || balanceUsd >= requiredBalanceUsd || (hasFreeTicket && !depositIntent)) {
+            navigate('/pre-game', { state: { selectedMode: location.state?.selectedMode } });
         }
-    }, [user?.freePlay, user?.hasFreeTicket, user?.freeTicketUsed, user?.balanceUsd, user?.balanceSol, user?.solPrice, navigate, solPrice]);
+    }, [user?.freePlay, user?.hasFreeTicket, user?.freeTicketUsed, user?.balanceUsd, user?.balanceSol, user?.solPrice, location.state, navigate, solPrice]);
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect your wallet first.'); return; }
