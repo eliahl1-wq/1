@@ -284,6 +284,7 @@ export class SurvivRenderer {
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
         this.targetZoom = 1.08;
+        this.isMobileLayout = false;
         this.worldHalf = 10000;
         this.myId = null;
         this.players = [];
@@ -421,7 +422,9 @@ export class SurvivRenderer {
         const h = parent?.clientHeight || window.innerHeight;
         // Surviv can be raster-heavy. A restrained adaptive cap keeps Retina
         // canvases sharp without paying the old 4x pixel cost at DPR 2.
-        const dprCap = w * h >= 1500000 ? 1 : (w < 760 ? 1 : 1.25);
+        const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
+        this.isMobileLayout = coarsePointer || w < 760;
+        const dprCap = w * h >= 1500000 ? 1 : (this.isMobileLayout ? 1 : 1.25);
         const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
@@ -431,7 +434,7 @@ export class SurvivRenderer {
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;
-        this.targetZoom = w < 760 ? 0.86 : 1.08;
+        this.targetZoom = this.isMobileLayout ? 0.86 : 1.08;
         if (!this.spectatorMode) this.zoom = this.targetZoom;
     }
 
@@ -493,6 +496,41 @@ export class SurvivRenderer {
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
         this._obstacleSpriteCache.clear();
+        this.me = null;
+        this.zone = null;
+        this.hoveredChestId = null;
+        this.lootToast = null;
+        this.lastLootId = null;
+        this.particles = [];
+        this.hitMarkers = [];
+        this.damageIndicators = [];
+        this.damageNumbers = [];
+        this.killFeed = [];
+        this.bloodDecals = [];
+        this._prevPlayers.clear();
+        this._interpPlayers.clear();
+        this._seenDeathMarkerIds.clear();
+        this._prevHp = 100;
+        this._prevAmmo = -1;
+        this._prevWeapon = 'fists';
+        this.camera.x = 0;
+        this.camera.y = 0;
+        this.hud = {
+            ...this.hud,
+            balance: 0,
+            hp: 100,
+            maxHp: 100,
+            armor: 0,
+            weapon: 'fists',
+            ammo: 0,
+            clipSize: 0,
+            reloading: false,
+            kills: 0,
+            cashoutEndAt: 0,
+            cashoutSeconds: 0,
+            inventory: { weapons: [], medkits: 0, ammoPacks: 0, chestsOpened: 0 },
+        };
+        this.clearInput();
         this.myId = null;
     }
 
@@ -506,10 +544,7 @@ export class SurvivRenderer {
 
     setInputEnabled(enabled) {
         this.inputEnabled = enabled;
-        if (!enabled) {
-            this.mouse.down = false;
-            this.clearMobileInput();
-        }
+        if (!enabled) this.clearInput();
     }
 
     setSpectatorMode(on, cam) {
@@ -597,7 +632,9 @@ export class SurvivRenderer {
         }
 
         // Accumulate walk cycle & bob for each player
+        const activePlayerIds = new Set();
         for (const p of this.players) {
+            activePlayerIds.add(p.id);
             const prevPos = this._prevPlayers.get(p.id) || { x: p.x, y: p.y };
             const distMoved = Math.hypot(p.x - prevPos.x, p.y - prevPos.y);
             if (distMoved > 0.05 && distMoved < 40) {
@@ -608,6 +645,12 @@ export class SurvivRenderer {
                 if (Math.abs(p.walkBob) < 0.01) p.walkBob = 0;
             }
             this._prevPlayers.set(p.id, { x: p.x, y: p.y });
+        }
+        for (const playerId of this._prevPlayers.keys()) {
+            if (!activePlayerIds.has(playerId)) this._prevPlayers.delete(playerId);
+        }
+        while (this._seenDeathMarkerIds.size > 200) {
+            this._seenDeathMarkerIds.delete(this._seenDeathMarkerIds.values().next().value);
         }
 
         // Track disappeared bullets for impact particles
@@ -898,6 +941,15 @@ export class SurvivRenderer {
         this.mobileAim.shooting = false;
     }
 
+    clearInput() {
+        this.keys.w = false;
+        this.keys.a = false;
+        this.keys.s = false;
+        this.keys.d = false;
+        this.mouse.down = false;
+        this.clearMobileInput();
+    }
+
     getInputPayload() {
         let dx = this.mobileMove.x;
         let dy = this.mobileMove.y;
@@ -910,7 +962,7 @@ export class SurvivRenderer {
             if (this.keys.d) dx += 1;
         }
         const len = Math.hypot(dx, dy);
-        if (len > 1e-6) {
+        if (len > 1) {
             dx /= len;
             dy /= len;
         }
@@ -919,9 +971,10 @@ export class SurvivRenderer {
         this.mouse.worldX = w.x;
         this.mouse.worldY = w.y;
 
+        const aimOrigin = this.me || this.camera;
         const pointerAimAngle = Math.atan2(
-            this.mouse.worldY - this.camera.y,
-            this.mouse.worldX - this.camera.x,
+            this.mouse.worldY - aimOrigin.y,
+            this.mouse.worldX - aimOrigin.x,
         );
         const aimAngle = this.mobileAim.active ? this.mobileAim.angle : pointerAimAngle;
         return {
@@ -935,6 +988,7 @@ export class SurvivRenderer {
 
     handleKeyDown(e) {
         const k = e.key.toLowerCase();
+        if (e.repeat && ['r', 'h', 'f', 'g', '1', '2', '3'].includes(k)) return null;
         if (k === 'tab') {
             if (!e.repeat) this.inventoryOpen = !this.inventoryOpen;
             e.preventDefault();
@@ -948,10 +1002,10 @@ export class SurvivRenderer {
             e.preventDefault();
         }
         if (k === 'r') return 'reload';
-        if (k === 'q') return 'useMedkit';
+        if (k === 'h') return 'useMedkit';
         if (k === 'f') return 'pickupWeapon';
         if (k === 'g') return 'dropWeapon';
-        if (['1', '2'].includes(k)) return `equipSlot:${Number(k) - 1}`;
+        if (['1', '2', '3'].includes(k)) return `equipSlot:${Number(k) - 1}`;
         return null;
     }
 
@@ -1782,7 +1836,7 @@ export class SurvivRenderer {
         this.drawLowAmmoWarning(ctx, W, H);
         this.drawMinimapPanel(ctx, W, H);
         this.drawLootToast(ctx, W, H);
-        this.drawFpsCounter(ctx, W, H);
+        if (import.meta.env.DEV) this.drawFpsCounter(ctx, W, H);
     }
 
     getTerrainPattern(ctx) {
@@ -5026,8 +5080,8 @@ export class SurvivRenderer {
     }
 
     drawHud(ctx, W, H) {
-        const pad = W < 760 ? 10 : 16;
-        const panelW = W < 760 ? 164 : 190;
+        const pad = this.isMobileLayout ? 10 : 16;
+        const panelW = this.isMobileLayout ? 164 : 190;
         const hpPct = clamp(this.hud.hp / (this.hud.maxHp || 100), 0, 1);
         const armorPct = clamp((this.hud.armor || 0) / 100, 0, 1);
 
@@ -5048,7 +5102,7 @@ export class SurvivRenderer {
 
         const weaponLabel = WEAPON_LABELS[this.hud.weapon] || 'Fists';
         const ammoText = this.hud.weapon === 'fists' ? 'MELEE' : (this.hud.reloading ? 'RELOADING' : String(this.hud.ammo) + '/' + String(this.hud.clipSize));
-        const weaponW = W < 760 ? 148 : 172;
+        const weaponW = this.isMobileLayout ? 148 : 172;
         this.drawPanel(ctx, W - pad - weaponW, pad, weaponW, 58);
         ctx.textAlign = 'right';
         ctx.fillStyle = '#ffffff';
@@ -5105,7 +5159,7 @@ export class SurvivRenderer {
         const minimapPlayers = this.minimap.players?.length
             ? this.minimap.players
             : this.players.map(p => ({ x: p.x, y: p.y, isYou: p.isYou || p.id === this.myId }));
-        const isMobile = W < 760;
+        const isMobile = this.isMobileLayout;
         const cacheSize = isMobile ? 96 : 160;
         if (!this._minimapCanvas && typeof document !== 'undefined') {
             this._minimapCanvas = document.createElement('canvas');
