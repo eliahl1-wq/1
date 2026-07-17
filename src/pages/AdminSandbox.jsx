@@ -55,71 +55,6 @@ function NumInput({ value, onChange, min, max, step = 'any', className = '' }) {
     );
 }
 
-function FakePreGamePreview({ values, username, onPlay }) {
-    const walletSol = values.solPrice > 0 ? values.walletUsd / values.solPrice : 0;
-    return (
-        <div className="sandbox-fake-screen">
-            <div className="sandbox-fake-topbar">
-                <div>
-                    <span className="sandbox-fake-brand">AgarStake</span>
-                    <p>Sandbox preview · no real money</p>
-                </div>
-                <div className="sandbox-fake-wallet">
-                    <span>Wallet balance</span>
-                    <strong>${values.walletUsd.toFixed(2)}</strong>
-                    <small>{walletSol.toFixed(5)} SOL</small>
-                </div>
-            </div>
-            <div className="sandbox-fake-pregame-card">
-                <span className="sandbox-fake-eyebrow">READY TO PLAY</span>
-                <h1>{values.modeLabel}</h1>
-                <p>Welcome, {username || 'Player'}. This preview uses only fake sandbox values.</p>
-                <div className="sandbox-fake-stake-row">
-                    <div><span>Entry</span><strong>${values.entryUsd.toFixed(2)}</strong></div>
-                    <div><span>Starting balance</span><strong>${values.startBalanceUsd.toFixed(2)}</strong></div>
-                    <div><span>Players online</span><strong>{Math.round(values.playersOnline)}</strong></div>
-                </div>
-                <button type="button" className="btn btn-primary sandbox-fake-play" onClick={onPlay}>Play sandbox match</button>
-            </div>
-        </div>
-    );
-}
-
-function FakePerformancePreview({ values, username }) {
-    const winRate = values.games > 0 ? (values.wins / values.games) * 100 : 0;
-    return (
-        <div className="sandbox-fake-screen sandbox-fake-performance">
-            <div className="sandbox-fake-topbar">
-                <div>
-                    <span className="sandbox-fake-brand">{username || 'Player'}</span>
-                    <p>Performance preview · editable sandbox data</p>
-                </div>
-                <div className="sandbox-fake-wallet">
-                    <span>Available balance</span>
-                    <strong>${values.walletUsd.toFixed(2)}</strong>
-                    <small>{(values.walletUsd / Math.max(1, values.solPrice)).toFixed(5)} SOL</small>
-                </div>
-            </div>
-            <div className="sandbox-fake-stat-grid">
-                <div><span>Total games</span><strong>{Math.round(values.games)}</strong></div>
-                <div><span>Win rate</span><strong>{winRate.toFixed(1)}%</strong></div>
-                <div><span>Biggest cashout</span><strong>${values.biggestCashoutUsd.toFixed(2)}</strong></div>
-                <div><span>Total earnings</span><strong>${values.totalEarningsUsd.toFixed(2)}</strong></div>
-                <div><span>Eliminations</span><strong>{Math.round(values.eliminations)}</strong></div>
-                <div><span>Average survival</span><strong>{Math.round(values.survivalSeconds)}s</strong></div>
-            </div>
-            <div className="sandbox-fake-chart">
-                <div className="sandbox-fake-chart-head"><span>Balance history</span><strong>+${Math.max(0, values.totalEarningsUsd).toFixed(2)}</strong></div>
-                <div className="sandbox-fake-bars">
-                    {[0.34, 0.48, 0.42, 0.68, 0.58, 0.82, 1].map((height, index) => (
-                        <i key={index} style={{ height: `${Math.max(12, height * Math.min(100, 32 + values.wins * 4))}%` }} />
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export default function AdminSandbox() {
     const navigate = useNavigate();
     const { user, token } = useAuth();
@@ -166,7 +101,7 @@ export default function AdminSandbox() {
     const [connectionNote, setConnectionNote] = useState('Connecting…');
     const [zoneHealth, setZoneHealth] = useState(100);
     const [outsideZone, setOutsideZone] = useState(false);
-    const [previewSurface, setPreviewSurface] = useState('match');
+    const previewSurface = 'match';
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [panelHidden, setPanelHidden] = useState(false);
     const [cashoutEditorOpen, setCashoutEditorOpen] = useState(false);
@@ -216,6 +151,26 @@ export default function AdminSandbox() {
     useEffect(() => {
         pausedRef.current = paused;
     }, [paused]);
+
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => {
+            const canvas = canvasRef.current;
+            const parent = canvas?.parentElement;
+            if (!canvas || !parent) return;
+            if (mode === 'slither') {
+                rendererRef.current?.resize();
+            } else {
+                const width = Math.max(1, Math.round(parent.clientWidth));
+                const height = Math.max(1, Math.round(parent.clientHeight));
+                if (canvas.width !== width) canvas.width = width;
+                if (canvas.height !== height) canvas.height = height;
+                if (socketRef.current?.connected) {
+                    socketRef.current.emit('0', { x: 0, y: 0, screenWidth: width, screenHeight: height });
+                }
+            }
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [panelHidden, mode]);
 
     useEffect(() => {
         editModeRef.current = editMode;
@@ -524,14 +479,14 @@ export default function AdminSandbox() {
 
         const socket = io(API_URL, {
             auth: { token, presenceId: getOrCreatePresenceId() },
-            transports: ['websocket', 'polling'],
-            rememberUpgrade: true,
+            transports: ['polling', 'websocket'],
+            upgrade: true,
             reconnection: true,
             reconnectionAttempts: Infinity,
-            reconnectionDelay: 750,
-            reconnectionDelayMax: 5000,
-            randomizationFactor: 0.35,
-            timeout: 20000,
+            reconnectionDelay: 1200,
+            reconnectionDelayMax: 8000,
+            randomizationFactor: 0.4,
+            timeout: 30000,
         });
         socketRef.current = socket;
 
@@ -643,7 +598,14 @@ export default function AdminSandbox() {
             setFakeResult({ type: 'death', reason: reason || 'zone' });
             setGameReady(false);
         });
-        socket.on('error', (msg) => console.error('Sandbox error:', msg));
+        socket.on('error', (msg) => {
+            console.error('Sandbox error:', msg);
+            setConnectionNote(String(msg || 'Sandbox error'));
+        });
+        socket.on('sandboxRecovered', () => {
+            setConnectionNote('Session recovered · joining…');
+            socket.emit('sandboxJoin', { token, mode, username: user.username });
+        });
         socket.on('connect_error', (err) => setConnectionNote(err?.message || 'Connection failed'));
         socket.on('disconnect', (reason) => {
             setConnected(false);
@@ -670,7 +632,7 @@ export default function AdminSandbox() {
             window.removeEventListener('keydown', onSplit);
             disconnectSocket();
         };
-    }, [user, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, resetLocalSandboxState]);
+    }, [user?.isAdmin, user?.username, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, resetLocalSandboxState]);
 
     useEffect(() => {
         if (!gameReady || mode !== 'slither') return undefined;
@@ -783,46 +745,14 @@ export default function AdminSandbox() {
                         {sandboxState?.paused && ' · Paused · drag camera'}
                     </p>
 
-                    <ControlSection title="Preview">
-                        <div className="sandbox-mode-tabs sandbox-preview-tabs">
-                            {[
-                                ['pregame', 'Pre-game'],
-                                ['match', 'Match'],
-                                ['performance', 'Performance'],
-                            ].map(([id, label]) => (
-                                <button
-                                    key={id}
-                                    type="button"
-                                    className={`ui-btn ${previewSurface === id ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
-                                    onClick={() => setPreviewSurface(id)}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
-                        <p className="sandbox-hint">Previewvärden är lokala och påverkar aldrig wallet eller databas.</p>
-                        {previewSurface !== 'match' && (
-                            <div className="sandbox-fake-inputs">
-                                <Row label="Wallet USD"><NumInput value={String(fakeValues.walletUsd)} min="0" step="1" onChange={(v) => updateFakeValue('walletUsd', v)} /></Row>
-                                <Row label="SOL price"><NumInput value={String(fakeValues.solPrice)} min="1" step="1" onChange={(v) => updateFakeValue('solPrice', v)} /></Row>
-                                <Row label="Entry fee"><NumInput value={String(fakeValues.entryUsd)} min="0" step="1" onChange={(v) => updateFakeValue('entryUsd', v)} /></Row>
-                                <Row label="Cashout amount"><NumInput value={String(fakeValues.cashoutUsd)} min="0" step="1" onChange={(v) => updateFakeValue('cashoutUsd', v)} /></Row>
-                                {previewSurface === 'pregame' ? (
-                                    <>
-                                        <Row label="Start balance"><NumInput value={String(fakeValues.startBalanceUsd)} min="0" step="1" onChange={(v) => updateFakeValue('startBalanceUsd', v)} /></Row>
-                                        <Row label="Players online"><NumInput value={String(fakeValues.playersOnline)} min="0" step="1" onChange={(v) => updateFakeValue('playersOnline', v)} /></Row>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Row label="Games"><NumInput value={String(fakeValues.games)} min="0" step="1" onChange={(v) => updateFakeValue('games', v)} /></Row>
-                                        <Row label="Wins"><NumInput value={String(fakeValues.wins)} min="0" step="1" onChange={(v) => updateFakeValue('wins', v)} /></Row>
-                                        <Row label="Biggest cashout"><NumInput value={String(fakeValues.biggestCashoutUsd)} min="0" step="1" onChange={(v) => updateFakeValue('biggestCashoutUsd', v)} /></Row>
-                                        <Row label="Total earnings"><NumInput value={String(fakeValues.totalEarningsUsd)} step="1" onChange={(v) => updateFakeValue('totalEarningsUsd', v)} /></Row>
-                                        <Row label="Eliminations"><NumInput value={String(fakeValues.eliminations)} min="0" step="1" onChange={(v) => updateFakeValue('eliminations', v)} /></Row>
-                                    </>
-                                )}
-                            </div>
-                        )}
+                    <ControlSection title="Visual wallet balance">
+                        <p className="sandbox-hint">Only changes the fake wallet shown in sandbox results. No real funds or database values change.</p>
+                        <Row label="Wallet USD">
+                            <NumInput value={String(fakeValues.walletUsd)} min="0" step="0.01" onChange={(value) => updateFakeValue('walletUsd', value)} />
+                        </Row>
+                        <Row label="SOL price">
+                            <NumInput value={String(fakeValues.solPrice)} min="0.01" step="0.01" onChange={(value) => updateFakeValue('solPrice', value)} />
+                        </Row>
                     </ControlSection>
 
                     <ControlSection title="Quick setup">
@@ -1123,10 +1053,7 @@ export default function AdminSandbox() {
                     <canvas
                         ref={canvasRef}
                         className="sandbox-canvas"
-                        style={{ display: previewSurface === 'match' ? 'block' : 'none' }}
                     />
-                    {previewSurface === 'pregame' && <FakePreGamePreview values={fakeValues} username={user?.username} onPlay={() => setPreviewSurface('match')} />}
-                    {previewSurface === 'performance' && <FakePerformancePreview values={fakeValues} username={user?.username} />}
                     {previewSurface === 'match' && (
                         <>
                             {!gameReady && !fakeResult && (
@@ -1200,7 +1127,6 @@ export default function AdminSandbox() {
                         }}
                         onHome={() => {
                             setFakeResult(null);
-                            setPreviewSurface('pregame');
                             setPaused(false);
                             pausedRef.current = false;
                             sendControl('pause', { paused: false });
@@ -1348,7 +1274,7 @@ export default function AdminSandbox() {
                     margin-bottom: 12px;
                 }
                 .sandbox-panel--hidden { display: none; }
-                .sandbox-layout--panel-hidden .sandbox-canvas-wrap { width: 100%; }
+                .sandbox-layout--panel-hidden .sandbox-canvas-wrap { width: 100%; flex: 1 1 100%; min-width: 0; }
                 .sandbox-panel-restore {
                     position: fixed;
                     top: 72px;
