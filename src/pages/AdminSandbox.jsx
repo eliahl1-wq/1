@@ -218,6 +218,26 @@ export default function AdminSandbox() {
     }, [paused]);
 
     useEffect(() => {
+        const frame = requestAnimationFrame(() => {
+            const canvas = canvasRef.current;
+            const parent = canvas?.parentElement;
+            if (!canvas || !parent) return;
+            if (mode === 'slither') {
+                rendererRef.current?.resize();
+            } else {
+                const width = Math.max(1, Math.round(parent.clientWidth));
+                const height = Math.max(1, Math.round(parent.clientHeight));
+                if (canvas.width !== width) canvas.width = width;
+                if (canvas.height !== height) canvas.height = height;
+                if (socketRef.current?.connected) {
+                    socketRef.current.emit('0', { x: 0, y: 0, screenWidth: width, screenHeight: height });
+                }
+            }
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [panelHidden, mode]);
+
+    useEffect(() => {
         editModeRef.current = editMode;
     }, [editMode]);
 
@@ -524,14 +544,14 @@ export default function AdminSandbox() {
 
         const socket = io(API_URL, {
             auth: { token, presenceId: getOrCreatePresenceId() },
-            transports: ['websocket', 'polling'],
-            rememberUpgrade: true,
+            transports: ['polling', 'websocket'],
+            upgrade: true,
             reconnection: true,
             reconnectionAttempts: Infinity,
-            reconnectionDelay: 750,
-            reconnectionDelayMax: 5000,
-            randomizationFactor: 0.35,
-            timeout: 20000,
+            reconnectionDelay: 1200,
+            reconnectionDelayMax: 8000,
+            randomizationFactor: 0.4,
+            timeout: 30000,
         });
         socketRef.current = socket;
 
@@ -643,7 +663,14 @@ export default function AdminSandbox() {
             setFakeResult({ type: 'death', reason: reason || 'zone' });
             setGameReady(false);
         });
-        socket.on('error', (msg) => console.error('Sandbox error:', msg));
+        socket.on('error', (msg) => {
+            console.error('Sandbox error:', msg);
+            setConnectionNote(String(msg || 'Sandbox error'));
+        });
+        socket.on('sandboxRecovered', () => {
+            setConnectionNote('Session recovered · joining…');
+            socket.emit('sandboxJoin', { token, mode, username: user.username });
+        });
         socket.on('connect_error', (err) => setConnectionNote(err?.message || 'Connection failed'));
         socket.on('disconnect', (reason) => {
             setConnected(false);
@@ -670,7 +697,7 @@ export default function AdminSandbox() {
             window.removeEventListener('keydown', onSplit);
             disconnectSocket();
         };
-    }, [user, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, resetLocalSandboxState]);
+    }, [user?.isAdmin, user?.username, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, resetLocalSandboxState]);
 
     useEffect(() => {
         if (!gameReady || mode !== 'slither') return undefined;
@@ -1348,7 +1375,7 @@ export default function AdminSandbox() {
                     margin-bottom: 12px;
                 }
                 .sandbox-panel--hidden { display: none; }
-                .sandbox-layout--panel-hidden .sandbox-canvas-wrap { width: 100%; }
+                .sandbox-layout--panel-hidden .sandbox-canvas-wrap { width: 100%; flex: 1 1 100%; min-width: 0; }
                 .sandbox-panel-restore {
                     position: fixed;
                     top: 72px;
