@@ -276,6 +276,33 @@ export default function AdminSandbox() {
         setFakeCashoutTimer(5);
     }, [fakeCashoutEndAt, fakeResult]);
 
+    const applyQuickPreset = useCallback((preset) => {
+        if (preset === 'lowLag') {
+            setSpeed(1);
+            setBotCount(3);
+            setFoodCount(50);
+            setInvincible(true);
+            sendControl('setSpeed', { multiplier: 1 });
+            sendControl('setInvincible', { enabled: true });
+            sendControl('spawnFood', { count: 50 });
+            sendControl('spawnBots', { count: 3, balance: 5 });
+            return;
+        }
+
+        setSpeed(1);
+        setBotCount(5);
+        setFoodCount(120);
+        setInvincible(false);
+        setZoneRadius(worldHalf);
+        setShrinkDuration(120);
+        setShrinkEndRadius(Math.max(200, Math.round(worldHalf * 0.22)));
+        sendControl('setSpeed', { multiplier: 1 });
+        sendControl('setInvincible', { enabled: false });
+        sendControl('setZoneRadius', { radius: worldHalf });
+        sendControl('spawnFood', { count: 120 });
+        sendControl('spawnBots', { count: 5, balance: 5 });
+    }, [sendControl, worldHalf]);
+
     const resetLocalSandboxState = useCallback(() => {
         agarDataRef.current = { player: {}, users: [], food: [], viruses: [], ejected: [], zone: null };
         setSandboxState(null);
@@ -780,6 +807,18 @@ export default function AdminSandbox() {
                                 )}
                             </div>
                         )}
+                    </ControlSection>
+
+                    <ControlSection title="Quick setup">
+                        <div className="sandbox-btn-row">
+                            <button type="button" className="ui-btn ui-btn-primary" onClick={() => applyQuickPreset('realMatch')}>
+                                Real match
+                            </button>
+                            <button type="button" className="ui-btn ui-btn-ghost" onClick={() => applyQuickPreset('lowLag')}>
+                                Low lag
+                            </button>
+                        </div>
+                        <p className="sandbox-hint">Real match ger zon, 5 bots och normal risk. Low lag håller antalet objekt lågt och stänger av spelardöd.</p>
                     </ControlSection>
 
                     <ControlSection title="Playback">
