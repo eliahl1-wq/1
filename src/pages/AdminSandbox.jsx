@@ -168,6 +168,8 @@ export default function AdminSandbox() {
     const [outsideZone, setOutsideZone] = useState(false);
     const [previewSurface, setPreviewSurface] = useState('match');
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [panelHidden, setPanelHidden] = useState(false);
+    const [cashoutEditorOpen, setCashoutEditorOpen] = useState(false);
     const [fakeCashoutEndAt, setFakeCashoutEndAt] = useState(0);
     const [fakeCashoutTimer, setFakeCashoutTimer] = useState(0);
     const [fakeResult, setFakeResult] = useState(null);
@@ -745,13 +747,18 @@ export default function AdminSandbox() {
         <div className="admin-page sandbox-page">
             <Background />
             <AppTopbar />
-            <div className="sandbox-layout">
-                <aside className="sandbox-panel">
+            <div className={`sandbox-layout${panelHidden ? ' sandbox-layout--panel-hidden' : ''}`}>
+                <aside className={`sandbox-panel${panelHidden ? ' sandbox-panel--hidden' : ''}`}>
                     <div className="sandbox-panel-header">
                         <h2>Sandbox Studio</h2>
-                        <button type="button" className="ui-btn ui-btn-ghost" onClick={() => navigate('/admin')}>
-                            ← Dashboard
-                        </button>
+                        <div className="sandbox-panel-actions">
+                            <button type="button" className="ui-btn ui-btn-ghost sandbox-mini-btn" onClick={() => setPanelHidden(true)}>
+                                Hide
+                            </button>
+                            <button type="button" className="ui-btn ui-btn-ghost sandbox-mini-btn" onClick={() => navigate('/admin')}>
+                                ← Dashboard
+                            </button>
+                        </div>
                     </div>
 
                     <div className="sandbox-mode-tabs">
@@ -1101,6 +1108,17 @@ export default function AdminSandbox() {
                     )}
                 </aside>
 
+                {panelHidden && (
+                    <button
+                        type="button"
+                        className="ui-btn ui-btn-primary sandbox-panel-restore"
+                        onClick={() => setPanelHidden(false)}
+                        aria-label="Show sandbox controls"
+                    >
+                        ☰ Controls
+                    </button>
+                )}
+
                 <main className="sandbox-canvas-wrap">
                     <canvas
                         ref={canvasRef}
@@ -1121,7 +1139,36 @@ export default function AdminSandbox() {
                                 <strong>{zoneHealth}%</strong>
                             </div>
                             <div className="sandbox-fake-cashout">
-                                <span className="sandbox-fake-badge">FAKE · NO FUNDS MOVE</span>
+                                <div className="sandbox-fake-cashout-head">
+                                    <span className="sandbox-fake-badge">FAKE · NO FUNDS MOVE</span>
+                                    <button
+                                        type="button"
+                                        className="sandbox-cashout-edit-toggle"
+                                        onClick={() => setCashoutEditorOpen(open => !open)}
+                                        aria-expanded={cashoutEditorOpen}
+                                    >
+                                        {cashoutEditorOpen ? 'Close editor' : 'Edit values'}
+                                    </button>
+                                </div>
+                                {cashoutEditorOpen && (
+                                    <div className="sandbox-cashout-editor">
+                                        <Row label="Cashout USD">
+                                            <NumInput min="0" step="0.01" value={fakeValues.cashoutUsd} onChange={(value) => updateFakeValue('cashoutUsd', value)} />
+                                        </Row>
+                                        <Row label="Wallet USD">
+                                            <NumInput min="0" step="0.01" value={fakeValues.walletUsd} onChange={(value) => updateFakeValue('walletUsd', value)} />
+                                        </Row>
+                                        <Row label="SOL price">
+                                            <NumInput min="0.01" step="0.01" value={fakeValues.solPrice} onChange={(value) => updateFakeValue('solPrice', value)} />
+                                        </Row>
+                                        <Row label="Survival seconds">
+                                            <NumInput min="0" step="1" value={fakeValues.survivalSeconds} onChange={(value) => updateFakeValue('survivalSeconds', value)} />
+                                        </Row>
+                                        <Row label="Eliminations">
+                                            <NumInput min="0" step="1" value={fakeValues.eliminations} onChange={(value) => updateFakeValue('eliminations', value)} />
+                                        </Row>
+                                    </div>
+                                )}
                                 <GameCashoutBar
                                     disabled={!gameReady || !!fakeResult}
                                     onComplete={startFakeCashout}
@@ -1247,7 +1294,34 @@ export default function AdminSandbox() {
                 }
                 .sandbox-zone-health--danger { border-color: rgba(239,68,68,.8); color: #ff6b6b; animation: sandbox-pulse 1s infinite; }
                 .sandbox-fake-cashout { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 9; text-align: center; }
-                .sandbox-fake-badge { display: inline-block; margin-bottom: 6px; color: #fbbf24; font-size: .62rem; font-weight: 900; letter-spacing: .09em; }
+                .sandbox-fake-cashout-head { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 6px; }
+                .sandbox-fake-badge { display: inline-block; color: #fbbf24; font-size: .62rem; font-weight: 900; letter-spacing: .09em; }
+                .sandbox-cashout-edit-toggle {
+                    border: 0;
+                    padding: 0;
+                    background: transparent;
+                    color: rgba(255,255,255,.72);
+                    font: inherit;
+                    font-size: .68rem;
+                    text-decoration: underline;
+                    cursor: pointer;
+                }
+                .sandbox-cashout-editor {
+                    width: min(440px, calc(100vw - 24px));
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 8px 12px;
+                    margin-bottom: 10px;
+                    padding: 12px;
+                    border: 1px solid rgba(255,255,255,.13);
+                    border-radius: 14px;
+                    background: rgba(8,10,18,.94);
+                    box-shadow: 0 14px 45px rgba(0,0,0,.42);
+                    text-align: left;
+                    backdrop-filter: blur(14px);
+                }
+                .sandbox-cashout-editor .sandbox-row { margin: 0; }
+                .sandbox-cashout-editor .sandbox-row:last-child { grid-column: 1 / -1; }
                 @keyframes sandbox-pulse { 50% { opacity: .58; } }
                 @media (max-width: 760px) {
                     .sandbox-fake-topbar { flex-direction: column; }
@@ -1273,6 +1347,17 @@ export default function AdminSandbox() {
                     align-items: center;
                     margin-bottom: 12px;
                 }
+                .sandbox-panel--hidden { display: none; }
+                .sandbox-layout--panel-hidden .sandbox-canvas-wrap { width: 100%; }
+                .sandbox-panel-restore {
+                    position: fixed;
+                    top: 72px;
+                    left: 16px;
+                    z-index: 30;
+                    min-height: 38px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+                }
+                .sandbox-panel-actions { display: flex; align-items: center; gap: 6px; }
                 .sandbox-panel-header h2 {
                     font-family: var(--display);
                     font-size: 1.1rem;
