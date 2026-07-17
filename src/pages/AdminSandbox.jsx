@@ -277,6 +277,8 @@ export default function AdminSandbox() {
     }, [fakeCashoutEndAt, fakeResult]);
 
     const applyQuickPreset = useCallback((preset) => {
+        sendControl('clearEntities');
+
         if (preset === 'lowLag') {
             setSpeed(1);
             setBotCount(3);
@@ -1065,9 +1067,9 @@ export default function AdminSandbox() {
                         <button
                             type="button"
                             className="ui-btn ui-btn-danger sandbox-full-btn"
-                            onClick={() => { if (window.confirm('Clear all entities?')) sendControl('clear'); }}
+                            onClick={() => { if (window.confirm('Clear bots, food and props? Your player stays connected.')) sendControl('clearEntities'); }}
                         >
-                            Clear sandbox
+                            Clear entities
                         </button>
                         <button
                             type="button"
