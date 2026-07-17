@@ -36,7 +36,7 @@ const WEAPON_LABELS = {
     lmg: 'M249 LMG',
 };
 
-const SURVIV_WEAPON_SLOTS = [0, 1];
+const SURVIV_WEAPON_SLOTS = [0, 1, 2];
 
 const WEAPON_CLIP_SIZES = {
     fists: 0,
@@ -73,9 +73,12 @@ function createSurvivUiSnapshot(player) {
         medkitUseMs: player?.medkitUseMs,
         dollarBalance: player?.dollarBalance,
         kills: player?.kills,
+        activeWeaponSlot: Number.isInteger(player?.activeWeaponSlot) ? player.activeWeaponSlot : 2,
+        weaponSlotAmmo: Array.isArray(player?.weaponSlotAmmo) ? player.weaponSlotAmmo : [],
         weaponsAmmo: player?.weaponsAmmo || {},
         inventory: player?.inventory || null,
         openedContainer: player?.openedContainer || null,
+        outsideZone: !!player?.outsideZone,
     };
 }
 
@@ -411,9 +414,15 @@ export default function SurvivGame() {
     }, [currentBalance, localTimer]);
 
     useEffect(() => {
+        const previousBackground = document.body.style.backgroundColor;
+        const previousTitle = document.title;
         document.body.style.backgroundColor = '#0a0a0c';
         document.title = 'AgarStake | Surviv';
         stopSessionRecording();
+        return () => {
+            document.body.style.backgroundColor = previousBackground;
+            document.title = previousTitle;
+        };
     }, []);
 
     useEffect(() => {
@@ -563,11 +572,15 @@ export default function SurvivGame() {
         socket.on('survivTick', (tick) => {
             renderer.updateState(tick);
             if (IS_MOBILE) {
-                const nearby = !!renderer.getNearbyChest();
+                const nearby = !!renderer.getNearbyGroundWeapon() || !!renderer.getNearbyChest();
                 setCanMobileInteract(previous => previous === nearby ? previous : nearby);
             }
             if (tick.you) {
                 const nextMe = createSurvivUiSnapshot(tick.you);
+                sessionStatsRef.current = {
+                    ...sessionStatsRef.current,
+                    eliminations: Number(nextMe.kills) || 0,
+                };
                 const nextMeSignature = JSON.stringify(nextMe);
                 if (nextMeSignature !== meUiSignatureRef.current) {
                     meUiSignatureRef.current = nextMeSignature;
@@ -788,7 +801,8 @@ export default function SurvivGame() {
         && me.weapon !== 'fists'
         && !me.reloading
         && (Number(me.clipSize) || 0) > 0
-        && (Number(me.ammo) || 0) < (Number(me.clipSize) || 0);
+        && (Number(me.ammo) || 0) < (Number(me.clipSize) || 0)
+        && (Number(me.inventory?.ammoPacks) || 0) > 0;
     const canMobileHeal = !!me
         && (Number(me.inventory?.medkits) || 0) > 0
         && (Number(me.hp) || 0) < (Number(me.maxHp) || 100);
@@ -855,6 +869,19 @@ export default function SurvivGame() {
                     SERVER RESET {Math.floor(resetCountdown / 3600) > 0
                         ? `${Math.floor(resetCountdown / 3600)}:${String(Math.floor((resetCountdown % 3600) / 60)).padStart(2, '0')}:${String(resetCountdown % 60).padStart(2, '0')}`
                         : `${Math.floor(resetCountdown / 60)}:${String(resetCountdown % 60).padStart(2, '0')}`}
+                </div>
+            )}
+
+            {gameReady && me?.outsideZone && !showResultModal && !isDead && (
+                <div className="surviv-zone-warning" role="alert" aria-live="assertive">
+                    <span className="surviv-zone-warning-icon" aria-hidden>!</span>
+                    RETURN TO THE SAFE ZONE
+                </div>
+            )}
+
+            {gameReady && !IS_MOBILE && !showResultModal && !isDead && !isSpectating && (
+                <div className="surviv-controls-hint" aria-label="Game controls">
+                    WASD MOVE · MOUSE FIRE · F PICKUP · E OPEN · R RELOAD · H HEAL · 1–3 WEAPONS
                 </div>
             )}
 
@@ -965,7 +992,7 @@ export default function SurvivGame() {
             {gameReady && me && !showResultModal && (
                 <div className="surviv-weapons-hotbar">
                     {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                        const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
+                        const weaponId = slotIdx === 2 ? 'fists' : (me.inventory?.weapons?.[slotIdx] || null);
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const activeSlot = Number.isInteger(me.activeWeaponSlot)
                             ? me.activeWeaponSlot
@@ -1057,8 +1084,8 @@ export default function SurvivGame() {
                     solPrice={user?.solPrice ?? 57}
                     onPlayAgain={handlePlayAgain}
                     onHome={handleLobby}
-                    onSpectate={!cashedAmount && isDead ? enterSpectate : undefined}
-                    showSpectate={!cashedAmount && isDead}
+                    onSpectate={!cashedAmount && isDead && liveSession ? enterSpectate : undefined}
+                    showSpectate={!cashedAmount && isDead && liveSession}
                     isJoining={isRejoining}
                     onClose={handleLobby}
                 />
@@ -1126,7 +1153,7 @@ export default function SurvivGame() {
                                     <h4 className="section-subtitle">WEAPONS</h4>
                                     <div className="weapons-grid">
                                         {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                                            const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
+                                            const weaponId = slotIdx === 2 ? 'fists' : (me.inventory?.weapons?.[slotIdx] || null);
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                                             const activeSlot = Number.isInteger(me.activeWeaponSlot)
                                                 ? me.activeWeaponSlot
