@@ -427,9 +427,10 @@ export default function SurvivGame() {
         if (!socketRef.current?.connected) return;
         if (cashoutActiveRef.current) return;
         rendererRef.current?.setHoldStart(0);
-        startCashoutCountdown(CASHOUT_SECONDS);
+        cashoutActiveRef.current = true;
+        setCashoutPending(true);
         socketRef.current.emit('cashOut');
-    }, [startCashoutCountdown]);
+    }, []);
 
     useLayoutEffect(() => {
         rendererRef.current?.setHud({
