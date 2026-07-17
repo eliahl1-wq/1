@@ -69,6 +69,7 @@ function VirtualJoystick({ label, variant, onChange }) {
             }}
             onPointerUp={release}
             onPointerCancel={release}
+            onLostPointerCapture={release}
             onContextMenu={(event) => event.preventDefault()}
         >
             <div className="surviv-mobile-stick-ring" />
@@ -140,7 +141,7 @@ function SurvivMobileControls({
                 <ActionButton label="Inventory" type="inventory" onPress={onInventory} />
                 <ActionButton label={isReloading ? 'Reloading' : 'Reload weapon'} type="reload" onPress={onReload} disabled={!canReload} />
                 <ActionButton label="Use medkit" type="heal" onPress={onHeal} disabled={!canHeal} />
-                <ActionButton label={canInteract ? 'Open nearby chest' : 'No chest nearby'} type="interact" onPress={onInteract} accent={canInteract} disabled={!canInteract} />
+                <ActionButton label={canInteract ? 'Interact with nearby item' : 'Nothing nearby'} type="interact" onPress={onInteract} accent={canInteract} disabled={!canInteract} />
             </div>
             <VirtualJoystick label="Aim and fire" variant="aim" onChange={onAim} />
         </div>
