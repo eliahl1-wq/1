@@ -509,6 +509,35 @@ export default function SurvivGame() {
             reconnection: true,
         });
         socketRef.current = socket;
+        let lastContinuousInput = '';
+        let lastInputSentAt = 0;
+
+        const clearPendingActions = () => {
+            reloadPendingRef.current = false;
+            useMedkitPendingRef.current = false;
+            pickupWeaponPendingRef.current = false;
+            equipSlotPendingRef.current = null;
+            openChestPendingRef.current = null;
+            takeChestItemPendingRef.current = null;
+            putChestItemPendingRef.current = null;
+            dropItemPendingRef.current = null;
+            closeChestPendingRef.current = false;
+        };
+        const emitSurvivJoin = () => {
+            if (!socket.connected || blockAutoJoinRef.current) return;
+            const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
+            awaitingWelcomeRef.current = true;
+            setGameReady(false);
+            setConnectionError('');
+            localStorage.setItem('current_game_mode', 'surviv');
+            socket.emit('joinGame', {
+                username: matchNickname,
+                token: authToken,
+                mode: 'surviv',
+                entryFeeUsd,
+                skinColor: preferredSkin,
+            });
+        };
 
         const onKeyDown = (e) => {
             if (blockInputRef.current) return;
@@ -570,185 +599,35 @@ export default function SurvivGame() {
             }
         };
         const onPointerUp = () => renderer.handlePointerUp();
+        const neutralizeInput = () => {
+            renderer.clearInput();
+            clearPendingActions();
+            if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
+                const neutral = renderer.getInputPayload();
+                neutral.dx = 0;
+                neutral.dy = 0;
+                neutral.shooting = false;
+                socket.volatile.emit('survivInput', neutral);
+            }
+        };
+        const onWindowBlur = () => neutralizeInput();
+        const onVisibilityChange = () => {
+            if (document.hidden) neutralizeInput();
+        };
 
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
         canvasRef.current.addEventListener('pointermove', onPointerMove);
         canvasRef.current.addEventListener('pointerdown', onPointerDown);
         window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('blur', onWindowBlur);
+        document.addEventListener('visibilitychange', onVisibilityChange);
 
-        socket.on('connect', () => setIsConnected(true));
-        socket.on('disconnect', () => setIsConnected(false));
-
-        socket.on('welcome', (player, world) => {
-            hasJoinedRef.current = true;
-            myIdRef.current = player.id;
-            renderer.setMyId(player.id);
-            sessionStartAtRef.current = Date.now();
-            setCurrentBalance(player.dollarBalance ?? 0);
-            setGameReady(true);
-            setIsRejoining(false);
-            renderer.start();
-
-            if (world?.cashOutRemaining > 0) {
-                startCashoutCountdown(world.cashOutRemaining);
-            }
-        });
-
-        socket.on('survivTick', (tick) => {
-            renderer.updateState(tick);
-            if (IS_MOBILE) {
-                const nearby = !!renderer.getNearbyGroundWeapon() || !!renderer.getNearbyChest();
-                setCanMobileInteract(previous => previous === nearby ? previous : nearby);
-            }
-            if (tick.you) {
-                const nextMe = createSurvivUiSnapshot(tick.you);
-                sessionStatsRef.current = {
-                    ...sessionStatsRef.current,
-                    eliminations: Number(nextMe.kills) || 0,
-                };
-                const nextMeSignature = JSON.stringify(nextMe);
-                if (nextMeSignature !== meUiSignatureRef.current) {
-                    meUiSignatureRef.current = nextMeSignature;
-                    setMe(nextMe);
-                }
-                const chestId = nextMe.openedContainer?.id || null;
-                if (chestId && chestId !== prevOpenedContainerIdRef.current) {
-                    inventoryOpenRef.current = true;
-                    setIsInventoryOpen(true);
-                }
-                prevOpenedContainerIdRef.current = chestId;
-            }
-            if (tick.dollarBalance != null) {
-                setCurrentBalance(tick.dollarBalance);
-            }
-            if (tick.resetTime) {
-                const left = Math.max(0, Math.floor((tick.resetTime - Date.now()) / 1000));
-                if (left !== resetCountdownValueRef.current) {
-                    resetCountdownValueRef.current = left;
-                    setResetCountdown(left);
-                }
-            }
-            // Track alive player count
-            const alive = tick.aliveCount ?? renderer.aliveCount ?? (tick.players || []).filter(p => (p.hp || 0) > 0).length;
-            if (alive !== aliveCountValueRef.current) {
-                aliveCountValueRef.current = alive;
-                setAliveCount(alive);
-            }
-        });
-
-        socket.on('leaderboard', (data) => {
-            if (data?.leaderboard) setLeaderboard(data.leaderboard);
-        });
-
-        socket.on('cashOutStarting', ({ seconds }) => {
-            startCashoutCountdown(seconds || CASHOUT_SECONDS);
-        });
-
-        socket.on('cashOutSuccess', ({ amount }) => {
-            cashoutActiveRef.current = false;
-            const survived = Date.now() - (sessionStartAtRef.current || Date.now());
-            setSessionStats(prev => ({ ...prev, timeSurvivedMs: survived }));
-            setCashedAmount(amount);
-            setShowResultModal(true);
-            setIsDead(false);
-            renderer.pause();
-            savePendingResult('surviv', {
-                type: 'cashout',
-                cashedAmount: amount,
-                timeSurvivedMs: survived,
-                eliminations: sessionStatsRef.current.eliminations,
-            });
-            blockAutoJoinRef.current = true;
-            refreshUser();
-        });
-
-        socket.on('RIP', () => {
-            setIsDead(true);
-            renderer.pause();
-        });
-
-        socket.on('died', (data) => {
-            const survived = Date.now() - (sessionStartAtRef.current || Date.now());
-            const eliminations = data?.kills ?? sessionStatsRef.current.eliminations;
-            setSessionStats({ timeSurvivedMs: survived, eliminations });
-            setIsDead(true);
-            setShowResultModal(true);
-            renderer.pause();
-            savePendingResult('surviv', {
-                type: 'death',
-                balance: data?.balance ?? currentBalanceRef.current,
-                timeSurvivedMs: survived,
-                eliminations,
-            });
-            blockAutoJoinRef.current = true;
-        });
-
-        socket.on('forcedDisconnect', () => {
-            window.location.reload();
-        });
-
-        socket.on('error', (msg) => {
-            console.error('Surviv socket error:', msg);
-            alert(typeof msg === 'string' ? msg : msg?.message || 'Connection error');
-            navigate('/pre-game', { state: { selectedMode: 'surviv' } });
-        });
-
-        inputIntervalRef.current = setInterval(() => {
-            if (!socket.connected || blockInputRef.current) return;
-            const payload = renderer.getInputPayload();
-            if (reloadPendingRef.current) {
-                payload.reload = true;
-                reloadPendingRef.current = false;
-            }
-            if (useMedkitPendingRef.current) {
-                payload.useMedkit = true;
-                useMedkitPendingRef.current = false;
-            }
-            if (pickupWeaponPendingRef.current) {
-                payload.pickupWeapon = true;
-                pickupWeaponPendingRef.current = false;
-            }
-            if (equipSlotPendingRef.current != null) {
-                payload.equipSlot = equipSlotPendingRef.current;
-                equipSlotPendingRef.current = null;
-            }
-            if (openChestPendingRef.current) {
-                payload.openChestId = openChestPendingRef.current;
-                openChestPendingRef.current = null;
-            }
-            if (takeChestItemPendingRef.current) {
-                payload.takeChestItem = takeChestItemPendingRef.current;
-                takeChestItemPendingRef.current = null;
-            }
-            if (putChestItemPendingRef.current) {
-                payload.putChestItem = putChestItemPendingRef.current;
-                putChestItemPendingRef.current = null;
-            }
-            if (dropItemPendingRef.current) {
-                payload.dropItem = dropItemPendingRef.current;
-                dropItemPendingRef.current = null;
-            }
-            if (closeChestPendingRef.current) {
-                payload.closeChest = true;
-                closeChestPendingRef.current = false;
-            }
-            socket.emit('survivInput', payload);
-        }, 1000 / 30);
-
-        if (!blockAutoJoinRef.current) {
-            const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
-            localStorage.setItem('current_game_mode', 'surviv');
-            socket.emit('joinGame', {
-                username: matchNickname,
-                token: authToken,
-                mode: 'surviv',
-                entryFeeUsd,
-                skinColor: preferredSkin,
-            });
-        } else {
-            renderer.start();
-        }
+        socket.on('connect', () => {
+            const rejoining = hasJoinedRef.current;
+            setIsConnected(true);
+            setConnectionError('');
+            if (blockAutoJoinRef.current) renderer.start();
 
         return () => {
             clearInterval(inputIntervalRef.current);
@@ -756,6 +635,8 @@ export default function SurvivGame() {
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('blur', onWindowBlur);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
             canvasRef.current?.removeEventListener('pointermove', onPointerMove);
             canvasRef.current?.removeEventListener('pointerdown', onPointerDown);
             renderer.destroy();
