@@ -6,13 +6,15 @@ const random = (min, max) => min + Math.random() * (max - min);
 const id = (prefix) => `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
 
 export class LocalSandboxEngine {
-    constructor(canvas, { mode = 'slither', username = 'Player', onState, onVitals } = {}) {
+    constructor(canvas, { mode = 'slither', username = 'Player', onState, onVitals, onFrame, inputProvider } = {}) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d', { alpha: false });
         this.mode = mode;
         this.username = username;
         this.onState = onState;
         this.onVitals = onVitals;
+        this.onFrame = onFrame;
+        this.inputProvider = inputProvider;
         this.worldHalf = mode === 'slither' ? 900 : 3000;
         this.zone = { cx: mode === 'slither' ? 0 : 3000, cy: mode === 'slither' ? 0 : 3000, radius: this.worldHalf, shrinking: false };
         const center = mode === 'slither' ? 0 : 3000;
@@ -50,8 +52,10 @@ export class LocalSandboxEngine {
     }
 
     start() {
-        this.canvas.addEventListener('pointermove', this.onPointer);
-        this.canvas.addEventListener('pointerdown', this.onPointer);
+        if (this.mode === 'agar') {
+            this.canvas.addEventListener('pointermove', this.onPointer);
+            this.canvas.addEventListener('pointerdown', this.onPointer);
+        }
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -66,8 +70,10 @@ export class LocalSandboxEngine {
     destroy() {
         cancelAnimationFrame(this.raf);
         this.resizeObserver?.disconnect();
-        this.canvas.removeEventListener('pointermove', this.onPointer);
-        this.canvas.removeEventListener('pointerdown', this.onPointer);
+        if (this.mode === 'agar') {
+            this.canvas.removeEventListener('pointermove', this.onPointer);
+            this.canvas.removeEventListener('pointerdown', this.onPointer);
+        }
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
     }
@@ -183,7 +189,8 @@ export class LocalSandboxEngine {
         const dt = Math.min(0.05, Math.max(0.001, (now - this.lastAt) / 1000)) * this.speed;
         this.lastAt = now;
         if (!this.paused) this.update(dt, now);
-        this.draw();
+        if (this.onFrame) this.emitFrame();
+        else this.draw();
         if (now - this.lastStateAt > 250) { this.lastStateAt = now; this.emitState(); }
         this.raf = requestAnimationFrame(this.loop);
     }
@@ -193,6 +200,15 @@ export class LocalSandboxEngine {
             const progress = clamp((now - this.zone.startAt) / this.zone.duration, 0, 1);
             this.zone.radius = this.zone.startRadius + (this.zone.endRadius - this.zone.startRadius) * progress;
             if (progress >= 1) this.zone.shrinking = false;
+        }
+        const input = this.inputProvider?.();
+        if (input && this.mode === 'slither') {
+            const magnitude = Math.hypot(input.dx || 0, input.dy || 0);
+            if (magnitude > 0.001) {
+                this.target.x = this.player.x + (input.dx / magnitude) * 400;
+                this.target.y = this.player.y + (input.dy / magnitude) * 400;
+            }
+            this.player.boost = !!input.boost;
         }
         this.moveEntity(this.player, this.target.x, this.target.y, dt, false);
         if (this.botAi) this.bots.forEach((bot, index) => {
@@ -232,6 +248,68 @@ export class LocalSandboxEngine {
         this.food = this.food.filter(food => {
             if (Math.hypot(food.x - entity.x, food.y - entity.y) > reach) return true;
             entity.size = clamp(entity.size + 0.015, 0.5, 200); entity.balance = entity.size; return false;
+        });
+    }
+
+    emitFrame() {
+        if (this.mode === 'slither') {
+            const serialize = (entity, isYou = false) => {
+                const segments = entity.body.map(point => ({ x: point.x, y: point.y }));
+                const sct = segments.length;
+                const sc = Math.min(3.15, 1 + Math.log1p(Math.max(0, sct - 12) / 90) * 0.59);
+                return {
+                    id: entity.id,
+                    name: entity.name,
+                    balance: entity.size,
+                    dollarBalance: entity.balance,
+                    color: entity.color,
+                    isBot: !!entity.isBot,
+                    isYou,
+                    segments,
+                    sct,
+                    angle: entity.angle || 0,
+                    sc,
+                    fam: 0,
+                    wsep: 3.6 * Math.min(1.65, 1 + (sc - 1) * 0.32),
+                    radius: 6.2 * sc,
+                    boost: !!entity.boost,
+                };
+            };
+            this.onFrame({
+                mode: 'slither',
+                tick: {
+                    you: this.player.id,
+                    snakes: [...this.statics.map(item => serialize(item)), ...this.bots.map(item => serialize(item)), serialize(this.player, true)],
+                    food: this.food.map(item => ({ ...item, balance: 0.01, dollarValue: 0.01 })),
+                    worldHalf: this.worldHalf,
+                    zone: { ...this.zone },
+                    competitiveSlither: true,
+                    circularMap: true,
+                    dollarBalance: this.player.balance,
+                },
+            });
+            return;
+        }
+        const asUser = (entity) => ({
+            id: entity.id,
+            username: entity.name,
+            color: entity.color,
+            balance: entity.balance,
+            dollarBalance: entity.balance,
+            cells: [{
+                id: entity.id + '_cell',
+                x: entity.x,
+                y: entity.y,
+                balance: entity.size,
+                radius: Math.max(18, 18 + entity.size * 1.8),
+            }],
+        });
+        this.onFrame({
+            mode: 'agar',
+            player: asUser(this.player),
+            users: [asUser(this.player), ...this.bots.map(asUser)],
+            food: this.food.map(item => ({ ...item, balance: 0.01 })),
+            zone: { ...this.zone },
         });
     }
 

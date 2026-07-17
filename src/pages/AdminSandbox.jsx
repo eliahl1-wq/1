@@ -508,10 +508,10 @@ export default function AdminSandbox() {
         const resize = () => {
             const parent = canvas.parentElement;
             if (!parent) return;
-            if (localEngineRef.current) {
-                localEngineRef.current.resize();
-            } else if (mode === 'slither' && rendererRef.current) {
+            if (mode === 'slither' && rendererRef.current) {
                 rendererRef.current.resize();
+            } else if (localEngineRef.current && !rendererRef.current) {
+                localEngineRef.current.resize();
             } else {
                 canvas.width = parent.clientWidth;
                 canvas.height = parent.clientHeight;
@@ -532,24 +532,54 @@ export default function AdminSandbox() {
         if (canvas.parentElement) canvasResizeObserver.observe(canvas.parentElement);
 
         if (offlineMode) {
+            let nativeRenderer = null;
+            if (mode === 'slither') {
+                nativeRenderer = new SlitherRenderer(canvas, { resizeToCanvas: true });
+                rendererRef.current = nativeRenderer;
+                nativeRenderer.setHideOverlays(hideOverlaysRef.current);
+                nativeRenderer.start();
+            } else {
+                startAgarLoop();
+            }
+
             const localEngine = new LocalSandboxEngine(canvas, {
                 mode,
                 username: user.username,
+                inputProvider: () => nativeRenderer?.getInput(),
                 onState: applyLocalState,
                 onVitals: ({ zoneHealth: health, outsideZone: outside }) => {
                     setZoneHealth(health);
                     setOutsideZone(outside);
                 },
+                onFrame: (frame) => {
+                    if (frame.mode === 'slither') {
+                        nativeRenderer?.updateState(frame.tick);
+                    } else {
+                        agarDataRef.current = {
+                            player: frame.player,
+                            users: frame.users,
+                            food: frame.food,
+                            viruses: [],
+                            ejected: [],
+                            zone: frame.zone,
+                        };
+                        setAgarZone(frame.zone);
+                    }
+                },
             });
             localEngineRef.current = localEngine;
             localEngine.start();
+            resize();
             setConnected(true);
             setGameReady(true);
-            setConnectionNote('Local · works offline');
+            setConnectionNote('Local · native game renderer');
             return () => {
                 canvasResizeObserver.disconnect();
                 window.removeEventListener('resize', resize);
                 localEngine.destroy();
+                if (animRef.current) cancelAnimationFrame(animRef.current);
+                nativeRenderer?.destroy();
+                if (rendererRef.current === nativeRenderer) rendererRef.current = null;
                 if (localEngineRef.current === localEngine) localEngineRef.current = null;
                 setConnected(false);
                 setGameReady(false);
@@ -844,7 +874,7 @@ export default function AdminSandbox() {
                             className={`ui-btn ${offlineMode ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
                             onClick={() => setOfflineMode(true)}
                         >
-                            Local (offline)
+                            Local (same game)
                         </button>
                         <button
                             type="button"
@@ -855,7 +885,7 @@ export default function AdminSandbox() {
                         </button>
                     </div>
                     <p className="sandbox-status">
-                        {offlineMode ? '● Local · no internet or backend needed' : (connected ? (gameReady ? '● Online' : '○ Joining…') : `○ ${connectionNote}`)}
+                        {offlineMode ? '● Local · same renderer, no backend needed' : (connected ? (gameReady ? '● Online' : '○ Joining…') : `○ ${connectionNote}`)}
                         {sandboxState?.paused && ' · Paused'}
                     </p>
 
