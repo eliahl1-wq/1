@@ -185,6 +185,7 @@ export default function SurvivGame() {
     const inputIntervalRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const hasJoinedRef = useRef(false);
+    const awaitingWelcomeRef = useRef(false);
     const cashoutActiveRef = useRef(false);
     const myIdRef = useRef(null);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
@@ -242,6 +243,7 @@ export default function SurvivGame() {
 
     const finishInventoryDrag = () => setInventoryDrag(null);
     const [isRejoining, setIsRejoining] = useState(false);
+    const [connectionError, setConnectionError] = useState('');
     const [sessionStats, setSessionStatsState] = useState(() => (
         pendingAtMount
             ? { timeSurvivedMs: pendingAtMount.timeSurvivedMs ?? 0, eliminations: pendingAtMount.eliminations ?? 0 }
@@ -322,16 +324,41 @@ export default function SurvivGame() {
     const handlePlayAgain = useCallback(() => {
         clearPendingResult('surviv');
         blockAutoJoinRef.current = false;
+        awaitingWelcomeRef.current = true;
+        hasJoinedRef.current = false;
         localStorage.setItem('current_game_mode', 'surviv');
         localStorage.setItem('selected_gamemode', 'surviv');
         markGamemodePlayed('surviv');
 
+        rendererRef.current?.resetSession();
+        rendererRef.current?.start();
+        setGameReady(false);
+        setConnectionError('');
         setIsDead(false);
         setCashedAmount(null);
         setShowResultModal(false);
         setIsSpectating(false);
         setIsRejoining(true);
+        setMe(null);
+        meUiSignatureRef.current = '';
+        setLeaderboard([]);
+        setAliveCount(0);
+        aliveCountValueRef.current = 0;
+        setCanMobileInteract(false);
+        inventoryOpenRef.current = false;
+        setIsInventoryOpen(false);
+        prevOpenedContainerIdRef.current = null;
+        reloadPendingRef.current = false;
+        useMedkitPendingRef.current = false;
+        pickupWeaponPendingRef.current = false;
+        equipSlotPendingRef.current = null;
+        openChestPendingRef.current = null;
+        takeChestItemPendingRef.current = null;
+        putChestItemPendingRef.current = null;
+        dropItemPendingRef.current = null;
+        closeChestPendingRef.current = false;
         setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
+        setCurrentBalance(0);
         setLocalTimer(0);
         setCashOutEndAt(0);
         cashoutActiveRef.current = false;
@@ -341,9 +368,6 @@ export default function SurvivGame() {
             setLiveSession(true);
             return;
         }
-
-        rendererRef.current?.resetSession();
-        rendererRef.current?.start();
 
         if (socketRef.current?.connected) {
             const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
@@ -355,7 +379,7 @@ export default function SurvivGame() {
                 skinColor: preferredSkin,
             });
         }
-    }, [authToken, liveSession]);
+    }, [authToken, liveSession, setCurrentBalance, setSessionStats]);
 
     const handleLobby = useCallback(() => {
         clearPendingResult('surviv');
@@ -385,6 +409,7 @@ export default function SurvivGame() {
                 clearInterval(intervalId);
                 timerIntervalRef.current = null;
                 cashOutEndAtRef.current = 0;
+                cashoutActiveRef.current = false;
                 setCashOutEndAt(0);
                 rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             }
@@ -454,11 +479,12 @@ export default function SurvivGame() {
     useEffect(() => {
         if (!isSpectating) return undefined;
         const syncCam = () => {
+            if (document.hidden || !socketRef.current?.connected) return;
             const cam = specCamRef.current;
-            socketRef.current?.emit('survivSpectateCam', { x: cam.x, y: cam.y });
+            socketRef.current.volatile.emit('survivSpectateCam', { x: cam.x, y: cam.y });
         };
         syncCam();
-        const id = setInterval(syncCam, 120);
+        const id = setInterval(syncCam, 250);
         return () => clearInterval(id);
     }, [isSpectating, specCamRef]);
 
@@ -839,10 +865,14 @@ export default function SurvivGame() {
 
             {(!isConnected || !gameReady) && !pendingAtMount && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <h2 style={{ marginBottom: '10px' }}>Deploying to Surviv...</h2>
-                        <p style={{ opacity: 0.5 }}>
-                            Make sure you have at least {formatUsd(entryFeeUsd)} balance.
+                    <div style={{ textAlign: 'center', maxWidth: 420, padding: 24 }}>
+                        <h2 style={{ marginBottom: '10px' }}>
+                            {connectionError ? 'Connection interrupted' : (isRejoining ? 'Rejoining your match...' : 'Joining Surviv...')}
+                        </h2>
+                        <p style={{ opacity: 0.62, lineHeight: 1.5 }}>
+                            {connectionError || (isRejoining
+                                ? 'Your player is protected briefly while the connection recovers.'
+                                : `Entry: ${formatUsd(entryFeeUsd)}. Waiting for the server to confirm your session.`)}
                         </p>
                     </div>
                 </div>
