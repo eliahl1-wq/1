@@ -987,6 +987,14 @@ export default function AdminDashboard() {
                                     themeColor="#a855f7"
                                 />
                                 <WalletCard 
+                                    title="Tournament Wallet" 
+                                    label="Entry Fees & Prizes"
+                                    address={wallets?.tournamentWallet?.address} 
+                                    sol={wallets?.tournamentWallet ? formatSol(wallets.tournamentWallet.balanceSol) : '—'} 
+                                    usd={wallets?.tournamentWallet ? formatUsd(wallets.tournamentWallet.balanceUsd) : '—'} 
+                                    themeColor="#ec4899"
+                                />
+                                <WalletCard 
                                     title="Owner Vault" 
                                     label="Profits"
                                     address={wallets?.ownerVault?.address} 
@@ -1383,6 +1391,7 @@ export default function AdminDashboard() {
                                     ...(wallets?.mainHouse ? [wallets.mainHouse] : []),
                                     ...(wallets?.brWallets ?? []),
                                     ...(wallets?.rewardWallet ? [{ ...wallets.rewardWallet, sweptOnReset: 'Manual surplus only' }] : []),
+                                    ...(wallets?.tournamentWallet ? [{ ...wallets.tournamentWallet, sweptOnReset: 'Manual tournament sweep' }] : []),
                                     ...(wallets?.ownerVault ? [wallets.ownerVault] : []),
                                 ]}
                                 loading={loading}
