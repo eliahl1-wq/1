@@ -4,6 +4,8 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import GameCashoutBar from '../components/GameCashoutBar';
+import GameResultModal from '../components/GameResultModal';
 import { SlitherRenderer } from '../game/slither/SlitherRenderer.js';
 import global from '../game/agar/global.js';
 import * as renderUtils from '../game/agar/render.js';
@@ -53,6 +55,71 @@ function NumInput({ value, onChange, min, max, step = 'any', className = '' }) {
     );
 }
 
+function FakePreGamePreview({ values, username, onPlay }) {
+    const walletSol = values.solPrice > 0 ? values.walletUsd / values.solPrice : 0;
+    return (
+        <div className="sandbox-fake-screen">
+            <div className="sandbox-fake-topbar">
+                <div>
+                    <span className="sandbox-fake-brand">AgarStake</span>
+                    <p>Sandbox preview · no real money</p>
+                </div>
+                <div className="sandbox-fake-wallet">
+                    <span>Wallet balance</span>
+                    <strong>${values.walletUsd.toFixed(2)}</strong>
+                    <small>{walletSol.toFixed(5)} SOL</small>
+                </div>
+            </div>
+            <div className="sandbox-fake-pregame-card">
+                <span className="sandbox-fake-eyebrow">READY TO PLAY</span>
+                <h1>{values.modeLabel}</h1>
+                <p>Welcome, {username || 'Player'}. This preview uses only fake sandbox values.</p>
+                <div className="sandbox-fake-stake-row">
+                    <div><span>Entry</span><strong>${values.entryUsd.toFixed(2)}</strong></div>
+                    <div><span>Starting balance</span><strong>${values.startBalanceUsd.toFixed(2)}</strong></div>
+                    <div><span>Players online</span><strong>{Math.round(values.playersOnline)}</strong></div>
+                </div>
+                <button type="button" className="btn btn-primary sandbox-fake-play" onClick={onPlay}>Play sandbox match</button>
+            </div>
+        </div>
+    );
+}
+
+function FakePerformancePreview({ values, username }) {
+    const winRate = values.games > 0 ? (values.wins / values.games) * 100 : 0;
+    return (
+        <div className="sandbox-fake-screen sandbox-fake-performance">
+            <div className="sandbox-fake-topbar">
+                <div>
+                    <span className="sandbox-fake-brand">{username || 'Player'}</span>
+                    <p>Performance preview · editable sandbox data</p>
+                </div>
+                <div className="sandbox-fake-wallet">
+                    <span>Available balance</span>
+                    <strong>${values.walletUsd.toFixed(2)}</strong>
+                    <small>{(values.walletUsd / Math.max(1, values.solPrice)).toFixed(5)} SOL</small>
+                </div>
+            </div>
+            <div className="sandbox-fake-stat-grid">
+                <div><span>Total games</span><strong>{Math.round(values.games)}</strong></div>
+                <div><span>Win rate</span><strong>{winRate.toFixed(1)}%</strong></div>
+                <div><span>Biggest cashout</span><strong>${values.biggestCashoutUsd.toFixed(2)}</strong></div>
+                <div><span>Total earnings</span><strong>${values.totalEarningsUsd.toFixed(2)}</strong></div>
+                <div><span>Eliminations</span><strong>{Math.round(values.eliminations)}</strong></div>
+                <div><span>Average survival</span><strong>{Math.round(values.survivalSeconds)}s</strong></div>
+            </div>
+            <div className="sandbox-fake-chart">
+                <div className="sandbox-fake-chart-head"><span>Balance history</span><strong>+${Math.max(0, values.totalEarningsUsd).toFixed(2)}</strong></div>
+                <div className="sandbox-fake-bars">
+                    {[0.34, 0.48, 0.42, 0.68, 0.58, 0.82, 1].map((height, index) => (
+                        <i key={index} style={{ height: `${Math.max(12, height * Math.min(100, 32 + values.wins * 4))}%` }} />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AdminSandbox() {
     const navigate = useNavigate();
     const { user, token } = useAuth();
@@ -96,6 +163,29 @@ export default function AdminSandbox() {
     const [agarZone, setAgarZone] = useState(null);
     const [sessionEpoch, setSessionEpoch] = useState(0);
     const [restarting, setRestarting] = useState(false);
+    const [connectionNote, setConnectionNote] = useState('Connecting…');
+    const [zoneHealth, setZoneHealth] = useState(100);
+    const [outsideZone, setOutsideZone] = useState(false);
+    const [previewSurface, setPreviewSurface] = useState('match');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [fakeCashoutEndAt, setFakeCashoutEndAt] = useState(0);
+    const [fakeCashoutTimer, setFakeCashoutTimer] = useState(0);
+    const [fakeResult, setFakeResult] = useState(null);
+    const [fakeValues, setFakeValues] = useState({
+        walletUsd: 125.50,
+        solPrice: 57,
+        entryUsd: 5,
+        startBalanceUsd: 5,
+        cashoutUsd: 18.75,
+        playersOnline: 24,
+        games: 42,
+        wins: 17,
+        biggestCashoutUsd: 86.40,
+        totalEarningsUsd: 214.25,
+        eliminations: 31,
+        survivalSeconds: 148,
+        modeLabel: 'Slither Arena',
+    });
 
     const spectatorBounds = mode === 'slither'
         ? {
@@ -152,6 +242,75 @@ export default function AdminSandbox() {
     const sendControl = useCallback((action, params = {}) => {
         socketRef.current?.emit('sandboxControl', { token, mode, action, params });
     }, [token, mode]);
+
+    useEffect(() => {
+        if (!fakeCashoutEndAt) {
+            setFakeCashoutTimer(0);
+            return undefined;
+        }
+        const update = () => {
+            const remaining = Math.max(0, Math.ceil((fakeCashoutEndAt - Date.now()) / 1000));
+            setFakeCashoutTimer(remaining);
+            if (remaining <= 0) {
+                setFakeCashoutEndAt(0);
+                setFakeResult({ type: 'cashout', amount: fakeValues.cashoutUsd });
+                setPaused(true);
+                pausedRef.current = true;
+                sendControl('pause', { paused: true });
+            }
+        };
+        update();
+        const id = setInterval(update, 200);
+        return () => clearInterval(id);
+    }, [fakeCashoutEndAt, fakeValues.cashoutUsd, sendControl]);
+
+    const updateFakeValue = useCallback((key, rawValue) => {
+        setFakeValues(current => ({
+            ...current,
+            [key]: key === 'modeLabel' ? rawValue : Number(rawValue) || 0,
+        }));
+    }, []);
+
+    const startFakeCashout = useCallback(() => {
+        if (fakeCashoutEndAt || fakeResult) return;
+        setFakeCashoutEndAt(Date.now() + 5000);
+        setFakeCashoutTimer(5);
+    }, [fakeCashoutEndAt, fakeResult]);
+
+    const applyQuickPreset = useCallback((preset) => {
+        sendControl('clearEntities');
+
+        if (preset === 'lowLag') {
+            setSpeed(1);
+            setBotCount(3);
+            setFoodCount(50);
+            setInvincible(true);
+            sendControl('setSpeed', { multiplier: 1 });
+            sendControl('setInvincible', { enabled: true });
+            sendControl('stopZoneShrink');
+            sendControl('setZoneRadius', { radius: worldHalf });
+            sendControl('spawnFood', { count: 50 });
+            sendControl('spawnBots', { count: 3, balance: 5 });
+            return;
+        }
+
+        setSpeed(1);
+        setBotCount(5);
+        setFoodCount(120);
+        setInvincible(false);
+        setZoneRadius(worldHalf);
+        setShrinkDuration(120);
+        setShrinkEndRadius(Math.max(200, Math.round(worldHalf * 0.22)));
+        sendControl('setSpeed', { multiplier: 1 });
+        sendControl('setInvincible', { enabled: false });
+        sendControl('setZoneRadius', { radius: worldHalf });
+        sendControl('startZoneShrink', {
+            durationMs: 120_000,
+            endRadius: Math.max(200, Math.round(worldHalf * 0.22)),
+        });
+        sendControl('spawnFood', { count: 120 });
+        sendControl('spawnBots', { count: 5, balance: 5 });
+    }, [sendControl, worldHalf]);
 
     const resetLocalSandboxState = useCallback(() => {
         agarDataRef.current = { player: {}, users: [], food: [], viruses: [], ejected: [], zone: null };
@@ -363,17 +522,27 @@ export default function AdminSandbox() {
 
         const socket = io(API_URL, {
             auth: { token, presenceId: getOrCreatePresenceId() },
-            transports: ['polling', 'websocket'],
+            transports: ['websocket', 'polling'],
+            rememberUpgrade: true,
             reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 750,
+            reconnectionDelayMax: 5000,
+            randomizationFactor: 0.35,
+            timeout: 20000,
         });
         socketRef.current = socket;
 
         socket.on('connect', () => {
             setConnected(true);
-            if (!hasJoinedRef.current) {
-                socket.emit('sandboxJoin', { token, mode, username: user.username });
-                hasJoinedRef.current = true;
-            }
+            setConnectionNote(socket.recovered ? 'Session recovered' : 'Connected');
+            socket.emit('sandboxJoin', { token, mode, username: user.username });
+            hasJoinedRef.current = true;
+        });
+
+        socket.io.on('reconnect_attempt', (attempt) => {
+            setConnected(false);
+            setConnectionNote(`Reconnecting… attempt ${attempt}`);
         });
 
         socket.on('welcome', (player, meta) => {
@@ -463,8 +632,21 @@ export default function AdminSandbox() {
             setTimeout(() => setRestarting(false), 400);
         });
 
+        socket.on('sandboxVitals', (vitals) => {
+            if (vitals?.zoneHealth != null) setZoneHealth(Math.max(0, Math.round(vitals.zoneHealth)));
+            setOutsideZone(!!vitals?.outsideZone);
+        });
+        socket.on('sandboxEliminated', ({ reason } = {}) => {
+            setFakeCashoutEndAt(0);
+            setFakeResult({ type: 'death', reason: reason || 'zone' });
+            setGameReady(false);
+        });
         socket.on('error', (msg) => console.error('Sandbox error:', msg));
-        socket.on('disconnect', () => setConnected(false));
+        socket.on('connect_error', (err) => setConnectionNote(err?.message || 'Connection failed'));
+        socket.on('disconnect', (reason) => {
+            setConnected(false);
+            setConnectionNote(reason === 'io server disconnect' ? 'Server disconnected' : 'Connection lost — retrying');
+        });
 
         // Agar mouse input
         const onPointer = (e) => {
@@ -590,10 +772,74 @@ export default function AdminSandbox() {
                     </div>
 
                     <p className="sandbox-status">
-                        {connected ? (gameReady ? '● Live' : '○ Connecting…') : '○ Disconnected'}
+                        {connected ? (gameReady ? '● Live' : '○ Joining…') : `○ ${connectionNote}`}
                         {sandboxState?.paused && ' · Paused · drag camera'}
                     </p>
 
+                    <ControlSection title="Preview">
+                        <div className="sandbox-mode-tabs sandbox-preview-tabs">
+                            {[
+                                ['pregame', 'Pre-game'],
+                                ['match', 'Match'],
+                                ['performance', 'Performance'],
+                            ].map(([id, label]) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    className={`ui-btn ${previewSurface === id ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                                    onClick={() => setPreviewSurface(id)}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="sandbox-hint">Previewvärden är lokala och påverkar aldrig wallet eller databas.</p>
+                        {previewSurface !== 'match' && (
+                            <div className="sandbox-fake-inputs">
+                                <Row label="Wallet USD"><NumInput value={String(fakeValues.walletUsd)} min="0" step="1" onChange={(v) => updateFakeValue('walletUsd', v)} /></Row>
+                                <Row label="SOL price"><NumInput value={String(fakeValues.solPrice)} min="1" step="1" onChange={(v) => updateFakeValue('solPrice', v)} /></Row>
+                                <Row label="Entry fee"><NumInput value={String(fakeValues.entryUsd)} min="0" step="1" onChange={(v) => updateFakeValue('entryUsd', v)} /></Row>
+                                <Row label="Cashout amount"><NumInput value={String(fakeValues.cashoutUsd)} min="0" step="1" onChange={(v) => updateFakeValue('cashoutUsd', v)} /></Row>
+                                {previewSurface === 'pregame' ? (
+                                    <>
+                                        <Row label="Start balance"><NumInput value={String(fakeValues.startBalanceUsd)} min="0" step="1" onChange={(v) => updateFakeValue('startBalanceUsd', v)} /></Row>
+                                        <Row label="Players online"><NumInput value={String(fakeValues.playersOnline)} min="0" step="1" onChange={(v) => updateFakeValue('playersOnline', v)} /></Row>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Row label="Games"><NumInput value={String(fakeValues.games)} min="0" step="1" onChange={(v) => updateFakeValue('games', v)} /></Row>
+                                        <Row label="Wins"><NumInput value={String(fakeValues.wins)} min="0" step="1" onChange={(v) => updateFakeValue('wins', v)} /></Row>
+                                        <Row label="Biggest cashout"><NumInput value={String(fakeValues.biggestCashoutUsd)} min="0" step="1" onChange={(v) => updateFakeValue('biggestCashoutUsd', v)} /></Row>
+                                        <Row label="Total earnings"><NumInput value={String(fakeValues.totalEarningsUsd)} step="1" onChange={(v) => updateFakeValue('totalEarningsUsd', v)} /></Row>
+                                        <Row label="Eliminations"><NumInput value={String(fakeValues.eliminations)} min="0" step="1" onChange={(v) => updateFakeValue('eliminations', v)} /></Row>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </ControlSection>
+
+                    <ControlSection title="Quick setup">
+                        <div className="sandbox-btn-row">
+                            <button type="button" className="ui-btn ui-btn-primary" onClick={() => applyQuickPreset('realMatch')}>
+                                Real match
+                            </button>
+                            <button type="button" className="ui-btn ui-btn-ghost" onClick={() => applyQuickPreset('lowLag')}>
+                                Low lag
+                            </button>
+                        </div>
+                        <p className="sandbox-hint">Real match startar zonen med 5 bots. Low lag håller zonen öppen och antalet objekt lågt.</p>
+                    </ControlSection>
+
+                    <button
+                        type="button"
+                        className="ui-btn ui-btn-ghost sandbox-full-btn"
+                        onClick={() => setShowAdvanced(value => !value)}
+                    >
+                        {showAdvanced ? 'Hide advanced controls' : 'Show advanced controls'}
+                    </button>
+
+                    {showAdvanced && (
+                        <>
                     <ControlSection title="Playback">
                         <button
                             type="button"
@@ -642,7 +888,7 @@ export default function AdminSandbox() {
                                 type="checkbox" checked={invincible}
                                 onChange={(e) => { setInvincible(e.target.checked); sendControl('setInvincible', { enabled: e.target.checked }); }}
                             />
-                            Invincible (no deaths)
+                            Invincible vs players (zone still hurts)
                         </label>
                     </ControlSection>
 
@@ -838,9 +1084,9 @@ export default function AdminSandbox() {
                         <button
                             type="button"
                             className="ui-btn ui-btn-danger sandbox-full-btn"
-                            onClick={() => { if (window.confirm('Clear all entities?')) sendControl('clear'); }}
+                            onClick={() => { if (window.confirm('Clear bots, food and props? Your player stays connected.')) sendControl('clearEntities'); }}
                         >
-                            Clear sandbox
+                            Clear entities
                         </button>
                         <button
                             type="button"
@@ -851,20 +1097,163 @@ export default function AdminSandbox() {
                         </button>
                         <p className="sandbox-hint">Abort kopplar från, raderar allt (agar + slither) och startar en helt ny session — använd om det laggar eller kraschar.</p>
                     </ControlSection>
+                        </>
+                    )}
                 </aside>
 
                 <main className="sandbox-canvas-wrap">
-                    <canvas ref={canvasRef} className="sandbox-canvas" />
-                    {!gameReady && (
-                        <div className="sandbox-overlay">
-                            <p>{restarting ? 'Startar om sandbox…' : 'Connecting to sandbox…'}</p>
-                        </div>
+                    <canvas
+                        ref={canvasRef}
+                        className="sandbox-canvas"
+                        style={{ display: previewSurface === 'match' ? 'block' : 'none' }}
+                    />
+                    {previewSurface === 'pregame' && <FakePreGamePreview values={fakeValues} username={user?.username} onPlay={() => setPreviewSurface('match')} />}
+                    {previewSurface === 'performance' && <FakePerformancePreview values={fakeValues} username={user?.username} />}
+                    {previewSurface === 'match' && (
+                        <>
+                            {!gameReady && !fakeResult && (
+                                <div className="sandbox-overlay">
+                                    <p>{restarting ? 'Startar om sandbox…' : connectionNote}</p>
+                                </div>
+                            )}
+                            <div className={`sandbox-zone-health${outsideZone ? ' sandbox-zone-health--danger' : ''}`}>
+                                <span>Zone health</span>
+                                <strong>{zoneHealth}%</strong>
+                            </div>
+                            <div className="sandbox-fake-cashout">
+                                <span className="sandbox-fake-badge">FAKE · NO FUNDS MOVE</span>
+                                <GameCashoutBar
+                                    disabled={!gameReady || !!fakeResult}
+                                    onComplete={startFakeCashout}
+                                    localTimer={fakeCashoutTimer}
+                                    cashOutTotal={5}
+                                    cashOutEndAt={fakeCashoutEndAt}
+                                />
+                            </div>
+                        </>
                     )}
                 </main>
+                {fakeResult && (
+                    <GameResultModal
+                        type={fakeResult.type}
+                        amount={fakeResult.amount || 0}
+                        timeSurvivedMs={Math.max(0, fakeValues.survivalSeconds * 1000)}
+                        eliminations={fakeValues.eliminations}
+                        walletBalanceUsd={fakeValues.walletUsd + (fakeResult.type === 'cashout' ? fakeResult.amount : 0)}
+                        walletBalanceSol={(fakeValues.walletUsd + (fakeResult.type === 'cashout' ? fakeResult.amount : 0)) / Math.max(1, fakeValues.solPrice)}
+                        solPrice={fakeValues.solPrice}
+                        onPlayAgain={() => {
+                            setFakeResult(null);
+                            setZoneHealth(100);
+                            setOutsideZone(false);
+                            setPaused(false);
+                            pausedRef.current = false;
+                            sendControl('pause', { paused: false });
+                            if (!gameReady) setSessionEpoch(n => n + 1);
+                        }}
+                        onHome={() => {
+                            setFakeResult(null);
+                            setPreviewSurface('pregame');
+                            setPaused(false);
+                            pausedRef.current = false;
+                            sendControl('pause', { paused: false });
+                        }}
+                        onClose={() => {
+                            setFakeResult(null);
+                            setPaused(false);
+                            pausedRef.current = false;
+                            sendControl('pause', { paused: false });
+                        }}
+                    />
+                )}
             </div>
 
             <style>{`
                 .sandbox-page { min-height: 100vh; }
+                .sandbox-preview-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                .sandbox-preview-tabs .ui-btn { padding: 8px 5px; font-size: .7rem; }
+                .sandbox-fake-inputs { margin-top: 12px; }
+                .sandbox-fake-screen {
+                    width: 100%;
+                    height: 100%;
+                    overflow: auto;
+                    padding: clamp(22px, 5vw, 70px);
+                    background:
+                        radial-gradient(circle at 15% 15%, rgba(91, 92, 240, .2), transparent 32%),
+                        radial-gradient(circle at 85% 80%, rgba(34, 197, 94, .12), transparent 30%),
+                        #07090f;
+                    color: #fff;
+                }
+                .sandbox-fake-topbar { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }
+                .sandbox-fake-brand { font-size: 1.2rem; font-weight: 900; letter-spacing: -.03em; }
+                .sandbox-fake-topbar p { margin: 5px 0 0; color: var(--text-2); font-size: .8rem; }
+                .sandbox-fake-wallet {
+                    min-width: 190px;
+                    padding: 14px 18px;
+                    border: 1px solid rgba(255,255,255,.12);
+                    border-radius: 16px;
+                    background: rgba(255,255,255,.05);
+                    display: grid;
+                    text-align: right;
+                }
+                .sandbox-fake-wallet span, .sandbox-fake-stake-row span, .sandbox-fake-stat-grid span { color: var(--text-2); font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; }
+                .sandbox-fake-wallet strong { font-size: 1.45rem; }
+                .sandbox-fake-wallet small { color: var(--green); }
+                .sandbox-fake-pregame-card {
+                    width: min(720px, 100%);
+                    margin: clamp(60px, 10vh, 120px) auto 0;
+                    padding: clamp(28px, 5vw, 54px);
+                    border-radius: 28px;
+                    border: 1px solid rgba(255,255,255,.12);
+                    background: linear-gradient(145deg, rgba(18,21,34,.96), rgba(11,13,22,.92));
+                    box-shadow: 0 30px 90px rgba(0,0,0,.45);
+                    text-align: center;
+                }
+                .sandbox-fake-eyebrow { color: var(--green); font-size: .7rem; font-weight: 900; letter-spacing: .16em; }
+                .sandbox-fake-pregame-card h1 { margin: 12px 0; font-size: clamp(2rem, 6vw, 4.2rem); letter-spacing: -.06em; }
+                .sandbox-fake-pregame-card > p { color: var(--text-2); }
+                .sandbox-fake-stake-row, .sandbox-fake-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 30px 0; }
+                .sandbox-fake-stake-row > div, .sandbox-fake-stat-grid > div {
+                    padding: 16px;
+                    border: 1px solid rgba(255,255,255,.08);
+                    border-radius: 14px;
+                    background: rgba(255,255,255,.035);
+                    display: grid;
+                    gap: 5px;
+                }
+                .sandbox-fake-stake-row strong, .sandbox-fake-stat-grid strong { font-size: 1.3rem; }
+                .sandbox-fake-play { width: 100%; min-height: 50px; }
+                .sandbox-fake-performance { padding-top: clamp(32px, 6vw, 80px); }
+                .sandbox-fake-stat-grid { width: min(900px, 100%); margin: 50px auto 20px; grid-template-columns: repeat(3, 1fr); }
+                .sandbox-fake-chart {
+                    width: min(900px, 100%);
+                    height: 260px;
+                    margin: 18px auto;
+                    padding: 22px;
+                    border: 1px solid rgba(255,255,255,.09);
+                    border-radius: 20px;
+                    background: rgba(255,255,255,.035);
+                }
+                .sandbox-fake-chart-head { display: flex; justify-content: space-between; }
+                .sandbox-fake-chart-head strong { color: var(--green); }
+                .sandbox-fake-bars { height: 180px; display: flex; gap: 10px; align-items: flex-end; margin-top: 20px; }
+                .sandbox-fake-bars i { flex: 1; min-height: 12px; border-radius: 8px 8px 2px 2px; background: linear-gradient(#6366f1, #22c55e); opacity: .85; }
+                .sandbox-zone-health {
+                    position: absolute; top: 18px; right: 18px; z-index: 8;
+                    display: flex; gap: 9px; align-items: center;
+                    padding: 9px 13px; border-radius: 12px;
+                    background: rgba(8,10,18,.82); border: 1px solid rgba(255,255,255,.1);
+                    font-size: .72rem;
+                }
+                .sandbox-zone-health--danger { border-color: rgba(239,68,68,.8); color: #ff6b6b; animation: sandbox-pulse 1s infinite; }
+                .sandbox-fake-cashout { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 9; text-align: center; }
+                .sandbox-fake-badge { display: inline-block; margin-bottom: 6px; color: #fbbf24; font-size: .62rem; font-weight: 900; letter-spacing: .09em; }
+                @keyframes sandbox-pulse { 50% { opacity: .58; } }
+                @media (max-width: 760px) {
+                    .sandbox-fake-topbar { flex-direction: column; }
+                    .sandbox-fake-wallet { width: 100%; text-align: left; }
+                    .sandbox-fake-stake-row, .sandbox-fake-stat-grid { grid-template-columns: 1fr 1fr; }
+                }
                 .sandbox-layout {
                     display: flex;
                     height: calc(100vh - 56px);
