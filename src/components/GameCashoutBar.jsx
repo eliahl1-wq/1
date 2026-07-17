@@ -70,6 +70,7 @@ function useHoldLogic(disabled, onHoldStart, onHoldEnd, onComplete) {
         }
         const onKeyDown = (e) => {
             if (e.code !== 'KeyQ' || e.repeat) return;
+            e.preventDefault();
             startHoldRef.current();
         };
         const onKeyUp = (e) => {
@@ -77,12 +78,20 @@ function useHoldLogic(disabled, onHoldStart, onHoldEnd, onComplete) {
             e.preventDefault();
             cancelHoldRef.current();
         };
+        const onVisibilityChange = () => {
+            if (document.hidden) cancelHoldRef.current();
+        };
+        const onWindowBlur = () => cancelHoldRef.current();
 
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('blur', onWindowBlur);
+        document.addEventListener('visibilitychange', onVisibilityChange);
         return () => {
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
+            window.removeEventListener('blur', onWindowBlur);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
             cancelHoldRef.current();
         };
     }, [disabled, cancelHold]);
