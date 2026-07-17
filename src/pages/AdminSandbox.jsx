@@ -167,6 +167,7 @@ export default function AdminSandbox() {
     const [zoneHealth, setZoneHealth] = useState(100);
     const [outsideZone, setOutsideZone] = useState(false);
     const [previewSurface, setPreviewSurface] = useState('match');
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [fakeCashoutEndAt, setFakeCashoutEndAt] = useState(0);
     const [fakeCashoutTimer, setFakeCashoutTimer] = useState(0);
     const [fakeResult, setFakeResult] = useState(null);
@@ -286,6 +287,8 @@ export default function AdminSandbox() {
             setInvincible(true);
             sendControl('setSpeed', { multiplier: 1 });
             sendControl('setInvincible', { enabled: true });
+            sendControl('stopZoneShrink');
+            sendControl('setZoneRadius', { radius: worldHalf });
             sendControl('spawnFood', { count: 50 });
             sendControl('spawnBots', { count: 3, balance: 5 });
             return;
@@ -301,6 +304,10 @@ export default function AdminSandbox() {
         sendControl('setSpeed', { multiplier: 1 });
         sendControl('setInvincible', { enabled: false });
         sendControl('setZoneRadius', { radius: worldHalf });
+        sendControl('startZoneShrink', {
+            durationMs: 120_000,
+            endRadius: Math.max(200, Math.round(worldHalf * 0.22)),
+        });
         sendControl('spawnFood', { count: 120 });
         sendControl('spawnBots', { count: 5, balance: 5 });
     }, [sendControl, worldHalf]);
@@ -820,9 +827,19 @@ export default function AdminSandbox() {
                                 Low lag
                             </button>
                         </div>
-                        <p className="sandbox-hint">Real match ger zon, 5 bots och normal risk. Low lag håller antalet objekt lågt och stänger av spelardöd.</p>
+                        <p className="sandbox-hint">Real match startar zonen med 5 bots. Low lag håller zonen öppen och antalet objekt lågt.</p>
                     </ControlSection>
 
+                    <button
+                        type="button"
+                        className="ui-btn ui-btn-ghost sandbox-full-btn"
+                        onClick={() => setShowAdvanced(value => !value)}
+                    >
+                        {showAdvanced ? 'Hide advanced controls' : 'Show advanced controls'}
+                    </button>
+
+                    {showAdvanced && (
+                        <>
                     <ControlSection title="Playback">
                         <button
                             type="button"
@@ -1080,6 +1097,8 @@ export default function AdminSandbox() {
                         </button>
                         <p className="sandbox-hint">Abort kopplar från, raderar allt (agar + slither) och startar en helt ny session — använd om det laggar eller kraschar.</p>
                     </ControlSection>
+                        </>
+                    )}
                 </aside>
 
                 <main className="sandbox-canvas-wrap">
