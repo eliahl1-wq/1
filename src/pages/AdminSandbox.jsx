@@ -55,7 +55,7 @@ function NumInput({ value, onChange, min, max, step = 'any', className = '' }) {
     );
 }
 
-function FakePreGamePreview({ values, username }) {
+function FakePreGamePreview({ values, username, onPlay }) {
     const walletSol = values.solPrice > 0 ? values.walletUsd / values.solPrice : 0;
     return (
         <div className="sandbox-fake-screen">
@@ -79,7 +79,7 @@ function FakePreGamePreview({ values, username }) {
                     <div><span>Starting balance</span><strong>${values.startBalanceUsd.toFixed(2)}</strong></div>
                     <div><span>Players online</span><strong>{Math.round(values.playersOnline)}</strong></div>
                 </div>
-                <button type="button" className="btn btn-primary sandbox-fake-play">Play sandbox match</button>
+                <button type="button" className="btn btn-primary sandbox-fake-play" onClick={onPlay}>Play sandbox match</button>
             </div>
         </div>
     );
@@ -1088,7 +1088,7 @@ export default function AdminSandbox() {
                         className="sandbox-canvas"
                         style={{ display: previewSurface === 'match' ? 'block' : 'none' }}
                     />
-                    {previewSurface === 'pregame' && <FakePreGamePreview values={fakeValues} username={user?.username} />}
+                    {previewSurface === 'pregame' && <FakePreGamePreview values={fakeValues} username={user?.username} onPlay={() => setPreviewSurface('match')} />}
                     {previewSurface === 'performance' && <FakePerformancePreview values={fakeValues} username={user?.username} />}
                     {previewSurface === 'match' && (
                         <>
@@ -1132,8 +1132,19 @@ export default function AdminSandbox() {
                             sendControl('pause', { paused: false });
                             if (!gameReady) setSessionEpoch(n => n + 1);
                         }}
-                        onHome={() => setFakeResult(null)}
-                        onClose={() => setFakeResult(null)}
+                        onHome={() => {
+                            setFakeResult(null);
+                            setPreviewSurface('pregame');
+                            setPaused(false);
+                            pausedRef.current = false;
+                            sendControl('pause', { paused: false });
+                        }}
+                        onClose={() => {
+                            setFakeResult(null);
+                            setPaused(false);
+                            pausedRef.current = false;
+                            sendControl('pause', { paused: false });
+                        }}
                     />
                 )}
             </div>
