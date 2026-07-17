@@ -55,12 +55,25 @@ export default function TournamentAdminPanel({ fetchAdmin, setActionMsg }) {
     };
 
     const action = async (tournament, type) => {
-        const verb = type === 'start' ? 'start this tournament now' : 'cancel this scheduled tournament';
-        if (!window.confirm(`Are you sure you want to ${verb}?`)) return;
+        const copy = {
+            start: {
+                confirmation: 'start this tournament now',
+                success: 'started',
+            },
+            cancel: {
+                confirmation: 'cancel this scheduled tournament',
+                success: 'cancelled',
+            },
+            end: {
+                confirmation: 'end this live tournament now and settle its final leaderboard and prizes',
+                success: 'ended and settled',
+            },
+        }[type];
+        if (!copy || !window.confirm(`Are you sure you want to ${copy.confirmation}?`)) return;
         setBusy(true);
         try {
             await fetchAdmin(`/api/admin/tournaments/${tournament.id}/${type}`, { method: 'POST' });
-            setActionMsg(`✅ Tournament ${type === 'start' ? 'started' : 'cancelled'}`);
+            setActionMsg(`✅ Tournament ${copy.success}`);
             await load();
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
@@ -127,6 +140,11 @@ export default function TournamentAdminPanel({ fetchAdmin, setActionMsg }) {
                                                 <button className="btn btn-primary" disabled={busy} onClick={() => action(tournament, 'start')} style={{ padding: '7px 12px', fontSize: '.72rem' }}>Start now</button>
                                                 <button className="btn btn-ghost" disabled={busy} onClick={() => action(tournament, 'cancel')} style={{ padding: '7px 12px', fontSize: '.72rem' }}>Cancel</button>
                                             </div>
+                                        )}
+                                        {tournament.status === 'live' && (
+                                            <button className="btn btn-ghost" disabled={busy} onClick={() => action(tournament, 'end')} style={{ padding: '7px 12px', fontSize: '.72rem', color: '#ef4444' }}>
+                                                End now
+                                            </button>
                                         )}
                                     </td>
                                 </tr>
