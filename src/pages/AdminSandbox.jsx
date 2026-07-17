@@ -7,6 +7,7 @@ import AppTopbar from '../components/AppTopbar';
 import GameCashoutBar from '../components/GameCashoutBar';
 import GameResultModal from '../components/GameResultModal';
 import { SlitherRenderer } from '../game/slither/SlitherRenderer.js';
+import { LocalSandboxEngine } from '../game/sandbox/LocalSandboxEngine.js';
 import global from '../game/agar/global.js';
 import * as renderUtils from '../game/agar/render.js';
 import { useSpectatorCamera } from '../hooks/useSpectatorCamera';
@@ -126,6 +127,7 @@ export default function AdminSandbox() {
     const canvasRef = useRef(null);
     const socketRef = useRef(null);
     const rendererRef = useRef(null);
+    const localEngineRef = useRef(null);
     const agarDataRef = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], zone: null });
     const animRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -163,7 +165,8 @@ export default function AdminSandbox() {
     const [agarZone, setAgarZone] = useState(null);
     const [sessionEpoch, setSessionEpoch] = useState(0);
     const [restarting, setRestarting] = useState(false);
-    const [connectionNote, setConnectionNote] = useState('Connecting…');
+    const [connectionNote, setConnectionNote] = useState('Local sandbox ready');
+    const [offlineMode, setOfflineMode] = useState(true);
     const [zoneHealth, setZoneHealth] = useState(100);
     const [outsideZone, setOutsideZone] = useState(false);
     const [previewSurface, setPreviewSurface] = useState('match');
@@ -241,9 +244,24 @@ export default function AdminSandbox() {
         syncWormEditorFromEntity(fromStatic || fromCtrl);
     }, [selectedWorm, staticWorms, controllableEntities, syncWormEditorFromEntity]);
 
+    const applyLocalState = useCallback((state) => {
+        if (!state) return;
+        setSandboxState(state);
+        setStaticWorms(state.staticWormIds || []);
+        setControllableEntities(state.controllableEntities || []);
+        if (state.zone) {
+            setZoneRadius(Math.round(state.zone.radius));
+            if (mode === 'agar') setAgarZone(state.zone);
+        }
+    }, [mode]);
+
     const sendControl = useCallback((action, params = {}) => {
+        if (offlineMode && localEngineRef.current) {
+            applyLocalState(localEngineRef.current.control(action, params));
+            return;
+        }
         socketRef.current?.emit('sandboxControl', { token, mode, action, params });
-    }, [token, mode]);
+    }, [token, mode, offlineMode, applyLocalState]);
 
     useEffect(() => {
         if (!fakeCashoutEndAt) {
@@ -478,9 +496,11 @@ export default function AdminSandbox() {
     }, [paused, mode, specCamRef]);
 
     useEffect(() => {
-        if (!user?.isAdmin || !token) return undefined;
+        if (!user?.isAdmin || (!offlineMode && !token)) return undefined;
 
         disconnectSocket();
+        localEngineRef.current?.destroy();
+        localEngineRef.current = null;
 
         const canvas = canvasRef.current;
         if (!canvas) return undefined;
@@ -488,7 +508,9 @@ export default function AdminSandbox() {
         const resize = () => {
             const parent = canvas.parentElement;
             if (!parent) return;
-            if (mode === 'slither' && rendererRef.current) {
+            if (localEngineRef.current) {
+                localEngineRef.current.resize();
+            } else if (mode === 'slither' && rendererRef.current) {
                 rendererRef.current.resize();
             } else {
                 canvas.width = parent.clientWidth;
@@ -506,7 +528,35 @@ export default function AdminSandbox() {
         };
         resize();
         window.addEventListener('resize', resize);
+        const canvasResizeObserver = new ResizeObserver(resize);
+        if (canvas.parentElement) canvasResizeObserver.observe(canvas.parentElement);
 
+        if (offlineMode) {
+            const localEngine = new LocalSandboxEngine(canvas, {
+                mode,
+                username: user.username,
+                onState: applyLocalState,
+                onVitals: ({ zoneHealth: health, outsideZone: outside }) => {
+                    setZoneHealth(health);
+                    setOutsideZone(outside);
+                },
+            });
+            localEngineRef.current = localEngine;
+            localEngine.start();
+            setConnected(true);
+            setGameReady(true);
+            setConnectionNote('Local · works offline');
+            return () => {
+                canvasResizeObserver.disconnect();
+                window.removeEventListener('resize', resize);
+                localEngine.destroy();
+                if (localEngineRef.current === localEngine) localEngineRef.current = null;
+                setConnected(false);
+                setGameReady(false);
+            };
+        }
+
+        setConnectionNote('Connecting…');
         if (mode === 'slither') {
             const renderer = new SlitherRenderer(canvas, { resizeToCanvas: true });
             rendererRef.current = renderer;
@@ -664,13 +714,14 @@ export default function AdminSandbox() {
         window.addEventListener('keydown', onSplit);
 
         return () => {
+            canvasResizeObserver.disconnect();
             window.removeEventListener('resize', resize);
             canvas.removeEventListener('pointermove', onPointer);
             canvas.removeEventListener('pointerdown', onPointer);
             window.removeEventListener('keydown', onSplit);
             disconnectSocket();
         };
-    }, [user, token, mode, sessionEpoch, disconnectSocket, startAgarLoop, resetLocalSandboxState]);
+    }, [user, token, mode, offlineMode, sessionEpoch, disconnectSocket, startAgarLoop, resetLocalSandboxState, applyLocalState]);
 
     useEffect(() => {
         if (!gameReady || mode !== 'slither') return undefined;
@@ -687,19 +738,23 @@ export default function AdminSandbox() {
             const worldX = (screenX - rect.width / 2) / zoom + cam.x;
             const worldY = (screenY - rect.height / 2) / zoom + cam.y;
             const wormId = selectedWormRef.current;
-            socketRef.current?.emit('sandboxMoveStatic', { token, id: wormId, x: worldX, y: worldY });
-            socketRef.current?.emit('sandboxControl', {
-                token,
-                mode,
-                action: 'moveStaticWorm',
-                params: { id: wormId, x: worldX, y: worldY },
-            });
+            if (offlineMode) {
+                sendControl('moveStaticWorm', { id: wormId, x: worldX, y: worldY });
+            } else {
+                socketRef.current?.emit('sandboxMoveStatic', { token, id: wormId, x: worldX, y: worldY });
+                socketRef.current?.emit('sandboxControl', {
+                    token,
+                    mode,
+                    action: 'moveStaticWorm',
+                    params: { id: wormId, x: worldX, y: worldY },
+                });
+            }
             setWormX(Math.round(worldX));
             setWormY(Math.round(worldY));
         };
         canvas.addEventListener('click', onCanvasClick);
         return () => canvas.removeEventListener('click', onCanvasClick);
-    }, [gameReady, mode, token]);
+    }, [gameReady, mode, token, offlineMode, sendControl]);
 
     const applySelectedWorm = useCallback(() => {
         if (!selectedWorm || !staticWorms.some(w => w.id === selectedWorm)) return;
@@ -778,9 +833,25 @@ export default function AdminSandbox() {
                         </button>
                     </div>
 
+                    <div className="sandbox-runtime-toggle">
+                        <button
+                            type="button"
+                            className={`ui-btn ${offlineMode ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                            onClick={() => setOfflineMode(true)}
+                        >
+                            Local (offline)
+                        </button>
+                        <button
+                            type="button"
+                            className={`ui-btn ${!offlineMode ? 'ui-btn-primary' : 'ui-btn-ghost'}`}
+                            onClick={() => setOfflineMode(false)}
+                        >
+                            Online server
+                        </button>
+                    </div>
                     <p className="sandbox-status">
-                        {connected ? (gameReady ? '● Live' : '○ Joining…') : `○ ${connectionNote}`}
-                        {sandboxState?.paused && ' · Paused · drag camera'}
+                        {offlineMode ? '● Local · no internet or backend needed' : (connected ? (gameReady ? '● Online' : '○ Joining…') : `○ ${connectionNote}`)}
+                        {sandboxState?.paused && ' · Paused'}
                     </p>
 
                     <ControlSection title="Preview">
@@ -1364,6 +1435,13 @@ export default function AdminSandbox() {
                     color: var(--text-h);
                     margin: 0;
                 }
+                .sandbox-runtime-toggle {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                }
+                .sandbox-runtime-toggle .ui-btn { padding: 8px 6px; font-size: .7rem; }
                 .sandbox-mode-tabs {
                     display: flex;
                     gap: 8px;
@@ -1428,9 +1506,16 @@ export default function AdminSandbox() {
                     line-height: 1.4;
                 }
                 .sandbox-canvas-wrap {
-                    flex: 1;
+                    flex: 1 1 0;
+                    min-width: 0;
+                    width: 100%;
                     position: relative;
+                    overflow: hidden;
                     background: #0a0a0c;
+                }
+                .sandbox-layout--panel-hidden .sandbox-canvas-wrap {
+                    flex-basis: 100%;
+                    width: 100vw;
                 }
                 .sandbox-canvas {
                     width: 100%;
