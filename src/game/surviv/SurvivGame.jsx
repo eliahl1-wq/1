@@ -268,6 +268,7 @@ export default function SurvivGame() {
     }, []);
     const [liveSession, setLiveSession] = useState(() => !pendingAtMount);
     const [localTimer, setLocalTimer] = useState(0);
+    const [cashoutPending, setCashoutPending] = useState(false);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
     const [resetCountdown, setResetCountdown] = useState(null);
     const [isInventoryOpen, setIsInventoryOpen] = useState(false);
@@ -360,6 +361,7 @@ export default function SurvivGame() {
         setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
         setCurrentBalance(0);
         setLocalTimer(0);
+        setCashoutPending(false);
         setCashOutEndAt(0);
         cashoutActiveRef.current = false;
         cashOutEndAtRef.current = 0;
@@ -391,6 +393,7 @@ export default function SurvivGame() {
     const startCashoutCountdown = useCallback((seconds) => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         cashoutActiveRef.current = true;
+        setCashoutPending(true);
         cashOutTotalRef.current = seconds;
         const endAt = Date.now() + seconds * 1000;
         cashOutEndAtRef.current = endAt;
@@ -409,7 +412,6 @@ export default function SurvivGame() {
                 clearInterval(intervalId);
                 timerIntervalRef.current = null;
                 cashOutEndAtRef.current = 0;
-                cashoutActiveRef.current = false;
                 setCashOutEndAt(0);
                 rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             }
@@ -418,7 +420,7 @@ export default function SurvivGame() {
     }, []);
 
     const canCashOutRef = useRef(false);
-    canCashOutRef.current = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
+    canCashOutRef.current = gameReady && isConnected && !cashoutPending && localTimer <= 0 && cashedAmount === null && !isDead;
 
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
@@ -645,6 +647,7 @@ export default function SurvivGame() {
                 timerIntervalRef.current = null;
             }
             cashoutActiveRef.current = false;
+            setCashoutPending(false);
             cashOutEndAtRef.current = 0;
             setLocalTimer(0);
             setCashOutEndAt(0);
@@ -733,6 +736,7 @@ export default function SurvivGame() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            setCashoutPending(false);
             hasJoinedRef.current = false;
             const survived = Date.now() - (sessionStartAtRef.current || Date.now());
             const eliminations = Number(renderer.me?.kills) || sessionStatsRef.current.eliminations || 0;
@@ -754,6 +758,7 @@ export default function SurvivGame() {
 
         socket.on('RIP', () => {
             cashoutActiveRef.current = false;
+            setCashoutPending(false);
             renderer.clearInput();
             setIsDead(true);
             renderer.pause();
@@ -800,6 +805,7 @@ export default function SurvivGame() {
             const message = typeof msg === 'string' ? msg : msg?.message || 'Connection error';
             console.error('Surviv socket error:', message);
             cashoutActiveRef.current = false;
+            setCashoutPending(false);
             if (timerIntervalRef.current) {
                 clearInterval(timerIntervalRef.current);
                 timerIntervalRef.current = null;
@@ -957,7 +963,7 @@ export default function SurvivGame() {
         socketRef.current?.emit('adminClearBots', { token: authToken });
     }, [authToken]);
 
-    const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
+    const cashoutReady = gameReady && isConnected && !cashoutPending && localTimer <= 0 && cashedAmount === null && !isDead;
     const healthRatio = me ? Math.max(0, Math.min(1, (Number(me.hp) || 0) / (Number(me.maxHp) || 100))) : 0;
     const armorRatio = me ? Math.max(0, Math.min(1, (Number(me.armor) || 0) / 100)) : 0;
     const medkitRemainingMs = Math.max(0, Number(me?.medkitRemainingMs) || 0);
@@ -1025,6 +1031,7 @@ export default function SurvivGame() {
                     onHoldEnd={handleHoldEnd}
                     onComplete={handleCashOut}
                     localTimer={localTimer}
+                    pending={cashoutPending}
                     cashOutTotal={cashOutTotalRef.current}
                     cashOutEndAt={cashOutEndAtRef.current}
                 />
