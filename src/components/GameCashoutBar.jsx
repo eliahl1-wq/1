@@ -135,13 +135,14 @@ export default function GameCashoutBar({
     onHoldEnd,
     onComplete,
     localTimer = 0,
+    pending = false,
     cashOutTotal = 10,
     cashOutEndAt = 0,
 }) {
     const securingProgress = useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt);
 
     const { isHolding, startHold, cancelHold } = useHoldLogic(
-        disabled || localTimer > 0,
+        disabled || localTimer > 0 || pending,
         onHoldStart,
         onHoldEnd,
         onComplete
@@ -156,6 +157,22 @@ export default function GameCashoutBar({
         e.preventDefault();
         cancelHold();
     };
+
+    if (pending && localTimer <= 0) {
+        return (
+            <div className="game-cashout-wrap" role="status" aria-live="polite">
+                <div className="game-cashout-securing">
+                    <div className="game-cashout-securing-head">
+                        <span className="game-cashout-securing-label">Finalizing payout</span>
+                        <span className="game-cashout-securing-time">...</span>
+                    </div>
+                    <div className="game-cashout-securing-track">
+                        <div className="game-cashout-securing-fill game-cashout-securing-fill--pending" />
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (localTimer > 0) {
         return (
