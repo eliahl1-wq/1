@@ -627,7 +627,266 @@ export default function SurvivGame() {
             const rejoining = hasJoinedRef.current;
             setIsConnected(true);
             setConnectionError('');
-            if (blockAutoJoinRef.current) renderer.start();
+            if (!blockAutoJoinRef.current) {
+                setIsRejoining(rejoining);
+                emitSurvivJoin();
+            } else {
+                renderer.start();
+            }
+        });
+        socket.on('disconnect', () => {
+            const cashoutWasActive = cashoutActiveRef.current;
+            setIsConnected(false);
+            renderer.clearInput();
+            renderer.pause();
+            clearPendingActions();
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+            cashoutActiveRef.current = false;
+            cashOutEndAtRef.current = 0;
+            setLocalTimer(0);
+            setCashOutEndAt(0);
+            if (!blockAutoJoinRef.current) {
+                awaitingWelcomeRef.current = true;
+                setGameReady(false);
+                setIsRejoining(!cashoutWasActive);
+                setConnectionError(cashoutWasActive
+                    ? 'Connection was lost while securing your cashout. Returning safely without starting another paid match.'
+                    : '');
+                if (cashoutWasActive) {
+                    blockAutoJoinRef.current = true;
+                    navigate('/pre-game', { state: { selectedMode: 'surviv', cashoutInterrupted: true } });
+                }
+            }
+        });
+
+        socket.on('welcome', (player, world) => {
+            awaitingWelcomeRef.current = false;
+            hasJoinedRef.current = true;
+            myIdRef.current = player.id;
+            renderer.setMyId(player.id);
+            if (!world?.rejoin || !sessionStartAtRef.current) sessionStartAtRef.current = Date.now();
+            setCurrentBalance(player.dollarBalance ?? 0);
+            setConnectionError('');
+            setGameReady(true);
+            setIsRejoining(false);
+            renderer.setInputEnabled(true);
+            renderer.start();
+
+            if (world?.cashOutRemaining > 0) {
+                startCashoutCountdown(world.cashOutRemaining);
+            }
+        });
+
+        socket.on('survivTick', (tick) => {
+            renderer.updateState(tick);
+            if (IS_MOBILE) {
+                const nearby = !!renderer.getNearbyGroundWeapon() || !!renderer.getNearbyChest();
+                setCanMobileInteract(previous => previous === nearby ? previous : nearby);
+            }
+            if (tick.you) {
+                const nextMe = createSurvivUiSnapshot(tick.you);
+                sessionStatsRef.current = {
+                    ...sessionStatsRef.current,
+                    eliminations: Number(nextMe.kills) || 0,
+                };
+                const nextMeSignature = JSON.stringify(nextMe);
+                if (nextMeSignature !== meUiSignatureRef.current) {
+                    meUiSignatureRef.current = nextMeSignature;
+                    setMe(nextMe);
+                }
+                const chestId = nextMe.openedContainer?.id || null;
+                if (chestId && chestId !== prevOpenedContainerIdRef.current) {
+                    inventoryOpenRef.current = true;
+                    setIsInventoryOpen(true);
+                }
+                prevOpenedContainerIdRef.current = chestId;
+            }
+            if (tick.dollarBalance != null) {
+                setCurrentBalance(tick.dollarBalance);
+            }
+            if (tick.resetTime) {
+                const left = Math.max(0, Math.floor((tick.resetTime - Date.now()) / 1000));
+                if (left !== resetCountdownValueRef.current) {
+                    resetCountdownValueRef.current = left;
+                    setResetCountdown(left);
+                }
+            }
+            const alive = tick.aliveCount
+                ?? renderer.aliveCount
+                ?? (tick.players || []).filter(player => (player.hp || 0) > 0).length;
+            if (alive !== aliveCountValueRef.current) {
+                aliveCountValueRef.current = alive;
+                setAliveCount(alive);
+            }
+        });
+
+        socket.on('leaderboard', (data) => {
+            if (data?.leaderboard) setLeaderboard(data.leaderboard);
+        });
+
+        socket.on('cashOutStarting', ({ seconds }) => {
+            startCashoutCountdown(seconds || CASHOUT_SECONDS);
+        });
+
+        socket.on('cashOutSuccess', ({ amount }) => {
+            cashoutActiveRef.current = false;
+            hasJoinedRef.current = false;
+            const survived = Date.now() - (sessionStartAtRef.current || Date.now());
+            const eliminations = Number(renderer.me?.kills) || sessionStatsRef.current.eliminations || 0;
+            setSessionStats({ timeSurvivedMs: survived, eliminations });
+            setCashedAmount(amount);
+            setShowResultModal(true);
+            setIsDead(false);
+            renderer.clearInput();
+            renderer.pause();
+            savePendingResult('surviv', {
+                type: 'cashout',
+                cashedAmount: amount,
+                timeSurvivedMs: survived,
+                eliminations,
+            });
+            blockAutoJoinRef.current = true;
+            refreshUser();
+        });
+
+        socket.on('RIP', () => {
+            cashoutActiveRef.current = false;
+            renderer.clearInput();
+            setIsDead(true);
+            renderer.pause();
+        });
+
+        socket.on('died', (data) => {
+            hasJoinedRef.current = false;
+            const survived = Date.now() - (sessionStartAtRef.current || Date.now());
+            const eliminations = data?.kills ?? sessionStatsRef.current.eliminations;
+            setSessionStats({ timeSurvivedMs: survived, eliminations });
+            setIsDead(true);
+            setShowResultModal(true);
+            renderer.clearInput();
+            renderer.pause();
+            savePendingResult('surviv', {
+                type: 'death',
+                balance: data?.balance ?? currentBalanceRef.current,
+                timeSurvivedMs: survived,
+                eliminations,
+            });
+            blockAutoJoinRef.current = true;
+        });
+
+        socket.on('forcedDisconnect', () => {
+            blockAutoJoinRef.current = true;
+            awaitingWelcomeRef.current = true;
+            hasJoinedRef.current = false;
+            renderer.clearInput();
+            renderer.pause();
+            alert('This match was resumed in another tab or device.');
+            navigate('/pre-game', { state: { selectedMode: 'surviv' } });
+        });
+
+        socket.on('connect_error', () => {
+            setIsConnected(false);
+            setGameReady(false);
+            setIsRejoining(hasJoinedRef.current);
+            setConnectionError('Could not reach the game server. Reconnecting automatically...');
+        });
+        socket.io.on('reconnect_failed', () => {
+            setConnectionError('Automatic reconnect failed. Return to the lobby and try again.');
+        });
+        socket.on('error', (msg) => {
+            const message = typeof msg === 'string' ? msg : msg?.message || 'Connection error';
+            console.error('Surviv socket error:', message);
+            cashoutActiveRef.current = false;
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+            setLocalTimer(0);
+            setCashOutEndAt(0);
+            if (!hasJoinedRef.current) {
+                blockAutoJoinRef.current = true;
+                alert(message);
+                navigate('/pre-game', { state: { selectedMode: 'surviv' } });
+                return;
+            }
+            alert(message);
+        });
+
+        inputIntervalRef.current = setInterval(() => {
+            if (
+                !socket.connected
+                || !hasJoinedRef.current
+                || awaitingWelcomeRef.current
+                || blockInputRef.current
+                || document.hidden
+            ) return;
+
+            const payload = renderer.getInputPayload();
+            let hasAction = false;
+            if (reloadPendingRef.current) {
+                payload.reload = true;
+                reloadPendingRef.current = false;
+                hasAction = true;
+            }
+            if (useMedkitPendingRef.current) {
+                payload.useMedkit = true;
+                useMedkitPendingRef.current = false;
+                hasAction = true;
+            }
+            if (pickupWeaponPendingRef.current) {
+                payload.pickupWeapon = true;
+                pickupWeaponPendingRef.current = false;
+                hasAction = true;
+            }
+            if (equipSlotPendingRef.current != null) {
+                payload.equipSlot = equipSlotPendingRef.current;
+                equipSlotPendingRef.current = null;
+                hasAction = true;
+            }
+            if (openChestPendingRef.current) {
+                payload.openChestId = openChestPendingRef.current;
+                openChestPendingRef.current = null;
+                hasAction = true;
+            }
+            if (takeChestItemPendingRef.current) {
+                payload.takeChestItem = takeChestItemPendingRef.current;
+                takeChestItemPendingRef.current = null;
+                hasAction = true;
+            }
+            if (putChestItemPendingRef.current) {
+                payload.putChestItem = putChestItemPendingRef.current;
+                putChestItemPendingRef.current = null;
+                hasAction = true;
+            }
+            if (dropItemPendingRef.current) {
+                payload.dropItem = dropItemPendingRef.current;
+                dropItemPendingRef.current = null;
+                hasAction = true;
+            }
+            if (closeChestPendingRef.current) {
+                payload.closeChest = true;
+                closeChestPendingRef.current = false;
+                hasAction = true;
+            }
+
+            const continuousSignature = [
+                Math.round((Number(payload.dx) || 0) * 1000),
+                Math.round((Number(payload.dy) || 0) * 1000),
+                Math.round((Number(payload.aimAngle) || 0) * 1000),
+                payload.shooting ? 1 : 0,
+            ].join(':');
+            const now = Date.now();
+            if (!hasAction && continuousSignature === lastContinuousInput && now - lastInputSentAt < 250) return;
+            lastContinuousInput = continuousSignature;
+            lastInputSentAt = now;
+            if (hasAction) socket.emit('survivInput', payload);
+            else socket.volatile.emit('survivInput', payload);
+        }, 1000 / 30);
+
+        if (blockAutoJoinRef.current) renderer.start();
 
         return () => {
             clearInterval(inputIntervalRef.current);
