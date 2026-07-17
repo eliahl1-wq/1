@@ -357,6 +357,9 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [subTab, setSubTab] = useState('overview');
+    const [visualBalanceInput, setVisualBalanceInput] = useState('');
+    const [visualBalanceSaving, setVisualBalanceSaving] = useState(false);
+    const [visualBalanceMessage, setVisualBalanceMessage] = useState('');
 
     useEffect(() => {
         let cancelled = false;
@@ -365,7 +368,11 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
             setError('');
             try {
                 const data = await fetchAdmin(`/api/admin/dashboard/users/${userId}`);
-                if (!cancelled) setDetail(data);
+                if (!cancelled) {
+                    setDetail(data);
+                    setVisualBalanceInput(String(data.user?.visualBalanceOverrideUsd ?? data.user?.balanceUsd ?? 0));
+                    setVisualBalanceMessage('');
+                }
             } catch (err) {
                 if (!cancelled) setError(err.message || 'Could not load user');
             } finally {
@@ -374,6 +381,36 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
         })();
         return () => { cancelled = true; };
     }, [userId, fetchAdmin]);
+
+    const updateVisualBalance = async (reset = false) => {
+        const parsed = Number(String(visualBalanceInput).replace(',', '.'));
+        if (!reset && (!Number.isFinite(parsed) || parsed < 0)) {
+            setVisualBalanceMessage('Enter a valid balance of $0 or more.');
+            return;
+        }
+        setVisualBalanceSaving(true);
+        setVisualBalanceMessage('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${userId}/visual-balance`, {
+                method: 'PUT',
+                body: JSON.stringify(reset ? { reset: true } : { balanceUsd: parsed }),
+            });
+            setDetail(current => ({
+                ...current,
+                user: {
+                    ...current.user,
+                    visualBalanceOverrideUsd: result.visualBalanceOverrideUsd,
+                    displayBalanceUsd: result.displayBalanceUsd,
+                },
+            }));
+            setVisualBalanceInput(String(result.displayBalanceUsd));
+            setVisualBalanceMessage(reset ? 'Reset to the real wallet balance.' : 'Visual balance saved.');
+        } catch (err) {
+            setVisualBalanceMessage(err.message || 'Could not update visual balance.');
+        } finally {
+            setVisualBalanceSaving(false);
+        }
+    };
 
     const u = detail?.user;
     const stats = detail?.stats;
@@ -410,7 +447,11 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                 ) : detail && (
                     <>
                         <div className="admin-user-modal-stats">
-                            <StatCard label="Balance" value={formatUsd(u.balanceUsd)} sub={formatSol(u.balanceSol)} />
+                            <StatCard
+                                label={u.visualBalanceOverrideUsd != null ? 'Visual balance' : 'Balance'}
+                                value={formatUsd(u.displayBalanceUsd ?? u.balanceUsd)}
+                                sub={u.visualBalanceOverrideUsd != null ? `Real: ${formatUsd(u.balanceUsd)} · UI only` : formatSol(u.balanceSol)}
+                            />
                             <StatCard label="Available rewards" value={formatUsd(rewards?.totalAvailableUsd)} sub={u.rewardsDisabled ? 'Rewards blocked' : 'Sponsored + retained + tournament'} />
                             <StatCard label="Playtime" value={formatDuration(u.playtime ?? 0)} sub={`Last active ${formatRelativeTime(u.latestActivityAt)}`} />
                             <StatCard label="Games played" value={stats.gamesPlayed} sub={`${stats.wins}W · ${stats.losses}L · ${stats.deaths} deaths`} />
@@ -457,6 +498,38 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                         <div className="admin-user-modal-body">
                             {subTab === 'overview' && (
                                 <div style={{ display: 'grid', gap: '16px', fontSize: '0.82rem' }}>
+                                    <section style={{ padding: '16px', border: '1px solid rgba(99,102,241,.35)', borderRadius: 'var(--r-xl)', background: 'rgba(99,102,241,.07)' }}>
+                                        <p className="label" style={{ marginBottom: '8px' }}>Visual wallet balance</p>
+                                        <p style={{ margin: '0 0 12px', color: 'var(--text-2)', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                                            Changes what this user sees in Pre-game and the UI only. Real SOL, entries, cashouts and withdrawals are unchanged.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'end' }}>
+                                            <label style={{ display: 'grid', gap: '5px', minWidth: '190px', flex: '1 1 220px' }}>
+                                                <span style={{ color: 'var(--text-2)', fontSize: '0.72rem' }}>Displayed balance (USD)</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="1000000000"
+                                                    step="0.01"
+                                                    value={visualBalanceInput}
+                                                    onChange={event => setVisualBalanceInput(event.target.value)}
+                                                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(0,0,0,.25)', color: 'var(--text-h)' }}
+                                                />
+                                            </label>
+                                            <button type="button" className="btn btn-primary" disabled={visualBalanceSaving} onClick={() => updateVisualBalance(false)}>
+                                                {visualBalanceSaving ? 'Saving…' : 'Save visual balance'}
+                                            </button>
+                                            <button type="button" className="btn btn-ghost" disabled={visualBalanceSaving || u.visualBalanceOverrideUsd == null} onClick={() => updateVisualBalance(true)}>
+                                                Reset to real balance
+                                            </button>
+                                        </div>
+                                        {visualBalanceMessage && (
+                                            <p style={{ margin: '10px 0 0', color: visualBalanceMessage.includes('Could not') || visualBalanceMessage.includes('valid') ? '#ef4444' : '#4ade80', fontSize: '0.75rem' }}>
+                                                {visualBalanceMessage}
+                                            </p>
+                                        )}
+                                    </section>
+
                                     <section style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', background: 'rgba(255,255,255,0.02)' }}>
                                         <p className="label" style={{ marginBottom: '12px' }}>Account & access</p>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
