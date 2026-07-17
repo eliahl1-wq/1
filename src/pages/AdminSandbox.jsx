@@ -729,12 +729,17 @@ export default function AdminSandbox() {
         if (!canvas) return undefined;
 
         const onCanvasClick = (e) => {
-            if (pausedRef.current || !editModeRef.current || !selectedWormRef.current || !rendererRef.current) return;
+            if (pausedRef.current || !editModeRef.current || !selectedWormRef.current) return;
             const rect = canvas.getBoundingClientRect();
             const screenX = e.clientX - rect.left;
             const screenY = e.clientY - rect.top;
-            const cam = rendererRef.current.camera || { x: 0, y: 0 };
-            const zoom = rendererRef.current.zoom || 1;
+            const localEngine = localEngineRef.current;
+            const cam = offlineMode
+                ? { x: localEngine?.player?.x || 0, y: localEngine?.player?.y || 0 }
+                : (rendererRef.current?.camera || { x: 0, y: 0 });
+            const zoom = offlineMode
+                ? (localEngine?.viewScale() || 1)
+                : (rendererRef.current?.zoom || 1);
             const worldX = (screenX - rect.width / 2) / zoom + cam.x;
             const worldY = (screenY - rect.height / 2) / zoom + cam.y;
             const wormId = selectedWormRef.current;
