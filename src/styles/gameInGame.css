@@ -2501,25 +2501,43 @@
 
 .surviv-controls-hint {
     position: fixed;
-    bottom: 20px;
-    left: 50%;
+    bottom: 112px;
+    left: 20px;
     z-index: 90;
-    transform: translateX(-50%);
-    max-width: calc(100vw - 580px);
+    max-width: min(360px, calc(100vw - 40px));
     overflow: hidden;
-    padding: 6px 10px;
-    border: 1px solid rgba(225, 204, 150, 0.15);
-    border-radius: 5px;
-    background: rgba(5, 8, 6, 0.66);
-    color: rgba(240, 229, 196, 0.62);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgba(214, 220, 220, 0.42);
     font-family: var(--mono);
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-align: center;
+    font-size: 0.52rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
-    backdrop-filter: blur(8px);
+    pointer-events: none;
+}
+
+/* Keep meta-information calm and out of the play area. */
+.surviv-game-page .game-reset-banner.surviv-server-timer,
+.surviv-game-page .game-reset-banner.surviv-server-timer.is-warning {
+    top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
+    right: max(18px, calc(env(safe-area-inset-right, 0px) + 14px));
+    left: auto;
+    transform: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent !important;
+    color: rgba(214, 220, 220, 0.42) !important;
+    box-shadow: none;
+    font-size: 0.52rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     pointer-events: none;
 }
 
