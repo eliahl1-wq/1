@@ -13,6 +13,7 @@ import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlay
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
+import GameSocialOverlay from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import MobileGameSession from '../../components/MobileGameSession';
@@ -1156,6 +1157,8 @@ export default function SlitherGame() {
 
 
             {/* Leaderboard — matches Agar */}
+
+            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} />
 
             <div className="game-leaderboard" style={{
 
