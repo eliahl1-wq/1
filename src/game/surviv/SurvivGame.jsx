@@ -7,6 +7,7 @@ import { normalizeSurvivEntryFee, formatUsd } from '../../constants/economy';
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
+import GameSocialOverlay from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import MobileGameSession from '../../components/MobileGameSession';
 import SurvivMobileControls from '../../components/SurvivMobileControls';
@@ -1285,6 +1286,8 @@ export default function SurvivGame() {
                     onClose={handleLobby}
                 />
             )}
+
+            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} />
 
             {/* Side-by-Side React Inventory Overlay */}
             {isInventoryOpen && me && (
