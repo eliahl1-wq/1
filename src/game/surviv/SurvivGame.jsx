@@ -26,6 +26,7 @@ const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
 
 const WEAPON_LABELS = {
     fists: 'Fists',
+    knife: 'Combat Knife',
     pistol: 'M9 Pistol',
     revolver: 'R8 Revolver',
     smg: 'Vector SMG',
@@ -89,6 +90,13 @@ function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
                 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
                     <path d="M5.5 11.5V8.8a1.3 1.3 0 0 1 2.6 0v1.7-3a1.3 1.3 0 0 1 2.6 0v3-2.2a1.3 1.3 0 0 1 2.6 0v2.9-1.5a1.3 1.3 0 0 1 2.6 0v4.1c0 3.8-2.6 6.2-6.1 6.2-3 0-5.3-2.2-5.3-5.1v-2.2c0-.7.4-1.2 1-1.2Z" />
                     <path d="M15.5 8.5V7.2a1.2 1.2 0 0 1 2.4 0v4.1M18 9.2a1.2 1.2 0 0 1 2.4 0v4.4c0 2.4-1.2 4.4-3.2 5.5" />
+                </svg>
+            );
+        case 'knife':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="m5 19 5.1-5.1 7.9-7.9c1.1-1.1 2.7-1.4 3.9-.7l-1.1 1.1.8.8-1.2 1.2.8.8-1.5 1.5.8.8-2.2 2.2c-1.3 1.3-3.4 1.3-4.7 0L11 18.1 5.9 23H3v-2.9L5 18.1Z" />
+                    <path d="m9.2 14.8 2 2" />
                 </svg>
             );
         case 'pistol':
@@ -202,6 +210,8 @@ export default function SurvivGame() {
     const closeChestPendingRef = useRef(false);
     const putChestItemPendingRef = useRef(null);
     const dropItemPendingRef = useRef(null);
+    const throwGrenadePendingRef = useRef(false);
+    const swapWeaponSlotsPendingRef = useRef(null);
     const meUiSignatureRef = useRef('');
     const resetCountdownValueRef = useRef(null);
     const aliveCountValueRef = useRef(0);
@@ -438,6 +448,7 @@ export default function SurvivGame() {
             cashoutSeconds: localTimer,
             cashoutTotal: cashOutTotalRef.current || CASHOUT_SECONDS,
             cashoutEndAt: cashOutEndAtRef.current,
+
         });
     }, [currentBalance, localTimer]);
 
@@ -577,12 +588,7 @@ export default function SurvivGame() {
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
             if (action === 'pickupWeapon') pickupWeaponPendingRef.current = true;
-            if (action === 'dropWeapon') {
-                const activeSlot = renderer.me?.activeWeaponSlot ?? -1;
-                if (activeSlot >= 0 && renderer.me?.inventory?.weapons?.[activeSlot]) {
-                    dropItemPendingRef.current = { itemKey: 'weapon', slotIdx: activeSlot };
-                }
-            }
+            if (action === 'throwGrenade') throwGrenadePendingRef.current = true;
             if (typeof action === 'string' && action.startsWith('equipSlot:')) {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
             }
@@ -848,6 +854,16 @@ export default function SurvivGame() {
                 pickupWeaponPendingRef.current = false;
                 hasAction = true;
             }
+            if (throwGrenadePendingRef.current) {
+                payload.throwGrenade = true;
+                throwGrenadePendingRef.current = false;
+                hasAction = true;
+            }
+            if (swapWeaponSlotsPendingRef.current) {
+                payload.swapWeaponSlots = swapWeaponSlotsPendingRef.current;
+                swapWeaponSlotsPendingRef.current = null;
+                hasAction = true;
+            }
             if (equipSlotPendingRef.current != null) {
                 payload.equipSlot = equipSlotPendingRef.current;
                 equipSlotPendingRef.current = null;
@@ -883,6 +899,7 @@ export default function SurvivGame() {
                 Math.round((Number(payload.dx) || 0) * 1000),
                 Math.round((Number(payload.dy) || 0) * 1000),
                 Math.round((Number(payload.aimAngle) || 0) * 1000),
+
                 payload.shooting ? 1 : 0,
             ].join(':');
             const now = Date.now();
@@ -1170,7 +1187,7 @@ export default function SurvivGame() {
             {gameReady && me && !showResultModal && (
                 <div className="surviv-weapons-hotbar">
                     {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                        const weaponId = slotIdx === 2 ? 'fists' : (me.inventory?.weapons?.[slotIdx] || null);
+                        const weaponId = slotIdx === 2 ? (me.inventory?.meleeWeapon || 'fists') : (me.inventory?.weapons?.[slotIdx] || null);
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const activeSlot = Number.isInteger(me.activeWeaponSlot)
                             ? me.activeWeaponSlot
@@ -1331,8 +1348,9 @@ export default function SurvivGame() {
                                     <h4 className="section-subtitle">WEAPONS</h4>
                                     <div className="weapons-grid">
                                         {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                                            const weaponId = slotIdx === 2 ? 'fists' : (me.inventory?.weapons?.[slotIdx] || null);
+                                            const weaponId = slotIdx === 2 ? (me.inventory?.meleeWeapon || 'fists') : (me.inventory?.weapons?.[slotIdx] || null);
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
+
                                             const activeSlot = Number.isInteger(me.activeWeaponSlot)
                                                 ? me.activeWeaponSlot
                                                 : (me.inventory?.weapons?.indexOf(me.weapon) ?? 0);
@@ -1343,7 +1361,7 @@ export default function SurvivGame() {
                                             return (
                                                 <div 
                                                     key={`weapon-slot-${slotIdx}`}
-                                                    className={`weapon-slot-card ${isActive ? 'active-slot' : ''} ${borderRarityClass} ${weaponId ? 'has-item' : 'empty-slot'}`}
+                                                    className={`weapon-slot-card ${isActive ? 'active-slot' : ''} ${borderRarityClass} ${weaponId ? 'has-item' : 'empty-slot'} ${(inventoryDrag?.key === 'weapon' && inventoryDrag?.source !== 'backpack') || (inventoryDrag?.source === 'backpack' && inventoryDrag?.slotIdx !== slotIdx) ? 'is-drop-target' : ''}`}
                                                     draggable={!!weaponId && weaponId !== 'fists'}
                                                     onDragStart={(e) => {
                                                         if (weaponId && weaponId !== 'fists') {
@@ -1351,6 +1369,21 @@ export default function SurvivGame() {
                                                         }
                                                     }}
                                                     onDragEnd={finishInventoryDrag}
+                                                    onDragOver={(e) => {
+                                                        const dragged = readInventoryDrag(e);
+                                                        if (dragged?.key === 'weapon' && (dragged.source === 'chest' || dragged.slotIdx !== slotIdx)) e.preventDefault();
+                                                    }}
+                                                    onDrop={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        const dragged = readInventoryDrag(e);
+                                                        if (dragged?.source === 'chest' && dragged.key === 'weapon' && me.openedContainer?.id) {
+                                                            takeChestItemPendingRef.current = { chestId: me.openedContainer.id, itemKey: 'weapon', targetSlot: slotIdx };
+                                                        } else if (dragged?.source === 'backpack' && dragged.key === 'weapon' && dragged.slotIdx !== slotIdx) {
+                                                            swapWeaponSlotsPendingRef.current = { fromSlot: dragged.slotIdx, toSlot: slotIdx };
+                                                        }
+                                                        finishInventoryDrag();
+                                                    }}
                                                     onClick={() => {
                                                         if (weaponId) {
                                                             equipSlotPendingRef.current = slotIdx;
@@ -1515,6 +1548,39 @@ export default function SurvivGame() {
                                             )}
                                         </div>
 
+                                        {/* Grenade Slot */}
+                                        <div
+                                            className={`item-slot-card grenade-slot ${(me.inventory?.grenades || 0) > 0 ? 'has-qty' : 'empty-qty'}`}
+                                            draggable={(me.inventory?.grenades || 0) > 0}
+                                            onDragStart={(e) => {
+                                                if ((me.inventory?.grenades || 0) > 0) beginInventoryDrag(e, { source: 'backpack', key: 'grenades' });
+                                            }}
+                                            onDragEnd={finishInventoryDrag}
+                                            onClick={() => {
+                                                const qty = me.inventory?.grenades || 0;
+                                                if (qty > 0 && me.openedContainer?.id) {
+                                                    putChestItemPendingRef.current = { chestId: me.openedContainer.id, itemKey: 'grenades' };
+                                                } else if (qty > 0) {
+                                                    throwGrenadePendingRef.current = true;
+                                                }
+                                            }}
+                                            style={{ cursor: (me.inventory?.grenades || 0) > 0 ? 'pointer' : 'default' }}
+                                        >
+                                            <div className="item-slot-icon-container">
+                                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2"><path d="M9 4h6v4H9zM7 8h10v3a6 6 0 0 1-10 0V8Z"/><path d="M12 4V2M15 5l2-1"/><path d="M8 14h8M9.5 17h5"/></svg>
+                                            </div>
+                                            <div className="item-slot-details">
+                                                <span className="item-slot-name">GRENADES</span>
+                                                <span className="item-slot-value">{me.inventory?.grenades || 0} / 3</span>
+                                            </div>
+                                            {(me.inventory?.grenades || 0) > 0 && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
+                                                    <span className="item-action-badge" style={{ position: 'static', color: me.openedContainer ? '#a855f7' : '#f59e0b' }}>{me.openedContainer ? 'DEPOSIT' : 'G THROW'}</span>
+                                                    <button className="slot-drop-btn" style={{ background: 'rgba(255, 59, 48, 0.16)', border: '1px solid rgba(255, 59, 48, 0.3)', borderRadius: '3px', color: '#ff6b6b', fontSize: '0.5rem', padding: '1px 3px', cursor: 'pointer', fontWeight: 800 }} onClick={(e) => { e.stopPropagation(); dropItemPendingRef.current = { itemKey: 'grenades' }; }}>DROP</button>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         {/* Armor Slot */}
                                         <div 
                                             className={`item-slot-card armor-slot ${(me.armor || 0) > 0 ? 'has-qty' : 'empty-qty'}`}
@@ -1634,6 +1700,9 @@ export default function SurvivGame() {
                                                 } else if (item.kind === 'ammo') {
                                                     strokeColor = '#d7d1bb';
                                                     itemIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2"><path d="M6 3h12v18H6zM10 6h4v2h-4zM10 10h4v2h-4zM10 14h4v2h-4z"/></svg>;
+                                                } else if (item.kind === 'grenade') {
+                                                    strokeColor = '#f59e0b';
+                                                    itemIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2"><path d="M9 4h6v4H9zM7 8h10v3a6 6 0 0 1-10 0V8Z"/><path d="M12 4V2M15 5l2-1"/><path d="M8 14h8M9.5 17h5"/></svg>;
                                                 } else if (item.kind === 'armor') {
                                                     strokeColor = '#5d9cff';
                                                     itemIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
@@ -1680,3 +1749,4 @@ export default function SurvivGame() {
         </div>
     );
 }
+
