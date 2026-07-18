@@ -110,14 +110,20 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
-    // Auto-poll balance every 8 seconds so deposits and tournament deductions
-    // appear quickly without requiring manual navigation
+    // Keep wallet data fresh outside live Surviv matches. During a match the
+    // socket already carries the live balance, so polling /api/me is redundant.
     useEffect(() => {
-        if (!token) return;
-        const interval = setInterval(() => {
+        if (!token) return undefined;
+        const poll = () => {
+            if (document.hidden || window.location.pathname === '/surviv-game') return;
             refreshUser();
-        }, 8000);
-        return () => clearInterval(interval);
+        };
+        const interval = setInterval(poll, 15000);
+        document.addEventListener('visibilitychange', poll);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', poll);
+        };
     }, [token, refreshUser]);
 
     const login = (userData, newToken) => {
