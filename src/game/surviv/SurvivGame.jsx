@@ -1059,7 +1059,7 @@ export default function SurvivGame() {
 
             {gameReady && !IS_MOBILE && !showResultModal && !isDead && !isSpectating && (
                 <div className="surviv-controls-hint" aria-label="Game controls">
-                    MOUSE FIRE · F PICKUP · E OPEN · R RELOAD · H HEAL · 1–3 WEAPONS
+                    F PICKUP · E OPEN · R RELOAD · H HEAL · TAB INVENTORY
                 </div>
             )}
 
