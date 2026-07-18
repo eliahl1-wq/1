@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { lazy, Suspense, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -8,7 +8,7 @@ import Transactions from './pages/Transactions';
 import Profile from './pages/Profile';
 import Game from './game/agar/Game'; // Uppdaterad sökväg
 import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
-import SurvivGame from './game/surviv/SurvivGame';
+const SurvivGame = lazy(() => import('./game/surviv/SurvivGame'));
 import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
 import AdminDashboard from './pages/AdminDashboard';
@@ -137,7 +137,7 @@ function App() {
                 <Route path="/pre-game" element={<PreGame />} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
                 <Route path="/slither-game" element={<ArenaRoute><SlitherGame /></ArenaRoute>} />
-                <Route path="/surviv-game" element={<ArenaRoute><SurvivGame /></ArenaRoute>} />
+                <Route path="/surviv-game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><SurvivGame /></Suspense></ArenaRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                 <Route path="/gamemodes" element={<Gamemodes />} />

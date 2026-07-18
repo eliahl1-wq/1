@@ -36,7 +36,7 @@ const WEAPON_LABELS = {
     lmg: 'M249 LMG',
 };
 
-const SURVIV_WEAPON_SLOTS = [0, 1];
+const SURVIV_WEAPON_SLOTS = [0, 1, 2];
 
 const WEAPON_CLIP_SIZES = {
     fists: 0,
@@ -73,9 +73,12 @@ function createSurvivUiSnapshot(player) {
         medkitUseMs: player?.medkitUseMs,
         dollarBalance: player?.dollarBalance,
         kills: player?.kills,
+        activeWeaponSlot: Number.isInteger(player?.activeWeaponSlot) ? player.activeWeaponSlot : 2,
+        weaponSlotAmmo: Array.isArray(player?.weaponSlotAmmo) ? player.weaponSlotAmmo : [],
         weaponsAmmo: player?.weaponsAmmo || {},
         inventory: player?.inventory || null,
         openedContainer: player?.openedContainer || null,
+        outsideZone: !!player?.outsideZone,
     };
 }
 
@@ -182,6 +185,7 @@ export default function SurvivGame() {
     const inputIntervalRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const hasJoinedRef = useRef(false);
+    const awaitingWelcomeRef = useRef(false);
     const cashoutActiveRef = useRef(false);
     const myIdRef = useRef(null);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
@@ -239,6 +243,7 @@ export default function SurvivGame() {
 
     const finishInventoryDrag = () => setInventoryDrag(null);
     const [isRejoining, setIsRejoining] = useState(false);
+    const [connectionError, setConnectionError] = useState('');
     const [sessionStats, setSessionStatsState] = useState(() => (
         pendingAtMount
             ? { timeSurvivedMs: pendingAtMount.timeSurvivedMs ?? 0, eliminations: pendingAtMount.eliminations ?? 0 }
@@ -263,6 +268,7 @@ export default function SurvivGame() {
     }, []);
     const [liveSession, setLiveSession] = useState(() => !pendingAtMount);
     const [localTimer, setLocalTimer] = useState(0);
+    const [cashoutPending, setCashoutPending] = useState(false);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
     const [resetCountdown, setResetCountdown] = useState(null);
     const [isInventoryOpen, setIsInventoryOpen] = useState(false);
@@ -319,17 +325,43 @@ export default function SurvivGame() {
     const handlePlayAgain = useCallback(() => {
         clearPendingResult('surviv');
         blockAutoJoinRef.current = false;
+        awaitingWelcomeRef.current = true;
+        hasJoinedRef.current = false;
         localStorage.setItem('current_game_mode', 'surviv');
         localStorage.setItem('selected_gamemode', 'surviv');
         markGamemodePlayed('surviv');
 
+        rendererRef.current?.resetSession();
+        rendererRef.current?.start();
+        setGameReady(false);
+        setConnectionError('');
         setIsDead(false);
         setCashedAmount(null);
         setShowResultModal(false);
         setIsSpectating(false);
         setIsRejoining(true);
+        setMe(null);
+        meUiSignatureRef.current = '';
+        setLeaderboard([]);
+        setAliveCount(0);
+        aliveCountValueRef.current = 0;
+        setCanMobileInteract(false);
+        inventoryOpenRef.current = false;
+        setIsInventoryOpen(false);
+        prevOpenedContainerIdRef.current = null;
+        reloadPendingRef.current = false;
+        useMedkitPendingRef.current = false;
+        pickupWeaponPendingRef.current = false;
+        equipSlotPendingRef.current = null;
+        openChestPendingRef.current = null;
+        takeChestItemPendingRef.current = null;
+        putChestItemPendingRef.current = null;
+        dropItemPendingRef.current = null;
+        closeChestPendingRef.current = false;
         setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
+        setCurrentBalance(0);
         setLocalTimer(0);
+        setCashoutPending(false);
         setCashOutEndAt(0);
         cashoutActiveRef.current = false;
         cashOutEndAtRef.current = 0;
@@ -338,9 +370,6 @@ export default function SurvivGame() {
             setLiveSession(true);
             return;
         }
-
-        rendererRef.current?.resetSession();
-        rendererRef.current?.start();
 
         if (socketRef.current?.connected) {
             const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
@@ -352,7 +381,7 @@ export default function SurvivGame() {
                 skinColor: preferredSkin,
             });
         }
-    }, [authToken, liveSession]);
+    }, [authToken, liveSession, setCurrentBalance, setSessionStats]);
 
     const handleLobby = useCallback(() => {
         clearPendingResult('surviv');
@@ -364,6 +393,7 @@ export default function SurvivGame() {
     const startCashoutCountdown = useCallback((seconds) => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         cashoutActiveRef.current = true;
+        setCashoutPending(true);
         cashOutTotalRef.current = seconds;
         const endAt = Date.now() + seconds * 1000;
         cashOutEndAtRef.current = endAt;
@@ -390,16 +420,17 @@ export default function SurvivGame() {
     }, []);
 
     const canCashOutRef = useRef(false);
-    canCashOutRef.current = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
+    canCashOutRef.current = gameReady && isConnected && !cashoutPending && localTimer <= 0 && cashedAmount === null && !isDead;
 
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
         if (!socketRef.current?.connected) return;
         if (cashoutActiveRef.current) return;
         rendererRef.current?.setHoldStart(0);
-        startCashoutCountdown(CASHOUT_SECONDS);
+        cashoutActiveRef.current = true;
+        setCashoutPending(true);
         socketRef.current.emit('cashOut');
-    }, [startCashoutCountdown]);
+    }, []);
 
     useLayoutEffect(() => {
         rendererRef.current?.setHud({
@@ -411,9 +442,15 @@ export default function SurvivGame() {
     }, [currentBalance, localTimer]);
 
     useEffect(() => {
+        const previousBackground = document.body.style.backgroundColor;
+        const previousTitle = document.title;
         document.body.style.backgroundColor = '#0a0a0c';
         document.title = 'AgarStake | Surviv';
         stopSessionRecording();
+        return () => {
+            document.body.style.backgroundColor = previousBackground;
+            document.title = previousTitle;
+        };
     }, []);
 
     useEffect(() => {
@@ -445,11 +482,12 @@ export default function SurvivGame() {
     useEffect(() => {
         if (!isSpectating) return undefined;
         const syncCam = () => {
+            if (document.hidden || !socketRef.current?.connected) return;
             const cam = specCamRef.current;
-            socketRef.current?.emit('survivSpectateCam', { x: cam.x, y: cam.y });
+            socketRef.current.volatile.emit('survivSpectateCam', { x: cam.x, y: cam.y });
         };
         syncCam();
-        const id = setInterval(syncCam, 120);
+        const id = setInterval(syncCam, 250);
         return () => clearInterval(id);
     }, [isSpectating, specCamRef]);
 
@@ -474,6 +512,35 @@ export default function SurvivGame() {
             reconnection: true,
         });
         socketRef.current = socket;
+        let lastContinuousInput = '';
+        let lastInputSentAt = 0;
+
+        const clearPendingActions = () => {
+            reloadPendingRef.current = false;
+            useMedkitPendingRef.current = false;
+            pickupWeaponPendingRef.current = false;
+            equipSlotPendingRef.current = null;
+            openChestPendingRef.current = null;
+            takeChestItemPendingRef.current = null;
+            putChestItemPendingRef.current = null;
+            dropItemPendingRef.current = null;
+            closeChestPendingRef.current = false;
+        };
+        const emitSurvivJoin = () => {
+            if (!socket.connected || blockAutoJoinRef.current) return;
+            const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
+            awaitingWelcomeRef.current = true;
+            setGameReady(false);
+            setConnectionError('');
+            localStorage.setItem('current_game_mode', 'surviv');
+            socket.emit('joinGame', {
+                username: matchNickname,
+                token: authToken,
+                mode: 'surviv',
+                entryFeeUsd,
+                skinColor: preferredSkin,
+            });
+        };
 
         const onKeyDown = (e) => {
             if (blockInputRef.current) return;
@@ -535,24 +602,81 @@ export default function SurvivGame() {
             }
         };
         const onPointerUp = () => renderer.handlePointerUp();
+        const neutralizeInput = () => {
+            renderer.clearInput();
+            clearPendingActions();
+            if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
+                const neutral = renderer.getInputPayload();
+                neutral.dx = 0;
+                neutral.dy = 0;
+                neutral.shooting = false;
+                socket.volatile.emit('survivInput', neutral);
+            }
+        };
+        const onWindowBlur = () => neutralizeInput();
+        const onVisibilityChange = () => {
+            if (document.hidden) neutralizeInput();
+        };
 
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
         canvasRef.current.addEventListener('pointermove', onPointerMove);
         canvasRef.current.addEventListener('pointerdown', onPointerDown);
         window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('blur', onWindowBlur);
+        document.addEventListener('visibilitychange', onVisibilityChange);
 
-        socket.on('connect', () => setIsConnected(true));
-        socket.on('disconnect', () => setIsConnected(false));
+        socket.on('connect', () => {
+            const rejoining = hasJoinedRef.current;
+            setIsConnected(true);
+            setConnectionError('');
+            if (!blockAutoJoinRef.current) {
+                setIsRejoining(rejoining);
+                emitSurvivJoin();
+            } else {
+                renderer.start();
+            }
+        });
+        socket.on('disconnect', () => {
+            const cashoutWasActive = cashoutActiveRef.current;
+            setIsConnected(false);
+            renderer.clearInput();
+            renderer.pause();
+            clearPendingActions();
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+            cashoutActiveRef.current = false;
+            setCashoutPending(false);
+            cashOutEndAtRef.current = 0;
+            setLocalTimer(0);
+            setCashOutEndAt(0);
+            if (!blockAutoJoinRef.current) {
+                awaitingWelcomeRef.current = true;
+                setGameReady(false);
+                setIsRejoining(!cashoutWasActive);
+                setConnectionError(cashoutWasActive
+                    ? 'Connection was lost while securing your cashout. Returning safely without starting another paid match.'
+                    : '');
+                if (cashoutWasActive) {
+                    blockAutoJoinRef.current = true;
+                    navigate('/pre-game', { state: { selectedMode: 'surviv', cashoutInterrupted: true } });
+                }
+            }
+        });
 
         socket.on('welcome', (player, world) => {
+            awaitingWelcomeRef.current = false;
             hasJoinedRef.current = true;
             myIdRef.current = player.id;
             renderer.setMyId(player.id);
-            sessionStartAtRef.current = Date.now();
+            if (!world?.rejoin || !sessionStartAtRef.current) sessionStartAtRef.current = Date.now();
             setCurrentBalance(player.dollarBalance ?? 0);
+            setConnectionError('');
             setGameReady(true);
             setIsRejoining(false);
+            renderer.setInputEnabled(true);
             renderer.start();
 
             if (world?.cashOutRemaining > 0) {
@@ -563,11 +687,15 @@ export default function SurvivGame() {
         socket.on('survivTick', (tick) => {
             renderer.updateState(tick);
             if (IS_MOBILE) {
-                const nearby = !!renderer.getNearbyChest();
+                const nearby = !!renderer.getNearbyGroundWeapon() || !!renderer.getNearbyChest();
                 setCanMobileInteract(previous => previous === nearby ? previous : nearby);
             }
             if (tick.you) {
                 const nextMe = createSurvivUiSnapshot(tick.you);
+                sessionStatsRef.current = {
+                    ...sessionStatsRef.current,
+                    eliminations: Number(nextMe.kills) || 0,
+                };
                 const nextMeSignature = JSON.stringify(nextMe);
                 if (nextMeSignature !== meUiSignatureRef.current) {
                     meUiSignatureRef.current = nextMeSignature;
@@ -590,8 +718,9 @@ export default function SurvivGame() {
                     setResetCountdown(left);
                 }
             }
-            // Track alive player count
-            const alive = tick.aliveCount ?? renderer.aliveCount ?? (tick.players || []).filter(p => (p.hp || 0) > 0).length;
+            const alive = tick.aliveCount
+                ?? renderer.aliveCount
+                ?? (tick.players || []).filter(player => (player.hp || 0) > 0).length;
             if (alive !== aliveCountValueRef.current) {
                 aliveCountValueRef.current = alive;
                 setAliveCount(alive);
@@ -608,33 +737,42 @@ export default function SurvivGame() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            setCashoutPending(false);
+            hasJoinedRef.current = false;
             const survived = Date.now() - (sessionStartAtRef.current || Date.now());
-            setSessionStats(prev => ({ ...prev, timeSurvivedMs: survived }));
+            const eliminations = Number(renderer.me?.kills) || sessionStatsRef.current.eliminations || 0;
+            setSessionStats({ timeSurvivedMs: survived, eliminations });
             setCashedAmount(amount);
             setShowResultModal(true);
             setIsDead(false);
+            renderer.clearInput();
             renderer.pause();
             savePendingResult('surviv', {
                 type: 'cashout',
                 cashedAmount: amount,
                 timeSurvivedMs: survived,
-                eliminations: sessionStatsRef.current.eliminations,
+                eliminations,
             });
             blockAutoJoinRef.current = true;
             refreshUser();
         });
 
         socket.on('RIP', () => {
+            cashoutActiveRef.current = false;
+            setCashoutPending(false);
+            renderer.clearInput();
             setIsDead(true);
             renderer.pause();
         });
 
         socket.on('died', (data) => {
+            hasJoinedRef.current = false;
             const survived = Date.now() - (sessionStartAtRef.current || Date.now());
             const eliminations = data?.kills ?? sessionStatsRef.current.eliminations;
             setSessionStats({ timeSurvivedMs: survived, eliminations });
             setIsDead(true);
             setShowResultModal(true);
+            renderer.clearInput();
             renderer.pause();
             savePendingResult('surviv', {
                 type: 'death',
@@ -646,70 +784,116 @@ export default function SurvivGame() {
         });
 
         socket.on('forcedDisconnect', () => {
-            window.location.reload();
-        });
-
-        socket.on('error', (msg) => {
-            console.error('Surviv socket error:', msg);
-            alert(typeof msg === 'string' ? msg : msg?.message || 'Connection error');
+            blockAutoJoinRef.current = true;
+            awaitingWelcomeRef.current = true;
+            hasJoinedRef.current = false;
+            renderer.clearInput();
+            renderer.pause();
+            alert('This match was resumed in another tab or device.');
             navigate('/pre-game', { state: { selectedMode: 'surviv' } });
         });
 
+        socket.on('connect_error', () => {
+            setIsConnected(false);
+            setGameReady(false);
+            setIsRejoining(hasJoinedRef.current);
+            setConnectionError('Could not reach the game server. Reconnecting automatically...');
+        });
+        socket.io.on('reconnect_failed', () => {
+            setConnectionError('Automatic reconnect failed. Return to the lobby and try again.');
+        });
+        socket.on('error', (msg) => {
+            const message = typeof msg === 'string' ? msg : msg?.message || 'Connection error';
+            console.error('Surviv socket error:', message);
+            cashoutActiveRef.current = false;
+            setCashoutPending(false);
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+            setLocalTimer(0);
+            setCashOutEndAt(0);
+            if (!hasJoinedRef.current) {
+                blockAutoJoinRef.current = true;
+                alert(message);
+                navigate('/pre-game', { state: { selectedMode: 'surviv' } });
+                return;
+            }
+            alert(message);
+        });
+
         inputIntervalRef.current = setInterval(() => {
-            if (!socket.connected || blockInputRef.current) return;
+            if (
+                !socket.connected
+                || !hasJoinedRef.current
+                || awaitingWelcomeRef.current
+                || blockInputRef.current
+                || document.hidden
+            ) return;
+
             const payload = renderer.getInputPayload();
+            let hasAction = false;
             if (reloadPendingRef.current) {
                 payload.reload = true;
                 reloadPendingRef.current = false;
+                hasAction = true;
             }
             if (useMedkitPendingRef.current) {
                 payload.useMedkit = true;
                 useMedkitPendingRef.current = false;
+                hasAction = true;
             }
             if (pickupWeaponPendingRef.current) {
                 payload.pickupWeapon = true;
                 pickupWeaponPendingRef.current = false;
+                hasAction = true;
             }
             if (equipSlotPendingRef.current != null) {
                 payload.equipSlot = equipSlotPendingRef.current;
                 equipSlotPendingRef.current = null;
+                hasAction = true;
             }
             if (openChestPendingRef.current) {
                 payload.openChestId = openChestPendingRef.current;
                 openChestPendingRef.current = null;
+                hasAction = true;
             }
             if (takeChestItemPendingRef.current) {
                 payload.takeChestItem = takeChestItemPendingRef.current;
                 takeChestItemPendingRef.current = null;
+                hasAction = true;
             }
             if (putChestItemPendingRef.current) {
                 payload.putChestItem = putChestItemPendingRef.current;
                 putChestItemPendingRef.current = null;
+                hasAction = true;
             }
             if (dropItemPendingRef.current) {
                 payload.dropItem = dropItemPendingRef.current;
                 dropItemPendingRef.current = null;
+                hasAction = true;
             }
             if (closeChestPendingRef.current) {
                 payload.closeChest = true;
                 closeChestPendingRef.current = false;
+                hasAction = true;
             }
-            socket.emit('survivInput', payload);
+
+            const continuousSignature = [
+                Math.round((Number(payload.dx) || 0) * 1000),
+                Math.round((Number(payload.dy) || 0) * 1000),
+                Math.round((Number(payload.aimAngle) || 0) * 1000),
+                payload.shooting ? 1 : 0,
+            ].join(':');
+            const now = Date.now();
+            if (!hasAction && continuousSignature === lastContinuousInput && now - lastInputSentAt < 250) return;
+            lastContinuousInput = continuousSignature;
+            lastInputSentAt = now;
+            if (hasAction) socket.emit('survivInput', payload);
+            else socket.volatile.emit('survivInput', payload);
         }, 1000 / 30);
 
-        if (!blockAutoJoinRef.current) {
-            const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
-            localStorage.setItem('current_game_mode', 'surviv');
-            socket.emit('joinGame', {
-                username: matchNickname,
-                token: authToken,
-                mode: 'surviv',
-                entryFeeUsd,
-                skinColor: preferredSkin,
-            });
-        } else {
-            renderer.start();
-        }
+        if (blockAutoJoinRef.current) renderer.start();
 
         return () => {
             clearInterval(inputIntervalRef.current);
@@ -717,6 +901,8 @@ export default function SurvivGame() {
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('blur', onWindowBlur);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
             canvasRef.current?.removeEventListener('pointermove', onPointerMove);
             canvasRef.current?.removeEventListener('pointerdown', onPointerDown);
             renderer.destroy();
@@ -778,7 +964,7 @@ export default function SurvivGame() {
         socketRef.current?.emit('adminClearBots', { token: authToken });
     }, [authToken]);
 
-    const cashoutReady = gameReady && isConnected && localTimer <= 0 && cashedAmount === null && !isDead;
+    const cashoutReady = gameReady && isConnected && !cashoutPending && localTimer <= 0 && cashedAmount === null && !isDead;
     const healthRatio = me ? Math.max(0, Math.min(1, (Number(me.hp) || 0) / (Number(me.maxHp) || 100))) : 0;
     const armorRatio = me ? Math.max(0, Math.min(1, (Number(me.armor) || 0) / 100)) : 0;
     const medkitRemainingMs = Math.max(0, Number(me?.medkitRemainingMs) || 0);
@@ -788,7 +974,8 @@ export default function SurvivGame() {
         && me.weapon !== 'fists'
         && !me.reloading
         && (Number(me.clipSize) || 0) > 0
-        && (Number(me.ammo) || 0) < (Number(me.clipSize) || 0);
+        && (Number(me.ammo) || 0) < (Number(me.clipSize) || 0)
+        && (Number(me.inventory?.ammoPacks) || 0) > 0;
     const canMobileHeal = !!me
         && (Number(me.inventory?.medkits) || 0) > 0
         && (Number(me.hp) || 0) < (Number(me.maxHp) || 100);
@@ -825,10 +1012,14 @@ export default function SurvivGame() {
 
             {(!isConnected || !gameReady) && !pendingAtMount && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <h2 style={{ marginBottom: '10px' }}>Deploying to Surviv...</h2>
-                        <p style={{ opacity: 0.5 }}>
-                            Make sure you have at least {formatUsd(entryFeeUsd)} balance.
+                    <div style={{ textAlign: 'center', maxWidth: 420, padding: 24 }}>
+                        <h2 style={{ marginBottom: '10px' }}>
+                            {connectionError ? 'Connection interrupted' : (isRejoining ? 'Rejoining your match...' : 'Joining Surviv...')}
+                        </h2>
+                        <p style={{ opacity: 0.62, lineHeight: 1.5 }}>
+                            {connectionError || (isRejoining
+                                ? 'Your player is protected briefly while the connection recovers.'
+                                : `Entry: ${formatUsd(entryFeeUsd)}. Waiting for the server to confirm your session.`)}
                         </p>
                     </div>
                 </div>
@@ -841,6 +1032,7 @@ export default function SurvivGame() {
                     onHoldEnd={handleHoldEnd}
                     onComplete={handleCashOut}
                     localTimer={localTimer}
+                    pending={cashoutPending}
                     cashOutTotal={cashOutTotalRef.current}
                     cashOutEndAt={cashOutEndAtRef.current}
                 />
@@ -855,6 +1047,19 @@ export default function SurvivGame() {
                     SERVER RESET {Math.floor(resetCountdown / 3600) > 0
                         ? `${Math.floor(resetCountdown / 3600)}:${String(Math.floor((resetCountdown % 3600) / 60)).padStart(2, '0')}:${String(resetCountdown % 60).padStart(2, '0')}`
                         : `${Math.floor(resetCountdown / 60)}:${String(resetCountdown % 60).padStart(2, '0')}`}
+                </div>
+            )}
+
+            {gameReady && me?.outsideZone && !showResultModal && !isDead && (
+                <div className="surviv-zone-warning" role="alert" aria-live="assertive">
+                    <span className="surviv-zone-warning-icon" aria-hidden>!</span>
+                    RETURN TO THE SAFE ZONE
+                </div>
+            )}
+
+            {gameReady && !IS_MOBILE && !showResultModal && !isDead && !isSpectating && (
+                <div className="surviv-controls-hint" aria-label="Game controls">
+                    WASD MOVE · MOUSE FIRE · F PICKUP · E OPEN · R RELOAD · H HEAL · 1–3 WEAPONS
                 </div>
             )}
 
@@ -965,7 +1170,7 @@ export default function SurvivGame() {
             {gameReady && me && !showResultModal && (
                 <div className="surviv-weapons-hotbar">
                     {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                        const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
+                        const weaponId = slotIdx === 2 ? 'fists' : (me.inventory?.weapons?.[slotIdx] || null);
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const activeSlot = Number.isInteger(me.activeWeaponSlot)
                             ? me.activeWeaponSlot
@@ -1057,8 +1262,8 @@ export default function SurvivGame() {
                     solPrice={user?.solPrice ?? 57}
                     onPlayAgain={handlePlayAgain}
                     onHome={handleLobby}
-                    onSpectate={!cashedAmount && isDead ? enterSpectate : undefined}
-                    showSpectate={!cashedAmount && isDead}
+                    onSpectate={!cashedAmount && isDead && liveSession ? enterSpectate : undefined}
+                    showSpectate={!cashedAmount && isDead && liveSession}
                     isJoining={isRejoining}
                     onClose={handleLobby}
                 />
@@ -1126,7 +1331,7 @@ export default function SurvivGame() {
                                     <h4 className="section-subtitle">WEAPONS</h4>
                                     <div className="weapons-grid">
                                         {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
-                                            const weaponId = me.inventory?.weapons?.[slotIdx] || 'fists';
+                                            const weaponId = slotIdx === 2 ? 'fists' : (me.inventory?.weapons?.[slotIdx] || null);
                                             const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                                             const activeSlot = Number.isInteger(me.activeWeaponSlot)
                                                 ? me.activeWeaponSlot
