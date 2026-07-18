@@ -8,6 +8,7 @@ import { drawGameMinimap } from '../minimap.js';
 
 const WEAPON_LABELS = {
     fists: 'Fists',
+    knife: 'Combat Knife',
     pistol: 'M9 Pistol',
     revolver: 'R8 Revolver',
     smg: 'Vector SMG',
@@ -29,16 +30,17 @@ const LOOT_COLORS = {
     medkit: '#5fe08a',
     armor: '#5d9cff',
     ammo: '#d7d1bb',
+    grenade: '#f59e0b',
     weapon: '#f2774f',
 };
 
 const WEAPON_FIRE_RATE = {
-    fists: 0, pistol: 280, revolver: 600, smg: 80, shotgun: 750,
+    fists: 0, knife: 340, pistol: 280, revolver: 600, smg: 80, shotgun: 750,
     assault: 150, dmr: 350, sniper: 1400, lmg: 110,
 };
 
 const WEAPON_SHAKE = {
-    fists: 0, pistol: 0.3, revolver: 0.8, smg: 0.15, shotgun: 1.0,
+    fists: 0, knife: 0.25, pistol: 0.3, revolver: 0.8, smg: 0.15, shotgun: 1.0,
     assault: 0.3, dmr: 0.6, sniper: 1.4, lmg: 0.25,
 };
 
@@ -446,6 +448,7 @@ export class SurvivRenderer {
     start() {
         if (this.running) return;
         this.running = true;
+
         this._lastFrameAt = performance.now();
         const loop = (now) => {
             if (!this.running) return;
@@ -896,6 +899,7 @@ export class SurvivRenderer {
             if (tick.hitConfirm.targetX != null) {
                 this.damageNumbers.push({
                     x: tick.hitConfirm.targetX + (Math.random() - 0.5) * 10,
+
                     y: tick.hitConfirm.targetY - 18,
                     amount: Math.round(tick.hitConfirm.damage || 0),
                     spawnedAt: Date.now(),
@@ -1004,7 +1008,7 @@ export class SurvivRenderer {
         if (k === 'r') return 'reload';
         if (k === 'h') return 'useMedkit';
         if (k === 'f') return 'pickupWeapon';
-        if (k === 'g') return 'dropWeapon';
+        if (k === 'g') return 'throwGrenade';
         if (['1', '2', '3'].includes(k)) return `equipSlot:${Number(k) - 1}`;
         return null;
     }
@@ -1346,6 +1350,7 @@ export class SurvivRenderer {
         ctx.save();
 
         // Softer base shadow (dimmed, not pitch black)
+
         ctx.fillStyle = 'rgba(8, 10, 14, 0.42)';
         roundRect(ctx, currentHouse.x - currentHouse.w / 2 + 8, currentHouse.y - currentHouse.h / 2 + 8, currentHouse.w - 16, currentHouse.h - 16, 7);
         ctx.fill();
@@ -1796,6 +1801,7 @@ export class SurvivRenderer {
                 this.drawBullet(ctx, b);
             }
         }
+
         // Draw players with interpolation
         for (const p of this.players) {
             const isMe = p.isYou || p.id === this.myId;
@@ -2246,6 +2252,7 @@ export class SurvivRenderer {
     getVisibleRoadAxisRange(o, isHorizontal, padding = 160) {
         const angle = -(o.rotation || 0);
         const cos = Math.cos(angle);
+
         const sin = Math.sin(angle);
         const corners = [
             [this._viewLeft, this._viewTop],
@@ -2696,6 +2703,7 @@ export class SurvivRenderer {
             const r = Math.max(o.w, o.h) / 2;
             // Ground shadow
             ctx.shadowBlur = 0;
+
             ctx.fillStyle = 'rgba(10, 18, 8, 0.22)';
             ctx.beginPath();
             ctx.ellipse(r * 0.05, r * 0.35, r * 0.72, r * 0.32, 0.15, 0, Math.PI * 2);
@@ -3146,6 +3154,7 @@ export class SurvivRenderer {
                 ctx.strokeStyle = '#a3e635';
                 ctx.lineWidth = 2.2;
                 ctx.beginPath();
+
                 ctx.moveTo(-10, 1); ctx.lineTo(-6, 11);
                 ctx.moveTo(-3, 1); ctx.lineTo(1, 11);
                 ctx.moveTo(4, 1); ctx.lineTo(8, 11);
@@ -3596,6 +3605,7 @@ export class SurvivRenderer {
 
                     // Straight magazine
                     ctx.fillStyle = '#111827';
+
                     ctx.fillRect(0, 3.7, 4.5, 8.5);
                     ctx.stroke();
 
@@ -3724,6 +3734,20 @@ export class SurvivRenderer {
                     ctx.fill();
                     ctx.stroke();
                 }
+            } else if (l.type === 'grenade') {
+                ctx.fillStyle = '#334155';
+                ctx.beginPath();
+                ctx.arc(0, 2, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#f59e0b';
+                roundRect(ctx, -4, -11, 8, 6, 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = '#fef3c7';
+                ctx.beginPath();
+                ctx.moveTo(0, -11); ctx.lineTo(5, -16); ctx.lineTo(9, -14);
+                ctx.stroke();
             } else if (l.type === 'medkit') {
                 roundRect(ctx, -11, -10, 22, 20, 4);
                 ctx.fill();
@@ -3861,6 +3885,22 @@ export class SurvivRenderer {
     }
 
     drawBullet(ctx, b) {
+        if (b.isGrenade || b.weaponType === 'grenade') {
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.rotate(Math.atan2(b.vy || 0, b.vx || 1));
+            ctx.fillStyle = '#374151';
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(-2, -8, 5, 4);
+            ctx.restore();
+            return;
+        }
         const angle = Math.atan2(b.vy || 0, b.vx || 1);
         ctx.save();
         ctx.translate(b.x, b.y);
@@ -4016,6 +4056,7 @@ export class SurvivRenderer {
             ctx.beginPath();
             ctx.arc(barrelDist, 0, 12, 0, Math.PI * 2);
             ctx.fill();
+
             ctx.restore();
         }
 
@@ -4142,6 +4183,34 @@ export class SurvivRenderer {
                 ctx.fill();
                 ctx.stroke();
             }
+            return;
+        }
+
+        if (weapon === 'knife') {
+            const now = this._frameNow;
+            const swinging = meleeUntil > now && meleeStartedAt > 0;
+            const duration = Math.max(1, meleeUntil - meleeStartedAt);
+            const progress = swinging ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
+            const swing = swinging ? Math.sin(progress * Math.PI) : 0;
+            ctx.save();
+            ctx.rotate(-0.35 + swing * 0.95);
+            ctx.strokeStyle = '#dbeafe';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(r * 0.28, 1);
+            ctx.lineTo(r * 1.5, -2);
+            ctx.stroke();
+            ctx.strokeStyle = '#7c4a21';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(r * 0.15, 2);
+            ctx.lineTo(r * 0.43, 1);
+            ctx.stroke();
+            ctx.fillStyle = playerColor;
+            ctx.beginPath();
+            ctx.arc(r * 0.12, 5, 5.7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
             return;
         }
 
@@ -4438,6 +4507,7 @@ export class SurvivRenderer {
                     rustGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
                     ctx.fillStyle = rustGrad;
                     ctx.beginPath();
+
                     ctx.arc(rx, ry, rr, 0, Math.PI * 2);
                     ctx.fill();
                 }
@@ -4888,6 +4958,7 @@ export class SurvivRenderer {
             ctx.strokeStyle = '#273238';
             ctx.lineWidth = 3.5;
             roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 7);
+
             ctx.stroke();
         }
 
@@ -5338,6 +5409,7 @@ export class SurvivRenderer {
             ctx.moveTo(-size, size);
             ctx.lineTo(-size * 0.35, size * 0.35);
             ctx.moveTo(size, size);
+
             ctx.lineTo(size * 0.35, size * 0.35);
             ctx.stroke();
             ctx.restore();
@@ -5528,3 +5600,4 @@ export class SurvivRenderer {
         }
     }
 }
+
