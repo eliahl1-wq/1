@@ -3,24 +3,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Keep source ASCII-only so deployment tooling cannot corrupt UTF-8 emoji bytes.
 const EMOTES = [
-    '\u{1F600}',
-    '\u{1F602}',
-    '\u{1F60E}',
-    '\u{1F621}',
-    '\u{1F62D}',
-    '\u{2764}\u{FE0F}',
-    '\u{1F44D}',
-    '\u{1F44B}',
+    '\u{1F600}', // happy
+    '\u{1F602}', // laughing
+    '\u{1F60E}', // cool
+    '\u{1F621}', // angry
+    '\u{1F62D}', // crying
+    '\u{2764}\u{FE0F}', // heart
+    '\u{1F44D}', // thumbs up
+    '\u{1F44B}', // wave
 ];
 const CHAT_TTL_MS = 12000;
 
-export default function GameSocialOverlay({ socket, disabled = false }) {
+export default function GameSocialOverlay({ socket, disabled = false, onEmote }) {
     const [chatOpen, setChatOpen] = useState(false);
     const [draft, setDraft] = useState('');
     const [messages, setMessages] = useState([]);
     const [wheelOpen, setWheelOpen] = useState(false);
     const [selected, setSelected] = useState(-1);
-    const [emoteToast, setEmoteToast] = useState(null);
     const inputRef = useRef(null);
     const wheelOpenRef = useRef(false);
     const selectedRef = useRef(-1);
@@ -43,20 +42,16 @@ export default function GameSocialOverlay({ socket, disabled = false }) {
             const next = { ...message, receivedAt: Date.now() };
             setMessages((current) => [...current.slice(-5), next]);
         };
-        const onEmote = (payload) => {
-            const receivedAt = Date.now();
-            setEmoteToast({ ...payload, receivedAt });
-            window.setTimeout(() => {
-                setEmoteToast((current) => current?.receivedAt === receivedAt ? null : current);
-            }, 2600);
+        const handleEmoteEvent = (payload) => {
+            if (payload?.playerId && payload?.emote) onEmote?.(payload);
         };
         socket.on('gameChatMessage', onChat);
-        socket.on('gameEmote', onEmote);
+        socket.on('gameEmote', handleEmoteEvent);
         return () => {
             socket.off('gameChatMessage', onChat);
-            socket.off('gameEmote', onEmote);
+            socket.off('gameEmote', handleEmoteEvent);
         };
-    }, [socket]);
+    }, [socket, onEmote]);
 
     useEffect(() => {
         const cleanup = window.setInterval(() => {
@@ -178,12 +173,6 @@ export default function GameSocialOverlay({ socket, disabled = false }) {
                 </div>
             )}
 
-            {emoteToast && (
-                <div style={{ position: 'absolute', left: '50%', top: 74, transform: 'translateX(-50%)', padding: '8px 15px', borderRadius: 999, background: 'rgba(8,12,18,.76)', border: '1px solid rgba(255,255,255,.13)', color: '#fff', fontSize: 13, fontWeight: 800, boxShadow: '0 8px 28px rgba(0,0,0,.35)' }}>
-                    <span style={{ color: 'rgba(105,220,255,.9)' }}>{emoteToast.sender}</span>
-                    <span style={{ marginLeft: 9, fontSize: 24, verticalAlign: 'middle' }}>{emoteToast.emote}</span>
-                </div>
-            )}
         </div>
     );
 }

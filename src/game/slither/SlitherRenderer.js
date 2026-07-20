@@ -133,6 +133,7 @@ export class SlitherRenderer {
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
         this.smooth = new Map();
+        this.worldEmotes = new Map();
         this._foodDrawList = [];
         this._visibleFoodBuf = [];
         this._foodSpatialGrid = new Map();
@@ -559,6 +560,7 @@ export class SlitherRenderer {
 
     resetSession() {
         this.smooth.clear();
+        this.worldEmotes.clear();
         this._renderPool.clear();
         this._boostTrailPool.clear();
         this._cameraInit = false;
@@ -567,6 +569,12 @@ export class SlitherRenderer {
         this.zoom = this.baseZoom;
         this.targetSnakes = [];
         this.state = { ...this.state, you: null };
+    }
+
+    showEmote(payload) {
+        if (!payload?.playerId || !payload?.emote) return;
+        const now = performance.now();
+        this.worldEmotes.set(payload.playerId, { emote: payload.emote, startedAt: now, expiresAt: now + 2600 });
     }
 
     removeSnake(id) {
@@ -2223,6 +2231,22 @@ export class SlitherRenderer {
             }
             this._drawSnake(snake, toScreen, zoom);
         }
+        const emoteNow = performance.now();
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '32px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+        for (const [playerId, activeEmote] of this.worldEmotes) {
+            if (activeEmote.expiresAt <= emoteNow) { this.worldEmotes.delete(playerId); continue; }
+            const snake = renderSnakes.find((candidate) => candidate.id === playerId);
+            const head = snake?.segments?.[0];
+            if (!head) continue;
+            const point = toScreen(head.x, head.y);
+            const progress = Math.min(1, (emoteNow - activeEmote.startedAt) / 2600);
+            ctx.globalAlpha = Math.min(1, (1 - progress) * 3);
+            ctx.fillText(activeEmote.emote, point.x, point.y - (snake.radius || 6) * zoom - 24 - progress * 10);
+        }
+        ctx.restore();
         const __t5 = performance.now();
         
         if (this._frame % 60 === 0) {

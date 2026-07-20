@@ -290,6 +290,7 @@ export class SurvivRenderer {
         this.worldHalf = 10000;
         this.myId = null;
         this.players = [];
+        this.worldEmotes = new Map();
         this.loot = [];
         this.bullets = [];
         this.localShotTracers = [];
@@ -466,8 +467,15 @@ export class SurvivRenderer {
         this._raf = null;
     }
 
+    showEmote(payload) {
+        if (!payload?.playerId || !payload?.emote) return;
+        const now = performance.now();
+        this.worldEmotes.set(payload.playerId, { emote: payload.emote, startedAt: now, expiresAt: now + 2600 });
+    }
+
     resetSession() {
         this.players = [];
+        this.worldEmotes.clear();
         this.loot = [];
         this.bullets = [];
         this.localShotTracers = [];
@@ -1819,6 +1827,22 @@ export class SurvivRenderer {
             if (this.isPlayerHidden(p, currentHouse, currentRoom)) continue;
             this.drawPlayer(ctx, p);
         }
+
+        const emoteNow = performance.now();
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `${32 / this.zoom}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+        for (const [playerId, activeEmote] of this.worldEmotes) {
+            if (activeEmote.expiresAt <= emoteNow) { this.worldEmotes.delete(playerId); continue; }
+            const player = this.players.find((candidate) => candidate.id === playerId);
+            if (!player || !this.isPointInView(player.x, player.y, 90)) continue;
+            if (this.isPlayerHidden(player, currentHouse, currentRoom)) continue;
+            const progress = Math.min(1, (emoteNow - activeEmote.startedAt) / 2600);
+            ctx.globalAlpha = Math.min(1, (1 - progress) * 3);
+            ctx.fillText(activeEmote.emote, player.x, player.y - (player.radius || 14) - (28 + progress * 10) / this.zoom);
+        }
+        ctx.restore();
 
         // Draw particles (world space)
         this.drawParticles(ctx, currentHouse, currentRoom);
