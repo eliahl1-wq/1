@@ -119,6 +119,7 @@ export default function Game() {
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
+    const hideNames = localStorage.getItem('hide_player_names') === 'true';
     const [cashedAmount, setCashedAmount] = useState(() => (
         pendingAtMount?.type === 'cashout' ? pendingAtMount.cashedAmount : null
     ));
@@ -810,7 +811,7 @@ export default function Game() {
                     });
                 });
                 
-                renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph, IS_MOBILE);
+                renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph, IS_MOBILE, hideNames);
                 const emoteNow = performance.now();
                 graph.save();
                 graph.textAlign = 'center';
@@ -1220,7 +1221,7 @@ export default function Game() {
                             color: p.id === myIdRef.current ? 'var(--accent)' : 'var(--text-bright)',
                             fontWeight: p.id === myIdRef.current ? '700' : '400'
                         }}>
-                            <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {p.name || 'An unnamed cell'}</span>
+                            <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {(hideNames && p.id !== myIdRef.current) ? '???' : (p.name || 'An unnamed cell')}</span>
                             <span className="mono">
                                 {isBattleRoyale ? `${p.kills ?? 0} kills` : `$${Number(p.balance ?? 0).toFixed(2)}`}
                             </span>

@@ -168,6 +168,7 @@ export class SlitherRenderer {
         this._inputEnabled = true;
         this.spectatorMode = false;
         this.hideOverlays = false;
+        this.hideNames = localStorage.getItem('hide_player_names') === 'true';
         this._inputEmitQueued = false;
         this._lastTapAt = 0;
         this.running = false;
@@ -1997,7 +1998,7 @@ export class SlitherRenderer {
         }
 
         if (!this.hideOverlays) {
-            if (snake.name) {
+            if (snake.name && (!this.hideNames || isYou)) {
                 ctx.fillStyle = 'rgba(255,255,255,0.95)';
                 const fontSize = Math.max(12, headEyeRadius * 0.85);
                 ctx.font = `bold ${fontSize}px Arial, sans-serif`;

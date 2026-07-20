@@ -181,7 +181,7 @@ function drawPlayerCashoutRing(graph, cell) {
     drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress);
 }
 
-const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQuality = false) => {
+const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQuality = false, hideNames = false) => {
     for (let cell of cells) {
         if (cell.color === 'rainbow') {
             const time = Date.now() * 0.002;
@@ -221,8 +221,10 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
         graph.font = 'bold ' + fontSize + 'px sans-serif';
         
         const nameY = cell.y - (cell.radius * 0.1);
-        graph.strokeText(cell.name, cell.x, nameY);
-        graph.fillText(cell.name, cell.x, nameY);
+        if (!hideNames || cell.isMe) {
+            graph.strokeText(cell.name, cell.x, nameY);
+            graph.fillText(cell.name, cell.x, nameY);
+        }
 
         if (!global.battleRoyale && cell.radius >= 22) {
             drawBalanceBadge(graph, cell, nameY, fontSize);

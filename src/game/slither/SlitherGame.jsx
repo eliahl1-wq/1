@@ -95,6 +95,7 @@ export default function SlitherGame() {
     const [currentBalance, setCurrentBalance] = useState(1.0);
 
     const [leaderboard, setLeaderboard] = useState([]);
+    const hideNames = localStorage.getItem('hide_player_names') === 'true';
 
     const [isDead, setIsDead] = useState(() => pendingAtMount?.type === 'death');
 
@@ -1211,7 +1212,7 @@ export default function SlitherGame() {
 
                         }}>
 
-                            <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {p.name}</span>
+                            <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {(hideNames && p.id !== myIdRef.current) ? '???' : p.name}</span>
 
                             <span style={{ fontFamily: 'ui-monospace, monospace' }}>
                                 {isBattleRoyale ? `${p.kills ?? 0} kills` : `$${(p.balance ?? 0).toFixed(2)}`}
