@@ -9,6 +9,7 @@ import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandsca
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
+import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
 
@@ -149,6 +150,7 @@ export class SlitherRenderer {
         this._cashoutActive = false;
         this.baseZoom = this.isMobile ? 2.05 : 2.88;
         this.zoom = this.baseZoom;
+        this._playerWheelZoom = 1;
         this.snakeThickness = this.isMobile ? 1.0 : 0.9;
         this._dpr = 1;
         // Pre-rendered sprite caches — gradients are expensive to build per frame
@@ -208,6 +210,11 @@ export class SlitherRenderer {
             this.boost = false;
             this._emitInput?.();
         };
+        this._onWheel = (e) => {
+            if (this.isMobile || this.spectatorMode || e.target !== this.canvas) return;
+            e.preventDefault();
+            this._playerWheelZoom = adjustPlayerWheelZoom(this._playerWheelZoom, e.deltaY);
+        };
         // slither.io mobile: press-and-hold steers (snake follows finger relative to
         // the head); boost is a double-tap-and-hold or a second finger — a plain
         // touch must NOT boost, otherwise steering bleeds mass on every turn.
@@ -245,6 +252,7 @@ export class SlitherRenderer {
         document.addEventListener('mousemove', this._onMouseMove);
         document.addEventListener('mousedown', this._onMouseDown);
         document.addEventListener('mouseup', this._onMouseUp);
+        this.canvas.addEventListener('wheel', this._onWheel, { passive: false });
         document.addEventListener('touchmove', this._onTouchMove, { passive: false });
         document.addEventListener('touchstart', this._onTouchStart, { passive: false });
         document.addEventListener('touchend', this._onTouchEnd);
@@ -567,6 +575,7 @@ export class SlitherRenderer {
         this.camera.x = 0;
         this.camera.y = 0;
         this.zoom = this.baseZoom;
+        this._playerWheelZoom = 1;
         this.targetSnakes = [];
         this.state = { ...this.state, you: null };
     }
@@ -2140,7 +2149,8 @@ export class SlitherRenderer {
             const meSc = me.sc ?? (meR / SLITHER_BASE_R);
             const minZoom = this.isMobile ? 0.85 : 1.32;
             const slitherGsc = Math.pow(1.094 / Math.max(1.05, meSc), 0.52);
-            const targetZoom = Math.min(this.baseZoom, Math.max(minZoom, this.baseZoom * slitherGsc));
+            const automaticZoom = Math.min(this.baseZoom, Math.max(minZoom, this.baseZoom * slitherGsc));
+            const targetZoom = Math.max(minZoom * PLAYER_WHEEL_ZOOM_MIN, automaticZoom * this._playerWheelZoom);
             const za = 1 - Math.exp(-dt / 0.6);
             this.zoom += (targetZoom - this.zoom) * za;
         }
@@ -2318,6 +2328,7 @@ export class SlitherRenderer {
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('mousedown', this._onMouseDown);
         document.removeEventListener('mouseup', this._onMouseUp);
+        this.canvas.removeEventListener('wheel', this._onWheel);
         document.removeEventListener('touchmove', this._onTouchMove);
         document.removeEventListener('touchstart', this._onTouchStart);
         document.removeEventListener('touchend', this._onTouchEnd);

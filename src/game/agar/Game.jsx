@@ -25,6 +25,7 @@ import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
+import { adjustPlayerWheelZoom } from '../../utils/gameWheel.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 5;
@@ -152,6 +153,7 @@ export default function Game() {
     const canvasDprRef = useRef(1);
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: DEFAULT_ENTRY_FEE, mode: 'agar' });
     const cameraZoomRef = useRef(1);
+    const playerWheelZoomRef = useRef(1);
     const cameraFrameTimeRef = useRef(0);
     const cameraViewportRef = useRef({ zoom: 1, sentAt: 0 });
 
@@ -404,6 +406,7 @@ export default function Game() {
             myIdRef.current = playerSettings.id;
             gameData.current.player = playerSettings;
             cameraZoomRef.current = 1;
+            playerWheelZoomRef.current = 1;
             cameraFrameTimeRef.current = 0;
             cameraViewportRef.current = { zoom: getMobileViewZoom(), sentAt: 0 };
             global.game.width = gameSizes.width;
@@ -700,7 +703,7 @@ export default function Game() {
             const frameDelta = Math.min(0.1, Math.max(0.001, (frameNow - previousFrame) / 1000));
             cameraFrameTimeRef.current = frameNow;
             if (hasPlayer && !isSpectating) {
-                const targetZoom = getAgarCameraZoom(player.cells);
+                const targetZoom = getAgarCameraZoom(player.cells) * playerWheelZoomRef.current;
                 const easing = 1 - Math.exp(-frameDelta * 4.5);
                 cameraZoomRef.current += (targetZoom - cameraZoomRef.current) * easing;
             }
@@ -883,6 +886,12 @@ export default function Game() {
         });
     };
 
+    const handleWheel = (e) => {
+        if (IS_MOBILE || isSpectating || isDead || cashedAmount !== null) return;
+        e.preventDefault();
+        playerWheelZoomRef.current = adjustPlayerWheelZoom(playerWheelZoomRef.current, e.deltaY);
+    };
+
     const handleTouch = (e) => {
         if (isSpectating || isDead || cashedAmount !== null) return;
         const canvas = canvasRef.current;
@@ -932,6 +941,7 @@ export default function Game() {
             <canvas
                 ref={canvasRef}
                 onMouseMove={handleMouseMove}
+                onWheel={handleWheel}
                 onTouchStart={handleTouch}
                 onTouchMove={handleTouch}
                 style={{ display: 'block', touchAction: 'none' }}

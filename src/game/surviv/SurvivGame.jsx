@@ -18,6 +18,7 @@ import { stopSessionRecording } from '../../utils/mixpanel';
 import { markGamemodePlayed } from '../../constants/gamemodes';
 import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
+import { nextWeaponSlot } from '../../utils/gameWheel.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 5;
@@ -612,6 +613,24 @@ export default function SurvivGame() {
             }
         };
         const onPointerUp = () => renderer.handlePointerUp();
+        let lastWeaponWheelAt = 0;
+        let wheelWeaponSlot = null;
+        const onWheel = (e) => {
+            if (IS_MOBILE || blockInputRef.current || inventoryOpenRef.current) return;
+            if (!hasJoinedRef.current || awaitingWelcomeRef.current || !e.deltaY) return;
+            e.preventDefault();
+            const now = performance.now();
+            if (now - lastWeaponWheelAt < 90) return;
+            const serverSlot = Number.isInteger(renderer.me?.activeWeaponSlot)
+                ? renderer.me.activeWeaponSlot
+                : 2;
+            const currentSlot = now - lastWeaponWheelAt > 300
+                ? serverSlot
+                : (wheelWeaponSlot ?? serverSlot);
+            wheelWeaponSlot = nextWeaponSlot(currentSlot, e.deltaY, SURVIV_WEAPON_SLOTS.length);
+            lastWeaponWheelAt = now;
+            equipSlotPendingRef.current = wheelWeaponSlot;
+        };
         const neutralizeInput = () => {
             renderer.clearInput();
             clearPendingActions();
@@ -632,6 +651,7 @@ export default function SurvivGame() {
         window.addEventListener('keyup', onKeyUp);
         canvasRef.current.addEventListener('pointermove', onPointerMove);
         canvasRef.current.addEventListener('pointerdown', onPointerDown);
+        canvasRef.current.addEventListener('wheel', onWheel, { passive: false });
         window.addEventListener('pointerup', onPointerUp);
         window.addEventListener('blur', onWindowBlur);
         document.addEventListener('visibilitychange', onVisibilityChange);
@@ -926,6 +946,7 @@ export default function SurvivGame() {
             document.removeEventListener('visibilitychange', onVisibilityChange);
             canvasRef.current?.removeEventListener('pointermove', onPointerMove);
             canvasRef.current?.removeEventListener('pointerdown', onPointerDown);
+            canvasRef.current?.removeEventListener('wheel', onWheel);
             renderer.destroy();
             socket.off();
             socket.disconnect();
