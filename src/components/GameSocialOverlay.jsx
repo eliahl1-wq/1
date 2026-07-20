@@ -1,7 +1,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const EMOTES = ['ðŸ‘', 'ðŸ˜‚', 'ðŸ”¥', 'â¤ï¸', 'ðŸ˜¡', 'ðŸ˜¢', 'ðŸŽ¯', 'ðŸ‘‹'];
+// Keep source ASCII-only so deployment tooling cannot corrupt UTF-8 emoji bytes.
+const EMOTES = [
+    '\u{1F600}',
+    '\u{1F602}',
+    '\u{1F60E}',
+    '\u{1F621}',
+    '\u{1F62D}',
+    '\u{2764}\u{FE0F}',
+    '\u{1F44D}',
+    '\u{1F44B}',
+];
 const CHAT_TTL_MS = 12000;
 
 export default function GameSocialOverlay({ socket, disabled = false }) {
@@ -132,7 +142,7 @@ export default function GameSocialOverlay({ socket, disabled = false }) {
                     {messages.map((message) => (
                         <div key={message.id} style={{ color: 'rgba(255,255,255,.82)', fontSize: 12, fontWeight: 600, textShadow: '0 1px 4px #000, 0 1px 8px #000' }}>
                             <span style={{ color: 'rgba(105,220,255,.9)', fontWeight: 850 }}>{message.sender}</span>
-                            <span style={{ color: 'rgba(255,255,255,.42)' }}> Â· </span>
+                            <span style={{ color: 'rgba(255,255,255,.42)' }}> - </span>
                             {message.message}
                         </div>
                     ))}
@@ -144,14 +154,14 @@ export default function GameSocialOverlay({ socket, disabled = false }) {
                             value={draft}
                             maxLength={180}
                             onChange={(event) => setDraft(event.target.value)}
-                            placeholder="Skriv till spelarnaâ€¦"
+                            placeholder="Skriv till spelarna..."
                             onKeyDown={(event) => event.stopPropagation()}
                             style={{ flex: 1, minWidth: 0, padding: '10px 12px', color: '#fff', background: 'transparent', border: 0, outline: 0, fontSize: 13 }}
                         />
                         <button type="submit" style={{ border: 0, padding: '0 14px', background: 'rgba(20,241,149,.14)', color: '#14f195', fontWeight: 900, cursor: 'pointer' }}>SEND</button>
                     </form>
                 ) : (
-                    <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textShadow: '0 1px 4px #000' }}>T CHAT Â· HOLD Y EMOTES</div>
+                    <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textShadow: '0 1px 4px #000' }}>T CHAT - HOLD Y EMOTES</div>
                 )}
             </div>
 
@@ -161,7 +171,7 @@ export default function GameSocialOverlay({ socket, disabled = false }) {
                         const angle = index * Math.PI * 2 / EMOTES.length;
                         const active = selected === index;
                         return (
-                            <div key={emote} style={{ position: 'absolute', left: '50%', top: '50%', width: 48, height: 48, transform: `translate(-50%, -50%) translate(${Math.cos(angle) * 88}px, ${Math.sin(angle) * 88}px) scale(${active ? 1.24 : 1})`, display: 'grid', placeItems: 'center', borderRadius: '50%', fontSize: 27, background: active ? 'rgba(20,241,149,.25)' : 'rgba(255,255,255,.06)', border: active ? '2px solid #14f195' : '1px solid rgba(255,255,255,.08)', transition: 'transform 80ms, background 80ms' }}>{emote}</div>
+                            <div key={emote} style={{ position: 'absolute', left: '50%', top: '50%', width: 48, height: 48, transform: `translate(-50%, -50%) translate(${Math.cos(angle) * 88}px, ${Math.sin(angle) * 88}px) scale(${active ? 1.24 : 1})`, display: 'grid', placeItems: 'center', borderRadius: '50%', fontSize: 28, fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif', background: active ? 'rgba(20,241,149,.25)' : 'rgba(255,255,255,.06)', border: active ? '2px solid #14f195' : '1px solid rgba(255,255,255,.08)', transition: 'transform 80ms, background 80ms' }}>{emote}</div>
                         );
                     })}
                     <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.55)', fontSize: 10, fontWeight: 850, textAlign: 'center' }}>RELEASE<br />TO SEND</div>
