@@ -4268,7 +4268,7 @@ export class SurvivRenderer {
             ctx.fill();
         }
 
-        if (!p.isBot && (!this.hideNames || isMe)) {
+        if (!this.hideNames || isMe) {
             ctx.fillStyle = isMe ? '#ffffff' : 'rgba(255,255,255,0.86)';
             ctx.font = '700 11px system-ui, sans-serif';
             ctx.textAlign = 'center';

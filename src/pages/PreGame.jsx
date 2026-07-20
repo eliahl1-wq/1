@@ -1570,6 +1570,23 @@ export default function PreGame() {
                                         placeholder="Enter name…"
                                         className="nickname-input"
                                     />
+                                    <label
+                                        htmlFor="hide-names-toggle"
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '6px', cursor: 'pointer', userSelect: 'none' }}
+                                    >
+                                        <input
+                                            id="hide-names-toggle"
+                                            type="checkbox"
+                                            checked={hideNames}
+                                            onChange={e => {
+                                                const val = e.target.checked;
+                                                setHideNames(val);
+                                                localStorage.setItem('hide_player_names', val ? 'true' : 'false');
+                                            }}
+                                            style={{ accentColor: '#9099ff', width: '11px', height: '11px', cursor: 'pointer', flexShrink: 0 }}
+                                        />
+                                        <span style={{ fontSize: '0.62rem', color: 'var(--text-3)', fontWeight: 500 }}>Turn off names</span>
+                                    </label>
                                 </div>
 
                                 <div className="divider" style={{ marginBottom: '14px' }} />
@@ -1631,41 +1648,6 @@ export default function PreGame() {
                                     </div>
                                 )}
 
-                                {/* Turn Off Names toggle */}
-                                <label
-                                    htmlFor="hide-names-toggle"
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        marginTop: '12px',
-                                        cursor: 'pointer',
-                                        userSelect: 'none',
-                                        padding: '8px 10px',
-                                        borderRadius: '8px',
-                                        background: hideNames ? 'rgba(144,153,255,0.08)' : 'rgba(255,255,255,0.03)',
-                                        border: hideNames ? '1px solid rgba(144,153,255,0.22)' : '1px solid rgba(255,255,255,0.07)',
-                                        transition: 'all 0.18s ease',
-                                    }}
-                                >
-                                    <input
-                                        id="hide-names-toggle"
-                                        type="checkbox"
-                                        checked={hideNames}
-                                        onChange={e => {
-                                            const val = e.target.checked;
-                                            setHideNames(val);
-                                            localStorage.setItem('hide_player_names', val ? 'true' : 'false');
-                                        }}
-                                        style={{ accentColor: '#9099ff', width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }}
-                                    />
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: hideNames ? '#9099ff' : 'var(--text-2)' }}>
-                                        Turn Off Names
-                                    </span>
-                                    <span style={{ fontSize: '0.62rem', color: 'var(--text-3)', marginLeft: 'auto' }}>
-                                        Hides all player names
-                                    </span>
-                                </label>
 
                                 <div className="hiw-wrap">
                                     <div
