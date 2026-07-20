@@ -509,7 +509,6 @@ export class SurvivRenderer {
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
         this._obstacleSpriteCache.clear();
-<<<<<<< HEAD
         this.me = null;
         this.zone = null;
         this.hoveredChestId = null;
@@ -545,12 +544,8 @@ export class SurvivRenderer {
             inventory: { weapons: [], medkits: 0, ammoPacks: 0, chestsOpened: 0 },
         };
         this.clearInput();
-=======
-        this._prevPlayers.clear();
-        this._interpPlayers.clear();
         this._interpMe = null;
         this._interpBullets.clear();
->>>>>>> 73940c9 (f)
         this.myId = null;
     }
 
