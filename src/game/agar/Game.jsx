@@ -91,6 +91,7 @@ export default function Game() {
     const location = useLocation();
     const navigate = useNavigate();
     const socketRef = useRef(null);
+    const worldEmotesRef = useRef(new Map());
     const hasJoinedGameRef = useRef(false);
     const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -106,6 +107,11 @@ export default function Game() {
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const sessionStartAtRef = useRef(null);
     const spectatorCamRef = useRef({ x: 3000, y: 3000 });
+    const handleGameEmote = useCallback((payload) => {
+        if (!payload?.playerId || !payload?.emote) return;
+        const now = performance.now();
+        worldEmotesRef.current.set(payload.playerId, { emote: payload.emote, startedAt: now, expiresAt: now + 2600 });
+    }, []);
     
     const WORLD_SIZE = 6000;
 
@@ -802,6 +808,22 @@ export default function Game() {
                 });
                 
                 renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph, IS_MOBILE);
+                const emoteNow = performance.now();
+                graph.save();
+                graph.textAlign = 'center';
+                graph.textBaseline = 'middle';
+                graph.font = '32px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+                for (const [playerId, activeEmote] of worldEmotesRef.current) {
+                    if (activeEmote.expiresAt <= emoteNow) { worldEmotesRef.current.delete(playerId); continue; }
+                    const emotePlayer = users.find((candidate) => candidate.id === playerId);
+                    const emoteCell = emotePlayer?.cells?.reduce((largest, cell) => (!largest || (cell.radius || 0) > (largest.radius || 0) ? cell : largest), null);
+                    if (!emoteCell) continue;
+                    const point = worldToScreen(emoteCell.x, emoteCell.y);
+                    const progress = Math.min(1, (emoteNow - activeEmote.startedAt) / 2600);
+                    graph.globalAlpha = Math.min(1, (1 - progress) * 3);
+                    graph.fillText(activeEmote.emote, point.x, point.y - (emoteCell.radius || 0) * viewZoom - 25 - progress * 10);
+                }
+                graph.restore();
                 renderUtils.drawHUD(global, graph);
 
                 const viewHalfW = screen.width / (2 * viewZoom);
@@ -1160,7 +1182,7 @@ export default function Game() {
                 )}
             </div>
 
-            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} />
+            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} />
 
             {/* Mock Leaderboard */}
             <div className="game-leaderboard" style={{
