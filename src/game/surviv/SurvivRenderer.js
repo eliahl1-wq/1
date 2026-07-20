@@ -348,6 +348,7 @@ export class SurvivRenderer {
         this.spectatorMode = false;
         this.externalCameraGetter = null;
         this.inventoryOpen = false;
+        this.hideNames = localStorage.getItem('hide_player_names') === 'true';
         this.running = false;
         this._raf = null;
         this._lastFrameAt = performance.now();
@@ -4267,7 +4268,7 @@ export class SurvivRenderer {
             ctx.fill();
         }
 
-        if (!p.isBot) {
+        if (!p.isBot && (!this.hideNames || isMe)) {
             ctx.fillStyle = isMe ? '#ffffff' : 'rgba(255,255,255,0.86)';
             ctx.font = '700 11px system-ui, sans-serif';
             ctx.textAlign = 'center';
@@ -5612,7 +5613,7 @@ export class SurvivRenderer {
         ctx.fillText('☠  ELIMINATED', 0, -7);
         ctx.fillStyle = 'rgba(255,255,255,0.84)';
         ctx.font = '700 11px system-ui, sans-serif';
-        ctx.fillText(animation.victimName, 0, 12);
+        ctx.fillText(this.hideNames ? '???' : animation.victimName, 0, 12);
         ctx.restore();
     }
     drawKillFeed(ctx, W, H) {
@@ -5643,18 +5644,19 @@ export class SurvivRenderer {
             ctx.textBaseline = 'middle';
 
             // Killer name
+            const killerDisplay = this.hideNames ? '???' : (e.killer || '?');
             ctx.fillStyle = '#ff6b6b';
-            ctx.fillText(e.killer || '?', x + 8, y + 11);
+            ctx.fillText(killerDisplay, x + 8, y + 11);
 
             // Skull icon
-            const killerW = ctx.measureText(e.killer || '?').width;
+            const killerW = ctx.measureText(killerDisplay).width;
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.fillText(' ☠ ', x + 8 + killerW, y + 11);
 
             // Victim name
             const midW = ctx.measureText(' ☠ ').width;
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.fillText(e.victim || '?', x + 8 + killerW + midW, y + 11);
+            ctx.fillText(this.hideNames ? '???' : (e.victim || '?'), x + 8 + killerW + midW, y + 11);
 
             y += 26;
         }

@@ -294,6 +294,7 @@ export default function SurvivGame() {
     const [me, setMe] = useState(null);
     const [canMobileInteract, setCanMobileInteract] = useState(false);
     const [aliveCount, setAliveCount] = useState(0);
+    const hideNames = localStorage.getItem('hide_player_names') === 'true';
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const entryFeeUsd = normalizeSurvivEntryFee(localStorage.getItem('selected_entry_fee'));
@@ -517,6 +518,7 @@ export default function SurvivGame() {
 
         const renderer = new SurvivRenderer(canvasRef.current);
         renderer.worldHalf = WORLD_HALF;
+        renderer.hideNames = hideNames;
         rendererRef.current = renderer;
 
         const socket = io(API_URL, {
@@ -1133,7 +1135,9 @@ export default function SurvivGame() {
                                 className={`game-leaderboard-row${entry.id === myIdRef.current ? ' is-me' : ''}`}
                                 aria-current={entry.id === myIdRef.current ? 'true' : undefined}
                             >
-                                <span className="game-leaderboard-name">{i + 1}. {entry.username}</span>
+                                <span className="game-leaderboard-name">
+                                    {i + 1}. {(hideNames && entry.id !== myIdRef.current) ? '???' : entry.username}
+                                </span>
                                 <span className="game-leaderboard-value">
                                     {formatUsd(entry.balance)}
                                 </span>
