@@ -137,7 +137,7 @@ export default function GameSocialOverlay({ socket, disabled = false }) {
 
     return (
         <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9500, fontFamily: 'Inter, system-ui, sans-serif' }}>
-            <div style={{ position: 'absolute', left: 18, bottom: 22, width: 'min(380px, calc(100vw - 36px))' }}>
+            <div style={{ position: 'absolute', left: 14, top: 158, width: 'min(380px, calc(100vw - 28px))' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
                     {messages.map((message) => (
                         <div key={message.id} style={{ color: 'rgba(255,255,255,.82)', fontSize: 12, fontWeight: 600, textShadow: '0 1px 4px #000, 0 1px 8px #000' }}>
