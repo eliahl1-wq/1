@@ -191,6 +191,7 @@ export default function SurvivGame() {
     const viewportRef = useRef(null);
     const socketRef = useRef(null);
     const rendererRef = useRef(null);
+    const handleGameEmote = useCallback((payload) => rendererRef.current?.showEmote(payload), []);
     const inputIntervalRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -1287,7 +1288,7 @@ export default function SurvivGame() {
                 />
             )}
 
-            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} />
+            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} />
 
             {/* Side-by-Side React Inventory Overlay */}
             {isInventoryOpen && me && (
