@@ -390,6 +390,8 @@ export class SurvivRenderer {
         // Previous player states for interpolation & tracking
         this._prevPlayers = new Map();
         this._interpPlayers = new Map();
+        this._interpMe = null;
+        this._interpBullets = new Map();
         this._currentVisibilityPolygon = null;
         this._currentVisibilityHouseId = null;
         this._losCacheKey = '';
@@ -507,6 +509,7 @@ export class SurvivRenderer {
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
         this._obstacleSpriteCache.clear();
+<<<<<<< HEAD
         this.me = null;
         this.zone = null;
         this.hoveredChestId = null;
@@ -542,6 +545,12 @@ export class SurvivRenderer {
             inventory: { weapons: [], medkits: 0, ammoPacks: 0, chestsOpened: 0 },
         };
         this.clearInput();
+=======
+        this._prevPlayers.clear();
+        this._interpPlayers.clear();
+        this._interpMe = null;
+        this._interpBullets.clear();
+>>>>>>> 73940c9 (f)
         this.myId = null;
     }
 
@@ -577,9 +586,133 @@ export class SurvivRenderer {
         this.hud.cashoutHoldStart = atMs;
     }
 
+    _ingestLocalSnapshot(me, receivedAt) {
+        if (!me) {
+            this._interpMe = null;
+            return;
+        }
+
+        const angle = Number(me.angle) || 0;
+        const state = this._interpMe;
+        if (!state || state.id !== me.id) {
+            this._interpMe = {
+                id: me.id,
+                x: me.x,
+                y: me.y,
+                angle,
+                targetX: me.x,
+                targetY: me.y,
+                targetAngle: angle,
+                serverX: me.x,
+                serverY: me.y,
+                vx: 0,
+                vy: 0,
+                receivedAt,
+            };
+            if (!this.externalCameraGetter && !this.spectatorMode) {
+                this.camera.x = me.x;
+                this.camera.y = me.y;
+            }
+            return;
+        }
+
+        const elapsed = clamp((receivedAt - state.receivedAt) / 1000, 0.001, 0.25);
+        const correctionDistance = Math.hypot(me.x - state.x, me.y - state.y);
+        if (correctionDistance > 180) {
+            state.x = me.x;
+            state.y = me.y;
+            state.vx = 0;
+            state.vy = 0;
+        } else {
+            const measuredVx = (me.x - state.serverX) / elapsed;
+            const measuredVy = (me.y - state.serverY) / elapsed;
+            state.vx = lerp(state.vx, measuredVx, 0.72);
+            state.vy = lerp(state.vy, measuredVy, 0.72);
+        }
+        state.targetX = me.x;
+        state.targetY = me.y;
+        state.targetAngle = angle;
+        state.serverX = me.x;
+        state.serverY = me.y;
+        state.receivedAt = receivedAt;
+    }
+
+    _advanceInterpolatedWorld(dt, now) {
+        const state = this._interpMe;
+        if (!state || !this.me || state.id !== this.me.id) return;
+
+        // The server publishes movement at 40 Hz. A tiny, bounded velocity lead
+        // fills the gaps between snapshots without changing authoritative state.
+        const leadSeconds = clamp((now - state.receivedAt) / 1000, 0, 0.04);
+        const targetX = state.targetX + state.vx * leadSeconds;
+        const targetY = state.targetY + state.vy * leadSeconds;
+        const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 34);
+        const angleAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 42);
+        state.x = lerp(state.x, targetX, positionAlpha);
+        state.y = lerp(state.y, targetY, positionAlpha);
+        state.angle = lerpAngle(state.angle, state.targetAngle, angleAlpha);
+
+        this.me.x = state.x;
+        this.me.y = state.y;
+        this.me.angle = state.angle;
+        if (!this.externalCameraGetter && !this.spectatorMode) {
+            this.camera.x = state.x;
+            this.camera.y = state.y;
+        }
+    }
+
+    _ingestBulletSnapshots(bullets, receivedAt) {
+        const activeIds = new Set();
+        for (const bullet of bullets) {
+            activeIds.add(bullet.id);
+            const previous = this._interpBullets.get(bullet.id);
+            if (!previous) {
+                this._interpBullets.set(bullet.id, {
+                    x: bullet.x,
+                    y: bullet.y,
+                    targetX: bullet.x,
+                    targetY: bullet.y,
+                    vx: Number(bullet.vx) || 0,
+                    vy: Number(bullet.vy) || 0,
+                    receivedAt,
+                });
+                continue;
+            }
+            if (Math.hypot(bullet.x - previous.x, bullet.y - previous.y) > 220) {
+                previous.x = bullet.x;
+                previous.y = bullet.y;
+            }
+            previous.targetX = bullet.x;
+            previous.targetY = bullet.y;
+            previous.vx = Number(bullet.vx) || 0;
+            previous.vy = Number(bullet.vy) || 0;
+            previous.receivedAt = receivedAt;
+        }
+        for (const id of this._interpBullets.keys()) {
+            if (!activeIds.has(id)) this._interpBullets.delete(id);
+        }
+    }
+
+    _advanceBulletInterpolation(dt, now) {
+        const alpha = 1 - Math.exp(-Math.min(dt, 0.05) * 46);
+        for (const bullet of this.bullets) {
+            const state = this._interpBullets.get(bullet.id);
+            if (!state) continue;
+            // Bullet velocity is expressed per 40 Hz simulation step.
+            const leadTicks = clamp((now - state.receivedAt) / 25, 0, 1.15);
+            const targetX = state.targetX + state.vx * leadTicks;
+            const targetY = state.targetY + state.vy * leadTicks;
+            state.x = lerp(state.x, targetX, alpha);
+            state.y = lerp(state.y, targetY, alpha);
+            bullet.x = state.x;
+            bullet.y = state.y;
+        }
+    }
+
     updateState(tick) {
         if (!tick) return;
         const receivedAt = Date.now();
+        const animationReceivedAt = performance.now();
         const withLocalClocks = (player) => {
             if (!player) return null;
             const meleeRemainingMs = Number(player.meleeRemainingMs) || 0;
@@ -601,6 +734,7 @@ export class SurvivRenderer {
 
         const rawMe = tick.you || (tick.players || []).find(p => p.isYou || p.id === this.myId);
         const me = withLocalClocks(rawMe);
+        this._ingestLocalSnapshot(me, animationReceivedAt);
         const rawPlayers = (tick.players || []).map(withLocalClocks);
         this.players = me
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
@@ -720,7 +854,9 @@ export class SurvivRenderer {
         if (this.particles.length > 80) {
             this.particles.splice(0, this.particles.length - 80);
         }
-        this.bullets = tick.bullets || [];
+        const nextBullets = tick.bullets || [];
+        this._ingestBulletSnapshots(nextBullets, animationReceivedAt);
+        this.bullets = nextBullets;
         // Static world snapshots may arrive less frequently than movement
         // ticks. Retain the last snapshot when omitted, and only rebuild the
         // expensive render cache when its actual contents changed.
@@ -874,10 +1010,6 @@ export class SurvivRenderer {
             this.hud.reloading = me.reloading;
             this.hud.kills = me.kills;
             if (me.inventory) this.hud.inventory = me.inventory;
-            if (!this.spectatorMode) {
-                this.camera.x = lerp(this.camera.x, me.x, 0.42);
-                this.camera.y = lerp(this.camera.y, me.y, 0.42);
-            }
         }
         if (tick.dollarBalance != null) {
             this.hud.balance = tick.dollarBalance;
@@ -1571,10 +1703,12 @@ export class SurvivRenderer {
         ctx.fill('evenodd');
         ctx.restore();
     }
-    findInteractChest(requireCursor = true) {
+    findInteractChest(
+        requireCursor = true,
+        currentHouse = this.getCurrentHouse(),
+        currentRoom = this.getCurrentRoom(currentHouse),
+    ) {
         if (!this.me) return null;
-        const currentHouse = this.getCurrentHouse();
-        const currentRoom = this.getCurrentRoom(currentHouse);
         let best = null;
         let bestCursor = Infinity;
         for (const l of this.loot) {
@@ -1631,14 +1765,18 @@ export class SurvivRenderer {
                 if (cam.zoom) this.zoom = cam.zoom;
             }
         } else if (!this.spectatorMode) {
-            this.zoom = lerp(this.zoom, this.targetZoom, clamp(dt * 5, 0, 1));
+            this.zoom = lerp(this.zoom, this.targetZoom, 1 - Math.exp(-Math.min(dt, 0.05) * 5));
         }
+
+        const animationNow = performance.now();
+        this._advanceInterpolatedWorld(dt, animationNow);
+        this._advanceBulletInterpolation(dt, animationNow);
 
         // Update camera shake
         if (this.cameraShake.intensity > 0.05) {
             this.cameraShake.x = (Math.random() - 0.5) * this.cameraShake.intensity * 2;
             this.cameraShake.y = (Math.random() - 0.5) * this.cameraShake.intensity * 2;
-            this.cameraShake.intensity *= this.cameraShake.decay;
+            this.cameraShake.intensity *= Math.pow(this.cameraShake.decay, dt * 60);
         } else {
             this.cameraShake.x = 0;
             this.cameraShake.y = 0;
@@ -1660,11 +1798,11 @@ export class SurvivRenderer {
                 p.x += p.vx * dt;
                 p.y += p.vy * dt;
                 p.life -= dt;
-                p.vx *= 0.94; // Less air friction than dust/sparks
-                p.vy *= 0.94;
+                p.vx *= Math.pow(0.94, dt * 60); // Frame-rate independent air friction
+                p.vy *= Math.pow(0.94, dt * 60);
                 if (p.rotation !== undefined) {
                     p.rotation += p.rotSpeed * dt;
-                    p.rotSpeed *= 0.91; // Slow down rotational spin
+                    p.rotSpeed *= Math.pow(0.91, dt * 60); // Slow down rotational spin
                 }
                 // Simulate a tiny brass bounce on the ground
                 if (p.bounceCount !== undefined && p.bounceCount < 2) {
@@ -1680,8 +1818,8 @@ export class SurvivRenderer {
                 p.x += p.vx * dt;
                 p.y += p.vy * dt;
                 p.life -= dt;
-                p.vx *= 0.92;
-                p.vy *= 0.92;
+                p.vx *= Math.pow(0.92, dt * 60);
+                p.vy *= Math.pow(0.92, dt * 60);
             }
             if (p.life > 0) this.particles[liveParticleCount++] = p;
         }
@@ -1696,8 +1834,8 @@ export class SurvivRenderer {
         }
         this.localShotTracers.length = liveTracerCount;
 
-        // Interpolate remote players
-        const interpSpeed = clamp(dt * 16, 0.05, 0.6);
+        // Interpolate remote players with the same response at 60, 120 or 144 Hz.
+        const interpSpeed = 1 - Math.exp(-Math.min(dt, 0.05) * 18);
         for (const [id, ip] of this._interpPlayers) {
             ip.x = lerp(ip.x, ip.targetX, interpSpeed);
             ip.y = lerp(ip.y, ip.targetY, interpSpeed);
@@ -1723,7 +1861,7 @@ export class SurvivRenderer {
         this.drawTerrain(ctx, camX, camY, W, H, z);
         const currentHouse = this.getCurrentHouse();
         const currentRoom = this.getCurrentRoom(currentHouse);
-        this.hoveredChestId = this.findInteractChest()?.id || null;
+        this.hoveredChestId = this.findInteractChest(true, currentHouse, currentRoom)?.id || null;
         // Pass 1: Draw fields (grass overlays, crops, dirt field bases)
         for (const o of this.fieldObstacles) {
             if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
@@ -5275,7 +5413,7 @@ export class SurvivRenderer {
                 this._minimapCanvas.height = cacheSize;
             }
             targetCtx.clearRect(0, 0, cacheSize, cacheSize);
-            this._nextMinimapRenderAt = now + (1000 / 30);
+            this._nextMinimapRenderAt = now + (1000 / 12);
         }
         drawGameMinimap(targetCtx, {
             screenW: shouldCache ? cacheSize : W,
