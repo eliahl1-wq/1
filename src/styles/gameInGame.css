@@ -1,4 +1,28 @@
 /* In-game HUD + overlays — mobile (touch) layout tweaks */
+html.game-session-active,
+body.game-session-active,
+body.game-session-active #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    background: #0a0a0c;
+}
+
+.game-viewport--mobile {
+    width: var(--game-viewport-width, 100dvw) !important;
+    height: var(--game-viewport-height, 100dvh) !important;
+    max-width: none !important;
+    max-height: none !important;
+    inset: 0 auto auto 0;
+    z-index: 2147483000;
+    overscroll-behavior: none;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
 
 .game-viewport--mobile .modern-overlay-card {
     padding: 28px 22px;
@@ -2308,8 +2332,8 @@
 
 @media (orientation: portrait) and (pointer: coarse) {
     .game-viewport--mobile.game-viewport--force-landscape {
-        width: 100dvh !important;
-        height: 100dvw !important;
+        width: var(--game-viewport-height, 100dvh) !important;
+        height: var(--game-viewport-width, 100dvw) !important;
         top: 50% !important;
         left: 50% !important;
         transform: translate(-50%, -50%) rotate(90deg);

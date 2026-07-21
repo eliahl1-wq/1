@@ -486,17 +486,19 @@ export class SurvivRenderer {
         const parent = this.canvas.parentElement;
         const w = parent?.clientWidth || window.innerWidth;
         const h = parent?.clientHeight || window.innerHeight;
-        // Surviv can be raster-heavy. A restrained adaptive cap keeps Retina
-        // canvases sharp without paying the old 4x pixel cost at DPR 2.
+        // Keep phone-sized Retina canvases sharp while capping total GPU pixels.
         const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
         this.isMobileLayout = coarsePointer || w < 760;
-        const dprCap = w * h >= 1500000 ? 1 : (this.isMobileLayout ? 1 : 1.25);
-        const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
+        const pixelBudgetDpr = Math.sqrt(2_400_000 / Math.max(1, w * h));
+        const dprCap = this.isMobileLayout ? 1.6 : 1.35;
+        const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr));
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = 'high';
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;

@@ -8,8 +8,12 @@ export function isTouchDevice() {
     return !!coarse || 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0;
 }
 
-/** Retina backing-store scale for mobile canvas (capped for GPU memory). */
-export function getMobileCanvasDpr() {
+/** Retina backing-store scale for mobile canvas, capped by total GPU pixels. */
+export function getMobileCanvasDpr(width, height, maxDpr = 2) {
     if (typeof window === 'undefined') return 1;
-    return Math.min(2, window.devicePixelRatio || 1);
+    const safeWidth = Number(width) || window.innerWidth;
+    const safeHeight = Number(height) || window.innerHeight;
+    const pixelBudget = 2_400_000;
+    const budgetDpr = Math.sqrt(pixelBudget / Math.max(1, safeWidth * safeHeight));
+    return Math.max(1, Math.min(maxDpr, window.devicePixelRatio || 1, budgetDpr));
 }

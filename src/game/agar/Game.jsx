@@ -673,7 +673,7 @@ export default function Game() {
         if (!canvas) return;
         const { width, height } = getGameScreenSize();
         const viewZoom = getMobileViewZoom() * cameraZoomRef.current;
-        const dpr = IS_MOBILE ? getMobileCanvasDpr() : 1;
+        const dpr = IS_MOBILE ? getMobileCanvasDpr(width, height) : 1;
         canvasDprRef.current = dpr;
         canvas.width = Math.round(width * dpr);
         canvas.height = Math.round(height * dpr);
@@ -938,8 +938,8 @@ export default function Game() {
 
     return (
         <div ref={viewportRef} className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{ 
-            width: '100vw', 
-            height: '100vh', 
+            width: 'var(--game-viewport-width, 100dvw)',
+            height: 'var(--game-viewport-height, 100dvh)',
             background: '#0a0a0c', 
             overflow: 'hidden', 
             position: 'fixed', 

@@ -893,9 +893,9 @@ export default function SlitherGame() {
 
         <div ref={viewportRef} className={`game-viewport${IS_MOBILE ? ' game-viewport--mobile' : ''}`} style={{
 
-            width: '100vw',
+            width: 'var(--game-viewport-width, 100dvw)',
 
-            height: '100vh',
+            height: 'var(--game-viewport-height, 100dvh)',
 
             background: '#0a0a0c',
 

@@ -264,8 +264,11 @@ export class SlitherRenderer {
 
     _pickDpr() {
         const rawDpr = window.devicePixelRatio || 1;
-        // Stable, static DPR selection to prevent dynamic canvas resizing / layout thrashing stutters
-        return this.isMobile ? Math.min(1.25, rawDpr) : Math.min(1.5, rawDpr);
+        const pixelBudgetDpr = Math.sqrt(2_400_000 / Math.max(1, (this.W || window.innerWidth) * (this.H || window.innerHeight)));
+        // Keep phones crisp while preventing tablets and desktop canvases from exceeding the GPU budget.
+        return this.isMobile
+            ? Math.max(1, Math.min(1.6, rawDpr, pixelBudgetDpr))
+            : Math.min(1.5, rawDpr);
     }
 
     _applyCanvasDpr(width, height) {

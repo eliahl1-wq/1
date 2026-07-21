@@ -9,7 +9,11 @@ export function getMobileViewZoom() {
 
 /** Canvas pixel size (matches the physical screen). */
 export function getGameScreenSize() {
-    return { width: window.innerWidth, height: window.innerHeight };
+    const viewport = window.visualViewport;
+    return {
+        width: Math.round(viewport?.width || window.innerWidth),
+        height: Math.round(viewport?.height || window.innerHeight),
+    };
 }
 
 /**

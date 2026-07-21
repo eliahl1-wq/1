@@ -1062,8 +1062,8 @@ export default function SurvivGame() {
 
     return (
         <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}`} style={{
-            width: '100vw',
-            height: '100vh',
+            width: 'var(--game-viewport-width, 100dvw)',
+            height: 'var(--game-viewport-height, 100dvh)',
             background: '#0a0a0c',
             overflow: 'hidden',
             position: 'fixed',

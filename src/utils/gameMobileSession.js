@@ -9,7 +9,11 @@ export async function enterGameMobileSession(container, orientation = null) {
         const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
         if (!fullscreenElement) {
             if (container.requestFullscreen) {
-                await container.requestFullscreen();
+                try {
+                    await container.requestFullscreen({ navigationUI: 'hide' });
+                } catch {
+                    await container.requestFullscreen();
+                }
             } else if (container.webkitRequestFullscreen) {
                 await container.webkitRequestFullscreen();
             }
