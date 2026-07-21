@@ -1794,7 +1794,8 @@ export class SlitherRenderer {
             return;
         }
 
-        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42);
+        const renderStepMultiplier = Math.max(1, Number(snake.renderStepMultiplier) || 1);
+        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42) * renderStepMultiplier;
         const q = this._quality;
         const holdActive = this._holdActive;
         const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);

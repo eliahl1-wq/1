@@ -321,8 +321,8 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
     renderer.ctx = ctx;
     renderer.W = width;
     renderer.H = height;
-    renderer.camera.x = 0;
-    renderer.camera.y = 0;
+    renderer.camera.x = width / 2;
+    renderer.camera.y = height / 2;
     renderer._frame = frame;
     renderer.hideOverlays = true;
     renderer.snakeThickness = 1;
@@ -331,7 +331,7 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
         if (actor.spawnDelay > 0) continue;
         ctx.save();
         ctx.shadowColor = actor.color;
-        ctx.shadowBlur = 9;
+        ctx.shadowBlur = 5;
         renderer._drawSnake({
             id: actor.id,
             angle: actor.angle,
@@ -339,7 +339,8 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
             color: actor.rainbow ? 'random' : actor.color,
             boost: false,
             isYou: false,
-            segments: actor.points.map((point) => ({ x: point.x - width / 2, y: point.y - height / 2 })),
+            segments: actor.points,
+            renderStepMultiplier: 1.55,
         }, null, 1);
         ctx.restore();
     }
@@ -426,18 +427,19 @@ function drawSurvivMuzzleBurst(ctx, actor) {
     const angle = actor.muzzleAngle ?? actor.angle;
     const x = actor.x + Math.cos(angle) * 29;
     const y = actor.y + Math.sin(angle) * 29;
-    const radius = 9 + strength * 17;
+    const radius = 46 + strength * 68;
     const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    glow.addColorStop(0, `rgba(255, 255, 220, ${0.95 * strength})`);
-    glow.addColorStop(0.28, `rgba(255, 202, 92, ${0.82 * strength})`);
+    glow.addColorStop(0, `rgba(255, 249, 218, ${0.34 * strength})`);
+    glow.addColorStop(0.22, `rgba(255, 202, 92, ${0.2 * strength})`);
+    glow.addColorStop(0.58, `rgba(255, 158, 64, ${0.08 * strength})`);
     glow.addColorStop(1, 'rgba(255, 126, 42, 0)');
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.filter = 'blur(2px)';
+    ctx.filter = 'blur(8px)';
     ctx.fillStyle = glow;
-    ctx.shadowColor = 'rgba(255, 174, 64, 0.9)';
-    ctx.shadowBlur = 18 * strength;
+    ctx.shadowColor = 'rgba(255, 174, 64, 0.35)';
+    ctx.shadowBlur = 26 * strength;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -550,7 +552,7 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
     ctx.restore();
     for (const actor of actors) {
         drawSurvivMuzzleBurst(ctx, actor);
-        renderer._muzzleFlash = actor.muzzle > 0 ? actor.muzzle / 0.11 : 0;
+        renderer._muzzleFlash = actor.muzzle > 0 ? (actor.muzzle / 0.11) * 0.45 : 0;
         renderer.myId = actor.id;
         renderer.drawPlayer(ctx, {
             id: actor.id,
@@ -636,7 +638,7 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
             if (family === 'slither') {
                 let remaining = dt;
                 while (remaining > 0) {
-                    const step = Math.min(1 / 90, remaining);
+                    const step = Math.min(1 / 60, remaining);
                     updateSnakes(actors, step, now - remaining * 1000, width, height);
                     remaining -= step;
                 }

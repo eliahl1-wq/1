@@ -361,7 +361,7 @@ function Panel({ title, sub, children }) {
     );
 }
 
-function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, actionLoading }) {
+function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, onRefresh, onDeleted, actionLoading }) {
     const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -369,6 +369,13 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
     const [visualBalanceInput, setVisualBalanceInput] = useState('');
     const [visualBalanceSaving, setVisualBalanceSaving] = useState(false);
     const [visualBalanceMessage, setVisualBalanceMessage] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [withdrawAmountUsd, setWithdrawAmountUsd] = useState('');
+    const [withdrawDestination, setWithdrawDestination] = useState('');
+    const [accountActionLoading, setAccountActionLoading] = useState(false);
+    const [accountActionMessage, setAccountActionMessage] = useState('');
+    const [accountActionError, setAccountActionError] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -381,6 +388,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                     setDetail(data);
                     setVisualBalanceInput(String(data.user?.visualBalanceOverrideUsd ?? data.user?.balanceUsd ?? 0));
                     setVisualBalanceMessage('');
+                    setWithdrawDestination(data.user?.wallet && data.user.wallet.length > 20 ? data.user.wallet : '');
                 }
             } catch (err) {
                 if (!cancelled) setError(err.message || 'Could not load user');
@@ -421,6 +429,99 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
         }
     };
 
+    const changePassword = async () => {
+        if (newPassword.length < 8 || newPassword.length > 128) {
+            setAccountActionError(true);
+            setAccountActionMessage('Password must be 8–128 characters.');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setAccountActionError(true);
+            setAccountActionMessage('Passwords do not match.');
+            return;
+        }
+        if (!window.confirm(`Change the password for ${detail?.user?.username}? Existing sessions will be signed out.`)) return;
+        setAccountActionLoading(true);
+        setAccountActionMessage('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${userId}/password`, {
+                method: 'PUT',
+                body: JSON.stringify({ password: newPassword }),
+            });
+            setNewPassword('');
+            setConfirmPassword('');
+            setAccountActionError(false);
+            setAccountActionMessage(result.message);
+        } catch (err) {
+            setAccountActionError(true);
+            setAccountActionMessage(err.message || 'Could not change password.');
+        } finally {
+            setAccountActionLoading(false);
+        }
+    };
+
+    const withdrawOwnerBalance = async () => {
+        const amount = Number(String(withdrawAmountUsd).replace(',', '.'));
+        if (!Number.isFinite(amount) || amount <= 0) {
+            setAccountActionError(true);
+            setAccountActionMessage('Enter a valid withdrawal amount.');
+            return;
+        }
+        if (!withdrawDestination.trim()) {
+            setAccountActionError(true);
+            setAccountActionMessage('Enter a destination wallet.');
+            return;
+        }
+        if (!window.confirm(`Withdraw ${formatUsd(amount)} from ${detail?.user?.username} to ${withdrawDestination.trim()}? This sends a real on-chain transaction.`)) return;
+        setAccountActionLoading(true);
+        setAccountActionMessage('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${userId}/withdraw`, {
+                method: 'POST',
+                body: JSON.stringify({ amountUSD: amount, destinationAddress: withdrawDestination.trim() }),
+            });
+            setDetail(current => {
+                const realBalanceUsd = Math.max(0, Number(current.user.balanceUsd || 0) - Number(result.amountUsd || 0));
+                return {
+                    ...current,
+                    user: {
+                        ...current.user,
+                        balanceSol: result.newBalance,
+                        balanceUsd: realBalanceUsd,
+                        displayBalanceUsd: current.user.visualBalanceOverrideUsd == null ? realBalanceUsd : current.user.displayBalanceUsd,
+                    },
+                };
+            });
+            setWithdrawAmountUsd('');
+            setAccountActionError(false);
+            setAccountActionMessage(`${result.message} Signature: ${result.signature}`);
+            await onRefresh?.();
+        } catch (err) {
+            setAccountActionError(true);
+            setAccountActionMessage(err.message || 'Withdrawal failed.');
+        } finally {
+            setAccountActionLoading(false);
+        }
+    };
+
+    const deleteAccount = async () => {
+        const username = detail?.user?.username;
+        const confirmation = window.prompt(`Permanently delete ${username}? Balances, rewards, active games, and claims must be empty. Transaction history is preserved.\n\nType ${username} to confirm.`);
+        if (confirmation == null) return;
+        setAccountActionLoading(true);
+        setAccountActionMessage('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${userId}`, {
+                method: 'DELETE',
+                body: JSON.stringify({ confirmation }),
+            });
+            onDeleted?.(result.message);
+        } catch (err) {
+            setAccountActionError(true);
+            setAccountActionMessage(err.message || 'Could not delete account.');
+            setAccountActionLoading(false);
+        }
+    };
     const u = detail?.user;
     const stats = detail?.stats;
     const rewards = detail?.rewards;
@@ -552,6 +653,57 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                                         </div>
                                     </section>
 
+                                    <section style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', background: 'rgba(255,255,255,0.02)' }}>
+                                        <p className="label" style={{ marginBottom: '8px' }}>Password & sessions</p>
+                                        <p style={{ margin: '0 0 12px', color: 'var(--text-2)', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                                            Passwords are securely hashed and cannot be viewed. Set a new password here; all existing sessions for this account will be signed out.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'end' }}>
+                                            <label style={{ display: 'grid', gap: '5px', flex: '1 1 200px' }}>
+                                                <span style={{ color: 'var(--text-2)', fontSize: '0.72rem' }}>New password</span>
+                                                <input type="password" minLength="8" maxLength="128" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)} style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(0,0,0,.25)', color: 'var(--text-h)' }} />
+                                            </label>
+                                            <label style={{ display: 'grid', gap: '5px', flex: '1 1 200px' }}>
+                                                <span style={{ color: 'var(--text-2)', fontSize: '0.72rem' }}>Confirm password</span>
+                                                <input type="password" minLength="8" maxLength="128" autoComplete="new-password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(0,0,0,.25)', color: 'var(--text-h)' }} />
+                                            </label>
+                                            <button type="button" className="btn btn-primary" disabled={accountActionLoading || !newPassword || !confirmPassword} onClick={changePassword}>Change password</button>
+                                        </div>
+                                    </section>
+
+                                    {u.isOwnerAccount && (
+                                        <section style={{ padding: '16px', border: '1px solid rgba(59,130,246,.38)', borderRadius: 'var(--r-xl)', background: 'rgba(59,130,246,.07)' }}>
+                                            <p className="label" style={{ marginBottom: '8px' }}>Withdraw from your account</p>
+                                            <p style={{ margin: '0 0 12px', color: 'var(--text-2)', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                                                Sends real SOL from this account without logging into it. Only accounts marked as yours are accepted by the server.
+                                            </p>
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'end' }}>
+                                                <label style={{ display: 'grid', gap: '5px', flex: '0 1 180px' }}>
+                                                    <span style={{ color: 'var(--text-2)', fontSize: '0.72rem' }}>Amount (USD)</span>
+                                                    <input type="number" min="0" step="0.01" max={u.balanceUsd} value={withdrawAmountUsd} onChange={event => setWithdrawAmountUsd(event.target.value)} placeholder={String(u.balanceUsd ?? 0)} style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(0,0,0,.25)', color: 'var(--text-h)' }} />
+                                                </label>
+                                                <label style={{ display: 'grid', gap: '5px', flex: '1 1 320px' }}>
+                                                    <span style={{ color: 'var(--text-2)', fontSize: '0.72rem' }}>Destination Solana wallet</span>
+                                                    <input type="text" value={withdrawDestination} onChange={event => setWithdrawDestination(event.target.value)} placeholder="Solana address" className="mono" style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(0,0,0,.25)', color: 'var(--text-h)' }} />
+                                                </label>
+                                                <button type="button" className="btn btn-primary" disabled={accountActionLoading || !withdrawAmountUsd || !withdrawDestination.trim()} onClick={withdrawOwnerBalance}>Withdraw SOL</button>
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    <section style={{ padding: '16px', border: '1px solid rgba(239,68,68,.4)', borderRadius: 'var(--r-xl)', background: 'rgba(239,68,68,.06)' }}>
+                                        <p className="label" style={{ marginBottom: '8px', color: '#f87171' }}>Delete account</p>
+                                        <p style={{ margin: '0 0 12px', color: 'var(--text-2)', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                                            Permanently removes the login account. It is blocked while any balance, reward, claim, withdrawal, or game is active. Financial transaction history remains for audit purposes.
+                                        </p>
+                                        <button type="button" className="btn btn-ghost" disabled={accountActionLoading} onClick={deleteAccount} style={{ borderColor: 'rgba(239,68,68,.55)', color: '#f87171' }}>Delete account permanently</button>
+                                    </section>
+
+                                    {accountActionMessage && (
+                                        <p style={{ margin: 0, padding: '10px 12px', borderRadius: '10px', background: accountActionError ? 'rgba(239,68,68,.1)' : 'rgba(74,222,128,.1)', color: accountActionError ? '#f87171' : '#4ade80', fontSize: '0.76rem', wordBreak: 'break-word' }}>
+                                            {accountActionMessage}
+                                        </p>
+                                    )}
                                     <section style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', background: 'rgba(255,255,255,0.02)' }}>
                                         <p className="label" style={{ marginBottom: '12px' }}>Rewards & tickets</p>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
@@ -1715,6 +1867,12 @@ export default function AdminDashboard() {
                     onClose={() => setSelectedUserId(null)}
                     onExclude={excludeUsersById}
                     onRestore={restoreUsersById}
+                    onRefresh={loadData}
+                    onDeleted={message => {
+                        setSelectedUserId(null);
+                        setActionMsg(`✅ ${message}`);
+                        loadData();
+                    }}
                     actionLoading={actionLoading}
                 />
             )}
