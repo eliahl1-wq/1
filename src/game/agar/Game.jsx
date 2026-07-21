@@ -11,7 +11,7 @@ import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlay
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
-import GameSocialOverlay from '../../components/GameSocialOverlay';
+import GameSocialOverlay, { drawGameEmote } from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import MobileGameSession from '../../components/MobileGameSession';
@@ -825,7 +825,11 @@ export default function Game() {
                     const point = worldToScreen(emoteCell.x, emoteCell.y);
                     const progress = Math.min(1, (emoteNow - activeEmote.startedAt) / 2600);
                     graph.globalAlpha = Math.min(1, (1 - progress) * 3);
-                    graph.fillText(activeEmote.emote, point.x, point.y - (emoteCell.radius || 0) * viewZoom - 25 - progress * 10);
+                    const emoteX = point.x;
+                    const emoteY = point.y - (emoteCell.radius || 0) * viewZoom - 25 - progress * 10;
+                    if (!drawGameEmote(graph, activeEmote.emote, emoteX, emoteY, 42)) {
+                        graph.fillText(activeEmote.emote, emoteX, emoteY);
+                    }
                 }
                 graph.restore();
                 renderUtils.drawHUD(global, graph);
