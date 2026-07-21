@@ -116,6 +116,9 @@ function createActors(family, width, height, colors) {
                 noiseOffset: random() * 1000,
                 noiseScale: 0.62 + random() * 0.48,
                 maxAngleChange: 0.055 + random() * 0.035,
+                turnVelocity: 0,
+                targetTurnVelocity: (random() > 0.5 ? 1 : -1) * (0.025 + random() * 0.04),
+                nextTurnChange: 0.25 + random() * 0.55,
                 avoidDirection: 0,
                 spawnDelay: index === 0 ? random() * 0.5 : 0.9 * index + random() * 1.6,
                 color: selectedOrPalette(colors.slither, index, random, ['random']),
@@ -149,6 +152,7 @@ function createActors(family, width, height, colors) {
                 targetId: null,
                 targetLock: 0,
                 outsideTime: 0,
+                spawnGeneration: 0,
             };
         });
     }
@@ -175,13 +179,18 @@ function createActors(family, width, height, colors) {
             color: selectedOrPalette(colors.agar, index, random, ['random', 'rainbow']),
             borderColor: '#000000',
             phase: random() * Math.PI * 2,
+            spawnDelay: index === 0 ? random() * 0.35 : 1.15 * index + random() * 1.35,
         };
     });
 }
 
 function respawnActor(actor, family, width, height) {
     const bounds = sceneBounds(family, width, height);
-    const position = spawnFromEdge(bounds, Math.random, 55 + Math.random() * 110);
+    // Keep slow Surviv actors close enough to the edge to enter the scene.
+    const spawnMargin = family === 'surviv'
+        ? 18 + Math.random() * 22
+        : 55 + Math.random() * 110;
+    const position = spawnFromEdge(bounds, Math.random, spawnMargin);
     const angle = inwardAngle(position, width, height, Math.random);
     actor.x = position.x;
     actor.y = position.y;
@@ -193,6 +202,7 @@ function respawnActor(actor, family, width, height) {
         actor.targetId = null;
         actor.targetLock = 0;
         actor.outsideTime = 0;
+        actor.spawnGeneration = (actor.spawnGeneration || 0) + 1;
     }
 }
 
@@ -251,23 +261,34 @@ function updateSnakes(actors, dt, elapsed, width, height) {
             continue;
         }
 
+        actor.nextTurnChange -= dt;
+        if (actor.nextTurnChange <= 0) {
+            const sharpTurn = Math.random() > 0.7;
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            const magnitude = sharpTurn
+                ? 0.065 + Math.random() * 0.035
+                : 0.025 + Math.random() * 0.04;
+            actor.targetTurnVelocity = direction * magnitude;
+            actor.nextTurnChange = 0.28 + Math.random() * 0.72;
+        }
+
         const noiseClock = elapsed * 0.005 + actor.noiseOffset;
         const noise = 0.5 * Math.sin(noiseClock * 0.8)
             + 0.3 * Math.sin(noiseClock * 1.2)
             + 0.2 * Math.sin(noiseClock * 1.8);
-        let intendedTurn = noise * actor.noiseScale;
+        let desiredTurnVelocity = actor.targetTurnVelocity + noise * 0.018 * actor.noiseScale;
         const avoidanceDirection = snakeAvoidanceDirection(actor, actors);
         if (avoidanceDirection !== 0) {
             actor.avoidDirection = avoidanceDirection;
-            intendedTurn += actor.avoidDirection * 0.95;
+            desiredTurnVelocity = actor.avoidDirection * actor.maxAngleChange;
         }
 
-        const turnPerFrame = Math.max(
-            -actor.maxAngleChange,
-            Math.min(actor.maxAngleChange, intendedTurn),
-        );
-        const sizeTurnScale = Math.max(0.58, Math.min(1, Math.pow(7.2 / actor.radius, 0.5)));
-        actor.angle += turnPerFrame * dt * 60 * sizeTurnScale;
+        const sizeTurnScale = Math.max(0.62, Math.min(1, Math.pow(7.2 / actor.radius, 0.5)));
+        const maxTurnVelocity = actor.maxAngleChange * sizeTurnScale;
+        desiredTurnVelocity = Math.max(-maxTurnVelocity, Math.min(maxTurnVelocity, desiredTurnVelocity));
+        const turnSmoothing = 1 - Math.exp(-dt * 7.5);
+        actor.turnVelocity += (desiredTurnVelocity - actor.turnVelocity) * turnSmoothing;
+        actor.angle += actor.turnVelocity * dt * 60;
         actor.x += Math.cos(actor.angle) * actor.speed * dt;
         actor.y += Math.sin(actor.angle) * actor.speed * dt;
 
@@ -291,9 +312,12 @@ function updateSnakes(actors, dt, elapsed, width, height) {
             actor.y,
             actor.angle,
             actor.points.length,
+            0.08,
         );
     }
-}function drawSnakes(ctx, renderer, actors, width, height, frame) {
+}
+
+function drawSnakes(ctx, renderer, actors, width, height, frame) {
     renderer.ctx = ctx;
     renderer.W = width;
     renderer.H = height;
@@ -324,15 +348,22 @@ function updateSnakes(actors, dt, elapsed, width, height) {
 function updateAndDrawAgar(ctx, actors, dt, elapsed, width, height) {
     const borders = { left: -200, right: width + 200, top: -200, bottom: height + 200 };
     for (const actor of actors) {
+        if (actor.spawnDelay > 0) {
+            actor.spawnDelay = Math.max(0, actor.spawnDelay - dt);
+            continue;
+        }
         actor.angle += Math.sin(elapsed * 0.00045 + actor.phase) * 0.12 * dt;
         actor.x += Math.cos(actor.angle) * actor.speed * dt;
         actor.y += Math.sin(actor.angle) * actor.speed * dt;
         actor.vX = Math.cos(actor.angle) * Math.min(6, actor.speed / AGAR_TICK_RATE);
         actor.vY = Math.sin(actor.angle) * Math.min(6, actor.speed / AGAR_TICK_RATE);
-        wrapActor(actor, 'agar', width, height, actor.radius + 20);
+        if (wrapActor(actor, 'agar', width, height, actor.radius + 20)) {
+            actor.spawnDelay = 0.8 + Math.random() * 2.4;
+        }
     }
 
     for (const actor of actors) {
+        if (actor.spawnDelay > 0) continue;
         ctx.fillStyle = actor.color;
         ctx.strokeStyle = actor.borderColor === '#000000' ? darkerColor(actor.color) : actor.borderColor;
         ctx.lineWidth = 7;
@@ -359,7 +390,15 @@ function survivTargetForActor(actor, actors, dt) {
             }
         }
         actor.targetId = target?.id || null;
+        actor.targetGeneration = target?.spawnGeneration || 0;
         actor.targetLock = 1.8 + Math.abs(Math.sin(actor.phase + actor.decisionIndex)) * 2.2;
+    }
+
+    // A recycled target can jump to the opposite edge while keeping the same id.
+    if (target && actor.targetGeneration !== (target.spawnGeneration || 0)) {
+        actor.targetId = null;
+        actor.targetLock = 0;
+        target = null;
     }
 
     return {
@@ -413,9 +452,10 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
         actor.muzzle = Math.max(0, actor.muzzle - dt);
 
         const { target, distance } = survivTargetForActor(actor, actors, dt);
-        const targetAngle = target
+        // Avoid rapid left/right flips when two actors pass very close together.
+        const targetAngle = target && distance > 58
             ? Math.atan2(target.y - actor.y, target.x - actor.x)
-            : actor.movementAngle;
+            : actor.angle;
         const range = survivPreferredRange(actor.weapon);
         const actorInside = isInsideScene(actor, 'surviv', width, height, 8);
         actor.outsideTime = actorInside ? 0 : actor.outsideTime + dt;
@@ -450,12 +490,12 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
         }
 
         actor.movementAngle = turnToward(actor.movementAngle, desiredMovementAngle, 2.1 * dt);
-        actor.angle = turnToward(actor.angle, targetAngle, 1.75 * dt);
+        actor.angle = turnToward(actor.angle, targetAngle, 0.9 * dt);
         actor.x += Math.cos(actor.movementAngle) * SURVIV_BACKGROUND_SPEED * actor.movementScale * dt;
         actor.y += Math.sin(actor.movementAngle) * SURVIV_BACKGROUND_SPEED * actor.movementScale * dt;
-        const wrapped = wrapActor(actor, 'surviv', width, height, 42);
+        const wrapped = wrapActor(actor, 'surviv', width, height, 190);
         if (wrapped) continue;
-        if (actor.outsideTime > 2.4) {
+        if (actor.outsideTime > 6.5) {
             respawnActor(actor, 'surviv', width, height);
             continue;
         }

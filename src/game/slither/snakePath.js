@@ -109,7 +109,7 @@ function syncSegmentCount(state, targetCount, spacing, refHead, angle = 0) {
 /**
  * Place body segments along the head's traveled path at fixed spacing.
  */
-export function updateBodyAlongPath(state, segments, spacing, headX, headY, angle = 0, fullSegmentCount = segments.length) {
+export function updateBodyAlongPath(state, segments, spacing, headX, headY, angle = 0, fullSegmentCount = segments.length, minHeadRecord = MIN_HEAD_RECORD) {
     if (!segments.length) return;
 
     let path = state.path;
@@ -120,7 +120,7 @@ export function updateBodyAlongPath(state, segments, spacing, headX, headY, angl
 
     segments[0].x = headX;
     segments[0].y = headY;
-    recordHeadOnPath(path, headX, headY, Math.max(0.22, spacing * MIN_HEAD_RECORD));
+    recordHeadOnPath(path, headX, headY, Math.max(0.08, spacing * minHeadRecord));
 
     ensurePathArcLength(path, fullSegmentCount, spacing, angle);
 
