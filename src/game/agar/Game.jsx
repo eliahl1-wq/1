@@ -213,7 +213,7 @@ export default function Game() {
 
         if (socketRef.current?.connected) {
             const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
-            const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
+            localStorage.removeItem('use_free_ticket');
             
             socketRef.current.emit('joinGame', {
                 username: nickname,
@@ -221,7 +221,7 @@ export default function Game() {
                 mode: playMode,
                 entryFeeUsd: fee,
                 skinColor: preferredSkinAgar,
-                useFreeTicket,
+                useFreeTicket: false,
             });
         }
     }, [token, liveSession]);
@@ -368,7 +368,6 @@ export default function Game() {
                 } else {
                     const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
                     const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
-                    localStorage.removeItem('use_free_ticket');
                     socket.emit('joinGame', {
                         username: matchNickname,
                         token,
@@ -620,7 +619,12 @@ export default function Game() {
                     timerIntervalRef.current = null;
                 }
             }
-            if (typeof msg === 'string' && msg.includes('balance')) {
+            if (typeof msg === 'string' && /insufficient/i.test(msg)) {
+                setIsRejoining(false);
+                const mode = joinParamsRef.current.mode;
+                const selectedMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
+                navigate('/lobby', { state: { depositIntent: true, selectedMode, requiredBalanceUsd: joinParamsRef.current.entryFeeUsd } });
+            } else if (typeof msg === 'string' && msg.includes('balance')) {
                 alert(msg);
                 navigate('/pre-game');
             } else if (typeof msg === 'string' && /battle royale/i.test(msg)) {

@@ -242,7 +242,7 @@ export default function SlitherGame() {
 
         if (socketRef.current?.connected) {
             const preferredSkin = localStorage.getItem('selected_skin') || 'random';
-            const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
+            localStorage.removeItem('use_free_ticket');
 
             socketRef.current.emit('joinGame', {
                 username: nickname,
@@ -250,7 +250,7 @@ export default function SlitherGame() {
                 mode: joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither',
                 entryFeeUsd: fee,
                 skinColor: preferredSkin,
-                useFreeTicket,
+                useFreeTicket: false,
             });
         }
     }, [authToken, liveSession, navigate]);
@@ -500,7 +500,6 @@ export default function SlitherGame() {
                     const joinMode = joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither';
                     const preferredSkin = localStorage.getItem('selected_skin') || 'random';
                     const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
-                    localStorage.removeItem('use_free_ticket');
                     socket.emit('joinGame', {
                         username: nickname,
                         token: authToken,
@@ -801,6 +800,13 @@ export default function SlitherGame() {
             if (joinParamsRef.current.isTournament && typeof msg === 'string') {
                 alert(msg);
                 navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+                return;
+            }
+
+            if (typeof msg === 'string' && /insufficient/i.test(msg)) {
+                setIsRejoining(false);
+                const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
+                navigate('/lobby', { state: { depositIntent: true, selectedMode: mode, requiredBalanceUsd: joinParamsRef.current.entryFeeUsd } });
                 return;
             }
 

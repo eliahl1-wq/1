@@ -94,7 +94,7 @@ function ActionIcon({ type }) {
     return <><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="5" /></>;
 }
 
-function ActionButton({ label, type, onPress, accent, disabled = false }) {
+function ActionButton({ label, type, onPress, onRelease, accent, disabled = false }) {
     return (
         <button
             type="button"
@@ -104,13 +104,23 @@ function ActionButton({ label, type, onPress, accent, disabled = false }) {
             disabled={disabled}
             onPointerDown={(event) => {
                 stopPointer(event);
+                event.currentTarget.setPointerCapture(event.pointerId);
                 onPress?.();
             }}
+            onPointerUp={(event) => { stopPointer(event); onRelease?.(); }}
+            onPointerCancel={(event) => { stopPointer(event); onRelease?.(); }}
+            onLostPointerCapture={() => onRelease?.()}
             onKeyDown={(event) => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
                 event.stopPropagation();
                 onPress?.();
+            }}
+            onKeyUp={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                event.stopPropagation();
+                onRelease?.();
             }}
         >
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -127,6 +137,7 @@ function SurvivMobileControls({
     onReload,
     onHeal,
     onInteract,
+    onInteractEnd,
     canInteract,
     canReload,
     canHeal,
@@ -141,7 +152,7 @@ function SurvivMobileControls({
                 <ActionButton label="Inventory" type="inventory" onPress={onInventory} />
                 <ActionButton label={isReloading ? 'Reloading' : 'Reload weapon'} type="reload" onPress={onReload} disabled={!canReload} />
                 <ActionButton label="Use medkit" type="heal" onPress={onHeal} disabled={!canHeal} />
-                <ActionButton label={canInteract ? 'Interact with nearby item' : 'Nothing nearby'} type="interact" onPress={onInteract} accent={canInteract} disabled={!canInteract} />
+                <ActionButton label={canInteract ? 'Interact with nearby item' : 'Nothing nearby'} type="interact" onPress={onInteract} onRelease={onInteractEnd} accent={canInteract} disabled={!canInteract} />
             </div>
             <VirtualJoystick label="Aim and fire" variant="aim" onChange={onAim} />
         </div>

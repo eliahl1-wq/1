@@ -163,12 +163,13 @@ const WEAPON_BULLET_SPECS = {
     }
 };
 
-const SURFACE_KINDS = new Set(['road', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
+const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
 const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
 const CACHEABLE_PROP_KINDS = new Set([
     'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
-    'door', 'furniture', 'machine', 'sandbag',
+    'door', 'furniture', 'machine', 'sandbag', 'signpost',
+    'stump', 'fallenLog', 'hayBale', 'reeds', 'grassTuft', 'wildflowers', 'mushrooms',
 ]);
 
 function obstacleRenderSignature(obstacles) {
@@ -236,44 +237,95 @@ function seededNoise(x, y) {
     return n - Math.floor(n);
 }
 
-function traceSmoothWaterPath(ctx, points, originX = 0, originY = 0) {
-    if (!points?.length) return;
+function traceSmoothPath(ctx, points, originX = 0, originY = 0, closed = false) {
+    if (!points?.length) return false;
     const local = points.map(point => ({ x: point.x - originX, y: point.y - originY }));
     ctx.beginPath();
     ctx.moveTo(local[0].x, local[0].y);
-    for (let i = 1; i < local.length - 1; i++) {
-        const current = local[i];
-        const next = local[i + 1];
-        ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+    const segmentCount = closed ? local.length : local.length - 1;
+    for (let i = 0; i < segmentCount; i++) {
+        const p0 = local[closed ? (i - 1 + local.length) % local.length : Math.max(0, i - 1)];
+        const p1 = local[i % local.length];
+        const p2 = local[(i + 1) % local.length];
+        const p3 = local[closed ? (i + 2) % local.length : Math.min(local.length - 1, i + 2)];
+        ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6,
+            p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6,
+            p2.y - (p3.y - p1.y) / 6,
+            p2.x,
+            p2.y,
+        );
     }
-    const last = local[local.length - 1];
-    ctx.lineTo(last.x, last.y);
+    if (closed) ctx.closePath();
+    return true;
 }
 
-function traceOrganicPond(ctx, obstacle, padding = 0) {
+function riverShapePoints(obstacle, padding = 0) {
+    const points = obstacle.points || [];
+    const left = [];
+    const right = [];
+    for (let i = 0; i < points.length; i++) {
+        const prev = points[Math.max(0, i - 1)];
+        const next = points[Math.min(points.length - 1, i + 1)];
+        const length = Math.max(1, Math.hypot(next.x - prev.x, next.y - prev.y));
+        const nx = -(next.y - prev.y) / length;
+        const ny = (next.x - prev.x) / length;
+        const halfWidth = (obstacle.widths?.[i] || obstacle.width || 220) / 2 + padding;
+        left.push({ x: points[i].x + nx * halfWidth, y: points[i].y + ny * halfWidth });
+        right.push({ x: points[i].x - nx * halfWidth, y: points[i].y - ny * halfWidth });
+    }
+    return left.concat(right.reverse());
+}
+
+function traceRiverShape(ctx, obstacle, padding = 0) {
+    const shape = riverShapePoints(obstacle, padding);
+    return traceSmoothPath(ctx, shape, obstacle.x, obstacle.y, true);
+}
+
+function offsetPathPoints(points, offset) {
+    return points.map((point, index) => {
+        const prev = points[Math.max(0, index - 1)];
+        const next = points[Math.min(points.length - 1, index + 1)];
+        const length = Math.max(1, Math.hypot(next.x - prev.x, next.y - prev.y));
+        return {
+            x: point.x - ((next.y - prev.y) / length) * offset,
+            y: point.y + ((next.x - prev.x) / length) * offset,
+        };
+    });
+}
+
+function forEachPathSample(points, spacing, callback) {
+    let carry = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+        const a = points[i];
+        const b = points[i + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const length = Math.hypot(dx, dy);
+        if (length < 1) continue;
+        for (let distance = spacing - carry; distance <= length; distance += spacing) {
+            const t = distance / length;
+            callback(a.x + dx * t, a.y + dy * t, Math.atan2(dy, dx));
+        }
+        carry = (carry + length) % spacing;
+    }
+}
+
+function traceOrganicPond(ctx, obstacle, padding = 0, scale = 1) {
     const count = 24;
-    const rx = obstacle.w / 2 + padding;
-    const ry = obstacle.h / 2 + padding;
+    const rx = (obstacle.w / 2 + padding) * scale;
+    const ry = (obstacle.h / 2 + padding) * scale;
     const points = [];
     for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2;
         const wobble = 1
-            + Math.sin(angle * 3 + obstacle.x * 0.007) * 0.055
-            + Math.sin(angle * 5 + obstacle.y * 0.009) * 0.035;
+            + Math.sin(angle * 3 + obstacle.x * 0.007) * 0.075
+            + Math.sin(angle * 5 + obstacle.y * 0.009) * 0.045
+            + Math.sin(angle * 7 + (obstacle.x - obstacle.y) * 0.003) * 0.018;
         points.push({ x: Math.cos(angle) * rx * wobble, y: Math.sin(angle) * ry * wobble });
     }
-    ctx.beginPath();
-    const firstMid = {
-        x: (points[count - 1].x + points[0].x) / 2,
-        y: (points[count - 1].y + points[0].y) / 2,
-    };
-    ctx.moveTo(firstMid.x, firstMid.y);
-    for (let i = 0; i < count; i++) {
-        const point = points[i];
-        const next = points[(i + 1) % count];
-        ctx.quadraticCurveTo(point.x, point.y, (point.x + next.x) / 2, (point.y + next.y) / 2);
-    }
-    ctx.closePath();
+    traceSmoothPath(ctx, points, 0, 0, true);
 }
 
 function biomeAt() {
@@ -307,6 +359,7 @@ export class SurvivRenderer {
         this.fieldObstacles = [];
         this.waterObstacles = [];
         this.roadObstacles = [];
+        this.roadJunctionObstacles = [];
         this.bridgeObstacles = [];
         this.sortedWorldObstacles = [];
         this._roomZonesByHouseId = new Map();
@@ -326,6 +379,8 @@ export class SurvivRenderer {
         this.zone = null;
         this.me = null;
         this.hoveredChestId = null;
+        this.chestHoldId = null;
+        this.chestHoldStartedAt = 0;
         this.lootToast = null;
         this.lastLootId = null;
         this.hud = {
@@ -346,6 +401,7 @@ export class SurvivRenderer {
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
         this.mobileMove = { x: 0, y: 0 };
+        this._localMoveVector = { dx: 0, dy: 0 };
         this.mobileAim = { angle: 0, strength: 0, active: false, shooting: false };
         this.inputEnabled = true;
         this.spectatorMode = false;
@@ -503,6 +559,7 @@ export class SurvivRenderer {
         this.fieldObstacles = [];
         this.waterObstacles = [];
         this.roadObstacles = [];
+        this.roadJunctionObstacles = [];
         this.bridgeObstacles = [];
         this.sortedWorldObstacles = [];
         this._roomZonesByHouseId.clear();
@@ -517,6 +574,8 @@ export class SurvivRenderer {
         this.me = null;
         this.zone = null;
         this.hoveredChestId = null;
+        this.chestHoldId = null;
+        this.chestHoldStartedAt = 0;
         this.lootToast = null;
         this.lastLootId = null;
         this.particles = [];
@@ -608,6 +667,7 @@ export class SurvivRenderer {
                 serverY: me.y,
                 vx: 0,
                 vy: 0,
+                stationarySnapshots: 0,
                 receivedAt,
             };
             if (!this.externalCameraGetter && !this.spectatorMode) {
@@ -620,6 +680,12 @@ export class SurvivRenderer {
         const elapsed = clamp((receivedAt - state.receivedAt) / 1000, 0.001, 0.25);
         const serverStepDistance = Math.hypot(me.x - state.serverX, me.y - state.serverY);
         const correctionDistance = Math.hypot(me.x - state.x, me.y - state.y);
+        const moveInput = this._getLocalMoveVector();
+        const isTryingToMove = Math.abs(moveInput.dx) > 0.001 || Math.abs(moveInput.dy) > 0.001;
+        const serverStopped = serverStepDistance < 0.04;
+        state.stationarySnapshots = serverStopped && isTryingToMove
+            ? (state.stationarySnapshots || 0) + 1
+            : 0;
         if (correctionDistance > 180) {
             state.x = me.x;
             state.y = me.y;
@@ -640,19 +706,31 @@ export class SurvivRenderer {
         state.targetAngle = angle;
         state.serverX = me.x;
         state.serverY = me.y;
-        state.receivedAt = receivedAt;
+        // One unchanged packet right after a key press usually means that input
+        // has not reached the server tick yet. Keep the prior prediction clock so
+        // the player does not move forward and immediately snap back. Two stopped
+        // packets disable prediction, which keeps wall collisions authoritative.
+        if (!(serverStopped && isTryingToMove && state.stationarySnapshots === 1)) {
+            state.receivedAt = receivedAt;
+        }
     }
 
     _advanceInterpolatedWorld(dt, now) {
         const state = this._interpMe;
         if (!state || !this.me || state.id !== this.me.id) return;
 
-        // Follow only authoritative snapshots. Velocity extrapolation could put
-        // the local player ahead of the server and then pull it backwards on the
-        // next packet, which looked like severe rubber-banding while walking.
-        const targetX = state.targetX;
-        const targetY = state.targetY;
-        const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 30);
+        // Extrapolate only from the input that is held right now. This starts
+        // movement immediately between 40 Hz snapshots, while avoiding the stale
+        // measured velocity that previously caused pull-backs after key release.
+        const moveInput = this._getLocalMoveVector();
+        const hasMoveInput = Math.abs(moveInput.dx) > 0.001 || Math.abs(moveInput.dy) > 0.001;
+        const canPredictMovement = hasMoveInput && (state.stationarySnapshots || 0) < 2;
+        const leadSeconds = canPredictMovement
+            ? clamp((now - state.receivedAt) / 1000, 0, 0.05)
+            : 0;
+        const targetX = state.targetX + moveInput.dx * 208 * leadSeconds;
+        const targetY = state.targetY + moveInput.dy * 208 * leadSeconds;
+        const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 48);
         const angleAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 42);
         state.x = lerp(state.x, targetX, positionAlpha);
         state.y = lerp(state.y, targetY, positionAlpha);
@@ -1104,7 +1182,13 @@ export class SurvivRenderer {
         this.clearMobileInput();
     }
 
-    getInputPayload() {
+    _getLocalMoveVector() {
+        const result = this._localMoveVector;
+        if (!this.inputEnabled || this.spectatorMode) {
+            result.dx = 0;
+            result.dy = 0;
+            return result;
+        }
         let dx = this.mobileMove.x;
         let dy = this.mobileMove.y;
         if (Math.hypot(dx, dy) < 0.04) {
@@ -1120,6 +1204,13 @@ export class SurvivRenderer {
             dx /= len;
             dy /= len;
         }
+        result.dx = dx;
+        result.dy = dy;
+        return result;
+    }
+
+    getInputPayload() {
+        const { dx, dy } = this._getLocalMoveVector();
         // Recalculate mouse world coordinates because camera (and player) moved
         const w = this.screenToWorld(this.mouse.x, this.mouse.y);
         this.mouse.worldX = w.x;
@@ -1131,10 +1222,18 @@ export class SurvivRenderer {
             this.mouse.worldX - aimOrigin.x,
         );
         const aimAngle = this.mobileAim.active ? this.mobileAim.angle : pointerAimAngle;
+        const pointerAimDistance = Math.hypot(
+            this.mouse.worldX - aimOrigin.x,
+            this.mouse.worldY - aimOrigin.y,
+        );
+        const aimDistance = this.mobileAim.active
+            ? 90 + this.mobileAim.strength * 260
+            : pointerAimDistance;
         return {
             dx,
             dy,
             aimAngle,
+            aimDistance,
             shooting: (this.mouse.down || this.mobileAim.shooting) && this.inputEnabled,
             reload: false,
         };
@@ -1189,10 +1288,15 @@ export class SurvivRenderer {
         if (chest) {
             this.hoveredChestId = chest.id;
             this.mouse.down = false;
-            return 'openChest:' + chest.id;
+            return null;
         }
         this.mouse.down = true;
         return null;
+    }
+
+    setChestHold(chestId, startedAt = 0) {
+        this.chestHoldId = chestId || null;
+        this.chestHoldStartedAt = chestId ? startedAt : 0;
     }
 
     handlePointerUp() {
@@ -1207,6 +1311,7 @@ export class SurvivRenderer {
         this.fieldObstacles = [];
         this.waterObstacles = [];
         this.roadObstacles = [];
+        this.roadJunctionObstacles = [];
         this.bridgeObstacles = [];
         this._roomZonesByHouseId.clear();
         this._doorwaysByHouseId.clear();
@@ -1267,7 +1372,10 @@ export class SurvivRenderer {
             if (SURFACE_KINDS.has(o.kind)) {
                 this.surfaceObstacles.push(o);
                 if (o.kind === 'field') this.fieldObstacles.push(o);
-                else if (o.kind === 'road') this.roadObstacles.push(o);
+                else if (o.kind === 'road' || o.kind === 'roadJunction' || o.kind === 'trail_path') {
+                    this.roadObstacles.push(o);
+                    if (o.kind === 'roadJunction') this.roadJunctionObstacles.push(o);
+                }
                 else if (o.kind === 'bridge') this.bridgeObstacles.push(o);
                 else if (o.kind === 'water' || o.kind === 'river_path' || (o.kind === 'river' && !hasSplineRiver)) {
                     this.waterObstacles.push(o);
@@ -1276,6 +1384,8 @@ export class SurvivRenderer {
                 solid.push(o);
             }
         }
+        const roadLayer = obstacle => obstacle.kind === 'trail_path' ? 0 : obstacle.kind === 'road' ? 1 : 2;
+        this.roadObstacles.sort((a, b) => roadLayer(a) - roadLayer(b));
         this.sortedWorldObstacles = solid.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
         for (const obstacle of this.sortedWorldObstacles) {
             if (!obstacle._insideHouseId) continue;
@@ -1336,8 +1446,6 @@ export class SurvivRenderer {
         }
         this._obstacleRevision++;
         this._losCacheKey = '';
-        this._roofSpriteCache.clear();
-        this._obstacleSpriteCache.clear();
     }
 
     findCollisionObstacleAt(x, y, padding = 0) {
@@ -1607,32 +1715,43 @@ export class SurvivRenderer {
         const angles = new Set();
 
         // Add sweep rays for smooth coverage between wall corners
-        // Exact endpoint rays keep corners crisp; 16 sweep rays keep indoor
+        // Exact endpoint rays keep corners crisp; 24 sweep rays keep indoor
         // 900px-radius edge sub-pixel smooth without the old O(256 * segments)
         // intersection cost every animation frame.
-        const sweepCount = 12;
+        const sweepCount = 24;
         for (let i = 0; i < sweepCount; i++) {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
 
-        // Cast around each nearby segment endpoint so corners stay sealed and stable.
+        // A large landmark can contain hundreds of wall edges. Casting three rays
+        // for every endpoint makes a single LOS refresh cost over a million
+        // intersections and causes visible frame spikes while moving. Keep the
+        // nearest endpoint in each small angular bucket; farther corners in the
+        // same direction are already occluded by that nearer edge.
         const epsilon = 0.00005;
         const epRangeSq = (maxDist + 200) * (maxDist + 200);
+        const endpointBinCount = 120;
+        const endpointBins = new Map();
+        const collectEndpoint = (x, y) => {
+            const dx = x - px;
+            const dy = y - py;
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq >= epRangeSq) return;
+            const angle = normalize(Math.atan2(dy, dx));
+            const bin = Math.floor((angle / (Math.PI * 2)) * endpointBinCount) % endpointBinCount;
+            const previous = endpointBins.get(bin);
+            if (!previous || distanceSq < previous.distanceSq) {
+                endpointBins.set(bin, { angle, distanceSq });
+            }
+        };
         for (const s of segments) {
-            const d1sq = (s.ax - px) * (s.ax - px) + (s.ay - py) * (s.ay - py);
-            const d2sq = (s.bx - px) * (s.bx - px) + (s.by - py) * (s.by - py);
-            if (d1sq < epRangeSq) {
-                const a1 = normalize(Math.atan2(s.ay - py, s.ax - px));
-                angles.add(normalize(a1 - epsilon));
-                angles.add(a1);
-                angles.add(normalize(a1 + epsilon));
-            }
-            if (d2sq < epRangeSq) {
-                const a2 = normalize(Math.atan2(s.by - py, s.bx - px));
-                angles.add(normalize(a2 - epsilon));
-                angles.add(a2);
-                angles.add(normalize(a2 + epsilon));
-            }
+            collectEndpoint(s.ax, s.ay);
+            collectEndpoint(s.bx, s.by);
+        }
+        for (const { angle } of endpointBins.values()) {
+            angles.add(normalize(angle - epsilon));
+            angles.add(angle);
+            angles.add(normalize(angle + epsilon));
         }
 
         // Sort all angles 0 → 2π, then cast rays
@@ -2213,18 +2332,22 @@ export class SurvivRenderer {
 
         if (kind === 'river_path') {
             if (o.points && o.points.length > 0) {
-                ctx.strokeStyle = '#c9aa72';
-                ctx.lineWidth = o.width + 28;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                traceSmoothWaterPath(ctx, o.points, o.x, o.y);
-                ctx.stroke();
+                ctx.fillStyle = '#6f6745';
+                traceRiverShape(ctx, o, 30);
+                ctx.fill();
+                ctx.fillStyle = '#baa06c';
+                traceRiverShape(ctx, o, 16);
+                ctx.fill();
             }
         } else if (kind === 'river') {
-            ctx.fillStyle = '#c9aa72';
-            ctx.fillRect(-o.w / 2 - 10, -o.h / 2 - 14, o.w + 20, o.h + 28);
+            ctx.fillStyle = '#baa06c';
+            roundRect(ctx, -o.w / 2 - 12, -o.h / 2 - 14, o.w + 24, o.h + 28, o.h / 2);
+            ctx.fill();
         } else if (kind === 'water') {
-            ctx.fillStyle = '#c9aa72';
+            ctx.fillStyle = '#66704d';
+            traceOrganicPond(ctx, o, 27);
+            ctx.fill();
+            ctx.fillStyle = '#b8a06e';
             traceOrganicPond(ctx, o, 16);
             ctx.fill();
         }
@@ -2232,12 +2355,32 @@ export class SurvivRenderer {
     }
 
     drawRoadShoulder(ctx, o) {
-        if (o.variant !== 'asphalt') return;
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
+
+        if (o.kind === 'trail_path' && o.points?.length) {
+            ctx.strokeStyle = o.variant === 'boardwalk' ? 'rgba(35, 30, 23, 0.38)' : '#63583f';
+            ctx.lineWidth = (o.width || 54) + (o.variant === 'boardwalk' ? 16 : 22);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            traceSmoothPath(ctx, o.points, o.x, o.y);
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
+        if (o.variant !== 'asphalt') {
+            ctx.restore();
+            return;
+        }
         ctx.fillStyle = '#655745';
+        if (o.kind === 'roadJunction') {
+            roundRect(ctx, -o.w / 2 - 12, -o.h / 2 - 12, o.w + 24, o.h + 24, 16);
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
         const isHorizontal = o.w > o.h;
         if (isHorizontal) {
             roundRect(ctx, -o.w / 2, -o.h / 2 - 12, o.w, o.h + 24, 10);
@@ -2257,36 +2400,58 @@ export class SurvivRenderer {
 
         if (kind === 'river_path') {
             if (o.points && o.points.length > 0) {
-                // Water body
-                ctx.strokeStyle = '#2a5e7a';
-                ctx.lineWidth = o.width;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                traceSmoothWaterPath(ctx, o.points, o.x, o.y);
-                ctx.stroke();
+                const waterGradient = ctx.createLinearGradient(-o.w / 2, -o.h / 2, o.w / 2, o.h / 2);
+                waterGradient.addColorStop(0, '#234f69');
+                waterGradient.addColorStop(0.52, '#2d6984');
+                waterGradient.addColorStop(1, '#24566f');
+                ctx.fillStyle = waterGradient;
+                traceRiverShape(ctx, o);
+                ctx.fill();
 
-                // Centerline highlight
-                ctx.strokeStyle = 'rgba(80, 160, 200, 0.12)';
-                ctx.lineWidth = o.width * 0.4;
-                ctx.stroke();
+                ctx.save();
+                traceRiverShape(ctx, o, -5);
+                ctx.clip();
+                ctx.lineCap = 'round';
+                ctx.setLineDash([48, 86]);
+                ctx.lineDashOffset = -(this._frameNow * 0.018) % 134;
+                for (const [index, factor] of [-0.24, 0, 0.24].entries()) {
+                    const flowPoints = offsetPathPoints(o.points, (o.width || 220) * factor);
+                    ctx.strokeStyle = index === 1 ? 'rgba(144, 211, 230, 0.18)' : 'rgba(126, 198, 220, 0.11)';
+                    ctx.lineWidth = index === 1 ? 2.4 : 1.6;
+                    traceSmoothPath(ctx, flowPoints, o.x, o.y);
+                    ctx.stroke();
+                }
+                ctx.setLineDash([]);
+                ctx.restore();
             }
         } else if (kind === 'river') {
             ctx.fillStyle = '#2a5e7a';
-            ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h);
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, o.h / 2);
+            ctx.fill();
 
-            // Subtle centerline highlight to give water depth without animation
             ctx.fillStyle = 'rgba(80, 160, 200, 0.12)';
-            ctx.fillRect(-o.w / 2 + 4, -o.h / 2 + o.h * 0.3, o.w - 8, o.h * 0.4);
+            roundRect(ctx, -o.w / 2 + 4, -o.h * 0.2, o.w - 8, o.h * 0.4, o.h * 0.2);
+            ctx.fill();
         } else if (kind === 'water') {
-            ctx.fillStyle = '#2a5e7a';
+            const pondGradient = ctx.createRadialGradient(-o.w * 0.14, -o.h * 0.18, 8, 0, 0, Math.max(o.w, o.h) * 0.56);
+            pondGradient.addColorStop(0, '#3b7990');
+            pondGradient.addColorStop(0.58, '#2b647e');
+            pondGradient.addColorStop(1, '#214d68');
+            ctx.fillStyle = pondGradient;
             traceOrganicPond(ctx, o);
             ctx.fill();
 
-            // Subtle inner highlight ring (lighter center)
-            ctx.strokeStyle = 'rgba(80, 160, 200, 0.14)';
-            ctx.lineWidth = Math.max(2, Math.min(o.w, o.h) * 0.06);
-            ctx.beginPath();
-            ctx.ellipse(0, 0, o.w / 2 * 0.6, o.h / 2 * 0.6, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(151, 213, 226, 0.18)';
+            ctx.lineWidth = 2.2;
+            ctx.setLineDash([22, 28]);
+            ctx.lineDashOffset = -(this._frameNow * 0.012) % 50;
+            traceOrganicPond(ctx, o, 0, 0.64);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.strokeStyle = 'rgba(185, 228, 235, 0.19)';
+            ctx.lineWidth = 1.4;
+            traceOrganicPond(ctx, o, 0, 0.38);
             ctx.stroke();
         }
         ctx.restore();
@@ -2297,6 +2462,68 @@ export class SurvivRenderer {
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
+
+        if (o.kind === 'trail_path' && o.points?.length) {
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            if (o.variant === 'boardwalk') {
+                ctx.strokeStyle = '#493b2b';
+                ctx.lineWidth = (o.width || 48) + 8;
+                traceSmoothPath(ctx, o.points, o.x, o.y);
+                ctx.stroke();
+                ctx.strokeStyle = '#8a704d';
+                ctx.lineWidth = o.width || 48;
+                traceSmoothPath(ctx, o.points, o.x, o.y);
+                ctx.stroke();
+
+                forEachPathSample(o.points, 18, (worldX, worldY, angle) => {
+                    ctx.save();
+                    ctx.translate(worldX - o.x, worldY - o.y);
+                    ctx.rotate(angle);
+                    ctx.fillStyle = seededNoise(worldX * 0.02, worldY * 0.02) > 0.48 ? '#9b8059' : '#806746';
+                    roundRect(ctx, -8, -(o.width || 48) / 2 + 3, 16, (o.width || 48) - 6, 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(42, 31, 22, 0.28)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    ctx.restore();
+                });
+            } else {
+                const palettes = {
+                    forest: ['#65583e', '#816f4e'],
+                    gravel: ['#696456', '#88816e'],
+                    farm: ['#76603f', '#967b52'],
+                    footpath: ['#6d5d42', '#8a7652'],
+                };
+                const palette = palettes[o.variant] || palettes.footpath;
+                ctx.strokeStyle = palette[0];
+                ctx.lineWidth = o.width || 54;
+                traceSmoothPath(ctx, o.points, o.x, o.y);
+                ctx.stroke();
+                ctx.strokeStyle = palette[1];
+                ctx.lineWidth = Math.max(12, (o.width || 54) - 13);
+                traceSmoothPath(ctx, o.points, o.x, o.y);
+                ctx.stroke();
+
+                ctx.fillStyle = 'rgba(52, 44, 32, 0.24)';
+                forEachPathSample(o.points, 76, (worldX, worldY, angle) => {
+                    const noise = seededNoise(worldX * 0.01, worldY * 0.01) - 0.5;
+                    ctx.beginPath();
+                    ctx.ellipse(worldX - o.x - Math.sin(angle) * noise * 22, worldY - o.y + Math.cos(angle) * noise * 22, 3.4, 1.8, angle, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+            ctx.restore();
+            return;
+        }
+
+        if (o.kind === 'roadJunction') {
+            ctx.fillStyle = '#2b2c28';
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 11);
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
 
         if (o.variant === 'asphalt') {
             ctx.fillStyle = '#2b2c28'; // Dark asphalt gray
@@ -2347,7 +2574,24 @@ export class SurvivRenderer {
     }
 
     drawRoadMarkings(ctx, o) {
+        if (o.kind === 'roadJunction') return;
         ctx.save();
+        if (o.kind === 'trail_path' && o.points?.length) {
+            ctx.translate(o.x, o.y);
+            ctx.rotate(o.rotation || 0);
+            if (o.variant !== 'boardwalk') {
+                ctx.strokeStyle = o.variant === 'gravel' ? 'rgba(45, 43, 37, 0.25)' : 'rgba(57, 45, 31, 0.28)';
+                ctx.lineWidth = 2.2;
+                ctx.setLineDash([22, 18]);
+                for (const offset of [-(o.width || 54) * 0.21, (o.width || 54) * 0.21]) {
+                    traceSmoothPath(ctx, offsetPathPoints(o.points, offset), o.x, o.y);
+                    ctx.stroke();
+                }
+                ctx.setLineDash([]);
+            }
+            ctx.restore();
+            return;
+        }
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
@@ -2359,6 +2603,7 @@ export class SurvivRenderer {
         const visible = this.getVisibleRoadAxisRange(o, isHorizontal, 180);
         const start = Math.max(-length / 2 + inset, visible.start);
         const end = Math.min(length / 2 - inset, visible.end);
+        const markingIntervals = this.getRoadMarkingIntervals(o, start, end, isHorizontal);
 
         const line = (a, b, offset = 0) => {
             if (isHorizontal) {
@@ -2404,25 +2649,26 @@ export class SurvivRenderer {
                 ctx.stroke();
             }
 
-            if (start < end) {
-                // Center yellow dashed line follows the actual road direction.
+            if (markingIntervals.length) {
                 ctx.strokeStyle = 'rgba(235, 185, 60, 0.76)';
                 ctx.lineWidth = 2.5;
                 ctx.setLineDash([18, 18]);
-                ctx.beginPath();
-                // Use the road's fixed local endpoints so the dash phase stays
-                // world-anchored without emitting dozens of segments per frame.
-                line(-length / 2 + inset, length / 2 - inset, 0);
-                ctx.stroke();
+                for (const interval of markingIntervals) {
+                    ctx.lineDashOffset = -((interval.start + length / 2) % 36);
+                    ctx.beginPath();
+                    line(interval.start, interval.end, 0);
+                    ctx.stroke();
+                }
                 ctx.setLineDash([]);
 
-                // White edge lines on both sides, also direction-aware.
                 ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
                 ctx.lineWidth = 1.5;
                 const edge = width / 2 - 8;
                 ctx.beginPath();
-                line(start, end, -edge);
-                line(start, end, edge);
+                for (const interval of markingIntervals) {
+                    line(interval.start, interval.end, -edge);
+                    line(interval.start, interval.end, edge);
+                }
                 ctx.stroke();
             }
         } else {
@@ -2435,6 +2681,40 @@ export class SurvivRenderer {
             ctx.stroke();
         }
         ctx.restore();
+    }
+
+    getRoadMarkingIntervals(road, start, end, isHorizontal) {
+        let intervals = start < end ? [{ start, end }] : [];
+        const angle = -(road.rotation || 0);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const roadWidth = isHorizontal ? road.h : road.w;
+
+        for (const junction of this.roadJunctionObstacles) {
+            const dx = junction.x - road.x;
+            const dy = junction.y - road.y;
+            const localX = dx * cos - dy * sin;
+            const localY = dx * sin + dy * cos;
+            const axis = isHorizontal ? localX : localY;
+            const cross = isHorizontal ? localY : localX;
+            const crossLimit = roadWidth / 2 + Math.max(junction.w, junction.h) / 2;
+            if (Math.abs(cross) > crossLimit || axis < start - 120 || axis > end + 120) continue;
+
+            const halfCut = (isHorizontal ? junction.w : junction.h) / 2 + 22;
+            const cutStart = axis - halfCut;
+            const cutEnd = axis + halfCut;
+            const next = [];
+            for (const interval of intervals) {
+                if (cutEnd <= interval.start || cutStart >= interval.end) {
+                    next.push(interval);
+                    continue;
+                }
+                if (cutStart > interval.start) next.push({ start: interval.start, end: cutStart });
+                if (cutEnd < interval.end) next.push({ start: cutEnd, end: interval.end });
+            }
+            intervals = next;
+        }
+        return intervals.filter(interval => interval.end - interval.start > 12);
     }
 
     getVisibleRoadAxisRange(o, isHorizontal, padding = 160) {
@@ -2583,7 +2863,7 @@ export class SurvivRenderer {
         if (allowCache && this.drawCachedObstacle(ctx, o, kind)) return;
 
         // Roads and water are now handled via layered passes
-        if (kind === 'road' || kind === 'river' || kind === 'water') return;
+        if (kind === 'road' || kind === 'roadJunction' || kind === 'trail_path' || kind === 'river' || kind === 'river_path' || kind === 'water') return;
 
         const shake = allowCache ? this.getObstacleHitShake(o) : { x: 0, y: 0 };
         ctx.save();
@@ -2931,30 +3211,273 @@ export class SurvivRenderer {
             ctx.stroke();
         } else if (kind === 'bush') {
             const r = Math.max(o.w, o.h) / 2;
-            ctx.shadowBlur = 3;
-            // Ground shadow
+            const hue = o.hue ?? 105;
+            ctx.shadowBlur = 0;
             ctx.fillStyle = 'rgba(10, 18, 8, 0.18)';
             ctx.beginPath();
-            ctx.ellipse(0, r * 0.18, r * 0.58, r * 0.24, 0, 0, Math.PI * 2);
+            ctx.ellipse(2, r * 0.23, r * 0.72, r * 0.27, 0.1, 0, Math.PI * 2);
             ctx.fill();
-            // Dark base blobs
-            ctx.fillStyle = `hsl(${(o.hue ?? 105)}, 32%, 24%)`;
+
+            if (o.variant === 'juniper') {
+                for (let layer = 0; layer < 3; layer++) {
+                    const points = 18;
+                    const layerR = r * (0.88 - layer * 0.18);
+                    ctx.fillStyle = `hsl(${hue + layer * 5}, ${34 + layer * 4}%, ${22 + layer * 7}%)`;
+                    ctx.beginPath();
+                    for (let i = 0; i < points; i++) {
+                        const angle = (i / points) * Math.PI * 2 + layer * 0.21;
+                        const radius = layerR * (i % 2 === 0 ? 1 : 0.62);
+                        const x = Math.cos(angle) * radius - layer * 2;
+                        const y = Math.sin(angle) * radius * 0.78 - layer * 3;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            } else if (o.variant === 'willow') {
+                ctx.strokeStyle = `hsl(${hue - 8}, 34%, 24%)`;
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 10; i++) {
+                    const angle = (i / 10) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 2);
+                    ctx.quadraticCurveTo(Math.cos(angle) * r * 0.42, Math.sin(angle) * r * 0.28, Math.cos(angle) * r * 0.82, Math.sin(angle) * r * 0.68);
+                    ctx.stroke();
+                    ctx.fillStyle = `hsl(${hue + (i % 3) * 5}, 42%, ${30 + (i % 2) * 7}%)`;
+                    ctx.beginPath();
+                    ctx.ellipse(Math.cos(angle) * r * 0.68, Math.sin(angle) * r * 0.54, r * 0.30, r * 0.13, angle, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else {
+                const lobeCount = o.variant === 'bramble' ? 9 : 7;
+                ctx.fillStyle = `hsl(${hue}, 34%, 23%)`;
+                ctx.beginPath();
+                for (let i = 0; i < lobeCount; i++) {
+                    const angle = (i / lobeCount) * Math.PI * 2;
+                    const radius = r * (0.38 + seededNoise(o.x * 0.03 + i, o.y * 0.03) * 0.16);
+                    ctx.moveTo(Math.cos(angle) * r * 0.45, Math.sin(angle) * r * 0.35);
+                    ctx.arc(Math.cos(angle) * r * 0.45, Math.sin(angle) * r * 0.35, radius, 0, Math.PI * 2);
+                }
+                ctx.fill();
+                ctx.fillStyle = `hsl(${hue + 8}, 42%, 34%)`;
+                for (let i = 0; i < lobeCount; i++) {
+                    const angle = (i / lobeCount) * Math.PI * 2 + 0.3;
+                    ctx.beginPath();
+                    ctx.ellipse(Math.cos(angle) * r * 0.36, Math.sin(angle) * r * 0.29 - r * 0.10, r * 0.31, r * 0.20, angle, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                if (o.variant === 'berry' || o.variant === 'flowering') {
+                    ctx.fillStyle = o.variant === 'berry' ? '#a83c4b' : '#eee2c6';
+                    for (let i = 0; i < 8; i++) {
+                        const angle = i * 2.399;
+                        const distance = r * (0.18 + (i % 3) * 0.17);
+                        ctx.beginPath();
+                        ctx.arc(Math.cos(angle) * distance, Math.sin(angle) * distance - r * 0.10, o.variant === 'berry' ? 2.3 : 2.8, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                if (o.variant === 'bramble') {
+                    ctx.strokeStyle = 'rgba(190, 205, 151, 0.42)';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i < 7; i++) {
+                        const angle = (i / 7) * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.moveTo(Math.cos(angle) * r * 0.48, Math.sin(angle) * r * 0.4);
+                        ctx.lineTo(Math.cos(angle) * r * 0.82, Math.sin(angle) * r * 0.67);
+                        ctx.stroke();
+                    }
+                }
+            }
+        } else if (kind === 'grassTuft') {
+            const halfW = o.w / 2;
+            const halfH = o.h / 2;
+            ctx.fillStyle = 'rgba(18, 36, 15, 0.12)';
             ctx.beginPath();
-            ctx.arc(-r * 0.2, r * 0.02, r * 0.48, 0, Math.PI * 2);
-            ctx.arc(r * 0.18, r * 0.04, r * 0.46, 0, Math.PI * 2);
-            ctx.arc(-r * 0.02, -r * 0.18, r * 0.42, 0, Math.PI * 2);
+            ctx.ellipse(0, halfH * 0.42, halfW * 0.72, halfH * 0.28, 0, 0, Math.PI * 2);
             ctx.fill();
-            // Lighter top blobs
-            ctx.fillStyle = `hsl(${(o.hue ?? 105) + 6}, 36%, 32%)`;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 11; i++) {
+                const t = i / 10;
+                const x = -halfW * 0.72 + t * halfW * 1.44;
+                const sway = (seededNoise(o.x * 0.02 + i, o.y * 0.02) - 0.5) * halfW * 0.6;
+                ctx.strokeStyle = `hsl(${(o.hue ?? 88) + (i % 3) * 5}, ${32 + (i % 2) * 8}%, ${o.variant === 'dry' ? 38 : 27 + (i % 4) * 4}%)`;
+                ctx.lineWidth = 1.4 + (i % 3) * 0.35;
+                ctx.beginPath();
+                ctx.moveTo(x, halfH * 0.48);
+                ctx.quadraticCurveTo(x + sway * 0.35, 0, x + sway, -halfH * (0.55 + (i % 4) * 0.12));
+                ctx.stroke();
+            }
+        } else if (kind === 'wildflowers') {
+            const halfW = o.w / 2;
+            const halfH = o.h / 2;
+            ctx.strokeStyle = '#456338';
+            ctx.lineWidth = 1.3;
+            for (let i = 0; i < 9; i++) {
+                const angle = i * 2.399;
+                const distance = (i % 4) / 4 * halfW * 0.9;
+                const x = Math.cos(angle) * distance;
+                const y = Math.sin(angle) * distance * 0.55;
+                ctx.beginPath();
+                ctx.moveTo(x, halfH * 0.55);
+                ctx.quadraticCurveTo(x - 2, y + 3, x, y - halfH * 0.28);
+                ctx.stroke();
+                const flowerHue = ((o.hue ?? 45) + i * 31) % 360;
+                ctx.fillStyle = `hsl(${flowerHue}, 62%, ${i % 3 === 0 ? 72 : 61}%)`;
+                for (let petal = 0; petal < 5; petal++) {
+                    const petalAngle = (petal / 5) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.arc(x + Math.cos(petalAngle) * 2.5, y - halfH * 0.28 + Math.sin(petalAngle) * 2.5, 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.fillStyle = '#e7b849';
+                ctx.beginPath();
+                ctx.arc(x, y - halfH * 0.28, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else if (kind === 'reeds') {
+            const halfW = o.w / 2;
+            const halfH = o.h / 2;
+            ctx.fillStyle = 'rgba(20, 43, 27, 0.14)';
             ctx.beginPath();
-            ctx.arc(-r * 0.14, -r * 0.06, r * 0.34, 0, Math.PI * 2);
-            ctx.arc(r * 0.12, -r * 0.04, r * 0.32, 0, Math.PI * 2);
+            ctx.ellipse(0, halfH * 0.38, halfW * 0.8, halfH * 0.26, 0, 0, Math.PI * 2);
             ctx.fill();
-            // Highlight spot
-            ctx.fillStyle = `hsl(${(o.hue ?? 105) + 12}, 40%, 38%)`;
+            for (let i = 0; i < 10; i++) {
+                const x = -halfW * 0.75 + (i / 9) * halfW * 1.5;
+                const topY = -halfH * (0.45 + (i % 4) * 0.14);
+                ctx.strokeStyle = `hsl(${(o.hue ?? 82) + (i % 3) * 4}, 38%, ${27 + (i % 3) * 5}%)`;
+                ctx.lineWidth = 1.4;
+                ctx.beginPath();
+                ctx.moveTo(x, halfH * 0.55);
+                ctx.quadraticCurveTo(x + (i % 2 ? 3 : -3), 0, x + (i % 3 - 1) * 3, topY);
+                ctx.stroke();
+                if (o.variant === 'cattails' && i % 3 === 0) {
+                    ctx.fillStyle = '#59402d';
+                    roundRect(ctx, x - 2 + (i % 3 - 1) * 3, topY - 5, 4, 9, 2);
+                    ctx.fill();
+                }
+            }
+        } else if (kind === 'stump') {
+            const r = Math.min(o.w, o.h) / 2;
+            ctx.fillStyle = 'rgba(18, 20, 13, 0.22)';
             ctx.beginPath();
-            ctx.arc(-r * 0.08, -r * 0.18, r * 0.18, 0, Math.PI * 2);
+            ctx.ellipse(2, r * 0.32, r * 0.88, r * 0.42, 0, 0, Math.PI * 2);
             ctx.fill();
+            ctx.fillStyle = '#604126';
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#a77a49';
+            ctx.beginPath();
+            ctx.arc(-2, -2, r * 0.65, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(82, 49, 25, 0.56)';
+            ctx.lineWidth = 1.2;
+            for (const ring of [0.24, 0.45]) {
+                ctx.beginPath();
+                ctx.arc(-2, -2, r * ring, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = '#49643a';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(r * 0.08, r * 0.05, r * 0.67, -0.1, 1.25);
+            ctx.stroke();
+        } else if (kind === 'fallenLog') {
+            const halfW = o.w / 2;
+            const halfH = o.h / 2;
+            ctx.fillStyle = 'rgba(15, 18, 12, 0.24)';
+            roundRect(ctx, -halfW + 3, -halfH + 7, o.w, o.h, halfH);
+            ctx.fill();
+            const logGradient = ctx.createLinearGradient(0, -halfH, 0, halfH);
+            logGradient.addColorStop(0, o.variant === 'birch' ? '#c0b69c' : '#725035');
+            logGradient.addColorStop(1, o.variant === 'birch' ? '#827b6c' : '#4d3423');
+            ctx.fillStyle = logGradient;
+            roundRect(ctx, -halfW, -halfH, o.w, o.h, halfH * 0.72);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(43, 28, 18, 0.52)';
+            ctx.lineWidth = 1.2;
+            for (let x = -halfW + 14; x < halfW - 8; x += 15) {
+                ctx.beginPath();
+                ctx.moveTo(x, -halfH * 0.65);
+                ctx.lineTo(x + 5, halfH * 0.65);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#b68b57';
+            ctx.beginPath();
+            ctx.ellipse(-halfW + 2, 0, halfH * 0.68, halfH * 0.88, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(79, 50, 27, 0.55)';
+            ctx.beginPath();
+            ctx.ellipse(-halfW + 2, 0, halfH * 0.36, halfH * 0.52, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            if (o.variant === 'mossy') {
+                ctx.strokeStyle = '#547044';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(-halfW * 0.25, -halfH * 0.66);
+                ctx.quadraticCurveTo(0, -halfH, halfW * 0.45, -halfH * 0.58);
+                ctx.stroke();
+            }
+        } else if (kind === 'mushrooms') {
+            for (let i = 0; i < 8; i++) {
+                const angle = i * 2.399;
+                const distance = 4 + (i % 4) * 3;
+                const x = Math.cos(angle) * distance;
+                const y = Math.sin(angle) * distance * 0.7;
+                ctx.fillStyle = '#d9c7a2';
+                ctx.fillRect(x - 1, y, 2, 5);
+                ctx.fillStyle = `hsl(${(o.hue ?? 24) + i * 2}, 52%, ${42 + (i % 3) * 6}%)`;
+                ctx.beginPath();
+                ctx.ellipse(x, y, 4, 2.6, angle, Math.PI, Math.PI * 2);
+                ctx.fill();
+            }
+        } else if (kind === 'signpost') {
+            ctx.fillStyle = 'rgba(17, 18, 13, 0.24)';
+            roundRect(ctx, -3, -o.h * 0.36 + 4, 8, o.h * 0.82, 3);
+            ctx.fill();
+            ctx.fillStyle = '#5d4027';
+            roundRect(ctx, -3, -o.h * 0.42, 6, o.h * 0.84, 2);
+            ctx.fill();
+            ctx.fillStyle = '#8a643d';
+            ctx.beginPath();
+            ctx.moveTo(-o.w / 2, -o.h * 0.30);
+            ctx.lineTo(o.w * 0.34, -o.h * 0.30);
+            ctx.lineTo(o.w / 2, -o.h * 0.12);
+            ctx.lineTo(o.w * 0.34, o.h * 0.06);
+            ctx.lineTo(-o.w / 2, o.h * 0.06);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(38, 25, 14, 0.55)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#c4aa78';
+            ctx.beginPath();
+            ctx.arc(-o.w * 0.28, -o.h * 0.12, 1.7, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (kind === 'hayBale') {
+            const baleGradient = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            baleGradient.addColorStop(0, '#c7a64e');
+            baleGradient.addColorStop(1, '#8e7136');
+            ctx.fillStyle = baleGradient;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, Math.min(8, o.h / 3));
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(87, 63, 27, 0.58)';
+            ctx.lineWidth = 2;
+            for (const x of [-o.w * 0.24, o.w * 0.24]) {
+                ctx.beginPath();
+                ctx.moveTo(x, -o.h / 2 + 2);
+                ctx.lineTo(x, o.h / 2 - 2);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = 'rgba(245, 216, 118, 0.32)';
+            ctx.lineWidth = 1;
+            for (let y = -o.h * 0.28; y <= o.h * 0.28; y += 6) {
+                ctx.beginPath();
+                ctx.moveTo(-o.w / 2 + 4, y);
+                ctx.lineTo(o.w / 2 - 4, y + 2);
+                ctx.stroke();
+            }
         } else if (kind === 'barrel') {
             const r = Math.max(o.w, o.h) / 2;
             // Metallic body gradient
@@ -3181,7 +3704,7 @@ export class SurvivRenderer {
         if (typeof document === 'undefined' || !o?.id || !CACHEABLE_PROP_KINDS.has(kind)) return false;
         if (o.w > 320 || o.h > 320 || !o.w || !o.h) return false;
 
-        const key = o.id + ':' + this._obstacleRevision;
+        const key = [o.id, kind, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || ''].join(':');
         let sprite = this._obstacleSpriteCache.get(key);
         if (!sprite) {
             if (this._obstacleCacheBuildsThisFrame >= 8) return false;
@@ -3529,6 +4052,36 @@ export class SurvivRenderer {
             }
 
             ctx.restore();
+
+            const nearby = !!this.me && Math.hypot(this.me.x - l.x, this.me.y - l.y) <= 96;
+            const holding = this.chestHoldId === l.id;
+            if (nearby || holding) {
+                const progress = holding
+                    ? clamp((this._frameNow - this.chestHoldStartedAt) / 2000, 0, 1)
+                    : 0;
+                ctx.fillStyle = 'rgba(7, 10, 8, 0.86)';
+                ctx.beginPath();
+                ctx.arc(0, -33, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                if (progress > 0) {
+                    ctx.strokeStyle = '#f5cf7a';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, -33, 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px system-ui';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('F', 0, -33);
+                ctx.font = 'bold 8px system-ui';
+                ctx.fillStyle = holding ? '#f5cf7a' : 'rgba(255,255,255,0.9)';
+                ctx.fillText(holding ? 'OPENING...' : 'HOLD TO OPEN', 0, -51);
+            }
         } else {
             ctx.fillStyle = 'rgba(6, 9, 7, 0.34)';
             ctx.beginPath();
@@ -5226,7 +5779,7 @@ export class SurvivRenderer {
         // custom roof is uncommon, while normal houses gain most from caching.
         if (o.w > 1400 || o.h > 1100) return false;
 
-        const key = o.id + ':' + this._obstacleRevision;
+        const key = [o.id, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.label || '', o.landmarkType || ''].join(':');
         let sprite = this._roofSpriteCache.get(key);
         if (!sprite) {
             // Spread cache creation across frames to avoid an entry stutter

@@ -222,6 +222,7 @@ export default function SurvivGame() {
     const pickupWeaponPendingRef = useRef(false);
     const equipSlotPendingRef = useRef(null);
     const openChestPendingRef = useRef(null);
+    const chestHoldIdRef = useRef(null);
     const takeChestItemPendingRef = useRef(null);
     const prevOpenedContainerIdRef = useRef(null);
     const closeChestPendingRef = useRef(false);
@@ -588,20 +589,20 @@ export default function SurvivGame() {
                 });
                 return;
             }
-            if (k === 'e') {
-                e.preventDefault();
-                if (e.repeat) return;
-                if (inventoryOpenRef.current) {
-                    handleCloseInventory();
-                    return;
-                }
-                const chest = renderer.getNearbyChest();
-                if (chest?.id) openChestPendingRef.current = chest.id;
-                return;
-            }
+
             if (k === 'escape') {
                 if (inventoryOpenRef.current) handleCloseInventory();
                 return;
+            }
+            if (k === 'f') {
+                e.preventDefault();
+                if (e.repeat) return;
+                const chest = renderer.getNearbyChest();
+                if (chest?.id) {
+                    chestHoldIdRef.current = chest.id;
+                    renderer.setChestHold(chest.id, Date.now());
+                    return;
+                }
             }
             const action = renderer.handleKeyDown(e);
             if (action === 'reload') reloadPendingRef.current = true;
@@ -612,7 +613,13 @@ export default function SurvivGame() {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
             }
         };
-        const onKeyUp = (e) => renderer.handleKeyUp(e);
+        const onKeyUp = (e) => {
+            if (e.key.toLowerCase() === 'f') {
+                chestHoldIdRef.current = null;
+                renderer.setChestHold(null);
+            }
+            renderer.handleKeyUp(e);
+        };
         const onPointerMove = (e) => {
             if (IS_MOBILE && e.pointerType !== 'mouse') return;
             renderer.handlePointerMove(e.clientX, e.clientY);
@@ -621,10 +628,8 @@ export default function SurvivGame() {
             if (IS_MOBILE && e.pointerType !== 'mouse') return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
-            const action = renderer.handlePointerDown();
-            if (typeof action === 'string' && action.startsWith('openChest:')) {
-                openChestPendingRef.current = action.slice('openChest:'.length);
-            }
+            renderer.handlePointerDown();
+
         };
         const onPointerUp = () => renderer.handlePointerUp();
         let lastWeaponWheelAt = 0;
@@ -648,6 +653,8 @@ export default function SurvivGame() {
         const neutralizeInput = () => {
             renderer.clearInput();
             clearPendingActions();
+            chestHoldIdRef.current = null;
+            renderer.setChestHold(null);
             if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
                 const neutral = renderer.getInputPayload();
                 neutral.dx = 0;
@@ -745,12 +752,7 @@ export default function SurvivGame() {
                     meUiSignatureRef.current = nextMeSignature;
                     setMe(nextMe);
                 }
-                const chestId = nextMe.openedContainer?.id || null;
-                if (chestId && chestId !== prevOpenedContainerIdRef.current) {
-                    inventoryOpenRef.current = true;
-                    setIsInventoryOpen(true);
-                }
-                prevOpenedContainerIdRef.current = chestId;
+
             }
             if (tick.dollarBalance != null) {
                 setCurrentBalance(tick.dollarBalance);
@@ -857,6 +859,12 @@ export default function SurvivGame() {
             }
             setLocalTimer(0);
             setCashOutEndAt(0);
+            if (!hasJoinedRef.current && /insufficient/i.test(message)) {
+                setIsRejoining(false);
+                blockAutoJoinRef.current = true;
+                navigate('/lobby', { state: { depositIntent: true, selectedMode: 'surviv', requiredBalanceUsd: joinParamsRef.current.entryFeeUsd } });
+                return;
+            }
             if (!hasJoinedRef.current) {
                 blockAutoJoinRef.current = true;
                 alert(message);
@@ -876,6 +884,14 @@ export default function SurvivGame() {
             ) return;
 
             const payload = renderer.getInputPayload();
+            const heldChest = chestHoldIdRef.current
+                ? renderer.getNearbyChest()
+                : null;
+            if (chestHoldIdRef.current && heldChest?.id !== chestHoldIdRef.current) {
+                chestHoldIdRef.current = null;
+                renderer.setChestHold(null);
+            }
+            payload.chestHoldId = chestHoldIdRef.current;
             let hasAction = false;
             if (reloadPendingRef.current) {
                 payload.reload = true;
@@ -937,8 +953,8 @@ export default function SurvivGame() {
                 Math.round((Number(payload.dx) || 0) * 1000),
                 Math.round((Number(payload.dy) || 0) * 1000),
                 Math.round((Number(payload.aimAngle) || 0) * 1000),
-
                 payload.shooting ? 1 : 0,
+                payload.chestHoldId || '',
             ].join(':');
             const now = Date.now();
             if (!hasAction && continuousSignature === lastContinuousInput && now - lastInputSentAt < 250) return;
@@ -1001,13 +1017,20 @@ export default function SurvivGame() {
     }, []);
 
     const handleMobileInteract = useCallback(() => {
-        const weapon = rendererRef.current?.getNearbyGroundWeapon();
-        if (weapon?.id) {
-            pickupWeaponPendingRef.current = true;
+        const renderer = rendererRef.current;
+        const chest = renderer?.getNearbyChest();
+        if (chest?.id) {
+            chestHoldIdRef.current = chest.id;
+            renderer.setChestHold(chest.id, Date.now());
             return;
         }
-        const chest = rendererRef.current?.getNearbyChest();
-        if (chest?.id) openChestPendingRef.current = chest.id;
+        const weapon = renderer?.getNearbyGroundWeapon();
+        if (weapon?.id) pickupWeaponPendingRef.current = true;
+    }, []);
+
+    const handleMobileInteractEnd = useCallback(() => {
+        chestHoldIdRef.current = null;
+        rendererRef.current?.setChestHold(null);
     }, []);
 
     const handleAdminSpawnBot = useCallback(() => {
@@ -1034,7 +1057,8 @@ export default function SurvivGame() {
         && (Number(me.inventory?.ammoReserves?.[WEAPON_AMMO_TYPES[me.weapon]]) || 0) > 0;
     const canMobileHeal = !!me
         && (Number(me.inventory?.medkits) || 0) > 0
-        && (Number(me.hp) || 0) < (Number(me.maxHp) || 100);
+        && (Number(me.hp) || 0) < (Number(me.maxHp) || 100)
+        && medkitRemainingMs <= 0;
 
     return (
         <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}`} style={{
@@ -1059,6 +1083,7 @@ export default function SurvivGame() {
                     onReload={handleMobileReload}
                     onHeal={handleMobileHeal}
                     onInteract={handleMobileInteract}
+                    onInteractEnd={handleMobileInteractEnd}
                     canInteract={canMobileInteract}
                     canReload={canMobileReload}
                     canHeal={canMobileHeal}
@@ -1115,7 +1140,7 @@ export default function SurvivGame() {
 
             {gameReady && !IS_MOBILE && !showResultModal && !isDead && !isSpectating && (
                 <div className="surviv-controls-hint" aria-label="Game controls">
-                    F PICKUP · E OPEN · R RELOAD · H HEAL · TAB INVENTORY
+                    HOLD F OPEN / F PICKUP · R RELOAD · H HEAL · TAB INVENTORY
                 </div>
             )}
 
@@ -1307,6 +1332,31 @@ export default function SurvivGame() {
                         </div>
                         <span className="hotbar-slot-name-compact">GRENADE</span>
                         <span className="hotbar-slot-ammo">{me.inventory?.grenades || 0}</span>
+                    </button>
+                    <button
+                        type="button"
+                        className={'hotbar-slot medkit-hotbar-slot ' + ((me.inventory?.medkits || 0) > 0 ? 'has-item' : 'empty-slot') + (medkitRemainingMs > 0 ? ' is-using' : '')}
+                        disabled={!canMobileHeal}
+                        aria-label={'Use medkit, ' + (me.inventory?.medkits || 0) + ' remaining'}
+                        title={(me.inventory?.medkits || 0) > 0
+                            ? (canMobileHeal ? 'Use medkit (H)' : (medkitRemainingMs > 0 ? 'Using medkit' : 'Health is already full'))
+                            : 'No medkits'}
+                        onClick={() => {
+                            if (canMobileHeal) useMedkitPendingRef.current = true;
+                        }}
+                    >
+                        <span className="hotbar-slot-key">H</span>
+                        <div className="hotbar-weapon-icon-wrap medkit-hotbar-icon" aria-hidden="true">
+                            <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="4" y="4" width="16" height="16" rx="4" />
+                                <path d="M12 8v8M8 12h8" />
+                            </svg>
+                        </div>
+                        <span className="hotbar-slot-name-compact">MEDKIT</span>
+                        <span className="hotbar-slot-ammo">{me.inventory?.medkits || 0}</span>
+                        {medkitRemainingMs > 0 && (
+                            <span className="medkit-hotbar-progress" style={{ '--medkit-progress': (medkitProgress * 100) + '%' }} />
+                        )}
                     </button>
                 </div>
             )}

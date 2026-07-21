@@ -106,7 +106,9 @@ export function drawGameMinimap(ctx, opts) {
         if (o.kind === 'houseFloor' && o.variant === 'ironworks') return 'rgba(72, 98, 107, 0.95)';
         if (o.kind === 'houseFloor') return 'rgba(196, 169, 117, 0.72)';
         if (o.kind === 'wall' || o.kind === 'interiorWall') return 'rgba(38, 31, 24, 0.9)';
-        if (o.kind === 'road') return 'rgba(120, 113, 95, 0.42)';
+        if (o.kind === 'road' || o.kind === 'roadJunction') return 'rgba(120, 113, 95, 0.42)';
+        if (o.kind === 'trail_path') return 'rgba(151, 126, 84, 0.52)';
+        if (o.kind === 'river_path') return 'rgba(61, 123, 151, 0.68)';
         if (o.kind === 'water') return 'rgba(72, 128, 150, 0.58)';
         if (o.kind === 'container') return 'rgba(99, 119, 126, 0.62)';
         return null;
@@ -127,7 +129,20 @@ export function drawGameMinimap(ctx, opts) {
         ctx.translate(p.x, p.y);
         ctx.rotate(o.rotation || 0);
         ctx.fillStyle = fill;
-        if (o.kind === 'wall' || o.kind === 'interiorWall') {
+        if ((o.kind === 'trail_path' || o.kind === 'river_path') && o.points?.length) {
+            ctx.strokeStyle = fill;
+            ctx.lineWidth = Math.max(1, (o.width || (o.kind === 'river_path' ? 220 : 54)) * scale);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            for (let i = 0; i < o.points.length; i++) {
+                const x = (o.points[i].x - o.x) * scale;
+                const y = (o.points[i].y - o.y) * scale;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        } else if (o.kind === 'wall' || o.kind === 'interiorWall') {
             ctx.fillRect(-mw / 2, -mh / 2, mw, mh);
         } else if (o.kind === 'water') {
             ctx.beginPath();
