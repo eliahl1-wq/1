@@ -1982,7 +1982,11 @@ export class SurvivRenderer {
             if (this.isPlayerHidden(player, currentHouse, currentRoom)) continue;
             const progress = Math.min(1, (emoteNow - activeEmote.startedAt) / 2600);
             ctx.globalAlpha = Math.min(1, (1 - progress) * 3);
-            ctx.fillText(activeEmote.emote, player.x, player.y - (player.radius || 14) - (28 + progress * 10) / this.zoom);
+            const emoteX = player.x;
+            const emoteY = player.y - (player.radius || 14) - (28 + progress * 10) / this.zoom;
+            if (!drawGameEmote(ctx, activeEmote.emote, emoteX, emoteY, 42 / this.zoom)) {
+                ctx.fillText(activeEmote.emote, emoteX, emoteY);
+            }
         }
         ctx.restore();
 
