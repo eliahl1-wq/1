@@ -9,6 +9,7 @@ import '../styles/ui.css';
 import '../styles/tournaments.css';
 import CustomDropdown from '../components/CustomDropdown';
 import Background from '../components/Background';
+import PregameGameBackground from '../components/PregameGameBackground';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
@@ -26,7 +27,6 @@ import { API_URL } from '../utils/apiBase';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
-const PregameGameBackground = React.lazy(() => import('../components/PregameGameBackground.jsx'));
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -970,14 +970,12 @@ export default function PreGame() {
                 <p>Play {modeBaseName}.io with real money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly.</p>
             </div>
             {user?.isAdmin ? (
-                <React.Suspense fallback={<Background />}>
-                    <PregameGameBackground
-                        mode={selectedMode}
-                        slitherColor={selectedSkin}
-                        agarColor={selectedSkinAgar}
-                        survivColor={selectedSkinSurviv}
-                    />
-                </React.Suspense>
+                <PregameGameBackground
+                    mode={selectedMode}
+                    slitherColor={selectedSkin}
+                    agarColor={selectedSkinAgar}
+                    survivColor={selectedSkinSurviv}
+                />
             ) : (
                 <Background />
             )}

@@ -7,10 +7,12 @@ const COLORS = ['#c080ff', '#9099ff', '#80d0d0', '#80ff80', '#eeee70', '#ffa060'
 const SURVIV_WEAPONS = ['pistol', 'smg', 'shotgun', 'assault', 'dmr', 'sniper', 'lmg'];
 const SURVIV_BULLET_SPEED = { pistol: 34, smg: 38, shotgun: 30, assault: 42, dmr: 48, sniper: 58, lmg: 40 };
 const SURVIV_PLAYER_SPEED = 5.2 * 40;
-const SURVIV_BACKGROUND_SPEED = SURVIV_PLAYER_SPEED * 0.36;
+const SURVIV_BACKGROUND_SPEED = SURVIV_PLAYER_SPEED * 0.26;
 const SLITHER_START_SPEED = 120.625;
+const SLITHER_BACKGROUND_SPEED = SLITHER_START_SPEED * 0.62;
 const AGAR_TICK_RATE = 40;
-const SCENE_ZOOM = { slither: 2.15, surviv: 1.95, agar: 1.42 };
+const AGAR_BACKGROUND_SPEED_MULTIPLIER = 0.42;
+const SCENE_ZOOM = { slither: 2.15, surviv: 2.55, agar: 1.42 };
 
 function mulberry32(seed) {
     return () => {
@@ -41,9 +43,9 @@ function darkerColor(hex) {
 
 function actorCount(family, width, height) {
     const areaScale = Math.sqrt((width * height) / (1440 * 900));
-    const base = family === 'slither' ? 6 : 5;
-    const min = 3;
-    const max = family === 'slither' ? 8 : 6;
+    const base = family === 'slither' ? 4 : family === 'surviv' ? 2 : 3;
+    const min = family === 'surviv' ? 1 : 2;
+    const max = family === 'surviv' ? 3 : 4;
     return Math.max(min, Math.min(max, Math.round(base * areaScale)));
 }
 
@@ -69,13 +71,15 @@ function createActors(family, width, height, colors) {
 
     if (family === 'slither') {
         return Array.from({ length: count }, (_, index) => {
-            const angle = random() * Math.PI * 2;
+            const orbitAngle = (index / count) * Math.PI * 2 + (random() - 0.5) * 0.42;
+            const angle = orbitAngle + (random() > 0.5 ? Math.PI / 2 : -Math.PI / 2);
             const sizeRoll = random();
             const radius = 5.5 + Math.pow(sizeRoll, 1.45) * 17;
-            const x = bounds.left + random() * bounds.width;
-            const y = bounds.top + random() * bounds.height;
+            const orbitScale = 0.23 + random() * 0.09;
+            const x = width / 2 + Math.cos(orbitAngle) * bounds.width * orbitScale;
+            const y = height / 2 + Math.sin(orbitAngle) * bounds.height * orbitScale;
             const spacing = Math.max(3.4, radius * 0.45);
-            const pointCount = 18 + Math.floor(Math.pow(random(), 0.72) * 92);
+            const pointCount = 16 + Math.floor(Math.pow(random(), 0.78) * 48);
             const points = Array.from({ length: pointCount }, (__, pointIndex) => ({
                 x: x - Math.cos(angle) * spacing * pointIndex,
                 y: y - Math.sin(angle) * spacing * pointIndex,
@@ -88,11 +92,13 @@ function createActors(family, width, height, colors) {
                 radius,
                 spacing,
                 points,
-                speed: SLITHER_START_SPEED,
+                speed: SLITHER_BACKGROUND_SPEED,
                 phase: random() * Math.PI * 2,
-                turnDirection: random() > 0.5 ? 1 : -1,
-                nextTurn: 0.8 + random() * 3.8,
+                targetAngle: angle,
+                nextTurn: 2.4 + random() * 4.2,
                 turnIndex: Math.floor(random() * 1000),
+                avoidDirection: 0,
+                avoidTime: 0,
                 color: selectedOrPalette(colors.slither, index, random, ['random']),
                 rainbow: colors.slither === 'random' && index === 0,
             };
@@ -113,6 +119,8 @@ function createActors(family, width, height, colors) {
                 nextTurn: 2.8 + random() * 4.8,
                 nextShot: 0.8 + random() * 3.1,
                 muzzle: 0,
+                isMoving: random() > 0.35,
+                movementTimer: 0.8 + random() * 2.2,
             };
         });
     }
@@ -120,7 +128,10 @@ function createActors(family, width, height, colors) {
     return Array.from({ length: count }, (_, index) => {
         const balance = 2.5 + random() * 12;
         const angle = random() * Math.PI * 2;
-        const speed = (6 / Math.pow(balance, 0.449)) * 1.45 * AGAR_TICK_RATE;
+        const speed = (6 / Math.pow(balance, 0.449))
+            * 1.45
+            * AGAR_TICK_RATE
+            * AGAR_BACKGROUND_SPEED_MULTIPLIER;
         return {
             id: `pregame-agar-${index}`,
             x: bounds.left + random() * bounds.width,
@@ -148,22 +159,66 @@ function wrapActor(actor, family, width, height, margin) {
     return wrapped;
 }
 
-function updateSnakes(actors, dt, elapsed, width, height) {
+function snakeAvoidanceDirection(actor, actors) {
+    const lookAhead = 54 + actor.radius * 4;
+    const lookX = actor.x + Math.cos(actor.angle) * lookAhead;
+    const lookY = actor.y + Math.sin(actor.angle) * lookAhead;
+    let nearestDistance = Infinity;
+    let nearestX = 0;
+    let nearestY = 0;
+
+    for (const other of actors) {
+        if (other === actor) continue;
+        const stride = Math.max(2, Math.floor(other.points.length / 24));
+        for (let index = 0; index < other.points.length; index += stride) {
+            const point = other.points[index];
+            const distance = Math.hypot(lookX - point.x, lookY - point.y);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestX = point.x;
+                nearestY = point.y;
+            }
+        }
+    }
+
+    const safetyDistance = 46 + actor.radius * 2.8;
+    if (nearestDistance >= safetyDistance) return 0;
+    const obstacleAngle = Math.atan2(nearestY - actor.y, nearestX - actor.x);
+    const obstacleSide = Math.sin(obstacleAngle - actor.angle);
+    return obstacleSide >= 0 ? -1 : 1;
+}
+
+function updateSnakes(actors, dt, width, height) {
     for (const actor of actors) {
         actor.nextTurn -= dt;
-        if (actor.nextTurn <= 0) {
+        actor.avoidTime = Math.max(0, actor.avoidTime - dt);
+        const avoidanceDirection = snakeAvoidanceDirection(actor, actors);
+        if (avoidanceDirection !== 0) {
+            if (actor.avoidTime <= 0) actor.avoidDirection = avoidanceDirection;
+            actor.avoidTime = 1.1;
+            actor.targetAngle = actor.angle + actor.avoidDirection * 1.02;
+        } else if (actor.nextTurn <= 0 && actor.avoidTime <= 0) {
             const roll = Math.abs(Math.sin(actor.phase * 7.31 + actor.turnIndex * 12.9898));
             const direction = Math.sin(actor.phase + actor.turnIndex * 4.17) >= 0 ? 1 : -1;
-            actor.angle += direction * (roll > 0.58 ? Math.PI / 2 : 0.28 + roll * 0.55);
+            const targetTurn = roll > 0.84 ? Math.PI / 2 : 0.24 + roll * 0.72;
+            actor.targetAngle = actor.angle + direction * targetTurn;
             actor.turnIndex += 1;
-            actor.nextTurn = 0.9 + Math.abs(Math.sin(actor.phase + actor.turnIndex * 2.13)) * 4.4;
+            actor.nextTurn = 2.6 + Math.abs(Math.sin(actor.phase + actor.turnIndex * 2.13)) * 4.8;
         }
-        const turn = Math.sin(elapsed * 0.00072 + actor.phase) * 0.16 + actor.turnDirection * 0.025;
-        actor.angle += turn * dt;
+
+        const angleDelta = Math.atan2(
+            Math.sin(actor.targetAngle - actor.angle),
+            Math.cos(actor.targetAngle - actor.angle),
+        );
+        const sizeTurnScale = Math.max(0.42, Math.min(1.05, Math.pow(8 / actor.radius, 0.55)));
+        const maxTurn = 0.95 * sizeTurnScale * dt;
+        actor.angle += Math.max(-maxTurn, Math.min(maxTurn, angleDelta));
         actor.x += Math.cos(actor.angle) * actor.speed * dt;
         actor.y += Math.sin(actor.angle) * actor.speed * dt;
         const wrapped = wrapActor(actor, 'slither', width, height, actor.radius * 8);
         if (wrapped) {
+            actor.targetAngle = actor.angle;
+            actor.avoidTime = 0;
             for (let i = 0; i < actor.points.length; i++) {
                 actor.points[i].x = actor.x - Math.cos(actor.angle) * actor.spacing * i;
                 actor.points[i].y = actor.y - Math.sin(actor.angle) * actor.spacing * i;
@@ -184,7 +239,6 @@ function updateSnakes(actors, dt, elapsed, width, height) {
         }
     }
 }
-
 function drawSnakes(ctx, renderer, actors, width, height, frame) {
     renderer.ctx = ctx;
     renderer.W = width;
@@ -196,6 +250,9 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
     renderer.snakeThickness = 1;
 
     for (const actor of actors) {
+        ctx.save();
+        ctx.shadowColor = actor.color;
+        ctx.shadowBlur = 18;
         renderer._drawSnake({
             id: actor.id,
             angle: actor.angle,
@@ -205,6 +262,7 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
             isYou: false,
             segments: actor.points.map((point) => ({ x: point.x - width / 2, y: point.y - height / 2 })),
         }, null, 1);
+        ctx.restore();
     }
 }
 
@@ -233,14 +291,23 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
         actor.nextTurn -= dt;
         actor.nextShot -= dt;
         actor.muzzle = Math.max(0, actor.muzzle - dt);
+        actor.movementTimer -= dt;
+        if (actor.movementTimer <= 0) {
+            actor.isMoving = !actor.isMoving;
+            actor.movementTimer = actor.isMoving
+                ? 1.2 + Math.abs(Math.sin(actor.phase + elapsed * 0.00037)) * 2.2
+                : 0.9 + Math.abs(Math.cos(actor.phase + elapsed * 0.00029)) * 1.8;
+        }
         if (actor.nextTurn <= 0) {
             actor.angle += (Math.sin(elapsed * 0.001 + actor.phase) > 0 ? 1 : -1) * (0.35 + Math.abs(Math.sin(actor.phase)) * 0.75);
             actor.nextTurn = 3 + (Math.sin(actor.phase + elapsed * 0.0002) + 1) * 2.2;
         }
 
-        actor.x += Math.cos(actor.angle) * SURVIV_BACKGROUND_SPEED * dt;
-        actor.y += Math.sin(actor.angle) * SURVIV_BACKGROUND_SPEED * dt;
-        wrapActor(actor, 'surviv', width, height, 42);
+        if (actor.isMoving) {
+            actor.x += Math.cos(actor.angle) * SURVIV_BACKGROUND_SPEED * dt;
+            actor.y += Math.sin(actor.angle) * SURVIV_BACKGROUND_SPEED * dt;
+            wrapActor(actor, 'surviv', width, height, 42);
+        }
 
         if (actor.nextShot <= 0) {
             const speed = (SURVIV_BULLET_SPEED[actor.weapon] || 38) * 40;
@@ -375,7 +442,7 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
             ctx.globalCompositeOperation = 'source-over';
 
             if (family === 'slither') {
-                updateSnakes(actors, dt, now, width, height);
+                updateSnakes(actors, dt, width, height);
                 drawSnakes(ctx, slitherRenderer, actors, width, height, frame);
             } else if (family === 'surviv') {
                 updateAndDrawSurviv(ctx, survivRenderer, actors, bullets, dt, now, width, height);
@@ -422,7 +489,7 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
                 filter: family === 'surviv'
                     ? 'blur(3.4px) saturate(1.4) brightness(1.12) drop-shadow(0 0 22px rgba(255,174,74,0.5))'
                     : family === 'slither'
-                        ? 'blur(2.8px) saturate(1.3) brightness(1.1) drop-shadow(0 0 25px rgba(128,100,255,0.44))'
+                        ? 'blur(2.8px) saturate(1.3) brightness(1.08)'
                         : 'blur(2.5px) saturate(1.24) brightness(1.07) drop-shadow(0 0 20px rgba(124,58,255,0.34))',
                 transform: `scale(${SCENE_ZOOM[family] || 1})`,
                 transformOrigin: 'center',
