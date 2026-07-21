@@ -39,7 +39,9 @@ const WEAPON_LABELS = {
     lmg: 'M249 LMG',
 };
 
-const SURVIV_WEAPON_SLOTS = [0, 1, 2];
+// Server slots stay 0/1 for firearms and 2 for melee. The HUD/key order is melee first.
+const SURVIV_WEAPON_SLOTS = [2, 0, 1];
+const SURVIV_SLOT_KEYS = { 2: 1, 0: 2, 1: 3 };
 
 const WEAPON_CLIP_SIZES = {
     fists: 0,
@@ -1236,15 +1238,15 @@ export default function SurvivGame() {
                                 className={`hotbar-slot ${isActive ? 'active-slot' : ''} ${weaponId ? 'has-item' : 'empty-slot'} ${borderRarityClass}`}
                                 disabled={!weaponId}
                                 aria-pressed={!!isActive}
-                                aria-label={weaponId ? `Equip ${weaponLabel}` : `Weapon slot ${slotIdx + 1}, empty`}
-                                title={weaponLabel || `Empty weapon slot ${slotIdx + 1}`}
+                                aria-label={weaponId ? `Equip ${weaponLabel}` : `Weapon slot ${SURVIV_SLOT_KEYS[slotIdx]}, empty`}
+                                title={weaponLabel || `Empty weapon slot ${SURVIV_SLOT_KEYS[slotIdx]}`}
                                 onClick={() => {
                                     if (weaponId) {
                                         equipSlotPendingRef.current = slotIdx;
                                     }
                                 }}
                             >
-                                <span className="hotbar-slot-key">{slotIdx + 1}</span>
+                                <span className="hotbar-slot-key">{SURVIV_SLOT_KEYS[slotIdx]}</span>
                                 {weaponId ? (
                                     <>
                                         <div className="hotbar-weapon-icon-wrap">
@@ -1252,7 +1254,7 @@ export default function SurvivGame() {
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         <span className={`hotbar-slot-ammo ${isReloading ? 'reloading' : ''}`}>
-                                            {weaponId === 'fists' ? 'MELEE' : (isActive ? (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`) : `${me.weaponSlotAmmo?.[slotIdx] !== undefined ? me.weaponSlotAmmo[slotIdx] : WEAPON_CLIP_SIZES[weaponId] || 0}/${WEAPON_CLIP_SIZES[weaponId] || 0}`)}
+                                            {weaponId === 'fists' || weaponId === 'knife' ? 'MELEE' : (isActive ? (isReloading ? 'RELOAD' : `${me.ammo}/${me.clipSize}`) : `${me.weaponSlotAmmo?.[slotIdx] !== undefined ? me.weaponSlotAmmo[slotIdx] : WEAPON_CLIP_SIZES[weaponId] || 0}/${WEAPON_CLIP_SIZES[weaponId] || 0}`)}
                                         </span>
                                         {isActive && isReloading && (
                                             <div
@@ -1267,6 +1269,26 @@ export default function SurvivGame() {
                             </button>
                         );
                     })}
+                    <button
+                        type="button"
+                        className={`hotbar-slot grenade-hotbar-slot ${(me.inventory?.grenades || 0) > 0 ? 'has-item' : 'empty-slot'}`}
+                        disabled={(me.inventory?.grenades || 0) <= 0}
+                        aria-label={`Throw grenade, ${me.inventory?.grenades || 0} remaining`}
+                        title={(me.inventory?.grenades || 0) > 0 ? 'Throw grenade (G)' : 'No grenades'}
+                        onClick={() => {
+                            if ((me.inventory?.grenades || 0) > 0) throwGrenadePendingRef.current = true;
+                        }}
+                    >
+                        <span className="hotbar-slot-key">G</span>
+                        <div className="hotbar-weapon-icon-wrap grenade-hotbar-icon" aria-hidden="true">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                <path d="M9 7.2h6l1.6 3.1a7 7 0 1 1-9.2 0L9 7.2Z" />
+                                <path d="M10 7V4h4v3M14 4h3.4M17.4 4c0 1.5 1.1 2.1 2.1 2.6" />
+                            </svg>
+                        </div>
+                        <span className="hotbar-slot-name-compact">GRENADE</span>
+                        <span className="hotbar-slot-ammo">{me.inventory?.grenades || 0}</span>
+                    </button>
                 </div>
             )}
 
@@ -1419,7 +1441,7 @@ export default function SurvivGame() {
                                                         }
                                                     }}
                                                 >
-                                                    <div className="slot-number">{slotIdx + 1}</div>
+                                                    <div className="slot-number">{SURVIV_SLOT_KEYS[slotIdx]}</div>
                                                     {weaponId ? (
                                                         <div className="weapon-card-content-flex" style={{ display: 'flex', alignItems: 'center', gap: '7px', height: '100%', minWidth: 0, overflow: 'hidden' }}>
                                                             <div className="weapon-card-icon-wrap" style={{ flexShrink: 0, width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>

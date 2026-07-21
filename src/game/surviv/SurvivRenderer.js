@@ -372,6 +372,7 @@ export class SurvivRenderer {
         // --- New visual feedback systems ---
         // Particle system (muzzle flash, bullet impacts, debris)
         this.particles = [];
+        this.grenadeExplosions = [];
         // Hit marker (center-screen X when you deal damage)
         this.hitMarkers = [];
         // Damage direction indicators (red arcs at screen edge)
@@ -516,6 +517,7 @@ export class SurvivRenderer {
         this.lootToast = null;
         this.lastLootId = null;
         this.particles = [];
+        this.grenadeExplosions = [];
         this.hitMarkers = [];
         this.damageIndicators = [];
         this.damageNumbers = [];
@@ -799,6 +801,10 @@ export class SurvivRenderer {
         const currentBulletIds = new Set((tick.bullets || []).map(b => b.id));
         for (const b of prevBullets) {
             if (!currentBulletIds.has(b.id)) {
+                if ((b.isGrenade || b.weaponType === 'grenade') && (!b.detonateAt || Date.now() + 140 >= b.detonateAt)) {
+                    this.spawnGrenadeExplosion(b.x, b.y);
+                    continue;
+                }
                 // Bullet disappeared! Spawn impact particles at b.x, b.y
                 const angle = Math.atan2(b.vy || 0, b.vx || 1);
                 let hitType = 'spark'; // Default spark
@@ -1145,7 +1151,9 @@ export class SurvivRenderer {
         if (k === 'h') return 'useMedkit';
         if (k === 'f') return 'pickupWeapon';
         if (k === 'g') return 'throwGrenade';
-        if (['1', '2', '3'].includes(k)) return `equipSlot:${Number(k) - 1}`;
+        if (k === '1') return 'equipSlot:2';
+        if (k === '2') return 'equipSlot:0';
+        if (k === '3') return 'equipSlot:1';
         return null;
     }
 
@@ -1978,7 +1986,8 @@ export class SurvivRenderer {
         }
         ctx.restore();
 
-        // Draw particles (world space)
+        // Draw grenade blast waves and particles (world space)
+        this.drawGrenadeExplosions(ctx, currentHouse, currentRoom);
         this.drawParticles(ctx, currentHouse, currentRoom);
 
         // Draw floating damage numbers (world space)
@@ -5434,6 +5443,74 @@ export class SurvivRenderer {
 
     // ========== NEW VISUAL FEEDBACK METHODS ==========
 
+    spawnGrenadeExplosion(x, y) {
+        const spawnedAt = performance.now();
+        this.grenadeExplosions.push({ x, y, spawnedAt, duration: 760, radius: 145 });
+        if (this.grenadeExplosions.length > 8) this.grenadeExplosions.shift();
+
+        for (let i = 0; i < 34; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 70 + Math.random() * 190;
+            const smoke = i >= 22;
+            const life = smoke ? 0.65 + Math.random() * 0.35 : 0.28 + Math.random() * 0.24;
+            this.particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life,
+                maxLife: life,
+                size: smoke ? 9 + Math.random() * 11 : 3 + Math.random() * 6,
+                color: smoke ? '#424844' : (Math.random() > 0.45 ? '#ffb020' : '#fff0a8'),
+                type: smoke ? 'grenadeSmoke' : 'grenadeFire',
+            });
+        }
+        this.cameraShake.intensity = Math.max(this.cameraShake.intensity || 0, 8);
+    }
+
+    drawGrenadeExplosions(ctx, currentHouse = null, currentRoom = null) {
+        const now = this._frameNow || performance.now();
+        this.grenadeExplosions = this.grenadeExplosions.filter((explosion) => now - explosion.spawnedAt < explosion.duration);
+        if (this.grenadeExplosions.length === 0) return;
+
+        ctx.save();
+        for (const explosion of this.grenadeExplosions) {
+            if (!this.isPointInView(explosion.x, explosion.y, explosion.radius + 20)) continue;
+            if (this.isPointHiddenByRooms(explosion.x, explosion.y, currentHouse, currentRoom)) continue;
+            const t = clamp((now - explosion.spawnedAt) / explosion.duration, 0, 1);
+            const blastT = Math.min(1, t / 0.42);
+            const radius = explosion.radius * (1 - Math.pow(1 - blastT, 3));
+
+            if (t < 0.28) {
+                const flashRadius = 18 + radius * 0.68;
+                const flash = ctx.createRadialGradient(explosion.x, explosion.y, 0, explosion.x, explosion.y, flashRadius);
+                flash.addColorStop(0, `rgba(255,255,238,${0.95 * (1 - t / 0.28)})`);
+                flash.addColorStop(0.28, `rgba(255,190,55,${0.8 * (1 - t / 0.28)})`);
+                flash.addColorStop(1, 'rgba(230,65,12,0)');
+                ctx.fillStyle = flash;
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, flashRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.globalAlpha = Math.max(0, 1 - t) * 0.95;
+            ctx.strokeStyle = t < 0.3 ? '#ffd166' : '#e26424';
+            ctx.lineWidth = Math.max(2, 11 * (1 - t));
+            ctx.beginPath();
+            ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            if (t > 0.12) {
+                ctx.globalAlpha = Math.max(0, 0.42 * (1 - t));
+                ctx.fillStyle = '#282e2a';
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, 28 + t * 38, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        ctx.restore();
+    }
+
     drawParticles(ctx, currentHouse = null, currentRoom = null) {
         if (this.particles.length === 0) return;
         ctx.save();
@@ -5454,10 +5531,16 @@ export class SurvivRenderer {
                 ctx.fillStyle = 'rgba(0,0,0,0.18)';
                 ctx.fillRect(-2.5, -0.9, 1, 1.8);
                 ctx.restore();
+            } else if (p.type === 'grenadeSmoke') {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = alpha * 0.42;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * (1.35 - alpha * 0.35), 0, Math.PI * 2);
+                ctx.fill();
             } else {
                 ctx.fillStyle = p.color || '#ffdd44';
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
+                ctx.shadowColor = p.type === 'grenadeFire' ? p.color : 'transparent';
+                ctx.shadowBlur = p.type === 'grenadeFire' ? 9 : 0;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
                 ctx.fill();
