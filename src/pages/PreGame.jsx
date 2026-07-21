@@ -22,7 +22,6 @@ import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
 import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeGamemodeForLobby } from '../constants/features';
 import { buildPresenceHeaders } from '../utils/sitePresence';
-import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { API_URL } from '../utils/apiBase';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 
@@ -2231,124 +2230,109 @@ function SurvivSkinPreview({ color, isLarge, nickname }) {
 
 /* ── SnakeSkinPreview ── */
 function SnakeSkinPreview({ color, isLarge, active = true }) {
-    const canvasRef = useRef(null);
-    const tRef = useRef(0);
-    const colorRef = useRef(color);
-
-    // Keep colorRef updated without re-triggering the main animation effect
-    useEffect(() => {
-        colorRef.current = color;
-    }, [color]);
-
-    useEffect(() => {
-        if (!active) return undefined;
-        const canvas = canvasRef.current;
-        if (!canvas) return undefined;
-        const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
-
-        let animationFrameId;
-        const segmentsCount = isLarge ? 32 : 24;
-        const radius = isLarge ? 13 : 13.5;
-        const spacing = isLarge ? 6 : 6;
-
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-
-        const totalLength = segmentsCount * spacing;
-        const headX = centerX + (totalLength / 2) - radius * 1.2;
-
-        const amp = isLarge ? 20 : 9;
-        const phaseSpeed = isLarge ? 0.0027 : 0.0033;
-        const rainbowColors = ['#c080ff', '#9099ff', '#80d0d0', '#80ff80', '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'];
-        const pointX = new Float32Array(segmentsCount);
-        const pointY = new Float32Array(segmentsCount);
-        const shadowCanvas = getSnakeShadowCanvas(radius);
-        const shadowHalf = shadowCanvas.width / 2;
-        let fixedColor = null;
-        let fixedSegmentCanvas = null;
-
-        const render = (now) => {
-            const phase = now * phaseSpeed;
-            const currentColor = colorRef.current;
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            for (let i = 0; i < segmentsCount; i++) {
-                pointX[i] = headX - i * spacing;
-                pointY[i] = centerY + Math.sin(phase - i * 0.35) * amp;
-            }
-
-            ctx.globalAlpha = 0.42;
-            for (let i = segmentsCount - 1; i >= 0; i--) {
-                ctx.setTransform(1, 0, 0, 0.75, pointX[i], pointY[i] + radius * 0.12);
-                ctx.drawImage(shadowCanvas, -shadowHalf, -shadowHalf);
-            }
-
-            ctx.globalAlpha = 1;
-            if (currentColor !== 'random' && currentColor !== fixedColor) {
-                fixedColor = currentColor;
-                fixedSegmentCanvas = getSnakeSegmentCanvas(radius, currentColor);
-            }
-            for (let i = segmentsCount - 1; i >= 0; i--) {
-                const nextIndex = i > 0 ? i - 1 : 1;
-                const angle = i > 0
-                    ? Math.atan2(pointY[nextIndex] - pointY[i], pointX[nextIndex] - pointX[i])
-                    : Math.atan2(pointY[i] - pointY[nextIndex], pointX[i] - pointX[nextIndex]);
-                const cos = Math.cos(angle);
-                const sin = Math.sin(angle);
-                const segmentCanvas = currentColor === 'random'
-                    ? getSnakeSegmentCanvas(radius, rainbowColors[Math.floor((now * 0.003 + i * 0.15) % rainbowColors.length)])
-                    : fixedSegmentCanvas;
-                const half = segmentCanvas.width / 2;
-                ctx.setTransform(cos, sin, -sin, cos, pointX[i], pointY[i]);
-                ctx.drawImage(segmentCanvas, -half, -half);
-            }
-
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            const headAngle = Math.atan2(pointY[0] - pointY[1], pointX[0] - pointX[1]);
-            const perpX = Math.sin(headAngle);
-            const perpY = -Math.cos(headAngle);
-            const fwdX = Math.cos(headAngle);
-            const fwdY = Math.sin(headAngle);
-            const eyeSide = radius * 0.39;
-            const eyeFwd = radius * 0.31;
-            const eyeR = Math.max(2.5, radius * 0.43);
-            const pupilR = eyeR * 0.48;
-            for (const side of [-1, 1]) {
-                const ex = pointX[0] + fwdX * eyeFwd + perpX * eyeSide * side;
-                const ey = pointY[0] + fwdY * eyeFwd + perpY * eyeSide * side;
-                ctx.beginPath();
-                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(ex + fwdX * eyeR * 0.4, ey + fwdY * eyeR * 0.4, pupilR, 0, Math.PI * 2);
-                ctx.fillStyle = '#000000';
-                ctx.fill();
-            }
-            animationFrameId = requestAnimationFrame(render);
-        };
-
-        animationFrameId = requestAnimationFrame(render);
-
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-        };
-    }, [isLarge, active]);
+    const gradientPrefix = useRef('snake-preview-' + Math.random().toString(36).slice(2)).current;
+    const palette = [
+        '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
+        '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0',
+    ];
+    const segmentsCount = isLarge ? 32 : 24;
+    const radius = isLarge ? 13 : 13.5;
+    const spacing = 6;
+    const width = isLarge ? 450 : 250;
+    const height = isLarge ? 200 : 100;
+    const centerY = height / 2;
+    const totalLength = segmentsCount * spacing;
+    const headX = width / 2 + totalLength / 2 - radius * 1.2;
+    const amp = isLarge ? 18 : 8;
+    const isRainbow = color === 'random';
+    const gradientColors = isRainbow ? palette : [color || '#c080ff'];
 
     return (
-        <div className="snake-preview-wrapper" style={{ width: '100%', height: isLarge ? '200px' : '100px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <canvas
-                ref={canvasRef}
-                width={isLarge ? 450 : 250}
-                height={isLarge ? 200 : 100}
-                style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block' }}
-            />
+        <div
+            className="snake-preview-wrapper"
+            style={{
+                width: '100%',
+                height: isLarge ? '200px' : '100px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                '--snake-preview-play-state': active ? 'running' : 'paused',
+            }}
+        >
+            <svg
+                className="snake-preview-svg"
+                viewBox={'0 0 ' + width + ' ' + height}
+                preserveAspectRatio="xMidYMid meet"
+                aria-hidden="true"
+            >
+                <defs>
+                    {gradientColors.map((gradientColor, index) => (
+                        <radialGradient
+                            key={gradientColor + index}
+                            id={gradientPrefix + '-' + index}
+                            cx="38%"
+                            cy="30%"
+                            r="72%"
+                        >
+                            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
+                            <stop offset="24%" stopColor={gradientColor} stopOpacity="1" />
+                            <stop offset="72%" stopColor={gradientColor} stopOpacity="1" />
+                            <stop offset="100%" stopColor="#11131a" stopOpacity="0.48" />
+                        </radialGradient>
+                    ))}
+                </defs>
+
+                {Array.from({ length: segmentsCount }, (_, drawIndex) => {
+                    const index = segmentsCount - 1 - drawIndex;
+                    const x = headX - index * spacing;
+                    const gradientIndex = isRainbow ? index % palette.length : 0;
+                    const fill = 'url(#' + gradientPrefix + '-' + gradientIndex + ')';
+                    return (
+                        <g
+                            key={index}
+                            className="snake-preview-segment"
+                            style={{
+                                '--snake-wave-delay': (-index * 0.058) + 's',
+                                '--snake-wave-min': (-amp) + 'px',
+                                '--snake-wave-amp': amp + 'px',
+                            }}
+                        >
+                            <ellipse
+                                cx={x}
+                                cy={centerY + radius * 0.3}
+                                rx={radius * 0.92}
+                                ry={radius * 0.7}
+                                fill="rgba(0,0,0,0.28)"
+                            />
+                            <circle cx={x} cy={centerY} r={radius} fill={fill} />
+                            {index === 0 && (
+                                <>
+                                    {[-1, 1].map(side => (
+                                        <g key={side}>
+                                            <circle
+                                                cx={x + radius * 0.34}
+                                                cy={centerY + side * radius * 0.39}
+                                                r={radius * 0.43}
+                                                fill="#ffffff"
+                                            />
+                                            <circle
+                                                cx={x + radius * 0.5}
+                                                cy={centerY + side * radius * 0.39}
+                                                r={radius * 0.205}
+                                                fill="#08090c"
+                                            />
+                                        </g>
+                                    ))}
+                                </>
+                            )}
+                        </g>
+                    );
+                })}
+            </svg>
         </div>
     );
 }
 
-/* ── AgarBlobPreview ── */
 function AgarBlobPreview({ color, isLarge, nickname }) {
     const canvasRef = useRef(null);
     const tRef = useRef(0);
