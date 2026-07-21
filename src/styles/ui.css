@@ -3791,25 +3791,3 @@
   animation: challenge-pulse 2s infinite ease-in-out;
 }
 
-.snake-preview-svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  background: transparent;
-  contain: layout paint style;
-}
-
-.snake-preview-segment {
-  animation: snake-preview-wave 1.65s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
-  animation-delay: var(--snake-wave-delay);
-  animation-play-state: var(--snake-preview-play-state, running);
-  will-change: transform;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-@keyframes snake-preview-wave {
-  from { transform: translate3d(0, var(--snake-wave-min), 0); }
-  to { transform: translate3d(0, var(--snake-wave-amp), 0); }
-}
