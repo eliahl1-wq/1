@@ -35,6 +35,8 @@ const LOOT_COLORS = {
     weapon: '#f2774f',
 };
 
+const AMMO_COLORS = { '9mm': '#f5d547', '12g': '#f05a5a', '556': '#63d471', '762': '#5aa9f8' };
+
 const WEAPON_FIRE_RATE = {
     fists: 0, knife: 340, pistol: 280, revolver: 600, smg: 80, shotgun: 750,
     assault: 150, dmr: 350, sniper: 1400, lmg: 110,
@@ -339,7 +341,7 @@ export class SurvivRenderer {
             cashoutEndAt: 0,
             cashoutTotal: 10,
             cashoutSeconds: 0,
-            inventory: { weapons: [], medkits: 0, ammoPacks: 0, chestsOpened: 0 },
+            inventory: { weapons: [], medkits: 0, ammoReserves: {}, chestsOpened: 0 },
         };
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
@@ -545,7 +547,7 @@ export class SurvivRenderer {
             kills: 0,
             cashoutEndAt: 0,
             cashoutSeconds: 0,
-            inventory: { weapons: [], medkits: 0, ammoPacks: 0, chestsOpened: 0 },
+            inventory: { weapons: [], medkits: 0, ammoReserves: {}, chestsOpened: 0 },
         };
         this.clearInput();
         this._interpMe = null;
@@ -3215,7 +3217,7 @@ export class SurvivRenderer {
     }
 
     drawLoot(ctx, l) {
-        const color = LOOT_COLORS[l.type] || '#d5d5d5';
+        const color = l.type === 'ammo' ? (AMMO_COLORS[l.ammoType] || LOOT_COLORS.ammo) : (LOOT_COLORS[l.type] || '#d5d5d5');
         const isChest = l.type === 'chest' || l.type === 'deathCrate';
         const pulse = isChest ? 1 : (1 + Math.sin(this._frameNow / 190 + l.x * 0.03) * 0.06);
         ctx.save();
@@ -3963,7 +3965,7 @@ export class SurvivRenderer {
                 roundRect(ctx, -12, -9, 24, 18, 4);
                 ctx.fill();
                 ctx.stroke();
-                ctx.fillStyle = '#6f684f';
+                ctx.fillStyle = 'rgba(20, 22, 18, 0.72)';
                 for (const x of [-6, 0, 6]) {
                     roundRect(ctx, x - 2, -6, 4, 11, 2);
                     ctx.fill();
@@ -5294,7 +5296,7 @@ export class SurvivRenderer {
         if (items.weaponLabel) lines.push(`+ ${items.weaponLabel}`);
         if (items.money) lines.push(`+$${Number(items.money).toFixed(2)}`);
         if (items.medkits) lines.push(`+${items.medkits} medkit${items.medkits === 1 ? '' : 's'}`);
-        if (items.ammoPacks) lines.push(`+${items.ammoPacks} ammo`);
+        if (items.ammoAmount) lines.push(`+${items.ammoAmount} ${items.ammoType || ''} ammo`.replace('  ', ' '));
         if (items.armor) lines.push(`+${Math.round(items.armor)} armor`);
         const text = lines.length ? lines.join('   ') : 'Empty';
         const w = Math.min(W - 28, Math.max(220, Math.min(390, text.length * 7 + 72)));
