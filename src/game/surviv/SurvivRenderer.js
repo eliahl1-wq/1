@@ -1999,6 +1999,15 @@ export class SurvivRenderer {
         ctx.restore();
 
         // Screen-space overlays
+        // Keep the local balance badge out of the zoomed/shaking world transform.
+        // Snapping its anchor to whole CSS pixels prevents text from becoming
+        // blurry while the camera smoothly follows a moving player.
+        const localPlayer = this.players.find((player) => player.isYou || player.id === this.myId);
+        if (localPlayer && !this.isPlayerHidden(localPlayer, currentHouse, currentRoom)) {
+            const screenX = Math.round((localPlayer.x - this.camera.x) * z + W / 2);
+            const screenY = Math.round((localPlayer.y - this.camera.y + (localPlayer.radius || 14) + 15) * z + H / 2);
+            drawBalanceBadge(ctx, screenX, screenY, this.hud.balance ?? localPlayer.dollarBalance ?? 0, true);
+        }
         this.drawMobileAimGuide(ctx);
         this.drawCrosshair(ctx);
         this.drawVignette(ctx, W, H);
@@ -4289,7 +4298,6 @@ export class SurvivRenderer {
         }
 
         if (isMe) {
-            drawBalanceBadge(ctx, p.x, p.y + r + 15, this.hud.balance ?? p.dollarBalance ?? 0, true);
             if (this.hud.cashoutEndAt > this._frameNow) {
                 const total = this.hud.cashoutTotal || 10;
                 const left = Math.max(0, (this.hud.cashoutEndAt - this._frameNow) / 1000);
