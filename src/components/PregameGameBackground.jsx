@@ -9,10 +9,10 @@ const SURVIV_BULLET_SPEED = { pistol: 34, smg: 38, shotgun: 30, assault: 42, dmr
 const SURVIV_PLAYER_SPEED = 5.2 * 40;
 const SURVIV_BACKGROUND_SPEED = SURVIV_PLAYER_SPEED * 0.26;
 const SLITHER_START_SPEED = 120.625;
-const SLITHER_BACKGROUND_SPEED = SLITHER_START_SPEED * 0.62;
+const SLITHER_BACKGROUND_SPEED = SLITHER_START_SPEED * 0.72;
 const AGAR_TICK_RATE = 40;
 const AGAR_BACKGROUND_SPEED_MULTIPLIER = 0.42;
-const SCENE_ZOOM = { slither: 2.15, surviv: 2.55, agar: 1.42 };
+const SCENE_ZOOM = { slither: 2.15, surviv: 2.35, agar: 1.42 };
 
 function mulberry32(seed) {
     return () => {
@@ -43,9 +43,9 @@ function darkerColor(hex) {
 
 function actorCount(family, width, height) {
     const areaScale = Math.sqrt((width * height) / (1440 * 900));
-    const base = family === 'slither' ? 4 : family === 'surviv' ? 2 : 3;
-    const min = family === 'surviv' ? 1 : 2;
-    const max = family === 'surviv' ? 3 : 4;
+    const base = family === 'slither' ? 4 : family === 'surviv' ? 4 : 3;
+    const min = family === 'surviv' ? 3 : 2;
+    const max = family === 'surviv' ? 5 : 4;
     return Math.max(min, Math.min(max, Math.round(base * areaScale)));
 }
 
@@ -116,11 +116,15 @@ function createActors(family, width, height, colors) {
                 phase: random() * Math.PI * 2,
                 color: selectedOrPalette(colors.surviv, index, random, ['random', 'random_color']),
                 weapon: SURVIV_WEAPONS[index % SURVIV_WEAPONS.length],
-                nextTurn: 2.8 + random() * 4.8,
-                nextShot: 0.8 + random() * 3.1,
+                movementAngle: angle,
+                movementMode: 'strafe',
+                movementScale: 0.62 + random() * 0.3,
+                strafeSide: random() > 0.5 ? 1 : -1,
+                nextDecision: 0.2 + random() * 0.7,
+                nextStrafe: 0.7 + random() * 1.3,
+                decisionIndex: Math.floor(random() * 1000),
+                nextShot: 0.35 + random() * 1.2,
                 muzzle: 0,
-                isMoving: random() > 0.35,
-                movementTimer: 0.8 + random() * 2.2,
             };
         });
     }
@@ -215,7 +219,8 @@ function updateSnakes(actors, dt, width, height) {
         actor.angle += Math.max(-maxTurn, Math.min(maxTurn, angleDelta));
         actor.x += Math.cos(actor.angle) * actor.speed * dt;
         actor.y += Math.sin(actor.angle) * actor.speed * dt;
-        const wrapped = wrapActor(actor, 'slither', width, height, actor.radius * 8);
+        const bodyLength = actor.spacing * Math.max(1, actor.points.length - 1);
+        const wrapped = wrapActor(actor, 'slither', width, height, bodyLength + actor.radius * 2);
         if (wrapped) {
             actor.targetAngle = actor.angle;
             actor.avoidTime = 0;
@@ -252,7 +257,7 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
     for (const actor of actors) {
         ctx.save();
         ctx.shadowColor = actor.color;
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 9;
         renderer._drawSnake({
             id: actor.id,
             angle: actor.angle,
@@ -281,39 +286,90 @@ function updateAndDrawAgar(ctx, actors, dt, elapsed, width, height) {
         ctx.fillStyle = actor.color;
         ctx.strokeStyle = actor.borderColor === '#000000' ? darkerColor(actor.color) : actor.borderColor;
         ctx.lineWidth = 7;
-        ctx.shadowBlur = 0;
+        ctx.shadowColor = actor.color;
+        ctx.shadowBlur = 8;
         drawOrganicCell(actor, borders, ctx, actors, true);
     }
 }
 
+function nearestSurvivTarget(actor, actors) {
+    let target = null;
+    let distance = Infinity;
+    for (const candidate of actors) {
+        if (candidate === actor) continue;
+        const candidateDistance = Math.hypot(candidate.x - actor.x, candidate.y - actor.y);
+        if (candidateDistance < distance) {
+            target = candidate;
+            distance = candidateDistance;
+        }
+    }
+    return { target, distance };
+}
+
+function survivPreferredRange(weapon) {
+    if (weapon === 'shotgun') return { min: 80, max: 180 };
+    if (weapon === 'sniper' || weapon === 'dmr') return { min: 220, max: 400 };
+    if (weapon === 'assault' || weapon === 'lmg') return { min: 150, max: 300 };
+    if (weapon === 'smg') return { min: 100, max: 220 };
+    return { min: 120, max: 250 };
+}
+
+function turnToward(current, target, maxTurn) {
+    const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+    return current + Math.max(-maxTurn, Math.min(maxTurn, delta));
+}
+
 function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width, height) {
     for (const actor of actors) {
-        actor.nextTurn -= dt;
+        actor.nextDecision -= dt;
+        actor.nextStrafe -= dt;
         actor.nextShot -= dt;
         actor.muzzle = Math.max(0, actor.muzzle - dt);
-        actor.movementTimer -= dt;
-        if (actor.movementTimer <= 0) {
-            actor.isMoving = !actor.isMoving;
-            actor.movementTimer = actor.isMoving
-                ? 1.2 + Math.abs(Math.sin(actor.phase + elapsed * 0.00037)) * 2.2
-                : 0.9 + Math.abs(Math.cos(actor.phase + elapsed * 0.00029)) * 1.8;
+
+        const { target, distance } = nearestSurvivTarget(actor, actors);
+        const targetAngle = target
+            ? Math.atan2(target.y - actor.y, target.x - actor.x)
+            : actor.movementAngle;
+        const range = survivPreferredRange(actor.weapon);
+
+        if (actor.nextStrafe <= 0) {
+            actor.strafeSide *= -1;
+            actor.nextStrafe = 0.7 + Math.abs(Math.sin(actor.phase + actor.decisionIndex)) * 1.5;
         }
-        if (actor.nextTurn <= 0) {
-            actor.angle += (Math.sin(elapsed * 0.001 + actor.phase) > 0 ? 1 : -1) * (0.35 + Math.abs(Math.sin(actor.phase)) * 0.75);
-            actor.nextTurn = 3 + (Math.sin(actor.phase + elapsed * 0.0002) + 1) * 2.2;
+        if (actor.nextDecision <= 0) {
+            const variation = Math.abs(Math.sin(actor.phase * 3.7 + actor.decisionIndex * 1.91));
+            if (!target) actor.movementMode = 'wander';
+            else if (distance > range.max) actor.movementMode = variation > 0.18 ? 'approach' : 'strafe';
+            else if (distance < range.min) actor.movementMode = variation > 0.28 ? 'retreat' : 'strafe';
+            else actor.movementMode = variation > 0.16 ? 'strafe' : 'approach';
+            actor.movementScale = 0.58 + variation * 0.38;
+            actor.decisionIndex += 1;
+            actor.nextDecision = 0.35 + variation * 0.75;
         }
 
-        if (actor.isMoving) {
-            actor.x += Math.cos(actor.angle) * SURVIV_BACKGROUND_SPEED * dt;
-            actor.y += Math.sin(actor.angle) * SURVIV_BACKGROUND_SPEED * dt;
-            wrapActor(actor, 'surviv', width, height, 42);
+        let desiredMovementAngle = targetAngle;
+        if (actor.movementMode === 'retreat') desiredMovementAngle += Math.PI;
+        else if (actor.movementMode === 'strafe') {
+            desiredMovementAngle += actor.strafeSide * Math.PI / 2;
+            desiredMovementAngle += Math.sin(elapsed * 0.0032 + actor.phase) * 0.2;
+        } else if (actor.movementMode === 'wander') {
+            desiredMovementAngle = actor.movementAngle + Math.sin(elapsed * 0.0014 + actor.phase) * 0.45;
+        } else {
+            desiredMovementAngle += Math.sin(elapsed * 0.0019 + actor.phase) * 0.12;
         }
 
-        if (actor.nextShot <= 0) {
+        actor.movementAngle = turnToward(actor.movementAngle, desiredMovementAngle, 2.1 * dt);
+        actor.angle = turnToward(actor.angle, targetAngle, 3.6 * dt);
+        actor.x += Math.cos(actor.movementAngle) * SURVIV_BACKGROUND_SPEED * actor.movementScale * dt;
+        actor.y += Math.sin(actor.movementAngle) * SURVIV_BACKGROUND_SPEED * actor.movementScale * dt;
+        wrapActor(actor, 'surviv', width, height, 42);
+
+        if (target && actor.nextShot <= 0) {
+            const shotAngle = Math.atan2(target.y - actor.y, target.x - actor.x);
             const speed = (SURVIV_BULLET_SPEED[actor.weapon] || 38) * 40;
             const spread = actor.weapon === 'shotgun' ? [-0.12, 0, 0.12] : [0];
             for (const offset of spread) {
-                const angle = actor.angle + offset;
+                const angle = shotAngle + offset;
                 bullets.push({
                     x: actor.x + Math.cos(angle) * 27,
                     y: actor.y + Math.sin(angle) * 27,
@@ -323,8 +379,9 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
                     life: 0.72,
                 });
             }
+            actor.angle = shotAngle;
             actor.muzzle = 0.11;
-            actor.nextShot = 1.8 + ((Math.sin(actor.phase + elapsed * 0.00031) + 1) * 0.9);
+            actor.nextShot = 0.65 + Math.abs(Math.sin(actor.phase + actor.decisionIndex * 0.73)) * 0.85;
         }
     }
 
@@ -487,10 +544,10 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
                 display: 'block',
                 opacity: family === 'surviv' ? 0.62 : 0.58,
                 filter: family === 'surviv'
-                    ? 'blur(3.4px) saturate(1.4) brightness(1.12) drop-shadow(0 0 22px rgba(255,174,74,0.5))'
+                    ? 'blur(4.2px) saturate(1.35) brightness(1.1)'
                     : family === 'slither'
-                        ? 'blur(2.8px) saturate(1.3) brightness(1.08)'
-                        : 'blur(2.5px) saturate(1.24) brightness(1.07) drop-shadow(0 0 20px rgba(124,58,255,0.34))',
+                        ? 'blur(4.2px) saturate(1.25) brightness(1.06)'
+                        : 'blur(4.2px) saturate(1.2) brightness(1.05)',
                 transform: `scale(${SCENE_ZOOM[family] || 1})`,
                 transformOrigin: 'center',
                 willChange: 'contents',
