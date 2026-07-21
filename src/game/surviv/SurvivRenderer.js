@@ -4,6 +4,7 @@
 
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawCashoutProgressRing } from '../cashoutRing.js';
+import { drawGameEmote } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
 
 const WEAPON_LABELS = {
