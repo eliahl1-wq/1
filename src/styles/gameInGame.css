@@ -1859,15 +1859,15 @@
     pointer-events: none;
 }
 
-/* Vertical weapons loadout - positioned standing on the right side */
+/* Vertical weapons loadout - clean, frameless Surviv-style rows */
 .surviv-game-page .surviv-weapons-hotbar {
     position: fixed;
     right: 20px;
     bottom: 22px;
-    width: 120px;
+    width: 104px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 3px;
     z-index: 100;
     pointer-events: auto;
     background: transparent;
@@ -1878,50 +1878,45 @@
     padding: 0;
 }
 
-/* Individual vertical hotbar slot card */
 .surviv-game-page .surviv-weapons-hotbar .hotbar-slot {
     width: 100%;
-    height: 52px;
-    border-radius: 6px;
-    background: rgba(9, 12, 10, 0.65);
-    border: 1px solid rgba(225, 204, 150, 0.1);
+    height: 44px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(5, 8, 6, 0.52), rgba(5, 8, 6, 0.08));
+    border: 0;
+    border-left: 2px solid transparent;
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: 5px;
+    padding: 4px 6px;
     cursor: pointer;
     position: relative;
     overflow: hidden;
-    transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .surviv-game-page .surviv-weapons-hotbar .hotbar-slot:hover:not(.empty-slot) {
-    background: rgba(14, 18, 15, 0.8);
-    border-color: rgba(225, 204, 150, 0.3);
-    transform: translateX(-4px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+    background: linear-gradient(90deg, rgba(13, 20, 16, 0.72), rgba(13, 20, 16, 0.12));
+    transform: translateX(-2px);
 }
 
 .surviv-game-page .surviv-weapons-hotbar .hotbar-slot.empty-slot {
-    border-style: dashed;
-    background: rgba(255, 255, 255, 0.01);
-    border-color: rgba(225, 204, 150, 0.05);
-    opacity: 0.22;
+    background: transparent;
+    border-left-color: rgba(255, 255, 255, 0.08);
+    opacity: 0.16;
     cursor: default;
 }
 
-/* Active weapon highlights */
 .surviv-game-page .surviv-weapons-hotbar .hotbar-slot.active-slot {
-    background: rgba(20, 26, 22, 0.85);
-    border-color: #14F195 !important;
-    box-shadow: 0 0 16px rgba(20, 241, 149, 0.22), inset 0 0 6px rgba(20, 241, 149, 0.12);
+    background: linear-gradient(90deg, rgba(20, 241, 149, 0.13), rgba(5, 8, 6, 0.08));
+    border-left-color: #14f195 !important;
+    box-shadow: none;
 }
 
-/* Weapon SVGs */
 .surviv-game-page .hotbar-weapon-icon-wrap {
     flex: 1;
     display: flex;
@@ -1929,7 +1924,7 @@
     justify-content: center;
     height: 100%;
     pointer-events: none;
-    opacity: 0.82;
+    opacity: 0.78;
     transition: opacity 0.15s ease;
 }
 
@@ -1938,47 +1933,42 @@
     filter: drop-shadow(0 0 4px rgba(20, 241, 149, 0.3));
 }
 
-/* Keybind badge */
 .surviv-game-page .hotbar-slot-key {
     position: static;
-    width: 16px;
-    height: 16px;
+    width: 13px;
+    height: 13px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: var(--mono);
-    font-size: 0.58rem;
+    font-size: 0.5rem;
     font-weight: 800;
-    color: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 3px;
+    color: rgba(255, 255, 255, 0.6);
+    border: 0;
+    background: transparent;
+    border-radius: 0;
     flex-shrink: 0;
 }
 
 .surviv-game-page .surviv-weapons-hotbar .active-slot .hotbar-slot-key {
-    border-color: rgba(20, 241, 149, 0.4);
-    color: #14F195;
-    background: rgba(20, 241, 149, 0.08);
+    color: #14f195;
 }
 
-/* Hide slot name compact on sidebar to keep clean surviv look */
 .surviv-game-page .hotbar-slot-name-compact {
     display: none;
 }
 
-/* Ammo value */
 .surviv-game-page .hotbar-slot-ammo {
     font-family: var(--mono);
-    font-size: 0.65rem;
-    font-weight: 900;
-    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.58rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.62);
     flex-shrink: 0;
 }
 
 .surviv-game-page .active-slot .hotbar-slot-ammo {
-    color: #14F195;
-    text-shadow: 0 0 4px rgba(20, 241, 149, 0.35);
+    color: #14f195;
+    text-shadow: none;
 }
 
 .surviv-game-page .active-slot .hotbar-slot-ammo.reloading {
@@ -1986,12 +1976,14 @@
     text-shadow: 0 0 6px rgba(255, 183, 0, 0.4);
 }
 
-/* Rarity classes for loadout slots */
-.surviv-game-page .hotbar-slot.rarity-border-common { border-color: rgba(215, 195, 150, 0.12); }
-.surviv-game-page .hotbar-slot.rarity-border-rare { border-color: rgba(113, 167, 255, 0.18); }
-.surviv-game-page .hotbar-slot.rarity-border-military { border-color: rgba(201, 133, 255, 0.24); }
+.surviv-game-page .hotbar-slot.rarity-border-common,
+.surviv-game-page .hotbar-slot.rarity-border-rare,
+.surviv-game-page .hotbar-slot.rarity-border-military {
+    border-right: 0;
+    border-top: 0;
+    border-bottom: 0;
+}
 
-/* Empty label */
 .surviv-game-page .hotbar-slot-empty-label {
     flex: 1;
     text-align: center;
