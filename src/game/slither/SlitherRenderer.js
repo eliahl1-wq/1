@@ -7,6 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
+import { drawGameEmote } from '../../components/GameSocialOverlay.jsx';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
@@ -2255,7 +2256,11 @@ export class SlitherRenderer {
             const point = toScreen(head.x, head.y);
             const progress = Math.min(1, (emoteNow - activeEmote.startedAt) / 2600);
             ctx.globalAlpha = Math.min(1, (1 - progress) * 3);
-            ctx.fillText(activeEmote.emote, point.x, point.y - (snake.radius || 6) * zoom - 24 - progress * 10);
+            const emoteX = point.x;
+            const emoteY = point.y - (snake.radius || 6) * zoom - 24 - progress * 10;
+            if (!drawGameEmote(ctx, activeEmote.emote, emoteX, emoteY, 42)) {
+                ctx.fillText(activeEmote.emote, emoteX, emoteY);
+            }
         }
         ctx.restore();
         const __t5 = performance.now();
