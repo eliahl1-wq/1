@@ -2577,6 +2577,83 @@
     }
 }
 
+.surviv-game-page .hotbar-ammo-reserve {
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.5rem;
+    font-weight: 600;
+}
+
+.surviv-game-page .ammo-reserves-card {
+    grid-column: 1 / -1;
+    padding: 9px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
+    background: rgba(7, 10, 8, 0.58);
+}
+
+.surviv-game-page .ammo-reserves-title {
+    margin-bottom: 7px;
+    color: rgba(255, 255, 255, 0.4);
+    font: 800 0.54rem/1 var(--mono);
+    letter-spacing: 0.1em;
+}
+
+.surviv-game-page .ammo-reserves-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+}
+
+.surviv-game-page .ammo-reserve {
+    position: relative;
+    display: grid;
+    grid-template-columns: 7px 1fr auto auto;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    padding: 6px 5px;
+    border: 1px solid color-mix(in srgb, var(--ammo-color) 24%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ammo-color) 7%, transparent);
+    cursor: pointer;
+}
+
+.surviv-game-page .ammo-reserve.empty-qty { opacity: 0.32; cursor: default; }
+.surviv-game-page .ammo-reserve-round {
+    width: 4px;
+    height: 13px;
+    border-radius: 3px 3px 1px 1px;
+    background: var(--ammo-color);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--ammo-color) 45%, transparent);
+}
+.surviv-game-page .ammo-reserve-label {
+    overflow: hidden;
+    color: var(--ammo-color);
+    font: 800 0.56rem/1 var(--mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.surviv-game-page .ammo-reserve strong { color: rgba(255, 255, 255, 0.88); font: 900 0.66rem/1 var(--mono); }
+.surviv-game-page .ammo-reserve-max { color: rgba(255, 255, 255, 0.28); font: 600 0.46rem/1 var(--mono); }
+.surviv-game-page .ammo-reserve-drop {
+    position: absolute;
+    top: -5px;
+    right: -3px;
+    width: 13px;
+    height: 13px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(25, 6, 6, 0.92);
+    color: #ff7777;
+    font: 700 0.6rem/12px sans-serif;
+    cursor: pointer;
+}
+
+@media (max-width: 720px) {
+    .surviv-game-page .ammo-reserves-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .surviv-game-page .surviv-inventory-modal,
     .surviv-game-page .surviv-inventory-container,
