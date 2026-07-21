@@ -54,7 +54,7 @@ export default function SlitherGame() {
 
     const location = useLocation();
 
-    const { user, token: authToken, refreshUser } = useAuth();
+    const { user, token: authToken, refreshUser, applyOptimisticBalanceDelta } = useAuth();
 
     const pendingAtMount = loadPendingResult('slither');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
@@ -75,6 +75,7 @@ export default function SlitherGame() {
     const hasJoinedRef = useRef(false);
 
     const cashoutActiveRef = useRef(false);
+    const playAgainPendingRef = useRef(false);
 
     const myIdRef = useRef(null);
     const prevBalanceRef = useRef(null);
@@ -116,6 +117,7 @@ export default function SlitherGame() {
     const [liveSession, setLiveSession] = useState(() => !pendingAtMount);
 
     const [localTimer, setLocalTimer] = useState(0);
+    const [cashoutPending, setCashoutPending] = useState(false);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
 
     const [resetCountdown, setResetCountdown] = useState(null);
@@ -214,40 +216,22 @@ export default function SlitherGame() {
         const modeKey = isCompetitive ? 'competitive-slither' : 'slither';
         localStorage.setItem('current_game_mode', modeKey);
         localStorage.setItem('selected_gamemode', modeKey);
-
-        clearPendingResult('slither');
+        playAgainPendingRef.current = true;
         blockAutoJoinRef.current = false;
-
-        setIsDead(false);
-        setCashedAmount(null);
-        setShowResultModal(false);
-        setIsSpectating(false);
         setIsRejoining(true);
-        setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
-        setLocalTimer(0);
-        setCashOutEndAt(0);
-        setGameReady(false);
-        prevBalanceRef.current = null;
-        prevKillsRef.current = null;
-        cashoutActiveRef.current = false;
-        cashOutEndAtRef.current = 0;
 
         if (!liveSession) {
             setLiveSession(true);
             return;
         }
 
-        rendererRef.current?.resetSession();
-        rendererRef.current?.start();
-
         if (socketRef.current?.connected) {
             const preferredSkin = localStorage.getItem('selected_skin') || 'random';
             localStorage.removeItem('use_free_ticket');
-
             socketRef.current.emit('joinGame', {
                 username: nickname,
                 token: authToken,
-                mode: joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither',
+                mode: isCompetitive ? 'competitive-slither' : 'slither',
                 entryFeeUsd: fee,
                 skinColor: preferredSkin,
                 useFreeTicket: false,
@@ -292,6 +276,7 @@ export default function SlitherGame() {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
         cashoutActiveRef.current = true;
+        setCashoutPending(true);
         cashOutTotalRef.current = seconds;
         const endAt = Date.now() + seconds * 1000;
         cashOutEndAtRef.current = endAt;
@@ -337,10 +322,14 @@ export default function SlitherGame() {
 
     const handleHoldStart = useCallback((atMs) => {
         rendererRef.current?.setHoldStart(atMs);
+        rendererRef.current?.setInputEnabled(false);
+        socketRef.current?.emit('cashOutHold', true);
     }, []);
 
     const handleHoldEnd = useCallback(() => {
         rendererRef.current?.setHoldStart(0);
+        rendererRef.current?.setInputEnabled(true);
+        socketRef.current?.emit('cashOutHold', false);
     }, []);
 
     const cashoutReady = !isBattleRoyale && gameReady && isConnected
@@ -516,6 +505,11 @@ export default function SlitherGame() {
 
 
         socket.on('welcome', (playerSettings, gameSizes) => {
+            playAgainPendingRef.current = false;
+            setCashoutPending(false);
+            setIsDead(false);
+            setCashedAmount(null);
+            setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
             clearPendingResult('slither');
             const mode = gameSizes?.mode || lobbyModeForSession(joinParamsRef.current.isCompetitive);
             const expectedMode = lobbyModeForSession(joinParamsRef.current.isCompetitive);
@@ -567,6 +561,7 @@ export default function SlitherGame() {
                 rendererRef.current?.setHud({ balance: bal });
             }
             setGameReady(true);
+            refreshUser?.();
             if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
                 startCashoutCountdown(gameSizes.cashOutRemaining, false);
             }
@@ -652,6 +647,15 @@ export default function SlitherGame() {
 
 
 
+        socket.on('cashOutProcessing', () => {
+            cashoutActiveRef.current = true;
+            setCashoutPending(true);
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            setLocalTimer(0);
+            rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
+            rendererRef.current?.removeSnake(myIdRef.current);
+        });
         socket.on('cashOutStarting', ({ seconds }) => {
             const total = seconds ?? CASHOUT_SECONDS;
             if (!cashoutActiveRef.current) {
@@ -674,6 +678,7 @@ export default function SlitherGame() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            setCashoutPending(false);
             cashOutEndAtRef.current = 0;
             setCashOutEndAt(0);
             setLocalTimer(0);
@@ -727,6 +732,7 @@ export default function SlitherGame() {
 
 
         socket.on('RIP', () => {
+            setCashoutPending(false);
             if (myIdRef.current) {
                 rendererRef.current?.removeSnake(myIdRef.current);
             }
@@ -785,6 +791,18 @@ export default function SlitherGame() {
 
         socket.on('error', (msg) => {
 
+            setCashoutPending(false);
+            if (playAgainPendingRef.current) {
+                playAgainPendingRef.current = false;
+                blockAutoJoinRef.current = true;
+                setIsRejoining(false);
+                if (typeof msg === 'string' && /insufficient/i.test(msg)) {
+                    refreshUser?.({ forceBalance: true });
+                    alert('Not enough funds for another round. Your game result is still saved.');
+                    return;
+                }
+            }
+
             if (cashoutActiveRef.current) {
                 cashoutActiveRef.current = false;
                 cashOutEndAtRef.current = 0;
@@ -804,6 +822,7 @@ export default function SlitherGame() {
             }
 
             if (typeof msg === 'string' && /insufficient/i.test(msg)) {
+                refreshUser?.({ forceBalance: true });
                 setIsRejoining(false);
                 const mode = persistLobbyGameMode(joinParamsRef.current.isCompetitive);
                 navigate('/lobby', { state: { depositIntent: true, selectedMode: mode, requiredBalanceUsd: joinParamsRef.current.entryFeeUsd } });
@@ -1094,6 +1113,7 @@ export default function SlitherGame() {
                     localTimer={localTimer}
                     cashOutTotal={cashOutTotalRef.current}
                     cashOutEndAt={cashOutEndAtRef.current}
+                    pending={cashoutPending}
                 />
             )}
 

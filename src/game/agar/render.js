@@ -93,7 +93,7 @@ const regulatePoint = (point, borders) => ({
 
 const cellStates = new Map();
 
-function drawOrganicCell(cell, borders, graph, highQuality = false) {
+function drawOrganicCell(cell, borders, graph, allCells = [], highQuality = false) {
     if (!cell.id) return; // Fallback if id is missing
     let state = cellStates.get(cell.id);
     if (!state) {
@@ -115,6 +115,13 @@ function drawOrganicCell(cell, borders, graph, highQuality = false) {
     let time = Date.now() * 0.002;
     let moveAngle = Math.atan2(cell.vY || 0, cell.vX || 0);
     let speed = Math.min(Math.sqrt((cell.vX || 0) ** 2 + (cell.vY || 0) ** 2), 6);
+    // Hitta överlappande celler så kontaktytan kan deformeras mjukt.
+    const overlaps = [];
+    for (const other of allCells) {
+        if (other.id === cell.id) continue;
+        const distance = Math.hypot(cell.x - other.x, cell.y - other.y);
+        if (distance < cell.radius + other.radius) overlaps.push(other);
+    }
 
 
     for (let i = 0; i < pointCount; i++) {
@@ -131,6 +138,18 @@ function drawOrganicCell(cell, borders, graph, highQuality = false) {
         // Beräkna punktens ursprungliga position
         let px = cell.x + currentRadius * Math.cos(theta);
         let py = cell.y + currentRadius * Math.sin(theta);
+
+        // Båda blobbarna delar på deformationen. Lite mindre än hälften
+        // lämnar en minimal visuell överlappning och förhindrar hål i skarven.
+        for (const other of overlaps) {
+            const distToOther = Math.hypot(px - other.x, py - other.y);
+            if (distToOther < other.radius) {
+                const depth = other.radius - distToOther;
+                currentRadius -= depth * 0.45;
+                px = cell.x + currentRadius * Math.cos(theta);
+                py = cell.y + currentRadius * Math.sin(theta);
+            }
+        }
         
 
         let point = { x: px, y: py };
@@ -179,7 +198,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
         graph.shadowBlur = 0;
         
         // Använd den organiska ritningen för slimy-effekt
-        drawOrganicCell(cell, borders, graph, highQuality);
+        drawOrganicCell(cell, borders, graph, cells, highQuality);
 
         // Draw the name of the player
         // Dynamisk fontstorlek: aggressivare skalning för korta namn (som 'eli')

@@ -85,7 +85,7 @@ function getAgarCameraZoom(cells) {
 export default function Game() {
     const canvasRef = useRef(null);
     const viewportRef = useRef(null);
-    const { user, token, refreshUser } = useAuth();
+    const { user, token, refreshUser, applyOptimisticBalanceDelta } = useAuth();
 
     const pendingAtMount = loadPendingResult('agar');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
@@ -104,6 +104,7 @@ export default function Game() {
     const timerIntervalRef = useRef(null);
     const animationFrameId = useRef(null);
     const cashoutActiveRef = useRef(false);
+    const playAgainPendingRef = useRef(false);
     const cashOutEndAtRef = useRef(0);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const sessionStartAtRef = useRef(null);
@@ -137,6 +138,7 @@ export default function Game() {
     const [isDead, setIsDead] = useState(() => pendingAtMount?.type === 'death');
     const [liveSession, setLiveSession] = useState(() => !pendingAtMount);
     const [localTimer, setLocalTimer] = useState(0);
+    const [cashoutPending, setCashoutPending] = useState(false);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
     const initialBR = () => {
         const mode = localStorage.getItem('current_game_mode') || '';
@@ -185,26 +187,9 @@ export default function Game() {
         const playMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
         localStorage.setItem('current_game_mode', playMode);
         localStorage.setItem('selected_gamemode', playMode);
-
-        clearPendingResult('agar');
+        playAgainPendingRef.current = true;
         blockAutoJoinRef.current = false;
-
-        setIsDead(false);
-        setCashedAmount(null);
-        setShowResultModal(false);
-        setIsSpectating(false);
         setIsRejoining(true);
-        setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
-        setLocalTimer(0);
-        prevBalanceRef.current = null;
-        prevKillsRef.current = null;
-        cashoutActiveRef.current = false;
-        global.cashOutTimer = 0;
-        global.cashOutEndAt = 0;
-        cashOutEndAtRef.current = 0;
-        setCashOutEndAt(0);
-        foodCacheRef.current.clear();
-        gameData.current = { player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null };
 
         if (!liveSession) {
             setLiveSession(true);
@@ -214,7 +199,6 @@ export default function Game() {
         if (socketRef.current?.connected) {
             const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
             localStorage.removeItem('use_free_ticket');
-            
             socketRef.current.emit('joinGame', {
                 username: nickname,
                 token,
@@ -228,6 +212,7 @@ export default function Game() {
 
     const handleLobby = useCallback(() => {
         clearPendingResult('agar');
+        playAgainPendingRef.current = false;
         blockAutoJoinRef.current = false;
         localStorage.removeItem('current_game_mode');
         const mode = joinParamsRef.current.mode;
@@ -238,6 +223,7 @@ export default function Game() {
     const startCashoutCountdown = useCallback((seconds) => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         cashoutActiveRef.current = true;
+        setCashoutPending(true);
 
         let timeLeft = seconds;
         cashOutTotalRef.current = seconds;
@@ -282,10 +268,12 @@ export default function Game() {
 
     const handleHoldStart = useCallback((atMs) => {
         global.holdStartAt = atMs;
+        socketRef.current?.emit('cashOutHold', true);
     }, []);
 
     const handleHoldEnd = useCallback(() => {
         global.holdStartAt = 0;
+        socketRef.current?.emit('cashOutHold', false);
     }, []);
 
     useEffect(() => {
@@ -362,6 +350,7 @@ export default function Game() {
         socket.on('connect', () => {
             console.log('Connected to socket server');
             setIsConnected(true);
+            refreshUser?.();
             if (!hasJoinedGameRef.current && !blockAutoJoinRef.current) {
                 if (wantsBattleRoyale) {
                     socket.emit('brRejoinMatch', { token });
@@ -386,6 +375,13 @@ export default function Game() {
         });
 
         socket.on('welcome', (playerSettings, gameSizes) => {
+            playAgainPendingRef.current = false;
+            setCashoutPending(false);
+            setIsDead(false);
+            setCashedAmount(null);
+            setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
+            setIsSpectating(false);
+            foodCacheRef.current.clear();
             clearPendingResult('agar');
             const isRejoin = gameSizes?.rejoin === true;
             console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
@@ -415,6 +411,7 @@ export default function Game() {
             setIsRejoining(false);
             setShowResultModal(false);
             setIsConnected(true);
+            refreshUser?.();
             const startBal = playerSettings.balance ?? 1.0;
             prevBalanceRef.current = startBal;
             prevKillsRef.current = playerSettings.kills ?? 0;
@@ -438,6 +435,19 @@ export default function Game() {
             }
         });
 
+        socket.on('cashOutProcessing', () => {
+            cashoutActiveRef.current = true;
+            setCashoutPending(true);
+            setLocalTimer(0);
+            global.cashOutTimer = 0;
+            global.cashOutEndAt = 0;
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            gameData.current = {
+                ...gameData.current,
+                users: gameData.current.users.filter(user => user.id !== myIdRef.current),
+            };
+        });
         socket.on('cashOutStarting', (data) => {
             const seconds = data?.seconds ?? CASHOUT_SECONDS;
             if (!cashoutActiveRef.current) {
@@ -533,6 +543,7 @@ export default function Game() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            setCashoutPending(false);
             global.cashOutTimer = 0;
             global.cashOutEndAt = 0;
             cashOutEndAtRef.current = 0;
@@ -558,6 +569,7 @@ export default function Game() {
 
         const handleDeath = () => {
             setIsDead(true);
+            setCashoutPending(false);
             global.cashOutTimer = 0;
             global.cashOutEndAt = 0;
             cashOutEndAtRef.current = 0;
@@ -607,6 +619,17 @@ export default function Game() {
 
         socket.on('error', (msg) => {
             console.error('Server error:', msg);
+            setCashoutPending(false);
+            if (playAgainPendingRef.current) {
+                playAgainPendingRef.current = false;
+                blockAutoJoinRef.current = true;
+                setIsRejoining(false);
+                if (typeof msg === 'string' && /insufficient/i.test(msg)) {
+                    refreshUser?.({ forceBalance: true });
+                    alert('Not enough funds for another round. Your game result is still saved.');
+                    return;
+                }
+            }
             if (cashoutActiveRef.current) {
                 cashoutActiveRef.current = false;
                 global.cashOutTimer = 0;
@@ -620,6 +643,7 @@ export default function Game() {
                 }
             }
             if (typeof msg === 'string' && /insufficient/i.test(msg)) {
+                refreshUser?.({ forceBalance: true });
                 setIsRejoining(false);
                 const mode = joinParamsRef.current.mode;
                 const selectedMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
@@ -1128,6 +1152,7 @@ export default function Game() {
                     localTimer={localTimer}
                     cashOutTotal={cashOutTotalRef.current}
                     cashOutEndAt={cashOutEndAtRef.current}
+                    pending={cashoutPending}
                 />
             )}
 

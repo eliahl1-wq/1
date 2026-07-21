@@ -1,7 +1,7 @@
 const FULL_ANGLE = Math.PI * 2;
 
 /** Hold Q / cashout button duration before the securing timer starts. */
-export const CASHOUT_HOLD_MS = 1000;
+export const CASHOUT_HOLD_MS = 3000;
 
 /** Brand purple — matches --accent / cashout button styling. */
 export const CASHOUT_RING_COLOR = '#785eff';

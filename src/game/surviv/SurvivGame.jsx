@@ -197,7 +197,7 @@ function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
 export default function SurvivGame() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, token: authToken, refreshUser } = useAuth();
+    const { user, token: authToken, refreshUser, applyOptimisticBalanceDelta } = useAuth();
 
     const pendingAtMount = loadPendingResult('surviv');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
@@ -212,6 +212,7 @@ export default function SurvivGame() {
     const hasJoinedRef = useRef(false);
     const awaitingWelcomeRef = useRef(false);
     const cashoutActiveRef = useRef(false);
+    const playAgainPendingRef = useRef(false);
     const myIdRef = useRef(null);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const cashOutEndAtRef = useRef(0);
@@ -352,48 +353,14 @@ export default function SurvivGame() {
     }, []);
 
     const handlePlayAgain = useCallback(() => {
-        clearPendingResult('surviv');
+        playAgainPendingRef.current = true;
         blockAutoJoinRef.current = false;
         awaitingWelcomeRef.current = true;
         hasJoinedRef.current = false;
         localStorage.setItem('current_game_mode', 'surviv');
         localStorage.setItem('selected_gamemode', 'surviv');
         markGamemodePlayed('surviv');
-
-        rendererRef.current?.resetSession();
-        rendererRef.current?.start();
-        setGameReady(false);
-        setConnectionError('');
-        setIsDead(false);
-        setCashedAmount(null);
-        setShowResultModal(false);
-        setIsSpectating(false);
         setIsRejoining(true);
-        setMe(null);
-        meUiSignatureRef.current = '';
-        setLeaderboard([]);
-        setAliveCount(0);
-        aliveCountValueRef.current = 0;
-        setCanMobileInteract(false);
-        inventoryOpenRef.current = false;
-        setIsInventoryOpen(false);
-        prevOpenedContainerIdRef.current = null;
-        reloadPendingRef.current = false;
-        useMedkitPendingRef.current = false;
-        pickupWeaponPendingRef.current = false;
-        equipSlotPendingRef.current = null;
-        openChestPendingRef.current = null;
-        takeChestItemPendingRef.current = null;
-        putChestItemPendingRef.current = null;
-        dropItemPendingRef.current = null;
-        closeChestPendingRef.current = false;
-        setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
-        setCurrentBalance(0);
-        setLocalTimer(0);
-        setCashoutPending(false);
-        setCashOutEndAt(0);
-        cashoutActiveRef.current = false;
-        cashOutEndAtRef.current = 0;
 
         if (!liveSession) {
             setLiveSession(true);
@@ -410,7 +377,7 @@ export default function SurvivGame() {
                 skinColor: preferredSkin,
             });
         }
-    }, [authToken, liveSession, setCurrentBalance, setSessionStats]);
+    }, [authToken, liveSession]);
 
     const handleLobby = useCallback(() => {
         clearPendingResult('surviv');
@@ -719,6 +686,14 @@ export default function SurvivGame() {
 
         socket.on('welcome', (player, world) => {
             awaitingWelcomeRef.current = false;
+            playAgainPendingRef.current = false;
+            clearPendingResult('surviv');
+            setIsDead(false);
+            setCashedAmount(null);
+            setShowResultModal(false);
+            setIsSpectating(false);
+            setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
+            setCashoutPending(false);
             hasJoinedRef.current = true;
             myIdRef.current = player.id;
             renderer.setMyId(player.id);
@@ -726,6 +701,7 @@ export default function SurvivGame() {
             setCurrentBalance(player.dollarBalance ?? 0);
             setConnectionError('');
             setGameReady(true);
+            refreshUser();
             setIsRejoining(false);
             renderer.setInputEnabled(true);
             renderer.start();
@@ -777,6 +753,15 @@ export default function SurvivGame() {
             if (data?.leaderboard) setLeaderboard(data.leaderboard);
         });
 
+        socket.on('cashOutProcessing', () => {
+            cashoutActiveRef.current = true;
+            setCashoutPending(true);
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            setLocalTimer(0);
+            renderer.clearInput();
+            renderer.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
+        });
         socket.on('cashOutStarting', ({ seconds }) => {
             startCashoutCountdown(seconds || CASHOUT_SECONDS);
         });
@@ -850,6 +835,16 @@ export default function SurvivGame() {
         });
         socket.on('error', (msg) => {
             const message = typeof msg === 'string' ? msg : msg?.message || 'Connection error';
+            if (playAgainPendingRef.current) {
+                playAgainPendingRef.current = false;
+                blockAutoJoinRef.current = true;
+                setIsRejoining(false);
+                if (/insufficient/i.test(message)) {
+                    refreshUser({ forceBalance: true });
+                    alert('Not enough funds for another round. Your game result is still saved.');
+                    return;
+                }
+            }
             console.error('Surviv socket error:', message);
             cashoutActiveRef.current = false;
             setCashoutPending(false);
@@ -860,6 +855,7 @@ export default function SurvivGame() {
             setLocalTimer(0);
             setCashOutEndAt(0);
             if (!hasJoinedRef.current && /insufficient/i.test(message)) {
+                refreshUser({ forceBalance: true });
                 setIsRejoining(false);
                 blockAutoJoinRef.current = true;
                 navigate('/lobby', { state: { depositIntent: true, selectedMode: 'surviv', requiredBalanceUsd: joinParamsRef.current.entryFeeUsd } });
@@ -985,10 +981,15 @@ export default function SurvivGame() {
 
     const handleHoldStart = useCallback(() => {
         rendererRef.current?.setHoldStart(Date.now());
+        rendererRef.current?.clearInput();
+        rendererRef.current?.setInputEnabled(false);
+        socketRef.current?.emit('cashOutHold', true);
     }, []);
 
     const handleHoldEnd = useCallback(() => {
         rendererRef.current?.setHoldStart(0);
+        rendererRef.current?.setInputEnabled(true);
+        socketRef.current?.emit('cashOutHold', false);
     }, []);
 
     const handleMobileMove = useCallback((dx, dy) => {

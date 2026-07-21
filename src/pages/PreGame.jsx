@@ -117,7 +117,7 @@ const getChromaName = (color) => {
 };
 
 export default function PreGame() {
-    const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
+    const { user, logout, token, login, refreshUser, applyOptimisticBalanceDelta, isAuthenticated } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const { connected, publicKey, sendTransaction } = useWallet();
@@ -646,6 +646,37 @@ export default function PreGame() {
         return () => clearInterval(id);
     }, [refreshUser]);
 
+    // Refresh from the backend as soon as Solana reports activity on the
+    // personal deposit address. Delayed retries cover backend confirmation time.
+    useEffect(() => {
+        if (!depositAddress || !connection) return undefined;
+        let subscriptionId;
+        const timers = [];
+        const syncAfterDeposit = () => {
+            refreshUser();
+            for (const delay of [1500, 4000, 9000]) {
+                timers.push(setTimeout(() => refreshUser(), delay));
+            }
+        };
+
+        try {
+            subscriptionId = connection.onAccountChange(
+                new PublicKey(depositAddress),
+                syncAfterDeposit,
+                'confirmed',
+            );
+        } catch {
+            return undefined;
+        }
+
+        return () => {
+            timers.forEach(clearTimeout);
+            if (subscriptionId != null) {
+                connection.removeAccountChangeListener(subscriptionId).catch(() => {});
+            }
+        };
+    }, [connection, depositAddress, refreshUser]);
+
     // Game status — poll so rejoin button stays accurate
     useEffect(() => {
         if (!token) {
@@ -882,10 +913,8 @@ export default function PreGame() {
                 throw new Error(err || 'Backend verification failed.');
             }
             const verification = await vr.json();
-            if (token) {
-                const mr = await fetch(`${API_URL}/api/me`, { headers: { Authorization: `Bearer ${token}` } });
-                if (mr.ok) login(await mr.json(), token);
-            }
+            applyOptimisticBalanceDelta({ usd: usdAmt, sol: solAmt });
+            await refreshUser();
             setStatusMsg(verification.rewardsReview
                 ? 'Deposit confirmed. Rewards are under linked-wallet review.'
                 : `✅ ${solAmt.toFixed(4)} SOL deposited!`);
@@ -2241,7 +2270,7 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
         if (!ctx) return undefined;
 
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        ctx.imageSmoothingQuality = 'medium';
 
         let animationFrameId = 0;
         const segmentsCount = isLarge ? 32 : 24;
@@ -2252,7 +2281,7 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
         const totalLength = segmentsCount * spacing;
         const headX = centerX + totalLength / 2 - radius * 1.2;
         const amp = isLarge ? 20 : 9;
-        const phaseSpeed = isLarge ? 0.0027 : 0.0033;
+        const phaseSpeed = isLarge ? 0.00335 : 0.00405;
         const rainbowColors = [
             '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
             '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0',
@@ -2281,7 +2310,7 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
             // Same shadow sprites and placement as the original preview,
             // drawn in one pass without nested save/restore calls.
             ctx.globalAlpha = 0.5;
-            for (let i = segmentsCount - 1; i >= 0; i--) {
+            for (let i = segmentsCount - 1; i >= 0; i -= 2) {
                 ctx.setTransform(1, 0, 0, 0.75, pointX[i], pointY[i] + radius * 0.12);
                 ctx.drawImage(shadowCanvas, -shadowHalf, -shadowHalf);
             }
@@ -2348,7 +2377,7 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
                 ref={canvasRef}
                 width={isLarge ? 450 : 250}
                 height={isLarge ? 200 : 100}
-                style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block', background: 'transparent' }}
+                style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block', background: 'transparent', willChange: 'contents' }}
             />
         </div>
     );
