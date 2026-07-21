@@ -572,11 +572,12 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
     renderer.myId = null;
 }
 
-export default function PregameGameBackground({ mode, slitherColor, agarColor, survivColor }) {
+export default function PregameGameBackground({ mode, slitherColor, agarColor, survivColor, paused = false }) {
     const canvasRef = useRef(null);
     const family = familyForMode(mode);
 
     useEffect(() => {
+        if (paused) return undefined;
         const canvas = canvasRef.current;
         if (!canvas) return undefined;
         const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
@@ -608,7 +609,8 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
             width = Math.max(1, window.innerWidth);
             height = Math.max(1, window.innerHeight);
             const mobile = window.matchMedia?.('(pointer: coarse)')?.matches || width < 760;
-            dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, mobile ? 1.35 : 1.25));
+            const maxDpr = family === 'slither' ? (mobile ? 0.78 : 0.82) : (mobile ? 1.35 : 1.25);
+            dpr = Math.max(family === 'slither' ? 0.7 : 1, Math.min(window.devicePixelRatio || 1, maxDpr));
             canvas.width = Math.round(width * dpr);
             canvas.height = Math.round(height * dpr);
             canvas.style.width = `${width}px`;
@@ -660,7 +662,7 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
             slitherRenderer.destroy();
             survivRenderer.destroy();
         };
-    }, [mode, slitherColor, agarColor, survivColor]);
+    }, [mode, slitherColor, agarColor, survivColor, paused]);
 
     return (
         <div aria-hidden="true" style={{

@@ -975,6 +975,7 @@ export default function PreGame() {
                     slitherColor={selectedSkin}
                     agarColor={selectedSkinAgar}
                     survivColor={selectedSkinSurviv}
+                    paused={showCustomizer}
                 />
             ) : (
                 <Background />
@@ -1555,7 +1556,7 @@ export default function PreGame() {
                                     </div>
 
                                     <div className="customize-lobby-preview-box">
-                                        <SnakeSkinPreview color={selectedSkin} isLarge={false} />
+                                        <SnakeSkinPreview color={selectedSkin} isLarge={false} active={!showCustomizer} />
                                     </div>
 
                                     <div className="customize-lobby-footer">
@@ -1782,7 +1783,7 @@ export default function PreGame() {
                                         {isSurvivFamily ? (
                                             <SurvivSkinPreview color={selectedSkinSurviv} isLarge={false} nickname={nickname} />
                                         ) : isSlitherFamily ? (
-                                            <SnakeSkinPreview color={selectedSkin} isLarge={false} />
+                                            <SnakeSkinPreview color={selectedSkin} isLarge={false} active={!showCustomizer} />
                                         ) : (
                                             <AgarBlobPreview color={selectedSkinAgar} isLarge={false} nickname={nickname} />
                                         )}
@@ -2229,7 +2230,7 @@ function SurvivSkinPreview({ color, isLarge, nickname }) {
 }
 
 /* ── SnakeSkinPreview ── */
-function SnakeSkinPreview({ color, isLarge }) {
+function SnakeSkinPreview({ color, isLarge, active = true }) {
     const canvasRef = useRef(null);
     const tRef = useRef(0);
     const colorRef = useRef(color);
@@ -2240,9 +2241,10 @@ function SnakeSkinPreview({ color, isLarge }) {
     }, [color]);
 
     useEffect(() => {
+        if (!active) return undefined;
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
+        if (!canvas) return undefined;
+        const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
 
         let animationFrameId;
         const segmentsCount = isLarge ? 32 : 24;
@@ -2256,108 +2258,83 @@ function SnakeSkinPreview({ color, isLarge }) {
         const headX = centerX + (totalLength / 2) - radius * 1.2;
 
         const amp = isLarge ? 20 : 9;
-        const wiggleSpeed = isLarge ? 0.045 : 0.055;
+        const phaseSpeed = isLarge ? 0.0027 : 0.0033;
+        const rainbowColors = ['#c080ff', '#9099ff', '#80d0d0', '#80ff80', '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'];
+        const pointX = new Float32Array(segmentsCount);
+        const pointY = new Float32Array(segmentsCount);
+        const shadowCanvas = getSnakeShadowCanvas(radius);
+        const shadowHalf = shadowCanvas.width / 2;
+        let fixedColor = null;
+        let fixedSegmentCanvas = null;
 
-        const render = () => {
-            tRef.current += 1;
-            const t = tRef.current;
+        const render = (now) => {
+            const phase = now * phaseSpeed;
             const currentColor = colorRef.current;
-
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Compute points directly using sine wave to eliminate memory shifting and distance search CPU overhead
-            const points = [];
             for (let i = 0; i < segmentsCount; i++) {
-                const x = headX - i * spacing;
-                const y = centerY + Math.sin(t * wiggleSpeed - i * 0.35) * amp;
-                points.push({ x, y });
+                pointX[i] = headX - i * spacing;
+                pointY[i] = centerY + Math.sin(phase - i * 0.35) * amp;
             }
 
-            // Draw shadow & body segments from tail to head
-            for (let i = points.length - 1; i >= 0; i--) {
-                const pt = points[i];
-                let segColorHex = currentColor;
-                if (currentColor === 'random') {
-                    const colors = [
-                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
-                        '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
-                    ];
-                    const colorIndex = Math.floor((t * 0.05 + i * 0.15) % colors.length);
-                    segColorHex = colors[colorIndex];
-                }
-
-                let segmentAngle = 0;
-                if (i > 0) {
-                    segmentAngle = Math.atan2(points[i - 1].y - pt.y, points[i - 1].x - pt.x);
-                } else if (points[i + 1]) {
-                    segmentAngle = Math.atan2(pt.y - points[i + 1].y, pt.x - points[i + 1].x);
-                }
-
-                const segmentCanvas = getSnakeSegmentCanvas(radius, segColorHex);
-                const shadowCanvas = getSnakeShadowCanvas(radius);
-
-                ctx.save();
-                ctx.translate(pt.x, pt.y);
-
-                // Draw drop shadow
-                ctx.save();
-                ctx.translate(0, radius * 0.12);
-                ctx.scale(1, 0.75);
-                ctx.globalAlpha = 0.5;
-                const shadowHalf = shadowCanvas.width / 2;
+            ctx.globalAlpha = 0.42;
+            for (let i = segmentsCount - 1; i >= 0; i--) {
+                ctx.setTransform(1, 0, 0, 0.75, pointX[i], pointY[i] + radius * 0.12);
                 ctx.drawImage(shadowCanvas, -shadowHalf, -shadowHalf);
-                ctx.restore();
-
-                // Draw segment
-                ctx.rotate(segmentAngle);
-                const segHalf = segmentCanvas.width / 2;
-                ctx.drawImage(segmentCanvas, -segHalf, -segHalf);
-
-                ctx.restore();
             }
 
-            // Draw eyes on the head segment
-            const head = points[0];
-            const next = points[1];
-            if (head && next) {
-                const headAngle = Math.atan2(head.y - next.y, head.x - next.x);
-                const perpX = Math.sin(headAngle);
-                const perpY = -Math.cos(headAngle);
-                const fwdX = Math.cos(headAngle);
-                const fwdY = Math.sin(headAngle);
-
-                const eyeSide = radius * 0.39;
-                const eyeFwd = radius * 0.31;
-                const eyeR = Math.max(2.5, radius * 0.43);
-                const pupilR = eyeR * 0.48;
-
-                for (const side of [-1, 1]) {
-                    const ex = head.x + fwdX * eyeFwd + perpX * eyeSide * side;
-                    const ey = head.y + fwdY * eyeFwd + perpY * eyeSide * side;
-
-                    ctx.beginPath();
-                    ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fill();
-
-                    const px = ex + fwdX * eyeR * 0.4;
-                    const py = ey + fwdY * eyeR * 0.4;
-                    ctx.beginPath();
-                    ctx.arc(px, py, pupilR, 0, Math.PI * 2);
-                    ctx.fillStyle = '#000000';
-                    ctx.fill();
-                }
+            ctx.globalAlpha = 1;
+            if (currentColor !== 'random' && currentColor !== fixedColor) {
+                fixedColor = currentColor;
+                fixedSegmentCanvas = getSnakeSegmentCanvas(radius, currentColor);
+            }
+            for (let i = segmentsCount - 1; i >= 0; i--) {
+                const nextIndex = i > 0 ? i - 1 : 1;
+                const angle = i > 0
+                    ? Math.atan2(pointY[nextIndex] - pointY[i], pointX[nextIndex] - pointX[i])
+                    : Math.atan2(pointY[i] - pointY[nextIndex], pointX[i] - pointX[nextIndex]);
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                const segmentCanvas = currentColor === 'random'
+                    ? getSnakeSegmentCanvas(radius, rainbowColors[Math.floor((now * 0.003 + i * 0.15) % rainbowColors.length)])
+                    : fixedSegmentCanvas;
+                const half = segmentCanvas.width / 2;
+                ctx.setTransform(cos, sin, -sin, cos, pointX[i], pointY[i]);
+                ctx.drawImage(segmentCanvas, -half, -half);
             }
 
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            const headAngle = Math.atan2(pointY[0] - pointY[1], pointX[0] - pointX[1]);
+            const perpX = Math.sin(headAngle);
+            const perpY = -Math.cos(headAngle);
+            const fwdX = Math.cos(headAngle);
+            const fwdY = Math.sin(headAngle);
+            const eyeSide = radius * 0.39;
+            const eyeFwd = radius * 0.31;
+            const eyeR = Math.max(2.5, radius * 0.43);
+            const pupilR = eyeR * 0.48;
+            for (const side of [-1, 1]) {
+                const ex = pointX[0] + fwdX * eyeFwd + perpX * eyeSide * side;
+                const ey = pointY[0] + fwdY * eyeFwd + perpY * eyeSide * side;
+                ctx.beginPath();
+                ctx.arc(ex, ey, eyeR, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(ex + fwdX * eyeR * 0.4, ey + fwdY * eyeR * 0.4, pupilR, 0, Math.PI * 2);
+                ctx.fillStyle = '#000000';
+                ctx.fill();
+            }
             animationFrameId = requestAnimationFrame(render);
         };
 
-        render();
+        animationFrameId = requestAnimationFrame(render);
 
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [isLarge]);
+    }, [isLarge, active]);
 
     return (
         <div className="snake-preview-wrapper" style={{ width: '100%', height: isLarge ? '200px' : '100px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
