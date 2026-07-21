@@ -100,8 +100,8 @@ function classifyTxCategory(tx) {
     if (tx.type === 'deposit') return 'deposit';
     if (['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset'].includes(m.event)) return 'sweep';
     if (tx.type === 'game') {
-        if (m.event === 'join' || m.event === 'br_join') return 'entry';
-        if (m.reason === 'Arena Death' || m.reason === 'BR Eliminated') return 'death';
+        if (['join', 'br_join', 'free_ticket_join'].includes(m.event)) return 'entry';
+        if (m.reason === 'Arena Death' || m.reason === 'BR Eliminated' || m.reason === 'Competitive Slither Death') return 'death';
         if (m.event === 'br_refund') return 'refund';
         return 'game';
     }
@@ -120,9 +120,14 @@ function txActivityLabelClient(tx) {
         case 'withdraw': return 'Withdrawal';
         case 'entry':
             if (m.event === 'br_join') return `BR entry · $${m.entryFeeUsd ?? '?'}`;
+            if (m.event === 'free_ticket_join') return `Free ticket entry · ${m.mode || 'agar'} · $${m.entryFeeUsd ?? '?'} ticket`;
             return `Arena entry · ${m.mode || 'agar'} · $${m.entryFeeUsd ?? '?'}`;
-        case 'cashout': return m.reason || 'Cashout';
-        case 'death': return m.reason || 'Eliminated';
+        case 'cashout':
+            if (m.isFreeTicketPlay) return `Free ticket reward · ${m.mode || 'arena'} · ${formatUsd(m.rewardCreditedUsd ?? tx.amountUsd ?? tx.amount)}`;
+            return m.reason || 'Cashout';
+        case 'death':
+            if (m.isFreeTicketPlay) return `Free ticket death · ${m.mode || 'arena'} · no reward`;
+            return m.reason || 'Eliminated';
         case 'refund': return 'BR refund';
         case 'sweep': return m.reason || 'Owner sweep';
         default: return m.reason || m.event || tx.type;
@@ -139,6 +144,10 @@ function OutcomeBadge({ outcome }) {
         Win: { bg: 'rgba(34,197,94,0.12)', color: 'var(--green)' },
         Loss: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
         'Break-even': { bg: 'rgba(234,179,8,0.12)', color: 'var(--yellow)' },
+        'Reward earned': { bg: 'rgba(34,197,94,0.12)', color: 'var(--green)' },
+        Blocked: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
+        'No reward': { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
+        'In progress': { bg: 'rgba(59,130,246,0.12)', color: 'var(--blue)' },
         excluded: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
     };
     const style = colors[outcome] || { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-2)' };
@@ -553,6 +562,11 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                                             <div><span style={{ color: 'var(--text-2)' }}>Tournament earned</span><br /><strong>{formatUsd(rewards?.tournamentEarnedUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Tournament claimed</span><br /><strong>{formatUsd(rewards?.tournamentClaimedUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Free ticket</span><br />{rewards?.hasFreeTicket && !rewards?.freeTicketUsed ? 'Available' : rewards?.freeTicketUsed ? 'Used' : 'None'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Free games played</span><br /><strong>{rewards?.freeTicketGamesPlayed ?? 0}</strong>{rewards?.freeTicketLastPlayedAt ? <small style={{ display: 'block', color: 'var(--text-3)', marginTop: '3px' }}>Last {formatRelativeTime(rewards.freeTicketLastPlayedAt)}</small> : null}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Free-game outcomes</span><br /><strong>{rewards?.freeTicketCashouts ?? 0} cashouts · {rewards?.freeTicketDeaths ?? 0} deaths</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Free reward earned</span><br /><strong>{formatUsd(rewards?.freeTicketRewardEligibleUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Free reward credited</span><br /><strong>{formatUsd(rewards?.freeTicketRewardCreditedUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Free reward blocked</span><br /><strong>{formatUsd(rewards?.freeTicketRewardBlockedUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>$5 challenge games</span><br />{rewards?.completedFiveDollarGames ?? 0}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>$10 challenge games</span><br />{rewards?.completedTenDollarGames ?? 0}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Challenge</span><br />{rewards?.challengeCompleted ? 'Completed' : rewards?.challengeUnlocked ? 'Unlocked' : 'In progress'}</div>
@@ -569,10 +583,12 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                                             columns={[
                                                 { key: 'mode', label: 'Mode', render: r => String(r.mode).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) },
                                                 { key: 'games', label: 'Entries' },
+                                                { key: 'freeTicketGames', label: 'Free games' },
                                                 { key: 'deaths', label: 'Deaths' },
                                                 { key: 'cashouts', label: 'Cashouts' },
                                                 { key: 'entryUsd', label: 'Entry value', render: r => formatUsd(r.entryUsd) },
                                                 { key: 'payoutUsd', label: 'Payouts', render: r => formatUsd(r.payoutUsd) },
+                                                { key: 'freeTicketRewardUsd', label: 'Free rewards', render: r => formatUsd(r.freeTicketRewardUsd) },
                                             ]}
                                             rows={stats.modeBreakdown || []}
                                             loading={false}
@@ -600,9 +616,10 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, ac
                                     columns={[
                                         { key: 'createdAt', label: 'Date', render: r => formatDate(r.createdAt) },
                                         { key: 'game', label: 'Game', render: r => String(r.game).charAt(0).toUpperCase() + String(r.game).slice(1) },
-                                        { key: 'entryFeeUsd', label: 'Entry', render: r => r.entryFeeUsd != null ? formatUsd(r.entryFeeUsd) : formatUsd(r.wagerUsd) },
-                                        { key: 'payoutUsd', label: 'Payout', render: r => formatUsd(r.payoutUsd) },
-                                        { key: 'outcome', label: 'Result', render: r => <OutcomeBadge outcome={r.outcome} /> },
+                                        { key: 'entryFeeUsd', label: 'Entry', render: r => r.isFreeTicketPlay ? `Free ticket (${formatUsd(r.ticketValueUsd)} value)` : r.entryFeeUsd != null ? formatUsd(r.entryFeeUsd) : formatUsd(r.wagerUsd) },
+                                        { key: 'rewardEligibleUsd', label: 'Reward earned', render: r => formatUsd(r.rewardEligibleUsd ?? r.payoutUsd) },
+                                        { key: 'rewardCreditedUsd', label: 'Credited / payout', render: r => formatUsd(r.rewardCreditedUsd ?? r.payoutUsd) },
+                                        { key: 'outcome', label: 'Result', render: r => <div style={{ display: 'grid', gap: '4px' }}><OutcomeBadge outcome={r.outcome} />{r.isFreeTicketPlay && <small style={{ color: 'var(--text-3)' }}>{r.rewardStatus}</small>}</div> },
                                     ]}
                                     rows={detail.gameHistory}
                                     loading={false}
