@@ -13,10 +13,11 @@ export const EMOTES = [
     { id: 'thumbs_up', value: '\u{1F44D}', label: 'Nice' },
 ];
 
+const EMOTE_BY_VALUE = new Map(EMOTES.map((emote) => [emote.value, emote]));
 const EMOTE_IMAGE_CACHE = new Map();
 
 export function drawGameEmote(ctx, value, x, y, size = 40) {
-    const emote = EMOTES.find((candidate) => candidate.value === value);
+    const emote = EMOTE_BY_VALUE.get(value);
     if (!emote?.image || typeof Image === 'undefined') return false;
     let image = EMOTE_IMAGE_CACHE.get(emote.id);
     if (!image) {
