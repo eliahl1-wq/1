@@ -14,14 +14,6 @@ const AGAR_TICK_RATE = 40;
 const AGAR_BACKGROUND_SPEED_MULTIPLIER = 0.42;
 const SCENE_ZOOM = { slither: 2.15, surviv: 2.35, agar: 1.42 };
 
-function mulberry32(seed) {
-    return () => {
-        let t = seed += 0x6D2B79F5;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 function familyForMode(mode) {
     if (String(mode || '').includes('slither')) return 'slither';
@@ -63,23 +55,33 @@ function sceneBounds(family, width, height) {
     };
 }
 
+function spawnFromEdge(bounds, random, margin) {
+    const roll = random();
+    if (roll < 0.4) return { x: bounds.right + margin, y: bounds.top + random() * bounds.height };
+    if (roll < 0.6) return { x: bounds.left + random() * bounds.width, y: bounds.top - margin };
+    if (roll < 0.8) return { x: bounds.left + random() * bounds.width, y: bounds.bottom + margin };
+    return { x: bounds.left - margin, y: bounds.top + random() * bounds.height };
+}
+
+function inwardAngle(position, width, height, random) {
+    return Math.atan2(height / 2 - position.y, width / 2 - position.x) + (random() - 0.5) * 1.05;
+}
+
 function createActors(family, width, height, colors) {
     const bounds = sceneBounds(family, width, height);
-    const seed = family === 'slither' ? 0x51A7E : family === 'surviv' ? 0x5A7A1 : 0xA6A2;
-    const random = mulberry32(seed + Math.round(width) * 7 + Math.round(height) * 13);
+    const random = Math.random;
     const count = actorCount(family, width, height);
 
     if (family === 'slither') {
         return Array.from({ length: count }, (_, index) => {
-            const orbitAngle = (index / count) * Math.PI * 2 + (random() - 0.5) * 0.42;
-            const angle = orbitAngle + (random() > 0.5 ? Math.PI / 2 : -Math.PI / 2);
             const sizeRoll = random();
             const radius = 5.5 + Math.pow(sizeRoll, 1.45) * 17;
-            const orbitScale = 0.23 + random() * 0.09;
-            const x = width / 2 + Math.cos(orbitAngle) * bounds.width * orbitScale;
-            const y = height / 2 + Math.sin(orbitAngle) * bounds.height * orbitScale;
             const spacing = Math.max(3.4, radius * 0.45);
             const pointCount = 16 + Math.floor(Math.pow(random(), 0.78) * 48);
+            const position = spawnFromEdge(bounds, random, 25 + random() * 65);
+            const x = position.x;
+            const y = position.y;
+            const angle = inwardAngle(position, width, height, random);
             const points = Array.from({ length: pointCount }, (__, pointIndex) => ({
                 x: x - Math.cos(angle) * spacing * pointIndex,
                 y: y - Math.sin(angle) * spacing * pointIndex,
@@ -107,20 +109,21 @@ function createActors(family, width, height, colors) {
 
     if (family === 'surviv') {
         return Array.from({ length: count }, (_, index) => {
-            const angle = random() * Math.PI * 2;
+            const position = spawnFromEdge(bounds, random, 20 + random() * 45);
+            const angle = inwardAngle(position, width, height, random);
             return {
                 id: `pregame-surviv-${index}`,
-                x: bounds.left + 30 + random() * Math.max(1, bounds.width - 60),
-                y: bounds.top + 30 + random() * Math.max(1, bounds.height - 60),
+                x: position.x,
+                y: position.y,
                 angle,
                 phase: random() * Math.PI * 2,
                 color: selectedOrPalette(colors.surviv, index, random, ['random', 'random_color']),
                 weapon: SURVIV_WEAPONS[index % SURVIV_WEAPONS.length],
                 movementAngle: angle,
-                movementMode: 'strafe',
+                movementMode: 'wander',
                 movementScale: 0.62 + random() * 0.3,
                 strafeSide: random() > 0.5 ? 1 : -1,
-                nextDecision: 0.2 + random() * 0.7,
+                nextDecision: 0.9 + random() * 0.8,
                 nextStrafe: 0.7 + random() * 1.3,
                 decisionIndex: Math.floor(random() * 1000),
                 nextShot: 0.35 + random() * 1.2,
@@ -131,16 +134,18 @@ function createActors(family, width, height, colors) {
 
     return Array.from({ length: count }, (_, index) => {
         const balance = 2.5 + random() * 12;
-        const angle = random() * Math.PI * 2;
+        const radius = 4 + Math.sqrt(balance * 18) * 6;
+        const position = spawnFromEdge(bounds, random, radius + 10 + random() * 40);
+        const angle = inwardAngle(position, width, height, random);
         const speed = (6 / Math.pow(balance, 0.449))
             * 1.45
             * AGAR_TICK_RATE
             * AGAR_BACKGROUND_SPEED_MULTIPLIER;
         return {
             id: `pregame-agar-${index}`,
-            x: bounds.left + random() * bounds.width,
-            y: bounds.top + random() * bounds.height,
-            radius: 4 + Math.sqrt(balance * 18) * 6,
+            x: position.x,
+            y: position.y,
+            radius,
             balance,
             angle,
             speed,
@@ -155,12 +160,23 @@ function createActors(family, width, height, colors) {
 
 function wrapActor(actor, family, width, height, margin) {
     const bounds = sceneBounds(family, width, height);
-    let wrapped = false;
-    if (actor.x < bounds.left - margin) { actor.x = bounds.right + margin; wrapped = true; }
-    else if (actor.x > bounds.right + margin) { actor.x = bounds.left - margin; wrapped = true; }
-    if (actor.y < bounds.top - margin) { actor.y = bounds.bottom + margin; wrapped = true; }
-    else if (actor.y > bounds.bottom + margin) { actor.y = bounds.top - margin; wrapped = true; }
-    return wrapped;
+    const outside = actor.x < bounds.left - margin
+        || actor.x > bounds.right + margin
+        || actor.y < bounds.top - margin
+        || actor.y > bounds.bottom + margin;
+    if (!outside) return false;
+
+    const position = spawnFromEdge(bounds, Math.random, 55 + Math.random() * 110);
+    const angle = inwardAngle(position, width, height, Math.random);
+    actor.x = position.x;
+    actor.y = position.y;
+    actor.angle = angle;
+    if (family === 'surviv') {
+        actor.movementAngle = angle;
+        actor.movementMode = 'wander';
+        actor.nextDecision = 0.7 + Math.random() * 0.8;
+    }
+    return true;
 }
 
 function snakeAvoidanceDirection(actor, actors) {
