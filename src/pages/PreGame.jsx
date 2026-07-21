@@ -26,6 +26,7 @@ import { API_URL } from '../utils/apiBase';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
+const PregameGameBackground = React.lazy(() => import('../components/PregameGameBackground.jsx'));
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -968,7 +969,18 @@ export default function PreGame() {
                 <h1>AgarStake — {modeBaseName} with Real Money</h1>
                 <p>Play {modeBaseName}.io with real money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly.</p>
             </div>
-            <Background />
+            {user?.isAdmin ? (
+                <React.Suspense fallback={<Background />}>
+                    <PregameGameBackground
+                        mode={selectedMode}
+                        slitherColor={selectedSkin}
+                        agarColor={selectedSkinAgar}
+                        survivColor={selectedSkinSurviv}
+                    />
+                </React.Suspense>
+            ) : (
+                <Background />
+            )}
 
             <AppTopbar>
                 {/* Nav right */}

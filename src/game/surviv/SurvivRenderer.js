@@ -4741,7 +4741,7 @@ export class SurvivRenderer {
             ctx.restore();
         }
     }
-    drawPlayer(ctx, p) {
+    drawPlayer(ctx, p, showHud = true) {
         const r = 14;
         const isMe = p.isYou || p.id === this.myId;
         const knocked = p.hp <= 0;
@@ -4837,6 +4837,9 @@ export class SurvivRenderer {
 
         ctx.restore();
 
+        // Background/preview surfaces can reuse the exact in-game character
+        // renderer without also painting gameplay-only names and status bars.
+        if (!showHud) return;
 
         const hpPct = clamp((p.hp || 0) / (p.maxHp || 100), 0, 1);
         const barW = 36;
