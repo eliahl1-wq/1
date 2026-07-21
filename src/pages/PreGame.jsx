@@ -8,7 +8,6 @@ import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import '../styles/tournaments.css';
 import CustomDropdown from '../components/CustomDropdown';
-import Background from '../components/Background';
 import PregameGameBackground from '../components/PregameGameBackground';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
@@ -969,17 +968,13 @@ export default function PreGame() {
                 <h1>AgarStake — {modeBaseName} with Real Money</h1>
                 <p>Play {modeBaseName}.io with real money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly.</p>
             </div>
-            {user?.isAdmin ? (
-                <PregameGameBackground
-                    mode={selectedMode}
-                    slitherColor={selectedSkin}
-                    agarColor={selectedSkinAgar}
-                    survivColor={selectedSkinSurviv}
-                    paused={showCustomizer}
-                />
-            ) : (
-                <Background />
-            )}
+            <PregameGameBackground
+                mode={selectedMode}
+                slitherColor={selectedSkin}
+                agarColor={selectedSkinAgar}
+                survivColor={selectedSkinSurviv}
+                paused={showCustomizer}
+            />
 
             <AppTopbar>
                 {/* Nav right */}
