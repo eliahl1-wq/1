@@ -616,10 +616,15 @@ export class SurvivRenderer {
         }
 
         const elapsed = clamp((receivedAt - state.receivedAt) / 1000, 0.001, 0.25);
+        const serverStepDistance = Math.hypot(me.x - state.serverX, me.y - state.serverY);
         const correctionDistance = Math.hypot(me.x - state.x, me.y - state.y);
         if (correctionDistance > 180) {
             state.x = me.x;
             state.y = me.y;
+            state.vx = 0;
+            state.vy = 0;
+        } else if (serverStepDistance < 0.04) {
+            // Do not let the previous velocity overshoot after the player stops.
             state.vx = 0;
             state.vy = 0;
         } else {
@@ -640,9 +645,12 @@ export class SurvivRenderer {
         const state = this._interpMe;
         if (!state || !this.me || state.id !== this.me.id) return;
 
-        // The server publishes movement at 40 Hz. A tiny, bounded velocity lead
-        // fills the gaps between snapshots without changing authoritative state.
-        const leadSeconds = clamp((now - state.receivedAt) / 1000, 0, 0.04);
+        // Keep a one-snapshot lead even when a new packet arrives. Starting the
+        // lead at zero made the visual target jump backwards every server tick.
+        const snapshotAge = clamp((now - state.receivedAt) / 1000, 0, 0.045);
+        const hasMoveInput = this.keys.w || this.keys.a || this.keys.s || this.keys.d
+            || Math.hypot(this.mobileMove.x || 0, this.mobileMove.y || 0) > 0.05;
+        const leadSeconds = hasMoveInput ? 0.022 + snapshotAge : 0;
         const targetX = state.targetX + state.vx * leadSeconds;
         const targetY = state.targetY + state.vy * leadSeconds;
         const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 34);
@@ -5457,7 +5465,7 @@ export class SurvivRenderer {
     // ========== NEW VISUAL FEEDBACK METHODS ==========
 
     spawnGrenadeExplosion(x, y) {
-        const spawnedAt = performance.now();
+        const spawnedAt = Date.now();
         this.grenadeExplosions.push({ x, y, spawnedAt, duration: 760, radius: 145 });
         if (this.grenadeExplosions.length > 8) this.grenadeExplosions.shift();
 
