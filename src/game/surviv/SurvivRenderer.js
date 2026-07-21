@@ -645,15 +645,12 @@ export class SurvivRenderer {
         const state = this._interpMe;
         if (!state || !this.me || state.id !== this.me.id) return;
 
-        // Keep a one-snapshot lead even when a new packet arrives. Starting the
-        // lead at zero made the visual target jump backwards every server tick.
-        const snapshotAge = clamp((now - state.receivedAt) / 1000, 0, 0.045);
-        const hasMoveInput = this.keys.w || this.keys.a || this.keys.s || this.keys.d
-            || Math.hypot(this.mobileMove.x || 0, this.mobileMove.y || 0) > 0.05;
-        const leadSeconds = hasMoveInput ? 0.022 + snapshotAge : 0;
-        const targetX = state.targetX + state.vx * leadSeconds;
-        const targetY = state.targetY + state.vy * leadSeconds;
-        const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 34);
+        // Follow only authoritative snapshots. Velocity extrapolation could put
+        // the local player ahead of the server and then pull it backwards on the
+        // next packet, which looked like severe rubber-banding while walking.
+        const targetX = state.targetX;
+        const targetY = state.targetY;
+        const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 30);
         const angleAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 42);
         state.x = lerp(state.x, targetX, positionAlpha);
         state.y = lerp(state.y, targetY, positionAlpha);
