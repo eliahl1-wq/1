@@ -145,6 +145,7 @@ function createActors(family, width, height, colors) {
                 decisionIndex: Math.floor(random() * 1000),
                 nextShot: 0.35 + random() * 1.2,
                 muzzle: 0,
+                muzzleAngle: angle,
                 targetId: null,
                 targetLock: 0,
                 outsideTime: 0,
@@ -380,6 +381,30 @@ function turnToward(current, target, maxTurn) {
     return current + Math.max(-maxTurn, Math.min(maxTurn, delta));
 }
 
+function drawSurvivMuzzleBurst(ctx, actor) {
+    if (actor.muzzle <= 0) return;
+    const strength = Math.max(0, Math.min(1, actor.muzzle / 0.11));
+    const angle = actor.muzzleAngle ?? actor.angle;
+    const x = actor.x + Math.cos(angle) * 29;
+    const y = actor.y + Math.sin(angle) * 29;
+    const radius = 9 + strength * 17;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    glow.addColorStop(0, `rgba(255, 255, 220, ${0.95 * strength})`);
+    glow.addColorStop(0.28, `rgba(255, 202, 92, ${0.82 * strength})`);
+    glow.addColorStop(1, 'rgba(255, 126, 42, 0)');
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.filter = 'blur(2px)';
+    ctx.fillStyle = glow;
+    ctx.shadowColor = 'rgba(255, 174, 64, 0.9)';
+    ctx.shadowBlur = 18 * strength;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
 function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width, height) {
     for (const actor of actors) {
         actor.nextDecision -= dt;
@@ -452,6 +477,7 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
                 });
             }
             actor.muzzle = 0.11;
+            actor.muzzleAngle = shotAngle;
             actor.nextShot = 0.65 + Math.abs(Math.sin(actor.phase + actor.decisionIndex * 0.73)) * 0.85;
         }
     }
@@ -483,6 +509,7 @@ function updateAndDrawSurviv(ctx, renderer, actors, bullets, dt, elapsed, width,
     for (const bullet of bullets) renderer.drawBullet(ctx, bullet);
     ctx.restore();
     for (const actor of actors) {
+        drawSurvivMuzzleBurst(ctx, actor);
         renderer._muzzleFlash = actor.muzzle > 0 ? actor.muzzle / 0.11 : 0;
         renderer.myId = actor.id;
         renderer.drawPlayer(ctx, {
@@ -533,7 +560,6 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
         let dpr = 1;
         let raf = 0;
         let lastFrame = performance.now();
-        let lastPaint = 0;
         let frame = 0;
 
         const resize = () => {
@@ -558,10 +584,8 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
 
         const render = (now) => {
             raf = requestAnimationFrame(render);
-            if (now - lastPaint < (1000 / 60) * 0.8) return;
             const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
             lastFrame = now;
-            lastPaint = now;
             frame += 1;
 
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -570,7 +594,12 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
             ctx.globalCompositeOperation = 'source-over';
 
             if (family === 'slither') {
-                updateSnakes(actors, dt, now, width, height);
+                let remaining = dt;
+                while (remaining > 0) {
+                    const step = Math.min(1 / 90, remaining);
+                    updateSnakes(actors, step, now - remaining * 1000, width, height);
+                    remaining -= step;
+                }
                 drawSnakes(ctx, slitherRenderer, actors, width, height, frame);
             } else if (family === 'surviv') {
                 updateAndDrawSurviv(ctx, survivRenderer, actors, bullets, dt, now, width, height);
