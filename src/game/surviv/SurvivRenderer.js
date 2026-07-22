@@ -478,16 +478,22 @@ export class SurvivRenderer {
         this._roofSpriteCache = new Map();
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleSpriteCache = new Map();
+        this._obstacleCachePixels = 0;
         this._obstacleCacheBuildsThisFrame = 0;
         this._surfaceSpriteCache = new Map();
         this._surfaceCachePixels = 0;
         this._surfaceCacheBuildsThisFrame = 0;
+        this._surfaceChunkCache = new Map();
+        this._surfaceChunkCachePixels = 0;
+        this._surfaceChunkBuildsThisFrame = 0;
+        this._surfaceChunkTileSize = 768;
         this._surfaceCacheKeyByObject = new WeakMap();
         this._surfacePathCache = new WeakMap();
         this._pathSampleCache = new WeakMap();
         this._roadMarkingCutCache = new WeakMap();
         this._waterAnimationGeometry = new WeakMap();
         this._buildingSurfaceCache = false;
+        this._buildingSurfaceChunk = false;
         // Previous HP for detecting damage
         this._prevHp = 100;
         // Previous ammo for detecting shots fired
@@ -617,8 +623,11 @@ export class SurvivRenderer {
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
         this._obstacleSpriteCache.clear();
+        this._obstacleCachePixels = 0;
         this._surfaceSpriteCache.clear();
         this._surfaceCachePixels = 0;
+        this._surfaceChunkCache.clear();
+        this._surfaceChunkCachePixels = 0;
         this._surfaceCacheKeyByObject = new WeakMap();
         this._surfacePathCache = new WeakMap();
         this._pathSampleCache = new WeakMap();
@@ -2085,6 +2094,7 @@ export class SurvivRenderer {
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleCacheBuildsThisFrame = 0;
         this._surfaceCacheBuildsThisFrame = 0;
+        this._surfaceChunkBuildsThisFrame = 0;
         // FPS counter
         this._fpsFrames++;
         const fpsSampleElapsed = performance.now() - this._fpsLastSampleAt;
@@ -2217,36 +2227,21 @@ export class SurvivRenderer {
             worldObstacleSource, this._visibleWorldObstacles, 48, currentHouse, currentRoom,
         );
 
-        // Pass 1: Draw fields (grass overlays, crops, dirt field bases)
-        for (const o of visibleFields) {
-            this.drawObstacle(ctx, o);
+        const surfacesCached = !currentHouse && this.drawSurfaceChunks(ctx, camX, camY, W, H, z);
+        if (!surfacesCached) {
+            // Fallback while the nearby chunks warm up. Each chunk is built at
+            // most once per frame, avoiding a large loading hitch.
+            for (const o of visibleFields) this.drawObstacle(ctx, o);
+            for (const o of visibleWater) this.drawObstacleShore(ctx, o);
+            for (const o of visibleRoads) this.drawRoadShoulder(ctx, o);
+            for (const o of visibleWater) this.drawObstacleBody(ctx, o);
+            for (const o of visibleRoads) this.drawRoadBody(ctx, o);
+            for (const o of visibleRoads) this.drawRoadMarkings(ctx, o);
+        } else {
+            // Static water is baked into the chunk; only its subtle movement
+            // remains dynamic.
+            for (const o of visibleWater) this.drawWaterAnimation(ctx, o);
         }
-
-        // Pass 2: Draw river & lake sandy shore bases
-        for (const o of visibleWater) {
-            this.drawObstacleShore(ctx, o);
-        }
-
-        // Pass 3: Draw road gravel/dirt shoulders (under the asphalt)
-        for (const o of visibleRoads) {
-            this.drawRoadShoulder(ctx, o);
-        }
-
-        // Pass 4: Draw river & lake water bodies (seamlessly on top of shores)
-        for (const o of visibleWater) {
-            this.drawObstacleBody(ctx, o);
-        }
-
-        // Pass 5: Draw road asphalt & dirt bodies (seamlessly on top of shoulders)
-        for (const o of visibleRoads) {
-            this.drawRoadBody(ctx, o);
-        }
-
-        // Pass 6: Draw road markings (yellow centerlines, white borders) & tire tracks
-        for (const o of visibleRoads) {
-            this.drawRoadMarkings(ctx, o);
-        }
-
         // Draw blood decals on the ground
         this.drawBloodDecals(ctx);
 
@@ -4079,6 +4074,149 @@ export class SurvivRenderer {
             ctx.clip();
         }
     }
+
+    surfaceObstacleIntersectsBounds(o, left, top, right, bottom, padding = 0) {
+        const halfW = (o._renderHalfW ?? Math.abs(Number(o.w) || 0) / 2) + padding;
+        const halfH = (o._renderHalfH ?? Math.abs(Number(o.h) || 0) / 2) + padding;
+        return o.x + halfW >= left && o.x - halfW <= right
+            && o.y + halfH >= top && o.y - halfH <= bottom;
+    }
+
+    buildSurfaceChunk(gridX, gridY) {
+        if (typeof document === 'undefined') return null;
+        const tile = this._surfaceChunkTileSize;
+        const scale = 1.5;
+        const bleed = 4;
+        const left = gridX * tile;
+        const top = gridY * tile;
+        const expandedLeft = left - bleed;
+        const expandedTop = top - bleed;
+        const expandedRight = left + tile + bleed;
+        const expandedBottom = top + tile + bleed;
+
+        const fields = this.fieldObstacles.filter(o => (
+            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 40)
+        ));
+        const water = this.waterObstacles.filter(o => (
+            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 50)
+        ));
+        const roads = this.roadObstacles.filter(o => (
+            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 40)
+        ));
+
+        const key = gridX + ':' + gridY;
+        if (!fields.length && !water.length && !roads.length) {
+            const emptySprite = { canvas: null, pixels: 0, left, top };
+            this._surfaceChunkCache.set(key, emptySprite);
+            return emptySprite;
+        }
+
+        const width = Math.round((tile + bleed * 2) * scale);
+        const height = width;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const cacheCtx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+        if (!cacheCtx) return null;
+
+        const previousBounds = [this._viewLeft, this._viewTop, this._viewRight, this._viewBottom];
+        const previousBuildingChunk = this._buildingSurfaceChunk;
+        this._viewLeft = expandedLeft;
+        this._viewTop = expandedTop;
+        this._viewRight = expandedRight;
+        this._viewBottom = expandedBottom;
+        this._buildingSurfaceChunk = true;
+
+        cacheCtx.imageSmoothingEnabled = true;
+        cacheCtx.imageSmoothingQuality = 'medium';
+        cacheCtx.scale(scale, scale);
+        cacheCtx.translate(-expandedLeft, -expandedTop);
+        try {
+            for (const o of fields) this.drawObstacle(cacheCtx, o, false);
+            for (const o of water) this.drawObstacleShore(cacheCtx, o, false);
+            for (const o of roads) this.drawRoadShoulder(cacheCtx, o, false);
+            for (const o of water) this.drawObstacleBody(cacheCtx, o, false);
+            for (const o of roads) this.drawRoadBody(cacheCtx, o, false);
+            for (const o of roads) this.drawRoadMarkings(cacheCtx, o, false);
+        } finally {
+            [this._viewLeft, this._viewTop, this._viewRight, this._viewBottom] = previousBounds;
+            this._buildingSurfaceChunk = previousBuildingChunk;
+        }
+
+        const pixels = width * height;
+        const sprite = {
+            canvas,
+            pixels,
+            left,
+            top,
+            sourceX: Math.round(bleed * scale),
+            sourceY: Math.round(bleed * scale),
+            sourceSize: Math.round(tile * scale),
+        };
+        const maxPixels = Math.max(
+            18_000_000,
+            ((this._surfaceChunkRequiredCount || 1) + 2) * pixels,
+        );
+        while (this._surfaceChunkCache.size && this._surfaceChunkCachePixels + pixels > maxPixels) {
+            const oldestKey = this._surfaceChunkCache.keys().next().value;
+            const oldest = this._surfaceChunkCache.get(oldestKey);
+            this._surfaceChunkCachePixels -= oldest?.pixels || 0;
+            this._surfaceChunkCache.delete(oldestKey);
+        }
+        this._surfaceChunkCache.set(key, sprite);
+        this._surfaceChunkCachePixels += pixels;
+        return sprite;
+    }
+
+    drawSurfaceChunks(ctx, camX, camY, viewW, viewH, zoom) {
+        if (typeof document === 'undefined' || !this.surfaceObstacles.length) return false;
+        const tile = this._surfaceChunkTileSize;
+        const halfW = viewW / Math.max(0.1, zoom) / 2 + 12;
+        const halfH = viewH / Math.max(0.1, zoom) / 2 + 12;
+        const minGridX = Math.floor((camX - halfW) / tile);
+        const maxGridX = Math.floor((camX + halfW - 0.001) / tile);
+        const minGridY = Math.floor((camY - halfH) / tile);
+        const maxGridY = Math.floor((camY + halfH - 0.001) / tile);
+        const required = [];
+        let allReady = true;
+        this._surfaceChunkRequiredCount = (maxGridX - minGridX + 1) * (maxGridY - minGridY + 1);
+
+        for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
+            for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
+                const key = gridX + ':' + gridY;
+                let sprite = this._surfaceChunkCache.get(key);
+                if (!sprite && this._surfaceChunkBuildsThisFrame < 1) {
+                    this._surfaceChunkBuildsThisFrame++;
+                    sprite = this.buildSurfaceChunk(gridX, gridY);
+                }
+                if (!sprite) {
+                    allReady = false;
+                    continue;
+                }
+                required.push({ key, sprite });
+            }
+        }
+        if (!allReady) return false;
+
+        for (const { key, sprite } of required) {
+            this._surfaceChunkCache.delete(key);
+            this._surfaceChunkCache.set(key, sprite);
+            if (!sprite.canvas) continue;
+            ctx.drawImage(
+                sprite.canvas,
+                sprite.sourceX,
+                sprite.sourceY,
+                sprite.sourceSize,
+                sprite.sourceSize,
+                sprite.left,
+                sprite.top,
+                tile,
+                tile,
+            );
+        }
+        return true;
+    }
+
     drawCachedSurfaceLayer(ctx, o, layer, drawLayer) {
         if (typeof document === 'undefined' || !o?.id || this._buildingSurfaceCache) return false;
 
@@ -4142,9 +4280,9 @@ export class SurvivRenderer {
             }
             sprite = { canvas, worldWidth, worldHeight, pixels };
 
-            // Bound the cache by actual texture area (~56 MB RGBA), rather than
-            // item count, because surface dimensions vary enormously.
-            const maxPixels = 14_000_000;
+            // Bound the per-object fallback cache by actual texture area (~24 MB
+            // RGBA); the steady-state chunk cache owns the larger surface budget.
+            const maxPixels = 6_000_000;
             while (this._surfaceSpriteCache.size && this._surfaceCachePixels + pixels > maxPixels) {
                 const oldestKey = this._surfaceSpriteCache.keys().next().value;
                 const oldest = this._surfaceSpriteCache.get(oldestKey);
@@ -4172,6 +4310,10 @@ export class SurvivRenderer {
 
         const key = [o.id, kind, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || ''].join(':');
         let sprite = this._obstacleSpriteCache.get(key);
+        if (sprite) {
+            this._obstacleSpriteCache.delete(key);
+            this._obstacleSpriteCache.set(key, sprite);
+        }
         if (!sprite) {
             if (this._obstacleCacheBuildsThisFrame >= 8) return false;
             this._obstacleCacheBuildsThisFrame++;
@@ -4187,13 +4329,21 @@ export class SurvivRenderer {
             if (!cacheCtx) return false;
             cacheCtx.translate(width / 2 - o.x, height / 2 - o.y);
             this.drawObstacle(cacheCtx, o, false);
-            sprite = { canvas, width, height };
+            const pixels = width * height;
+            sprite = { canvas, width, height, pixels };
 
-            if (this._obstacleSpriteCache.size >= 320) {
+            const maxPixels = 12_000_000;
+            while (this._obstacleSpriteCache.size && (
+                this._obstacleSpriteCache.size >= 900
+                || this._obstacleCachePixels + pixels > maxPixels
+            )) {
                 const oldestKey = this._obstacleSpriteCache.keys().next().value;
+                const oldest = this._obstacleSpriteCache.get(oldestKey);
+                this._obstacleCachePixels -= oldest?.pixels || 0;
                 this._obstacleSpriteCache.delete(oldestKey);
             }
             this._obstacleSpriteCache.set(key, sprite);
+            this._obstacleCachePixels += pixels;
         }
 
         const shake = this.getObstacleHitShake(o);

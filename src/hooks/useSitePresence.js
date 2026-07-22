@@ -10,7 +10,7 @@ import { API_URL } from '../utils/apiBase';
  */
 export default function useSitePresence() {
     const location = useLocation();
-    const { user } = useAuth();
+    const { user, token } = useAuth();
 
     useEffect(() => {
         let alive = true;
@@ -19,6 +19,7 @@ export default function useSitePresence() {
             pingSitePresence(API_URL, {
                 page: location.pathname,
                 username: user?.username,
+                token,
             });
         };
         ping();
@@ -27,6 +28,6 @@ export default function useSitePresence() {
             alive = false;
             clearInterval(id);
         };
-    }, [location.pathname, user?.username]);
+    }, [location.pathname, user?.username, token]);
 }
 

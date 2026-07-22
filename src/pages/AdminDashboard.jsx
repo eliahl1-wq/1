@@ -1434,6 +1434,7 @@ export default function AdminDashboard() {
                         >
                             <DataTable
                                 columns={[
+                                    { key: 'username', label: 'Account', render: r => r.username || 'Guest' },
                                     { key: 'ip', label: 'IP', render: r => <span className="mono">{r.ip}</span> },
                                     { key: 'country', label: 'Country', render: r => r.country },
                                     { key: 'page', label: 'Page', render: r => <span className="mono">{r.page}</span> },

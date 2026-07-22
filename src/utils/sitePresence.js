@@ -23,7 +23,7 @@ export function buildPresenceHeaders({ page, gamemode } = {}) {
     return headers;
 }
 
-export async function pingSitePresence(apiUrl, { page, gamemode, username } = {}) {
+export async function pingSitePresence(apiUrl, { page, gamemode, username, token } = {}) {
     if (!apiUrl) return;
     const base = apiUrl.replace(/\/$/, '');
     try {
@@ -32,6 +32,8 @@ export async function pingSitePresence(apiUrl, { page, gamemode, username } = {}
             headers: {
                 'Content-Type': 'application/json',
                 'bypass-tunnel-reminders': 'true',
+                'X-Presence-Guest': token ? 'false' : 'true',
+                ...(token ? { Authorization: 'Bearer ' + token } : {}),
                 ...buildPresenceHeaders({ page, gamemode }),
             },
             body: JSON.stringify({
