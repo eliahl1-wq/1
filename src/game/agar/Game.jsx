@@ -11,7 +11,7 @@ import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlay
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
-import GameSocialOverlay, { drawGameEmote } from '../../components/GameSocialOverlay';
+import GameSocialOverlay, { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import GameBRHud from '../../components/GameBRHud';
 import MobileGameSession from '../../components/MobileGameSession';
@@ -93,6 +93,7 @@ export default function Game() {
     const navigate = useNavigate();
     const socketRef = useRef(null);
     const worldEmotesRef = useRef(new Map());
+    const worldChatsRef = useRef(new Map());
     const hasJoinedGameRef = useRef(false);
     const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -113,6 +114,12 @@ export default function Game() {
         if (!payload?.playerId || !payload?.emote) return;
         const now = performance.now();
         worldEmotesRef.current.set(payload.playerId, { emote: payload.emote, startedAt: now, expiresAt: now + 2600 });
+    }, []);
+
+    const handleGameChat = useCallback((payload) => {
+        if (!payload?.playerId || !payload?.message) return;
+        const now = performance.now();
+        worldChatsRef.current.set(payload.playerId, { message: payload.message, startedAt: now, expiresAt: now + 4000 });
     }, []);
     
     const WORLD_SIZE = 6000;
@@ -859,6 +866,24 @@ export default function Game() {
                     }
                 }
                 graph.restore();
+
+                // Draw chat bubbles
+                graph.save();
+                for (const [playerId, activeChat] of worldChatsRef.current) {
+                    if (activeChat.expiresAt <= emoteNow) { worldChatsRef.current.delete(playerId); continue; }
+                    const chatPlayer = users.find((candidate) => candidate.id === playerId);
+                    const chatCell = chatPlayer?.cells?.reduce((largest, cell) => (!largest || (cell.radius || 0) > (largest.radius || 0) ? cell : largest), null);
+                    if (!chatCell) continue;
+                    const point = worldToScreen(chatCell.x, chatCell.y);
+                    const progress = Math.min(1, (emoteNow - activeChat.startedAt) / 4000);
+                    graph.globalAlpha = Math.min(1, (1 - progress) * 3);
+                    const chatX = point.x;
+                    const emoteOffset = (worldEmotesRef.current.get(playerId)?.expiresAt ?? 0) > emoteNow ? 52 : 0;
+                    const chatY = point.y - (chatCell.radius || 0) * viewZoom - 25 - progress * 10 - emoteOffset;
+                    drawChatBubble(graph, activeChat.message, chatX, chatY, 13);
+                }
+                graph.restore();
+
                 renderUtils.drawHUD(global, graph);
 
                 const viewHalfW = screen.width / (2 * viewZoom);
@@ -1225,7 +1250,7 @@ export default function Game() {
                 )}
             </div>
 
-            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} />
+            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} onChat={handleGameChat} />
 
             {/* Mock Leaderboard */}
             <div className="game-leaderboard" style={{

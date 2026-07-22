@@ -7,7 +7,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
-import { drawGameEmote } from '../../components/GameSocialOverlay.jsx';
+import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
@@ -136,6 +136,7 @@ export class SlitherRenderer {
         this.targetSnakes = [];
         this.smooth = new Map();
         this.worldEmotes = new Map();
+        this.worldChats = new Map();
         this._foodDrawList = [];
         this._visibleFoodBuf = [];
         this._foodSpatialGrid = new Map();
@@ -574,6 +575,7 @@ export class SlitherRenderer {
     resetSession() {
         this.smooth.clear();
         this.worldEmotes.clear();
+        this.worldChats.clear();
         this._renderPool.clear();
         this._boostTrailPool.clear();
         this._cameraInit = false;
@@ -589,6 +591,12 @@ export class SlitherRenderer {
         if (!payload?.playerId || !payload?.emote) return;
         const now = performance.now();
         this.worldEmotes.set(payload.playerId, { emote: payload.emote, startedAt: now, expiresAt: now + 2600 });
+    }
+
+    showChat(payload) {
+        if (!payload?.playerId || !payload?.message) return;
+        const now = performance.now();
+        this.worldChats.set(payload.playerId, { message: payload.message, startedAt: now, expiresAt: now + 4000 });
     }
 
     removeSnake(id) {
@@ -2269,6 +2277,24 @@ export class SlitherRenderer {
             }
         }
         ctx.restore();
+
+        const chatNow = performance.now();
+        ctx.save();
+        for (const [playerId, activeChat] of this.worldChats) {
+            if (activeChat.expiresAt <= chatNow) { this.worldChats.delete(playerId); continue; }
+            const snake = renderSnakes.find((candidate) => candidate.id === playerId);
+            const head = snake?.segments?.[0];
+            if (!head) continue;
+            const point = toScreen(head.x, head.y);
+            const progress = Math.min(1, (chatNow - activeChat.startedAt) / 4000);
+            ctx.globalAlpha = Math.min(1, (1 - progress) * 3);
+            const chatX = point.x;
+            const emoteOffset = (this.worldEmotes.get(playerId)?.expiresAt ?? 0) > chatNow ? 52 : 0;
+            const chatY = point.y - (snake.radius || 6) * zoom - 24 - progress * 10 - emoteOffset;
+            drawChatBubble(ctx, activeChat.message, chatX, chatY, 13);
+        }
+        ctx.restore();
+
         const __t5 = performance.now();
         
         if (this._frame % 60 === 0) {

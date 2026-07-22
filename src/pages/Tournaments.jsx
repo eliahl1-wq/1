@@ -5,6 +5,7 @@ import AppFooter from '../components/AppFooter';
 import Background from '../components/Background';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import { markActiveTournamentsSeen } from '../utils/tournamentNotifications';
 import '../styles/ui.css';
 import '../styles/tournaments.css';
 
@@ -46,7 +47,9 @@ export default function Tournaments() {
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok) throw new Error(data.error || 'Could not load tournaments');
                 if (active) {
-                    setTournaments(data.tournaments || []);
+                    const loadedTournaments = data.tournaments || [];
+                    setTournaments(loadedTournaments);
+                    markActiveTournamentsSeen(loadedTournaments);
                     setError('');
                 }
             } catch (err) {

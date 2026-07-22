@@ -31,9 +31,91 @@ export function drawGameEmote(ctx, value, x, y, size = 40) {
     return true;
 }
 
+export function drawChatBubble(ctx, text, x, y, size = 12) {
+    if (!text) return;
+
+    ctx.save();
+    ctx.font = `bold ${size}px "Inter", "Segoe UI", Arial, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+
+    const maxTextWidth = size * 18;
+    const maxLines = 3;
+    const lines = [];
+    let current = '';
+    for (const character of String(text)) {
+        const candidate = current + character;
+        if (current && ctx.measureText(candidate).width > maxTextWidth) {
+            lines.push(current.trim());
+            current = character.trimStart();
+            if (lines.length === maxLines) break;
+        } else {
+            current = candidate;
+        }
+    }
+    if (lines.length < maxLines && current.trim()) lines.push(current.trim());
+    const consumed = lines.join('').replace(/\s/g, '').length;
+    const original = String(text).replace(/\s/g, '');
+    if (consumed < original.length && lines.length) {
+        let last = lines.length - 1;
+        while (lines[last] && ctx.measureText(`${lines[last]}…`).width > maxTextWidth) {
+            lines[last] = lines[last].slice(0, -1);
+        }
+        lines[last] = `${lines[last]}…`;
+    }
+    if (!lines.length) { ctx.restore(); return; }
+
+    const lineHeight = size * 1.22;
+    const textWidth = Math.max(...lines.map((line) => ctx.measureText(line).width));
+    const paddingX = Math.max(3, size * 0.77);
+    const paddingY = Math.max(2, size * 0.61);
+    const bubbleWidth = textWidth + paddingX * 2;
+    const bubbleHeight = lines.length * lineHeight + paddingY * 2;
+    const rectX = x - bubbleWidth / 2;
+    const rectY = y - bubbleHeight / 2;
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = Math.max(2, size * 0.77);
+    ctx.shadowOffsetY = Math.max(1, size * 0.3);
+    ctx.fillStyle = 'rgba(8, 12, 18, 0.9)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = Math.max(0.5, size * 0.08);
+
+    const radius = Math.max(2, size * 0.46);
+    ctx.beginPath();
+    ctx.moveTo(rectX + radius, rectY);
+    ctx.lineTo(rectX + bubbleWidth - radius, rectY);
+    ctx.quadraticCurveTo(rectX + bubbleWidth, rectY, rectX + bubbleWidth, rectY + radius);
+    ctx.lineTo(rectX + bubbleWidth, rectY + bubbleHeight - radius);
+    ctx.quadraticCurveTo(rectX + bubbleWidth, rectY + bubbleHeight, rectX + bubbleWidth - radius, rectY + bubbleHeight);
+    ctx.lineTo(rectX + radius, rectY + bubbleHeight);
+    ctx.quadraticCurveTo(rectX, rectY + bubbleHeight, rectX, rectY + bubbleHeight - radius);
+    ctx.lineTo(rectX, rectY + radius);
+    ctx.quadraticCurveTo(rectX, rectY, rectX + radius, rectY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const ptrSize = Math.max(2, size * 0.38);
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = 'rgba(8, 12, 18, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(x - ptrSize, rectY + bubbleHeight);
+    ctx.lineTo(x + ptrSize, rectY + bubbleHeight);
+    ctx.lineTo(x, rectY + bubbleHeight + ptrSize);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    const firstLineY = y - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, index) => ctx.fillText(line, x, firstLineY + index * lineHeight));
+    ctx.restore();
+}
 const CHAT_TTL_MS = 12000;
 
-export default function GameSocialOverlay({ socket, disabled = false, onEmote }) {
+export default function GameSocialOverlay({ socket, disabled = false, onEmote, onChat }) {
     const [chatOpen, setChatOpen] = useState(false);
     const [draft, setDraft] = useState('');
     const [messages, setMessages] = useState([]);
@@ -57,20 +139,21 @@ export default function GameSocialOverlay({ socket, disabled = false, onEmote })
 
     useEffect(() => {
         if (!socket) return undefined;
-        const onChat = (message) => {
+        const handleChatMessage = (message) => {
             const next = { ...message, receivedAt: Date.now() };
             setMessages((current) => [...current.slice(-5), next]);
+            if (message?.playerId && message?.message) onChat?.(message);
         };
         const handleEmoteEvent = (payload) => {
             if (payload?.playerId && payload?.emote) onEmote?.(payload);
         };
-        socket.on('gameChatMessage', onChat);
+        socket.on('gameChatMessage', handleChatMessage);
         socket.on('gameEmote', handleEmoteEvent);
         return () => {
-            socket.off('gameChatMessage', onChat);
+            socket.off('gameChatMessage', handleChatMessage);
             socket.off('gameEmote', handleEmoteEvent);
         };
-    }, [socket, onEmote]);
+    }, [socket, onEmote, onChat]);
 
     useEffect(() => {
         const cleanup = window.setInterval(() => {

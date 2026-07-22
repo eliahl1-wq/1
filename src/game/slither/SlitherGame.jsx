@@ -67,6 +67,7 @@ export default function SlitherGame() {
 
     const rendererRef = useRef(null);
     const handleGameEmote = useCallback((payload) => rendererRef.current?.showEmote(payload), []);
+    const handleGameChat = useCallback((payload) => rendererRef.current?.showChat(payload), []);
 
     const inputIntervalRef = useRef(null);
 
@@ -1182,7 +1183,7 @@ export default function SlitherGame() {
 
             {/* Leaderboard — matches Agar */}
 
-            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} />
+            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} onChat={handleGameChat} />
 
             <div className="game-leaderboard" style={{
 

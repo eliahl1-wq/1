@@ -294,6 +294,19 @@
   color: var(--accent);
   background-color: rgba(124, 58, 255, 0.16);
 }
+.gm-nav-link--notification {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.gm-nav-notification-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2), 0 0 10px rgba(168, 85, 247, 0.9);
+}
 
 .mode-title {
   font-family: var(--display);

@@ -1,17 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../utils/apiBase';
+import { hasUnseenActiveTournament, TOURNAMENT_SEEN_EVENT } from '../utils/tournamentNotifications';
 
 export default function AppTopbar({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
     const [menuOpen, setMenuOpen] = useState(false);
+    const [hasTournamentNotification, setHasTournamentNotification] = useState(false);
 
     useEffect(() => {
         setMenuOpen(false);
     }, [location.pathname]);
 
+
+    useEffect(() => {
+        let active = true;
+        const loadTournamentNotification = async () => {
+            try {
+                const response = await fetch(API_URL + '/api/tournaments?t=' + Date.now(), {
+                    headers: { 'Cache-Control': 'no-cache' },
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (active) setHasTournamentNotification(hasUnseenActiveTournament(data.tournaments || []));
+            } catch {
+                // Keep navigation usable if tournament status cannot be loaded.
+            }
+        };
+        const handleSeen = () => setHasTournamentNotification(false);
+        loadTournamentNotification();
+        const poll = setInterval(loadTournamentNotification, 60_000);
+        window.addEventListener(TOURNAMENT_SEEN_EVENT, handleSeen);
+        return () => {
+            active = false;
+            clearInterval(poll);
+            window.removeEventListener(TOURNAMENT_SEEN_EVENT, handleSeen);
+        };
+    }, []);
     const linkClass = (path) => (
         `gm-nav-link${location.pathname === path ? ' gm-nav-link--active' : ''}`
     );
@@ -24,8 +52,9 @@ export default function AppTopbar({ children }) {
             <button type="button" className={linkClass('/gamemodes')} onClick={() => navigate('/gamemodes')}>
                 Modes
             </button>
-            <button type="button" className={linkClass('/tournaments')} onClick={() => navigate('/tournaments')}>
-                Tournaments
+            <button type="button" className={linkClass('/tournaments') + ' gm-nav-link--notification'} onClick={() => navigate('/tournaments')}>
+                <span>Tournaments</span>
+                {hasTournamentNotification && <span className="gm-nav-notification-dot" aria-label="New tournament" />}
             </button>
             {user && (
                 <button type="button" className={linkClass('/rewards')} onClick={() => navigate('/rewards')}>

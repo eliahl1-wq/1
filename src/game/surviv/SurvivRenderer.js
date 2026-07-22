@@ -4,7 +4,7 @@
 
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
-import { drawGameEmote } from '../../components/GameSocialOverlay.jsx';
+import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
 
 const WEAPON_LABELS = {
@@ -203,8 +203,6 @@ function obstacleRenderSignature(obstacles) {
         mixNumber(o.rotation);
         mixNumber(o.width);
         mixNumber(o.collidable === false ? 0 : 1);
-        mixNumber(o.hp);
-        mixNumber(o.maxHp);
     }
     return `${obstacles.length}:${hash >>> 0}`;
 }
@@ -346,6 +344,7 @@ export class SurvivRenderer {
         this.myId = null;
         this.players = [];
         this.worldEmotes = new Map();
+        this.worldChats = new Map();
         this.loot = [];
         this.bullets = [];
         this.localShotTracers = [];
@@ -485,6 +484,8 @@ export class SurvivRenderer {
         this._surfaceCacheBuildsThisFrame = 0;
         this._surfaceCacheKeyByObject = new WeakMap();
         this._surfacePathCache = new WeakMap();
+        this._pathSampleCache = new WeakMap();
+        this._roadMarkingCutCache = new WeakMap();
         this._waterAnimationGeometry = new WeakMap();
         this._buildingSurfaceCache = false;
         // Previous HP for detecting damage
@@ -562,9 +563,16 @@ export class SurvivRenderer {
         this.worldEmotes.set(payload.playerId, { emote: payload.emote, startedAt: now, expiresAt: now + 2600 });
     }
 
+    showChat(payload) {
+        if (!payload?.playerId || !payload?.message) return;
+        const now = performance.now();
+        this.worldChats.set(payload.playerId, { message: payload.message, startedAt: now, expiresAt: now + 4000 });
+    }
+
     resetSession() {
         this.players = [];
         this.worldEmotes.clear();
+        this.worldChats.clear();
         this.loot = [];
         this.bullets = [];
         this.localShotTracers = [];
@@ -613,6 +621,8 @@ export class SurvivRenderer {
         this._surfaceCachePixels = 0;
         this._surfaceCacheKeyByObject = new WeakMap();
         this._surfacePathCache = new WeakMap();
+        this._pathSampleCache = new WeakMap();
+        this._roadMarkingCutCache = new WeakMap();
         this._waterAnimationGeometry = new WeakMap();
         this.me = null;
         this.zone = null;
@@ -1074,6 +1084,18 @@ export class SurvivRenderer {
                 this.obstacles = tick.obstacles;
                 this._obstacleRenderSignature = nextSignature;
                 this.rebuildObstacleRenderCache();
+            } else {
+                // Damage changes a prop's appearance but not its render geometry.
+                // Preserve cached identities instead of rebuilding every structure
+                // bucket and surface texture for a single HP update.
+                for (const obstacle of tick.obstacles) {
+                    const previous = previousObstacles.get(obstacle.id);
+                    if (!previous) continue;
+                    previous.hp = obstacle.hp;
+                    previous.maxHp = obstacle.maxHp;
+                    previous.destructible = obstacle.destructible;
+                    if (obstacle._hitAt) previous._hitAt = obstacle._hitAt;
+                }
             }
         }
         this.zone = tick.zone || null;
@@ -2303,6 +2325,22 @@ export class SurvivRenderer {
         }
         ctx.restore();
 
+        const chatNow = performance.now();
+        ctx.save();
+        for (const [playerId, activeChat] of this.worldChats) {
+            if (activeChat.expiresAt <= chatNow) { this.worldChats.delete(playerId); continue; }
+            const player = this._playersById.get(playerId);
+            if (!player || !this.isPointInView(player.x, player.y, 90)) continue;
+            if (this.isPlayerHidden(player, currentHouse, currentRoom)) continue;
+            const progress = Math.min(1, (chatNow - activeChat.startedAt) / 4000);
+            ctx.globalAlpha = Math.min(1, (1 - progress) * 3);
+            const chatX = player.x;
+            const emoteOffset = (this.worldEmotes.get(playerId)?.expiresAt ?? 0) > chatNow ? 52 : 0;
+            const chatY = player.y - (player.radius || 14) - (28 + progress * 10 + emoteOffset) / this.zoom;
+            drawChatBubble(ctx, activeChat.message, chatX, chatY, 13 / this.zoom);
+        }
+        ctx.restore();
+
         // Draw grenade blast waves and particles (world space)
         this.drawGrenadeExplosions(ctx, currentHouse, currentRoom);
         this.drawParticles(ctx, currentHouse, currentRoom);
@@ -2565,12 +2603,18 @@ export class SurvivRenderer {
             return;
         }
         const isHorizontal = o.w > o.h;
-        if (isHorizontal) {
-            roundRect(ctx, -o.w / 2, -o.h / 2 - 12, o.w, o.h + 24, 10);
-        } else {
-            roundRect(ctx, -o.w / 2 - 12, -o.h / 2, o.w + 24, o.h, 10);
+        const halfLength = (isHorizontal ? o.w : o.h) / 2;
+        const visible = this.getVisibleRoadAxisRange(o, isHorizontal, 220);
+        const start = Math.max(-halfLength, visible.start);
+        const end = Math.min(halfLength, visible.end);
+        if (end > start) {
+            if (isHorizontal) {
+                roundRect(ctx, start, -o.h / 2 - 12, end - start, o.h + 24, 10);
+            } else {
+                roundRect(ctx, -o.w / 2 - 12, start, o.w + 24, end - start, 10);
+            }
+            ctx.fill();
         }
-        ctx.fill();
         ctx.restore();
     }
 
@@ -2657,6 +2701,23 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    getCachedPathSamples(o, spacing) {
+        let samplesBySpacing = this._pathSampleCache.get(o);
+        if (!samplesBySpacing) {
+            samplesBySpacing = new Map();
+            this._pathSampleCache.set(o, samplesBySpacing);
+        }
+        let samples = samplesBySpacing.get(spacing);
+        if (!samples) {
+            samples = [];
+            forEachPathSample(o.points || [], spacing, (x, y, angle) => {
+                samples.push({ x, y, angle });
+            });
+            samplesBySpacing.set(spacing, samples);
+        }
+        return samples;
+    }
+
     drawRoadBody(ctx, o, allowCache = true) {
         if (allowCache && this.drawCachedSurfaceLayer(ctx, o, 'roadBody', cacheCtx => this.drawRoadBody(cacheCtx, o, false))) return;
         ctx.save();
@@ -2675,7 +2736,9 @@ export class SurvivRenderer {
                 ctx.lineWidth = o.width || 48;
                 this.strokeSurfacePath(ctx, o, 'trailCenter', path => traceSmoothPath(path, o.points, o.x, o.y));
 
-                forEachPathSample(o.points, 18, (worldX, worldY, angle) => {
+                for (const sample of this.getCachedPathSamples(o, 18)) {
+                    const { x: worldX, y: worldY, angle } = sample;
+                    if (!this._buildingSurfaceCache && !this.isPointInView(worldX, worldY, 90)) continue;
                     ctx.save();
                     ctx.translate(worldX - o.x, worldY - o.y);
                     ctx.rotate(angle);
@@ -2686,7 +2749,7 @@ export class SurvivRenderer {
                     ctx.lineWidth = 1;
                     ctx.stroke();
                     ctx.restore();
-                });
+                }
             } else {
                 const palettes = {
                     forest: ['#65583e', '#816f4e'],
@@ -2703,12 +2766,14 @@ export class SurvivRenderer {
                 this.strokeSurfacePath(ctx, o, 'trailCenter', path => traceSmoothPath(path, o.points, o.x, o.y));
 
                 ctx.fillStyle = 'rgba(52, 44, 32, 0.24)';
-                forEachPathSample(o.points, 76, (worldX, worldY, angle) => {
+                for (const sample of this.getCachedPathSamples(o, 76)) {
+                    const { x: worldX, y: worldY, angle } = sample;
+                    if (!this._buildingSurfaceCache && !this.isPointInView(worldX, worldY, 90)) continue;
                     const noise = seededNoise(worldX * 0.01, worldY * 0.01) - 0.5;
                     ctx.beginPath();
                     ctx.ellipse(worldX - o.x - Math.sin(angle) * noise * 22, worldY - o.y + Math.cos(angle) * noise * 22, 3.4, 1.8, angle, 0, Math.PI * 2);
                     ctx.fill();
-                });
+                }
             }
             ctx.restore();
             return;
@@ -2722,49 +2787,61 @@ export class SurvivRenderer {
             return;
         }
 
-        if (o.variant === 'asphalt') {
+        const isHorizontal = o.w > o.h;
+        const halfLength = (isHorizontal ? o.w : o.h) / 2;
+        const visible = this.getVisibleRoadAxisRange(o, isHorizontal, 220);
+        const start = Math.max(-halfLength, visible.start);
+        const end = Math.min(halfLength, visible.end);
+
+        if (end > start && o.variant === 'asphalt') {
             ctx.fillStyle = '#2b2c28'; // Dark asphalt gray
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
+            if (isHorizontal) {
+                roundRect(ctx, start, -o.h / 2, end - start, o.h, 5);
+            } else {
+                roundRect(ctx, -o.w / 2, start, o.w, end - start, 5);
+            }
             ctx.fill();
-        } else {
-            // --- DIRT ROAD WITH IRREGULAR EDGES ---
+        } else if (end > start) {
+            // Dirt-road detail is generated only for the camera-visible segment.
+            // Samples remain anchored to the road origin, so edges never slide.
             ctx.fillStyle = '#7a684c';
             ctx.beginPath();
             const step = 28;
             const roadId = Math.round(o.x + o.y);
-            const isHorizontal = o.w > o.h;
+            const edgeWobble = (axis, side) => {
+                if (axis <= -halfLength + 0.01 || axis >= halfLength - 0.01) return 0;
+                return Math.sin(axis * 0.05 + roadId * side) * 5 + Math.cos(axis * 0.12) * 3;
+            };
+            const firstSample = -halfLength + Math.max(1, Math.ceil((start + halfLength) / step)) * step;
+            const lastSample = -halfLength + Math.min(
+                Math.floor((halfLength * 2 - 0.01) / step),
+                Math.floor((end + halfLength) / step),
+            ) * step;
 
             if (isHorizontal) {
-                const halfW = o.w / 2;
-                ctx.moveTo(-halfW, -o.h / 2);
-                for (let xx = -halfW + step; xx < halfW; xx += step) {
-                    const wobble = Math.sin(xx * 0.05 + roadId) * 5 + Math.cos(xx * 0.12) * 3;
-                    ctx.lineTo(xx, -o.h / 2 + wobble);
+                ctx.moveTo(start, -o.h / 2 + edgeWobble(start, 1));
+                for (let xx = firstSample; xx < end; xx += step) {
+                    ctx.lineTo(xx, -o.h / 2 + edgeWobble(xx, 1));
                 }
-                ctx.lineTo(halfW, -o.h / 2);
-                ctx.lineTo(halfW, o.h / 2);
-                for (let xx = halfW - step; xx > -halfW; xx -= step) {
-                    const wobble = Math.sin(xx * 0.05 - roadId) * 5 + Math.cos(xx * 0.12) * 3;
-                    ctx.lineTo(xx, o.h / 2 + wobble);
+                ctx.lineTo(end, -o.h / 2 + edgeWobble(end, 1));
+                ctx.lineTo(end, o.h / 2 + edgeWobble(end, -1));
+                for (let xx = lastSample; xx > start; xx -= step) {
+                    ctx.lineTo(xx, o.h / 2 + edgeWobble(xx, -1));
                 }
-                ctx.lineTo(-halfW, o.h / 2);
-                ctx.closePath();
+                ctx.lineTo(start, o.h / 2 + edgeWobble(start, -1));
             } else {
-                const halfH = o.h / 2;
-                ctx.moveTo(o.w / 2, -halfH);
-                for (let yy = -halfH + step; yy < halfH; yy += step) {
-                    const wobble = Math.sin(yy * 0.05 + roadId) * 5 + Math.cos(yy * 0.12) * 3;
-                    ctx.lineTo(o.w / 2 + wobble, yy);
+                ctx.moveTo(o.w / 2 + edgeWobble(start, 1), start);
+                for (let yy = firstSample; yy < end; yy += step) {
+                    ctx.lineTo(o.w / 2 + edgeWobble(yy, 1), yy);
                 }
-                ctx.lineTo(o.w / 2, halfH);
-                ctx.lineTo(-o.w / 2, halfH);
-                for (let yy = halfH - step; yy > -halfH; yy -= step) {
-                    const wobble = Math.sin(yy * 0.05 - roadId) * 5 + Math.cos(yy * 0.12) * 3;
-                    ctx.lineTo(-o.w / 2 + wobble, yy);
+                ctx.lineTo(o.w / 2 + edgeWobble(end, 1), end);
+                ctx.lineTo(-o.w / 2 + edgeWobble(end, -1), end);
+                for (let yy = lastSample; yy > start; yy -= step) {
+                    ctx.lineTo(-o.w / 2 + edgeWobble(yy, -1), yy);
                 }
-                ctx.lineTo(-o.w / 2, -halfH);
-                ctx.closePath();
+                ctx.lineTo(-o.w / 2 + edgeWobble(start, -1), start);
             }
+            ctx.closePath();
             ctx.fill();
         }
         ctx.restore();
@@ -2886,19 +2963,23 @@ export class SurvivRenderer {
             ctx.lineWidth = 3.5;
             const trackOff = width * 0.18;
             ctx.beginPath();
-            line(-length / 2, length / 2, -trackOff);
-            line(-length / 2, length / 2, trackOff);
+            line(start, end, -trackOff);
+            line(start, end, trackOff);
             ctx.stroke();
         }
         ctx.restore();
     }
 
-    getRoadMarkingIntervals(road, start, end, isHorizontal) {
-        let intervals = start < end ? [{ start, end }] : [];
+    getRoadMarkingCuts(road, isHorizontal) {
+        const cached = this._roadMarkingCutCache.get(road);
+        if (cached?.isHorizontal === isHorizontal) return cached.cuts;
+
+        const cuts = [];
         const angle = -(road.rotation || 0);
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
         const roadWidth = isHorizontal ? road.h : road.w;
+        const halfLength = (isHorizontal ? road.w : road.h) / 2;
 
         for (const junction of this.roadJunctionObstacles) {
             const dx = junction.x - road.x;
@@ -2908,22 +2989,38 @@ export class SurvivRenderer {
             const axis = isHorizontal ? localX : localY;
             const cross = isHorizontal ? localY : localX;
             const crossLimit = roadWidth / 2 + Math.max(junction.w, junction.h) / 2;
-            if (Math.abs(cross) > crossLimit || axis < start - 120 || axis > end + 120) continue;
+            if (Math.abs(cross) > crossLimit || axis < -halfLength - 120 || axis > halfLength + 120) continue;
 
             const halfCut = (isHorizontal ? junction.w : junction.h) / 2 + 22;
-            const cutStart = axis - halfCut;
-            const cutEnd = axis + halfCut;
-            const next = [];
-            for (const interval of intervals) {
-                if (cutEnd <= interval.start || cutStart >= interval.end) {
-                    next.push(interval);
-                    continue;
-                }
-                if (cutStart > interval.start) next.push({ start: interval.start, end: cutStart });
-                if (cutEnd < interval.end) next.push({ start: cutEnd, end: interval.end });
-            }
-            intervals = next;
+            cuts.push({
+                start: Math.max(-halfLength, axis - halfCut),
+                end: Math.min(halfLength, axis + halfCut),
+            });
         }
+
+        cuts.sort((a, b) => a.start - b.start);
+        const merged = [];
+        for (const cut of cuts) {
+            const previous = merged[merged.length - 1];
+            if (previous && cut.start <= previous.end) previous.end = Math.max(previous.end, cut.end);
+            else if (cut.end > cut.start) merged.push(cut);
+        }
+        this._roadMarkingCutCache.set(road, { isHorizontal, cuts: merged });
+        return merged;
+    }
+
+    getRoadMarkingIntervals(road, start, end, isHorizontal) {
+        if (start >= end) return [];
+        const intervals = [];
+        let cursor = start;
+        for (const cut of this.getRoadMarkingCuts(road, isHorizontal)) {
+            if (cut.end <= cursor) continue;
+            if (cut.start >= end) break;
+            if (cut.start > cursor) intervals.push({ start: cursor, end: Math.min(end, cut.start) });
+            cursor = Math.max(cursor, cut.end);
+            if (cursor >= end) break;
+        }
+        if (cursor < end) intervals.push({ start: cursor, end });
         return intervals.filter(interval => interval.end - interval.start > 12);
     }
 
@@ -4012,6 +4109,12 @@ export class SurvivRenderer {
         }
         const key = `${objectKey}:${layer}:${scale.toFixed(2)}`;
         let sprite = this._surfaceSpriteCache.get(key);
+        if (sprite) {
+            // Refresh recency so actively visible structures are not evicted by
+            // one-off textures encountered while the camera is moving.
+            this._surfaceSpriteCache.delete(key);
+            this._surfaceSpriteCache.set(key, sprite);
+        }
         if (!sprite) {
             // Large canvases are intentionally built one at a time so entering a
             // new area cannot turn one frame into a long cache-generation spike.

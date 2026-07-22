@@ -207,6 +207,7 @@ export default function SurvivGame() {
     const socketRef = useRef(null);
     const rendererRef = useRef(null);
     const handleGameEmote = useCallback((payload) => rendererRef.current?.showEmote(payload), []);
+    const handleGameChat = useCallback((payload) => rendererRef.current?.showChat(payload), []);
     const inputIntervalRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const hasJoinedRef = useRef(false);
@@ -1412,7 +1413,7 @@ export default function SurvivGame() {
                 />
             )}
 
-            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} />
+            <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} onChat={handleGameChat} />
 
             {/* Side-by-Side React Inventory Overlay */}
             {isInventoryOpen && me && (
