@@ -827,6 +827,8 @@ export default function Game() {
                             name: u.username,
                             isMe: u.id === myIdRef.current,
                             isCashingOut: u.isCashingOut,
+                            cashoutHoldActive: u.cashoutHoldActive,
+                            cashoutHoldStartedAt: u.cashoutHoldStartedAt,
                             dollarBalance: totalDollarBalance * massShare,
                             color: u.color.fill || u.color,
                             borderColor: u.color.border || '#000',

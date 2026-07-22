@@ -3,7 +3,7 @@
  */
 
 import { drawBalanceBadge } from '../balanceBadge.js';
-import { drawCashoutProgressRing } from '../cashoutRing.js';
+import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
 
@@ -340,7 +340,7 @@ export class SurvivRenderer {
         this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
-        this.targetZoom = 1.08;
+        this.targetZoom = 1.15;
         this.isMobileLayout = false;
         this.worldHalf = 10000;
         this.myId = null;
@@ -368,6 +368,14 @@ export class SurvivRenderer {
         this._losSegmentsByHouseId = new Map();
         this._renderObstaclesByHouseId = new Map();
         this._collisionBuckets = new Map();
+        this._houseBuckets = new Map();
+        this._houseBucketSize = 800;
+        this._playersById = new Map();
+        this._visibleFields = [];
+        this._visibleWater = [];
+        this._visibleRoads = [];
+        this._visibleBridges = [];
+        this._visibleWorldObstacles = [];
         this._obstacleRenderSignature = '';
         this._obstacleRevision = 0;
         this._viewLeft = -Infinity;
@@ -491,20 +499,20 @@ export class SurvivRenderer {
         // Keep phone-sized Retina canvases sharp while capping total GPU pixels.
         const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
         this.isMobileLayout = coarsePointer || w < 760;
-        const pixelBudgetDpr = Math.sqrt(2_400_000 / Math.max(1, w * h));
-        const dprCap = this.isMobileLayout ? 1.6 : 1.35;
-        const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr));
+        const pixelBudgetDpr = Math.sqrt(1_850_000 / Math.max(1, w * h));
+        const dprCap = this.isMobileLayout ? 1.4 : 1.2;
+        const dpr = Math.max(0.75, Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr));
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'high';
+        this.ctx.imageSmoothingQuality = 'medium';
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;
-        this.targetZoom = this.isMobileLayout ? 0.86 : 1.08;
+        this.targetZoom = this.isMobileLayout ? 0.92 : 1.15;
         if (!this.spectatorMode) this.zoom = this.targetZoom;
     }
 
@@ -572,6 +580,13 @@ export class SurvivRenderer {
         this._interiorFogHouseIds.clear();
         this._losSegmentsByHouseId.clear();
         this._renderObstaclesByHouseId.clear();
+        this._houseBuckets.clear();
+        this._playersById.clear();
+        this._visibleFields.length = 0;
+        this._visibleWater.length = 0;
+        this._visibleRoads.length = 0;
+        this._visibleBridges.length = 0;
+        this._visibleWorldObstacles.length = 0;
         this._obstacleRenderSignature = '';
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
@@ -895,6 +910,8 @@ export class SurvivRenderer {
         this.players = me
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
             : rawPlayers;
+        this._playersById.clear();
+        for (const player of this.players) this._playersById.set(player.id, player);
         this.loot = this._ingestLootSnapshots(tick.loot || [], receivedAt);
         this.deathMarkers = Array.isArray(tick.deathMarkers) ? tick.deathMarkers : [];
         const activeMarkerIds = new Set();
@@ -1391,6 +1408,7 @@ export class SurvivRenderer {
         this._losSegmentsByHouseId.clear();
         this._renderObstaclesByHouseId.clear();
         this._collisionBuckets.clear();
+        this._houseBuckets.clear();
 
         const hasSplineRiver = this.obstacles.some(obstacle => obstacle.kind === 'river_path');
         for (const o of this.obstacles) {
@@ -1418,6 +1436,22 @@ export class SurvivRenderer {
             }
         }
 
+        const houseCell = this._houseBucketSize;
+        for (const house of this.houseFloors) {
+            const minX = Math.floor((house.x - house.w / 2) / houseCell);
+            const maxX = Math.floor((house.x + house.w / 2) / houseCell);
+            const minY = Math.floor((house.y - house.h / 2) / houseCell);
+            const maxY = Math.floor((house.y + house.h / 2) / houseCell);
+            for (let gx = minX; gx <= maxX; gx++) {
+                for (let gy = minY; gy <= maxY; gy++) {
+                    const key = gx + ',' + gy;
+                    const bucket = this._houseBuckets.get(key);
+                    if (bucket) bucket.push(house);
+                    else this._houseBuckets.set(key, [house]);
+                }
+            }
+        }
+
         const housesById = new Map(this.houseFloors.map(h => [h.id, h]));
         const solid = [];
         for (const o of this.obstacles) {
@@ -1433,7 +1467,7 @@ export class SurvivRenderer {
             if (!SURFACE_KINDS.has(o.kind) && o.kind !== 'roomZone') {
                 const house = o.houseId
                     ? housesById.get(o.houseId)
-                    : this.houseFloors.find(h => this.pointInsideRect(h, o.x, o.y, -2));
+                    : this.findHouseContainingPoint(o.x, o.y);
                 o._insideHouseId = house?.id || null;
                 const houseRooms = house ? (this._roomZonesByHouseId.get(house.id) || []) : [];
                 const room = house
@@ -1560,13 +1594,26 @@ export class SurvivRenderer {
             && y + pad >= this._viewTop && y - pad <= this._viewBottom;
     }
 
+    collectVisibleObstacles(source, target, pad, currentHouse, currentRoom) {
+        target.length = 0;
+        for (const obstacle of source) {
+            if (this.isObstacleInView(obstacle, pad)
+                && this.shouldDrawObstacle(obstacle, currentHouse, currentRoom)) {
+                target.push(obstacle);
+            }
+        }
+        return target;
+    }
+
     pointInsideRect(o, x, y, pad = 0) {
         return x >= o.x - o.w / 2 - pad && x <= o.x + o.w / 2 + pad
             && y >= o.y - o.h / 2 - pad && y <= o.y + o.h / 2 + pad;
     }
 
     findHouseContainingPoint(x, y) {
-        return this.houseFloors.find(o => this.pointInsideRect(o, x, y, -2)) || null;
+        const cell = this._houseBucketSize;
+        const bucket = this._houseBuckets.get(Math.floor(x / cell) + ',' + Math.floor(y / cell));
+        return bucket?.find(house => this.pointInsideRect(house, x, y, -2)) || null;
     }
 
     getCurrentHouse() {
@@ -1618,7 +1665,7 @@ export class SurvivRenderer {
         if (!currentHouse || house.id !== currentHouse.id) return true;
         if (!this.usesInteriorFog(currentHouse)) return false;
         // Houses with no rooms never hide anything.
-        const hasRooms = this.roomZones.some(r => r.houseId === currentHouse.id);
+        const hasRooms = (this._roomZonesByHouseId.get(currentHouse.id)?.length || 0) > 0;
         if (!hasRooms || !currentRoom) return false;
         const room = this.findRoomContainingPoint(x, y, house);
         if (!room || room.id === currentRoom.id) return false;
@@ -2065,56 +2112,61 @@ export class SurvivRenderer {
         const currentHouse = this.getCurrentHouse();
         const currentRoom = this.getCurrentRoom(currentHouse);
         this.hoveredChestId = this.findInteractChest(true, currentHouse, currentRoom)?.id || null;
+        const visibleFields = this.collectVisibleObstacles(
+            this.fieldObstacles, this._visibleFields, 32, currentHouse, currentRoom,
+        );
+        const visibleWater = this.collectVisibleObstacles(
+            this.waterObstacles, this._visibleWater, 40, currentHouse, currentRoom,
+        );
+        const visibleRoads = this.collectVisibleObstacles(
+            this.roadObstacles, this._visibleRoads, 32, currentHouse, currentRoom,
+        );
+        const visibleBridges = this.collectVisibleObstacles(
+            this.bridgeObstacles, this._visibleBridges, 48, currentHouse, currentRoom,
+        );
+        const worldObstacleSource = currentHouse
+            ? (this._renderObstaclesByHouseId.get(currentHouse.id) || [])
+            : this.sortedWorldObstacles;
+        const visibleWorldObstacles = this.collectVisibleObstacles(
+            worldObstacleSource, this._visibleWorldObstacles, 48, currentHouse, currentRoom,
+        );
+
         // Pass 1: Draw fields (grass overlays, crops, dirt field bases)
-        for (const o of this.fieldObstacles) {
-            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
-                this.drawObstacle(ctx, o);
-            }
+        for (const o of visibleFields) {
+            this.drawObstacle(ctx, o);
         }
 
         // Pass 2: Draw river & lake sandy shore bases
-        for (const o of this.waterObstacles) {
-            if (this.isObstacleInView(o, 40) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
-                this.drawObstacleShore(ctx, o);
-            }
+        for (const o of visibleWater) {
+            this.drawObstacleShore(ctx, o);
         }
 
         // Pass 3: Draw road gravel/dirt shoulders (under the asphalt)
-        for (const o of this.roadObstacles) {
-            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
-                this.drawRoadShoulder(ctx, o);
-            }
+        for (const o of visibleRoads) {
+            this.drawRoadShoulder(ctx, o);
         }
 
         // Pass 4: Draw river & lake water bodies (seamlessly on top of shores)
-        for (const o of this.waterObstacles) {
-            if (this.isObstacleInView(o, 40) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
-                this.drawObstacleBody(ctx, o);
-            }
+        for (const o of visibleWater) {
+            this.drawObstacleBody(ctx, o);
         }
 
         // Pass 5: Draw road asphalt & dirt bodies (seamlessly on top of shoulders)
-        for (const o of this.roadObstacles) {
-            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
-                this.drawRoadBody(ctx, o);
-            }
+        for (const o of visibleRoads) {
+            this.drawRoadBody(ctx, o);
         }
 
         // Pass 6: Draw road markings (yellow centerlines, white borders) & tire tracks
-        for (const o of this.roadObstacles) {
-            if (this.isObstacleInView(o, 32) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
-                this.drawRoadMarkings(ctx, o);
-            }
+        for (const o of visibleRoads) {
+            this.drawRoadMarkings(ctx, o);
         }
 
         // Draw blood decals on the ground
         this.drawBloodDecals(ctx);
 
         // Pass 7: Draw bridges (go on top of road/river intersections)
-        for (const o of this.bridgeObstacles) {
-            if (this.isObstacleInView(o, 48) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) {
-                this.drawObstacle(ctx, o);
-            }
+        for (const o of visibleBridges) {
+            this.drawObstacle(ctx, o);
         }
 
         this.drawWorldBorder(ctx);
@@ -2126,11 +2178,8 @@ export class SurvivRenderer {
                 if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
             }
         }
-        const visibleWorldObstacles = currentHouse
-            ? (this._renderObstaclesByHouseId.get(currentHouse.id) || [])
-            : this.sortedWorldObstacles;
         for (const o of visibleWorldObstacles) {
-            if (this.isObstacleInView(o, 48) && this.shouldDrawObstacle(o, currentHouse, currentRoom)) this.drawObstacle(ctx, o);
+            this.drawObstacle(ctx, o);
         }
         this.drawDeathMarkers(ctx, currentHouse);
         // Only use the new LOS shadow system (replaces old room shadows)
@@ -2177,7 +2226,7 @@ export class SurvivRenderer {
         ctx.font = `${32 / this.zoom}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
         for (const [playerId, activeEmote] of this.worldEmotes) {
             if (activeEmote.expiresAt <= emoteNow) { this.worldEmotes.delete(playerId); continue; }
-            const player = this.players.find((candidate) => candidate.id === playerId);
+            const player = this._playersById.get(playerId);
             if (!player || !this.isPointInView(player.x, player.y, 90)) continue;
             if (this.isPlayerHidden(player, currentHouse, currentRoom)) continue;
             const progress = Math.min(1, (emoteNow - activeEmote.startedAt) / 2600);
@@ -2206,7 +2255,7 @@ export class SurvivRenderer {
         // Keep the local balance badge out of the zoomed/shaking world transform.
         // Snapping its anchor to whole CSS pixels prevents text from becoming
         // blurry while the camera smoothly follows a moving player.
-        const localPlayer = this.players.find((player) => player.isYou || player.id === this.myId);
+        const localPlayer = this.me || this._playersById.get(this.myId);
         if (localPlayer && !this.isPlayerHidden(localPlayer, currentHouse, currentRoom)) {
             const screenX = Math.round((localPlayer.x - this.camera.x) * z + W / 2);
             const screenY = Math.round((localPlayer.y - this.camera.y + (localPlayer.radius || 14) + 15) * z + H / 2);
@@ -5056,13 +5105,14 @@ export class SurvivRenderer {
             ctx.fillText(p.username || 'Player', p.x, p.y - r - 20);
         }
 
-        if (isMe) {
-            if (this.hud.cashoutEndAt > this._frameNow) {
-                const total = this.hud.cashoutTotal || 10;
-                const left = Math.max(0, (this.hud.cashoutEndAt - this._frameNow) / 1000);
-                const progress = 1 - left / total;
-                drawCashoutProgressRing(ctx, p.x, p.y, r + 12, progress, { counterClockwise: true });
-            }
+        if (p.cashoutHoldActive || (isMe && this.hud.cashoutHoldStart)) {
+            const startedAt = isMe && this.hud.cashoutHoldStart
+                ? this.hud.cashoutHoldStart
+                : p.cashoutHoldStartedAt;
+            const progress = startedAt
+                ? Math.min(1, Math.max(0, (this._frameNow - startedAt) / CASHOUT_HOLD_MS))
+                : 0;
+            drawCashoutProgressRing(ctx, p.x, p.y, r + 12, progress, { counterClockwise: true });
         }
     }
 

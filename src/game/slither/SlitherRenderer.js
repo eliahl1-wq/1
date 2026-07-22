@@ -2,7 +2,7 @@
  * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
-import { drawCashoutProgressRing, getCashoutRingProgress, CASHOUT_HOLD_MS } from '../cashoutRing.js';
+import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
@@ -2023,10 +2023,12 @@ export class SlitherRenderer {
                 drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
             }
 
-            if (snake.isCashingOut && snake.cashOutEndTime && !isYou) {
-                const progress = getCashoutRingProgress(snake.cashOutEndTime, 5);
+            if (snake.cashoutHoldActive || (isYou && this._holdStartAt)) {
+                const progress = isYou
+                    ? this._getHoldProgress(performance.now())
+                    : Math.min(1, Math.max(0, (Date.now() - (snake.cashoutHoldStartedAt || Date.now())) / CASHOUT_HOLD_MS));
                 const ringR = headRadius + 10;
-                drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
+                drawCashoutProgressRing(ctx, hx, hy, ringR, progress, { counterClockwise: true });
             }
         }
 
@@ -2273,19 +2275,6 @@ export class SlitherRenderer {
             console.log(`[Perf] frameMs=${frameMs.toFixed(1)} dt=${dt.toFixed(3)} | smooth=${(__t2-__t1).toFixed(1)}ms | bg/setup=${(__t3-__t2).toFixed(1)}ms | food=${(__t4-__t3).toFixed(1)}ms | snakes=${(__t5-__t4).toFixed(1)}ms | total=${(__t5-__t0).toFixed(1)}ms`);
         }
 
-        // Balance badge + cashout rings on your snake head
-        if (me?.segments?.[0] && !this.hideOverlays) {
-            const head = me.segments[0];
-            const { x: hx, y: hy } = toScreen(head.x, head.y);
-            const headRadius = (me.radius || 6) * zoom * (this.snakeThickness ?? 1);
-            const { cashoutEndAt, cashoutTotal } = this.hud;
-            const ringR = headRadius + 10;
-
-            if (cashoutEndAt && cashoutEndAt > Date.now()) {
-                const progress = getCashoutRingProgress(cashoutEndAt, cashoutTotal || 10);
-                drawCashoutProgressRing(ctx, hx, hy, ringR, progress);
-            }
-        }
 
         if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
             const viewHalfW = W / (2 * zoom);

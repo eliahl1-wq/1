@@ -1,6 +1,6 @@
 const FULL_ANGLE = Math.PI * 2;
 
-/** Hold Q / cashout button duration before the securing timer starts. */
+/** Hold Q / cashout button duration before cashout is submitted. */
 export const CASHOUT_HOLD_MS = 3000;
 
 /** Brand purple — matches --accent / cashout button styling. */
@@ -14,7 +14,7 @@ export function getCashoutRingProgress(endAtMs, totalSeconds) {
 }
 
 /**
- * Purple progress ring — same style as the cashout countdown timer.
+ * Purple progress ring for the three-second hold-to-cashout gesture.
  * Timer drains clockwise; hold-to-cashout fills counter-clockwise.
  */
 export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) {
