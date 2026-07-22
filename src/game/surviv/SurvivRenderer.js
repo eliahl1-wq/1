@@ -240,7 +240,7 @@ function seededNoise(x, y) {
 function traceSmoothPath(ctx, points, originX = 0, originY = 0, closed = false) {
     if (!points?.length) return false;
     const local = points.map(point => ({ x: point.x - originX, y: point.y - originY }));
-    ctx.beginPath();
+    ctx.beginPath?.();
     ctx.moveTo(local[0].x, local[0].y);
     const segmentCount = closed ? local.length : local.length - 1;
     for (let i = 0; i < segmentCount; i++) {
@@ -366,6 +366,7 @@ export class SurvivRenderer {
         this._doorwaysByHouseId = new Map();
         this._interiorFogHouseIds = new Set();
         this._losSegmentsByHouseId = new Map();
+        this._nearbyLosSegments = [];
         this._renderObstaclesByHouseId = new Map();
         this._collisionBuckets = new Map();
         this._houseBuckets = new Map();
@@ -479,6 +480,13 @@ export class SurvivRenderer {
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleSpriteCache = new Map();
         this._obstacleCacheBuildsThisFrame = 0;
+        this._surfaceSpriteCache = new Map();
+        this._surfaceCachePixels = 0;
+        this._surfaceCacheBuildsThisFrame = 0;
+        this._surfaceCacheKeyByObject = new WeakMap();
+        this._surfacePathCache = new WeakMap();
+        this._waterAnimationGeometry = new WeakMap();
+        this._buildingSurfaceCache = false;
         // Previous HP for detecting damage
         this._prevHp = 100;
         // Previous ammo for detecting shots fired
@@ -504,16 +512,17 @@ export class SurvivRenderer {
         // Keep phone-sized Retina canvases sharp while capping total GPU pixels.
         const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
         this.isMobileLayout = coarsePointer || w < 760;
-        const pixelBudgetDpr = Math.sqrt(1_550_000 / Math.max(1, w * h));
-        const dprCap = this.isMobileLayout ? 1.25 : 1;
-        const dpr = Math.max(0.7, Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr));
+        const pixelBudgetDpr = Math.sqrt(1_850_000 / Math.max(1, w * h));
+        const dprCap = this.isMobileLayout ? 1.4 : 1.2;
+        const dpr = Math.max(0.75, Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr));
+        this.renderDpr = dpr;
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'low';
+        this.ctx.imageSmoothingQuality = 'medium';
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;
@@ -600,6 +609,11 @@ export class SurvivRenderer {
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
         this._obstacleSpriteCache.clear();
+        this._surfaceSpriteCache.clear();
+        this._surfaceCachePixels = 0;
+        this._surfaceCacheKeyByObject = new WeakMap();
+        this._surfacePathCache = new WeakMap();
+        this._waterAnimationGeometry = new WeakMap();
         this.me = null;
         this.zone = null;
         this.hoveredChestId = null;
@@ -1799,8 +1813,22 @@ export class SurvivRenderer {
      * Gather wall segments (edges of rectangles) from all solid obstacles
      * that should block line of sight.
      */
-    _gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse) {
-        return this._losSegmentsByHouseId.get(currentHouse?.id) || [];
+    _gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse, px = this.me?.x, py = this.me?.y, maxDist = 900) {
+        const source = this._losSegmentsByHouseId.get(currentHouse?.id) || [];
+        if (!Number.isFinite(px) || !Number.isFinite(py)) return source;
+        const target = this._nearbyLosSegments;
+        target.length = 0;
+        const range = maxDist + 80;
+        const left = px - range;
+        const right = px + range;
+        const top = py - range;
+        const bottom = py + range;
+        for (const segment of source) {
+            if (Math.max(segment.ax, segment.bx) < left || Math.min(segment.ax, segment.bx) > right
+                || Math.max(segment.ay, segment.by) < top || Math.min(segment.ay, segment.by) > bottom) continue;
+            target.push(segment);
+        }
+        return target;
     }
     /**
      * Ray-segment intersection.
@@ -1918,7 +1946,7 @@ export class SurvivRenderer {
             || !polygon
             || (playerMoved && now - this._losLastBuildAt >= 30);
         if (needsRebuild) {
-            const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse);
+            const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse, px, py, maxDist);
             polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
             this._losCacheKey = cacheKey;
             this._losCachedPolygon = polygon;
@@ -2034,6 +2062,7 @@ export class SurvivRenderer {
         this._frameNow = Date.now();
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleCacheBuildsThisFrame = 0;
+        this._surfaceCacheBuildsThisFrame = 0;
         // FPS counter
         this._fpsFrames++;
         const fpsSampleElapsed = performance.now() - this._fpsLastSampleAt;
@@ -2480,7 +2509,8 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawObstacleShore(ctx, o) {
+    drawObstacleShore(ctx, o, allowCache = true) {
+        if (allowCache && this.drawCachedSurfaceLayer(ctx, o, 'waterShore', cacheCtx => this.drawObstacleShore(cacheCtx, o, false))) return;
         const kind = o.kind || 'crate';
         ctx.save();
         ctx.translate(o.x, o.y);
@@ -2490,11 +2520,9 @@ export class SurvivRenderer {
         if (kind === 'river_path') {
             if (o.points && o.points.length > 0) {
                 ctx.fillStyle = '#6f6745';
-                traceRiverShape(ctx, o, 30);
-                ctx.fill();
+                this.fillSurfacePath(ctx, o, 'riverShore30', path => traceRiverShape(path, o, 30));
                 ctx.fillStyle = '#baa06c';
-                traceRiverShape(ctx, o, 16);
-                ctx.fill();
+                this.fillSurfacePath(ctx, o, 'riverShore16', path => traceRiverShape(path, o, 16));
             }
         } else if (kind === 'river') {
             ctx.fillStyle = '#baa06c';
@@ -2502,16 +2530,15 @@ export class SurvivRenderer {
             ctx.fill();
         } else if (kind === 'water') {
             ctx.fillStyle = '#66704d';
-            traceOrganicPond(ctx, o, 27);
-            ctx.fill();
+            this.fillSurfacePath(ctx, o, 'pondShore27', path => traceOrganicPond(path, o, 27));
             ctx.fillStyle = '#b8a06e';
-            traceOrganicPond(ctx, o, 16);
-            ctx.fill();
+            this.fillSurfacePath(ctx, o, 'pondShore16', path => traceOrganicPond(path, o, 16));
         }
         ctx.restore();
     }
 
-    drawRoadShoulder(ctx, o) {
+    drawRoadShoulder(ctx, o, allowCache = true) {
+        if (allowCache && this.drawCachedSurfaceLayer(ctx, o, 'roadShoulder', cacheCtx => this.drawRoadShoulder(cacheCtx, o, false))) return;
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
@@ -2522,8 +2549,7 @@ export class SurvivRenderer {
             ctx.lineWidth = (o.width || 54) + (o.variant === 'boardwalk' ? 16 : 22);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            traceSmoothPath(ctx, o.points, o.x, o.y);
-            ctx.stroke();
+            this.strokeSurfacePath(ctx, o, 'trailCenter', path => traceSmoothPath(path, o.points, o.x, o.y));
             ctx.restore();
             return;
         }
@@ -2548,73 +2574,91 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawObstacleBody(ctx, o) {
+    drawObstacleBody(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
+        const cached = allowCache
+            && this.drawCachedSurfaceLayer(ctx, o, 'waterBody', cacheCtx => this.drawObstacleBody(cacheCtx, o, false));
+
+        if (!cached) {
+            ctx.save();
+            ctx.translate(o.x, o.y);
+            ctx.rotate(o.rotation || 0);
+            ctx.shadowBlur = 0;
+
+            if (kind === 'river_path') {
+                if (o.points && o.points.length > 0) {
+                    const waterGradient = ctx.createLinearGradient(-o.w / 2, -o.h / 2, o.w / 2, o.h / 2);
+                    waterGradient.addColorStop(0, '#234f69');
+                    waterGradient.addColorStop(0.52, '#2d6984');
+                    waterGradient.addColorStop(1, '#24566f');
+                    ctx.fillStyle = waterGradient;
+                    this.fillSurfacePath(ctx, o, 'riverBody', path => traceRiverShape(path, o));
+                }
+            } else if (kind === 'river') {
+                ctx.fillStyle = '#2a5e7a';
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, o.h / 2);
+                ctx.fill();
+
+                ctx.fillStyle = 'rgba(80, 160, 200, 0.12)';
+                roundRect(ctx, -o.w / 2 + 4, -o.h * 0.2, o.w - 8, o.h * 0.4, o.h * 0.2);
+                ctx.fill();
+            } else if (kind === 'water') {
+                const pondGradient = ctx.createRadialGradient(-o.w * 0.14, -o.h * 0.18, 8, 0, 0, Math.max(o.w, o.h) * 0.56);
+                pondGradient.addColorStop(0, '#3b7990');
+                pondGradient.addColorStop(0.58, '#2b647e');
+                pondGradient.addColorStop(1, '#214d68');
+                ctx.fillStyle = pondGradient;
+                this.fillSurfacePath(ctx, o, 'pondBody', path => traceOrganicPond(path, o));
+            }
+            ctx.restore();
+        }
+
+        if (allowCache) this.drawWaterAnimation(ctx, o);
+    }
+
+    drawWaterAnimation(ctx, o) {
+        const kind = o.kind || 'water';
+        if (kind === 'river' || !o.w || !o.h) return;
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
         ctx.shadowBlur = 0;
 
-        if (kind === 'river_path') {
-            if (o.points && o.points.length > 0) {
-                const waterGradient = ctx.createLinearGradient(-o.w / 2, -o.h / 2, o.w / 2, o.h / 2);
-                waterGradient.addColorStop(0, '#234f69');
-                waterGradient.addColorStop(0.52, '#2d6984');
-                waterGradient.addColorStop(1, '#24566f');
-                ctx.fillStyle = waterGradient;
-                traceRiverShape(ctx, o);
-                ctx.fill();
-
-                ctx.save();
-                traceRiverShape(ctx, o, -5);
-                ctx.clip();
-                ctx.lineCap = 'round';
-                ctx.setLineDash([48, 86]);
-                ctx.lineDashOffset = -(this._frameNow * 0.018) % 134;
-                for (const [index, factor] of [-0.24, 0, 0.24].entries()) {
-                    const flowPoints = offsetPathPoints(o.points, (o.width || 220) * factor);
-                    ctx.strokeStyle = index === 1 ? 'rgba(144, 211, 230, 0.18)' : 'rgba(126, 198, 220, 0.11)';
-                    ctx.lineWidth = index === 1 ? 2.4 : 1.6;
-                    traceSmoothPath(ctx, flowPoints, o.x, o.y);
-                    ctx.stroke();
-                }
-                ctx.setLineDash([]);
-                ctx.restore();
+        if (kind === 'river_path' && o.points?.length) {
+            let flowPaths = this._waterAnimationGeometry.get(o);
+            if (!flowPaths) {
+                flowPaths = [-0.24, 0, 0.24].map(factor => offsetPathPoints(o.points, (o.width || 220) * factor));
+                this._waterAnimationGeometry.set(o, flowPaths);
             }
-        } else if (kind === 'river') {
-            ctx.fillStyle = '#2a5e7a';
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, o.h / 2);
-            ctx.fill();
-
-            ctx.fillStyle = 'rgba(80, 160, 200, 0.12)';
-            roundRect(ctx, -o.w / 2 + 4, -o.h * 0.2, o.w - 8, o.h * 0.4, o.h * 0.2);
-            ctx.fill();
+            ctx.save();
+            this.clipSurfacePath(ctx, o, 'riverClip-5', path => traceRiverShape(path, o, -5));
+            ctx.lineCap = 'round';
+            ctx.setLineDash([48, 86]);
+            ctx.lineDashOffset = -(this._frameNow * 0.018) % 134;
+            for (let index = 0; index < flowPaths.length; index++) {
+                ctx.strokeStyle = index === 1 ? 'rgba(144, 211, 230, 0.18)' : 'rgba(126, 198, 220, 0.11)';
+                ctx.lineWidth = index === 1 ? 2.4 : 1.6;
+                this.strokeSurfacePath(ctx, o, `riverFlow${index}`, path => traceSmoothPath(path, flowPaths[index], o.x, o.y));
+            }
+            ctx.setLineDash([]);
+            ctx.restore();
         } else if (kind === 'water') {
-            const pondGradient = ctx.createRadialGradient(-o.w * 0.14, -o.h * 0.18, 8, 0, 0, Math.max(o.w, o.h) * 0.56);
-            pondGradient.addColorStop(0, '#3b7990');
-            pondGradient.addColorStop(0.58, '#2b647e');
-            pondGradient.addColorStop(1, '#214d68');
-            ctx.fillStyle = pondGradient;
-            traceOrganicPond(ctx, o);
-            ctx.fill();
-
             ctx.strokeStyle = 'rgba(151, 213, 226, 0.18)';
             ctx.lineWidth = 2.2;
             ctx.setLineDash([22, 28]);
             ctx.lineDashOffset = -(this._frameNow * 0.012) % 50;
-            traceOrganicPond(ctx, o, 0, 0.64);
-            ctx.stroke();
+            this.strokeSurfacePath(ctx, o, 'pondWave64', path => traceOrganicPond(path, o, 0, 0.64));
             ctx.setLineDash([]);
 
             ctx.strokeStyle = 'rgba(185, 228, 235, 0.19)';
             ctx.lineWidth = 1.4;
-            traceOrganicPond(ctx, o, 0, 0.38);
-            ctx.stroke();
+            this.strokeSurfacePath(ctx, o, 'pondWave38', path => traceOrganicPond(path, o, 0, 0.38));
         }
         ctx.restore();
     }
 
-    drawRoadBody(ctx, o) {
+    drawRoadBody(ctx, o, allowCache = true) {
+        if (allowCache && this.drawCachedSurfaceLayer(ctx, o, 'roadBody', cacheCtx => this.drawRoadBody(cacheCtx, o, false))) return;
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
@@ -2626,12 +2670,10 @@ export class SurvivRenderer {
             if (o.variant === 'boardwalk') {
                 ctx.strokeStyle = '#493b2b';
                 ctx.lineWidth = (o.width || 48) + 8;
-                traceSmoothPath(ctx, o.points, o.x, o.y);
-                ctx.stroke();
+                this.strokeSurfacePath(ctx, o, 'trailCenter', path => traceSmoothPath(path, o.points, o.x, o.y));
                 ctx.strokeStyle = '#8a704d';
                 ctx.lineWidth = o.width || 48;
-                traceSmoothPath(ctx, o.points, o.x, o.y);
-                ctx.stroke();
+                this.strokeSurfacePath(ctx, o, 'trailCenter', path => traceSmoothPath(path, o.points, o.x, o.y));
 
                 forEachPathSample(o.points, 18, (worldX, worldY, angle) => {
                     ctx.save();
@@ -2655,12 +2697,10 @@ export class SurvivRenderer {
                 const palette = palettes[o.variant] || palettes.footpath;
                 ctx.strokeStyle = palette[0];
                 ctx.lineWidth = o.width || 54;
-                traceSmoothPath(ctx, o.points, o.x, o.y);
-                ctx.stroke();
+                this.strokeSurfacePath(ctx, o, 'trailCenter', path => traceSmoothPath(path, o.points, o.x, o.y));
                 ctx.strokeStyle = palette[1];
                 ctx.lineWidth = Math.max(12, (o.width || 54) - 13);
-                traceSmoothPath(ctx, o.points, o.x, o.y);
-                ctx.stroke();
+                this.strokeSurfacePath(ctx, o, 'trailCenter', path => traceSmoothPath(path, o.points, o.x, o.y));
 
                 ctx.fillStyle = 'rgba(52, 44, 32, 0.24)';
                 forEachPathSample(o.points, 76, (worldX, worldY, angle) => {
@@ -2730,8 +2770,9 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawRoadMarkings(ctx, o) {
+    drawRoadMarkings(ctx, o, allowCache = true) {
         if (o.kind === 'roadJunction') return;
+        if (allowCache && this.drawCachedSurfaceLayer(ctx, o, 'roadMarkings', cacheCtx => this.drawRoadMarkings(cacheCtx, o, false))) return;
         ctx.save();
         if (o.kind === 'trail_path' && o.points?.length) {
             ctx.translate(o.x, o.y);
@@ -2740,9 +2781,11 @@ export class SurvivRenderer {
                 ctx.strokeStyle = o.variant === 'gravel' ? 'rgba(45, 43, 37, 0.25)' : 'rgba(57, 45, 31, 0.28)';
                 ctx.lineWidth = 2.2;
                 ctx.setLineDash([22, 18]);
-                for (const offset of [-(o.width || 54) * 0.21, (o.width || 54) * 0.21]) {
-                    traceSmoothPath(ctx, offsetPathPoints(o.points, offset), o.x, o.y);
-                    ctx.stroke();
+                const trackOffsets = [-(o.width || 54) * 0.21, (o.width || 54) * 0.21];
+                for (let trackIndex = 0; trackIndex < trackOffsets.length; trackIndex++) {
+                    const offset = trackOffsets[trackIndex];
+                    this.strokeSurfacePath(ctx, o, `trailTrack${trackIndex}`,
+                        path => traceSmoothPath(path, offsetPathPoints(o.points, offset), o.x, o.y));
                 }
                 ctx.setLineDash([]);
             }
@@ -2885,6 +2928,10 @@ export class SurvivRenderer {
     }
 
     getVisibleRoadAxisRange(o, isHorizontal, padding = 160) {
+        if (this._buildingSurfaceCache) {
+            const length = isHorizontal ? o.w : o.h;
+            return { start: -length / 2 - padding, end: length / 2 + padding };
+        }
         const angle = -(o.rotation || 0);
         const cos = Math.cos(angle);
 
@@ -3027,6 +3074,8 @@ export class SurvivRenderer {
 
     drawObstacle(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
+        if (allowCache && (kind === 'field' || kind === 'bridge')
+            && this.drawCachedSurfaceLayer(ctx, o, kind, cacheCtx => this.drawObstacle(cacheCtx, o, false))) return;
         if (allowCache && this.drawCachedObstacle(ctx, o, kind)) return;
 
         // Roads and water are now handled via layered passes
@@ -3891,6 +3940,127 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    getCachedSurfacePath(o, key, tracePath) {
+        if (typeof Path2D === 'undefined' || !o) return null;
+        let paths = this._surfacePathCache.get(o);
+        if (!paths) {
+            paths = new Map();
+            this._surfacePathCache.set(o, paths);
+        }
+        let path = paths.get(key);
+        if (!path) {
+            path = new Path2D();
+            tracePath(path);
+            paths.set(key, path);
+        }
+        return path;
+    }
+
+    fillSurfacePath(ctx, o, key, tracePath) {
+        const path = this.getCachedSurfacePath(o, key, tracePath);
+        if (path) ctx.fill(path);
+        else {
+            tracePath(ctx);
+            ctx.fill();
+        }
+    }
+
+    strokeSurfacePath(ctx, o, key, tracePath) {
+        const path = this.getCachedSurfacePath(o, key, tracePath);
+        if (path) ctx.stroke(path);
+        else {
+            tracePath(ctx);
+            ctx.stroke();
+        }
+    }
+
+    clipSurfacePath(ctx, o, key, tracePath) {
+        const path = this.getCachedSurfacePath(o, key, tracePath);
+        if (path) ctx.clip(path);
+        else {
+            tracePath(ctx);
+            ctx.clip();
+        }
+    }
+    drawCachedSurfaceLayer(ctx, o, layer, drawLayer) {
+        if (typeof document === 'undefined' || !o?.id || this._buildingSurfaceCache) return false;
+
+        const padding = layer === 'field' ? 48
+            : o.kind === 'water' ? Math.ceil(Math.max(o.w || 0, o.h || 0) * 0.075 + 40)
+                : layer === 'waterShore' ? 44
+                    : layer === 'roadShoulder' ? 30 : 20;
+        const halfW = o._renderHalfW ?? Math.abs(Number(o.w) || 0) / 2;
+        const halfH = o._renderHalfH ?? Math.abs(Number(o.h) || 0) / 2;
+        const worldWidth = Math.ceil(halfW * 2 + padding * 2);
+        const worldHeight = Math.ceil(halfH * 2 + padding * 2);
+        const worldArea = worldWidth * worldHeight;
+        // Cache normal fields, ponds, junctions and local road/trail sections.
+        // Giant map-spanning splines stay vector-rendered to avoid huge textures.
+        if (!worldWidth || !worldHeight || worldWidth > 2800 || worldHeight > 2100 || worldArea > 2_650_000) return false;
+
+        const scale = Math.min(1.75, Math.max(1, (this.targetZoom || 1) * (this.renderDpr || 1)));
+        let objectKey = this._surfaceCacheKeyByObject.get(o);
+        if (!objectKey) {
+            const pointsKey = o.points?.length
+                ? o.points.map(point => `${Math.round(point.x)},${Math.round(point.y)}`).join(';')
+                : '';
+            objectKey = [
+                o.id, o.kind || '', o.variant || '', o.x, o.y, o.w, o.h, o.width || '',
+                Number(o.rotation || 0).toFixed(3), pointsKey,
+            ].join(':');
+            this._surfaceCacheKeyByObject.set(o, objectKey);
+        }
+        const key = `${objectKey}:${layer}:${scale.toFixed(2)}`;
+        let sprite = this._surfaceSpriteCache.get(key);
+        if (!sprite) {
+            // Large canvases are intentionally built one at a time so entering a
+            // new area cannot turn one frame into a long cache-generation spike.
+            if (this._surfaceCacheBuildsThisFrame >= 1) return false;
+            this._surfaceCacheBuildsThisFrame++;
+
+            const width = Math.ceil(worldWidth * scale);
+            const height = Math.ceil(worldHeight * scale);
+            const pixels = width * height;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const cacheCtx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+            if (!cacheCtx) return false;
+            cacheCtx.imageSmoothingEnabled = true;
+            cacheCtx.imageSmoothingQuality = 'medium';
+            cacheCtx.translate(width / 2, height / 2);
+            cacheCtx.scale(scale, scale);
+            cacheCtx.translate(-o.x, -o.y);
+            this._buildingSurfaceCache = true;
+            try {
+                drawLayer(cacheCtx);
+            } finally {
+                this._buildingSurfaceCache = false;
+            }
+            sprite = { canvas, worldWidth, worldHeight, pixels };
+
+            // Bound the cache by actual texture area (~56 MB RGBA), rather than
+            // item count, because surface dimensions vary enormously.
+            const maxPixels = 14_000_000;
+            while (this._surfaceSpriteCache.size && this._surfaceCachePixels + pixels > maxPixels) {
+                const oldestKey = this._surfaceSpriteCache.keys().next().value;
+                const oldest = this._surfaceSpriteCache.get(oldestKey);
+                this._surfaceCachePixels -= oldest?.pixels || 0;
+                this._surfaceSpriteCache.delete(oldestKey);
+            }
+            this._surfaceSpriteCache.set(key, sprite);
+            this._surfaceCachePixels += pixels;
+        }
+
+        ctx.drawImage(
+            sprite.canvas,
+            o.x - sprite.worldWidth / 2,
+            o.y - sprite.worldHeight / 2,
+            sprite.worldWidth,
+            sprite.worldHeight,
+        );
+        return true;
+    }
     drawCachedObstacle(ctx, o, kind) {
         if (typeof document === 'undefined' || !o?.id || !CACHEABLE_PROP_KINDS.has(kind)) return false;
         const maxCacheW = kind === 'houseFloor' ? 2000 : 320;
