@@ -21,7 +21,7 @@ import { API_URL } from '../../utils/apiBase';
 import { nextWeaponSlot } from '../../utils/gameWheel.js';
 
 const IS_MOBILE = isTouchDevice();
-const CASHOUT_SECONDS = 5;
+const CASHOUT_SECONDS = 0;
 const WORLD_HALF = 10000;
 
 const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
@@ -212,6 +212,7 @@ export default function SurvivGame() {
     const hasJoinedRef = useRef(false);
     const awaitingWelcomeRef = useRef(false);
     const cashoutActiveRef = useRef(false);
+    const cashoutHoldActiveRef = useRef(false);
     const playAgainPendingRef = useRef(false);
     const myIdRef = useRef(null);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
@@ -541,7 +542,7 @@ export default function SurvivGame() {
         };
 
         const onKeyDown = (e) => {
-            if (blockInputRef.current) return;
+            if (blockInputRef.current || cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
             const k = e.key.toLowerCase();
             if (k === 'tab' || k === 'i') {
                 e.preventDefault();
@@ -588,17 +589,17 @@ export default function SurvivGame() {
             renderer.handleKeyUp(e);
         };
         const onPointerMove = (e) => {
-            if (IS_MOBILE && e.pointerType !== 'mouse') return;
+            if (cashoutHoldActiveRef.current || cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            if (IS_MOBILE && e.pointerType !== 'mouse') return;
+            if (cashoutHoldActiveRef.current || cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
             renderer.handlePointerDown();
 
         };
-        const onPointerUp = () => renderer.handlePointerUp();
+        const onPointerUp = () => { if (!cashoutHoldActiveRef.current && !cashoutActiveRef.current) renderer.handlePointerUp(); };
         let lastWeaponWheelAt = 0;
         let wheelWeaponSlot = null;
         const onWheel = (e) => {
@@ -707,7 +708,11 @@ export default function SurvivGame() {
             renderer.start();
 
             if (world?.cashOutRemaining > 0) {
-                startCashoutCountdown(world.cashOutRemaining);
+                cashoutActiveRef.current = true;
+                setCashoutPending(true);
+                setLocalTimer(0);
+                cashOutEndAtRef.current = 0;
+                setCashOutEndAt(0);
             }
         });
 
@@ -762,8 +767,13 @@ export default function SurvivGame() {
             renderer.clearInput();
             renderer.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
         });
-        socket.on('cashOutStarting', ({ seconds }) => {
-            startCashoutCountdown(seconds || CASHOUT_SECONDS);
+        socket.on('cashOutStarting', () => {
+            cashoutActiveRef.current = true;
+            setCashoutPending(true);
+            setLocalTimer(0);
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            renderer.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
         });
 
         socket.on('cashOutSuccess', ({ amount }) => {
@@ -876,6 +886,8 @@ export default function SurvivGame() {
                 || !hasJoinedRef.current
                 || awaitingWelcomeRef.current
                 || blockInputRef.current
+                || cashoutHoldActiveRef.current
+                || cashoutActiveRef.current
                 || document.hidden
             ) return;
 
@@ -980,13 +992,14 @@ export default function SurvivGame() {
     }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser, handleCloseInventory]);
 
     const handleHoldStart = useCallback(() => {
+        cashoutHoldActiveRef.current = true;
         rendererRef.current?.setHoldStart(Date.now());
-        rendererRef.current?.clearInput();
-        rendererRef.current?.setInputEnabled(false);
+        rendererRef.current?.setInputEnabled(false, true);
         socketRef.current?.emit('cashOutHold', true);
     }, []);
 
     const handleHoldEnd = useCallback(() => {
+        cashoutHoldActiveRef.current = false;
         rendererRef.current?.setHoldStart(0);
         rendererRef.current?.setInputEnabled(true);
         socketRef.current?.emit('cashOutHold', false);

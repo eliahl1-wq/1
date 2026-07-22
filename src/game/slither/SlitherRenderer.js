@@ -627,9 +627,9 @@ export class SlitherRenderer {
         return end > 0 && end > nowMs;
     }
 
-    setInputEnabled(enabled) {
+    setInputEnabled(enabled, preserveInput = false) {
         this._inputEnabled = !!enabled;
-        if (!enabled) {
+        if (!enabled && !preserveInput) {
             this.inputDx = 0;
             this.inputDy = 0;
             this.boost = false;

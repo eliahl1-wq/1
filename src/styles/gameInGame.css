@@ -106,8 +106,17 @@ body.game-session-active #root {
     bottom: max(24px, env(safe-area-inset-bottom, 0px) + 16px);
     left: 50%;
     transform: translateX(-50%);
-    z-index: 110;
+    z-index: 2147483647;
     pointer-events: none;
+}
+
+.game-cashout-input-lock {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    pointer-events: auto;
+    touch-action: none;
+    cursor: default;
 }
 
 .game-cashout-stack {
@@ -2046,7 +2055,7 @@ body.game-session-active #root {
 /* Bottom center cashout button is completely cleared of overlaps */
 .surviv-game-page .game-cashout-wrap {
     bottom: 22px !important;
-    z-index: 110;
+    z-index: 2147483647;
 }
 
 /* Responsive Scaling & Mobile support */

@@ -99,54 +99,31 @@ function useHoldLogic(disabled, onHoldStart, onHoldEnd, onComplete) {
     return { isHolding, startHold, cancelHold };
 }
 
-function useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt) {
-    const [progress, setProgress] = useState(0);
-
-    useEffect(() => {
-        if (localTimer <= 0) {
-            setProgress(0);
-            return undefined;
-        }
-
-        const total = cashOutTotal || 10;
-        let raf = 0;
-
-        const tick = () => {
-            const remainingSec = cashOutEndAt > 0
-                ? Math.max(0, cashOutEndAt - Date.now()) / 1000
-                : localTimer;
-            const next = total > 0
-                ? Math.min(1, Math.max(0, 1 - remainingSec / total))
-                : 0;
-            setProgress(next);
-            if (remainingSec > 0) raf = requestAnimationFrame(tick);
-        };
-
-        raf = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(raf);
-    }, [localTimer, cashOutTotal, cashOutEndAt]);
-
-    return progress;
-}
 
 export default function GameCashoutBar({
     disabled,
     onHoldStart,
     onHoldEnd,
     onComplete,
-    localTimer = 0,
     pending = false,
-    cashOutTotal = 10,
-    cashOutEndAt = 0,
 }) {
-    const securingProgress = useSecuringProgress(localTimer, cashOutTotal, cashOutEndAt);
-
     const { isHolding, startHold, cancelHold } = useHoldLogic(
-        disabled || localTimer > 0 || pending,
+        disabled || pending,
         onHoldStart,
         onHoldEnd,
         onComplete
     );
+
+    useEffect(() => {
+        if (!isHolding) return undefined;
+        const blockOtherKeys = (event) => {
+            if (event.code === 'KeyQ') return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        };
+        window.addEventListener('keydown', blockOtherKeys, true);
+        return () => window.removeEventListener('keydown', blockOtherKeys, true);
+    }, [isHolding]);
 
     const handleHoldStart = (e) => {
         e.preventDefault();
@@ -158,7 +135,7 @@ export default function GameCashoutBar({
         cancelHold();
     };
 
-    if (pending && localTimer <= 0) {
+    if (pending) {
         return (
             <div className="game-cashout-wrap" role="status" aria-live="polite">
                 <div className="game-cashout-securing">
@@ -174,28 +151,12 @@ export default function GameCashoutBar({
         );
     }
 
-    if (localTimer > 0) {
-        return (
-            <div className="game-cashout-wrap">
-                <div className="game-cashout-securing">
-                    <div className="game-cashout-securing-head">
-                        <span className="game-cashout-securing-label">Securing</span>
-                        <span className="game-cashout-securing-time">{localTimer}s</span>
-                    </div>
-                    <div className="game-cashout-securing-track">
-                        <div
-                            className="game-cashout-securing-fill"
-                            style={{ transform: `scaleX(${securingProgress})` }}
-                        />
-                    </div>
-                </div>
-            </div>
-        );
-    }
 
     return (
-        <div className="game-cashout-wrap">
-            <div className="game-cashout-stack">
+        <>
+            {isHolding && <div className="game-cashout-input-lock" aria-hidden />}
+            <div className="game-cashout-wrap">
+                <div className="game-cashout-stack">
                 <button
                     type="button"
                     className={`game-cashout-btn btn btn-primary${isHolding ? ' game-cashout-btn--holding' : ''}`}
@@ -220,7 +181,8 @@ export default function GameCashoutBar({
                         Hold <KeyCap>Q</KeyCap> for {HOLD_SECONDS} second{HOLD_SECONDS === 1 ? '' : 's'}
                     </p>
                 )}
+                </div>
             </div>
-        </div>
+        </>
     );
 }

@@ -28,7 +28,7 @@ import { API_URL } from '../../utils/apiBase';
 
 
 const IS_MOBILE = isTouchDevice();
-const CASHOUT_SECONDS = 5;
+const CASHOUT_SECONDS = 0;
 const SLITHER_WORLD_HALF = 2400;
 const COMPETITIVE_WORLD_HALF = SLITHER_WORLD_HALF * 0.3;
 const SLITHER_SPEC_ZOOM = IS_MOBILE ? 2.05 : 2.88;
@@ -316,13 +316,14 @@ export default function SlitherGame() {
         if (!socketRef.current?.connected) return;
         if (cashoutActiveRef.current) return;
         rendererRef.current?.setHoldStart(0);
-        startCashoutCountdown(CASHOUT_SECONDS);
+        cashoutActiveRef.current = true;
+        setCashoutPending(true);
         socketRef.current.emit('cashOut');
-    }, [startCashoutCountdown]);
+    }, []);
 
     const handleHoldStart = useCallback((atMs) => {
         rendererRef.current?.setHoldStart(atMs);
-        rendererRef.current?.setInputEnabled(false);
+        rendererRef.current?.setInputEnabled(false, true);
         socketRef.current?.emit('cashOutHold', true);
     }, []);
 
@@ -563,7 +564,11 @@ export default function SlitherGame() {
             setGameReady(true);
             refreshUser?.();
             if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
-                startCashoutCountdown(gameSizes.cashOutRemaining, false);
+                cashoutActiveRef.current = true;
+                setCashoutPending(true);
+                setLocalTimer(0);
+                cashOutEndAtRef.current = 0;
+                setCashOutEndAt(0);
             }
         });
 
@@ -656,22 +661,13 @@ export default function SlitherGame() {
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
             rendererRef.current?.removeSnake(myIdRef.current);
         });
-        socket.on('cashOutStarting', ({ seconds }) => {
-            const total = seconds ?? CASHOUT_SECONDS;
-            if (!cashoutActiveRef.current) {
-                startCashoutCountdown(total);
-                return;
-            }
-            cashOutTotalRef.current = total;
-            const endAt = Date.now() + total * 1000;
-            cashOutEndAtRef.current = endAt;
-            setCashOutEndAt(endAt);
-            setLocalTimer(total);
-            rendererRef.current?.setHud({
-                cashoutEndAt: endAt,
-                cashoutTotal: total,
-                cashoutSeconds: total,
-            });
+        socket.on('cashOutStarting', () => {
+            cashoutActiveRef.current = true;
+            setCashoutPending(true);
+            setLocalTimer(0);
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
+            rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
         });
 
 

@@ -28,7 +28,7 @@ import { API_URL } from '../../utils/apiBase';
 import { adjustPlayerWheelZoom } from '../../utils/gameWheel.js';
 
 const IS_MOBILE = isTouchDevice();
-const CASHOUT_SECONDS = 5;
+const CASHOUT_SECONDS = 0;
 
 /** True when the local player's cell overlaps this pellet (we ate it or are eating it). */
 function foodEatenByPlayer(f, myId, users) {
@@ -104,6 +104,7 @@ export default function Game() {
     const timerIntervalRef = useRef(null);
     const animationFrameId = useRef(null);
     const cashoutActiveRef = useRef(false);
+    const cashoutHoldActiveRef = useRef(false);
     const playAgainPendingRef = useRef(false);
     const cashOutEndAtRef = useRef(0);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
@@ -262,16 +263,19 @@ export default function Game() {
         if (!canCashOutRef.current) return;
         if (cashoutActiveRef.current) return;
         global.holdStartAt = 0;
-        startCashoutCountdown(CASHOUT_SECONDS);
+        cashoutActiveRef.current = true;
+        setCashoutPending(true);
         socketRef.current?.emit('cashOut');
-    }, [startCashoutCountdown]);
+    }, []);
 
     const handleHoldStart = useCallback((atMs) => {
+        cashoutHoldActiveRef.current = true;
         global.holdStartAt = atMs;
         socketRef.current?.emit('cashOutHold', true);
     }, []);
 
     const handleHoldEnd = useCallback(() => {
+        cashoutHoldActiveRef.current = false;
         global.holdStartAt = 0;
         socketRef.current?.emit('cashOutHold', false);
     }, []);
@@ -429,9 +433,10 @@ export default function Game() {
                 });
             }
             
-            // Återuppta cashout-timer om man refreashar mitt i
             if (gameSizes?.cashOutRemaining > 0 && !gameSizes?.battleRoyale) {
-                startCashoutCountdown(gameSizes.cashOutRemaining);
+                cashoutActiveRef.current = true;
+                setCashoutPending(true);
+                setLocalTimer(0);
             }
         });
 
@@ -448,20 +453,14 @@ export default function Game() {
                 users: gameData.current.users.filter(user => user.id !== myIdRef.current),
             };
         });
-        socket.on('cashOutStarting', (data) => {
-            const seconds = data?.seconds ?? CASHOUT_SECONDS;
-            if (!cashoutActiveRef.current) {
-                startCashoutCountdown(seconds);
-                return;
-            }
-            cashOutTotalRef.current = seconds;
-            global.cashOutTotal = seconds;
-            const endAt = Date.now() + seconds * 1000;
-            cashOutEndAtRef.current = endAt;
-            global.cashOutEndAt = endAt;
-            setCashOutEndAt(endAt);
-            setLocalTimer(seconds);
-            global.cashOutTimer = seconds;
+        socket.on('cashOutStarting', () => {
+            cashoutActiveRef.current = true;
+            setCashoutPending(true);
+            setLocalTimer(0);
+            global.cashOutTimer = 0;
+            global.cashOutEndAt = 0;
+            cashOutEndAtRef.current = 0;
+            setCashOutEndAt(0);
         });
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
@@ -659,6 +658,7 @@ export default function Game() {
         });
 
         const handleKeyDown = (e) => {
+            if (cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
             if (e.code === 'Space') { 
                 socketRef.current?.emit('2'); // Split
             } else if (e.code === 'KeyW') {
@@ -903,11 +903,11 @@ export default function Game() {
 
     const tryDoubleTapEject = useMobileDoubleTapEject(
         IS_MOBILE && isConnected && !isDead && !isSpectating && cashedAmount === null,
-        () => socketRef.current?.emit('1'),
+        () => { if (!cashoutHoldActiveRef.current && !cashoutActiveRef.current) socketRef.current?.emit('1'); },
     );
 
     const handleMouseMove = (e) => {
-        if (isSpectating || isDead || cashedAmount !== null) return;
+        if (isSpectating || isDead || cashedAmount !== null || cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
@@ -926,7 +926,7 @@ export default function Game() {
     };
 
     const handleTouch = (e) => {
-        if (isSpectating || isDead || cashedAmount !== null) return;
+        if (isSpectating || isDead || cashedAmount !== null || cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const t = e.touches?.[0];
@@ -1146,8 +1146,8 @@ export default function Game() {
             {!isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={!cashoutReady}
-                    onHoldStart={() => { cashoutActiveRef.current = true; }}
-                    onHoldEnd={() => { cashoutActiveRef.current = false; }}
+                    onHoldStart={handleHoldStart}
+                    onHoldEnd={handleHoldEnd}
                     onComplete={handleCashOut}
                     localTimer={localTimer}
                     cashOutTotal={cashOutTotalRef.current}

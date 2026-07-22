@@ -432,6 +432,8 @@ export class SurvivRenderer {
         // Particle system (muzzle flash, bullet impacts, debris)
         this.particles = [];
         this.grenadeExplosions = [];
+        this.chestBursts = [];
+        this._lootBurstStates = new Map();
         // Hit marker (center-screen X when you deal damage)
         this.hitMarkers = [];
         // Damage direction indicators (red arcs at screen edge)
@@ -547,6 +549,7 @@ export class SurvivRenderer {
         this.deathMarkers = [];
         this.killAnimations = [];
         this._seenDeathMarkerIds.clear();
+        this._lootBurstStates.clear();
         this._graveFirstSeenAt.clear();
         this.obstacles = [];
         this.minimap = { players: [], food: [], obstacles: [] };
@@ -582,6 +585,8 @@ export class SurvivRenderer {
         this.lastLootId = null;
         this.particles = [];
         this.grenadeExplosions = [];
+        this.chestBursts = [];
+        this._lootBurstStates = new Map();
         this.hitMarkers = [];
         this.damageIndicators = [];
         this.damageNumbers = [];
@@ -590,6 +595,7 @@ export class SurvivRenderer {
         this._prevPlayers.clear();
         this._interpPlayers.clear();
         this._seenDeathMarkerIds.clear();
+        this._lootBurstStates.clear();
         this._prevHp = 100;
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
@@ -624,9 +630,9 @@ export class SurvivRenderer {
         Object.assign(this.hud, patch);
     }
 
-    setInputEnabled(enabled) {
+    setInputEnabled(enabled, preserveInput = false) {
         this.inputEnabled = enabled;
-        if (!enabled) this.clearInput();
+        if (!enabled && !preserveInput) this.clearInput();
     }
 
     setSpectatorMode(on, cam) {
@@ -747,6 +753,70 @@ export class SurvivRenderer {
         }
     }
 
+    _ingestLootSnapshots(nextLoot, receivedAt) {
+        for (const [id, state] of this._lootBurstStates) {
+            if (receivedAt >= state.endAt) this._lootBurstStates.delete(id);
+        }
+
+        for (const item of nextLoot) {
+            let state = this._lootBurstStates.get(item.id);
+            if (state) {
+                item._burstStartedAt = state.startedAt;
+                item._burstEndAt = state.endAt;
+                item._burstSpin = state.spin;
+                continue;
+            }
+
+            const remainingMs = clamp(Number(item.burstRemainingMs) || 0, 0, 700);
+            if (remainingMs <= 0 || !Number.isFinite(item.spawnX) || !Number.isFinite(item.spawnY)) continue;
+            const endAt = receivedAt + remainingMs;
+            state = {
+                startedAt: endAt - 700,
+                endAt,
+                spin: ((Number(item.burstIndex) || 0) % 2 === 0 ? -1 : 1)
+                    * (1.15 + ((Number(item.burstIndex) || 0) % 3) * 0.32),
+            };
+            this._lootBurstStates.set(item.id, state);
+            item._burstStartedAt = state.startedAt;
+            item._burstEndAt = state.endAt;
+            item._burstSpin = state.spin;
+
+            if (item.source !== 'chest') continue;
+            const burstKey = `${item.spawnX}:${item.spawnY}:${Math.round(state.endAt / 50)}`;
+            if (this.chestBursts.some(burst => burst.key === burstKey)) continue;
+            this.chestBursts.push({
+                key: burstKey,
+                x: item.spawnX,
+                y: item.spawnY,
+                tier: item.tier || 'common',
+                startedAt: state.startedAt,
+                endAt: state.endAt,
+            });
+
+            const burstColor = RARITY_COLORS[item.tier] || '#f5bd63';
+            for (let i = 0; i < 16; i++) {
+                const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
+                const speed = 65 + Math.random() * 105;
+                const shard = i < 9;
+                this.particles.push({
+                    x: item.spawnX,
+                    y: item.spawnY - 3,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 0.42 + Math.random() * 0.26,
+                    maxLife: 0.68,
+                    size: shard ? 3 + Math.random() * 2.5 : 1.5 + Math.random() * 2,
+                    color: shard ? (i % 2 ? '#8a5128' : '#c18442') : burstColor,
+                    type: shard ? 'chestShard' : 'chestSpark',
+                    rotation: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 12,
+                });
+            }
+            this.cameraShake.intensity = Math.min(5, this.cameraShake.intensity + 1.25);
+        }
+        return nextLoot;
+    }
+
     _ingestBulletSnapshots(bullets, receivedAt) {
         const activeIds = new Set();
         for (const bullet of bullets) {
@@ -825,7 +895,7 @@ export class SurvivRenderer {
         this.players = me
             ? [me, ...rawPlayers.filter(p => p.id !== me.id && !p.isYou)]
             : rawPlayers;
-        this.loot = tick.loot || [];
+        this.loot = this._ingestLootSnapshots(tick.loot || [], receivedAt);
         this.deathMarkers = Array.isArray(tick.deathMarkers) ? tick.deathMarkers : [];
         const activeMarkerIds = new Set();
         for (const marker of this.deathMarkers) {
@@ -941,8 +1011,8 @@ export class SurvivRenderer {
                 }
             }
         }
-        if (this.particles.length > 80) {
-            this.particles.splice(0, this.particles.length - 80);
+        if (this.particles.length > 110) {
+            this.particles.splice(0, this.particles.length - 110);
         }
         const nextBullets = tick.bullets || [];
         this._ingestBulletSnapshots(nextBullets, animationReceivedAt);
@@ -1927,7 +1997,7 @@ export class SurvivRenderer {
         let liveParticleCount = 0;
         for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
-            if (p.type === 'shell') {
+            if (p.type === 'shell' || p.type === 'chestShard') {
                 p.x += p.vx * dt;
                 p.y += p.vy * dt;
                 p.life -= dt;
@@ -2069,6 +2139,7 @@ export class SurvivRenderer {
         // Draw zone (gas circle)
         this.drawZone(ctx);
 
+        this.drawChestBursts(ctx, currentHouse, currentRoom);
         for (const l of this.loot) {
             if (this.isPointInView(l.x, l.y, 70) && !this.isLootHidden(l, currentHouse, currentRoom)) this.drawLoot(ctx, l);
         }
@@ -2654,14 +2725,24 @@ export class SurvivRenderer {
             if (markingIntervals.length) {
                 ctx.strokeStyle = 'rgba(235, 185, 60, 0.76)';
                 ctx.lineWidth = 2.5;
-                ctx.setLineDash([18, 18]);
+                // Draw explicit world-anchored dashes. A native dashed path restarts
+                // at the camera-clipped path edge, which makes the markings appear
+                // to slide as that edge moves with the player.
+                const dashLength = 18;
+                const dashPeriod = 36;
+                const roadAxisStart = -length / 2;
+                ctx.beginPath();
                 for (const interval of markingIntervals) {
-                    ctx.lineDashOffset = -((interval.start + length / 2) % 36);
-                    ctx.beginPath();
-                    line(interval.start, interval.end, 0);
-                    ctx.stroke();
+                    const firstDashIndex = Math.floor((interval.start - roadAxisStart) / dashPeriod);
+                    for (let dashIndex = firstDashIndex; ; dashIndex++) {
+                        const dashStart = roadAxisStart + dashIndex * dashPeriod;
+                        if (dashStart >= interval.end) break;
+                        const clippedStart = Math.max(interval.start, dashStart);
+                        const clippedEnd = Math.min(interval.end, dashStart + dashLength);
+                        if (clippedEnd > clippedStart) line(clippedStart, clippedEnd, 0);
+                    }
                 }
-                ctx.setLineDash([]);
+                ctx.stroke();
 
                 ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
                 ctx.lineWidth = 1.5;
@@ -3388,15 +3469,39 @@ export class SurvivRenderer {
         } else if (kind === 'fallenLog') {
             const halfW = o.w / 2;
             const halfH = o.h / 2;
-            ctx.fillStyle = 'rgba(15, 18, 12, 0.24)';
-            roundRect(ctx, -halfW + 3, -halfH + 7, o.w, o.h, halfH);
+            // Keep the cast shadow pointing down-right in world space even though
+            // the log itself is rotated. This matches trees, rocks and crates.
+            const rotation = o.rotation || 0;
+            const shadowWorldX = 3.5;
+            const shadowWorldY = 6;
+            const shadowLocalX = Math.cos(rotation) * shadowWorldX + Math.sin(rotation) * shadowWorldY;
+            const shadowLocalY = -Math.sin(rotation) * shadowWorldX + Math.cos(rotation) * shadowWorldY;
+            ctx.save();
+            ctx.translate(shadowLocalX, shadowLocalY);
+            ctx.shadowColor = 'rgba(8, 13, 8, 0.18)';
+            ctx.shadowBlur = 4;
+            ctx.fillStyle = 'rgba(11, 16, 10, 0.25)';
+            roundRect(ctx, -halfW + 2, -halfH + 2, o.w - 4, o.h - 4, halfH * 0.78);
+            ctx.fill();
+            ctx.restore();
+
+            // A tighter contact shadow grounds the trunk without creating a dark halo.
+            ctx.fillStyle = 'rgba(18, 20, 13, 0.18)';
+            roundRect(ctx, -halfW + 5, halfH * 0.2, o.w - 10, halfH * 0.62, halfH * 0.3);
             ctx.fill();
             const logGradient = ctx.createLinearGradient(0, -halfH, 0, halfH);
             logGradient.addColorStop(0, o.variant === 'birch' ? '#c0b69c' : '#725035');
+            logGradient.addColorStop(0.42, o.variant === 'birch' ? '#aaa188' : '#68472f');
             logGradient.addColorStop(1, o.variant === 'birch' ? '#827b6c' : '#4d3423');
             ctx.fillStyle = logGradient;
             roundRect(ctx, -halfW, -halfH, o.w, o.h, halfH * 0.72);
             ctx.fill();
+            ctx.strokeStyle = 'rgba(225, 184, 121, 0.16)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(-halfW + halfH * 0.55, -halfH * 0.62);
+            ctx.lineTo(halfW - halfH * 0.55, -halfH * 0.62);
+            ctx.stroke();
             ctx.strokeStyle = 'rgba(43, 28, 18, 0.52)';
             ctx.lineWidth = 1.2;
             for (let x = -halfW + 14; x < halfW - 8; x += 15) {
@@ -3741,16 +3846,98 @@ export class SurvivRenderer {
         return true;
     }
 
+    drawChestBursts(ctx, currentHouse = null, currentRoom = null) {
+        if (!this.chestBursts.length) return;
+        const now = this._frameNow;
+        let liveCount = 0;
+        ctx.save();
+        for (const burst of this.chestBursts) {
+            if (now >= burst.endAt) continue;
+            this.chestBursts[liveCount++] = burst;
+            if (!this.isPointInView(burst.x, burst.y, 90)) continue;
+            if (this.isPointHiddenByRooms(burst.x, burst.y, currentHouse, currentRoom)) continue;
+
+            const t = clamp((now - burst.startedAt) / Math.max(1, burst.endAt - burst.startedAt), 0, 1);
+            const ease = 1 - Math.pow(1 - t, 3);
+            const alpha = Math.max(0, 1 - t);
+            const tierColor = RARITY_COLORS[burst.tier] || '#f5bd63';
+            ctx.save();
+            ctx.translate(burst.x, burst.y);
+
+            ctx.globalAlpha = alpha * 0.72;
+            ctx.strokeStyle = tierColor;
+            ctx.lineWidth = 3 - t * 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 14 + ease * 48, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.globalAlpha = alpha * 0.38;
+            ctx.strokeStyle = '#fff3c4';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 8 + ease * 31, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // The lid flips away as the contents launch from the chest center.
+            ctx.save();
+            ctx.translate(0, -8 - Math.sin(t * Math.PI) * 28 - ease * 10);
+            ctx.rotate(-0.08 + ease * 1.15);
+            ctx.globalAlpha = Math.max(0, 1 - t * 1.25);
+            ctx.fillStyle = burst.tier === 'rare' ? '#2f69b5'
+                : burst.tier === 'military' ? '#53653d'
+                    : '#8c4d27';
+            ctx.strokeStyle = 'rgba(23, 13, 7, 0.85)';
+            ctx.lineWidth = 2;
+            roundRect(ctx, -21, -6, 42, 12, 3);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = tierColor;
+            ctx.fillRect(-2, -6, 4, 12);
+            ctx.restore();
+
+            ctx.restore();
+        }
+        ctx.restore();
+        this.chestBursts.length = liveCount;
+    }
+
     drawLoot(ctx, l) {
         const color = l.type === 'ammo' ? (AMMO_COLORS[l.ammoType] || LOOT_COLORS.ammo) : (LOOT_COLORS[l.type] || '#d5d5d5');
         const isChest = l.type === 'chest' || l.type === 'deathCrate';
         const pulse = isChest ? 1 : (1 + Math.sin(this._frameNow / 190 + l.x * 0.03) * 0.06);
+        const isBursting = !isChest && l._burstEndAt > this._frameNow && Number.isFinite(l.spawnX) && Number.isFinite(l.spawnY);
+        const burstDuration = Math.max(1, (l._burstEndAt || 0) - (l._burstStartedAt || 0));
+        const burstT = isBursting
+            ? clamp((this._frameNow - l._burstStartedAt) / burstDuration, 0, 1)
+            : 1;
+        const burstEase = 1 - Math.pow(1 - burstT, 3);
+        const arcHeight = l.type === 'weapon' ? 44 : 32;
+        const drawX = isBursting ? lerp(l.spawnX, l.x, burstEase) : l.x;
+        const drawY = isBursting
+            ? lerp(l.spawnY, l.y, burstEase) - Math.sin(burstT * Math.PI) * arcHeight
+            : l.y;
+        const landingBounce = burstT > 0.72
+            ? Math.sin(((burstT - 0.72) / 0.28) * Math.PI) * 0.16
+            : 0;
+        const burstScale = isBursting ? 0.48 + burstEase * 0.52 + landingBounce : 1;
+
         ctx.save();
-        ctx.translate(l.x, l.y);
-        ctx.scale(pulse, pulse);
+        if (isBursting) {
+            ctx.fillStyle = `rgba(4, 7, 5, ${0.12 + burstEase * 0.24})`;
+            ctx.beginPath();
+            ctx.ellipse(l.x, l.y + 10, 10 + burstEase * 8, 3 + burstEase * 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.translate(drawX, drawY);
+        if (isBursting) ctx.rotate((1 - burstEase) * (l._burstSpin || 0));
+        ctx.scale(pulse * burstScale, pulse * burstScale);
 
         if (isChest) {
             const hovered = this.hoveredChestId === l.id;
+            const holding = this.chestHoldId === l.id;
+            const holdProgress = holding
+                ? clamp((this._frameNow - this.chestHoldStartedAt) / 2000, 0, 1)
+                : 0;
             const isDeathCrate = l.type === 'deathCrate';
             const tierColor = isDeathCrate ? '#a855f7' : (RARITY_COLORS[l.tier] || '#d7c396');
             const glowRad = 34 + Math.sin(this._frameNow / 260 + l.x * 0.035) * 5;
@@ -3780,7 +3967,10 @@ export class SurvivRenderer {
                         : { lid: '#7c3a27', body: '#502315', trim: '#ca8a04', dark: '#2b1008', lock: '#fbbf24', glow: '#f59e0b' };
 
             ctx.save();
-            ctx.rotate(isDeathCrate ? 0.045 : -0.055);
+            const baseRotation = isDeathCrate ? 0.045 : -0.055;
+            const anticipation = holding ? Math.sin(this._frameNow / 34) * 0.025 * (0.35 + holdProgress) : 0;
+            ctx.translate(0, holding ? -Math.abs(Math.sin(this._frameNow / 70)) * holdProgress * 1.3 : 0);
+            ctx.rotate(baseRotation + anticipation);
 
             // Apply interactive glow when hovered
             if (hovered) {
@@ -4056,11 +4246,8 @@ export class SurvivRenderer {
             ctx.restore();
 
             const nearby = !!this.me && Math.hypot(this.me.x - l.x, this.me.y - l.y) <= 96;
-            const holding = this.chestHoldId === l.id;
             if (nearby || holding) {
-                const progress = holding
-                    ? clamp((this._frameNow - this.chestHoldStartedAt) / 2000, 0, 1)
-                    : 0;
+                const progress = holdProgress;
                 ctx.fillStyle = 'rgba(7, 10, 8, 0.86)';
                 ctx.beginPath();
                 ctx.arc(0, -33, 12, 0, Math.PI * 2);
@@ -4085,10 +4272,12 @@ export class SurvivRenderer {
                 ctx.fillText(holding ? 'OPENING...' : 'HOLD TO OPEN', 0, -51);
             }
         } else {
-            ctx.fillStyle = 'rgba(6, 9, 7, 0.34)';
-            ctx.beginPath();
-            ctx.ellipse(0, 10, 18, 7, 0, 0, Math.PI * 2);
-            ctx.fill();
+            if (!isBursting) {
+                ctx.fillStyle = 'rgba(6, 9, 7, 0.34)';
+                ctx.beginPath();
+                ctx.ellipse(0, 10, 18, 7, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             const groundGlow = ctx.createRadialGradient(0, 0, 3, 0, 0, 25);
             groundGlow.addColorStop(0, color + '38');
@@ -6098,7 +6287,17 @@ export class SurvivRenderer {
             const alpha = clamp(p.life / (p.maxLife || 0.2), 0, 1);
             ctx.globalAlpha = alpha;
 
-            if (p.type === 'shell') {
+            if (p.type === 'chestShard') {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation || 0);
+                ctx.fillStyle = p.color || '#9a5c2d';
+                ctx.strokeStyle = 'rgba(42, 22, 10, 0.55)';
+                ctx.lineWidth = 0.8;
+                ctx.fillRect(-p.size, -p.size * 0.42, p.size * 2, p.size * 0.84);
+                ctx.strokeRect(-p.size, -p.size * 0.42, p.size * 2, p.size * 0.84);
+                ctx.restore();
+            } else if (p.type === 'shell') {
                 ctx.save();
                 ctx.translate(p.x, p.y);
                 ctx.rotate(p.rotation || 0);
