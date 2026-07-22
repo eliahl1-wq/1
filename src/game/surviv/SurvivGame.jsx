@@ -212,7 +212,6 @@ export default function SurvivGame() {
     const hasJoinedRef = useRef(false);
     const awaitingWelcomeRef = useRef(false);
     const cashoutActiveRef = useRef(false);
-    const cashoutHoldActiveRef = useRef(false);
     const playAgainPendingRef = useRef(false);
     const myIdRef = useRef(null);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
@@ -542,7 +541,7 @@ export default function SurvivGame() {
         };
 
         const onKeyDown = (e) => {
-            if (blockInputRef.current || cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
+            if (blockInputRef.current || cashoutActiveRef.current) return;
             const k = e.key.toLowerCase();
             if (k === 'tab' || k === 'i') {
                 e.preventDefault();
@@ -589,17 +588,17 @@ export default function SurvivGame() {
             renderer.handleKeyUp(e);
         };
         const onPointerMove = (e) => {
-            if (cashoutHoldActiveRef.current || cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
+            if (cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            if (cashoutHoldActiveRef.current || cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
+            if (cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
             renderer.handlePointerDown();
 
         };
-        const onPointerUp = () => { if (!cashoutHoldActiveRef.current && !cashoutActiveRef.current) renderer.handlePointerUp(); };
+        const onPointerUp = () => { if (!cashoutActiveRef.current) renderer.handlePointerUp(); };
         let lastWeaponWheelAt = 0;
         let wheelWeaponSlot = null;
         const onWheel = (e) => {
@@ -886,7 +885,6 @@ export default function SurvivGame() {
                 || !hasJoinedRef.current
                 || awaitingWelcomeRef.current
                 || blockInputRef.current
-                || cashoutHoldActiveRef.current
                 || cashoutActiveRef.current
                 || document.hidden
             ) return;
@@ -992,16 +990,12 @@ export default function SurvivGame() {
     }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser, handleCloseInventory]);
 
     const handleHoldStart = useCallback(() => {
-        cashoutHoldActiveRef.current = true;
         rendererRef.current?.setHoldStart(Date.now());
-        rendererRef.current?.setInputEnabled(false, true);
         socketRef.current?.emit('cashOutHold', true);
     }, []);
 
     const handleHoldEnd = useCallback(() => {
-        cashoutHoldActiveRef.current = false;
         rendererRef.current?.setHoldStart(0);
-        rendererRef.current?.setInputEnabled(true);
         socketRef.current?.emit('cashOutHold', false);
     }, []);
 

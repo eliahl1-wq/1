@@ -104,7 +104,6 @@ export default function Game() {
     const timerIntervalRef = useRef(null);
     const animationFrameId = useRef(null);
     const cashoutActiveRef = useRef(false);
-    const cashoutHoldActiveRef = useRef(false);
     const playAgainPendingRef = useRef(false);
     const cashOutEndAtRef = useRef(0);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
@@ -269,13 +268,11 @@ export default function Game() {
     }, []);
 
     const handleHoldStart = useCallback((atMs) => {
-        cashoutHoldActiveRef.current = true;
         global.holdStartAt = atMs;
         socketRef.current?.emit('cashOutHold', true);
     }, []);
 
     const handleHoldEnd = useCallback(() => {
-        cashoutHoldActiveRef.current = false;
         global.holdStartAt = 0;
         socketRef.current?.emit('cashOutHold', false);
     }, []);
@@ -658,7 +655,7 @@ export default function Game() {
         });
 
         const handleKeyDown = (e) => {
-            if (cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
+            if (cashoutActiveRef.current) return;
             if (e.code === 'Space') { 
                 socketRef.current?.emit('2'); // Split
             } else if (e.code === 'KeyW') {
@@ -903,11 +900,11 @@ export default function Game() {
 
     const tryDoubleTapEject = useMobileDoubleTapEject(
         IS_MOBILE && isConnected && !isDead && !isSpectating && cashedAmount === null,
-        () => { if (!cashoutHoldActiveRef.current && !cashoutActiveRef.current) socketRef.current?.emit('1'); },
+        () => { if (!cashoutActiveRef.current) socketRef.current?.emit('1'); },
     );
 
     const handleMouseMove = (e) => {
-        if (isSpectating || isDead || cashedAmount !== null || cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
+        if (isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
@@ -926,7 +923,7 @@ export default function Game() {
     };
 
     const handleTouch = (e) => {
-        if (isSpectating || isDead || cashedAmount !== null || cashoutHoldActiveRef.current || cashoutActiveRef.current) return;
+        if (isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const t = e.touches?.[0];

@@ -116,13 +116,18 @@ export default function GameCashoutBar({
 
     useEffect(() => {
         if (!isHolding) return undefined;
-        const blockOtherKeys = (event) => {
-            if (event.code === 'KeyQ') return;
+        const blockOtherButtons = (event) => {
+            const control = event.target?.closest?.('button, a, input, select, textarea, [role=button], .btn, .ui-btn');
+            if (!control || control.closest('.game-cashout-btn')) return;
             event.preventDefault();
             event.stopImmediatePropagation();
         };
-        window.addEventListener('keydown', blockOtherKeys, true);
-        return () => window.removeEventListener('keydown', blockOtherKeys, true);
+        document.addEventListener('pointerdown', blockOtherButtons, true);
+        document.addEventListener('click', blockOtherButtons, true);
+        return () => {
+            document.removeEventListener('pointerdown', blockOtherButtons, true);
+            document.removeEventListener('click', blockOtherButtons, true);
+        };
     }, [isHolding]);
 
     const handleHoldStart = (e) => {
@@ -154,7 +159,6 @@ export default function GameCashoutBar({
 
     return (
         <>
-            {isHolding && <div className="game-cashout-input-lock" aria-hidden />}
             <div className="game-cashout-wrap">
                 <div className="game-cashout-stack">
                 <button
