@@ -1253,7 +1253,7 @@ export default function AdminDashboard() {
                                     style={{ width: '100%', padding: '9px 11px' }}
                                 />
                             </label>
-                            <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={savePregamePlayingOverride}>
+                            <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => savePregamePlayingOverride()}>
                                 Save for everyone
                             </button>
                             <button type="button" className="btn btn-ghost" disabled={actionLoading} onClick={() => savePregamePlayingOverride('')}>
