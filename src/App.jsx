@@ -12,7 +12,6 @@ const SurvivGame = lazy(() => import('./game/surviv/SurvivGame'));
 import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
 import AdminDashboard from './pages/AdminDashboard';
-import AdminSandbox from './pages/AdminSandbox';
 import HowItWorks from './pages/HowItWorks';
 import Faq from './pages/Faq';
 import Rewards from './pages/Rewards';
@@ -148,7 +147,6 @@ function App() {
                 <Route path="/surviv" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                <Route path="/admin/sandbox" element={<AdminRoute><AdminSandbox /></AdminRoute>} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/faq" element={<Faq />} />
                 <Route path="/rewards" element={<PrivateRoute><Rewards /></PrivateRoute>} />

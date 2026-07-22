@@ -787,7 +787,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
 }
 
 export default function AdminDashboard() {
-    const { token } = useAuth();
+    const { token, user, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [tab, setTab] = useState('overview');
     const [loading, setLoading] = useState(true);
@@ -940,6 +940,25 @@ export default function AdminDashboard() {
         }, 5000);
         return () => clearInterval(id);
     }, [tab, txFilter, showExcluded, fetchTransactions]);
+
+    const togglePersonalFreePlay = async (enabled) => {
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            await fetchAdmin('/api/admin/personal-free-play', {
+                method: 'PUT',
+                body: JSON.stringify({ enabled }),
+            });
+            await refreshUser({ forceBalance: true });
+            setActionMsg(enabled
+                ? '✅ Personal sandbox enabled. All normal gamemode screens now run as free play only for your account.'
+                : '✅ Personal sandbox disabled. Your account uses real entries again.');
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     const savePregamePlayingOverride = async (nextValue = pregamePlayingOverride) => {
         setActionLoading(true);
@@ -1173,9 +1192,15 @@ export default function AdminDashboard() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <LiveIndicator active={tab === 'activity' || tab === 'overview'} />
-                        <button className="btn btn-primary" onClick={() => navigate('/admin/sandbox')} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
-                            Sandbox Studio
-                        </button>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '10px', background: user?.personalFreePlay ? 'rgba(34,197,94,.12)' : 'rgba(255,255,255,.035)', color: 'var(--text-h)', fontSize: '.76rem', fontWeight: 800, cursor: actionLoading ? 'wait' : 'pointer' }}>
+                            <input
+                                type="checkbox"
+                                checked={!!user?.personalFreePlay}
+                                disabled={actionLoading}
+                                onChange={event => togglePersonalFreePlay(event.target.checked)}
+                            />
+                            Sandbox free play
+                        </label>
                         <button className="btn btn-ghost" onClick={() => loadData()} disabled={loading} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
                             {loading ? 'Refreshing…' : 'Refresh'}
                         </button>
