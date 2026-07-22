@@ -167,7 +167,7 @@ const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor
 const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
 const CACHEABLE_PROP_KINDS = new Set([
-    'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
+    'houseFloor', 'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
     'door', 'furniture', 'machine', 'sandbag', 'signpost',
     'stump', 'fallenLog', 'hayBale', 'reeds', 'grassTuft', 'wildflowers', 'mushrooms',
 ]);
@@ -340,7 +340,7 @@ export class SurvivRenderer {
         this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
-        this.targetZoom = 1.15;
+        this.targetZoom = 1.32;
         this.isMobileLayout = false;
         this.worldHalf = 10000;
         this.myId = null;
@@ -467,6 +467,11 @@ export class SurvivRenderer {
         this._currentVisibilityHouseId = null;
         this._losCacheKey = '';
         this._losCachedPolygon = null;
+        this._losDisplayPolygon = null;
+        this._losLastBuildAt = 0;
+        this._losLastPlayerX = NaN;
+        this._losLastPlayerY = NaN;
+        this._frameDt = 1 / 60;
         this._minimapCanvas = null;
         this._minimapCtx = null;
         this._nextMinimapRenderAt = 0;
@@ -499,20 +504,20 @@ export class SurvivRenderer {
         // Keep phone-sized Retina canvases sharp while capping total GPU pixels.
         const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
         this.isMobileLayout = coarsePointer || w < 760;
-        const pixelBudgetDpr = Math.sqrt(1_850_000 / Math.max(1, w * h));
-        const dprCap = this.isMobileLayout ? 1.4 : 1.2;
-        const dpr = Math.max(0.75, Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr));
+        const pixelBudgetDpr = Math.sqrt(1_550_000 / Math.max(1, w * h));
+        const dprCap = this.isMobileLayout ? 1.25 : 1;
+        const dpr = Math.max(0.7, Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr));
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'medium';
+        this.ctx.imageSmoothingQuality = 'low';
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;
-        this.targetZoom = this.isMobileLayout ? 0.92 : 1.15;
+        this.targetZoom = this.isMobileLayout ? 1.05 : 1.32;
         if (!this.spectatorMode) this.zoom = this.targetZoom;
     }
 
@@ -568,6 +573,10 @@ export class SurvivRenderer {
         this._currentVisibilityHouseId = null;
         this._losCacheKey = '';
         this._losCachedPolygon = null;
+        this._losDisplayPolygon = null;
+        this._losLastBuildAt = 0;
+        this._losLastPlayerX = NaN;
+        this._losLastPlayerY = NaN;
         this.surfaceObstacles = [];
         this.fieldObstacles = [];
         this.waterObstacles = [];
@@ -1837,7 +1846,7 @@ export class SurvivRenderer {
         // Exact endpoint rays keep corners crisp; 24 sweep rays keep indoor
         // 900px-radius edge sub-pixel smooth without the old O(256 * segments)
         // intersection cost every animation frame.
-        const sweepCount = 24;
+        const sweepCount = 20;
         for (let i = 0; i < sweepCount; i++) {
             angles.add((Math.PI * 2 * i) / sweepCount);
         }
@@ -1849,7 +1858,7 @@ export class SurvivRenderer {
         // same direction are already occluded by that nearer edge.
         const epsilon = 0.00005;
         const epRangeSq = (maxDist + 200) * (maxDist + 200);
-        const endpointBinCount = 120;
+        const endpointBinCount = 96;
         const endpointBins = new Map();
         const collectEndpoint = (x, y) => {
             const dx = x - px;
@@ -1900,17 +1909,42 @@ export class SurvivRenderer {
         const py = this.me.y;
         const maxDist = 900;
 
-        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}:${Math.round(px / 12)}:${Math.round(py / 12)}`;
+        const now = performance.now();
+        const cacheKey = `${currentHouse.id}:${this._obstacleRevision}`;
         let polygon = this._losCachedPolygon;
-        if (cacheKey !== this._losCacheKey || !polygon) {
+        const playerMoved = !Number.isFinite(this._losLastPlayerX)
+            || Math.hypot(px - this._losLastPlayerX, py - this._losLastPlayerY) >= 1.5;
+        const needsRebuild = cacheKey !== this._losCacheKey
+            || !polygon
+            || (playerMoved && now - this._losLastBuildAt >= 30);
+        if (needsRebuild) {
             const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse);
             polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
             this._losCacheKey = cacheKey;
             this._losCachedPolygon = polygon;
+            this._losLastBuildAt = now;
+            this._losLastPlayerX = px;
+            this._losLastPlayerY = py;
         }
-        if (polygon.length < 3) return;
+        if (!polygon || polygon.length < 3) return;
+        // Collision/visibility uses the newest authoritative shape immediately.
         this._currentVisibilityPolygon = polygon;
         this._currentVisibilityHouseId = currentHouse.id;
+
+        // Render a frame-rate-independent blend between LOS updates. This removes
+        // the old 12-world-unit shadow jumps without ray-casting at 140 Hz.
+        let displayPolygon = this._losDisplayPolygon;
+        if (!displayPolygon || displayPolygon.length !== polygon.length || cacheKey !== this._losDisplayCacheKey) {
+            displayPolygon = polygon.map(point => ({ x: point.x, y: point.y }));
+            this._losDisplayPolygon = displayPolygon;
+            this._losDisplayCacheKey = cacheKey;
+        } else {
+            const shadowAlpha = 1 - Math.exp(-Math.min(this._frameDt, 0.05) * 28);
+            for (let i = 0; i < polygon.length; i++) {
+                displayPolygon[i].x = lerp(displayPolygon[i].x, polygon[i].x, shadowAlpha);
+                displayPolygon[i].y = lerp(displayPolygon[i].y, polygon[i].y, shadowAlpha);
+            }
+        }
 
         ctx.save();
 
@@ -1924,9 +1958,9 @@ export class SurvivRenderer {
         // Outer rectangle (the dark overlay covering the whole world)
         ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
         // Visibility polygon
-        ctx.moveTo(polygon[0].x, polygon[0].y);
-        for (let i = 1; i < polygon.length; i++) {
-            ctx.lineTo(polygon[i].x, polygon[i].y);
+        ctx.moveTo(displayPolygon[0].x, displayPolygon[0].y);
+        for (let i = 1; i < displayPolygon.length; i++) {
+            ctx.lineTo(displayPolygon[i].x, displayPolygon[i].y);
         }
         ctx.closePath();
         ctx.fill('evenodd');
@@ -1996,6 +2030,7 @@ export class SurvivRenderer {
     }
 
     draw(dt = 1 / 60) {
+        this._frameDt = dt;
         this._frameNow = Date.now();
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleCacheBuildsThisFrame = 0;
@@ -3858,7 +3893,9 @@ export class SurvivRenderer {
 
     drawCachedObstacle(ctx, o, kind) {
         if (typeof document === 'undefined' || !o?.id || !CACHEABLE_PROP_KINDS.has(kind)) return false;
-        if (o.w > 320 || o.h > 320 || !o.w || !o.h) return false;
+        const maxCacheW = kind === 'houseFloor' ? 2000 : 320;
+        const maxCacheH = kind === 'houseFloor' ? 1400 : 320;
+        if (o.w > maxCacheW || o.h > maxCacheH || !o.w || !o.h) return false;
 
         const key = [o.id, kind, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || ''].join(':');
         let sprite = this._obstacleSpriteCache.get(key);
@@ -6021,7 +6058,7 @@ export class SurvivRenderer {
         if (typeof document === 'undefined' || !o?.id) return false;
         // Huge landmarks would create multi-megabyte single sprites. Their
         // custom roof is uncommon, while normal houses gain most from caching.
-        if (o.w > 1400 || o.h > 1100) return false;
+        if (o.w > 2000 || o.h > 1400) return false;
 
         const key = [o.id, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.label || '', o.landmarkType || ''].join(':');
         let sprite = this._roofSpriteCache.get(key);
