@@ -220,6 +220,7 @@ export default function PreGame() {
         playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0, competitiveSlither: 0, surviv: 0 },
         siteUsersOnline: 0,
     });
+    const [pregamePlayingOverride, setPregamePlayingOverride] = useState(null);
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [showDiscovery, setShowDiscovery] = useState(false);
@@ -423,6 +424,7 @@ export default function PreGame() {
 
 
     const siteUsersOnline = (liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0) + (liveStats.totalBotsOnline ?? 0);
+    const pregamePlayingCount = pregamePlayingOverride ?? siteUsersOnline;
     const globalCashoutTotalUsd =
         liveStats.globalPlayerEarningsUsd
         ?? liveStats.totalUserBalanceUsd
@@ -564,17 +566,26 @@ export default function PreGame() {
         let alive = true;
         const fetchStats = async () => {
             try {
-                const r = await fetch(`${API_URL}/api/stats?t=${Date.now()}`, {
-                    headers: {
-                        'bypass-tunnel-reminders': 'true',
-                        'Cache-Control': 'no-cache',
-                        ...buildPresenceHeaders({
-                            page: location.pathname,
-                            gamemode: selectedMode,
-                        }),
-                    },
-                });
+                const [r, displaySettingsResponse] = await Promise.all([
+                    fetch(API_URL + '/api/stats?t=' + Date.now(), {
+                        headers: {
+                            'bypass-tunnel-reminders': 'true',
+                            'Cache-Control': 'no-cache',
+                            ...buildPresenceHeaders({
+                                page: location.pathname,
+                                gamemode: selectedMode,
+                            }),
+                        },
+                    }),
+                    fetch(API_URL + '/api/pregame/display-settings?t=' + Date.now(), {
+                        headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' },
+                    }),
+                ]);
                 if (r.ok && alive) setLiveStats(await r.json());
+                if (displaySettingsResponse.ok && alive) {
+                    const settings = await displaySettingsResponse.json();
+                    setPregamePlayingOverride(Number.isInteger(settings.playingOverride) ? settings.playingOverride : null);
+                }
             } catch { }
         };
         fetchStats();
@@ -1470,7 +1481,7 @@ export default function PreGame() {
                                     <div className="mode-playing-count">
                                         <span className="live-dot" aria-hidden="true" />
                                         <span>
-                                            Playing: <span className="mono">{siteUsersOnline}</span>
+                                            Playing: <span className="mono">{pregamePlayingCount}</span>
                                         </span>
                                     </div>
                                     <button

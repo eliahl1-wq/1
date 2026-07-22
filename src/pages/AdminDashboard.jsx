@@ -819,6 +819,7 @@ export default function AdminDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
     const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
+    const [pregamePlayingOverride, setPregamePlayingOverride] = useState('');
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -884,13 +885,14 @@ export default function AdminDashboard() {
             if (includeExcludedUsers) userParams.set('showExcluded', 'true');
             if (sort) userParams.set('sort', sort);
             const userQuery = userParams.toString() ? `?${userParams}` : '';
-            const [ov, au, us, wal, sw, security] = await Promise.all([
+            const [ov, au, us, wal, sw, security, pregameDisplay] = await Promise.all([
                 fetchAdmin('/api/admin/dashboard/overview'),
                 fetchAdmin('/api/admin/dashboard/active-users'),
                 fetchAdmin(`/api/admin/dashboard/users${userQuery}`),
                 fetchAdmin('/api/admin/dashboard/wallets'),
                 fetchAdmin('/api/admin/dashboard/sweeps'),
                 fetchAdmin('/api/admin/reward-security-alerts'),
+                fetchAdmin('/api/pregame/display-settings'),
             ]);
             setOverview(ov);
             setActiveUsers(au);
@@ -899,6 +901,7 @@ export default function AdminDashboard() {
             setSweeps(sw.sweeps ?? []);
             setRewardAlerts(security.alerts ?? []);
             setPendingRewardClaims(security.pendingClaims ?? []);
+            setPregamePlayingOverride(pregameDisplay.playingOverride ?? '');
             await Promise.all([
                 fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded),
                 fetchLiveFeed(true),
@@ -937,6 +940,25 @@ export default function AdminDashboard() {
         }, 5000);
         return () => clearInterval(id);
     }, [tab, txFilter, showExcluded, fetchTransactions]);
+
+    const savePregamePlayingOverride = async (nextValue = pregamePlayingOverride) => {
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            const result = await fetchAdmin('/api/admin/pregame/display-settings', {
+                method: 'PUT',
+                body: JSON.stringify({ playingOverride: nextValue }),
+            });
+            setPregamePlayingOverride(result.playingOverride ?? '');
+            setActionMsg(result.playingOverride == null
+                ? '✅ Pregame Playing is automatic again.'
+                : `✅ Pregame Playing now shows ${result.playingOverride} for everyone.`);
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     const resolveRewardAlert = async (alert, action) => {
         const verb = action === 'approve' ? 'allow rewards for' : 'keep rewards blocked for';
@@ -1207,6 +1229,40 @@ export default function AdminDashboard() {
 
                 {tab === 'overview' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'flex-end',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            padding: '18px',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r-lg)',
+                            background: 'rgba(139,92,246,0.08)',
+                        }}>
+                            <label style={{ display: 'grid', gap: '7px', minWidth: '220px' }}>
+                                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--text-h)' }}>Pregame “Playing”</span>
+                                <input
+                                    className="admin-input"
+                                    type="number"
+                                    min="0"
+                                    max="999999"
+                                    step="1"
+                                    value={pregamePlayingOverride}
+                                    placeholder="Automatic"
+                                    onChange={event => setPregamePlayingOverride(event.target.value)}
+                                    style={{ width: '100%', padding: '9px 11px' }}
+                                />
+                            </label>
+                            <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={savePregamePlayingOverride}>
+                                Save for everyone
+                            </button>
+                            <button type="button" className="btn btn-ghost" disabled={actionLoading} onClick={() => savePregamePlayingOverride('')}>
+                                Use automatic
+                            </button>
+                            <span style={{ color: 'var(--text-3)', fontSize: '0.72rem', maxWidth: '420px' }}>
+                                Only changes the number shown in the left pregame gamemode card. Dashboard and real player statistics are unaffected.
+                            </span>
+                        </div>
                         <div>
                             <h3 style={{ margin: '0 0 16px', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-h)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 🔗 Actual On-Chain Wallets
