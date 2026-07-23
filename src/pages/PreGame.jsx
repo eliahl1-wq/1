@@ -2284,6 +2284,7 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
         ctx.imageSmoothingQuality = 'medium';
 
         let animationFrameId = 0;
+        let lastPaint = 0;
         const segmentsCount = isLarge ? 32 : 24;
         const radius = isLarge ? 13 : 13.5;
         const spacing = 6;
@@ -2306,6 +2307,9 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
         let fixedSegmentCanvas = null;
 
         const render = (now) => {
+            animationFrameId = requestAnimationFrame(render);
+            if (now - lastPaint < 12) return;
+            lastPaint = now;
             const phase = now * phaseSpeed;
             const currentColor = colorRef.current;
 
@@ -2375,7 +2379,6 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
                 ctx.fill();
             }
 
-            animationFrameId = requestAnimationFrame(render);
         };
 
         animationFrameId = requestAnimationFrame(render);
@@ -2388,7 +2391,7 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
                 ref={canvasRef}
                 width={isLarge ? 450 : 250}
                 height={isLarge ? 200 : 100}
-                style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block', background: 'transparent', willChange: 'contents' }}
+                style={{ height: '100%', width: '100%', objectFit: 'contain', display: 'block', background: 'transparent' }}
             />
         </div>
     );

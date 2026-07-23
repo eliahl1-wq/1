@@ -329,9 +329,6 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
 
     for (const actor of actors) {
         if (actor.spawnDelay > 0) continue;
-        ctx.save();
-        ctx.shadowColor = actor.color;
-        ctx.shadowBlur = 5;
         renderer._drawSnake({
             id: actor.id,
             angle: actor.angle,
@@ -340,9 +337,8 @@ function drawSnakes(ctx, renderer, actors, width, height, frame) {
             boost: false,
             isYou: false,
             segments: actor.points,
-            renderStepMultiplier: 1.55,
+            renderStepMultiplier: 2.25,
         }, null, 1);
-        ctx.restore();
     }
 }
 
@@ -603,6 +599,7 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
         let dpr = 1;
         let raf = 0;
         let lastFrame = performance.now();
+        let lastPaint = 0;
         let frame = 0;
 
         const resize = () => {
@@ -628,6 +625,8 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
 
         const render = (now) => {
             raf = requestAnimationFrame(render);
+            if (now - lastPaint < 12) return;
+            lastPaint = now;
             const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
             lastFrame = now;
             frame += 1;
@@ -694,7 +693,7 @@ export default function PregameGameBackground({ mode, slitherColor, agarColor, s
                         : 'blur(4.2px) saturate(1.2) brightness(1.05)',
                 transform: `scale(${SCENE_ZOOM[family] || 1})`,
                 transformOrigin: 'center',
-                willChange: 'contents',
+                willChange: 'transform',
             }} />
             <div style={{
                 position: 'absolute',
