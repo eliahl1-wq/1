@@ -265,7 +265,7 @@ export default function Lobby() {
                                     </div>
                                     <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transaction History</button>
                                     <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile'); }}>My Profile</button>
-                                    <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/affiliate'); }}>Refer & Earn</button>
+                                    <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/rewards#affiliate-rewards'); }}>Refer & Earn</button>
                                     <button className="user-menu-item danger" onClick={logout}>Log Out</button>
                                 </div>
                             )}

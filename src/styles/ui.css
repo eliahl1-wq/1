@@ -1445,6 +1445,50 @@
   height: 22px;
 }
 
+.pregame-affiliate-link {
+  position: fixed;
+  left: 68px;
+  bottom: 18px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  color: #101c12;
+  background: var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pregame-affiliate-link > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  background: rgba(16, 28, 18, 0.15);
+  border-radius: 50%;
+  font-size: 0.82rem;
+}
+
+.pregame-affiliate-link:hover {
+  color: #101c12;
+  filter: brightness(1.06);
+  box-shadow: 0 10px 28px rgba(106, 255, 155, 0.22);
+  transform: translateY(-2px);
+}
+
+.pregame-affiliate-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
 .footer-status {
   display: inline-flex;
   align-items: center;
@@ -3033,6 +3077,12 @@
   .pregame-discord-link {
     left: 14px;
     bottom: calc(62px + env(safe-area-inset-bottom, 0));
+  }
+
+  .pregame-affiliate-link {
+    left: 60px;
+    bottom: calc(62px + env(safe-area-inset-bottom, 0));
+    padding: 0 10px;
   }
 
   .gm-discovery {

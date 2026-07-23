@@ -57,8 +57,9 @@ export default function AppTopbar({ children }) {
                 {hasTournamentNotification && <span className="gm-nav-notification-dot" aria-label="New tournament" />}
             </button>
             {user && (
-                <button type="button" className={linkClass('/rewards')} onClick={() => navigate('/rewards')}>
-                    Rewards
+                <button type="button" className={linkClass('/rewards') + ' gm-nav-link--notification'} onClick={() => navigate('/rewards')}>
+                    <span>Rewards</span>
+                    {user.affiliateRewardsAvailable && <span className="gm-nav-notification-dot" aria-label="Affiliate rewards available" />}
                 </button>
             )}
 

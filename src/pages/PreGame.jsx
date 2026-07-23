@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
@@ -1151,7 +1151,7 @@ export default function PreGame() {
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'profile' } }); }}>Profile</button>
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }}>Stats</button>
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transactions</button>
-                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/affiliate'); }}>Refer & Earn</button>
+                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/rewards#affiliate-rewards'); }}>Refer & Earn</button>
                                         <button className="user-menu-item danger" onClick={logout}>Log Out</button>
                                     </div>
                                 )}
@@ -2028,6 +2028,18 @@ export default function PreGame() {
                     />
                 </svg>
             </a>
+
+            {!user?.affiliateActive && !user?.isAdmin && !user?.personalFreePlay && (
+                <Link
+                    className="pregame-affiliate-link"
+                    to="/rewards#affiliate-rewards"
+                    aria-label="Become an affiliate"
+                    title="Become an affiliate"
+                >
+                    <span aria-hidden="true">$</span>
+                    <span>Become Affiliate</span>
+                </Link>
+            )}
 
             {/* SOL price + footer */}
             <div className="pregame-bottom-bar">

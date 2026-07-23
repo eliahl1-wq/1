@@ -7,7 +7,7 @@ export default function AppFooter({ showStatus = true }) {
             <nav className="footer-links" aria-label="Site links">
                 <Link to="/how-it-works">How it Works</Link>
                 <Link to="/faq">FAQ</Link>
-                <Link to="/affiliate-program">Affiliate</Link>
+                <Link to="/rewards#affiliate-rewards">Affiliate</Link>
                 <a href="mailto:support@agararena.space">Support</a>
                 {showStatus && (
                     <span className="footer-status">

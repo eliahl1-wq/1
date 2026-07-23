@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppTopbar from '../components/AppTopbar';
 import Background from '../components/Background';
+import AffiliateRewardsPanel from '../components/AffiliateRewardsPanel';
 import { API_URL } from '../utils/apiBase';
 
 export default function Rewards() {
@@ -224,6 +225,8 @@ export default function Rewards() {
                 <p style={{ margin: '0 0 32px', color: 'var(--text-2)', fontSize: '1.05rem', lineHeight: '1.5' }}>
                     Complete challenges to unlock your earned rewards and claim free tickets.
                 </p>
+
+                <AffiliateRewardsPanel />
 
                 {/* Top Rewards Summary */}
                 <div className="profile-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '40px' }}>
