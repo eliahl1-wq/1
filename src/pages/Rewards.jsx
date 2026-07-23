@@ -141,7 +141,6 @@ export default function Rewards() {
     const claimedRewardAmount = Number(latestClaim?.meta?.amountUsd) || 0;
     const challengeRewardAmount = promoBalance > 0 ? promoBalance : (isCompleted ? claimedRewardAmount : 0);
     const tournamentBalance = Number(user.tournamentRewardsBalance) || 0;
-    const affiliateEligible = !user.isAdmin && !user.personalFreePlay && !user.isOwnerAccount;
     const affiliateMetrics = affiliateData?.metrics || {};
     const affiliatePending = Number(affiliateMetrics.pendingCommissionUsd) || 0;
     const affiliateAvailable = Number(affiliateMetrics.availableCommissionUsd) || 0;
@@ -272,36 +271,13 @@ export default function Rewards() {
                     <RewardStatCard
                         label="Total Reward Balance"
                         value={`$${totalRewardBalance.toFixed(2)}`}
-                        detail="Game, tournament and affiliate rewards"
+                        detail="All unclaimed rewards combined"
                     />
                     <RewardStatCard
                         label="Ready To Claim"
                         value={`$${totalReadyToClaim.toFixed(2)}`}
                         detail={totalReadyToClaim > 0 ? 'Available through the claim options below' : 'No rewards are currently claimable'}
                         tone="claimable"
-                    />
-                    <RewardStatCard
-                        label="Game Rewards"
-                        value={`$${currentBalance.toFixed(2)}`}
-                        detail={`$${claimableBalance.toFixed(2)} unlocked · $${Math.max(0, currentBalance - claimableBalance).toFixed(2)} locked`}
-                    />
-                    <RewardStatCard
-                        label="Tournament Rewards"
-                        value={`$${tournamentBalance.toFixed(2)}`}
-                        detail={user.tournamentRewardClaimInProgress ? 'Claim processing' : tournamentBalance > 0 ? 'Ready to claim' : 'No unclaimed winnings'}
-                        tone="tournament"
-                    />
-                    <RewardStatCard
-                        label="Affiliate Rewards"
-                        value={affiliateEligible && !affiliateData ? '--' : `$${affiliateBalance.toFixed(2)}`}
-                        detail={!affiliateEligible
-                            ? 'Unavailable for this account'
-                            : !affiliateData
-                                ? 'Loading affiliate rewards'
-                                : !affiliateData.profile?.active
-                                    ? 'Activate below to start earning'
-                                    : `$${affiliateAvailable.toFixed(2)} available · $${affiliatePending.toFixed(2)} pending`}
-                        tone="affiliate"
                     />
                     <RewardStatCard
                         label="Total Paid (All-Time)"

@@ -159,26 +159,22 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
                             <strong>{data.profile.referralLink}</strong>
                             <small>Code: <b>{data.profile.referralCode}</b> · 60-day first-touch attribution</small>
                         </div>
-                        <button className="btn btn-green" onClick={copyLink}>{copyLabel}</button>
+                        <button className="btn affiliate-copy-button" onClick={copyLink}>{copyLabel}</button>
                     </div>
 
                     <div className="affiliate-stat-grid">
                         <article><span>Referred users</span><strong>{metrics.totalReferredUsers || 0}</strong><small>{metrics.activeReferredUsers || 0} active in 30 days</small></article>
                         <article><span>Cashout volume</span><strong>{money(metrics.totalReferredCashoutVolumeUsd)}</strong><small>Eligible completed cashouts</small></article>
-                        <article><span>Pending</span><strong>{money(metrics.pendingCommissionUsd)}</strong><small>{data.config.holdingPeriodDays}-day holding period</small></article>
-                        <article><span>Available</span><strong className="affiliate-green">{money(available)}</strong><small>Ready to request</small></article>
-                        <article><span>Total paid</span><strong>{money(metrics.totalPaidCommissionUsd)}</strong><small>Completed payouts</small></article>
                         <article><span>Conversion</span><strong>{metrics.conversionRate == null ? '—' : `${(metrics.conversionRate * 100).toFixed(1)}%`}</strong><small>{metrics.referralClicks || 0} tracked clicks</small></article>
                     </div>
-
                     <div className="affiliate-payout-card">
                         <div>
                             <span className="label">Affiliate payout</span>
                             <strong>{money(available)} available · {shortWallet(data.profile.payoutWallet)}</strong>
-                            <small>Minimum {money(minimum)}. Admin-reviewed and paid in SOL to your connected profile wallet.</small>
+                            <small>{money(metrics.pendingCommissionUsd)} pending ({data.config.holdingPeriodDays} days) · Minimum {money(minimum)}. Paid in SOL to your profile wallet.</small>
                         </div>
                         {!hasWallet ? (
-                            <button className="btn btn-green" onClick={() => navigate('/profile')}>Connect payout wallet</button>
+                            <button className="btn btn-primary" onClick={() => navigate('/profile')}>Connect payout wallet</button>
                         ) : (
                             <button
                                 className="btn btn-green"
