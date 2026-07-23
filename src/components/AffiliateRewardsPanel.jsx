@@ -52,7 +52,26 @@ export default function AffiliateRewardsPanel() {
         document.getElementById('affiliate-rewards')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, [data]);
 
-    if (!eligible) return null;
+    if (!eligible) {
+        return (
+            <section id="affiliate-rewards" style={{ marginBottom: '40px', scrollMarginTop: '90px' }}>
+                <div className="affiliate-section-heading">
+                    <div>
+                        <span className="affiliate-kicker">Refer & Earn</span>
+                        <h2>Affiliate Rewards</h2>
+                    </div>
+                </div>
+                <div className="affiliate-link-card">
+                    <div>
+                        <span className="label">Affiliate access unavailable</span>
+                        <strong>Use a normal player account to join the affiliate program</strong>
+                        <small>Admin, owner, test, and personal free-play accounts are excluded from affiliate commission by the anti-abuse rules.</small>
+                    </div>
+                    <button className="btn btn-primary" disabled>Become Affiliate</button>
+                </div>
+            </section>
+        );
+    }
 
     const activate = async () => {
         setLoading(true);
