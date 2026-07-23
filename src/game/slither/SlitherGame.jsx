@@ -15,6 +15,7 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
+import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
 import GameBRHud from '../../components/GameBRHud';
 import MobileGameSession from '../../components/MobileGameSession';
 import { SlitherMobileControls } from '../../components/MobileGameControls';
@@ -187,6 +188,34 @@ export default function SlitherGame() {
         maxZoom: SLITHER_SPEC_MAX_ZOOM,
         initialZoom: SLITHER_SPEC_ZOOM,
     });
+    const getSpectatablePlayers = useCallback(() => {
+        const renderer = rendererRef.current;
+        const snakes = renderer?.targetSnakes || [];
+        return snakes
+            .filter(snake => snake.id !== myIdRef.current && snake.segments?.[0])
+            .map(snake => {
+                const smoothHead = renderer?.smooth?.get(snake.id)?.segments?.[0];
+                return {
+                    id: snake.id,
+                    name: snake.name || 'Snake',
+                    x: smoothHead?.x ?? snake.segments[0].x,
+                    y: smoothHead?.y ?? snake.segments[0].y,
+                };
+            });
+    }, []);
+    const {
+        target: spectateTarget,
+        isFollowing: isFollowingPlayer,
+        followNearest,
+        cyclePrevious: spectatePrevious,
+        cycleNext: spectateNext,
+        useFreeCamera,
+        getSpectatorCamera,
+    } = useSpectatorFollow({
+        active: isSpectating,
+        cameraRef: specCamRef,
+        getPlayers: getSpectatablePlayers,
+    });
 
     const enterSpectate = useCallback(() => {
         const renderer = rendererRef.current;
@@ -199,10 +228,11 @@ export default function SlitherGame() {
         worldUpdatesEnabledRef.current = true;
         renderer?.start();
         seedSpecCam(startX, startY, startZoom);
+        followNearest(startX, startY);
         setIsSpectating(true);
         setShowResultModal(false);
         socketRef.current?.emit('slitherSpectateCam', { x: startX, y: startY });
-    }, [seedSpecCam]);
+    }, [followNearest, seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
         worldUpdatesEnabledRef.current = false;
@@ -370,7 +400,7 @@ export default function SlitherGame() {
         }
         renderer.setInputEnabled(false);
         renderer.setExternalCameraGetter(() => {
-            const cam = specCamRef.current;
+            const cam = getSpectatorCamera() || specCamRef.current;
             return { x: cam.x, y: cam.y, zoom: cam.zoom };
         });
         renderer.setSpectatorMode(true, {
@@ -383,18 +413,18 @@ export default function SlitherGame() {
             renderer.setSpectatorMode(false);
             renderer.setInputEnabled(!blockInputRef.current);
         };
-    }, [isSpectating, isDead, cashedAmount, specCamRef]);
+    }, [isSpectating, isDead, cashedAmount, getSpectatorCamera, specCamRef]);
 
     useEffect(() => {
         if (!isSpectating) return undefined;
         const syncCam = () => {
-            const cam = specCamRef.current;
+            const cam = getSpectatorCamera() || specCamRef.current;
             socketRef.current?.emit('slitherSpectateCam', { x: cam.x, y: cam.y });
         };
         syncCam();
         const id = setInterval(syncCam, 120);
         return () => clearInterval(id);
-    }, [isSpectating, specCamRef]);
+    }, [getSpectatorCamera, isSpectating, specCamRef]);
 
 
 
@@ -987,7 +1017,14 @@ export default function SlitherGame() {
             )}
 
             {isSpectating && (
-                <GameSpectateHud onBack={exitSpectate} />
+                <GameSpectateHud
+                    onBack={exitSpectate}
+                    targetName={spectateTarget?.name}
+                    isFollowing={isFollowingPlayer}
+                    onPrevious={spectatePrevious}
+                    onNext={spectateNext}
+                    onFreeCamera={useFreeCamera}
+                />
             )}
 
 

@@ -9,6 +9,7 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
+import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
 import MobileGameSession from '../../components/MobileGameSession';
 import SurvivMobileControls from '../../components/SurvivMobileControls';
 import { isTouchDevice } from '../../utils/mobile';
@@ -313,6 +314,7 @@ export default function SurvivGame() {
     const [me, setMe] = useState(null);
     const [canMobileInteract, setCanMobileInteract] = useState(false);
     const [aliveCount, setAliveCount] = useState(0);
+    const spectateTargetsRef = useRef([]);
     const hideNames = localStorage.getItem('hide_player_names') === 'true';
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
@@ -333,6 +335,33 @@ export default function SurvivGame() {
         maxZoom: 3,
         initialZoom: SPEC_ZOOM,
     });
+    const getSpectatablePlayers = useCallback(() => {
+        if (spectateTargetsRef.current.length) {
+            return spectateTargetsRef.current.filter(player => player.id !== myIdRef.current);
+        }
+        const players = rendererRef.current?.players || [];
+        return players
+            .filter(player => player.id !== myIdRef.current && (player.hp || 0) > 0)
+            .map(player => ({
+                id: player.id,
+                name: player.username || player.name || 'Player',
+                x: player.x,
+                y: player.y,
+            }));
+    }, []);
+    const {
+        target: spectateTarget,
+        isFollowing: isFollowingPlayer,
+        followNearest,
+        cyclePrevious: spectatePrevious,
+        cycleNext: spectateNext,
+        useFreeCamera,
+        getSpectatorCamera,
+    } = useSpectatorFollow({
+        active: isSpectating,
+        cameraRef: specCamRef,
+        getPlayers: getSpectatablePlayers,
+    });
 
     const blockInputRef = useRef(false);
     blockInputRef.current = isSpectating || isDead || cashedAmount !== null;
@@ -344,10 +373,11 @@ export default function SurvivGame() {
         const startY = renderer?.camera?.y ?? 0;
         renderer?.start();
         seedSpecCam(startX, startY, SPEC_ZOOM);
+        followNearest(startX, startY);
         setIsSpectating(true);
         setShowResultModal(false);
         socketRef.current?.emit('survivSpectateCam', { x: startX, y: startY });
-    }, [seedSpecCam]);
+    }, [followNearest, seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
         worldUpdatesEnabledRef.current = false;
@@ -468,7 +498,7 @@ export default function SurvivGame() {
         }
         renderer.setInputEnabled(false);
         renderer.setExternalCameraGetter(() => {
-            const cam = specCamRef.current;
+            const cam = getSpectatorCamera() || specCamRef.current;
             return { x: cam.x, y: cam.y, zoom: cam.zoom };
         });
         renderer.setSpectatorMode(true, {
@@ -481,19 +511,19 @@ export default function SurvivGame() {
             renderer.setSpectatorMode(false);
             renderer.setInputEnabled(!blockInputRef.current);
         };
-    }, [isSpectating, isDead, cashedAmount, specCamRef]);
+    }, [isSpectating, isDead, cashedAmount, getSpectatorCamera, specCamRef]);
 
     useEffect(() => {
         if (!isSpectating) return undefined;
         const syncCam = () => {
             if (document.hidden || !socketRef.current?.connected) return;
-            const cam = specCamRef.current;
+            const cam = getSpectatorCamera() || specCamRef.current;
             socketRef.current.volatile.emit('survivSpectateCam', { x: cam.x, y: cam.y });
         };
         syncCam();
         const id = setInterval(syncCam, 250);
         return () => clearInterval(id);
-    }, [isSpectating, specCamRef]);
+    }, [getSpectatorCamera, isSpectating, specCamRef]);
 
     useEffect(() => {
         if (!liveSession) return undefined;
@@ -726,6 +756,9 @@ export default function SurvivGame() {
 
         socket.on('survivTick', (tick) => {
             if (!worldUpdatesEnabledRef.current) return;
+            if (Array.isArray(tick.spectateTargets)) {
+                spectateTargetsRef.current = tick.spectateTargets;
+            }
             renderer.updateState(tick);
             if (IS_MOBILE) {
                 const nearby = !!renderer.getNearbyGroundWeapon() || !!renderer.getNearbyChest();
@@ -1144,7 +1177,14 @@ export default function SurvivGame() {
             )}
 
             {isSpectating && (
-                <GameSpectateHud onBack={exitSpectate} />
+                <GameSpectateHud
+                    onBack={exitSpectate}
+                    targetName={spectateTarget?.name}
+                    isFollowing={isFollowingPlayer}
+                    onPrevious={spectatePrevious}
+                    onNext={spectateNext}
+                    onFreeCamera={useFreeCamera}
+                />
             )}
 
             {gameReady && resetCountdown != null && resetCountdown > 0 && !showResultModal && (

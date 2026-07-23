@@ -13,6 +13,7 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import GameSocialOverlay, { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
+import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
 import GameBRHud from '../../components/GameBRHud';
 import MobileGameSession from '../../components/MobileGameSession';
 import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
@@ -179,19 +180,65 @@ export default function Game() {
         worldHeight: WORLD_SIZE,
         baseViewZoom,
     });
+    const getSpectatablePlayers = useCallback(() => {
+        const globalTargets = gameData.current.rewardInfo?.spectateTargets;
+        if (Array.isArray(globalTargets)) {
+            return globalTargets.filter(player => player.id !== myIdRef.current);
+        }
+        return (gameData.current.users || [])
+            .filter(player => player.id !== myIdRef.current && player.cells?.length)
+            .map(player => ({
+                id: player.id,
+                name: player.username || player.name || 'Player',
+                x: Number.isFinite(player.x) ? player.x : player.cells[0]?.x,
+                y: Number.isFinite(player.y) ? player.y : player.cells[0]?.y,
+            }));
+    }, []);
+    const {
+        target: spectateTarget,
+        isFollowing: isFollowingPlayer,
+        followNearest,
+        cyclePrevious: spectatePrevious,
+        cycleNext: spectateNext,
+        useFreeCamera,
+        getSpectatorCamera,
+    } = useSpectatorFollow({
+        active: isSpectating,
+        cameraRef: specCamRef,
+        getPlayers: getSpectatablePlayers,
+    });
 
     const enterSpectate = useCallback(() => {
         worldUpdatesEnabledRef.current = true;
         seedSpecCam(spectatorCamRef.current.x, spectatorCamRef.current.y, 1);
+        followNearest(spectatorCamRef.current.x, spectatorCamRef.current.y);
         setIsSpectating(true);
         setShowResultModal(false);
-    }, [seedSpecCam]);
+    }, [followNearest, seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
         worldUpdatesEnabledRef.current = false;
         setIsSpectating(false);
         setShowResultModal(true);
     }, []);
+    useEffect(() => {
+        if (!isSpectating) return undefined;
+        const syncCamera = () => {
+            if (document.hidden || !socketRef.current?.connected) return;
+            const camera = getSpectatorCamera() || specCamRef.current;
+            const { width, height } = getGameScreenSize();
+            const zoom = baseViewZoom * camera.zoom;
+            socketRef.current.volatile.emit('agarSpectateCam', {
+                x: camera.x,
+                y: camera.y,
+                screenWidth: width / zoom,
+                screenHeight: height / zoom,
+            });
+        };
+        syncCamera();
+        const interval = setInterval(syncCamera, 150);
+        return () => clearInterval(interval);
+    }, [baseViewZoom, getSpectatorCamera, isSpectating, specCamRef]);
 
     const handlePlayAgain = useCallback(() => {
         if (playAgainPendingRef.current) return;
@@ -787,13 +834,12 @@ export default function Game() {
             if (hasPlayer && !isSpectating) {
                 spectatorCamRef.current = { x: player.x, y: player.y };
             }
-            const camX = isSpectating
-                ? specCamRef.current.x
-                : (hasPlayer ? player.x : spectatorCamRef.current.x);
-            const camY = isSpectating
-                ? specCamRef.current.y
-                : (hasPlayer ? player.y : spectatorCamRef.current.y);
-            const viewZoom = baseViewZoom * (isSpectating ? specCamRef.current.zoom : cameraZoomRef.current);
+            const spectatorCamera = isSpectating
+                ? (getSpectatorCamera() || specCamRef.current)
+                : null;
+            const camX = spectatorCamera?.x ?? (hasPlayer ? player.x : spectatorCamRef.current.x);
+            const camY = spectatorCamera?.y ?? (hasPlayer ? player.y : spectatorCamRef.current.y);
+            const viewZoom = baseViewZoom * (spectatorCamera?.zoom ?? cameraZoomRef.current);
             if (hasPlayer && !isSpectating && socketRef.current?.connected) {
                 const sentViewport = cameraViewportRef.current;
                 const sentAt = Date.now();
@@ -968,7 +1014,7 @@ export default function Game() {
         };
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);
-    }, [isConnected, isDead, brZone, cashedAmount, isSpectating, baseViewZoom]); 
+    }, [isConnected, isDead, brZone, cashedAmount, isSpectating, baseViewZoom, getSpectatorCamera, specCamRef]);
 
     const tryDoubleTapEject = useMobileDoubleTapEject(
         IS_MOBILE && isConnected && !isDead && !isSpectating && cashedAmount === null,
@@ -1052,7 +1098,14 @@ export default function Game() {
             <MobileGameSession containerRef={viewportRef} />
 
             {isSpectating && (
-                <GameSpectateHud onBack={exitSpectate} />
+                <GameSpectateHud
+                    onBack={exitSpectate}
+                    targetName={spectateTarget?.name}
+                    isFollowing={isFollowingPlayer}
+                    onPrevious={spectatePrevious}
+                    onNext={spectateNext}
+                    onFreeCamera={useFreeCamera}
+                />
             )}
 
             {IS_MOBILE && isConnected && !isDead && cashedAmount === null && !isSpectating && (
