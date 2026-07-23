@@ -184,7 +184,6 @@ export class SlitherRenderer {
         this._boostTrailPool = new Map();
         this._smoothSeen = new Set();
         this._screenScratch = { x: 0, y: 0 };
-        this._perfEma = 16.7;
         this._quality = 1;
         this._rainbowStampPack = null;
         this._deathClusterBuf = [];
@@ -359,7 +358,6 @@ export class SlitherRenderer {
     }
 
     updateState(tick) {
-        const __t0 = performance.now();
         if (tick.snakes) {
             this.targetSnakes = tick.snakes;
             this._sortDirty = true;
@@ -441,13 +439,7 @@ export class SlitherRenderer {
         } else if (!isCompetitive && tick.balance != null && !tick.battleRoyale) {
             this.hud.balance = tick.balance;
         }
-        const __t1 = performance.now();
-        if (!this._lastTickLogMs) this._lastTickLogMs = __t1;
-        const tickGap = __t1 - this._lastTickLogMs;
-        this._lastTickLogMs = __t1;
-        if (this._frame % 60 === 0) {
-            console.log(`[Perf] Last server tick gap: ${tickGap.toFixed(1)}ms. Food: ${tick.food?.length || 0}`);
-        }
+
     }
 
     _ensureFoodGrid() {
@@ -578,13 +570,24 @@ export class SlitherRenderer {
         this.worldChats.clear();
         this._renderPool.clear();
         this._boostTrailPool.clear();
+        this._foodAnimCache.clear();
+        this._foodDrawList.length = 0;
+        this._visibleFoodBuf.length = 0;
+        this._foodSpatialGrid.clear();
+        this._foodGridDirty = true;
+        this._slurpGhosts.length = 0;
+        this._deathClusterBuf.length = 0;
+        this._deathClusterIds.clear();
         this._cameraInit = false;
         this.camera.x = 0;
         this.camera.y = 0;
         this.zoom = this.baseZoom;
         this._playerWheelZoom = 1;
         this.targetSnakes = [];
-        this.state = { ...this.state, you: null };
+        this._holdStartAt = 0;
+        this.hud.cashoutEndAt = 0;
+        this.hud.cashoutSeconds = 0;
+        this.state = { ...this.state, snakes: [], food: [], minimap: [], you: null };
     }
 
     showEmote(payload) {
@@ -2083,13 +2086,10 @@ export class SlitherRenderer {
         const H = this.H;
 
         const now = performance.now();
-        const __t0 = performance.now();
         let dt = this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 1 / 60;
         this._lastFrameTime = now;
         if (dt > 0.1) dt = 0.1;
 
-        const frameMs = dt * 1000;
-        this._perfEma = this._perfEma * 0.9 + frameMs * 0.1;
         const nowMs = Date.now();
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
@@ -2111,9 +2111,7 @@ export class SlitherRenderer {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
-        const __t1 = performance.now();
         this._updateSmoothing(dt);
-        const __t2 = performance.now();
 
         // Build render snakes without per-frame object spreads
         const renderSnakes = this._renderSnakeBuf;
@@ -2204,9 +2202,7 @@ export class SlitherRenderer {
         const foodHalfW = W / 2 / zoom + 160 / zoom;
         const foodHalfH = H / 2 / zoom + 160 / zoom;
         this._rebuildVisibleFoodBuf(cx, cy, foodHalfW, foodHalfH);
-        const __t3 = performance.now();
         this._drawFood(ctx, this._visibleFoodBuf, toScreen, W, H, zoom, dt);
-        const __t4 = performance.now();
 
         const sorted = this._sortedRenderSnakes;
         if (this._sortDirty || sorted.length !== renderSnakes.length) {
@@ -2295,11 +2291,6 @@ export class SlitherRenderer {
         }
         ctx.restore();
 
-        const __t5 = performance.now();
-        
-        if (this._frame % 60 === 0) {
-            console.log(`[Perf] frameMs=${frameMs.toFixed(1)} dt=${dt.toFixed(3)} | smooth=${(__t2-__t1).toFixed(1)}ms | bg/setup=${(__t3-__t2).toFixed(1)}ms | food=${(__t4-__t3).toFixed(1)}ms | snakes=${(__t5-__t4).toFixed(1)}ms | total=${(__t5-__t0).toFixed(1)}ms`);
-        }
 
 
         if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {

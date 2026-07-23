@@ -214,6 +214,7 @@ export default function SurvivGame() {
     const awaitingWelcomeRef = useRef(false);
     const cashoutActiveRef = useRef(false);
     const playAgainPendingRef = useRef(false);
+    const worldUpdatesEnabledRef = useRef(!pendingAtMount);
     const myIdRef = useRef(null);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const cashOutEndAtRef = useRef(0);
@@ -337,6 +338,7 @@ export default function SurvivGame() {
     blockInputRef.current = isSpectating || isDead || cashedAmount !== null;
 
     const enterSpectate = useCallback(() => {
+        worldUpdatesEnabledRef.current = true;
         const renderer = rendererRef.current;
         const startX = renderer?.camera?.x ?? 0;
         const startY = renderer?.camera?.y ?? 0;
@@ -348,14 +350,17 @@ export default function SurvivGame() {
     }, [seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
+        worldUpdatesEnabledRef.current = false;
         rendererRef.current?.pause();
         setIsSpectating(false);
         setShowResultModal(true);
     }, []);
 
     const handlePlayAgain = useCallback(() => {
+        if (playAgainPendingRef.current) return;
         playAgainPendingRef.current = true;
         blockAutoJoinRef.current = false;
+        worldUpdatesEnabledRef.current = false;
         awaitingWelcomeRef.current = true;
         hasJoinedRef.current = false;
         localStorage.setItem('current_game_mode', 'surviv');
@@ -382,7 +387,8 @@ export default function SurvivGame() {
 
     const handleLobby = useCallback(() => {
         clearPendingResult('surviv');
-        blockAutoJoinRef.current = false;
+        blockAutoJoinRef.current = true;
+        worldUpdatesEnabledRef.current = false;
         localStorage.setItem('selected_gamemode', 'surviv');
         navigate('/pre-game', { state: { selectedMode: 'surviv' } });
     }, [navigate]);
@@ -652,7 +658,7 @@ export default function SurvivGame() {
             if (!blockAutoJoinRef.current) {
                 setIsRejoining(rejoining);
                 emitSurvivJoin();
-            } else {
+            } else if (worldUpdatesEnabledRef.current) {
                 renderer.start();
             }
         });
@@ -688,6 +694,8 @@ export default function SurvivGame() {
         socket.on('welcome', (player, world) => {
             awaitingWelcomeRef.current = false;
             playAgainPendingRef.current = false;
+            blockAutoJoinRef.current = false;
+            worldUpdatesEnabledRef.current = true;
             clearPendingResult('surviv');
             setIsDead(false);
             setCashedAmount(null);
@@ -717,6 +725,7 @@ export default function SurvivGame() {
         });
 
         socket.on('survivTick', (tick) => {
+            if (!worldUpdatesEnabledRef.current) return;
             renderer.updateState(tick);
             if (IS_MOBILE) {
                 const nearby = !!renderer.getNearbyGroundWeapon() || !!renderer.getNearbyChest();
@@ -755,6 +764,7 @@ export default function SurvivGame() {
         });
 
         socket.on('leaderboard', (data) => {
+            if (!worldUpdatesEnabledRef.current) return;
             if (data?.leaderboard) setLeaderboard(data.leaderboard);
         });
 
@@ -778,6 +788,7 @@ export default function SurvivGame() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            worldUpdatesEnabledRef.current = false;
             setCashoutPending(false);
             hasJoinedRef.current = false;
             const survived = Date.now() - (sessionStartAtRef.current || Date.now());
@@ -799,6 +810,7 @@ export default function SurvivGame() {
         });
 
         socket.on('RIP', () => {
+            worldUpdatesEnabledRef.current = false;
             cashoutActiveRef.current = false;
             setCashoutPending(false);
             renderer.clearInput();
@@ -807,6 +819,7 @@ export default function SurvivGame() {
         });
 
         socket.on('died', (data) => {
+            worldUpdatesEnabledRef.current = false;
             hasJoinedRef.current = false;
             const survived = Date.now() - (sessionStartAtRef.current || Date.now());
             const eliminations = data?.kills ?? sessionStatsRef.current.eliminations;
@@ -825,6 +838,7 @@ export default function SurvivGame() {
         });
 
         socket.on('forcedDisconnect', () => {
+            worldUpdatesEnabledRef.current = false;
             blockAutoJoinRef.current = true;
             awaitingWelcomeRef.current = true;
             hasJoinedRef.current = false;
@@ -971,9 +985,10 @@ export default function SurvivGame() {
             else socket.volatile.emit('survivInput', payload);
         }, 1000 / 30);
 
-        if (blockAutoJoinRef.current) renderer.start();
+        if (blockAutoJoinRef.current && worldUpdatesEnabledRef.current) renderer.start();
 
         return () => {
+            worldUpdatesEnabledRef.current = false;
             clearInterval(inputIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             window.removeEventListener('keydown', onKeyDown);

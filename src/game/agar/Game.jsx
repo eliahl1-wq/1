@@ -106,6 +106,8 @@ export default function Game() {
     const animationFrameId = useRef(null);
     const cashoutActiveRef = useRef(false);
     const playAgainPendingRef = useRef(false);
+    const cashoutReconnectRef = useRef(false);
+    const worldUpdatesEnabledRef = useRef(!pendingAtMount);
     const cashOutEndAtRef = useRef(0);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const sessionStartAtRef = useRef(null);
@@ -179,23 +181,27 @@ export default function Game() {
     });
 
     const enterSpectate = useCallback(() => {
+        worldUpdatesEnabledRef.current = true;
         seedSpecCam(spectatorCamRef.current.x, spectatorCamRef.current.y, 1);
         setIsSpectating(true);
         setShowResultModal(false);
     }, [seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
+        worldUpdatesEnabledRef.current = false;
         setIsSpectating(false);
         setShowResultModal(true);
     }, []);
 
     const handlePlayAgain = useCallback(() => {
+        if (playAgainPendingRef.current) return;
         const { nickname, entryFeeUsd: fee, mode } = joinParamsRef.current;
         const playMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
         localStorage.setItem('current_game_mode', playMode);
         localStorage.setItem('selected_gamemode', playMode);
         playAgainPendingRef.current = true;
         blockAutoJoinRef.current = false;
+        worldUpdatesEnabledRef.current = false;
         setIsRejoining(true);
 
         if (!liveSession) {
@@ -220,7 +226,8 @@ export default function Game() {
     const handleLobby = useCallback(() => {
         clearPendingResult('agar');
         playAgainPendingRef.current = false;
-        blockAutoJoinRef.current = false;
+        blockAutoJoinRef.current = true;
+        worldUpdatesEnabledRef.current = false;
         localStorage.removeItem('current_game_mode');
         const mode = joinParamsRef.current.mode;
         const selectedMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
@@ -384,6 +391,8 @@ export default function Game() {
 
         socket.on('welcome', (playerSettings, gameSizes) => {
             playAgainPendingRef.current = false;
+            blockAutoJoinRef.current = false;
+            worldUpdatesEnabledRef.current = true;
             setCashoutPending(false);
             setIsDead(false);
             setCashedAmount(null);
@@ -468,6 +477,7 @@ export default function Game() {
         });
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
+            if (!worldUpdatesEnabledRef.current) return;
             const foodMap = foodCacheRef.current;
             const seen = new Set();
             for (const f of foodList || []) {
@@ -529,6 +539,7 @@ export default function Game() {
         });
 
         socket.on('leaderboard', (data) => {
+            if (!worldUpdatesEnabledRef.current) return;
             const lb = data.leaderboard || [];
             if (data.battleRoyale && myIdRef.current) {
                 const me = lb.find(p => p.id === myIdRef.current);
@@ -546,6 +557,10 @@ export default function Game() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            cashoutReconnectRef.current = false;
+            blockAutoJoinRef.current = true;
+            worldUpdatesEnabledRef.current = false;
+            hasJoinedGameRef.current = false;
             setCashoutPending(false);
             global.cashOutTimer = 0;
             global.cashOutEndAt = 0;
@@ -571,6 +586,10 @@ export default function Game() {
         });
 
         const handleDeath = () => {
+            cashoutReconnectRef.current = false;
+            blockAutoJoinRef.current = true;
+            worldUpdatesEnabledRef.current = false;
+            hasJoinedGameRef.current = false;
             setIsDead(true);
             setCashoutPending(false);
             global.cashOutTimer = 0;
@@ -602,6 +621,8 @@ export default function Game() {
         };
 
         socket.on('forcedDisconnect', () => {
+            blockAutoJoinRef.current = true;
+            worldUpdatesEnabledRef.current = false;
             console.warn('Session replaced by another window.');
             navigate('/pre-game');
         });
@@ -612,7 +633,12 @@ export default function Game() {
         socket.on('disconnect', (reason) => {
             console.log('Socket disconnected:', reason);
             setIsConnected(false);
-            hasJoinedGameRef.current = false; // Återställ för eventuell återanslutning
+            hasJoinedGameRef.current = false;
+            if (cashoutActiveRef.current) {
+                cashoutReconnectRef.current = true;
+                blockAutoJoinRef.current = true;
+                worldUpdatesEnabledRef.current = false;
+            }
         });
 
         socket.on('connect_error', (err) => {
@@ -643,6 +669,22 @@ export default function Game() {
                 if (timerIntervalRef.current) {
                     clearInterval(timerIntervalRef.current);
                     timerIntervalRef.current = null;
+                }
+                if (cashoutReconnectRef.current && socketRef.current?.connected) {
+                    cashoutReconnectRef.current = false;
+                    blockAutoJoinRef.current = false;
+                    worldUpdatesEnabledRef.current = true;
+                    setIsRejoining(true);
+                    const params = joinParamsRef.current;
+                    const playMode = params.mode.startsWith('br-') ? params.mode.replace(/^br-/, '') : params.mode;
+                    socketRef.current.emit('joinGame', {
+                        username: params.nickname,
+                        token,
+                        mode: playMode,
+                        entryFeeUsd: params.entryFeeUsd,
+                        skinColor: localStorage.getItem('selected_skin_agar') || 'random',
+                        useFreeTicket: false,
+                    });
                 }
             }
             if (typeof msg === 'string' && /insufficient/i.test(msg)) {
@@ -676,6 +718,7 @@ export default function Game() {
         handleResize();
 
         return () => {
+            worldUpdatesEnabledRef.current = false;
             cancelAnimationFrame(animationFrameId.current);
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('resize', handleResize);
@@ -919,7 +962,9 @@ export default function Game() {
                     zone: brZone,
                 });
             }
-            if (!isDead || isSpectating) animationFrameId.current = requestAnimationFrame(gameLoop);
+            if ((!isDead && cashedAmount === null) || isSpectating) {
+                animationFrameId.current = requestAnimationFrame(gameLoop);
+            }
         };
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);

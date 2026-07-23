@@ -77,6 +77,8 @@ export default function SlitherGame() {
 
     const cashoutActiveRef = useRef(false);
     const playAgainPendingRef = useRef(false);
+    const cashoutReconnectRef = useRef(false);
+    const worldUpdatesEnabledRef = useRef(!pendingAtMount);
 
     const myIdRef = useRef(null);
     const prevBalanceRef = useRef(null);
@@ -194,6 +196,7 @@ export default function SlitherGame() {
         if (myIdRef.current) {
             renderer?.removeSnake(myIdRef.current);
         }
+        worldUpdatesEnabledRef.current = true;
         renderer?.start();
         seedSpecCam(startX, startY, startZoom);
         setIsSpectating(true);
@@ -202,12 +205,14 @@ export default function SlitherGame() {
     }, [seedSpecCam]);
 
     const exitSpectate = useCallback(() => {
+        worldUpdatesEnabledRef.current = false;
         rendererRef.current?.pause();
         setIsSpectating(false);
         setShowResultModal(true);
     }, []);
 
     const handlePlayAgain = useCallback(() => {
+        if (playAgainPendingRef.current) return;
         if (joinParamsRef.current.isTournament) {
             clearPendingResult('slither');
             navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
@@ -219,6 +224,7 @@ export default function SlitherGame() {
         localStorage.setItem('selected_gamemode', modeKey);
         playAgainPendingRef.current = true;
         blockAutoJoinRef.current = false;
+        worldUpdatesEnabledRef.current = false;
         setIsRejoining(true);
 
         if (!liveSession) {
@@ -242,7 +248,8 @@ export default function SlitherGame() {
 
     const handleLobby = useCallback(() => {
         clearPendingResult('slither');
-        blockAutoJoinRef.current = false;
+        blockAutoJoinRef.current = true;
+        worldUpdatesEnabledRef.current = false;
         if (joinParamsRef.current.isTournament) {
             navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
             return;
@@ -508,6 +515,8 @@ export default function SlitherGame() {
 
         socket.on('welcome', (playerSettings, gameSizes) => {
             playAgainPendingRef.current = false;
+            blockAutoJoinRef.current = false;
+            worldUpdatesEnabledRef.current = true;
             setCashoutPending(false);
             setIsDead(false);
             setCashedAmount(null);
@@ -550,6 +559,7 @@ export default function SlitherGame() {
             }
             myIdRef.current = playerSettings.id;
             renderer.resetSession();
+            renderer.start();
             sessionStartAtRef.current = Date.now();
             setIsRejoining(false);
             setShowResultModal(false);
@@ -574,6 +584,7 @@ export default function SlitherGame() {
         });
 
         socket.on('slitherTick', (tick) => {
+            if (!worldUpdatesEnabledRef.current) return;
             const mergedTick = tick.competitiveSlither && tick.zone
                 ? { ...tick, competitiveSlither: true, circularMap: true }
                 : tick;
@@ -675,6 +686,10 @@ export default function SlitherGame() {
 
         socket.on('cashOutSuccess', ({ amount }) => {
             cashoutActiveRef.current = false;
+            cashoutReconnectRef.current = false;
+            blockAutoJoinRef.current = true;
+            worldUpdatesEnabledRef.current = false;
+            hasJoinedRef.current = false;
             setCashoutPending(false);
             cashOutEndAtRef.current = 0;
             setCashOutEndAt(0);
@@ -707,6 +722,7 @@ export default function SlitherGame() {
 
 
         socket.on('leaderboard', ({ leaderboard: lb, battleRoyale: lbBR }) => {
+            if (!worldUpdatesEnabledRef.current) return;
             const now = Date.now();
             if (now - lastLeaderboardAtRef.current < 400) return;
             lastLeaderboardAtRef.current = now;
@@ -729,6 +745,10 @@ export default function SlitherGame() {
 
 
         socket.on('RIP', () => {
+            cashoutReconnectRef.current = false;
+            blockAutoJoinRef.current = true;
+            worldUpdatesEnabledRef.current = false;
+            hasJoinedRef.current = false;
             setCashoutPending(false);
             if (myIdRef.current) {
                 rendererRef.current?.removeSnake(myIdRef.current);
@@ -776,6 +796,8 @@ export default function SlitherGame() {
         });
 
         socket.on('forcedDisconnect', () => {
+            blockAutoJoinRef.current = true;
+            worldUpdatesEnabledRef.current = false;
             if (joinParamsRef.current.isTournament) {
                 navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
                 return;
@@ -810,6 +832,21 @@ export default function SlitherGame() {
                     timerIntervalRef.current = null;
                 }
                 rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
+                if (cashoutReconnectRef.current && socketRef.current?.connected) {
+                    cashoutReconnectRef.current = false;
+                    blockAutoJoinRef.current = false;
+                    worldUpdatesEnabledRef.current = true;
+                    setIsRejoining(true);
+                    const params = joinParamsRef.current;
+                    socketRef.current.emit('joinGame', {
+                        username: params.nickname,
+                        token: authToken,
+                        mode: params.isCompetitive ? 'competitive-slither' : 'slither',
+                        entryFeeUsd: params.entryFeeUsd,
+                        skinColor: localStorage.getItem('selected_skin') || 'random',
+                        useFreeTicket: false,
+                    });
+                }
             }
 
             if (joinParamsRef.current.isTournament && typeof msg === 'string') {
@@ -852,11 +889,14 @@ export default function SlitherGame() {
 
 
         socket.on('disconnect', () => {
-
             setIsConnected(false);
-
             hasJoinedRef.current = false;
-
+            if (cashoutActiveRef.current) {
+                cashoutReconnectRef.current = true;
+                blockAutoJoinRef.current = true;
+                worldUpdatesEnabledRef.current = false;
+                rendererRef.current?.pause();
+            }
         });
 
 
@@ -866,6 +906,7 @@ export default function SlitherGame() {
 
 
         return () => {
+            worldUpdatesEnabledRef.current = false;
             if (inputIntervalRef.current) clearInterval(inputIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             renderer.destroy();
