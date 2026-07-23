@@ -1151,6 +1151,7 @@ export default function PreGame() {
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'profile' } }); }}>Profile</button>
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }}>Stats</button>
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transactions</button>
+                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/affiliate'); }}>Refer & Earn</button>
                                         <button className="user-menu-item danger" onClick={logout}>Log Out</button>
                                     </div>
                                 )}

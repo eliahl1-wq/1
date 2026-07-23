@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import TournamentAdminPanel from '../components/TournamentAdminPanel';
+import AffiliateAdminPanel from '../components/AffiliateAdminPanel';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
 
@@ -14,6 +15,7 @@ const TABS = [
     { id: 'users', label: 'Users' },
     { id: 'activity', label: 'Activity' },
     { id: 'tournaments', label: 'Tournaments' },
+    { id: 'affiliates', label: 'Affiliates' },
     { id: 'rewards', label: 'Rewards' },
     { id: 'operations', label: 'Operations' },
 ];
@@ -1360,6 +1362,10 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     </div>
+                )}
+
+                {tab === 'affiliates' && (
+                    <AffiliateAdminPanel fetchAdmin={fetchAdmin} />
                 )}
 
                 {tab === 'tournaments' && (

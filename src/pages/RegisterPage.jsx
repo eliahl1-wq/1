@@ -5,6 +5,12 @@ import { identifyMixpanelUser, trackMixpanelEvent } from '../utils/mixpanel';
 import { setPageSeo, SEO } from '../utils/seo';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
+import {
+    clearStoredReferral,
+    getReferralDeviceId,
+    getStoredReferral,
+    normalizeReferralCode,
+} from '../utils/referral';
 
 export default function RegisterPage() {
     const [email, setEmail]       = useState('');
@@ -14,6 +20,10 @@ export default function RegisterPage() {
     const [message, setMessage]   = useState('');
     const [isSuccess, setIsSuccess] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const storedReferral = getStoredReferral();
+    const [referralCode, setReferralCode] = useState(storedReferral?.code || '');
+    const [referralStatus, setReferralStatus] = useState(storedReferral ? 'Referral link captured' : '');
+    const referralLocked = !!storedReferral;
     const navigate = useNavigate();
 
     useEffect(() => { setPageSeo(SEO.register); }, []);
@@ -26,7 +36,15 @@ export default function RegisterPage() {
             const res = await fetch(`${API_URL}/api/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminders': 'true' },
-                body: JSON.stringify({ email, username, password }),
+                body: JSON.stringify({
+                    email,
+                    username,
+                    password,
+                    referralCode: normalizeReferralCode(referralCode) || '',
+                    referralClickId: storedReferral?.clickId || null,
+                    referralDeviceId: getReferralDeviceId(),
+                    referralSource: storedReferral ? 'link' : 'manual',
+                }),
             });
             const data = await res.json();
             if (res.ok) {
@@ -34,6 +52,7 @@ export default function RegisterPage() {
                     identifyMixpanelUser(data.userId, { username: data.username });
                     trackMixpanelEvent('sign_up_completed', { sign_up_method: 'email', platform: 'web' });
                 }
+                clearStoredReferral();
                 setIsSuccess(true);
                 setMessage('Account created! Redirecting to login…');
                 setTimeout(() => navigate('/login'), 2000);
@@ -49,7 +68,32 @@ export default function RegisterPage() {
     };
 
     const handleGoogleLogin = () => {
-        window.location.href = `${API_URL}/api/auth/google`;
+        const referral = getStoredReferral();
+        const params = new URLSearchParams();
+        const code = normalizeReferralCode(referral?.code || referralCode);
+        if (code) params.set('ref', code);
+        if (referral?.clickId) params.set('clickId', referral.clickId);
+        params.set('deviceId', getReferralDeviceId());
+        window.location.href = `${API_URL}/api/auth/google?${params}`;
+    };
+
+    const validateReferral = async () => {
+        const code = normalizeReferralCode(referralCode);
+        if (!referralCode) {
+            setReferralStatus('');
+            return;
+        }
+        if (!code) {
+            setReferralStatus('Invalid referral code format');
+            return;
+        }
+        try {
+            const response = await fetch(`${API_URL}/api/referrals/resolve?code=${encodeURIComponent(code)}`);
+            const data = await response.json().catch(() => ({}));
+            setReferralStatus(response.ok ? `Referral code ${data.referralCode} is valid` : 'Referral code not found');
+        } catch {
+            setReferralStatus('Referral validation unavailable');
+        }
     };
 
     return (
@@ -122,6 +166,22 @@ export default function RegisterPage() {
                                 autoComplete="username"
                                 style={{ width: '100%', boxSizing: 'border-box' }}
                             />
+                        </div>
+
+                        <div>
+                            <label className="label" style={{ display: 'block', marginBottom: '5px' }}>Referral Code <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>(optional)</span></label>
+                            <input
+                                type="text"
+                                placeholder="Enter referral code"
+                                value={referralCode}
+                                onChange={event => !referralLocked && setReferralCode(event.target.value)}
+                                onBlur={validateReferral}
+                                className="input"
+                                readOnly={referralLocked}
+                                autoComplete="off"
+                                style={{ width: '100%', boxSizing: 'border-box', opacity: referralLocked ? 0.75 : 1 }}
+                            />
+                            {referralStatus && <small style={{ display: 'block', marginTop: 5, color: referralStatus.includes('not') || referralStatus.includes('Invalid') ? 'var(--red)' : 'var(--green)' }}>{referralStatus}</small>}
                         </div>
 
                         {/* Password */}

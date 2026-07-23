@@ -5,6 +5,7 @@ import Background from '../components/Background';
 import { setPageSeo, SEO } from '../utils/seo';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
+import { getReferralDeviceId, getStoredReferral } from '../utils/referral';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -47,7 +48,12 @@ export default function LoginPage() {
     };
 
     const handleGoogleLogin = () => {
-        window.location.href = `${API_URL}/api/auth/google`;
+        const referral = getStoredReferral();
+        const params = new URLSearchParams();
+        if (referral?.code) params.set('ref', referral.code);
+        if (referral?.clickId) params.set('clickId', referral.clickId);
+        params.set('deviceId', getReferralDeviceId());
+        window.location.href = `${API_URL}/api/auth/google?${params}`;
     };
 
     return (
