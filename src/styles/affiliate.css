@@ -149,6 +149,102 @@
     border-radius: var(--r-md);
 }
 
+.affiliate-rewards-embedded .affiliate-payout-challenge {
+    display: block;
+}
+
+.affiliate-payout-header,
+.affiliate-payout-requirement,
+.affiliate-payout-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.affiliate-payout-header {
+    margin-bottom: 24px;
+}
+
+.affiliate-payout-header h4 {
+    margin: 5px 0 0;
+    color: var(--text-h);
+    font-size: 1rem;
+    font-weight: 650;
+}
+
+.affiliate-payout-amount {
+    flex: 0 0 auto;
+    text-align: right;
+}
+
+.affiliate-payout-amount span {
+    display: block;
+    color: var(--text-3);
+    font-size: .65rem;
+    font-weight: 750;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.affiliate-payout-amount strong {
+    margin: 4px 0 0;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 1.35rem;
+    font-weight: 900;
+    letter-spacing: -.03em;
+    word-break: normal;
+}
+
+.affiliate-payout-requirement {
+    margin-bottom: 8px;
+    color: var(--text-2);
+    font-size: .88rem;
+}
+
+.affiliate-payout-requirement span.is-complete {
+    color: var(--green);
+}
+
+.affiliate-payout-requirement strong {
+    margin: 0;
+    color: var(--text-h);
+    font-family: var(--mono);
+    font-size: .82rem;
+    word-break: normal;
+}
+
+.affiliate-payout-progress {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--bg-3);
+}
+
+.affiliate-payout-progress > div {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--green);
+    transition: width .45s ease-out;
+}
+
+.affiliate-payout-meta {
+    align-items: flex-start;
+    margin-top: 10px;
+    color: var(--text-3);
+    font-size: .72rem;
+    line-height: 1.4;
+}
+
+.affiliate-payout-challenge > .btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 22px;
+    padding: 13px 20px;
+    font-size: .9rem;
+}
+
 .affiliate-copy-button {
     border: 1px solid rgba(124, 58, 255, .3);
     background: rgba(124, 58, 255, .13);
@@ -170,5 +266,24 @@
     .affiliate-rewards-embedded .affiliate-link-card,
     .affiliate-rewards-embedded .affiliate-payout-card {
         padding: 18px;
+    }
+}
+
+@media (max-width: 520px) {
+    .affiliate-payout-header {
+        align-items: flex-start;
+    }
+
+    .affiliate-payout-meta {
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .affiliate-payout-requirement {
+        gap: 8px;
+    }
+
+    .affiliate-payout-requirement strong {
+        white-space: nowrap;
     }
 }

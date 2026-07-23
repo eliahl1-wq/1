@@ -125,6 +125,7 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
     const available = Number(metrics.availableCommissionUsd || 0);
     const activePayout = !!data?.payouts?.some(item => ['requested', 'processing'].includes(item.status));
     const hasWallet = !!data?.profile?.payoutWallet;
+    const payoutProgress = minimum > 0 ? Math.min(100, (available / minimum) * 100) : 100;
 
     return (
         <section id="affiliate-rewards" className="affiliate-rewards-embedded">
@@ -167,12 +168,40 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
                         <article><span>Cashout volume</span><strong>{money(metrics.totalReferredCashoutVolumeUsd)}</strong><small>Eligible completed cashouts</small></article>
                         <article><span>Conversion</span><strong>{metrics.conversionRate == null ? '—' : `${(metrics.conversionRate * 100).toFixed(1)}%`}</strong><small>{metrics.referralClicks || 0} tracked clicks</small></article>
                     </div>
-                    <div className="affiliate-payout-card">
-                        <div>
-                            <span className="label">Affiliate payout</span>
-                            <strong>{money(available)} available · {shortWallet(data.profile.payoutWallet)}</strong>
-                            <small>{money(metrics.pendingCommissionUsd)} pending ({data.config.holdingPeriodDays} days) · Minimum {money(minimum)}. Paid in SOL to your profile wallet.</small>
+                    <div className="affiliate-payout-card affiliate-payout-challenge">
+                        <div className="affiliate-payout-header">
+                            <div>
+                                <span className="label">Payout challenge</span>
+                                <h4>Unlock affiliate payout</h4>
+                            </div>
+                            <div className="affiliate-payout-amount">
+                                <span>Available</span>
+                                <strong>{money(available)}</strong>
+                            </div>
                         </div>
+
+                        <div className="affiliate-payout-requirement">
+                            <span className={available >= minimum ? 'is-complete' : ''}>
+                                {available >= minimum ? '✓ ' : ''}Reach the minimum payout
+                            </span>
+                            <strong>{money(available)} / {money(minimum)}</strong>
+                        </div>
+                        <div
+                            className="affiliate-payout-progress"
+                            role="progressbar"
+                            aria-label="Affiliate payout minimum progress"
+                            aria-valuemin="0"
+                            aria-valuemax={minimum}
+                            aria-valuenow={Math.min(available, minimum)}
+                        >
+                            <div style={{ width: `${payoutProgress}%` }} />
+                        </div>
+
+                        <div className="affiliate-payout-meta">
+                            <span>{money(metrics.pendingCommissionUsd)} pending for {data.config.holdingPeriodDays} days</span>
+                            <span>{hasWallet ? `Wallet: ${shortWallet(data.profile.payoutWallet)}` : 'Payout wallet not connected'}</span>
+                        </div>
+
                         {!hasWallet ? (
                             <button className="btn btn-primary" onClick={() => navigate('/profile')}>Connect payout wallet</button>
                         ) : (
@@ -181,11 +210,10 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
                                 onClick={requestPayout}
                                 disabled={loading || activePayout || available < minimum}
                             >
-                                {activePayout ? 'Payout under review' : loading ? 'Requesting…' : available < minimum ? `Minimum ${money(minimum)}` : 'Claim affiliate payout'}
+                                {activePayout ? 'PAYOUT UNDER REVIEW' : loading ? 'REQUESTING…' : available < minimum ? `REACH ${money(minimum)} TO CLAIM` : 'CLAIM AFFILIATE PAYOUT'}
                             </button>
                         )}
                     </div>
-
                     <div className="affiliate-table-panel">
                         <div className="affiliate-section-heading"><div><span className="affiliate-kicker">Ledger</span><h2>Recent commissions</h2></div></div>
                         <div className="affiliate-table-scroll">
