@@ -688,14 +688,22 @@ export default function SlitherGame() {
             cashoutActiveRef.current = false;
             cashoutReconnectRef.current = false;
             blockAutoJoinRef.current = true;
-            worldUpdatesEnabledRef.current = false;
+            // The server changes a finished Slither player into a passive
+            // spectator. Keep ticks and rendering alive behind the result modal.
+            worldUpdatesEnabledRef.current = true;
             hasJoinedRef.current = false;
             setCashoutPending(false);
             cashOutEndAtRef.current = 0;
             setCashOutEndAt(0);
             setLocalTimer(0);
             rendererRef.current?.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
-            rendererRef.current?.pause();
+            rendererRef.current?.removeSnake(myIdRef.current);
+            rendererRef.current?.start();
+            const liveCamera = rendererRef.current?.camera ?? spectatorCamRef.current;
+            socketRef.current?.emit('slitherSpectateCam', {
+                x: liveCamera.x,
+                y: liveCamera.y,
+            });
             if (joinParamsRef.current.isTournament) {
                 localStorage.setItem('current_game_mode', 'tournament-slither');
             } else {
@@ -747,7 +755,9 @@ export default function SlitherGame() {
         socket.on('RIP', () => {
             cashoutReconnectRef.current = false;
             blockAutoJoinRef.current = true;
-            worldUpdatesEnabledRef.current = false;
+            // The server changes a finished Slither player into a passive
+            // spectator. Keep ticks and rendering alive behind the result modal.
+            worldUpdatesEnabledRef.current = true;
             hasJoinedRef.current = false;
             setCashoutPending(false);
             if (myIdRef.current) {
