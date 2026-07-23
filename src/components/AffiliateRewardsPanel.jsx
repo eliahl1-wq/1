@@ -15,7 +15,7 @@ function Status({ value }) {
     return <span className={`affiliate-status affiliate-status--${value}`}>{value}</span>;
 }
 
-export default function AffiliateRewardsPanel() {
+export default function AffiliateRewardsPanel({ onDataChange }) {
     const { user, token, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [data, setData] = useState(null);
@@ -28,6 +28,7 @@ export default function AffiliateRewardsPanel() {
     const load = useCallback(async () => {
         if (!eligible || !token) {
             setData(null);
+            onDataChange?.(null);
             return;
         }
         setLoading(true);
@@ -38,12 +39,13 @@ export default function AffiliateRewardsPanel() {
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(payload.message || 'Could not load affiliate rewards');
             setData(payload);
+            onDataChange?.(payload);
         } catch (error) {
             setMessage(error.message);
         } finally {
             setLoading(false);
         }
-    }, [eligible, token]);
+    }, [eligible, onDataChange, token]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -54,7 +56,7 @@ export default function AffiliateRewardsPanel() {
 
     if (!eligible) {
         return (
-            <section id="affiliate-rewards" style={{ marginBottom: '40px', scrollMarginTop: '90px' }}>
+            <section id="affiliate-rewards" className="affiliate-rewards-embedded">
                 <div className="affiliate-section-heading">
                     <div>
                         <span className="affiliate-kicker">Refer & Earn</span>
@@ -67,7 +69,7 @@ export default function AffiliateRewardsPanel() {
                         <strong>Use a normal player account to join the affiliate program</strong>
                         <small>Admin, owner, test, and personal free-play accounts are excluded from affiliate commission by the anti-abuse rules.</small>
                     </div>
-                    <button className="btn btn-primary" disabled>Become Affiliate</button>
+                    <button className="btn btn-green" disabled>Become Affiliate</button>
                 </div>
             </section>
         );
@@ -125,7 +127,7 @@ export default function AffiliateRewardsPanel() {
     const hasWallet = !!data?.profile?.payoutWallet;
 
     return (
-        <section id="affiliate-rewards" style={{ marginBottom: '40px', scrollMarginTop: '90px' }}>
+        <section id="affiliate-rewards" className="affiliate-rewards-embedded">
             <div className="affiliate-section-heading">
                 <div>
                     <span className="affiliate-kicker">Refer & Earn</span>
@@ -143,7 +145,7 @@ export default function AffiliateRewardsPanel() {
                         <strong>Earn 30% of AgarArena's eligible 5% cashout fee</strong>
                         <small>Activate once to receive your permanent referral link. No guaranteed earnings; affiliate terms and anti-abuse rules apply.</small>
                     </div>
-                    <button className="btn btn-primary" onClick={activate} disabled={loading}>
+                    <button className="btn btn-green" onClick={activate} disabled={loading}>
                         {loading ? 'Activating…' : 'Become Affiliate'}
                     </button>
                 </div>
@@ -157,7 +159,7 @@ export default function AffiliateRewardsPanel() {
                             <strong>{data.profile.referralLink}</strong>
                             <small>Code: <b>{data.profile.referralCode}</b> · 60-day first-touch attribution</small>
                         </div>
-                        <button className="btn btn-primary" onClick={copyLink}>{copyLabel}</button>
+                        <button className="btn btn-green" onClick={copyLink}>{copyLabel}</button>
                     </div>
 
                     <div className="affiliate-stat-grid">
@@ -176,10 +178,10 @@ export default function AffiliateRewardsPanel() {
                             <small>Minimum {money(minimum)}. Admin-reviewed and paid in SOL to your connected profile wallet.</small>
                         </div>
                         {!hasWallet ? (
-                            <button className="btn btn-primary" onClick={() => navigate('/profile')}>Connect payout wallet</button>
+                            <button className="btn btn-green" onClick={() => navigate('/profile')}>Connect payout wallet</button>
                         ) : (
                             <button
-                                className="btn btn-primary"
+                                className="btn btn-green"
                                 onClick={requestPayout}
                                 disabled={loading || activePayout || available < minimum}
                             >

@@ -5,6 +5,17 @@ import AppTopbar from '../components/AppTopbar';
 import Background from '../components/Background';
 import AffiliateRewardsPanel from '../components/AffiliateRewardsPanel';
 import { API_URL } from '../utils/apiBase';
+import '../styles/rewards.css';
+
+function RewardStatCard({ label, value, detail, tone = 'default' }) {
+    return (
+        <div className={`rewards-stat-card rewards-stat-card--${tone}`}>
+            <div className="rewards-stat-label">{label}</div>
+            <div className="rewards-stat-value mono">{value}</div>
+            <div className="rewards-stat-detail">{detail}</div>
+        </div>
+    );
+}
 
 export default function Rewards() {
     const { user, loading, refreshUser } = useAuth();
@@ -12,6 +23,7 @@ export default function Rewards() {
     const [history, setHistory] = useState([]);
     const [historyLoaded, setHistoryLoaded] = useState(false);
     const [claimStatus, setClaimStatus] = useState(null); // { type: 'success'|'error'|'loading', message: string }
+    const [affiliateData, setAffiliateData] = useState(null);
     const claimLockRef = useRef(false);
 
     useEffect(() => {
@@ -128,9 +140,38 @@ export default function Rewards() {
     const latestClaim = history.find(tx => tx.meta?.event === 'sponsored_rewards_claim');
     const claimedRewardAmount = Number(latestClaim?.meta?.amountUsd) || 0;
     const challengeRewardAmount = promoBalance > 0 ? promoBalance : (isCompleted ? claimedRewardAmount : 0);
-    const totalClaimedAllTime = history
+    const tournamentBalance = Number(user.tournamentRewardsBalance) || 0;
+    const affiliateEligible = !user.isAdmin && !user.personalFreePlay && !user.isOwnerAccount;
+    const affiliateMetrics = affiliateData?.metrics || {};
+    const affiliatePending = Number(affiliateMetrics.pendingCommissionUsd) || 0;
+    const affiliateAvailable = Number(affiliateMetrics.availableCommissionUsd) || 0;
+    const affiliateBalance = affiliatePending + affiliateAvailable;
+    const affiliateMinimum = Number(affiliateData?.config?.minimumPayoutUsd) || 25;
+    const affiliatePayoutActive = !!affiliateData?.payouts?.some(payout => ['requested', 'processing'].includes(payout.status));
+    const affiliateRequestable = affiliateAvailable >= affiliateMinimum
+        && !!affiliateData?.profile?.payoutWallet
+        && !affiliatePayoutActive
+        ? affiliateAvailable
+        : 0;
+    const totalRewardBalance = currentBalance + tournamentBalance + affiliateBalance;
+    const totalReadyToClaim = claimableBalance + tournamentBalance + affiliateRequestable;
+    const totalGameClaimed = history
         .filter(tx => tx.meta?.event === 'sponsored_rewards_claim')
         .reduce((sum, tx) => sum + (Number(tx.meta?.amountUsd) || 0), 0);
+    const totalTournamentClaimed = history
+        .filter(tx => tx.meta?.event === 'tournament_reward_claim')
+        .reduce((sum, tx) => sum + (Number(tx.meta?.amountUsd) || 0), 0);
+    const totalAffiliatePaid = Number(affiliateMetrics.totalPaidCommissionUsd) || 0;
+    const totalClaimedAllTime = totalGameClaimed + totalTournamentClaimed + totalAffiliatePaid;
+    const rewardHistory = [
+        ...history,
+        ...(affiliateData?.payouts || []).map(payout => ({
+            _id: `affiliate-payout-${payout.id}`,
+            affiliatePayout: true,
+            createdAt: payout.requestedAt,
+            ...payout,
+        })),
+    ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     const challengeRewardLabel = isCompleted && promoBalance <= 0 && !historyLoaded
         ? '--'
         : `$${challengeRewardAmount.toFixed(2)}`;
@@ -226,55 +267,48 @@ export default function Rewards() {
                     Complete challenges to unlock your earned rewards and claim free tickets.
                 </p>
 
-                <AffiliateRewardsPanel />
-
-                {/* Top Rewards Summary */}
-                <div className="profile-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '40px' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
-                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700' }}>
-                            Current Reward Balance
-                        </div>
-                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em' }}>
-                            ${currentBalance.toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>Locked promo + winnings</div>
-                    </div>
-
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
-                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700', color: 'var(--green)' }}>
-                            Ready To Claim
-                        </div>
-                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--green)', letterSpacing: '-0.03em' }}>
-                            ${claimableBalance.toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>
-                            {user.rewardClaimInProgress ? 'Claim processing' : canClaim ? 'Unlocked & ready' : 'Complete challenges first'}
-                        </div>
-                    </div>
-
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
-                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700', color: 'var(--yellow)' }}>
-                            Tournament Winnings
-                        </div>
-                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--yellow)', letterSpacing: '-0.03em' }}>
-                            ${(user.tournamentRewardsBalance || 0).toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>
-                            {user.tournamentRewardClaimInProgress ? 'Claim processing' : (user.tournamentRewardsBalance > 0 ? 'Ready to claim' : 'No unclaimed winnings')}
-                        </div>
-                    </div>
-
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '16px 20px' }}>
-                        <div className="label" style={{ marginBottom: '8px', textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: '700' }}>
-                            Total Claimed (All-Time)
-                        </div>
-                        <div className="mono" style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em' }}>
-                            ${totalClaimedAllTime.toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '6px' }}>Successfully paid out in SOL</div>
-                    </div>
+                {/* Unified Rewards Summary */}
+                <div className="rewards-summary-grid">
+                    <RewardStatCard
+                        label="Total Reward Balance"
+                        value={`$${totalRewardBalance.toFixed(2)}`}
+                        detail="Game, tournament and affiliate rewards"
+                    />
+                    <RewardStatCard
+                        label="Ready To Claim"
+                        value={`$${totalReadyToClaim.toFixed(2)}`}
+                        detail={totalReadyToClaim > 0 ? 'Available through the claim options below' : 'No rewards are currently claimable'}
+                        tone="claimable"
+                    />
+                    <RewardStatCard
+                        label="Game Rewards"
+                        value={`$${currentBalance.toFixed(2)}`}
+                        detail={`$${claimableBalance.toFixed(2)} unlocked · $${Math.max(0, currentBalance - claimableBalance).toFixed(2)} locked`}
+                    />
+                    <RewardStatCard
+                        label="Tournament Rewards"
+                        value={`$${tournamentBalance.toFixed(2)}`}
+                        detail={user.tournamentRewardClaimInProgress ? 'Claim processing' : tournamentBalance > 0 ? 'Ready to claim' : 'No unclaimed winnings'}
+                        tone="tournament"
+                    />
+                    <RewardStatCard
+                        label="Affiliate Rewards"
+                        value={affiliateEligible && !affiliateData ? '--' : `$${affiliateBalance.toFixed(2)}`}
+                        detail={!affiliateEligible
+                            ? 'Unavailable for this account'
+                            : !affiliateData
+                                ? 'Loading affiliate rewards'
+                                : !affiliateData.profile?.active
+                                    ? 'Activate below to start earning'
+                                    : `$${affiliateAvailable.toFixed(2)} available · $${affiliatePending.toFixed(2)} pending`}
+                        tone="affiliate"
+                    />
+                    <RewardStatCard
+                        label="Total Paid (All-Time)"
+                        value={`$${totalClaimedAllTime.toFixed(2)}`}
+                        detail="Game, tournament and affiliate payouts"
+                    />
                 </div>
-
                 {user.rewardsDisabled && (
                     <div className="panel" style={{ padding: '16px 18px', marginBottom: '24px', border: '1px solid rgba(239,68,68,0.35)', color: 'var(--red)' }}>
                         Promotional rewards are disabled while an admin reviews accounts funded by the same external wallet. Retained game winnings can still be claimed.
@@ -428,7 +462,7 @@ export default function Rewards() {
                             Tournament Winnings
                         </h2>
 
-                        <div className="panel" style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.05) 0%, rgba(234, 179, 8, 0.02) 100%)', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
+                        <div className="panel" style={{ padding: '24px', background: 'var(--bg-1)', border: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
                                 <div>
                                     <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-h)', fontWeight: '600' }}>
@@ -494,19 +528,28 @@ export default function Rewards() {
                     <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-1)', fontWeight: '700' }}>
                         Rewards History
                     </h2>
-                    {history.length === 0 ? (
+                    {rewardHistory.length === 0 ? (
                         <div className="panel" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-2)', fontSize: '0.9rem' }}>
                             No rewards activity found.
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {history.map((tx) => {
+                            {rewardHistory.map((tx) => {
                                 let title = 'Reward Activity';
                                 let desc = '';
                                 let val = '';
                                 let color = 'var(--text-h)';
 
-                                if (tx.meta?.event === 'sponsored_rewards_claim') {
+                                if (tx.affiliatePayout) {
+                                    const payoutStatus = String(tx.status || 'requested');
+                                    const isPaid = ['completed', 'paid'].includes(payoutStatus);
+                                    title = 'Affiliate Payout';
+                                    desc = isPaid
+                                        ? `Paid to ${tx.destinationWallet ? tx.destinationWallet.slice(0, 6) + '...' + tx.destinationWallet.slice(-5) : 'your wallet'}`
+                                        : `Payout ${payoutStatus.replace('_', ' ')}`;
+                                    val = `${isPaid ? '-' : ''}$${Number(tx.amountUsd || 0).toFixed(2)}`;
+                                    color = isPaid ? 'var(--green)' : 'var(--yellow)';
+                                } else if (tx.meta?.event === 'sponsored_rewards_claim') {
                                     title = 'Claim Payout';
                                     desc = `Claimed via Solana: ${tx.meta.signature ? tx.meta.signature.slice(0, 8) + '...' : 'Pending'}`;
                                     val = `-$${(tx.meta.amountUsd || 0).toFixed(2)}`;
@@ -548,6 +591,9 @@ export default function Rewards() {
                         </div>
                     )}
                 </section>
+
+                {/* Affiliate details stay last so the core reward flow reads top-to-bottom. */}
+                <AffiliateRewardsPanel onDataChange={setAffiliateData} />
 
                 {/* Custom Modal/Alert System */}
                 {claimStatus && (

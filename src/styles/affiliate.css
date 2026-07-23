@@ -66,3 +66,96 @@
     .affiliate-terms ul { columns: 1; }
     .affiliate-hero { padding-top: 46px; }
 }
+
+/* Rewards-page integration: use the same surfaces and hierarchy as the rest of Rewards. */
+.affiliate-rewards-embedded {
+    --affiliate-green: var(--green);
+    margin: 8px 0 40px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+    scroll-margin-top: 90px;
+}
+
+.affiliate-rewards-embedded > .affiliate-section-heading {
+    padding: 0;
+    margin-bottom: 16px;
+}
+
+.affiliate-rewards-embedded > .affiliate-section-heading h2 {
+    margin: 5px 0 0;
+    color: var(--text-h);
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.affiliate-rewards-embedded .affiliate-kicker {
+    color: var(--text-3);
+}
+
+.affiliate-rewards-embedded .affiliate-link-card,
+.affiliate-rewards-embedded .affiliate-payout-card,
+.affiliate-rewards-embedded .affiliate-table-panel,
+.affiliate-rewards-embedded .affiliate-stat-grid article {
+    background: var(--bg-1);
+    border-color: var(--border);
+    border-radius: var(--r-md);
+    box-shadow: none;
+}
+
+.affiliate-rewards-embedded .affiliate-admin-stack {
+    gap: 14px;
+}
+
+.affiliate-rewards-embedded .affiliate-link-card,
+.affiliate-rewards-embedded .affiliate-payout-card,
+.affiliate-rewards-embedded .affiliate-table-panel {
+    margin: 0;
+}
+
+.affiliate-rewards-embedded .affiliate-link-card,
+.affiliate-rewards-embedded .affiliate-payout-card {
+    padding: 24px;
+}
+
+.affiliate-rewards-embedded .affiliate-stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin: 0;
+}
+
+.affiliate-rewards-embedded .affiliate-stat-grid article {
+    min-height: 0;
+    padding: 16px 18px;
+}
+
+.affiliate-rewards-embedded .affiliate-stat-grid strong {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.03em;
+}
+
+.affiliate-rewards-embedded .affiliate-table-panel .affiliate-section-heading {
+    padding: 18px 20px 10px;
+}
+
+.affiliate-rewards-embedded .affiliate-table-panel .affiliate-section-heading h2 {
+    margin: 4px 0 0;
+    font-size: 1rem;
+}
+
+.affiliate-rewards-embedded .affiliate-notice {
+    border-color: var(--green-border);
+    background: var(--green-dim);
+    border-radius: var(--r-md);
+}
+
+@media (max-width: 520px) {
+    .affiliate-rewards-embedded .affiliate-stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .affiliate-rewards-embedded .affiliate-link-card,
+    .affiliate-rewards-embedded .affiliate-payout-card {
+        padding: 18px;
+    }
+}
