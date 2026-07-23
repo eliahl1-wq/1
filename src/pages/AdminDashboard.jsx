@@ -100,7 +100,7 @@ function formatDuration(ms) {
 function classifyTxCategory(tx) {
     const m = tx.meta || {};
     if (tx.type === 'deposit') return 'deposit';
-    if (['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset'].includes(m.event)) return 'sweep';
+    if (['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset', 'affiliate_pool_factory_reset'].includes(m.event)) return 'sweep';
     if (tx.type === 'game') {
         if (['join', 'br_join', 'free_ticket_join'].includes(m.event)) return 'entry';
         if (m.reason === 'Arena Death' || m.reason === 'BR Eliminated' || m.reason === 'Competitive Slither Death') return 'death';

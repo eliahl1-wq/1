@@ -37,6 +37,29 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
         body: JSON.stringify(changes),
     });
 
+    const factoryResetAffiliatePool = async () => {
+        const confirmation = window.prompt(
+            'DANGER: This permanently removes every affiliate profile, referral, click, risk flag, and unpaid commission from the active program. Unpaid affiliate funds are swept to the owner vault. Completed payout and commission audit history is preserved.\n\nActive payout requests must be resolved first.\n\nType RESET AFFILIATE POOL to continue.'
+        );
+        if (confirmation == null) return;
+        if (confirmation !== 'RESET AFFILIATE POOL') {
+            setMessage('Reset cancelled: confirmation phrase did not match.');
+            return;
+        }
+        setLoading(true);
+        setMessage('');
+        try {
+            const result = await fetchAdmin('/api/admin/affiliate-pool/factory-reset', {
+                method: 'POST',
+                body: JSON.stringify({ confirmation }),
+            });
+            await load();
+            setMessage(result.message);
+        } catch (error) {
+            setMessage(error.message);
+            setLoading(false);
+        }
+    };
     if (loading && !data) return <div className="affiliate-loading"><span className="spinner" /> Loading affiliates…</div>;
     if (!data) return <div className="affiliate-notice">{message || 'Could not load affiliates.'}</div>;
 
@@ -48,6 +71,25 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                 <article><span>Payout requests</span><strong>{data.payouts.filter(p => ['requested', 'processing'].includes(p.status)).length}</strong></article>
                 <article><span>Open risk flags</span><strong>{data.riskFlags.length}</strong></article>
                 <article><span>Recent commissions</span><strong>{data.commissions.length}</strong></article>
+            </section>
+
+            <section className="affiliate-table-panel">
+                <div className="affiliate-section-heading">
+                    <div>
+                        <span className="affiliate-kicker">Pool maintenance</span>
+                        <h2>Affiliate factory reset</h2>
+                        <small>Clears the active affiliate program and sweeps all unpaid affiliate rewards. Financial audit history remains.</small>
+                    </div>
+                    <button
+                        type="button"
+                        className="btn btn-ghost"
+                        disabled={loading}
+                        onClick={factoryResetAffiliatePool}
+                        style={{ color: 'var(--red)', borderColor: 'rgba(239,68,68,0.45)' }}
+                    >
+                        FACTORY RESET AFFILIATE POOL
+                    </button>
+                </div>
             </section>
 
             <section className="affiliate-table-panel">

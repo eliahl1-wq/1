@@ -68,7 +68,7 @@ export default function Transactions() {
                         const event = tx.meta?.event || '';
                         const isGameWithdrawal =
                             /Arena Cashout|Admin Forced Cashout|Auto Room Reset|BR Victory|BR Refund/i.test(reason) ||
-                            ['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset'].includes(event);
+                            ['pool_sweep', 'br_owner_sweep', 'reward_owner_surplus_sweep', 'reward_pool_factory_reset', 'affiliate_pool_factory_reset'].includes(event);
                         if (isGameWithdrawal) return false;
                         return !!tx.meta?.destination;
                     }
