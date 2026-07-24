@@ -29,7 +29,7 @@ export const AGAR = Object.freeze({
     decimals: readPositiveInteger(env.VITE_AGAR_DECIMALS, 9),
     name: env.VITE_AGAR_NAME?.trim() || 'AGARSTAKE',
     symbol: env.VITE_AGAR_SYMBOL?.trim() || 'AGAR',
-    logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/agar-token-logo.svg',
+    logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/agarstake-token-logo.png',
     balancePollIntervalMs: readPositiveInteger(env.VITE_AGAR_BALANCE_POLL_MS, 15_000),
     marketData: Object.freeze({
         provider: env.VITE_AGAR_MARKET_PROVIDER?.trim() || 'dexscreener',
