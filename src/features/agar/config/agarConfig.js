@@ -27,7 +27,7 @@ export const AGAR = Object.freeze({
     enabled: readBoolean(env.VITE_AGAR_ENABLED, false),
     mint: env.VITE_AGAR_MINT?.trim() || '',
     decimals: readPositiveInteger(env.VITE_AGAR_DECIMALS, 9),
-    name: env.VITE_AGAR_NAME?.trim() || 'Agar',
+    name: env.VITE_AGAR_NAME?.trim() || 'AGARSTAKE',
     symbol: env.VITE_AGAR_SYMBOL?.trim() || 'AGAR',
     logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/agar-token-logo.svg',
     balancePollIntervalMs: readPositiveInteger(env.VITE_AGAR_BALANCE_POLL_MS, 15_000),

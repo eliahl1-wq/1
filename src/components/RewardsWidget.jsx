@@ -312,7 +312,7 @@ export default function RewardsWidget() {
                         aria-label="Open AGAR price chart"
                         title="Open AGAR chart"
                     >
-                        <AgarLogo size={14} />
+                        <AgarLogo size={18} />
                         <span className="mono">
                             {agarLaunchReady && Number.isFinite(agarMarket.price)
                                 ? `${agarMarket.price.toLocaleString('en-US', { maximumSignificantDigits: 5 })}`

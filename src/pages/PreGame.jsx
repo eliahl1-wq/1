@@ -1017,6 +1017,23 @@ export default function PreGame() {
                 <div className="topbar-right">
                     {isAuthenticated ? (
                         <>
+                            <button
+                                type="button"
+                                className="agar-nav-balance"
+                                onClick={() => openAgarModal({ action: 'BUY' })}
+                                aria-label="Buy AGAR with account balance"
+                                title="Exchange account SOL for AGAR"
+                            >
+                                <AgarLogo size={22} />
+                                <span className="agar-nav-balance__symbol">{AGAR.symbol}</span>
+                                <strong className="mono">
+                                    {agarBalanceLoading
+                                        ? '…'
+                                        : agarBalance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
+                                </strong>
+                                <span className="agar-nav-balance__add" aria-hidden="true">+</span>
+                            </button>
+
                             {/* Balance pill */}
                             {(user?.balance || 0) > 0 && (
                                 <div style={{ position: 'relative' }}>
@@ -1115,31 +1132,6 @@ export default function PreGame() {
                                 </div>
                             )}
 
-                            <div className="agar-nav-balance" aria-label="AGAR balance">
-                                <button
-                                    type="button"
-                                    className="agar-nav-balance__value"
-                                    onClick={() => openAgarModal()}
-                                    title="Open AGAR chart"
-                                >
-                                    <AgarLogo size={18} />
-                                    <span className="agar-nav-balance__symbol">{AGAR.symbol}</span>
-                                    <strong className="mono">
-                                        {agarBalanceLoading
-                                            ? '…'
-                                            : agarBalance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
-                                    </strong>
-                                </button>
-                                <button
-                                    type="button"
-                                    className="agar-nav-balance__add"
-                                    onClick={() => openAgarModal({ action: 'BUY' })}
-                                    aria-label="Buy AGAR"
-                                    title="Exchange SOL for AGAR"
-                                >
-                                    +
-                                </button>
-                            </div>
 
                             {/* Deposit button */}
                             <button

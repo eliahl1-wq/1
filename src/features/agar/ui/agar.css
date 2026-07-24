@@ -1,32 +1,21 @@
 .agar-nav-balance {
     display: inline-flex;
-    align-items: stretch;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
     height: 32px;
-    overflow: hidden;
+    padding: 0 10px;
+    color: var(--text-h);
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(151, 124, 255, 0.22);
     border-radius: var(--r-full);
-}
-
-.agar-nav-balance__value,
-.agar-nav-balance__add {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-h);
-    background: transparent;
-    border: 0;
     cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.agar-nav-balance__value {
-    gap: 6px;
-    padding: 0 9px;
-}
-
-.agar-nav-balance__value:hover,
-.agar-nav-balance__add:hover {
+.agar-nav-balance:hover {
     background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(151, 124, 255, 0.42);
 }
 
 .agar-nav-balance__symbol {
@@ -36,19 +25,20 @@
     letter-spacing: 0.05em;
 }
 
-.agar-nav-balance__value strong {
+.agar-nav-balance strong {
     color: var(--text-bright);
     font-size: 0.72rem;
 }
 
 .agar-nav-balance__add {
-    width: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: #c7baff;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 700;
-    border-left: 1px solid rgba(151, 124, 255, 0.18);
+    line-height: 1;
 }
-
 .agar-price-pill {
     display: inline-flex;
     gap: 6px;
@@ -798,8 +788,8 @@
         display: none;
     }
 
-    .agar-nav-balance__value {
-        padding: 0 7px;
+    .agar-nav-balance {
+        padding: 0 8px;
     }
 
     .agar-token-float {
