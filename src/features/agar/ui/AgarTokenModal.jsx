@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import {
     AGAR,
     buildAgarExternalUrl,
@@ -33,6 +31,11 @@ function formatMetric(key, value, launchReady, comingSoon) {
     }).format(value);
 }
 
+function shortAddress(address) {
+    if (!address) return 'Not available';
+    return `${address.slice(0, 5)}…${address.slice(-5)}`;
+}
+
 function ExternalLink({ href, children }) {
     if (!href) {
         return (
@@ -51,17 +54,22 @@ function ExternalLink({ href, children }) {
 export default function AgarTokenModal({
     open,
     onClose,
+    initialAction = '',
     snapshot,
     marketLoading,
     marketError,
     walletBalance,
     balanceLoading,
     balanceError,
+    accountAddress,
+    accountSolBalance,
+    accountSolPrice,
+    authToken,
     config = AGAR,
 }) {
-    const wallet = useWallet();
-    const { connection } = useConnection();
     const [notice, setNotice] = useState('');
+    const [tradeSide, setTradeSide] = useState(initialAction === 'SELL' ? 'SELL' : 'BUY');
+    const [tradeAmount, setTradeAmount] = useState('');
     const launchReady = isAgarLaunchReady(config);
 
     useEffect(() => {
@@ -78,8 +86,11 @@ export default function AgarTokenModal({
     }, [onClose, open]);
 
     useEffect(() => {
-        if (open) setNotice('');
-    }, [open]);
+        if (!open) return;
+        setTradeSide(initialAction === 'SELL' ? 'SELL' : 'BUY');
+        setTradeAmount('');
+        setNotice(initialAction && !launchReady ? config.messages.notLaunched : '');
+    }, [config.messages.notLaunched, initialAction, launchReady, open]);
 
     if (!open) return null;
 
@@ -88,14 +99,25 @@ export default function AgarTokenModal({
             setNotice(config.messages.notLaunched);
             return;
         }
-        if (!wallet.connected) {
-            setNotice('Connect a wallet before swapping AGAR.');
+        if (!accountAddress || !authToken) {
+            setNotice('Your AgarStake account wallet is not available.');
+            return;
+        }
+        const parsedAmount = Number(tradeAmount);
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+            setNotice(`Enter a valid ${side === 'BUY' ? 'SOL' : config.symbol} amount.`);
             return;
         }
         try {
             setNotice(`Preparing ${side.toLowerCase()}…`);
-            await executeAgarSwap({ side, wallet, connection, config });
-            setNotice('');
+            await executeAgarSwap({
+                side,
+                amount: parsedAmount,
+                accountAddress,
+                authToken,
+                config,
+            });
+            setNotice('Swap submitted.');
         } catch (error) {
             setNotice(error.message || 'AGAR swaps are unavailable.');
         }
@@ -113,6 +135,20 @@ export default function AgarTokenModal({
             setNotice('Could not copy the contract address.');
         }
     };
+
+    const parsedTradeAmount = Number(tradeAmount);
+    const agarPrice = Number(snapshot.price);
+    const solPrice = Number(accountSolPrice);
+    const estimatedOutput = Number.isFinite(parsedTradeAmount)
+        && parsedTradeAmount > 0
+        && Number.isFinite(agarPrice)
+        && agarPrice > 0
+        && Number.isFinite(solPrice)
+        && solPrice > 0
+        ? tradeSide === 'BUY'
+            ? parsedTradeAmount * solPrice / agarPrice
+            : parsedTradeAmount * agarPrice / solPrice
+        : null;
 
     const chartUrl = buildAgarExternalUrl(config.marketData.chartUrl, config);
     const axiomUrl = buildAgarExternalUrl(config.links.axiom, config);
@@ -172,41 +208,84 @@ export default function AgarTokenModal({
                         )}
                     </div>
 
-                    <aside className="agar-modal__trade-panel">
+                    <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}`}>
+                        <div className="agar-modal__account-wallet">
+                            <div>
+                                <span>Account wallet</span>
+                                <strong className="mono" title={accountAddress}>
+                                    {shortAddress(accountAddress)}
+                                </strong>
+                            </div>
+                            <span className="agar-modal__account-lock" title="Locked to your AgarStake account">
+                                Account linked
+                            </span>
+                        </div>
+
                         <div className="agar-modal__wallet-row">
-                            <span>AGAR Balance</span>
+                            <span>{config.symbol} Balance</span>
                             <strong>
-                                {wallet.connected
-                                    ? `${balanceLoading ? '…' : walletBalance.toLocaleString('en-US', { maximumFractionDigits: config.decimals })} ${config.symbol}`
-                                    : `0 ${config.symbol}`}
+                                {balanceLoading
+                                    ? `… ${config.symbol}`
+                                    : `${walletBalance.toLocaleString('en-US', { maximumFractionDigits: config.decimals })} ${config.symbol}`}
                             </strong>
                         </div>
-                        {!wallet.connected && <WalletMultiButton />}
+                        <div className="agar-modal__wallet-row">
+                            <span>SOL Balance</span>
+                            <strong>{Number(accountSolBalance || 0).toFixed(4)} SOL</strong>
+                        </div>
                         {balanceError && launchReady && <span className="agar-modal__micro-status">{balanceError}</span>}
 
-                        <div className="agar-modal__trade-placeholder">
+                        <div className="agar-modal__trade-side-tabs">
+                            <button
+                                type="button"
+                                className={tradeSide === 'BUY' ? 'active' : ''}
+                                onClick={() => { setTradeSide('BUY'); setNotice(''); }}
+                            >
+                                Buy
+                            </button>
+                            <button
+                                type="button"
+                                className={tradeSide === 'SELL' ? 'active' : ''}
+                                onClick={() => { setTradeSide('SELL'); setNotice(''); }}
+                            >
+                                Sell
+                            </button>
+                        </div>
+
+                        <label className="agar-modal__trade-placeholder">
                             <span>You pay</span>
                             <div>
-                                <strong>--</strong>
-                                <span>Token</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    inputMode="decimal"
+                                    placeholder="0.00"
+                                    value={tradeAmount}
+                                    onChange={(event) => setTradeAmount(event.target.value)}
+                                />
+                                <span>{tradeSide === 'BUY' ? 'SOL' : config.symbol}</span>
                             </div>
-                        </div>
+                        </label>
                         <div className="agar-modal__trade-placeholder">
-                            <span>You receive</span>
+                            <span>Estimated receive</span>
                             <div>
-                                <strong>--</strong>
-                                <span>{config.symbol}</span>
+                                <strong>
+                                    {estimatedOutput == null
+                                        ? '--'
+                                        : estimatedOutput.toLocaleString('en-US', { maximumSignificantDigits: 7 })}
+                                </strong>
+                                <span>{tradeSide === 'BUY' ? config.symbol : 'SOL'}</span>
                             </div>
                         </div>
 
-                        <div className="agar-modal__trade-actions">
-                            <button type="button" className="agar-modal__trade agar-modal__trade--buy" onClick={() => handleTrade('BUY')}>
-                                Buy {config.symbol}
-                            </button>
-                            <button type="button" className="agar-modal__trade agar-modal__trade--sell" onClick={() => handleTrade('SELL')}>
-                                Sell {config.symbol}
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            className={`agar-modal__trade ${tradeSide === 'BUY' ? 'agar-modal__trade--buy' : 'agar-modal__trade--sell'}`}
+                            onClick={() => handleTrade(tradeSide)}
+                        >
+                            {tradeSide === 'BUY' ? `Buy ${config.symbol}` : `Sell ${config.symbol}`}
+                        </button>
 
                         {notice && <div className="agar-modal__notice" role="status">{notice}</div>}
                     </aside>

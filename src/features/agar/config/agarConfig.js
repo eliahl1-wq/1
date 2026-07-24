@@ -40,9 +40,8 @@ export const AGAR = Object.freeze({
         pollIntervalMs: readPositiveInteger(env.VITE_AGAR_MARKET_POLL_MS, 30_000),
     }),
     swap: Object.freeze({
-        provider: env.VITE_AGAR_SWAP_PROVIDER?.trim() || 'jupiter-link',
-        buyUrl: env.VITE_AGAR_JUPITER_BUY_URL?.trim() || 'https://jup.ag/swap/SOL-{mint}',
-        sellUrl: env.VITE_AGAR_JUPITER_SELL_URL?.trim() || 'https://jup.ag/swap/{mint}-SOL',
+        provider: env.VITE_AGAR_SWAP_PROVIDER?.trim() || 'account-jupiter',
+        endpoint: env.VITE_AGAR_SWAP_ENDPOINT?.trim() || '/api/agar/swap',
     }),
     links: Object.freeze({
         axiom: env.VITE_AGAR_AXIOM_URL?.trim() || 'https://axiom.trade/t/{mint}?chain=sol',

@@ -1,18 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
 import { AGAR, isAgarLaunchReady } from '../config/agarConfig';
 import { fetchAgarBalance } from './agarBalance';
 
-export function useAgarBalance(config = AGAR) {
+export function useAgarBalance(config = AGAR, accountAddress = '') {
     const { connection } = useConnection();
-    const { connected, publicKey } = useWallet();
     const [balance, setBalance] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const launchReady = isAgarLaunchReady(config);
+    const accountPublicKey = useMemo(() => {
+        if (!accountAddress) return null;
+        try {
+            return new PublicKey(accountAddress);
+        } catch {
+            return null;
+        }
+    }, [accountAddress]);
 
     const refresh = useCallback(async () => {
-        if (!connected || !publicKey || !launchReady) {
+        if (!accountPublicKey || !launchReady) {
             setBalance(0);
             setError('');
             return;
@@ -22,7 +30,7 @@ export function useAgarBalance(config = AGAR) {
         try {
             const next = await fetchAgarBalance({
                 connection,
-                owner: publicKey,
+                owner: accountPublicKey,
                 config,
             });
             setBalance(next);
@@ -32,11 +40,11 @@ export function useAgarBalance(config = AGAR) {
         } finally {
             setLoading(false);
         }
-    }, [config, connected, connection, launchReady, publicKey]);
+    }, [accountPublicKey, config, connection, launchReady]);
 
     useEffect(() => {
         refresh();
-        if (!connected || !launchReady) return undefined;
+        if (!accountPublicKey || !launchReady) return undefined;
 
         const poll = window.setInterval(refresh, config.balancePollIntervalMs);
         const onFocus = () => refresh();
@@ -45,11 +53,11 @@ export function useAgarBalance(config = AGAR) {
             window.clearInterval(poll);
             window.removeEventListener('focus', onFocus);
         };
-    }, [config.balancePollIntervalMs, connected, launchReady, refresh]);
+    }, [accountPublicKey, config.balancePollIntervalMs, launchReady, refresh]);
 
     return {
         balance,
-        connected,
+        accountReady: Boolean(accountPublicKey),
         loading,
         error,
         refresh,

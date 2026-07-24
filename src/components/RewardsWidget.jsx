@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import { AGAR } from '../features/agar/config/agarConfig';
+import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
+import AgarLogo from '../features/agar/ui/AgarLogo';
 
 const SolLogo = ({ size = 13, style }) => (
     <img
@@ -15,6 +18,7 @@ export default function RewardsWidget() {
     const { user, refreshUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const { snapshot: agarMarket, launchReady: agarLaunchReady, openAgarModal } = useAgarToken();
     const [expanded, setExpanded] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [hasSeen, setHasSeen] = useState(false);
@@ -300,6 +304,22 @@ export default function RewardsWidget() {
 
             {/* Toggle Button Container */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {location.pathname === '/pre-game' && (
+                    <button
+                        type="button"
+                        className="agar-price-pill"
+                        onClick={() => openAgarModal()}
+                        aria-label="Open AGAR price chart"
+                        title="Open AGAR chart"
+                    >
+                        <AgarLogo size={14} />
+                        <span className="mono">
+                            {agarLaunchReady && Number.isFinite(agarMarket.price)
+                                ? `${agarMarket.price.toLocaleString('en-US', { maximumSignificantDigits: 5 })}`
+                                : AGAR.messages.comingSoon}
+                        </span>
+                    </button>
+                )}
                 {location.pathname === '/pre-game' && (
                     <div className="sol-price-pill" style={{ position: 'static', margin: 0, height: '28px', display: 'flex', alignItems: 'center', gap: '6px', boxSizing: 'border-box' }}>
                         <SolLogo size={14} />

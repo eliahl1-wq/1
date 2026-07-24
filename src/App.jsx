@@ -132,7 +132,7 @@ function App() {
             <AuthProvider>
               <SitePresenceRunner />
               <ReferralCapture />
-              <AgarTokenExperience />
+              <AgarTokenExperience>
               <Routes>
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -158,6 +158,7 @@ function App() {
                 <Route path="/affiliate" element={<Navigate to="/rewards#affiliate-rewards" replace />} />
                 <Route path="/" element={<Navigate to="/pre-game" />} />
               </Routes>
+              </AgarTokenExperience>
             </AuthProvider>
           </Router>
         </WalletModalProvider>

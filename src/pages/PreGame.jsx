@@ -25,6 +25,9 @@ import { API_URL } from '../utils/apiBase';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
+import { AGAR } from '../features/agar/config/agarConfig';
+import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
+import AgarLogo from '../features/agar/ui/AgarLogo';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
 
@@ -123,6 +126,11 @@ export default function PreGame() {
     const location = useLocation();
     const { connected, publicKey, sendTransaction } = useWallet();
     const { connection } = useConnection();
+    const {
+        openAgarModal,
+        walletBalance: agarBalance,
+        balanceLoading: agarBalanceLoading,
+    } = useAgarToken();
 
     // ── Tournament States ───────────────────────────────
     const { tournamentId } = useParams();
@@ -1106,6 +1114,32 @@ export default function PreGame() {
                                     )}
                                 </div>
                             )}
+
+                            <div className="agar-nav-balance" aria-label="AGAR balance">
+                                <button
+                                    type="button"
+                                    className="agar-nav-balance__value"
+                                    onClick={() => openAgarModal()}
+                                    title="Open AGAR chart"
+                                >
+                                    <AgarLogo size={18} />
+                                    <span className="agar-nav-balance__symbol">{AGAR.symbol}</span>
+                                    <strong className="mono">
+                                        {agarBalanceLoading
+                                            ? '…'
+                                            : agarBalance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
+                                    </strong>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="agar-nav-balance__add"
+                                    onClick={() => openAgarModal({ action: 'BUY' })}
+                                    aria-label="Buy AGAR"
+                                    title="Exchange SOL for AGAR"
+                                >
+                                    +
+                                </button>
+                            </div>
 
                             {/* Deposit button */}
                             <button

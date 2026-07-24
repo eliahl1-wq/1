@@ -1,13 +1,13 @@
 import { AGAR, isAgarLaunchReady } from '../config/agarConfig';
-import { jupiterLinkSwapProvider } from './providers/jupiterLinkSwapProvider';
+import { accountJupiterSwapProvider } from './providers/accountJupiterSwapProvider';
 
 const providers = new Map([
-    ['jupiter-link', jupiterLinkSwapProvider],
+    ['account-jupiter', accountJupiterSwapProvider],
 ]);
 
 /**
  * Swap providers implement:
- *   execute({ side, mint, wallet, connection }): Promise<unknown>
+ *   execute({ side, amount, mint, accountAddress, authToken }): Promise<unknown>
  *
  * This keeps Jupiter-specific request, quote, transaction, and signing logic
  * outside the UI.
@@ -21,8 +21,9 @@ export function registerAgarSwapProvider(name, provider) {
 
 export async function executeAgarSwap({
     side,
-    wallet,
-    connection,
+    amount,
+    accountAddress,
+    authToken,
     config = AGAR,
 }) {
     if (!isAgarLaunchReady(config)) {
@@ -39,8 +40,9 @@ export async function executeAgarSwap({
         side,
         mint: config.mint,
         decimals: config.decimals,
-        wallet,
-        connection,
+        amount,
+        accountAddress,
+        authToken,
         config,
     });
 }

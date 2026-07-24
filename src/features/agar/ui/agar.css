@@ -1,3 +1,81 @@
+.agar-nav-balance {
+    display: inline-flex;
+    align-items: stretch;
+    height: 32px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(151, 124, 255, 0.22);
+    border-radius: var(--r-full);
+}
+
+.agar-nav-balance__value,
+.agar-nav-balance__add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-h);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.agar-nav-balance__value {
+    gap: 6px;
+    padding: 0 9px;
+}
+
+.agar-nav-balance__value:hover,
+.agar-nav-balance__add:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.agar-nav-balance__symbol {
+    color: var(--text-2);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+}
+
+.agar-nav-balance__value strong {
+    color: var(--text-bright);
+    font-size: 0.72rem;
+}
+
+.agar-nav-balance__add {
+    width: 30px;
+    color: #c7baff;
+    font-size: 1rem;
+    font-weight: 700;
+    border-left: 1px solid rgba(151, 124, 255, 0.18);
+}
+
+.agar-price-pill {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    height: 28px;
+    padding: 5px 10px;
+    color: var(--text);
+    background: #000;
+    border: 1px solid rgba(151, 124, 255, 0.22);
+    border-radius: 20px;
+    box-shadow: var(--shadow-xl);
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.agar-price-pill:hover {
+    color: var(--text-h);
+    background: var(--bg-2);
+    border-color: rgba(151, 124, 255, 0.42);
+}
+
+.agar-price-pill .mono {
+    color: #b9aaff;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
 .agar-token-float {
     position: fixed;
     right: 18px;
@@ -428,6 +506,75 @@
     padding: 13px;
 }
 
+.agar-modal__account-wallet {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    background: rgba(120, 94, 255, 0.06);
+    border: 1px solid rgba(120, 94, 255, 0.15);
+    border-radius: var(--r-md);
+}
+
+.agar-modal__account-wallet > div {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.agar-modal__account-wallet span {
+    color: var(--text-3);
+    font-size: 0.52rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.agar-modal__account-wallet strong {
+    color: var(--text-h);
+    font-size: 0.65rem;
+}
+
+.agar-modal__account-lock {
+    flex: 0 0 auto;
+    padding: 3px 6px;
+    color: #b9aaff !important;
+    background: rgba(120, 94, 255, 0.1);
+    border-radius: var(--r-full);
+}
+
+.agar-modal__trade-panel.is-buy-intent {
+    border-color: rgba(120, 94, 255, 0.28);
+    box-shadow: inset 0 0 28px rgba(120, 94, 255, 0.035);
+}
+
+.agar-modal__trade-side-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    padding: 3px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--r-md);
+}
+
+.agar-modal__trade-side-tabs button {
+    min-height: 28px;
+    color: var(--text-2);
+    font-family: var(--ui);
+    font-size: 0.64rem;
+    font-weight: 800;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.agar-modal__trade-side-tabs button.active {
+    color: #fff;
+    background: rgba(120, 94, 255, 0.18);
+}
+
 .agar-modal__wallet-row {
     display: flex;
     align-items: center;
@@ -473,6 +620,22 @@
     align-items: center;
     justify-content: space-between;
     margin-top: 5px;
+}
+
+.agar-modal__trade-placeholder input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    color: var(--text-h);
+    font-family: var(--mono);
+    font-size: 1rem;
+    background: transparent;
+    border: 0;
+    outline: 0;
+}
+
+.agar-modal__trade-placeholder input::placeholder {
+    color: var(--text-3);
 }
 
 .agar-modal__trade-placeholder strong {
@@ -631,6 +794,14 @@
 }
 
 @media (max-width: 780px) {
+    .agar-nav-balance__symbol {
+        display: none;
+    }
+
+    .agar-nav-balance__value {
+        padding: 0 7px;
+    }
+
     .agar-token-float {
         right: 12px;
         bottom: calc(12px + env(safe-area-inset-bottom, 0));
