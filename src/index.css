@@ -755,6 +755,35 @@ input[type=number] {
   z-index: 10;
 }
 
+.skin-card--locked {
+  border-color: rgba(151, 124, 255, 0.18);
+}
+
+.skin-card--locked .skin-card-icon {
+  filter: saturate(0.45) brightness(0.72);
+}
+
+.skin-lock-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 5px;
+  color: #b9aaff;
+  font-size: 0.46rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  background: rgba(124, 78, 255, 0.14);
+  border: 1px solid rgba(151, 124, 255, 0.25);
+  border-radius: 5px;
+}
+
+.skin-card-price {
+  color: #a995ff;
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+
 .skin-card.active .skin-card-icon {
   border-color: rgba(255, 255, 255, 0.3);
 }

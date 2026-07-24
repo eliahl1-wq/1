@@ -16,6 +16,7 @@ import HowItWorks from './pages/HowItWorks';
 import Faq from './pages/Faq';
 import Rewards from './pages/Rewards';
 import Tournaments from './pages/Tournaments';
+import Shop from './pages/Shop';
 import ReferralCapture from './components/ReferralCapture';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -154,6 +155,7 @@ function App() {
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/faq" element={<Faq />} />
                 <Route path="/rewards" element={<PrivateRoute><Rewards /></PrivateRoute>} />
+                <Route path="/shop" element={<PrivateRoute><Shop /></PrivateRoute>} />
                 <Route path="/affiliate-program" element={<Navigate to="/rewards#affiliate-rewards" replace />} />
                 <Route path="/affiliate" element={<Navigate to="/rewards#affiliate-rewards" replace />} />
                 <Route path="/" element={<Navigate to="/pre-game" />} />

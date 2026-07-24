@@ -261,12 +261,47 @@ export default function PreGame() {
     const [hasSeenRainbow, setHasSeenRainbow] = useState(
         () => localStorage.getItem('has_seen_rainbow') === 'true'
     );
+    const [skinInventoryLoaded, setSkinInventoryLoaded] = useState(false);
+    const [ownedSkinProducts, setOwnedSkinProducts] = useState(() => new Set());
+    const [shopProducts, setShopProducts] = useState([]);
 
     const [showCustomizer, setShowCustomizer] = useState(false);
 
     useEffect(() => {
         localStorage.setItem('has_seen_rainbow', hasSeenRainbow);
     }, [hasSeenRainbow]);
+
+    useEffect(() => {
+        if (!token) return undefined;
+        let active = true;
+        Promise.all([
+            fetch(`${API_URL}/api/shop/inventory`, {
+                cache: 'no-store',
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${API_URL}/api/shop/catalog`, { cache: 'no-store' }),
+        ]).then(async ([inventoryResponse, catalogResponse]) => {
+            if (!active) return;
+            const inventory = inventoryResponse.ok ? await inventoryResponse.json() : { entitlements: [] };
+            const catalog = catalogResponse.ok ? await catalogResponse.json() : { products: [] };
+            setOwnedSkinProducts(new Set((inventory.entitlements || []).map((entry) => entry.productId)));
+            setShopProducts(catalog.products || []);
+            setSkinInventoryLoaded(true);
+        }).catch(() => {
+            if (active) setSkinInventoryLoaded(true);
+        });
+        return () => { active = false; };
+    }, [token]);
+
+    useEffect(() => {
+        if (!skinInventoryLoaded) return;
+        if (selectedSkin === 'random' && !ownedSkinProducts.has('slither:rainbow')) {
+            setSelectedSkin('#c080ff');
+        }
+        if (selectedSkinAgar === 'random' && !ownedSkinProducts.has('agar:rainbow')) {
+            setSelectedSkinAgar('#c080ff');
+        }
+    }, [ownedSkinProducts, selectedSkin, selectedSkinAgar, skinInventoryLoaded]);
 
     useEffect(() => {
         localStorage.setItem('selected_skin', selectedSkin);
@@ -2088,6 +2123,9 @@ export default function PreGame() {
                 const isRainbow = currentChroma === 'random' && customizerTab !== 'surviv';
                 const isRandomSelection = currentChroma === 'random' || currentChroma === 'random_color';
                 const displayChroma = isRandomSelection ? '#80d0d0' : currentChroma;
+                const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
+                const ownsRainbow = customizerTab !== 'surviv' && ownedSkinProducts.has(rainbowProductId);
+                const rainbowProduct = shopProducts.find((product) => product.id === rainbowProductId);
 
                 const cycleChroma = (direction) => {
                     if (isRandomSelection) return;
@@ -2110,6 +2148,11 @@ export default function PreGame() {
                 };
 
                 const setSkinStyle = (style) => {
+                    if (style === 'rainbow' && !ownsRainbow) {
+                        setShowCustomizer(false);
+                        navigate('/shop');
+                        return;
+                    }
                     let newSkin = style;
                     if (style === 'rainbow') newSkin = 'random';
                     else if (style === 'classic') newSkin = '#c080ff';
@@ -2230,16 +2273,22 @@ export default function PreGame() {
                                         {customizerTab !== 'surviv' && (
                                             <button
                                                 type="button"
-                                                className={`skin-card ${isRainbow ? 'active' : ''}`}
+                                                className={`skin-card ${isRainbow ? 'active' : ''} ${!ownsRainbow ? 'skin-card--locked' : ''}`}
                                                 style={{ position: 'relative' }}
                                                 onClick={() => {
                                                     setSkinStyle('rainbow');
                                                     if (!hasSeenRainbow) setHasSeenRainbow(true);
                                                 }}
                                             >
-                                                {!hasSeenRainbow && <div className="notify-dot"></div>}
+                                                {!hasSeenRainbow && ownsRainbow && <div className="notify-dot"></div>}
+                                                {!ownsRainbow && <div className="skin-lock-badge">LOCKED</div>}
                                                 <div className="skin-card-icon rainbow-icon"></div>
                                                 <span>Rainbow</span>
+                                                {!ownsRainbow && (
+                                                    <small className="skin-card-price">
+                                                        {rainbowProduct?.estimatedAgar ? `${rainbowProduct.estimatedAgar} AGAR` : '$3 in AGAR'}
+                                                    </small>
+                                                )}
                                             </button>
                                         )}
                                     </div>
