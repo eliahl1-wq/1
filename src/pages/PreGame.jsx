@@ -2416,7 +2416,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                 const cos = Math.cos(segmentAngle);
                 const sin = Math.sin(segmentAngle);
                 const segmentCanvas = currentColor === 'random'
-                    ? rainbowCanvases[Math.floor((now * 0.003 + i * 0.15) % rainbowCanvases.length)]
+                    ? rainbowCanvases[Math.floor((now * 0.0012 + i * 0.15) % rainbowCanvases.length)]
                     : fixedSegmentCanvas;
                 const segmentHalf = segmentCanvas.width / 2;
                 ctx.setTransform(cos, sin, -sin, cos, pointX[i], pointY[i]);
@@ -2498,7 +2498,7 @@ export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) 
             let strokeStyle = '#000000';
 
             if (currentColor === 'random') {
-                const hue = (t * 0.35) % 360;
+                const hue = (t * 0.14) % 360;
                 fillStyle = `hsl(${hue}, 100%, 55%)`;
                 strokeStyle = `hsl(${hue}, 100%, 42%)`;
             } else {

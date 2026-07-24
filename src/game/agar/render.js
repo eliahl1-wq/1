@@ -188,7 +188,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
     for (let cell of cells) {
         if (cell.color === 'rainbow') {
             const time = Date.now() * 0.002;
-            const hue = (time * 100) % 360;
+            const hue = (time * 40) % 360;
             graph.fillStyle = `hsl(${hue}, 100%, 55%)`;
             graph.strokeStyle = `hsl(${hue}, 100%, 42%)`;
         } else {

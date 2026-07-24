@@ -1915,7 +1915,7 @@ export class SlitherRenderer {
                 let currentGlow = glow;
                 let currentGlowScale = stampScale;
                 if (isRainbow) {
-                    const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowPack.colors.length);
+                    const colorIndex = Math.floor((this._frame * 0.048 + i * 0.35) % rainbowPack.colors.length);
                     const stamp = rainbowPack.stamps[colorIndex];
                     currentGlow = stamp.glow;
                     currentGlowScale = stamp.bodySS * (cacheR / bodyRadius);
@@ -1946,7 +1946,7 @@ export class SlitherRenderer {
             let currentHalf = half;
 
             if (isRainbow) {
-                const colorIndex = Math.floor((this._frame * 0.12 + i * 0.35) % rainbowPack.colors.length);
+                const colorIndex = Math.floor((this._frame * 0.048 + i * 0.35) % rainbowPack.colors.length);
                 const stamp = rainbowPack.stamps[colorIndex];
                 sprite = (boosting && i === 0) ? stamp.boostBody : stamp.normal;
                 currentStampScale = stamp.bodySS * (cacheR / bodyRadius);
