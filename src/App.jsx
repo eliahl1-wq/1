@@ -29,6 +29,7 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 import { MIN_ENTRY_FEE } from './constants/economy';
 import { isBattleRoyaleAvailable } from './constants/features';
 import useSitePresence from './hooks/useSitePresence';
+import AgarTokenExperience from './features/agar/ui/AgarTokenExperience';
 
 const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL?.trim()
   || 'https://api.mainnet.solana.com';
@@ -131,6 +132,7 @@ function App() {
             <AuthProvider>
               <SitePresenceRunner />
               <ReferralCapture />
+              <AgarTokenExperience />
               <Routes>
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/register" element={<RegisterPage />} />

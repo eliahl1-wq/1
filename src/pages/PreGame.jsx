@@ -24,6 +24,7 @@ import { buildPresenceHeaders } from '../utils/sitePresence';
 import { API_URL } from '../utils/apiBase';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
+import { CHROMA_SKIN_COLORS } from '../constants/skins';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
 
@@ -238,19 +239,6 @@ export default function PreGame() {
     const [hideNames, setHideNames] = useState(
         () => localStorage.getItem('hide_player_names') === 'true'
     );
-
-    const SKIN_COLORS = [
-        'random',
-        '#c080ff', // lavender-purple
-        '#9099ff', // indigo-blue
-        '#80d0d0', // turquoise-cyan
-        '#80ff80', // lime-green
-        '#eeee70', // tinted-yellow
-        '#ffa060', // orange
-        '#ff9050', // pink-red
-        '#ff4040', // dark-red
-        '#e030e0', // magenta
-    ];
 
     const [selectedSkin, setSelectedSkin] = useState(
         () => localStorage.getItem('selected_skin') || '#c080ff'
@@ -2078,10 +2066,7 @@ export default function PreGame() {
                 const cycleChroma = (direction) => {
                     if (isRandomSelection) return;
 
-                    const chromas = [
-                        '#c080ff', '#9099ff', '#80d0d0', '#80ff80',
-                        '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'
-                    ];
+                    const chromas = CHROMA_SKIN_COLORS;
                     let idx = chromas.indexOf(currentChroma);
                     if (idx === -1) idx = 0;
 

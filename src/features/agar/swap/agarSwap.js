@@ -1,0 +1,46 @@
+import { AGAR, isAgarLaunchReady } from '../config/agarConfig';
+import { jupiterLinkSwapProvider } from './providers/jupiterLinkSwapProvider';
+
+const providers = new Map([
+    ['jupiter-link', jupiterLinkSwapProvider],
+]);
+
+/**
+ * Swap providers implement:
+ *   execute({ side, mint, wallet, connection }): Promise<unknown>
+ *
+ * This keeps Jupiter-specific request, quote, transaction, and signing logic
+ * outside the UI.
+ */
+export function registerAgarSwapProvider(name, provider) {
+    if (!name || typeof provider?.execute !== 'function') {
+        throw new TypeError('An AGAR swap provider must expose execute().');
+    }
+    providers.set(name, provider);
+}
+
+export async function executeAgarSwap({
+    side,
+    wallet,
+    connection,
+    config = AGAR,
+}) {
+    if (!isAgarLaunchReady(config)) {
+        throw new Error(config.messages.notLaunched);
+    }
+
+    const provider = providers.get(config.swap.provider);
+    if (!provider) {
+        // TODO: Register any custom swap adapter selected in configuration.
+        throw new Error('AGAR swaps are not available yet.');
+    }
+
+    return provider.execute({
+        side,
+        mint: config.mint,
+        decimals: config.decimals,
+        wallet,
+        connection,
+        config,
+    });
+}
