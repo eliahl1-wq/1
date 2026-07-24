@@ -10,6 +10,7 @@ import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
+import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -88,6 +89,7 @@ function normalizeSnakeColor(color) {
 /** Bucket colors so sprite cache stays small across many snakes. */
 function bucketSnakeColor(color) {
     if (color === 'random') return 'random';
+    if (parseFlagSkin(color)) return '#808080';
     const cs = normalizeSnakeColor(color);
     const { r, g, b } = parseColor(cs);
     const step = 24;
@@ -186,6 +188,7 @@ export class SlitherRenderer {
         this._screenScratch = { x: 0, y: 0 };
         this._quality = 1;
         this._rainbowStampPack = null;
+        this._flagStampPacks = new Map();
         this._deathClusterBuf = [];
         this._deathClusterIds = new Set();
         this._deathFoodScratch = [];
@@ -1740,6 +1743,20 @@ export class SlitherRenderer {
         return pack;
     }
 
+    _getFlagStamps(code, cacheR, prNeeds) {
+        const colors = getFlagSegmentColors(code);
+        const prKey = `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`;
+        const key = `${code}|${cacheR}|${prKey}`;
+        let pack = this._flagStampPacks.get(key);
+        if (!pack) {
+            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds));
+            pack = { code, cacheR, prKey, colors, stamps };
+            if (this._flagStampPacks.size >= 48) this._flagStampPacks.delete(this._flagStampPacks.keys().next().value);
+            this._flagStampPacks.set(key, pack);
+        }
+        return pack;
+    }
+
     _drawSnake(snake, toScreen, zoom) {
         const isYou = !!snake.isYou;
 
@@ -1857,11 +1874,20 @@ export class SlitherRenderer {
             trailGlow: boosting,
         };
 
-        const isRainbow = (snake.color === 'random');
-        const rainbowPack = isRainbow ? this._getRainbowStamps(cacheR, prNeeds, bodyRadius) : null;
+        const isRainbow = snake.color === 'random';
+        const flagCode = parseFlagSkin(snake.color);
+        const isPatternSkin = isRainbow || !!flagCode;
+        const patternPack = isRainbow
+            ? this._getRainbowStamps(cacheR, prNeeds, bodyRadius)
+            : flagCode
+                ? this._getFlagStamps(flagCode, cacheR, prNeeds)
+                : null;
+        const getPatternIndex = (index) => isRainbow
+            ? Math.floor((this._frame * 0.048 + index * 0.35) % patternPack.colors.length)
+            : Math.floor(index * 0.28) % patternPack.colors.length;
 
         let normal, boostBody, glow, trailGlow, bodySS, stampScale;
-        if (!isRainbow) {
+        if (!isPatternSkin) {
             const stamp = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
             normal = stamp.normal;
             boostBody = stamp.boostBody;
@@ -1870,7 +1896,7 @@ export class SlitherRenderer {
             bodySS = stamp.bodySS;
             stampScale = bodySS * (cacheR / bodyRadius);
         } else {
-            const stamp = rainbowPack.stamps[0];
+            const stamp = patternPack.stamps[0];
             trailGlow = stamp.trailGlow;
             bodySS = stamp.bodySS;
             stampScale = bodySS * (cacheR / bodyRadius);
@@ -1904,7 +1930,7 @@ export class SlitherRenderer {
         }
 
         // Glow (underneath the body segments for a clean outline)
-        if (boosting && prNeeds.glow && (glow || isRainbow)) {
+        if (boosting && prNeeds.glow && (glow || isPatternSkin)) {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = 0.28 * pulse;
@@ -1914,9 +1940,8 @@ export class SlitherRenderer {
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
                 let currentGlow = glow;
                 let currentGlowScale = stampScale;
-                if (isRainbow) {
-                    const colorIndex = Math.floor((this._frame * 0.048 + i * 0.35) % rainbowPack.colors.length);
-                    const stamp = rainbowPack.stamps[colorIndex];
+                if (isPatternSkin) {
+                    const stamp = patternPack.stamps[getPatternIndex(i)];
                     currentGlow = stamp.glow;
                     currentGlowScale = stamp.bodySS * (cacheR / bodyRadius);
                 }
@@ -1945,9 +1970,8 @@ export class SlitherRenderer {
             let currentDh = dh;
             let currentHalf = half;
 
-            if (isRainbow) {
-                const colorIndex = Math.floor((this._frame * 0.048 + i * 0.35) % rainbowPack.colors.length);
-                const stamp = rainbowPack.stamps[colorIndex];
+            if (isPatternSkin) {
+                const stamp = patternPack.stamps[getPatternIndex(i)];
                 sprite = (boosting && i === 0) ? stamp.boostBody : stamp.normal;
                 currentStampScale = stamp.bodySS * (cacheR / bodyRadius);
                 currentDw = sprite.width / currentStampScale;

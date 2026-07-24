@@ -1,6 +1,7 @@
 import global from './global.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawBalanceBadge as drawBalanceBadgePill } from '../balanceBadge.js';
+import { drawFlag, parseFlagSkin } from '../../constants/flagSkins.js';
 
 const FULL_ANGLE = 2 * Math.PI;
 
@@ -161,8 +162,21 @@ function drawOrganicCell(cell, borders, graph, allCells = [], highQuality = fals
         graph.lineTo(points[i].x, points[i].y);
     }
     graph.closePath();
-    graph.fill();
-    graph.stroke();
+    const flagCode = parseFlagSkin(cell.color);
+    if (flagCode) {
+        graph.save();
+        graph.clip();
+        drawFlag(graph, flagCode, cell.x, cell.y, cell.radius * 2.15, cell.radius * 2.15);
+        graph.restore();
+        graph.beginPath();
+        graph.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) graph.lineTo(points[i].x, points[i].y);
+        graph.closePath();
+        graph.stroke();
+    } else {
+        graph.fill();
+        graph.stroke();
+    }
 }
 
 
@@ -186,7 +200,11 @@ function drawPlayerCashoutRing(graph, cell) {
 
 const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQuality = false, hideNames = false) => {
     for (let cell of cells) {
-        if (cell.color === 'rainbow') {
+        const flagCode = parseFlagSkin(cell.color);
+        if (flagCode) {
+            graph.fillStyle = '#ffffff';
+            graph.strokeStyle = '#16161d';
+        } else if (cell.color === 'rainbow') {
             const time = Date.now() * 0.002;
             const hue = (time * 40) % 360;
             graph.fillStyle = `hsl(${hue}, 100%, 55%)`;

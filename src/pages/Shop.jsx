@@ -6,6 +6,7 @@ import AgarLogo from '../features/agar/ui/AgarLogo';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import { flagSkinValue, DEFAULT_FLAG_CODE } from '../constants/flagSkins';
 import { AgarBlobPreview, SnakeSkinPreview } from './PreGame';
 import '../styles/shop.css';
 
@@ -28,6 +29,19 @@ function RainbowPreview({ mode, nickname }) {
     );
 }
 
+function FlagPackPreview({ nickname }) {
+    const defaultFlag = flagSkinValue(DEFAULT_FLAG_CODE);
+    return (
+        <div className="shop-rainbow-preview shop-flag-preview" aria-hidden="true">
+            <div className="shop-flag-preview-item">
+                <AgarBlobPreview color={defaultFlag} isLarge={false} nickname={nickname} hideName />
+            </div>
+            <div className="shop-flag-preview-item">
+                <SnakeSkinPreview color="flag:us" isLarge={false} />
+            </div>
+        </div>
+    );
+}
 export default function Shop() {
     const navigate = useNavigate();
     const { token, user, refreshUser } = useAuth();
@@ -114,7 +128,7 @@ export default function Shop() {
                 type: response.status === 202 ? 'pending' : 'success',
                 message: response.status === 202
                     ? 'Payment was broadcast and is being confirmed. Do not retry.'
-                    : 'Rainbow unlocked successfully.',
+                    : `${quote?.skinId === 'flags' ? 'Flag Pack' : 'Rainbow'} unlocked successfully.`,
             });
         } catch (error) {
             setNotice({ type: 'error', message: error.message });
@@ -124,11 +138,17 @@ export default function Shop() {
     };
 
     const useSkin = (product) => {
+        if (product.skinId === 'flags') {
+            const flag = flagSkinValue(DEFAULT_FLAG_CODE);
+            localStorage.setItem('selected_skin_agar', flag);
+            localStorage.setItem('selected_skin', flag);
+            navigate('/pre-game', { state: { mode: 'agar' } });
+            return;
+        }
         const storageKey = product.gameMode === 'agar' ? 'selected_skin_agar' : 'selected_skin';
         localStorage.setItem(storageKey, 'random');
         navigate('/pre-game', { state: { mode: product.gameMode } });
     };
-
     const shopReady = catalog?.ready === true && publicConfig?.shopReady === true;
 
     return (
@@ -171,6 +191,7 @@ export default function Shop() {
 
                 <section className="shop-products" aria-label="AGAR skins">
                     {(catalog?.products || [
+                        { id: 'flags:bundle', gameMode: 'all', skinId: 'flags', name: 'Flag Pack', usdPrice: 1 },
                         { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
                         { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
                     ]).map((product) => {
@@ -178,13 +199,17 @@ export default function Shop() {
                         return (
                             <article className="shop-product-card" key={product.id}>
                                 <div className="shop-product-topline">
-                                    <span>{product.gameMode.toUpperCase()}</span>
+                                    <span>{product.gameMode === 'all' ? 'AGAR + SLITHER' : product.gameMode.toUpperCase()}</span>
                                     <span className={owned ? 'is-owned' : ''}>{owned ? 'OWNED' : 'LIMITED SKIN'}</span>
                                 </div>
-                                <RainbowPreview mode={product.gameMode} nickname={user?.username} />
+                                {product.skinId === 'flags'
+                                    ? <FlagPackPreview nickname={user?.username} />
+                                    : <RainbowPreview mode={product.gameMode} nickname={user?.username} />}
                                 <div className="shop-product-copy">
                                     <h2>{product.name}</h2>
-                                    <p>A luminous animated spectrum made for {product.gameMode === 'agar' ? 'Agar' : 'Slither'}.</p>
+                                    <p>{product.skinId === 'flags'
+                                        ? 'One pack with popular country flags for both Agar and Slither.'
+                                        : `A luminous animated spectrum made for ${product.gameMode === 'agar' ? 'Agar' : 'Slither'}.`}</p>
                                 </div>
                                 <div className="shop-product-price">
                                     <div>
@@ -227,7 +252,7 @@ export default function Shop() {
                     <section className="shop-confirm" role="dialog" aria-modal="true" aria-labelledby="shop-confirm-title" onMouseDown={(event) => event.stopPropagation()}>
                         <AgarLogo size={46} config={config} />
                         <p className="shop-kicker">CONFIRM ON-CHAIN PURCHASE</p>
-                        <h2 id="shop-confirm-title">{quote.gameMode === 'agar' ? 'Agar' : 'Slither'} Rainbow</h2>
+                        <h2 id="shop-confirm-title">{quote.skinId === 'flags' ? 'Agar + Slither Flag Pack' : `${quote.gameMode === 'agar' ? 'Agar' : 'Slither'} Rainbow`}</h2>
                         <div className="shop-confirm-amount mono">{quote.tokenAmount} AGAR</div>
                         <div className="shop-confirm-row"><span>Reference value</span><strong>${Number(quote.usdPrice).toFixed(2)}</strong></div>
                         <div className="shop-confirm-row"><span>Distribution</span><strong>90% / 10%</strong></div>

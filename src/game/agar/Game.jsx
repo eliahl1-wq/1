@@ -1,3 +1,4 @@
+import { getPremiumSkinId } from '../../constants/flagSkins';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
@@ -265,7 +266,7 @@ export default function Game() {
                 mode: playMode,
                 entryFeeUsd: fee,
                 skinColor: preferredSkinAgar,
-                skinId: preferredSkinAgar === 'random' ? 'rainbow' : 'free',
+                skinId: getPremiumSkinId(preferredSkinAgar),
                 useFreeTicket: false,
             });
         }
@@ -426,7 +427,7 @@ export default function Game() {
                         mode: sessionMode,
                         entryFeeUsd,
                         skinColor: preferredSkinAgar,
-                skinId: preferredSkinAgar === 'random' ? 'rainbow' : 'free',
+                skinId: getPremiumSkinId(preferredSkinAgar),
                         useFreeTicket,
                     });
                 }
@@ -732,7 +733,7 @@ export default function Game() {
                         mode: playMode,
                         entryFeeUsd: params.entryFeeUsd,
                         skinColor: localStorage.getItem('selected_skin_agar') || '#c080ff',
-                        skinId: (localStorage.getItem('selected_skin_agar') || '#c080ff') === 'random' ? 'rainbow' : 'free',
+                        skinId: getPremiumSkinId(localStorage.getItem('selected_skin_agar') || '#c080ff'),
                         useFreeTicket: false,
                     });
                 }

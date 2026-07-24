@@ -25,6 +25,7 @@ import { API_URL } from '../utils/apiBase';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
+import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
 import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
@@ -105,6 +106,11 @@ function resolvePreGameMode(pathname, locationStateMode, isAdmin = false) {
 }
 
 const getChromaName = (color) => {
+    const flagCode = parseFlagSkin(color);
+    if (flagCode) {
+        const flag = getFlagSkin(flagCode);
+        return `${flag.emoji} ${flag.name}`;
+    }
     if (color === 'random') return 'Rainbow';
     switch (color) {
         case '#c080ff': return 'Lavender Purple';
@@ -303,6 +309,12 @@ export default function PreGame() {
             setSelectedSkin('#c080ff');
         }
         if (selectedSkinAgar === 'random' && !user?.isAdmin && !ownedSkinProducts.has('agar:rainbow')) {
+            setSelectedSkinAgar('#c080ff');
+        }
+        if (parseFlagSkin(selectedSkin) && !user?.isAdmin && !ownedSkinProducts.has('flags:bundle')) {
+            setSelectedSkin('#c080ff');
+        }
+        if (parseFlagSkin(selectedSkinAgar) && !user?.isAdmin && !ownedSkinProducts.has('flags:bundle')) {
             setSelectedSkinAgar('#c080ff');
         }
     }, [ownedSkinProducts, selectedSkin, selectedSkinAgar, skinInventoryLoaded, user?.isAdmin]);
@@ -2102,6 +2114,11 @@ export default function PreGame() {
             {/* Customizer Modal Overlay */}
             {showCustomizer && (() => {
                 const getChromaName = (color) => {
+                    const flagCode = parseFlagSkin(color);
+                    if (flagCode) {
+                        const flag = getFlagSkin(flagCode);
+                        return `${flag.emoji} ${flag.name}`;
+                    }
                     if (color === 'random_color') return 'Random';
                     if (color === 'random') return customizerTab === 'surviv' ? 'Random' : 'Rainbow';
                     switch (color) {
@@ -2125,13 +2142,16 @@ export default function PreGame() {
                         : selectedSkinAgar;
                 const isRandomColor = currentChroma === 'random_color';
                 const isRainbow = currentChroma === 'random' && customizerTab !== 'surviv';
+                const activeFlagCode = parseFlagSkin(currentChroma);
+                const isFlag = !!activeFlagCode && customizerTab !== 'surviv';
                 const isRandomSelection = currentChroma === 'random' || currentChroma === 'random_color';
-                const displayChroma = isRandomSelection ? '#80d0d0' : currentChroma;
+                const displayChroma = (isRandomSelection || isFlag) ? '#80d0d0' : currentChroma;
                 const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
                 const ownsRainbow = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has(rainbowProductId));
+                const ownsFlagPack = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has('flags:bundle'));
 
                 const cycleChroma = (direction) => {
-                    if (isRandomSelection) return;
+                    if (isRandomSelection || isFlag) return;
 
                     const chromas = CHROMA_SKIN_COLORS;
                     let idx = chromas.indexOf(currentChroma);
@@ -2151,13 +2171,14 @@ export default function PreGame() {
                 };
 
                 const setSkinStyle = (style) => {
-                    if (style === 'rainbow' && !ownsRainbow) {
+                    if ((style === 'rainbow' && !ownsRainbow) || (style === 'flags' && !ownsFlagPack)) {
                         setShowCustomizer(false);
                         navigate('/shop');
                         return;
                     }
                     let newSkin = style;
                     if (style === 'rainbow') newSkin = 'random';
+                    else if (style === 'flags') newSkin = flagSkinValue(activeFlagCode || DEFAULT_FLAG_CODE);
                     else if (style === 'classic') newSkin = '#c080ff';
                     
                     if (customizerTab === 'slither') setSelectedSkin(newSkin);
@@ -2252,7 +2273,7 @@ export default function PreGame() {
                                     <div className="skin-cards-grid">
                                         <button
                                             type="button"
-                                            className={`skin-card ${(!isRainbow && !isRandomColor) ? 'active' : ''}`}
+                                            className={`skin-card ${(!isRainbow && !isRandomColor && !isFlag) ? 'active' : ''}`}
                                             onClick={() => setSkinStyle('classic')}
                                         >
                                             <div className="skin-card-icon grid-icon">
@@ -2288,8 +2309,37 @@ export default function PreGame() {
                                                 <span>Rainbow</span>
                                             </button>
                                         )}
+
+                                        {customizerTab !== 'surviv' && ownsFlagPack && (
+                                            <button
+                                                type="button"
+                                                className={`skin-card ${isFlag ? 'active' : ''}`}
+                                                onClick={() => setSkinStyle('flags')}
+                                            >
+                                                <div className="skin-card-icon flag-pack-icon">{getFlagSkin(activeFlagCode || DEFAULT_FLAG_CODE).emoji}</div>
+                                                <span>Flag Pack</span>
+                                            </button>
+                                        )}
                                     </div>
 
+
+                                    {isFlag && ownsFlagPack && (
+                                        <label className="flag-skin-picker">
+                                            <span>Choose flag</span>
+                                            <select
+                                                value={activeFlagCode || DEFAULT_FLAG_CODE}
+                                                onChange={(event) => {
+                                                    const value = flagSkinValue(event.target.value);
+                                                    if (customizerTab === 'slither') setSelectedSkin(value);
+                                                    else setSelectedSkinAgar(value);
+                                                }}
+                                            >
+                                                {FLAG_SKINS.map((flag) => (
+                                                    <option key={flag.code} value={flag.code}>{flag.emoji} {flag.name}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                    )}
                                     <button
                                         className="btn-primary customizer-done-btn"
                                         onClick={() => setShowCustomizer(false)}
@@ -2375,6 +2425,8 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const shadowHalf = shadowCanvas.width / 2;
         let fixedColor = null;
         let fixedSegmentCanvas = null;
+        let fixedFlagCode = null;
+        let flagCanvases = [];
 
         const render = (now) => {
             animationFrameId = requestAnimationFrame(render);
@@ -2401,7 +2453,12 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
             }
 
             ctx.globalAlpha = 1;
-            if (currentColor !== 'random' && currentColor !== fixedColor) {
+            const flagCode = parseFlagSkin(currentColor);
+            if (flagCode && flagCode !== fixedFlagCode) {
+                fixedFlagCode = flagCode;
+                flagCanvases = getFlagSegmentColors(flagCode).map((flagColor) => getSnakeSegmentCanvas(radius, flagColor));
+            }
+            if (currentColor !== 'random' && !flagCode && currentColor !== fixedColor) {
                 fixedColor = currentColor;
                 fixedSegmentCanvas = getSnakeSegmentCanvas(radius, currentColor);
             }
@@ -2417,7 +2474,9 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                 const sin = Math.sin(segmentAngle);
                 const segmentCanvas = currentColor === 'random'
                     ? rainbowCanvases[Math.floor((now * 0.0012 + i * 0.15) % rainbowCanvases.length)]
-                    : fixedSegmentCanvas;
+                    : flagCode
+                        ? flagCanvases[Math.floor(i * 0.28) % flagCanvases.length]
+                        : fixedSegmentCanvas;
                 const segmentHalf = segmentCanvas.width / 2;
                 ctx.setTransform(cos, sin, -sin, cos, pointX[i], pointY[i]);
                 ctx.drawImage(segmentCanvas, -segmentHalf, -segmentHalf);
@@ -2497,7 +2556,11 @@ export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) 
             let fillStyle = currentColor;
             let strokeStyle = '#000000';
 
-            if (currentColor === 'random') {
+            const flagCode = parseFlagSkin(currentColor);
+            if (flagCode) {
+                fillStyle = '#ffffff';
+                strokeStyle = '#16161d';
+            } else if (currentColor === 'random') {
                 const hue = (t * 0.14) % 360;
                 fillStyle = `hsl(${hue}, 100%, 55%)`;
                 strokeStyle = `hsl(${hue}, 100%, 42%)`;
@@ -2584,8 +2647,20 @@ export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) 
                 ctx.lineWidth = isLarge ? 6 : 3;
                 ctx.shadowBlur = 0; // No drop shadow glow, identical to game
 
-                ctx.fill();
-                ctx.stroke();
+                if (flagCode) {
+                    ctx.clip();
+                    drawFlag(ctx, flagCode, cx, cy, radius * 2.15, radius * 2.15);
+                    ctx.restore();
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else {
+                    ctx.fill();
+                    ctx.stroke();
+                }
                 ctx.restore();
 
                 if (drawName && !hideName) {

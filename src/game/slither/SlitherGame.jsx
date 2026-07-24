@@ -1,3 +1,4 @@
+import { getPremiumSkinId } from '../../constants/flagSkins';
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -271,7 +272,7 @@ export default function SlitherGame() {
                 mode: isCompetitive ? 'competitive-slither' : 'slither',
                 entryFeeUsd: fee,
                 skinColor: preferredSkin,
-                skinId: preferredSkin === 'random' ? 'rainbow' : 'free',
+                skinId: getPremiumSkinId(preferredSkin),
                 useFreeTicket: false,
             });
         }
@@ -522,7 +523,7 @@ export default function SlitherGame() {
                         token: authToken,
                         tournamentId: joinParamsRef.current.tournamentId,
                         skinColor: localStorage.getItem('selected_skin') || '#c080ff',
-                        skinId: (localStorage.getItem('selected_skin') || '#c080ff') === 'random' ? 'rainbow' : 'free',
+                        skinId: getPremiumSkinId(localStorage.getItem('selected_skin') || '#c080ff'),
                     });
                 } else if (br) {
                     socket.emit('brRejoinMatch', { token: authToken });
@@ -536,7 +537,7 @@ export default function SlitherGame() {
                         mode: joinMode,
                         entryFeeUsd: fee,
                         skinColor: preferredSkin,
-                skinId: preferredSkin === 'random' ? 'rainbow' : 'free',
+                skinId: getPremiumSkinId(preferredSkin),
                         useFreeTicket,
                     });
                 }
@@ -887,7 +888,7 @@ export default function SlitherGame() {
                         mode: params.isCompetitive ? 'competitive-slither' : 'slither',
                         entryFeeUsd: params.entryFeeUsd,
                         skinColor: localStorage.getItem('selected_skin') || '#c080ff',
-                        skinId: (localStorage.getItem('selected_skin') || '#c080ff') === 'random' ? 'rainbow' : 'free',
+                        skinId: getPremiumSkinId(localStorage.getItem('selected_skin') || '#c080ff'),
                         useFreeTicket: false,
                     });
                 }

@@ -1,3 +1,4 @@
+import { getPremiumSkinId } from '../constants/flagSkins';
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -68,7 +69,7 @@ export default function BRLobby() {
                 username: matchNickname,
                 entryFeeUsd,
                 skinColor: preferredSkin,
-                skinId: preferredSkin === 'random' ? 'rainbow' : 'free'
+                skinId: getPremiumSkinId(preferredSkin)
             });
         });
 

@@ -3,6 +3,7 @@ import { drawOrganicCell } from '../game/agar/render.js';
 import { SlitherRenderer } from '../game/slither/SlitherRenderer.js';
 import { rebuildPathFromSegments, updateBodyAlongPath } from '../game/slither/snakePath.js';
 import { SurvivRenderer } from '../game/surviv/SurvivRenderer.js';
+import { parseFlagSkin } from '../constants/flagSkins.js';
 
 const COLORS = ['#c080ff', '#9099ff', '#80d0d0', '#80ff80', '#eeee70', '#ffa060', '#ff9050', '#ff4040', '#e030e0'];
 const SURVIV_WEAPONS = ['pistol', 'smg', 'shotgun', 'assault', 'dmr', 'sniper', 'lmg'];
@@ -361,10 +362,11 @@ function updateAndDrawAgar(ctx, actors, dt, elapsed, width, height) {
 
     for (const actor of actors) {
         if (actor.spawnDelay > 0) continue;
-        ctx.fillStyle = actor.color;
-        ctx.strokeStyle = actor.borderColor === '#000000' ? darkerColor(actor.color) : actor.borderColor;
+        const flagCode = parseFlagSkin(actor.color);
+        ctx.fillStyle = flagCode ? '#ffffff' : actor.color;
+        ctx.strokeStyle = flagCode ? '#16161d' : actor.borderColor === '#000000' ? darkerColor(actor.color) : actor.borderColor;
         ctx.lineWidth = 7;
-        ctx.shadowColor = actor.color;
+        ctx.shadowColor = flagCode ? '#000000' : actor.color;
         ctx.shadowBlur = 8;
         drawOrganicCell(actor, borders, ctx, actors, true);
     }

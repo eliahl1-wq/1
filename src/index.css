@@ -1028,4 +1028,39 @@ input[type=number] {
   33% { background-color: #c080ff; }
   66% { background-color: #ffa060; }
 }
+.flag-pack-icon {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(124, 58, 255, 0.16));
+  font-size: 1.15rem;
+  line-height: 1;
+}
 
+.flag-skin-picker {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  color: var(--text-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 11px;
+}
+
+.flag-skin-picker select {
+  min-width: 0;
+  padding: 8px 10px;
+  color: #fff;
+  background: #15131e;
+  border: 1px solid rgba(151, 124, 255, 0.28);
+  border-radius: 8px;
+  outline: none;
+}
+
+.flag-skin-picker select:focus {
+  border-color: var(--accent);
+}
