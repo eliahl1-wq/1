@@ -17,13 +17,16 @@ export default function AgarLogo({ size = 42, config = AGAR }) {
     }
 
     return (
-        <img
+        <span
             className="agar-logo"
-            src={config.logoUrl}
-            alt={`${config.name} logo`}
-            width={size}
-            height={size}
-            onError={() => setFailed(true)}
-        />
+            style={{ width: size, height: size }}
+        >
+            <img
+                className="agar-logo__image"
+                src={config.logoUrl}
+                alt={config.name + ' logo'}
+                onError={() => setFailed(true)}
+            />
+        </span>
     );
 }

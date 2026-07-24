@@ -20,7 +20,7 @@ function RainbowPreview({ mode, nickname }) {
     return (
         <div className={`shop-rainbow-preview shop-rainbow-preview--${mode}`} aria-hidden="true">
             {mode === 'agar' ? (
-                <AgarBlobPreview color="random" isLarge={true} nickname={nickname} />
+                <AgarBlobPreview color="random" isLarge={true} nickname={nickname} hideName />
             ) : (
                 <SnakeSkinPreview color="random" isLarge={true} />
             )}
@@ -35,6 +35,7 @@ export default function Shop() {
         walletBalance,
         balanceLoading,
         refreshAgarBalance,
+        openAgarModal,
         config,
         publicConfig,
     } = useAgarToken();
@@ -63,9 +64,13 @@ export default function Shop() {
         load().catch(() => setNotice({ type: 'error', message: 'The shop could not be loaded.' }));
     }, [load]);
 
-    const ownedProducts = useMemo(() => new Set(
-        (inventory?.entitlements || []).map((entry) => entry.productId),
-    ), [inventory]);
+    const ownedProducts = useMemo(() => {
+        const products = new Set((inventory?.entitlements || []).map((entry) => entry.productId));
+        if (user?.isAdmin) {
+            (catalog?.products || []).forEach((product) => products.add(product.id));
+        }
+        return products;
+    }, [catalog?.products, inventory, user?.isAdmin]);
 
     const requestQuote = async (productId) => {
         setBusy(productId);
@@ -143,6 +148,15 @@ export default function Shop() {
                             <span>YOUR AGAR BALANCE</span>
                             <strong className="mono">{balanceLoading ? '…' : walletBalance.toLocaleString('en-US', { maximumFractionDigits: 6 })}</strong>
                         </div>
+                        <button
+                            type="button"
+                            className="shop-balance-add"
+                            aria-label="Buy AGAR"
+                            title="Buy AGAR"
+                            onClick={() => openAgarModal({ action: 'BUY' })}
+                        >
+                            +
+                        </button>
                     </div>
                 </header>
 

@@ -1,5 +1,18 @@
 .shop-page {
+    height: 100dvh;
     min-height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(151, 124, 255, 0.42) rgba(255, 255, 255, 0.025);
+}
+
+.shop-page::-webkit-scrollbar { width: 8px; }
+.shop-page::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.025); }
+.shop-page::-webkit-scrollbar-thumb {
+    background: rgba(151, 124, 255, 0.42);
+    border-radius: 999px;
 }
 
 .shop-shell {
@@ -70,6 +83,35 @@
 .shop-balance-card strong {
     color: #fff;
     font-size: 1rem;
+}
+
+.shop-balance-add {
+    display: grid;
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    padding: 0;
+    place-items: center;
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+    background: linear-gradient(135deg, #7c4dff, #536dfe);
+    border: 1px solid rgba(190, 174, 255, 0.38);
+    border-radius: 9px;
+    box-shadow: 0 7px 20px rgba(102, 75, 255, 0.25);
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.shop-balance-add:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+}
+
+.shop-balance-add:active {
+    transform: scale(0.95);
 }
 
 .shop-launch-banner,

@@ -697,23 +697,33 @@ input[type=number] {
 
 .skin-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 108px));
+  grid-auto-rows: 82px;
+  gap: 9px;
+  justify-content: start;
+  max-height: 190px;
+  padding: 3px 8px 7px 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(151, 124, 255, 0.38) transparent;
 }
 
 .skin-card {
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
-  padding: 12px;
+  min-width: 0;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   cursor: pointer;
   transition: all 0.2s;
   color: var(--text-2);
-  font-size: 0.85rem;
+  font-size: 0.74rem;
   position: relative;
 }
 
@@ -730,12 +740,21 @@ input[type=number] {
 }
 
 .skin-card-icon {
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.skin-cards-grid::-webkit-scrollbar {
+  width: 5px;
+}
+
+.skin-cards-grid::-webkit-scrollbar-thumb {
+  background: rgba(151, 124, 255, 0.38);
+  border-radius: 999px;
 }
 
 .skin-card:hover .skin-card-icon {

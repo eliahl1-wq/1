@@ -284,24 +284,28 @@ export default function PreGame() {
             if (!active) return;
             const inventory = inventoryResponse.ok ? await inventoryResponse.json() : { entitlements: [] };
             const catalog = catalogResponse.ok ? await catalogResponse.json() : { products: [] };
-            setOwnedSkinProducts(new Set((inventory.entitlements || []).map((entry) => entry.productId)));
+            const ownedProducts = new Set((inventory.entitlements || []).map((entry) => entry.productId));
+            if (user?.isAdmin) {
+                (catalog.products || []).forEach((product) => ownedProducts.add(product.id));
+            }
+            setOwnedSkinProducts(ownedProducts);
             setShopProducts(catalog.products || []);
             setSkinInventoryLoaded(true);
         }).catch(() => {
             if (active) setSkinInventoryLoaded(true);
         });
         return () => { active = false; };
-    }, [token]);
+    }, [token, user?.isAdmin]);
 
     useEffect(() => {
         if (!skinInventoryLoaded) return;
-        if (selectedSkin === 'random' && !ownedSkinProducts.has('slither:rainbow')) {
+        if (selectedSkin === 'random' && !user?.isAdmin && !ownedSkinProducts.has('slither:rainbow')) {
             setSelectedSkin('#c080ff');
         }
-        if (selectedSkinAgar === 'random' && !ownedSkinProducts.has('agar:rainbow')) {
+        if (selectedSkinAgar === 'random' && !user?.isAdmin && !ownedSkinProducts.has('agar:rainbow')) {
             setSelectedSkinAgar('#c080ff');
         }
-    }, [ownedSkinProducts, selectedSkin, selectedSkinAgar, skinInventoryLoaded]);
+    }, [ownedSkinProducts, selectedSkin, selectedSkinAgar, skinInventoryLoaded, user?.isAdmin]);
 
     useEffect(() => {
         localStorage.setItem('selected_skin', selectedSkin);
@@ -2124,8 +2128,7 @@ export default function PreGame() {
                 const isRandomSelection = currentChroma === 'random' || currentChroma === 'random_color';
                 const displayChroma = isRandomSelection ? '#80d0d0' : currentChroma;
                 const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
-                const ownsRainbow = customizerTab !== 'surviv' && ownedSkinProducts.has(rainbowProductId);
-                const rainbowProduct = shopProducts.find((product) => product.id === rainbowProductId);
+                const ownsRainbow = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has(rainbowProductId));
 
                 const cycleChroma = (direction) => {
                     if (isRandomSelection) return;
@@ -2218,7 +2221,7 @@ export default function PreGame() {
                                         ) : customizerTab === 'surviv' ? (
                                             <SurvivSkinPreview color={selectedSkinSurviv} isLarge={true} nickname={nickname} />
                                         ) : (
-                                            <AgarBlobPreview color={selectedSkinAgar} isLarge={true} nickname={nickname} />
+                                            <AgarBlobPreview color={selectedSkinAgar} isLarge={true} nickname={nickname} hideName />
                                         )}
                                     </div>
 
@@ -2270,10 +2273,10 @@ export default function PreGame() {
                                             <span>Random</span>
                                         </button>
 
-                                        {customizerTab !== 'surviv' && (
+                                        {customizerTab !== 'surviv' && ownsRainbow && (
                                             <button
                                                 type="button"
-                                                className={`skin-card ${isRainbow ? 'active' : ''} ${!ownsRainbow ? 'skin-card--locked' : ''}`}
+                                                className={`skin-card ${isRainbow ? 'active' : ''}`}
                                                 style={{ position: 'relative' }}
                                                 onClick={() => {
                                                     setSkinStyle('rainbow');
@@ -2281,14 +2284,8 @@ export default function PreGame() {
                                                 }}
                                             >
                                                 {!hasSeenRainbow && ownsRainbow && <div className="notify-dot"></div>}
-                                                {!ownsRainbow && <div className="skin-lock-badge">LOCKED</div>}
                                                 <div className="skin-card-icon rainbow-icon"></div>
                                                 <span>Rainbow</span>
-                                                {!ownsRainbow && (
-                                                    <small className="skin-card-price">
-                                                        {rainbowProduct?.estimatedAgar ? `${rainbowProduct.estimatedAgar} AGAR` : '$3 in AGAR'}
-                                                    </small>
-                                                )}
                                             </button>
                                         )}
                                     </div>
@@ -2470,7 +2467,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
     );
 }
 
-export function AgarBlobPreview({ color, isLarge, nickname }) {
+export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) {
     const canvasRef = useRef(null);
     const tRef = useRef(0);
     const colorRef = useRef(color);
@@ -2591,7 +2588,7 @@ export function AgarBlobPreview({ color, isLarge, nickname }) {
                 ctx.stroke();
                 ctx.restore();
 
-                if (drawName) {
+                if (drawName && !hideName) {
                     // Draw nickname identical to in-game text formatting
                     let fontSize = radius / 1.8;
                     const nameStr = (nickname || 'GUEST').toUpperCase();
@@ -2622,7 +2619,7 @@ export function AgarBlobPreview({ color, isLarge, nickname }) {
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
-    }, [isLarge, nickname]);
+    }, [hideName, isLarge, nickname]);
 
     return (
         <div className="agar-preview-wrapper" style={{ width: '100%', height: isLarge ? '200px' : '100px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -2635,4 +2632,3 @@ export function AgarBlobPreview({ color, isLarge, nickname }) {
         </div>
     );
 }
-
