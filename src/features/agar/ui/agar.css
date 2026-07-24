@@ -38,6 +38,7 @@
     font-size: 1.05rem;
     font-weight: 700;
     line-height: 1;
+    transform: translateY(1px);
 }
 .agar-price-pill {
     display: inline-flex;
@@ -358,7 +359,8 @@
 .agar-modal__identity h2 span {
     color: var(--text-2);
     font-family: var(--mono);
-    font-size: 0.68rem;
+    font-size: 0.82rem;
+    font-weight: 700;
     letter-spacing: 0.03em;
 }
 

@@ -170,8 +170,8 @@ export default function AgarTokenModal({
                         <div>
                             <span className="agar-modal__eyebrow">AgarStake ecosystem</span>
                             <h2 id="agar-modal-title">
-                                {config.name}
-                                <span>{config.symbol}</span>
+                                {config.symbol}
+                                <span>{config.name}</span>
                             </h2>
                         </div>
                     </div>
