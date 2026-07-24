@@ -2338,7 +2338,7 @@ function SurvivSkinPreview({ color, isLarge, nickname }) {
 }
 
 /* ── SnakeSkinPreview ── */
-function SnakeSkinPreview({ color, isLarge, active = true }) {
+export function SnakeSkinPreview({ color, isLarge, active = true }) {
     const canvasRef = useRef(null);
     const colorRef = useRef(color);
 
@@ -2470,7 +2470,7 @@ function SnakeSkinPreview({ color, isLarge, active = true }) {
     );
 }
 
-function AgarBlobPreview({ color, isLarge, nickname }) {
+export function AgarBlobPreview({ color, isLarge, nickname }) {
     const canvasRef = useRef(null);
     const tRef = useRef(0);
     const colorRef = useRef(color);

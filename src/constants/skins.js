@@ -13,7 +13,7 @@ function defineSkin(id, name, color, usdPrice = 0) {
  * futureAgarPrice intentionally remains empty until live AGAR pricing exists.
  */
 export const SKIN_CATALOG = Object.freeze([
-    defineSkin('rainbow', 'Rainbow', 'random'),
+    defineSkin('rainbow', 'Rainbow', 'random', 3),
     defineSkin('random-color', 'Random', 'random_color'),
     defineSkin('lavender-purple', 'Lavender Purple', '#c080ff'),
     defineSkin('indigo-blue', 'Indigo Blue', '#9099ff'),

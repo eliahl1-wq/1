@@ -263,7 +263,7 @@ export default function SlitherGame() {
         }
 
         if (socketRef.current?.connected) {
-            const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+            const preferredSkin = localStorage.getItem('selected_skin') || '#c080ff';
             localStorage.removeItem('use_free_ticket');
             socketRef.current.emit('joinGame', {
                 username: nickname,
@@ -271,6 +271,7 @@ export default function SlitherGame() {
                 mode: isCompetitive ? 'competitive-slither' : 'slither',
                 entryFeeUsd: fee,
                 skinColor: preferredSkin,
+                skinId: preferredSkin === 'random' ? 'rainbow' : 'free',
                 useFreeTicket: false,
             });
         }
@@ -520,13 +521,14 @@ export default function SlitherGame() {
                         username: nickname,
                         token: authToken,
                         tournamentId: joinParamsRef.current.tournamentId,
-                        skinColor: localStorage.getItem('selected_skin') || 'random',
+                        skinColor: localStorage.getItem('selected_skin') || '#c080ff',
+                        skinId: (localStorage.getItem('selected_skin') || '#c080ff') === 'random' ? 'rainbow' : 'free',
                     });
                 } else if (br) {
                     socket.emit('brRejoinMatch', { token: authToken });
                 } else {
                     const joinMode = joinParamsRef.current.isCompetitive ? 'competitive-slither' : 'slither';
-                    const preferredSkin = localStorage.getItem('selected_skin') || 'random';
+                    const preferredSkin = localStorage.getItem('selected_skin') || '#c080ff';
                     const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
                     socket.emit('joinGame', {
                         username: nickname,
@@ -534,6 +536,7 @@ export default function SlitherGame() {
                         mode: joinMode,
                         entryFeeUsd: fee,
                         skinColor: preferredSkin,
+                skinId: preferredSkin === 'random' ? 'rainbow' : 'free',
                         useFreeTicket,
                     });
                 }
@@ -883,7 +886,8 @@ export default function SlitherGame() {
                         token: authToken,
                         mode: params.isCompetitive ? 'competitive-slither' : 'slither',
                         entryFeeUsd: params.entryFeeUsd,
-                        skinColor: localStorage.getItem('selected_skin') || 'random',
+                        skinColor: localStorage.getItem('selected_skin') || '#c080ff',
+                        skinId: (localStorage.getItem('selected_skin') || '#c080ff') === 'random' ? 'rainbow' : 'free',
                         useFreeTicket: false,
                     });
                 }

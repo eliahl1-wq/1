@@ -6,6 +6,7 @@ import AgarLogo from '../features/agar/ui/AgarLogo';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import { AgarBlobPreview, SnakeSkinPreview } from './PreGame';
 import '../styles/shop.css';
 
 function authHeaders(token, json = false) {
@@ -15,15 +16,13 @@ function authHeaders(token, json = false) {
     };
 }
 
-function RainbowPreview({ mode }) {
+function RainbowPreview({ mode, nickname }) {
     return (
         <div className={`shop-rainbow-preview shop-rainbow-preview--${mode}`} aria-hidden="true">
             {mode === 'agar' ? (
-                <div className="shop-rainbow-agar"><span>AGAR</span></div>
+                <AgarBlobPreview color="random" isLarge={true} nickname={nickname} />
             ) : (
-                <div className="shop-rainbow-snake">
-                    {Array.from({ length: 9 }, (_, index) => <i key={index} />)}
-                </div>
+                <SnakeSkinPreview color="random" isLarge={true} />
             )}
         </div>
     );
@@ -31,7 +30,7 @@ function RainbowPreview({ mode }) {
 
 export default function Shop() {
     const navigate = useNavigate();
-    const { token, refreshUser } = useAuth();
+    const { token, user, refreshUser } = useAuth();
     const {
         walletBalance,
         balanceLoading,
@@ -168,7 +167,7 @@ export default function Shop() {
                                     <span>{product.gameMode.toUpperCase()}</span>
                                     <span className={owned ? 'is-owned' : ''}>{owned ? 'OWNED' : 'LIMITED SKIN'}</span>
                                 </div>
-                                <RainbowPreview mode={product.gameMode} />
+                                <RainbowPreview mode={product.gameMode} nickname={user?.username} />
                                 <div className="shop-product-copy">
                                     <h2>{product.name}</h2>
                                     <p>A luminous animated spectrum made for {product.gameMode === 'agar' ? 'Agar' : 'Slither'}.</p>

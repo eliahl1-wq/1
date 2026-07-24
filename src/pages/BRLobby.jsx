@@ -61,13 +61,14 @@ export default function BRLobby() {
             joinedRef.current = true;
             setJoining(true);
             const skinKey = variant === 'slither' ? 'selected_skin' : 'selected_skin_agar';
-            const preferredSkin = localStorage.getItem(skinKey) || 'random';
+            const preferredSkin = localStorage.getItem(skinKey) || '#c080ff';
             socket.emit('brJoinQueue', {
                 variant,
                 token,
                 username: matchNickname,
                 entryFeeUsd,
-                skinColor: preferredSkin
+                skinColor: preferredSkin,
+                skinId: preferredSkin === 'random' ? 'rainbow' : 'free'
             });
         });
 

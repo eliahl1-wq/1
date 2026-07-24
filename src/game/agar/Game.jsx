@@ -257,7 +257,7 @@ export default function Game() {
         }
 
         if (socketRef.current?.connected) {
-            const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
+            const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || '#c080ff';
             localStorage.removeItem('use_free_ticket');
             socketRef.current.emit('joinGame', {
                 username: nickname,
@@ -265,6 +265,7 @@ export default function Game() {
                 mode: playMode,
                 entryFeeUsd: fee,
                 skinColor: preferredSkinAgar,
+                skinId: preferredSkinAgar === 'random' ? 'rainbow' : 'free',
                 useFreeTicket: false,
             });
         }
@@ -417,7 +418,7 @@ export default function Game() {
                 if (wantsBattleRoyale) {
                     socket.emit('brRejoinMatch', { token });
                 } else {
-                    const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || 'random';
+                    const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || '#c080ff';
                     const useFreeTicket = localStorage.getItem('use_free_ticket') === 'true';
                     socket.emit('joinGame', {
                         username: matchNickname,
@@ -425,6 +426,7 @@ export default function Game() {
                         mode: sessionMode,
                         entryFeeUsd,
                         skinColor: preferredSkinAgar,
+                skinId: preferredSkinAgar === 'random' ? 'rainbow' : 'free',
                         useFreeTicket,
                     });
                 }
@@ -729,7 +731,8 @@ export default function Game() {
                         token,
                         mode: playMode,
                         entryFeeUsd: params.entryFeeUsd,
-                        skinColor: localStorage.getItem('selected_skin_agar') || 'random',
+                        skinColor: localStorage.getItem('selected_skin_agar') || '#c080ff',
+                        skinId: (localStorage.getItem('selected_skin_agar') || '#c080ff') === 'random' ? 'rainbow' : 'free',
                         useFreeTicket: false,
                     });
                 }
