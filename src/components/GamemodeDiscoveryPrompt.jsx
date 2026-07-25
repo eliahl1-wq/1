@@ -52,8 +52,21 @@ export default function GamemodeDiscoveryPrompt({
                         </svg>
                     </button>
                 </div>
-                <button type="button" className="gm-discovery-close" onClick={handleDismiss} aria-label="Dismiss">
-                    ✕
+                <button
+                    type="button"
+                    className="gm-discovery-close"
+                    onClick={handleDismiss}
+                    onPointerUp={(event) => {
+                        if (event.pointerType === 'touch' || event.pointerType === 'pen') {
+                            event.preventDefault();
+                            handleDismiss();
+                        }
+                    }}
+                    aria-label="Close arena suggestions"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
                 </button>
             </div>
 
