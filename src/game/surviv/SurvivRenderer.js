@@ -486,7 +486,9 @@ export class SurvivRenderer {
         this._surfaceChunkCache = new Map();
         this._surfaceChunkCachePixels = 0;
         this._surfaceChunkBuildsThisFrame = 0;
-        this._surfaceChunkTileSize = 768;
+        // Smaller tiles keep first-time cache builds under a 140 Hz frame
+        // budget while preserving the same 1.5x texture resolution.
+        this._surfaceChunkTileSize = 512;
         this._surfaceCacheKeyByObject = new WeakMap();
         this._surfacePathCache = new WeakMap();
         this._pathSampleCache = new WeakMap();
@@ -1589,8 +1591,9 @@ export class SurvivRenderer {
                 { ax: maxX, ay: maxY, bx: minX, by: maxY },
                 { ax: minX, ay: maxY, bx: minX, by: minY },
             ];
-            for (const obstacle of solid) {
-                if (obstacle._insideHouseId !== house.id || !LOS_BLOCKING_KINDS.has(obstacle.kind)) continue;
+            const houseObstacles = this._renderObstaclesByHouseId.get(house.id) || [];
+            for (const obstacle of houseObstacles) {
+                if (!LOS_BLOCKING_KINDS.has(obstacle.kind)) continue;
                 const left = obstacle.x - obstacle.w / 2;
                 const right = obstacle.x + obstacle.w / 2;
                 const top = obstacle.y - obstacle.h / 2;
@@ -4315,7 +4318,9 @@ export class SurvivRenderer {
             this._obstacleSpriteCache.set(key, sprite);
         }
         if (!sprite) {
-            if (this._obstacleCacheBuildsThisFrame >= 8) return false;
+            // Spread cold prop-cache creation across frames. The vector fallback
+            // is visually identical, while avoiding a burst when a town enters view.
+            if (this._obstacleCacheBuildsThisFrame >= 3) return false;
             this._obstacleCacheBuildsThisFrame++;
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
