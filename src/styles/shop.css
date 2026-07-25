@@ -383,20 +383,107 @@
     .shop-economy-note h2 { grid-column: 1 / -1; }
 }
 .shop-flag-preview {
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    padding: 14px;
-}
-
-.shop-flag-preview-item {
     position: relative;
-    z-index: 1;
-    display: grid;
-    place-items: center;
-    min-width: 0;
+    display: block;
+    padding: 0;
+    isolation: isolate;
     overflow: hidden;
 }
 
-.shop-flag-preview-item canvas {
-    max-width: 100%;
+.shop-flag-scene {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+.shop-flag-scene--agar {
+    top: 0;
+    height: 44%;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.shop-flag-scene--slither {
+    top: 44%;
+    bottom: 0;
+}
+
+.shop-flag-scene-label {
+    position: absolute;
+    top: 9px;
+    left: 12px;
+    z-index: 3;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    line-height: 1;
+}
+
+.shop-flag-actor {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.shop-flag-actor > .agar-preview-wrapper,
+.shop-flag-actor > .snake-preview-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.shop-flag-actor canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none;
+}
+
+.shop-flag-blob--main {
+    top: 7%;
+    left: 27%;
+    width: 46%;
+    aspect-ratio: 2.25;
+}
+
+.shop-flag-blob--medium {
+    top: 39%;
+    left: 4%;
+    width: 32%;
+    aspect-ratio: 2.25;
+}
+
+.shop-flag-blob--small {
+    top: 47%;
+    right: 7%;
+    width: 24%;
+    aspect-ratio: 2.25;
+}
+
+.shop-flag-snake--main {
+    top: -3%;
+    right: -3%;
+    width: 66%;
+    aspect-ratio: 2.25;
+}
+
+.shop-flag-snake--medium {
+    top: 27%;
+    left: -4%;
+    width: 53%;
+    aspect-ratio: 2.5;
+}
+
+.shop-flag-snake--small {
+    right: 8%;
+    bottom: -3%;
+    width: 43%;
+    aspect-ratio: 2.5;
+}
+
+@media (max-width: 640px) {
+    .shop-flag-scene-label {
+        top: 7px;
+        left: 10px;
+    }
 }

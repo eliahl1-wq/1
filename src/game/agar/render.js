@@ -1,7 +1,7 @@
 import global from './global.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawBalanceBadge as drawBalanceBadgePill } from '../balanceBadge.js';
-import { drawFlag, parseFlagSkin } from '../../constants/flagSkins.js';
+import { drawFlag, getFlagBorderColor, parseFlagSkin } from '../../constants/flagSkins.js';
 
 const FULL_ANGLE = 2 * Math.PI;
 
@@ -203,7 +203,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
         const flagCode = parseFlagSkin(cell.color);
         if (flagCode) {
             graph.fillStyle = '#ffffff';
-            graph.strokeStyle = '#16161d';
+            graph.strokeStyle = getFlagBorderColor(flagCode);
         } else if (cell.color === 'rainbow') {
             const time = Date.now() * 0.002;
             const hue = (time * 40) % 360;

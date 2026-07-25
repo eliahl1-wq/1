@@ -25,7 +25,7 @@ import { API_URL } from '../utils/apiBase';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
-import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
+import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
 import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
@@ -2151,7 +2151,16 @@ export default function PreGame() {
                 const ownsFlagPack = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has('flags:bundle'));
 
                 const cycleChroma = (direction) => {
-                    if (isRandomSelection || isFlag) return;
+                    if (isFlag) {
+                        let index = FLAG_SKINS.findIndex((flag) => flag.code === activeFlagCode);
+                        if (index === -1) index = 0;
+                        const nextIndex = (index + direction + FLAG_SKINS.length) % FLAG_SKINS.length;
+                        const value = flagSkinValue(FLAG_SKINS[nextIndex].code);
+                        if (customizerTab === 'slither') setSelectedSkin(value);
+                        else setSelectedSkinAgar(value);
+                        return;
+                    }
+                    if (isRandomSelection) return;
 
                     const chromas = CHROMA_SKIN_COLORS;
                     let idx = chromas.indexOf(currentChroma);
@@ -2358,6 +2367,32 @@ export default function PreGame() {
     );
 }
 
+const RANDOM_PREVIEW_DURATION_MS = 4500;
+const RANDOM_PREVIEW_KEYFRAMES = Object.freeze([
+    [128, 208, 208],
+    [192, 128, 255],
+    [255, 160, 96],
+]);
+
+function getRandomPreviewRgb(timeMs) {
+    const phase = ((timeMs % RANDOM_PREVIEW_DURATION_MS) / RANDOM_PREVIEW_DURATION_MS) * RANDOM_PREVIEW_KEYFRAMES.length;
+    const fromIndex = Math.floor(phase) % RANDOM_PREVIEW_KEYFRAMES.length;
+    const toIndex = (fromIndex + 1) % RANDOM_PREVIEW_KEYFRAMES.length;
+    const progress = phase - Math.floor(phase);
+    const eased = progress * progress * (3 - 2 * progress);
+    return RANDOM_PREVIEW_KEYFRAMES[fromIndex].map((channel, index) => (
+        Math.round(channel + (RANDOM_PREVIEW_KEYFRAMES[toIndex][index] - channel) * eased)
+    ));
+}
+
+function randomPreviewColor(timeMs, brightness = 1) {
+    const [r, g, b] = getRandomPreviewRgb(timeMs).map((channel) => Math.round(channel * brightness));
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+const RANDOM_PREVIEW_SNAKE_COLORS = Object.freeze(Array.from({ length: 48 }, (_, index) => (
+    randomPreviewColor((index / 48) * RANDOM_PREVIEW_DURATION_MS)
+)));
 function SurvivSkinPreview({ color, isLarge, nickname }) {
     const isRandom = color === 'random' || color === 'random_color';
     const displayColor = isRandom ? '#80d0d0' : color;
@@ -2422,6 +2457,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const pointY = new Float64Array(segmentsCount);
         const shadowCanvas = getSnakeShadowCanvas(radius);
         const rainbowCanvases = rainbowColors.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
+        const randomColorCanvases = RANDOM_PREVIEW_SNAKE_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
         const shadowHalf = shadowCanvas.width / 2;
         let fixedColor = null;
         let fixedSegmentCanvas = null;
@@ -2458,7 +2494,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                 fixedFlagCode = flagCode;
                 flagCanvases = getFlagSegmentColors(flagCode).map((flagColor) => getSnakeSegmentCanvas(radius, flagColor));
             }
-            if (currentColor !== 'random' && !flagCode && currentColor !== fixedColor) {
+            if (currentColor !== 'random' && currentColor !== 'random_color' && !flagCode && currentColor !== fixedColor) {
                 fixedColor = currentColor;
                 fixedSegmentCanvas = getSnakeSegmentCanvas(radius, currentColor);
             }
@@ -2474,9 +2510,11 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                 const sin = Math.sin(segmentAngle);
                 const segmentCanvas = currentColor === 'random'
                     ? rainbowCanvases[Math.floor((now * 0.0012 + i * 0.15) % rainbowCanvases.length)]
-                    : flagCode
-                        ? flagCanvases[Math.floor(i * 0.28) % flagCanvases.length]
-                        : fixedSegmentCanvas;
+                    : currentColor === 'random_color'
+                        ? randomColorCanvases[Math.floor((now % RANDOM_PREVIEW_DURATION_MS) / RANDOM_PREVIEW_DURATION_MS * randomColorCanvases.length)]
+                        : flagCode
+                            ? flagCanvases[Math.floor(i * 0.28) % flagCanvases.length]
+                            : fixedSegmentCanvas;
                 const segmentHalf = segmentCanvas.width / 2;
                 ctx.setTransform(cos, sin, -sin, cos, pointX[i], pointY[i]);
                 ctx.drawImage(segmentCanvas, -segmentHalf, -segmentHalf);
@@ -2542,7 +2580,7 @@ export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) 
 
         let animationFrameId;
 
-        const render = () => {
+        const render = (now = performance.now()) => {
             tRef.current += 1;
             const t = tRef.current;
             const currentColor = colorRef.current;
@@ -2559,11 +2597,14 @@ export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) 
             const flagCode = parseFlagSkin(currentColor);
             if (flagCode) {
                 fillStyle = '#ffffff';
-                strokeStyle = '#16161d';
+                strokeStyle = getFlagBorderColor(flagCode);
             } else if (currentColor === 'random') {
                 const hue = (t * 0.14) % 360;
                 fillStyle = `hsl(${hue}, 100%, 55%)`;
                 strokeStyle = `hsl(${hue}, 100%, 42%)`;
+            } else if (currentColor === 'random_color') {
+                fillStyle = randomPreviewColor(now);
+                strokeStyle = randomPreviewColor(now, 0.72);
             } else {
                 const h = currentColor.replace('#', '');
                 let r = 120, g = 120, b = 120;

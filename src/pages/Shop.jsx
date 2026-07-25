@@ -29,15 +29,32 @@ function RainbowPreview({ mode, nickname }) {
     );
 }
 
-function FlagPackPreview({ nickname }) {
-    const defaultFlag = flagSkinValue(DEFAULT_FLAG_CODE);
+function FlagPackPreview() {
     return (
         <div className="shop-rainbow-preview shop-flag-preview" aria-hidden="true">
-            <div className="shop-flag-preview-item">
-                <AgarBlobPreview color={defaultFlag} isLarge={false} nickname={nickname} hideName />
+            <div className="shop-flag-scene shop-flag-scene--agar">
+                <span className="shop-flag-scene-label">AGAR FLAGS</span>
+                <div className="shop-flag-actor shop-flag-blob shop-flag-blob--main">
+                    <AgarBlobPreview color="flag:se" isLarge hideName />
+                </div>
+                <div className="shop-flag-actor shop-flag-blob shop-flag-blob--medium">
+                    <AgarBlobPreview color="flag:br" isLarge hideName />
+                </div>
+                <div className="shop-flag-actor shop-flag-blob shop-flag-blob--small">
+                    <AgarBlobPreview color="flag:jp" isLarge hideName />
+                </div>
             </div>
-            <div className="shop-flag-preview-item">
-                <SnakeSkinPreview color="flag:us" isLarge={false} />
+            <div className="shop-flag-scene shop-flag-scene--slither">
+                <span className="shop-flag-scene-label">SLITHER FLAGS</span>
+                <div className="shop-flag-actor shop-flag-snake shop-flag-snake--main">
+                    <SnakeSkinPreview color="flag:us" isLarge />
+                </div>
+                <div className="shop-flag-actor shop-flag-snake shop-flag-snake--medium">
+                    <SnakeSkinPreview color="flag:de" isLarge={false} />
+                </div>
+                <div className="shop-flag-actor shop-flag-snake shop-flag-snake--small">
+                    <SnakeSkinPreview color="flag:gb" isLarge={false} />
+                </div>
             </div>
         </div>
     );

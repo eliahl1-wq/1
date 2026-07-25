@@ -37,6 +37,29 @@ export function getFlagSegmentColors(code) {
     return getFlagSkin(code).colors;
 }
 
+const FLAG_BORDER_COLORS = Object.freeze({
+    se: '#004f7d',
+    us: '#292852',
+    gb: '#00184f',
+    de: '#980000',
+    fr: '#003c75',
+    es: '#7a0f14',
+    it: '#006b34',
+    br: '#006b29',
+    ca: '#9d0018',
+    jp: '#8b0022',
+    no: '#800820',
+    fi: '#002563',
+    dk: '#900b21',
+    nl: '#173367',
+    pl: '#9d0e2b',
+    ua: '#004184',
+});
+
+export function getFlagBorderColor(code) {
+    return FLAG_BORDER_COLORS[getFlagSkin(code).code] || '#303746';
+}
+
 export function getPremiumSkinId(value) {
     if (value === 'random') return 'rainbow';
     if (parseFlagSkin(value)) return 'flags';
