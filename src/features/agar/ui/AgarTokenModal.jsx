@@ -6,6 +6,7 @@ import {
 } from '../config/agarConfig';
 import { executeAgarSwap } from '../swap/agarSwap';
 import AgarLogo from './AgarLogo';
+import AgarPriceChart from './AgarPriceChart';
 
 const DETAIL_METRICS = [
     ['Price', 'price'],
@@ -150,7 +151,7 @@ export default function AgarTokenModal({
             : parsedTradeAmount * agarPrice / solPrice
         : null;
 
-    const chartUrl = buildAgarExternalUrl(config.marketData.chartUrl, config);
+
     const axiomUrl = buildAgarExternalUrl(config.links.axiom, config);
     const dexScreenerUrl = buildAgarExternalUrl(config.links.dexScreener, config);
     const birdeyeUrl = buildAgarExternalUrl(config.links.birdeye, config);
@@ -188,24 +189,7 @@ export default function AgarTokenModal({
                             <span>Chart</span>
                             <span>{launchReady && marketLoading ? 'Loading…' : launchReady ? 'Live' : config.messages.comingSoon}</span>
                         </div>
-                        {launchReady && chartUrl ? (
-                            <iframe
-                                className="agar-modal__chart-frame"
-                                src={chartUrl}
-                                title={`${config.symbol} live chart`}
-                                loading="lazy"
-                                referrerPolicy="strict-origin-when-cross-origin"
-                            />
-                        ) : (
-                            <div className="agar-modal__chart-placeholder">
-                                <div className="agar-modal__chart-grid" aria-hidden="true" />
-                                <svg viewBox="0 0 700 220" preserveAspectRatio="none" aria-hidden="true">
-                                    <path d="M0 190 C70 178 90 142 155 155 S250 118 315 130 S415 66 480 82 S595 28 700 42" />
-                                </svg>
-                                <strong>{config.messages.comingSoon}</strong>
-                                <span>{config.symbol} / USD</span>
-                            </div>
-                        )}
+                        <AgarPriceChart launchReady={launchReady} />
                     </div>
 
                     <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}`}>

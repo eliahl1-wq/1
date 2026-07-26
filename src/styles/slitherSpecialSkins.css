@@ -1,0 +1,70 @@
+.slither-special-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    background-size: 180% 180%;
+    box-shadow: inset 0 0 9px rgba(255, 255, 255, 0.24);
+    animation: slitherSpecialGradient 5s ease-in-out infinite;
+}
+
+.slither-special-icon span {
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 1rem;
+    line-height: 1;
+    text-shadow: 0 0 7px rgba(255, 255, 255, 0.85);
+}
+
+.slither-special-icon--eclipse span {
+    color: #ffd27a;
+    text-shadow: 0 0 8px rgba(255, 138, 69, 0.9);
+}
+
+.shop-special-preview {
+    isolation: isolate;
+}
+
+.shop-special-preview::after {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+        radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--special-skin-glow) 24%, transparent), transparent 48%),
+        linear-gradient(160deg, rgba(7, 8, 18, 0.28), rgba(2, 3, 8, 0.72));
+    content: "";
+    pointer-events: none;
+}
+
+.shop-special-preview > canvas,
+.shop-special-preview .snake-skin-preview {
+    z-index: 2;
+}
+
+.shop-special-preview-glow {
+    position: absolute;
+    z-index: 1;
+    width: 210px;
+    height: 120px;
+    background: var(--special-skin-glow);
+    border-radius: 50%;
+    filter: blur(55px);
+    opacity: 0.22;
+    pointer-events: none;
+}
+
+.shop-special-preview--aurora::before {
+    background-image:
+        radial-gradient(circle, rgba(220, 255, 244, 0.3) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(212, 195, 255, 0.2) 1px, transparent 1.5px);
+    background-position: 0 0, 11px 9px;
+    background-size: 25px 25px, 31px 31px;
+}
+
+.shop-special-preview--eclipse::before {
+    background-image: radial-gradient(circle, rgba(255, 173, 86, 0.13) 1px, transparent 1.5px);
+    background-size: 23px 23px;
+}
+
+@keyframes slitherSpecialGradient {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}

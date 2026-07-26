@@ -11,7 +11,9 @@ import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverla
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
+import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_VALUE, drawAgarStakeCharm, getAgarStakeCharmImage } from '../../constants/agarStakeSkin.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
+import { drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
 
@@ -88,6 +90,9 @@ function normalizeSnakeColor(color) {
 
 /** Bucket colors so sprite cache stays small across many snakes. */
 function bucketSnakeColor(color) {
+    const specialSkin = getSlitherSpecialSkin(color);
+    if (specialSkin) return specialSkin.colors[0];
+    if (color === AGARSTAKE_SKIN_VALUE) return AGARSTAKE_SKIN_COLORS[0];
     if (color === 'random') return 'random';
     if (parseFlagSkin(color)) return '#808080';
     const cs = normalizeSnakeColor(color);
@@ -188,6 +193,8 @@ export class SlitherRenderer {
         this._screenScratch = { x: 0, y: 0 };
         this._quality = 1;
         this._rainbowStampPack = null;
+        this._agarStakeStampPack = null;
+        this._agarStakeCharmImage = getAgarStakeCharmImage();
         this._flagStampPacks = new Map();
         this._deathClusterBuf = [];
         this._deathClusterIds = new Set();
@@ -1743,6 +1750,34 @@ export class SlitherRenderer {
         return pack;
     }
 
+    _getAgarStakeStamps(cacheR, prNeeds) {
+        const prKey = `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`;
+        let pack = this._agarStakeStampPack;
+        if (!pack || pack.cacheR !== cacheR || pack.prKey !== prKey) {
+            const colors = AGARSTAKE_SKIN_COLORS;
+            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds));
+            pack = { cacheR, prKey, colors, stamps };
+            this._agarStakeStampPack = pack;
+        }
+        return pack;
+    }
+    _getSpecialSkinStamps(skin, cacheR, prNeeds) {
+        if (!this._specialSkinStampPacks) this._specialSkinStampPacks = new Map();
+        const prKey = `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`;
+        const key = `${skin.id}|${cacheR}|${prKey}`;
+        let pack = this._specialSkinStampPacks.get(key);
+        if (!pack) {
+            const colors = skin.colors;
+            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds));
+            pack = { cacheR, prKey, colors, stamps, skinId: skin.id };
+            if (this._specialSkinStampPacks.size >= 24) {
+                this._specialSkinStampPacks.delete(this._specialSkinStampPacks.keys().next().value);
+            }
+            this._specialSkinStampPacks.set(key, pack);
+        }
+        return pack;
+    }
+
     _getFlagStamps(code, cacheR, prNeeds) {
         const colors = getFlagSegmentColors(code);
         const prKey = `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`;
@@ -1875,17 +1910,26 @@ export class SlitherRenderer {
         };
 
         const isRainbow = snake.color === 'random';
+        const isAgarStake = snake.color === AGARSTAKE_SKIN_VALUE;
+        const specialSkin = getSlitherSpecialSkin(snake.color);
         const flagCode = parseFlagSkin(snake.color);
-        const isPatternSkin = isRainbow || !!flagCode;
+        const isPatternSkin = isRainbow || isAgarStake || !!specialSkin || !!flagCode;
         const patternPack = isRainbow
             ? this._getRainbowStamps(cacheR, prNeeds, bodyRadius)
-            : flagCode
-                ? this._getFlagStamps(flagCode, cacheR, prNeeds)
-                : null;
+            : isAgarStake
+                ? this._getAgarStakeStamps(cacheR, prNeeds)
+                : specialSkin
+                    ? this._getSpecialSkinStamps(specialSkin, cacheR, prNeeds)
+                    : flagCode
+                        ? this._getFlagStamps(flagCode, cacheR, prNeeds)
+                        : null;
         const getPatternIndex = (index) => isRainbow
             ? Math.floor((this._frame * 0.048 + index * 0.35) % patternPack.colors.length)
-            : Math.floor(index * 0.28) % patternPack.colors.length;
-
+            : isAgarStake
+                ? Math.floor(index * 0.22) % patternPack.colors.length
+                : specialSkin
+                    ? Math.floor((index / Math.max(1, bumps.length - 1)) * (patternPack.colors.length - 1))
+                    : Math.floor(index * 0.28) % patternPack.colors.length;
         let normal, boostBody, glow, trailGlow, bodySS, stampScale;
         if (!isPatternSkin) {
             const stamp = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
@@ -1998,10 +2042,28 @@ export class SlitherRenderer {
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
 
+        if (specialSkin) {
+            drawSlitherSpecialDetails(ctx, specialSkin.id, bumps, bodyRadius, this._frame * 0.055);
+        }
+
         if (boosting) {
             this._drawBoostWaves(ctx, bumps, bumpCount, bodyRadius, pulse);
         }
 
+        if (isAgarStake) {
+            if (snake._agarStakeCharmSeed === undefined) {
+                snake._agarStakeCharmSeed = String(snake.id || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) * 0.17;
+            }
+            drawAgarStakeCharm(
+                ctx,
+                this._agarStakeCharmImage,
+                hx,
+                hy,
+                headRadius,
+                angle,
+                this._frame * 0.055 + snake._agarStakeCharmSeed,
+            );
+        }
         // Head and Eyes
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);
