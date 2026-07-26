@@ -11,9 +11,9 @@ import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverla
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
-import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_VALUE, drawAgarStakeCharm, getAgarStakeCharmImage } from '../../constants/agarStakeSkin.js';
+import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_VALUE, createAgarStakeCharmState, drawAgarStakeCharm, getAgarStakeCharmImage, getAgarStakePatternIndex } from '../../constants/agarStakeSkin.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
-import { drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
+import { drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
 
@@ -91,7 +91,7 @@ function normalizeSnakeColor(color) {
 /** Bucket colors so sprite cache stays small across many snakes. */
 function bucketSnakeColor(color) {
     const specialSkin = getSlitherSpecialSkin(color);
-    if (specialSkin) return specialSkin.colors[0];
+    if (specialSkin) return specialSkin.baseColor;
     if (color === AGARSTAKE_SKIN_VALUE) return AGARSTAKE_SKIN_COLORS[0];
     if (color === 'random') return 'random';
     if (parseFlagSkin(color)) return '#808080';
@@ -195,6 +195,7 @@ export class SlitherRenderer {
         this._rainbowStampPack = null;
         this._agarStakeStampPack = null;
         this._agarStakeCharmImage = getAgarStakeCharmImage();
+        this._agarStakeCharmStates = new Map();
         this._flagStampPacks = new Map();
         this._deathClusterBuf = [];
         this._deathClusterIds = new Set();
@@ -742,6 +743,9 @@ export class SlitherRenderer {
         }
         for (const id of this._boostTrailPool.keys()) {
             if (!seen.has(id)) this._boostTrailPool.delete(id);
+        }
+        for (const id of this._agarStakeCharmStates.keys()) {
+            if (!seen.has(id)) this._agarStakeCharmStates.delete(id);
         }
     }
 
@@ -1498,8 +1502,8 @@ export class SlitherRenderer {
         }
         ctx.restore();
     }
-    _paintSnakeSegment(g, c, rPx, cs, contrast = 1) {
-        const segmentCanvas = getSnakeSegmentCanvas(rPx, cs);
+    _paintSnakeSegment(g, c, rPx, cs, contrast = 1, preserveTone = false) {
+        const segmentCanvas = getSnakeSegmentCanvas(rPx, cs, preserveTone);
         g.save();
         g.translate(c, c);
         const half = segmentCanvas.width / 2;
@@ -1657,8 +1661,8 @@ export class SlitherRenderer {
     /**
      * Pre-render normal segment + optional glow/boost overlays into o.pr_imgs cache.
      */
-    _getSnakePrImgs(cs, rPx, needs = {}) {
-        const key = `${cs}|${rPx}`;
+    _getSnakePrImgs(cs, rPx, needs = {}, preserveTone = false) {
+        const key = `${cs}|${rPx}|${preserveTone ? 'raw' : 'vivid'}`;
         let pair = this._prImgs.get(key);
         const bodySS = rPx <= 44 ? this._bodySS : rPx <= 84 ? 1.5 : 1.25;
 
@@ -1674,10 +1678,10 @@ export class SlitherRenderer {
 
         if (!pair.normal) {
             pair.normal = this._getSprite(`pr_norm_v39|${key}`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1);
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, preserveTone);
             });
             pair.boostBody = this._getSprite(`pr_norm_v39|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04);
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04, preserveTone);
             });
         }
 
@@ -1728,8 +1732,8 @@ export class SlitherRenderer {
     }
 
     /** Pre-rendered segment stamp cache — body sprites built once per color/radius. */
-    _getSnakeSegmentStamp(cs, rPx, needs = {}) {
-        return this._getSnakePrImgs(cs, rPx, needs);
+    _getSnakeSegmentStamp(cs, rPx, needs = {}, preserveTone = false) {
+        return this._getSnakePrImgs(cs, rPx, needs, preserveTone);
     }
 
     /** Cache all rainbow segment stamps once per snake draw (avoids per-bump lookups). */
@@ -1755,7 +1759,7 @@ export class SlitherRenderer {
         let pack = this._agarStakeStampPack;
         if (!pack || pack.cacheR !== cacheR || pack.prKey !== prKey) {
             const colors = AGARSTAKE_SKIN_COLORS;
-            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds));
+            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds, true));
             pack = { cacheR, prKey, colors, stamps };
             this._agarStakeStampPack = pack;
         }
@@ -1767,7 +1771,7 @@ export class SlitherRenderer {
         const key = `${skin.id}|${cacheR}|${prKey}`;
         let pack = this._specialSkinStampPacks.get(key);
         if (!pack) {
-            const colors = skin.colors;
+            const colors = [skin.baseColor];
             const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds));
             pack = { cacheR, prKey, colors, stamps, skinId: skin.id };
             if (this._specialSkinStampPacks.size >= 24) {
@@ -1926,9 +1930,9 @@ export class SlitherRenderer {
         const getPatternIndex = (index) => isRainbow
             ? Math.floor((this._frame * 0.048 + index * 0.35) % patternPack.colors.length)
             : isAgarStake
-                ? Math.floor(index * 0.22) % patternPack.colors.length
+                ? getAgarStakePatternIndex(index)
                 : specialSkin
-                    ? Math.floor((index / Math.max(1, bumps.length - 1)) * (patternPack.colors.length - 1))
+                    ? 0
                     : Math.floor(index * 0.28) % patternPack.colors.length;
         let normal, boostBody, glow, trailGlow, bodySS, stampScale;
         if (!isPatternSkin) {
@@ -2043,6 +2047,7 @@ export class SlitherRenderer {
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
 
         if (specialSkin) {
+            drawSlitherSpecialBody(ctx, specialSkin.id, bumps, bodyRadius, this._frame * 0.055, boosting);
             drawSlitherSpecialDetails(ctx, specialSkin.id, bumps, bodyRadius, this._frame * 0.055);
         }
 
@@ -2054,6 +2059,11 @@ export class SlitherRenderer {
             if (snake._agarStakeCharmSeed === undefined) {
                 snake._agarStakeCharmSeed = String(snake.id || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) * 0.17;
             }
+            let charmState = this._agarStakeCharmStates.get(snake.id);
+            if (!charmState) {
+                charmState = createAgarStakeCharmState();
+                this._agarStakeCharmStates.set(snake.id, charmState);
+            }
             drawAgarStakeCharm(
                 ctx,
                 this._agarStakeCharmImage,
@@ -2062,6 +2072,8 @@ export class SlitherRenderer {
                 headRadius,
                 angle,
                 this._frame * 0.055 + snake._agarStakeCharmSeed,
+                charmState,
+                performance.now(),
             );
         }
         // Head and Eyes

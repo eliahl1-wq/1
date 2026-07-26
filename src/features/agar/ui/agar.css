@@ -418,6 +418,8 @@
 }
 
 .agar-modal__chart {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     padding: 13px;
 }
@@ -684,6 +686,13 @@
 }
 
 .agar-modal__notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 34px;
+    min-height: 34px;
+    overflow: hidden;
     padding: 8px 9px;
     color: #c7baff;
     font-size: 0.62rem;
@@ -692,6 +701,10 @@
     background: rgba(120, 94, 255, 0.08);
     border: 1px solid rgba(120, 94, 255, 0.18);
     border-radius: var(--r-md);
+}
+
+.agar-modal__notice.is-empty {
+    visibility: hidden;
 }
 
 .agar-modal__stats {
@@ -877,8 +890,11 @@
 }
 
 .agar-price-chart {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     overflow: hidden;
-    min-height: 270px;
+    min-height: 360px;
     background: #0b0c11;
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: var(--r-md);
@@ -945,13 +961,15 @@
 
 .agar-price-chart__canvas {
     position: relative;
-    min-height: 218px;
+    flex: 1;
+    min-height: 292px;
 }
 
 .agar-price-chart__canvas > svg {
     display: block;
     width: 100%;
-    height: 218px;
+    height: 100%;
+    min-height: 292px;
     overflow: visible;
     touch-action: pan-y;
 }

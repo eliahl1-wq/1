@@ -27,8 +27,8 @@ import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRende
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
 import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
-import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_PRODUCT_ID, AGARSTAKE_SKIN_VALUE, drawAgarStakeCharm, getAgarStakeCharmImage } from '../constants/agarStakeSkin';
-import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
+import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_PRODUCT_ID, AGARSTAKE_SKIN_VALUE, createAgarStakeCharmState, drawAgarStakeCharm, getAgarStakeCharmImage, getAgarStakePatternIndex } from '../constants/agarStakeSkin';
+import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
 import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
@@ -2507,13 +2507,14 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const pointY = new Float64Array(segmentsCount);
         const shadowCanvas = getSnakeShadowCanvas(radius);
         const rainbowCanvases = rainbowColors.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
-        const agarStakeCanvases = AGARSTAKE_SKIN_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
+        const agarStakeCanvases = AGARSTAKE_SKIN_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor, true));
         const specialSkinCanvases = new Map(SLITHER_SPECIAL_SKINS.map((skin) => [
             skin.id,
-            skin.colors.map((snakeColor) => getSnakeSegmentCanvas(radius, snakeColor)),
+            getSnakeSegmentCanvas(radius, skin.baseColor),
         ]));
         const detailPoints = Array.from({ length: segmentsCount }, () => ({ x: 0, y: 0 }));
         const agarStakeCharmImage = getAgarStakeCharmImage();
+        const agarStakeCharmState = createAgarStakeCharmState();
         const randomColorCanvases = RANDOM_PREVIEW_SNAKE_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
         const shadowHalf = shadowCanvas.width / 2;
         let fixedColor = null;
@@ -2573,9 +2574,9 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                     : currentColor === 'random_color'
                         ? randomColorCanvases[Math.floor((now % RANDOM_PREVIEW_DURATION_MS) / RANDOM_PREVIEW_DURATION_MS * randomColorCanvases.length)]
                         : currentColor === AGARSTAKE_SKIN_VALUE
-                            ? agarStakeCanvases[Math.floor(i * 0.22) % agarStakeCanvases.length]
+                            ? agarStakeCanvases[getAgarStakePatternIndex(i)]
                         : currentSpecialSkin
-                            ? specialSkinCanvases.get(currentSpecialSkin.id)[Math.floor((i / Math.max(1, segmentsCount - 1)) * (currentSpecialSkin.colors.length - 1))]
+                            ? specialSkinCanvases.get(currentSpecialSkin.id)
                         : flagCode
                             ? flagCanvases[Math.floor(i * 0.28) % flagCanvases.length]
                             : fixedSegmentCanvas;
@@ -2584,7 +2585,9 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                 ctx.drawImage(segmentCanvas, -segmentHalf, -segmentHalf);
             }
 
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             if (currentSpecialSkin) {
+                drawSlitherSpecialBody(ctx, currentSpecialSkin.id, detailPoints, radius, now * 0.0042);
                 drawSlitherSpecialDetails(ctx, currentSpecialSkin.id, detailPoints, radius, now * 0.0042);
             }
 
@@ -2609,6 +2612,8 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                     radius,
                     headAngle,
                     now * 0.0042,
+                    agarStakeCharmState,
+                    now,
                 );
             }
             for (const side of [-1, 1]) {

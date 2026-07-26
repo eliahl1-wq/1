@@ -271,7 +271,13 @@ export default function AgarTokenModal({
                             {tradeSide === 'BUY' ? `Buy ${config.symbol}` : `Sell ${config.symbol}`}
                         </button>
 
-                        {notice && <div className="agar-modal__notice" role="status">{notice}</div>}
+                        <div
+                            className={`agar-modal__notice ${notice ? '' : 'is-empty'}`}
+                            role="status"
+                            aria-live="polite"
+                        >
+                            {notice || '\u00a0'}
+                        </div>
                     </aside>
 
                     <div className="agar-modal__stats">

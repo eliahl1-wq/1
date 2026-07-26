@@ -66,8 +66,8 @@ export function normalizeColor(hex) {
     };
 }
 
-export function getSnakeSegmentCanvas(radius, hexColor) {
-    const key = `${Math.round(radius * 10)}_${hexColor}`;
+export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false) {
+    const key = `${Math.round(radius * 10)}_${preserveTone ? 'raw_' : ''}${hexColor}`;
     if (snakeSegmentCache.has(key)) return snakeSegmentCache.get(key);
 
     const R = radius;
@@ -83,7 +83,7 @@ export function getSnakeSegmentCanvas(radius, hexColor) {
     const imgData = ctx.createImageData(canvasSize, canvasSize);
     const data = imgData.data;
 
-    const col = normalizeColor(hexColor);
+    const col = preserveTone ? parseColorHex(hexColor) : normalizeColor(hexColor);
     const f = 1.416 * s;
 
     for (let t = 0; t < canvasSize; t++) {
