@@ -1900,6 +1900,27 @@ body.game-session-active #root {
     -webkit-backdrop-filter: blur(2px);
 }
 
+.surviv-game-page .surviv-inventory-modal.is-ground-drop-active {
+    background: rgba(55, 8, 8, 0.26);
+    box-shadow: inset 0 0 0 2px rgba(255, 92, 92, 0.28);
+}
+
+.surviv-game-page .surviv-ground-drop-hint {
+    position: absolute;
+    left: 50%;
+    bottom: max(22px, env(safe-area-inset-bottom, 0px) + 12px);
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    border: 1px solid rgba(255, 104, 104, 0.58);
+    border-radius: 7px;
+    background: rgba(50, 8, 8, 0.88);
+    color: #ff9a9a;
+    font: 900 0.66rem/1.1 system-ui, sans-serif;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+}
 .surviv-game-page .surviv-inventory-container {
     background: rgba(9, 12, 10, 0.72);
     border-color: rgba(225, 204, 150, 0.18);

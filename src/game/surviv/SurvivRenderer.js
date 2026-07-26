@@ -467,10 +467,10 @@ export class SurvivRenderer {
         this._currentVisibilityHouseId = null;
         this._losCacheKey = '';
         this._losCachedPolygon = null;
-        this._losDisplayPolygon = null;
-        this._losLastBuildAt = 0;
         this._losLastPlayerX = NaN;
         this._losLastPlayerY = NaN;
+        this._losRayDirections = null;
+        this._losWorkingPolygon = [];
         this._frameDt = 1 / 60;
         this._minimapCanvas = null;
         this._minimapCtx = null;
@@ -598,10 +598,10 @@ export class SurvivRenderer {
         this._currentVisibilityHouseId = null;
         this._losCacheKey = '';
         this._losCachedPolygon = null;
-        this._losDisplayPolygon = null;
-        this._losLastBuildAt = 0;
         this._losLastPlayerX = NaN;
         this._losLastPlayerY = NaN;
+        this._losRayDirections = null;
+        this._losWorkingPolygon = [];
         this.surfaceObstacles = [];
         this.fieldObstacles = [];
         this.waterObstacles = [];
@@ -1883,74 +1883,40 @@ export class SurvivRenderer {
     /**
      * Cast a single ray from (px,py) at angle, returning the closest intersection point.
      */
-    _castRay(px, py, angle, segments, maxDist) {
-        const rdx = Math.cos(angle);
-        const rdy = Math.sin(angle);
+    _castRay(px, py, rdx, rdy, segments, maxDist, out) {
         let closest = maxDist;
         for (let i = 0; i < segments.length; i++) {
             const s = segments[i];
             const t = this._raySegmentIntersect(px, py, rdx, rdy, s.ax, s.ay, s.bx, s.by);
             if (t < closest) closest = t;
         }
-        return { x: px + rdx * closest, y: py + rdy * closest };
+        out.x = px + rdx * closest;
+        out.y = py + rdy * closest;
+        return out;
     }
 
     /**
-     * Build the visibility polygon by casting rays toward all wall endpoints
-     * plus sweep rays for smooth edges.
+     * Build a fixed-size visibility polygon. Stable ray indices are important:
+     * endpoint-driven polygons change length/order as the player moves, which
+     * makes interpolation visibly jump inside large buildings.
      */
     _buildVisibilityPolygon(px, py, segments, maxDist) {
-        // All angles normalized to [0, 2π]
-        const normalize = a => ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-        const angles = new Set();
-
-        // Add sweep rays for smooth coverage between wall corners
-        // Exact endpoint rays keep corners crisp; 24 sweep rays keep indoor
-        // 900px-radius edge sub-pixel smooth without the old O(256 * segments)
-        // intersection cost every animation frame.
-        const sweepCount = 20;
-        for (let i = 0; i < sweepCount; i++) {
-            angles.add((Math.PI * 2 * i) / sweepCount);
+        const rayCount = 256;
+        let directions = this._losRayDirections;
+        if (!directions || directions.length !== rayCount) {
+            const angleStep = (Math.PI * 2) / rayCount;
+            directions = Array.from({ length: rayCount }, (_, i) => ({
+                x: Math.cos(i * angleStep),
+                y: Math.sin(i * angleStep),
+            }));
+            this._losRayDirections = directions;
         }
-
-        // A large landmark can contain hundreds of wall edges. Casting three rays
-        // for every endpoint makes a single LOS refresh cost over a million
-        // intersections and causes visible frame spikes while moving. Keep the
-        // nearest endpoint in each small angular bucket; farther corners in the
-        // same direction are already occluded by that nearer edge.
-        const epsilon = 0.00005;
-        const epRangeSq = (maxDist + 200) * (maxDist + 200);
-        const endpointBinCount = 96;
-        const endpointBins = new Map();
-        const collectEndpoint = (x, y) => {
-            const dx = x - px;
-            const dy = y - py;
-            const distanceSq = dx * dx + dy * dy;
-            if (distanceSq >= epRangeSq) return;
-            const angle = normalize(Math.atan2(dy, dx));
-            const bin = Math.floor((angle / (Math.PI * 2)) * endpointBinCount) % endpointBinCount;
-            const previous = endpointBins.get(bin);
-            if (!previous || distanceSq < previous.distanceSq) {
-                endpointBins.set(bin, { angle, distanceSq });
-            }
-        };
-        for (const s of segments) {
-            collectEndpoint(s.ax, s.ay);
-            collectEndpoint(s.bx, s.by);
+        const polygon = this._losWorkingPolygon;
+        for (let i = 0; i < rayCount; i++) {
+            const point = polygon[i] || (polygon[i] = { x: 0, y: 0 });
+            const direction = directions[i];
+            this._castRay(px, py, direction.x, direction.y, segments, maxDist, point);
         }
-        for (const { angle } of endpointBins.values()) {
-            angles.add(normalize(angle - epsilon));
-            angles.add(angle);
-            angles.add(normalize(angle + epsilon));
-        }
-
-        // Sort all angles 0 → 2π, then cast rays
-        const sortedAngles = [...angles].sort((a, b) => a - b);
-        const polygon = [];
-        for (const angle of sortedAngles) {
-            polygon.push(this._castRay(px, py, angle, segments, maxDist));
-        }
-
         return polygon;
     }
 
@@ -1971,20 +1937,18 @@ export class SurvivRenderer {
         const py = this.me.y;
         const maxDist = 900;
 
-        const now = performance.now();
         const cacheKey = `${currentHouse.id}:${this._obstacleRevision}`;
         let polygon = this._losCachedPolygon;
         const playerMoved = !Number.isFinite(this._losLastPlayerX)
-            || Math.hypot(px - this._losLastPlayerX, py - this._losLastPlayerY) >= 1.5;
+            || Math.hypot(px - this._losLastPlayerX, py - this._losLastPlayerY) >= 0.2;
         const needsRebuild = cacheKey !== this._losCacheKey
             || !polygon
-            || (playerMoved && now - this._losLastBuildAt >= 30);
+            || playerMoved;
         if (needsRebuild) {
             const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse, px, py, maxDist);
             polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
             this._losCacheKey = cacheKey;
             this._losCachedPolygon = polygon;
-            this._losLastBuildAt = now;
             this._losLastPlayerX = px;
             this._losLastPlayerY = py;
         }
@@ -1993,20 +1957,9 @@ export class SurvivRenderer {
         this._currentVisibilityPolygon = polygon;
         this._currentVisibilityHouseId = currentHouse.id;
 
-        // Render a frame-rate-independent blend between LOS updates. This removes
-        // the old 12-world-unit shadow jumps without ray-casting at 140 Hz.
-        let displayPolygon = this._losDisplayPolygon;
-        if (!displayPolygon || displayPolygon.length !== polygon.length || cacheKey !== this._losDisplayCacheKey) {
-            displayPolygon = polygon.map(point => ({ x: point.x, y: point.y }));
-            this._losDisplayPolygon = displayPolygon;
-            this._losDisplayCacheKey = cacheKey;
-        } else {
-            const shadowAlpha = 1 - Math.exp(-Math.min(this._frameDt, 0.05) * 28);
-            for (let i = 0; i < polygon.length; i++) {
-                displayPolygon[i].x = lerp(displayPolygon[i].x, polygon[i].x, shadowAlpha);
-                displayPolygon[i].y = lerp(displayPolygon[i].y, polygon[i].y, shadowAlpha);
-            }
-        }
+        // The polygon is rebuilt from the interpolated local player position.
+        // Drawing it directly keeps the shadow locked to every rendered frame.
+        const displayPolygon = polygon;
 
         ctx.save();
 

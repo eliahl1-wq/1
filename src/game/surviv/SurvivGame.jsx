@@ -273,6 +273,13 @@ export default function SurvivGame() {
         }
     };
 
+    const inventoryDragToDropRequest = (dragged) => {
+        if (dragged?.source !== 'backpack') return null;
+        return dragged.key === 'weapon'
+            ? { itemKey: 'weapon', slotIdx: dragged.slotIdx }
+            : { itemKey: dragged.key, ammoType: dragged.ammoType };
+    };
+
     const finishInventoryDrag = () => setInventoryDrag(null);
     const [isRejoining, setIsRejoining] = useState(false);
     const [connectionError, setConnectionError] = useState('');
@@ -1473,25 +1480,31 @@ export default function SurvivGame() {
             {/* Side-by-Side React Inventory Overlay */}
             {isInventoryOpen && me && (
                 <div 
-                    className="surviv-inventory-modal" 
+                    className={`surviv-inventory-modal ${inventoryDrag?.source === 'backpack' ? 'is-ground-drop-active' : ''}`}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="surviv-inventory-title"
                     onClick={handleCloseInventory}
                     onDragOver={(e) => {
-                        if (readInventoryDrag(e)?.source === 'backpack') e.preventDefault();
+                        if (e.target !== e.currentTarget) return;
+                        if (readInventoryDrag(e)?.source === 'backpack') {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                        }
                     }}
                     onDrop={(e) => {
+                        if (e.target !== e.currentTarget) return;
                         e.preventDefault();
-                        const dragged = readInventoryDrag(e);
-                        if (dragged?.source === 'backpack') {
-                            dropItemPendingRef.current = dragged.key === 'weapon'
-                                ? { itemKey: 'weapon', slotIdx: dragged.slotIdx }
-                                : { itemKey: dragged.key, ammoType: dragged.ammoType };
-                        }
+                        const request = inventoryDragToDropRequest(readInventoryDrag(e));
+                        if (request) dropItemPendingRef.current = request;
                         finishInventoryDrag();
                     }}
                 >
+                    {inventoryDrag?.source === 'backpack' && (
+                        <div className="surviv-ground-drop-hint" aria-hidden="true">
+                            SLÄPP HÄR FÖR ATT DROPA PÅ MARKEN
+                        </div>
+                    )}
                     <div className={`surviv-inventory-container ${!me.openedContainer ? 'backpack-only' : 'has-chest'}`} onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="surviv-inventory-header">
@@ -1896,7 +1909,7 @@ export default function SurvivGame() {
                         </div>
 
                         <div className="surviv-inventory-footer">
-                            <span>{me.openedContainer ? 'CHEST OPEN' : 'BACKPACK'}</span>
+                            <span>{me.openedContainer ? 'CHEST OPEN' : 'DRA UT ETT FÖREMÅL FÖR ATT DROPA'}</span>
                             <span>{formatUsd(me.dollarBalance || 0)}</span>
                         </div>
                     </div>
