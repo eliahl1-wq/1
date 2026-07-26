@@ -198,7 +198,7 @@ export default function Shop() {
                 type: response.status === 202 ? 'pending' : 'success',
                 message: response.status === 202
                     ? 'Payment was broadcast and is being confirmed. Do not retry.'
-                    : `${getSlitherSpecialSkin(quote?.skinId)?.name || (quote?.skinId === 'flags' ? 'Flag Pack' : quote?.skinId === 'agarstake' ? 'AgarStake Charm' : 'Rainbow')} unlocked successfully.`,
+                    : `${getSlitherSpecialSkin(quote?.skinId)?.name || (quote?.skinId === 'flags' ? 'Flag Pack' : quote?.skinId === 'agarstake' ? 'AGAR' : 'Rainbow')} unlocked successfully.`,
             });
         } catch (error) {
             setNotice({ type: 'error', message: error.message });
@@ -296,7 +296,7 @@ export default function Shop() {
                         { id: 'flags:bundle', gameMode: 'all', skinId: 'flags', name: 'Flag Pack', usdPrice: 1 },
                         { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
                         { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
-                        { id: AGARSTAKE_SKIN_PRODUCT_ID, gameMode: 'slither', skinId: 'agarstake', name: 'AgarStake Charm', usdPrice: 1 },
+                        { id: AGARSTAKE_SKIN_PRODUCT_ID, gameMode: 'slither', skinId: 'agarstake', name: 'AGAR', usdPrice: 1 },
                         ...SLITHER_SPECIAL_SKINS.map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
                     ]).map((product) => {
                         const owned = ownedProducts.has(product.id);
@@ -335,7 +335,7 @@ export default function Shop() {
                                     <p>{product.skinId === 'flags'
                                         ? 'One pack with popular country flags for both Agar and Slither.'
                                         : product.skinId === 'agarstake'
-                                            ? 'A black and purple AgarStake snake with a hanging crypto-logo charm.'
+                                            ? 'A black and purple AGAR snake with a hanging crypto-logo charm.'
                                             : specialSkin
                                                 ? specialSkin.description
                                                 : 'A luminous animated spectrum made for ' + (product.gameMode === 'agar' ? 'Agar' : 'Slither') + '.'}</p>
@@ -434,7 +434,7 @@ export default function Shop() {
                                 quote.skinId === 'flags'
                                     ? 'Agar + Slither Flag Pack'
                                     : quote.skinId === 'agarstake'
-                                        ? 'Slither AgarStake Charm'
+                                        ? 'AGAR'
                                         : (quote.gameMode === 'agar' ? 'Agar' : 'Slither') + ' Rainbow'
                             )}
                         </h2>

@@ -2129,7 +2129,7 @@ export default function PreGame() {
                         const flag = getFlagSkin(flagCode);
                         return `${flag.emoji} ${flag.name}`;
                     }
-                    if (color === AGARSTAKE_SKIN_VALUE) return 'AgarStake Charm';
+                    if (color === AGARSTAKE_SKIN_VALUE) return 'AGAR';
                     const specialNameSkin = getSlitherSpecialSkin(color);
                     if (specialNameSkin) return specialNameSkin.name;
                     if (color === 'random_color') return 'Random';
@@ -2353,7 +2353,7 @@ export default function PreGame() {
                                                 <div className="skin-card-icon agarstake-charm-icon">
                                                     <img src="/agarstake-charm.png" alt="" />
                                                 </div>
-                                                <span>AgarStake</span>
+                                                <span>AGAR</span>
                                             </button>
                                         )}
                                         {customizerTab === 'slither' && SLITHER_SPECIAL_SKINS.filter((skin) => ownedSpecialSkinIds.has(skin.id)).map((skin) => (

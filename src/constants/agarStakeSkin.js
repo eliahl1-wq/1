@@ -13,6 +13,7 @@ export function getAgarStakePatternIndex(segmentIndex) {
 }
 
 let charmImage = null;
+const AGARSTAKE_ROPE_JOINTS = 8;
 
 export function getAgarStakeCharmImage() {
     if (charmImage || typeof Image === 'undefined') return charmImage;
@@ -29,7 +30,7 @@ function createRopePoint() {
 export function createAgarStakeCharmState() {
     return {
         initialized: false,
-        points: Array.from({ length: 4 }, createRopePoint),
+        points: Array.from({ length: AGARSTAKE_ROPE_JOINTS }, createRopePoint),
         anchorX: 0,
         anchorY: 0,
         lastTime: 0,
@@ -38,8 +39,8 @@ export function createAgarStakeCharmState() {
 }
 
 function resetCharmState(state, anchorX, anchorY, backwardX, backwardY, radius, segmentLength, now) {
-    if (!Array.isArray(state.points) || state.points.length !== 4) {
-        state.points = Array.from({ length: 4 }, createRopePoint);
+    if (!Array.isArray(state.points) || state.points.length !== AGARSTAKE_ROPE_JOINTS) {
+        state.points = Array.from({ length: AGARSTAKE_ROPE_JOINTS }, createRopePoint);
     }
     for (let index = 0; index < state.points.length; index += 1) {
         const point = state.points[index];
@@ -57,7 +58,7 @@ function resetCharmState(state, anchorX, anchorY, backwardX, backwardY, radius, 
 }
 
 function constrainRope(points, anchorX, anchorY, segmentLength) {
-    for (let iteration = 0; iteration < 7; iteration += 1) {
+    for (let iteration = 0; iteration < 12; iteration += 1) {
         for (let index = 0; index < points.length; index += 1) {
             const point = points[index];
             const previous = index === 0 ? null : points[index - 1];
@@ -168,7 +169,7 @@ export function drawAgarStakeCharm(
     const anchorX = headX - forwardX * radius * 0.18;
     const anchorY = headY - forwardY * radius * 0.18;
     const ropeLength = radius * 3.05;
-    const segmentLength = ropeLength / 4;
+    const segmentLength = ropeLength / AGARSTAKE_ROPE_JOINTS;
     const charmRadius = Math.max(5, radius * 0.72);
     const state = physicsState || createAgarStakeCharmState();
     const timestamp = Number.isFinite(now) && now > 0 ? now : phase * 1000;
