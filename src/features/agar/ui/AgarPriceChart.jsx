@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { API_URL } from '../../../utils/apiBase';
 
 const RANGES = ['1H', '6H', '24H', '7D'];
-const WIDTH = 700;
-const HEIGHT = 250;
 const PAD_X = 12;
 const PAD_Y = 24;
 
@@ -14,7 +12,7 @@ function formatPrice(value) {
     return `$${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 }
 
-function buildGeometry(points) {
+function buildGeometry(points, width, height) {
     if (points.length < 2) return null;
     const values = points.map((point) => point.close);
     let min = Math.min(...values);
@@ -24,19 +22,21 @@ function buildGeometry(points) {
         min -= spread;
         max += spread;
     }
-    const innerWidth = WIDTH - PAD_X * 2;
-    const innerHeight = HEIGHT - PAD_Y * 2;
+    const innerWidth = width - PAD_X * 2;
+    const innerHeight = height - PAD_Y * 2;
     const coordinates = points.map((point, index) => ({
         ...point,
         x: PAD_X + (index / (points.length - 1)) * innerWidth,
         y: PAD_Y + ((max - point.close) / (max - min)) * innerHeight,
     }));
     const line = coordinates.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ');
-    const area = `${PAD_X},${HEIGHT - PAD_Y} ${line} ${WIDTH - PAD_X},${HEIGHT - PAD_Y}`;
+    const area = `${PAD_X},${height - PAD_Y} ${line} ${width - PAD_X},${height - PAD_Y}`;
     return { min, max, coordinates, line, area };
 }
 
 export default function AgarPriceChart({ launchReady }) {
+    const canvasRef = useRef(null);
+    const [size, setSize] = useState({ width: 700, height: 292 });
     const [range, setRange] = useState('24H');
     const [points, setPoints] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -75,7 +75,28 @@ export default function AgarPriceChart({ launchReady }) {
         };
     }, [launchReady, range]);
 
-    const geometry = useMemo(() => buildGeometry(points), [points]);
+    useEffect(() => {
+        const element = canvasRef.current;
+        if (!element) return undefined;
+        const updateSize = () => {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                setSize({
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height),
+                });
+            }
+        };
+        updateSize();
+        const observer = new ResizeObserver(updateSize);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
+
+    const geometry = useMemo(
+        () => buildGeometry(points, size.width, size.height),
+        [points, size.height, size.width],
+    );
     const activePoint = geometry?.coordinates[hoveredIndex ?? geometry.coordinates.length - 1] || null;
     const firstPrice = points[0]?.close;
     const lastPrice = points.at(-1)?.close;
@@ -115,7 +136,7 @@ export default function AgarPriceChart({ launchReady }) {
                 </nav>
             </div>
 
-            <div className="agar-price-chart__canvas">
+            <div className="agar-price-chart__canvas" ref={canvasRef}>
                 {!launchReady ? (
                     <div className="agar-price-chart__state"><strong>Coming Soon</strong><span>AGAR / USD</span></div>
                 ) : loading && !geometry ? (
@@ -126,8 +147,8 @@ export default function AgarPriceChart({ launchReady }) {
                     <div className="agar-price-chart__state"><strong>Waiting for trades</strong><span>Price history will appear here.</span></div>
                 ) : (
                     <svg
-                        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-                        preserveAspectRatio="none"
+                        viewBox={`0 0 ${size.width} ${size.height}`}
+
                         role="img"
                         aria-label={`AGAR ${range} price chart`}
                         onPointerMove={handlePointer}
@@ -144,14 +165,14 @@ export default function AgarPriceChart({ launchReady }) {
                             </linearGradient>
                         </defs>
                         <g className="agar-price-chart__grid">
-                            {[0.2, 0.4, 0.6, 0.8].map((ratio) => <line key={`h${ratio}`} x1="0" x2={WIDTH} y1={HEIGHT * ratio} y2={HEIGHT * ratio} />)}
-                            {[0.2, 0.4, 0.6, 0.8].map((ratio) => <line key={`v${ratio}`} y1="0" y2={HEIGHT} x1={WIDTH * ratio} x2={WIDTH * ratio} />)}
+                            {[0.2, 0.4, 0.6, 0.8].map((ratio) => <line key={`h${ratio}`} x1="0" x2={size.width} y1={size.height * ratio} y2={size.height * ratio} />)}
+                            {[0.2, 0.4, 0.6, 0.8].map((ratio) => <line key={`v${ratio}`} y1="0" y2={size.height} x1={size.width * ratio} x2={size.width * ratio} />)}
                         </g>
                         <polygon points={geometry.area} fill="url(#agar-chart-fill)" />
                         <polyline points={geometry.line} fill="none" stroke="url(#agar-chart-line)" strokeWidth="3" vectorEffect="non-scaling-stroke" />
                         {activePoint && hoveredIndex !== null && (
                             <g className="agar-price-chart__cursor">
-                                <line x1={activePoint.x} x2={activePoint.x} y1="0" y2={HEIGHT} />
+                                <line x1={activePoint.x} x2={activePoint.x} y1="0" y2={size.height} />
                                 <circle cx={activePoint.x} cy={activePoint.y} r="5" />
                             </g>
                         )}
