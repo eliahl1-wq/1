@@ -59,22 +59,56 @@ function colorAt(palette, amount) {
     return `rgb(${channel(0)}, ${channel(2)}, ${channel(4)})`;
 }
 
-function strokeBodyGradient(ctx, points, palette, width, alpha) {
+function measureBodyPath(points) {
+    const distances = new Float32Array(points.length);
+    for (let i = 1; i < points.length; i++) {
+        distances[i] = distances[i - 1] + Math.hypot(
+            points[i].x - points[i - 1].x,
+            points[i].y - points[i - 1].y,
+        );
+    }
+    return { distances, total: distances[distances.length - 1] };
+}
+
+function sampleBodyPath(points, metrics, distance) {
+    const target = Math.max(0, Math.min(metrics.total, distance));
+    let low = 1;
+    let high = points.length - 1;
+    while (low < high) {
+        const middle = (low + high) >> 1;
+        if (metrics.distances[middle] < target) low = middle + 1;
+        else high = middle;
+    }
+    const tailIndex = low;
+    const headIndex = Math.max(0, tailIndex - 1);
+    const span = Math.max(0.0001, metrics.distances[tailIndex] - metrics.distances[headIndex]);
+    const mix = (target - metrics.distances[headIndex]) / span;
+    const head = points[headIndex];
+    const tail = points[tailIndex];
+    return {
+        x: head.x + (tail.x - head.x) * mix,
+        y: head.y + (tail.y - head.y) * mix,
+        angle: Math.atan2(head.y - tail.y, head.x - tail.x),
+    };
+}
+function strokeBodyGradient(ctx, points, metrics, palette, width, alpha) {
     const tailIndex = points.length - 1;
-    if (tailIndex < 1) return;
-    const chunkSize = Math.max(7, Math.ceil(tailIndex / 18));
+    if (tailIndex < 1 || metrics.total <= 0) return;
+    const chunkLength = Math.max(width * 4.5, metrics.total / 22);
     ctx.lineWidth = width;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalAlpha = alpha;
 
     for (let tail = tailIndex; tail > 0;) {
-        const head = Math.max(0, tail - chunkSize);
+        const targetDistance = Math.max(0, metrics.distances[tail] - chunkLength);
+        let head = tail - 1;
+        while (head > 0 && metrics.distances[head] > targetDistance) head--;
         const from = points[tail];
         const to = points[head];
         const gradient = ctx.createLinearGradient(from.x, from.y, to.x, to.y);
-        gradient.addColorStop(0, colorAt(palette, tail / tailIndex));
-        gradient.addColorStop(1, colorAt(palette, head / tailIndex));
+        gradient.addColorStop(0, colorAt(palette, metrics.distances[tail] / metrics.total));
+        gradient.addColorStop(1, colorAt(palette, metrics.distances[head] / metrics.total));
         ctx.strokeStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(from.x, from.y);
@@ -83,67 +117,68 @@ function strokeBodyGradient(ctx, points, palette, width, alpha) {
         tail = head;
     }
 }
-
 export function drawSlitherSpecialBody(ctx, skinId, points, radius, phase = 0, boosting = false) {
     const skin = getSlitherSpecialSkin(skinId);
     if (!ctx || !skin || !Array.isArray(points) || points.length < 3 || radius <= 0) return;
     const pulse = 0.88 + Math.sin(phase * 0.72) * 0.12;
+    const metrics = measureBodyPath(points);
 
     ctx.save();
     if (skin.id === 'aurora') {
         ctx.globalCompositeOperation = 'lighter';
         ctx.shadowColor = '#49ffe4';
         ctx.shadowBlur = radius * (boosting ? 2.2 : 1.55);
-        strokeBodyGradient(ctx, points, skin.bodyGradient, radius * 2.34, 0.24 * pulse);
+        strokeBodyGradient(ctx, points, metrics, skin.bodyGradient, radius * 2.34, 0.24 * pulse);
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.shadowBlur = 0;
-        strokeBodyGradient(ctx, points, skin.bodyGradient, radius * 1.86, 0.97);
+        strokeBodyGradient(ctx, points, metrics, skin.bodyGradient, radius * 1.86, 0.97);
 
         ctx.globalCompositeOperation = 'lighter';
         ctx.shadowColor = '#d9fff7';
         ctx.shadowBlur = radius * 0.9;
-        strokeBodyGradient(ctx, points, skin.coreGradient, radius * 0.38, 0.72 * pulse);
+        strokeBodyGradient(ctx, points, metrics, skin.coreGradient, radius * 0.38, 0.72 * pulse);
         ctx.shadowBlur = 0;
-        strokeBodyGradient(ctx, points, ['#ffffff', '#aaffed', '#eadcff'], radius * 0.09, 0.7);
+        strokeBodyGradient(ctx, points, metrics, ['#ffffff', '#aaffed', '#eadcff'], radius * 0.09, 0.7);
     } else if (skin.id === 'eclipse') {
         ctx.globalCompositeOperation = 'lighter';
         ctx.shadowColor = '#ff572f';
         ctx.shadowBlur = radius * (boosting ? 2.35 : 1.45);
-        strokeBodyGradient(ctx, points, ['#401122', '#ff4a34', '#ffb34f', '#551126'], radius * 2.25, 0.2 * pulse);
+        strokeBodyGradient(ctx, points, metrics, ['#401122', '#ff4a34', '#ffb34f', '#551126'], radius * 2.25, 0.2 * pulse);
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.shadowBlur = 0;
-        strokeBodyGradient(ctx, points, skin.bodyGradient, radius * 1.92, 1);
+        strokeBodyGradient(ctx, points, metrics, skin.bodyGradient, radius * 1.92, 1);
 
         ctx.globalCompositeOperation = 'lighter';
         ctx.shadowColor = '#ff6a35';
         ctx.shadowBlur = radius * 1.05;
-        strokeBodyGradient(ctx, points, skin.coreGradient, radius * 0.44, 0.93 * pulse);
+        strokeBodyGradient(ctx, points, metrics, skin.coreGradient, radius * 0.44, 0.93 * pulse);
         ctx.shadowColor = '#fff0b0';
         ctx.shadowBlur = radius * 0.45;
-        strokeBodyGradient(ctx, points, ['#ff7440', '#fff3b8', '#ff8c37'], radius * 0.12, 0.84);
+        strokeBodyGradient(ctx, points, metrics, ['#ff7440', '#fff3b8', '#ff8c37'], radius * 0.12, 0.84);
     }
     ctx.restore();
 }
 
 export function drawSlitherSpecialDetails(ctx, skinId, points, radius, phase = 0) {
     if (!ctx || !Array.isArray(points) || points.length < 3 || radius <= 0) return;
+    const metrics = measureBodyPath(points);
+    if (metrics.total <= radius * 2) return;
+
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
 
     if (skinId === 'aurora') {
-        const step = Math.max(7, Math.ceil(points.length / 24));
+        const spacing = radius * 4.8;
         let marker = 0;
-        for (let i = 4; i < points.length - 1; i += step, marker++) {
-            const point = points[i];
-            const next = points[Math.min(points.length - 1, i + 1)];
-            const angle = Math.atan2(point.y - next.y, point.x - next.x);
+        for (let distance = radius * 2.8; distance < metrics.total - radius * 1.5 && marker < 36; distance += spacing, marker++) {
+            const point = sampleBodyPath(points, metrics, distance);
             const side = marker % 2 === 0 ? 1 : -1;
             const drift = Math.sin(phase * 0.8 + marker * 1.9) * radius * 0.14;
-            const x = point.x + Math.sin(angle) * radius * (0.58 * side) + Math.cos(angle) * drift;
-            const y = point.y - Math.cos(angle) * radius * (0.58 * side) + Math.sin(angle) * drift;
+            const x = point.x + Math.sin(point.angle) * radius * (0.58 * side) + Math.cos(point.angle) * drift;
+            const y = point.y - Math.cos(point.angle) * radius * (0.58 * side) + Math.sin(point.angle) * drift;
             const twinkle = 0.7 + Math.sin(phase + marker * 1.7) * 0.25;
             const starRadius = Math.max(1.1, radius * (marker % 3 === 0 ? 0.15 : 0.09));
 
@@ -167,17 +202,16 @@ export function drawSlitherSpecialDetails(ctx, skinId, points, radius, phase = 0
             ctx.stroke();
         }
     } else if (skinId === 'eclipse') {
-        const step = Math.max(12, Math.ceil(points.length / 16));
-        for (let i = 6; i < points.length - 1; i += step) {
-            const point = points[i];
-            const next = points[Math.min(points.length - 1, i + 1)];
-            const angle = Math.atan2(point.y - next.y, point.x - next.x);
-            const pulse = 0.76 + Math.sin(phase * 0.75 + i * 0.35) * 0.2;
+        const spacing = radius * 5.8;
+        let marker = 0;
+        for (let distance = radius * 3.2; distance < metrics.total - radius * 1.8 && marker < 28; distance += spacing, marker++) {
+            const point = sampleBodyPath(points, metrics, distance);
+            const pulse = 0.76 + Math.sin(phase * 0.75 + marker * 1.2) * 0.2;
             const sigilRadius = Math.max(2.5, radius * 0.5);
 
             ctx.save();
             ctx.translate(point.x, point.y);
-            ctx.rotate(angle + Math.PI * 0.5);
+            ctx.rotate(point.angle + Math.PI * 0.5);
             ctx.globalAlpha = pulse;
             ctx.shadowColor = '#ff7b3d';
             ctx.shadowBlur = radius * 0.72;
