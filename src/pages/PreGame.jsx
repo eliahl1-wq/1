@@ -114,6 +114,7 @@ const getChromaName = (color) => {
         const flag = getFlagSkin(flagCode);
         return `${flag.emoji} ${flag.name}`;
     }
+    if (color === AGARSTAKE_SKIN_VALUE) return 'AGAR';
     if (color === 'random') return 'Rainbow';
     switch (color) {
         case '#c080ff': return 'Lavender Purple';

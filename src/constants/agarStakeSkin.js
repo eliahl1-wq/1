@@ -35,6 +35,8 @@ export function createAgarStakeCharmState() {
         anchorY: 0,
         lastTime: 0,
         radius: 0,
+        backwardX: -1,
+        backwardY: 0,
     };
 }
 
@@ -55,10 +57,12 @@ function resetCharmState(state, anchorX, anchorY, backwardX, backwardY, radius, 
     state.anchorY = anchorY;
     state.lastTime = now;
     state.radius = radius;
+    state.backwardX = backwardX;
+    state.backwardY = backwardY;
 }
 
 function constrainRope(points, anchorX, anchorY, segmentLength) {
-    for (let iteration = 0; iteration < 12; iteration += 1) {
+    for (let iteration = 0; iteration < 8; iteration += 1) {
         for (let index = 0; index < points.length; index += 1) {
             const point = points[index];
             const previous = index === 0 ? null : points[index - 1];
@@ -96,17 +100,21 @@ function updateCharmState(state, anchorX, anchorY, backwardX, backwardY, radius,
     }
 
     const frameScale = Math.max(0.45, Math.min(1.8, (now - state.lastTime) / 16.667 || 1));
-    const damping = Math.pow(0.9, frameScale);
-    const straightening = 1 - Math.pow(0.968, frameScale);
+    const damping = Math.pow(0.955, frameScale);
+    const straightening = 1 - Math.pow(0.9915, frameScale);
+    const followTranslation = 0.76;
+    const turn = Math.max(-0.28, Math.min(0.28, state.backwardX * backwardY - state.backwardY * backwardX));
+    const lateralX = -backwardY;
+    const lateralY = backwardX;
 
     for (let index = 0; index < state.points.length; index += 1) {
         const point = state.points[index];
 
         // Compensate for camera/body translation while retaining turn inertia.
-        point.x += anchorDeltaX;
-        point.y += anchorDeltaY;
-        point.previousX += anchorDeltaX;
-        point.previousY += anchorDeltaY;
+        point.x += anchorDeltaX * followTranslation;
+        point.y += anchorDeltaY * followTranslation;
+        point.previousX += anchorDeltaX * followTranslation;
+        point.previousY += anchorDeltaY * followTranslation;
 
         const velocityX = (point.x - point.previousX) * damping;
         const velocityY = (point.y - point.previousY) * damping;
@@ -115,10 +123,11 @@ function updateCharmState(state, anchorX, anchorY, backwardX, backwardY, radius,
         const restingDistance = segmentLength * (index + 1);
         const restingX = anchorX + backwardX * restingDistance;
         const restingY = anchorY + backwardY * restingDistance;
-        const pointSpring = straightening * (0.42 + index * 0.12);
+        const pointSpring = straightening * (0.2 + index * 0.045);
+        const turnImpulse = turn * radius * (index + 1) * 0.085;
 
-        point.x += velocityX + (restingX - point.x) * pointSpring;
-        point.y += velocityY + (restingY - point.y) * pointSpring;
+        point.x += velocityX + (restingX - point.x) * pointSpring + lateralX * turnImpulse;
+        point.y += velocityY + (restingY - point.y) * pointSpring + lateralY * turnImpulse;
         point.previousX = currentX;
         point.previousY = currentY;
     }
@@ -128,6 +137,8 @@ function updateCharmState(state, anchorX, anchorY, backwardX, backwardY, radius,
     state.anchorY = anchorY;
     state.lastTime = now;
     state.radius = radius;
+    state.backwardX = backwardX;
+    state.backwardY = backwardY;
 }
 
 function traceRope(ctx, anchorX, anchorY, points) {
@@ -168,7 +179,7 @@ export function drawAgarStakeCharm(
     const backwardY = -forwardY;
     const anchorX = headX - forwardX * radius * 0.18;
     const anchorY = headY - forwardY * radius * 0.18;
-    const ropeLength = radius * 3.05;
+    const ropeLength = radius * 3.75;
     const segmentLength = ropeLength / AGARSTAKE_ROPE_JOINTS;
     const charmRadius = Math.max(5, radius * 0.72);
     const state = physicsState || createAgarStakeCharmState();

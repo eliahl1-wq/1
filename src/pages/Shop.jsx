@@ -20,6 +20,11 @@ function authHeaders(token, json = false) {
     };
 }
 
+function getProductDisplayName(product) {
+    if (product?.skinId === 'agarstake' || product?.id === AGARSTAKE_SKIN_PRODUCT_ID) return 'AGAR';
+    return product?.name || 'Skin';
+}
+
 function RainbowPreview({ mode, nickname }) {
     return (
         <div className={`shop-rainbow-preview shop-rainbow-preview--${mode}`} aria-hidden="true">
@@ -329,7 +334,7 @@ export default function Shop() {
                                             : <RainbowPreview mode={product.gameMode} nickname={user?.username} />}
                                 <div className="shop-product-copy">
                                     <div className="shop-product-heading">
-                                        <h2>{product.name}</h2>
+                                        <h2>{getProductDisplayName(product)}</h2>
                                         <span>{product.skinId === 'flags' ? 'BUNDLE' : 'SKIN'}</span>
                                     </div>
                                     <p>{product.skinId === 'flags'
