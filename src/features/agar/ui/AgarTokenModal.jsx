@@ -34,7 +34,7 @@ function formatMetric(key, value, launchReady, comingSoon) {
 
 function shortAddress(address) {
     if (!address) return 'Not available';
-    return `${address.slice(0, 5)}…${address.slice(-5)}`;
+    return `${address.slice(0, 5)}â€¦${address.slice(-5)}`;
 }
 
 function ExternalLink({ href, children }) {
@@ -66,9 +66,14 @@ export default function AgarTokenModal({
     accountSolBalance,
     accountSolPrice,
     authToken,
+    refreshAgarBalance,
+    refreshAccountBalance,
     config = AGAR,
 }) {
     const [notice, setNotice] = useState('');
+    const [noticeType, setNoticeType] = useState('');
+    const [transactionSignature, setTransactionSignature] = useState('');
+    const [submitting, setSubmitting] = useState(false);
     const [tradeSide, setTradeSide] = useState(initialAction === 'SELL' ? 'SELL' : 'BUY');
     const [tradeAmount, setTradeAmount] = useState('');
     const launchReady = isAgarLaunchReady(config);
@@ -91,49 +96,76 @@ export default function AgarTokenModal({
         setTradeSide(initialAction === 'SELL' ? 'SELL' : 'BUY');
         setTradeAmount('');
         setNotice(initialAction && !launchReady ? config.messages.notLaunched : '');
+        setNoticeType(initialAction && !launchReady ? 'error' : '');
+        setTransactionSignature('');
+        setSubmitting(false);
     }, [config.messages.notLaunched, initialAction, launchReady, open]);
 
     if (!open) return null;
 
     const handleTrade = async (side) => {
+        if (submitting) return;
         if (!launchReady) {
             setNotice(config.messages.notLaunched);
+            setNoticeType('error');
             return;
         }
         if (!accountAddress || !authToken) {
             setNotice('Your AgarStake account wallet is not available.');
+            setNoticeType('error');
             return;
         }
         const parsedAmount = Number(tradeAmount);
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
             setNotice(`Enter a valid ${side === 'BUY' ? 'SOL' : config.symbol} amount.`);
+            setNoticeType('error');
             return;
         }
         try {
-            setNotice(`Preparing ${side.toLowerCase()}…`);
-            await executeAgarSwap({
+            setSubmitting(true);
+            setTransactionSignature('');
+            setNoticeType('');
+            setNotice(`Preparing ${side.toLowerCase()}â€¦`);
+            const result = await executeAgarSwap({
                 side,
                 amount: parsedAmount,
                 accountAddress,
                 authToken,
                 config,
             });
-            setNotice('Swap submitted.');
+            if (!result?.success || !result?.signature) {
+                throw new Error('The swap could not be confirmed.');
+            }
+            setTradeAmount('');
+            setTransactionSignature(result.signature);
+            setNotice('Swap confirmed on Solana.');
+            setNoticeType('success');
+            await Promise.allSettled([
+                refreshAgarBalance?.(),
+                refreshAccountBalance?.(),
+            ]);
         } catch (error) {
+            setTransactionSignature('');
             setNotice(error.message || 'AGAR swaps are unavailable.');
+            setNoticeType('error');
+        } finally {
+            setSubmitting(false);
         }
     };
 
     const copyContract = async () => {
         if (!launchReady) {
             setNotice(config.messages.notLaunched);
+            setNoticeType('error');
             return;
         }
         try {
             await navigator.clipboard.writeText(config.mint);
             setNotice('Contract address copied.');
+            setNoticeType('success');
         } catch {
             setNotice('Could not copy the contract address.');
+            setNoticeType('error');
         }
     };
 
@@ -187,7 +219,7 @@ export default function AgarTokenModal({
                     <div className="agar-modal__chart">
                         <div className="agar-modal__chart-topline">
                             <span>Chart</span>
-                            <span>{launchReady && marketLoading ? 'Loading…' : launchReady ? 'Live' : config.messages.comingSoon}</span>
+                            <span>{launchReady && marketLoading ? 'Loadingâ€¦' : launchReady ? 'Live' : config.messages.comingSoon}</span>
                         </div>
                         <AgarPriceChart launchReady={launchReady} />
                     </div>
@@ -209,7 +241,7 @@ export default function AgarTokenModal({
                             <span>{config.symbol} Balance</span>
                             <strong>
                                 {balanceLoading
-                                    ? `… ${config.symbol}`
+                                    ? `â€¦ ${config.symbol}`
                                     : `${walletBalance.toLocaleString('en-US', { maximumFractionDigits: config.decimals })} ${config.symbol}`}
                             </strong>
                         </div>
@@ -223,14 +255,24 @@ export default function AgarTokenModal({
                             <button
                                 type="button"
                                 className={tradeSide === 'BUY' ? 'active' : ''}
-                                onClick={() => { setTradeSide('BUY'); setNotice(''); }}
+                                onClick={() => {
+                                    setTradeSide('BUY');
+                                    setNotice('');
+                                    setNoticeType('');
+                                    setTransactionSignature('');
+                                }}
                             >
                                 Buy
                             </button>
                             <button
                                 type="button"
                                 className={tradeSide === 'SELL' ? 'active' : ''}
-                                onClick={() => { setTradeSide('SELL'); setNotice(''); }}
+                                onClick={() => {
+                                    setTradeSide('SELL');
+                                    setNotice('');
+                                    setNoticeType('');
+                                    setTransactionSignature('');
+                                }}
                             >
                                 Sell
                             </button>
@@ -267,16 +309,31 @@ export default function AgarTokenModal({
                             type="button"
                             className={`agar-modal__trade ${tradeSide === 'BUY' ? 'agar-modal__trade--buy' : 'agar-modal__trade--sell'}`}
                             onClick={() => handleTrade(tradeSide)}
+                            disabled={submitting}
                         >
-                            {tradeSide === 'BUY' ? `Buy ${config.symbol}` : `Sell ${config.symbol}`}
+                            {submitting
+                                ? 'Confirmingâ€¦'
+                                : tradeSide === 'BUY'
+                                    ? `Buy ${config.symbol}`
+                                    : `Sell ${config.symbol}`}
                         </button>
 
                         <div
-                            className={`agar-modal__notice ${notice ? '' : 'is-empty'}`}
+                            className={`agar-modal__notice ${notice ? '' : 'is-empty'} ${noticeType ? `is-${noticeType}` : ''}`}
                             role="status"
                             aria-live="polite"
                         >
-                            {notice || '\u00a0'}
+                            <span>{notice || '\u00a0'}</span>
+                            {transactionSignature && (
+                                <a
+                                    className="agar-modal__tx-link"
+                                    href={`https://solscan.io/tx/${transactionSignature}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    View transaction
+                                </a>
+                            )}
                         </div>
                     </aside>
 
@@ -302,7 +359,7 @@ export default function AgarTokenModal({
                     {!launchReady && (
                         <div className="agar-modal__launch-note">
                             <span className="agar-modal__launch-dot" />
-                            Contract not configured · All AGAR features remain disabled
+                            Contract not configured Â· All AGAR features remain disabled
                         </div>
                     )}
                 </div>
