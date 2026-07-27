@@ -6,6 +6,7 @@ import AgarLogo from '../features/agar/ui/AgarLogo';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 import { flagSkinValue, DEFAULT_FLAG_CODE } from '../constants/flagSkins';
 import { AGARSTAKE_SKIN_PRODUCT_ID, AGARSTAKE_SKIN_VALUE } from '../constants/agarStakeSkin';
 import { SLITHER_SPECIAL_SKINS, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
@@ -259,7 +260,7 @@ export default function Shop() {
                         </div>
                         <div className="shop-balance-copy">
                             <span>YOUR AGAR BALANCE</span>
-                            <strong className="mono">{balanceLoading ? '...' : walletBalance.toLocaleString('en-US', { maximumFractionDigits: 6 })}</strong>
+                            <strong className="mono">{balanceLoading ? '...' : formatAgarAmount(walletBalance)}</strong>
                             <small>Available to spend</small>
                         </div>
                         <button

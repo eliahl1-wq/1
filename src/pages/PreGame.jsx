@@ -32,6 +32,7 @@ import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetail
 import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
+import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
 
@@ -1060,7 +1061,7 @@ export default function PreGame() {
                                 <strong className="mono">
                                     {agarBalanceLoading
                                         ? '…'
-                                        : agarBalance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
+                                        : formatAgarAmount(agarBalance)}
                                 </strong>
                                 <span className="agar-nav-balance__add" aria-hidden="true">+</span>
                             </button>

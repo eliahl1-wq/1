@@ -7,6 +7,7 @@ import {
 import { executeAgarSwap } from '../swap/agarSwap';
 import AgarLogo from './AgarLogo';
 import AgarPriceChart from './AgarPriceChart';
+import { formatAgarAmount } from '../formatAgarAmount';
 
 const DETAIL_METRICS = [
     ['Price', 'price'],
@@ -242,7 +243,7 @@ export default function AgarTokenModal({
                             <strong>
                                 {balanceLoading
                                     ? `… ${config.symbol}`
-                                    : `${walletBalance.toLocaleString('en-US', { maximumFractionDigits: config.decimals })} ${config.symbol}`}
+                                    : `${formatAgarAmount(walletBalance)} ${config.symbol}`}
                             </strong>
                         </div>
                         <div className="agar-modal__wallet-row">

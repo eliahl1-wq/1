@@ -1,6 +1,7 @@
 import React from 'react';
 import { AGAR, isAgarLaunchReady } from '../config/agarConfig';
 import AgarLogo from './AgarLogo';
+import { formatAgarAmount } from '../formatAgarAmount';
 
 const CARD_METRICS = [
     ['Price', 'price'],
@@ -77,7 +78,7 @@ export default function AgarTokenCard({
                         <strong>
                             {balanceLoading
                                 ? '…'
-                                : walletBalance.toLocaleString('en-US', { maximumFractionDigits: config.decimals })}
+                                : formatAgarAmount(walletBalance)}
                             {' '}{config.symbol}
                         </strong>
                     </span>

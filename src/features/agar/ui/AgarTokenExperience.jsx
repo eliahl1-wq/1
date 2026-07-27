@@ -48,10 +48,13 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
     }), [config, publicConfig]);
     const market = useAgarMarketData(runtimeConfig);
     const wallet = useAgarBalance(runtimeConfig, user?.depositAddress || '', token);
+<<<<<<< HEAD
     const refreshAccountBalance = useCallback(
         () => refreshUser({ forceBalance: true }),
         [refreshUser],
     );
+=======
+>>>>>>> f6d3102 (f)
 
     const openAgarModal = useCallback(({ action = '' } = {}) => {
         setInitialAction(action);
