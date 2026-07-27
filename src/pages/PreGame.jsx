@@ -35,7 +35,7 @@ import AgarLogo from '../features/agar/ui/AgarLogo';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
 
-/* â”€â”€ Solana logo icon â”€â”€ */
+/* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
     <img
         src="/solana-sol-logo.png"
@@ -84,7 +84,7 @@ const WalletIcon = ({ size = 14, style }) => (
     </svg>
 );
 
-/* â”€â”€ Currency toggle options â”€â”€ */
+/* ── Currency toggle options ── */
 const CUR_OPTIONS = [
     { label: 'USD', value: 'USD' },
     { label: 'SOL', value: 'SOL' },
@@ -142,7 +142,7 @@ export default function PreGame() {
         balanceLoading: agarBalanceLoading,
     } = useAgarToken();
 
-    // â”€â”€ Tournament States â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Tournament States ───────────────────────────────
     const { tournamentId } = useParams();
     const [tournament, setTournament] = useState(null);
     const [tournamentLoading, setTournamentLoading] = useState(true);
@@ -188,7 +188,7 @@ export default function PreGame() {
         clearAllPendingResults();
     }, []);
 
-    // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── State ──────────────────────────────────────────
     const modeCardRef = useRef(null);
     const mainCardRef = useRef(null);
     const [leaderboardHeight, setLeaderboardHeight] = useState('auto');
@@ -497,7 +497,7 @@ export default function PreGame() {
     const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
     const canJoin = selectedEntryFee !== null && (freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
 
-    // â”€â”€ Format helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
         const n = Number(v || 0);
         if (!isFinite(n)) return '0';
@@ -510,11 +510,11 @@ export default function PreGame() {
 
     const shortAddr = (addr, chars = 5) =>
         addr && addr.length > chars * 2 + 3
-            ? `${addr.slice(0, chars)}â€¦${addr.slice(-chars)}`
+            ? `${addr.slice(0, chars)}…${addr.slice(-chars)}`
             : addr;
 
-    const statusClass = statusMsg.startsWith('âœ…') || statusMsg.includes('copied')
-        ? 'success' : statusMsg.startsWith('âŒ') ? 'error' : 'info';
+    const statusClass = statusMsg.startsWith('✅') || statusMsg.includes('copied')
+        ? 'success' : statusMsg.startsWith('❌') ? 'error' : 'info';
 
     const handleLeaderboardScroll = useCallback(() => {
         const el = leaderboardListRef.current;
@@ -526,7 +526,7 @@ export default function PreGame() {
         }, 700);
     }, []);
 
-    // â”€â”€ Effects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Effects ────────────────────────────────────────
     useEffect(() => {
         if (location.pathname === '/agar') {
             setPageSeo(SEO.agar);
@@ -619,7 +619,7 @@ export default function PreGame() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [handleClickOutside]);
 
-    // Live stats poll â€” gamemode counts + site presence
+    // Live stats poll — gamemode counts + site presence
     useEffect(() => {
         let alive = true;
         const fetchStats = async () => {
@@ -715,7 +715,7 @@ export default function PreGame() {
         return () => clearInterval(id);
     }, [refreshUser]);
 
-    // Game status â€” poll so rejoin button stays accurate
+    // Game status — poll so rejoin button stays accurate
     useEffect(() => {
         if (!token) {
             setIsAlreadyInGame(false);
@@ -750,7 +750,7 @@ export default function PreGame() {
                     localStorage.setItem('selected_gamemode', d.mode);
                     if (d.entryFeeUsd) localStorage.setItem('selected_entry_fee', String(d.entryFeeUsd));
                 } else if (r.ok) {
-                    // Only clear active session â€” keep selected_gamemode so lobby shows the last mode played
+                    // Only clear active session — keep selected_gamemode so lobby shows the last mode played
                     setCurrentGameMode(null);
                     setActiveGameBalance(null);
                     setActiveEntryFee(null);
@@ -773,7 +773,7 @@ export default function PreGame() {
         };
     }, [token, API_URL, user?.isAdmin]);
 
-    // â”€â”€ Drag panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Drag panel ─────────────────────────────────────
     useEffect(() => {
         if (!isDragging) return;
         const onMove = (e) => {
@@ -838,7 +838,7 @@ export default function PreGame() {
         });
     };
 
-    // â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Handlers ───────────────────────────────────────
     const handleStartMatch = () => {
         if (!isAuthenticated) { navigate('/login'); return; }
 
@@ -919,10 +919,10 @@ export default function PreGame() {
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect wallet first.'); return; }
-        if (!depositAddress) { setStatusMsg('âŒ No deposit address. Contact support.'); return; }
+        if (!depositAddress) { setStatusMsg('❌ No deposit address. Contact support.'); return; }
         const parsed = parseFloat(amount);
-        if (isNaN(parsed) || parsed <= 0) { setStatusMsg('âŒ Enter a valid amount.'); return; }
-        setStatusMsg('Waiting for wallet approvalâ€¦');
+        if (isNaN(parsed) || parsed <= 0) { setStatusMsg('❌ Enter a valid amount.'); return; }
+        setStatusMsg('Waiting for wallet approval…');
 
         const solAmt = isCurSOL ? parsed : parsed / solPrice;
         const usdAmt = isCurSOL ? parsed * solPrice : parsed;
@@ -936,10 +936,10 @@ export default function PreGame() {
             tx.recentBlockhash = blockhash;
             tx.feePayer = publicKey;
             const sig = await sendTransaction(tx, connection);
-            setStatusMsg('Confirming on-chainâ€¦');
+            setStatusMsg('Confirming on-chain…');
             const conf = await connection.confirmTransaction(sig, 'confirmed');
             if (conf.value.err) throw new Error('Transaction failed on-chain.');
-            setStatusMsg('Verifying with backendâ€¦');
+            setStatusMsg('Verifying with backend…');
             const vr = await fetch(`${API_URL}/api/deposit-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' },
@@ -955,22 +955,22 @@ export default function PreGame() {
             await refreshUser();
             setStatusMsg(verification.rewardsReview
                 ? 'Deposit confirmed. Rewards are under linked-wallet review.'
-                : `âœ… ${solAmt.toFixed(4)} SOL deposited!`);
+                : `✅ ${solAmt.toFixed(4)} SOL deposited!`);
             setAmount('');
         } catch (err) {
             const m = err.message || '';
-            if (m.includes('User rejected')) setStatusMsg('âŒ Cancelled in wallet.');
-            else if (m.toLowerCase().includes('insufficient')) setStatusMsg('âŒ Insufficient funds.');
-            else setStatusMsg('âŒ Deposit failed. Try again.');
+            if (m.includes('User rejected')) setStatusMsg('❌ Cancelled in wallet.');
+            else if (m.toLowerCase().includes('insufficient')) setStatusMsg('❌ Insufficient funds.');
+            else setStatusMsg('❌ Deposit failed. Try again.');
         }
     };
 
     const handleWithdraw = async () => {
         if (!token) return;
-        if (!withdrawAddress || !isValidWithdrawAddress) { setStatusMsg('âŒ Invalid Solana address.'); return; }
+        if (!withdrawAddress || !isValidWithdrawAddress) { setStatusMsg('❌ Invalid Solana address.'); return; }
         const parsed = parseFloat(withdrawAmount);
-        if (isNaN(parsed) || parsed < 1) { setStatusMsg('âŒ Minimum withdrawal is $1.00'); return; }
-        setStatusMsg('â³ Processing withdrawalâ€¦');
+        if (isNaN(parsed) || parsed < 1) { setStatusMsg('❌ Minimum withdrawal is $1.00'); return; }
+        setStatusMsg('⏳ Processing withdrawal…');
         try {
             const usdAmt = isCurSOL ? parsed * solPrice : parsed;
             const r = await fetch(`${API_URL}/api/withdraw`, {
@@ -981,12 +981,12 @@ export default function PreGame() {
             const d = await r.json();
             if (!r.ok) throw new Error(d.message || 'Withdrawal failed');
             await refreshUser();
-            setStatusMsg('âœ… Funds sent to your wallet!');
+            setStatusMsg('✅ Funds sent to your wallet!');
             setWithdrawAmount('');
-        } catch (e) { setStatusMsg(`âŒ ${e.message}`); }
+        } catch (e) { setStatusMsg(`❌ ${e.message}`); }
     };
 
-    // â”€â”€ Panel position â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Panel position ─────────────────────────────────
     const panelStyle = {
         position: 'absolute',
         left: panelPos.x !== null ? panelPos.x : '50%',
@@ -996,7 +996,7 @@ export default function PreGame() {
         transition: isDragging ? 'none' : undefined,
     };
 
-    // â”€â”€ Play button variant â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Play button variant ─────────────────────────────
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
         : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
             : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
@@ -1015,12 +1015,12 @@ export default function PreGame() {
         : `${modeCardTitle} ${modeSubtitle}`;
 
     const playBtnLabel = isMatchmaking
-        ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding matchâ€¦' : 'Joiningâ€¦'}</>
+        ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding match…' : 'Joining…'}</>
         : !isAuthenticated ? 'Play Now'
             : (isAlreadyInGame && canRejoinThisMode)
                 ? 'Rejoin'
                 : (isAlreadyInGame && !canRejoinThisMode)
-                    ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'surviv' ? 'Surviv' : currentGameMode === 'slither' || currentGameMode === 'competitive-slither' ? 'Slither' : 'Agar')} â€” switch mode`
+                    ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'surviv' ? 'Surviv' : currentGameMode === 'slither' || currentGameMode === 'competitive-slither' ? 'Slither' : 'Agar')} — switch mode`
                     : selectedEntryFee === null
                         ? (isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake')
                         : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
@@ -1028,11 +1028,11 @@ export default function PreGame() {
 
     const panelOpen = isWalletExpanded || isWithdrawExpanded;
 
-    // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Render ─────────────────────────────────────────
     return (
         <div className="page-shell page-shell--pregame">
             <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
-                <h1>AgarStake â€” {modeBaseName} with Real Money</h1>
+                <h1>AgarStake — {modeBaseName} with Real Money</h1>
                 <p>Play {modeBaseName}.io with real money on AgarStake. Deposit Solana, compete in the arena, and cash out crypto instantly.</p>
             </div>
             <PregameGameBackground
@@ -1059,7 +1059,7 @@ export default function PreGame() {
                                 <span className="agar-nav-balance__symbol">{AGAR.symbol}</span>
                                 <strong className="mono">
                                     {agarBalanceLoading
-                                        ? 'â€¦'
+                                        ? '…'
                                         : agarBalance.toLocaleString('en-US', { maximumFractionDigits: 4 })}
                                 </strong>
                                 <span className="agar-nav-balance__add" aria-hidden="true">+</span>
@@ -1136,8 +1136,8 @@ export default function PreGame() {
                                             </div>
                                             <div className="wallet-card-sub">
                                                 {isCurSOL
-                                                    ? `â‰ˆ $${fmt(balanceUsd)} USD`
-                                                    : `â‰ˆ ${fmt(balanceSol)} SOL`}
+                                                    ? `≈ $${fmt(balanceUsd)} USD`
+                                                    : `≈ ${fmt(balanceSol)} SOL`}
                                             </div>
 
                                             {/* Action buttons */}
@@ -1222,7 +1222,7 @@ export default function PreGame() {
                 />
             )}
 
-            {/* â”€â”€ Deposit Float Panel â”€â”€ */}
+            {/* ── Deposit Float Panel ── */}
             {isWalletExpanded && (
                 <div ref={walletExpandRef} className="float-panel" style={panelStyle}>
                     <div
@@ -1232,7 +1232,7 @@ export default function PreGame() {
                         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                     >
                         <span className="float-panel-title">Deposit Funds</span>
-                        <button className="float-panel-close" onClick={() => { setIsWalletExpanded(false); setStatusMsg(''); }}>âœ•</button>
+                        <button className="float-panel-close" onClick={() => { setIsWalletExpanded(false); setStatusMsg(''); }}>✕</button>
                     </div>
 
                     {/* Tab bar */}
@@ -1287,8 +1287,8 @@ export default function PreGame() {
                                 {amount && (
                                     <div className="amount-hint">
                                         {isCurSOL
-                                            ? `â‰ˆ $${(parseFloat(amount) * solPrice).toFixed(2)}`
-                                            : `â‰ˆ ${(parseFloat(amount) / solPrice).toFixed(4)} SOL`}
+                                            ? `≈ $${(parseFloat(amount) * solPrice).toFixed(2)}`
+                                            : `≈ ${(parseFloat(amount) / solPrice).toFixed(4)} SOL`}
                                     </div>
                                 )}
                             </div>
@@ -1304,10 +1304,10 @@ export default function PreGame() {
                             <div style={{ width: '100%' }}>
                                 <div className="label" style={{ marginBottom: '4px' }}>Deposit Address</div>
                                 <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                                    {depositAddress || 'Generatingâ€¦'}
+                                    {depositAddress || 'Generating…'}
                                 </div>
                                 <button
-                                    onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('âœ… Address copied!'); }}
+                                    onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
                                     style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: '700', borderRadius: '6px', cursor: 'pointer', letterSpacing: '0.04em' }}
                                 >
                                     COPY ADDRESS
@@ -1318,12 +1318,12 @@ export default function PreGame() {
 
                     {statusMsg && <div className={`status-msg ${statusClass}`}>{statusMsg}</div>}
                     <div style={{ textAlign: 'center', fontSize: '0.58rem', color: 'var(--text-3)', fontWeight: 600 }}>
-                        Custodial Â· Secure Processing
+                        Custodial · Secure Processing
                     </div>
                 </div>
             )}
 
-            {/* â”€â”€ Withdraw Float Panel â”€â”€ */}
+            {/* ── Withdraw Float Panel ── */}
             {isWithdrawExpanded && (
                 <div ref={withdrawExpandRef} className="float-panel" style={{ ...panelStyle, top: panelPos.y + 20 }}>
                     <div
@@ -1333,7 +1333,7 @@ export default function PreGame() {
                         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                     >
                         <span className="float-panel-title">Withdraw Funds</span>
-                        <button className="float-panel-close" onClick={() => { setIsWithdrawExpanded(false); setStatusMsg(''); }}>âœ•</button>
+                        <button className="float-panel-close" onClick={() => { setIsWithdrawExpanded(false); setStatusMsg(''); }}>✕</button>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1410,8 +1410,8 @@ export default function PreGame() {
                             </div>
                             <div className="amount-hint">
                                 {isCurSOL
-                                    ? `â‰ˆ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
-                                    : `â‰ˆ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(2)} SOL`}
+                                    ? `≈ $${(parseFloat(withdrawAmount || 0) * solPrice).toFixed(2)}`
+                                    : `≈ ${(parseFloat(withdrawAmount || 0) / solPrice).toFixed(2)} SOL`}
                             </div>
                         </div>
 
@@ -1422,15 +1422,15 @@ export default function PreGame() {
 
                     {statusMsg && <div className={`status-msg ${statusClass}`}>{statusMsg}</div>}
                     <div style={{ textAlign: 'center', fontSize: '0.58rem', color: 'var(--text-3)', fontWeight: 600 }}>
-                        Custodial Â· Secure Transfer
+                        Custodial · Secure Transfer
                     </div>
                 </div>
             )}
 
-            {/* â”€â”€ Main layout â”€â”€ */}
+            {/* ── Main layout ── */}
             {freePlay && (
                 <div className="test-mode-banner">
-                    TEST MODE â€” Free play, no real SOL used
+                    TEST MODE — Free play, no real SOL used
                 </div>
             )}
 
@@ -1452,7 +1452,7 @@ export default function PreGame() {
             {tournamentId && tournamentLoading ? (
                 <div className="tournament-empty" style={{ margin: '15vh auto', maxWidth: 520, textAlign: 'center', color: 'var(--text-2)' }}>
                     <span className="spinner" style={{ marginRight: 8 }} />
-                    Loading tournament lobbyâ€¦
+                    Loading tournament lobby…
                 </div>
             ) : (
                 <div className={tournamentId ? "pre-game-grid pre-game-grid--tournament" : "pre-game-grid"}>
@@ -1575,7 +1575,7 @@ export default function PreGame() {
                                         value={nickname}
                                         onChange={e => setNickname(e.target.value)}
                                         maxLength={15}
-                                        placeholder="Enter nameâ€¦"
+                                        placeholder="Enter name…"
                                         className="nickname-input"
                                     />
                                 </div>
@@ -1659,7 +1659,7 @@ export default function PreGame() {
                                         value={nickname}
                                         onChange={e => setNickname(e.target.value)}
                                         maxLength={15}
-                                        placeholder="Enter nameâ€¦"
+                                        placeholder="Enter name…"
                                         className="nickname-input"
                                     />
                                     <label
@@ -1686,7 +1686,7 @@ export default function PreGame() {
                                 <div className="entry-row" style={{ marginBottom: '14px' }}>
                                     <span className="label">Entry Fee</span>
                                     <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                                        {freePlay ? 'FREE (Test)' : (entryFeeForSession != null ? formatUsd(entryFeeForSession) : 'â€”')}
+                                        {freePlay ? 'FREE (Test)' : (entryFeeForSession != null ? formatUsd(entryFeeForSession) : '—')}
                                     </span>
                                 </div>
 
@@ -1718,7 +1718,7 @@ export default function PreGame() {
                                     </div>
                                     {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && user?.hasFreeTicket && !user?.freeTicketUsed) && (
                                         <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
-                                            âœ¨ free ticket available
+                                            ✨ free ticket available
                                         </div>
                                     )}
                                 </div>
@@ -1735,8 +1735,8 @@ export default function PreGame() {
                                 {isAlreadyInGame && currentGameMode && (
                                     <div style={{ marginTop: '10px', fontSize: '0.72rem', color: 'var(--accent)', textAlign: 'center', fontWeight: 600 }}>
                                         Active session: {currentGameMode.startsWith('br-') ? 'Battle Royale' : (currentGameMode === 'slither' ? 'Slither' : 'Agar')}
-                                        {activeEntryFee != null && !freePlay && ` Â· ${formatUsd(activeEntryFee)} entry`}
-                                        {activeGameBalance != null && !currentGameMode.startsWith('br-') && ` Â· $${Number(activeGameBalance).toFixed(2)} in arena`}
+                                        {activeEntryFee != null && !freePlay && ` · ${formatUsd(activeEntryFee)} entry`}
+                                        {activeGameBalance != null && !currentGameMode.startsWith('br-') && ` · $${Number(activeGameBalance).toFixed(2)} in arena`}
                                     </div>
                                 )}
 
@@ -1796,7 +1796,7 @@ export default function PreGame() {
                                                         <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
                                                     </div>
                                                     <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                        Real players only â€” ${economyFeeForDisplay} matches are a separate pool from other stakes.
+                                                        Real players only — ${economyFeeForDisplay} matches are a separate pool from other stakes.
                                                         Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
                                                         Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
                                                         Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
@@ -1902,7 +1902,7 @@ export default function PreGame() {
 
                                 {(tournament?.leaderboard || []).length === 0 ? (
                                     <div className="empty-state" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px' }}>
-                                        <div className="empty-state-icon" aria-hidden="true" style={{ fontSize: '1.4rem', marginBottom: '8px', color: '#f97316' }}>ðŸ†</div>
+                                        <div className="empty-state-icon" aria-hidden="true" style={{ fontSize: '1.4rem', marginBottom: '8px', color: '#f97316' }}>🏆</div>
                                         <p className="empty-state-title" style={{ fontSize: '0.78rem' }}>No cashouts yet</p>
                                         <p className="empty-state-sub" style={{ fontSize: '0.68rem' }}>Be the first to bank a cashout!</p>
                                     </div>
@@ -1991,9 +1991,9 @@ export default function PreGame() {
 
                                 {(leaderboardTab === 'alltime' ? leaderboardData.alltime : liveLeaderboardEvents).length === 0 ? (
                                     <div className="empty-state">
-                                        <div className="empty-state-icon" aria-hidden="true">ðŸ†</div>
+                                        <div className="empty-state-icon" aria-hidden="true">🏆</div>
                                         <p className="empty-state-title">No champions yet</p>
-                                        <p className="empty-state-sub">Be the first to cash out big â€” your name goes here.</p>
+                                        <p className="empty-state-sub">Be the first to cash out big — your name goes here.</p>
                                     </div>
                                 ) : (
                                     <div
@@ -2334,7 +2334,7 @@ export default function PreGame() {
                                                 onClick={() => setSkinStyle(skin.id)}
                                             >
                                                 <div className={`skin-card-icon slither-special-icon slither-special-icon--${skin.id}`} style={{ backgroundImage: skin.badgeGradient }}>
-                                                    <span>{skin.id === 'aurora' ? 'âœ¦' : 'â˜¾'}</span>
+                                                    <span>{skin.id === 'aurora' ? '✦' : '☾'}</span>
                                                 </div>
                                                 <span>{skin.name}</span>
                                             </button>
@@ -2439,7 +2439,7 @@ function SurvivSkinPreview({ color, isLarge, nickname }) {
     );
 }
 
-/* â”€â”€ SnakeSkinPreview â”€â”€ */
+/* ── SnakeSkinPreview ── */
 export function SnakeSkinPreview({ color, isLarge, active = true }) {
     const canvasRef = useRef(null);
     const colorRef = useRef(color);
