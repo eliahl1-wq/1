@@ -16,7 +16,7 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
     const [modalOpen, setModalOpen] = useState(false);
     const [initialAction, setInitialAction] = useState('');
     const [publicConfig, setPublicConfig] = useState(null);
-    const { user, token } = useAuth();
+    const { user, token, refreshUser } = useAuth();
 
     useEffect(() => {
         let active = true;
@@ -47,7 +47,11 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
         symbol: publicConfig?.symbol ?? config.symbol,
     }), [config, publicConfig]);
     const market = useAgarMarketData(runtimeConfig);
-    const wallet = useAgarBalance(runtimeConfig, user?.depositAddress || '');
+    const wallet = useAgarBalance(runtimeConfig, user?.depositAddress || '', token);
+    const refreshAccountBalance = useCallback(
+        () => refreshUser({ forceBalance: true }),
+        [refreshUser],
+    );
 
     const openAgarModal = useCallback(({ action = '' } = {}) => {
         setInitialAction(action);
@@ -102,6 +106,8 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
                     accountSolBalance={Number(user?.balanceSol ?? user?.balance ?? 0) || 0}
                     accountSolPrice={Number(user?.solPrice) || 0}
                     authToken={token}
+                    refreshAgarBalance={wallet.refresh}
+                    refreshAccountBalance={refreshAccountBalance}
                     config={runtimeConfig}
                 />
             )}

@@ -715,37 +715,6 @@ export default function PreGame() {
         return () => clearInterval(id);
     }, [refreshUser]);
 
-    // Refresh from the backend as soon as Solana reports activity on the
-    // personal deposit address. Delayed retries cover backend confirmation time.
-    useEffect(() => {
-        if (!depositAddress || !connection) return undefined;
-        let subscriptionId;
-        const timers = [];
-        const syncAfterDeposit = () => {
-            refreshUser();
-            for (const delay of [1500, 4000, 9000]) {
-                timers.push(setTimeout(() => refreshUser(), delay));
-            }
-        };
-
-        try {
-            subscriptionId = connection.onAccountChange(
-                new PublicKey(depositAddress),
-                syncAfterDeposit,
-                'confirmed',
-            );
-        } catch {
-            return undefined;
-        }
-
-        return () => {
-            timers.forEach(clearTimeout);
-            if (subscriptionId != null) {
-                connection.removeAccountChangeListener(subscriptionId).catch(() => {});
-            }
-        };
-    }, [connection, depositAddress, refreshUser]);
-
     // Game status — poll so rejoin button stays accurate
     useEffect(() => {
         if (!token) {

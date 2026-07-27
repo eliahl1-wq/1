@@ -1,26 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
+import { useCallback, useEffect, useState } from 'react';
 import { AGAR, isAgarLaunchReady } from '../config/agarConfig';
-import { fetchAgarBalance } from './agarBalance';
+import { API_URL } from '../../../utils/apiBase';
 
-export function useAgarBalance(config = AGAR, accountAddress = '') {
-    const { connection } = useConnection();
+export function useAgarBalance(config = AGAR, accountAddress = '', authToken = '') {
     const [balance, setBalance] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const launchReady = isAgarLaunchReady(config);
-    const accountPublicKey = useMemo(() => {
-        if (!accountAddress) return null;
-        try {
-            return new PublicKey(accountAddress);
-        } catch {
-            return null;
-        }
-    }, [accountAddress]);
+    const accountReady = Boolean(accountAddress && authToken);
 
     const refresh = useCallback(async () => {
-        if (!accountPublicKey || !launchReady) {
+        if (!accountReady || !launchReady) {
             setBalance(0);
             setError('');
             return;
@@ -28,23 +18,29 @@ export function useAgarBalance(config = AGAR, accountAddress = '') {
 
         setLoading(true);
         try {
-            const next = await fetchAgarBalance({
-                connection,
-                owner: accountPublicKey,
-                config,
+            const response = await fetch(`${API_URL}/api/agar/balance`, {
+                headers: {
+                    Authorization: `Bearer ${authToken}`,
+                },
+                cache: 'no-store',
             });
-            setBalance(next);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload.message || 'Balance unavailable');
+            }
+            const next = Number(payload.balance);
+            setBalance(Number.isFinite(next) ? next : 0);
             setError('');
         } catch {
             setError('Balance unavailable');
         } finally {
             setLoading(false);
         }
-    }, [accountPublicKey, config, connection, launchReady]);
+    }, [accountReady, authToken, launchReady]);
 
     useEffect(() => {
         refresh();
-        if (!accountPublicKey || !launchReady) return undefined;
+        if (!accountReady || !launchReady) return undefined;
 
         const poll = window.setInterval(refresh, config.balancePollIntervalMs);
         const onFocus = () => refresh();
@@ -53,11 +49,11 @@ export function useAgarBalance(config = AGAR, accountAddress = '') {
             window.clearInterval(poll);
             window.removeEventListener('focus', onFocus);
         };
-    }, [accountPublicKey, config.balancePollIntervalMs, launchReady, refresh]);
+    }, [accountReady, config.balancePollIntervalMs, launchReady, refresh]);
 
     return {
         balance,
-        accountReady: Boolean(accountPublicKey),
+        accountReady,
         loading,
         error,
         refresh,
