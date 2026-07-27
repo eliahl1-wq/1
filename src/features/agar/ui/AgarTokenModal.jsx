@@ -34,7 +34,7 @@ function formatMetric(key, value, launchReady, comingSoon) {
 
 function shortAddress(address) {
     if (!address) return 'Not available';
-    return `${address.slice(0, 5)}â€¦${address.slice(-5)}`;
+    return `${address.slice(0, 5)}…${address.slice(-5)}`;
 }
 
 function ExternalLink({ href, children }) {
@@ -125,7 +125,7 @@ export default function AgarTokenModal({
             setSubmitting(true);
             setTransactionSignature('');
             setNoticeType('');
-            setNotice(`Preparing ${side.toLowerCase()}â€¦`);
+            setNotice(`Preparing ${side.toLowerCase()}…`);
             const result = await executeAgarSwap({
                 side,
                 amount: parsedAmount,
@@ -219,7 +219,7 @@ export default function AgarTokenModal({
                     <div className="agar-modal__chart">
                         <div className="agar-modal__chart-topline">
                             <span>Chart</span>
-                            <span>{launchReady && marketLoading ? 'Loadingâ€¦' : launchReady ? 'Live' : config.messages.comingSoon}</span>
+                            <span>{launchReady && marketLoading ? 'Loading…' : launchReady ? 'Live' : config.messages.comingSoon}</span>
                         </div>
                         <AgarPriceChart launchReady={launchReady} />
                     </div>
@@ -241,7 +241,7 @@ export default function AgarTokenModal({
                             <span>{config.symbol} Balance</span>
                             <strong>
                                 {balanceLoading
-                                    ? `â€¦ ${config.symbol}`
+                                    ? `… ${config.symbol}`
                                     : `${walletBalance.toLocaleString('en-US', { maximumFractionDigits: config.decimals })} ${config.symbol}`}
                             </strong>
                         </div>
@@ -312,7 +312,7 @@ export default function AgarTokenModal({
                             disabled={submitting}
                         >
                             {submitting
-                                ? 'Confirmingâ€¦'
+                                ? 'Confirming…'
                                 : tradeSide === 'BUY'
                                     ? `Buy ${config.symbol}`
                                     : `Sell ${config.symbol}`}
@@ -359,7 +359,7 @@ export default function AgarTokenModal({
                     {!launchReady && (
                         <div className="agar-modal__launch-note">
                             <span className="agar-modal__launch-dot" />
-                            Contract not configured Â· All AGAR features remain disabled
+                            Contract not configured · All AGAR features remain disabled
                         </div>
                     )}
                 </div>
