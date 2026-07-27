@@ -50,8 +50,8 @@ export default function Lobby() {
 
     const depositAddress = user?.depositAddress;
 
-    const statusClass = statusMsg.startsWith('âœ…') || statusMsg.includes('copied')
-        ? 'success' : (statusMsg.includes('failed') || statusMsg.includes('Error') || statusMsg.startsWith('âŒ'))
+    const statusClass = statusMsg.startsWith('✅') || statusMsg.includes('copied')
+        ? 'success' : (statusMsg.includes('failed') || statusMsg.includes('Error') || statusMsg.startsWith('❌'))
             ? 'error' : 'info';
 
     // Pre-fill deposit amount from redirect
@@ -61,7 +61,7 @@ export default function Lobby() {
             if (pending) {
                 setDepositAmount(pending);
                 localStorage.removeItem('pending_deposit');
-                setStatusMsg('Amount prefilled â€” complete deposit below.');
+                setStatusMsg('Amount prefilled — complete deposit below.');
             }
         } catch { }
     }, [connected]);
@@ -106,7 +106,7 @@ export default function Lobby() {
         }
     }, [token, refreshUser]);
 
-    // QR code â€“ show when disconnected (always) or connected + manual tab
+    // QR code – show when disconnected (always) or connected + manual tab
     useEffect(() => {
         const shouldShow = !connected || depositMethod === 'manual';
         if (qrRef.current && depositAddress && shouldShow) {
@@ -136,10 +136,10 @@ export default function Lobby() {
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect your wallet first.'); return; }
-        if (!depositAddress) { setStatusMsg('âŒ No deposit address found.'); return; }
+        if (!depositAddress) { setStatusMsg('❌ No deposit address found.'); return; }
         const parsed = parseFloat(depositAmount);
-        if (isNaN(parsed) || parsed <= 0) { setStatusMsg('âŒ Enter a valid amount.'); return; }
-        setStatusMsg('Waiting for wallet approvalâ€¦');
+        if (isNaN(parsed) || parsed <= 0) { setStatusMsg('❌ Enter a valid amount.'); return; }
+        setStatusMsg('Waiting for wallet approval…');
         try {
             const solAmt = isCurSOL ? parsed : parsed / solPrice;
             const usdAmt = isCurSOL ? parsed * solPrice : parsed;
@@ -151,10 +151,10 @@ export default function Lobby() {
             tx.recentBlockhash = blockhash;
             tx.feePayer = publicKey;
             const sig = await sendTransaction(tx, connection);
-            setStatusMsg('Confirming on-chainâ€¦');
+            setStatusMsg('Confirming on-chain…');
             const conf = await connection.confirmTransaction(sig, 'confirmed');
             if (conf.value.err) throw new Error('Transaction failed on-chain.');
-            setStatusMsg('Verifying with backendâ€¦');
+            setStatusMsg('Verifying with backend…');
             const vr = await fetch(`${API_URL}/api/deposit-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true' },
@@ -170,13 +170,13 @@ export default function Lobby() {
             await refreshUser();
             setStatusMsg(verification.rewardsReview
                 ? 'Deposit confirmed. Rewards are under linked-wallet review.'
-                : `âœ… ${solAmt.toFixed(4)} SOL deposited!`);
+                : `✅ ${solAmt.toFixed(4)} SOL deposited!`);
             setDepositAmount('');
         } catch (err) {
             const m = err.message || '';
-            if (m.includes('User rejected')) setStatusMsg('âŒ Cancelled in wallet.');
-            else if (m.toLowerCase().includes('insufficient')) setStatusMsg('âŒ Insufficient funds.');
-            else setStatusMsg('âŒ Deposit failed. Try again.');
+            if (m.includes('User rejected')) setStatusMsg('❌ Cancelled in wallet.');
+            else if (m.toLowerCase().includes('insufficient')) setStatusMsg('❌ Insufficient funds.');
+            else setStatusMsg('❌ Deposit failed. Try again.');
         }
     };
 
@@ -243,7 +243,7 @@ export default function Lobby() {
                 )}
             </AppTopbar>
 
-            {/* â”€â”€ Center Content â”€â”€ */}
+            {/* ── Center Content ── */}
             <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '72px 16px 40px', width: '100%', maxWidth: '440px', boxSizing: 'border-box' }}>
 
                 {/* Header */}
@@ -253,7 +253,7 @@ export default function Lobby() {
                     </h1>
                     <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 500 }}>
                         {user?.hasFreeTicket && !user?.freeTicketUsed ? (
-                            <span style={{ color: 'var(--green)', fontWeight: 700 }}>âœ¨ Free Ticket available! Enter the arena below.</span>
+                            <span style={{ color: 'var(--green)', fontWeight: 700 }}>✨ Free Ticket available! Enter the arena below.</span>
                         ) : (
                             `Deposit $${MIN_ENTRY_FEE} minimum to enter the arena.`
                         )}
@@ -333,8 +333,8 @@ export default function Lobby() {
                                         {depositAmount && (
                                             <div className="amount-hint">
                                                 {isCurSOL
-                                                    ? `â‰ˆ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}`
-                                                    : `â‰ˆ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
+                                                    ? `≈ $${(parseFloat(depositAmount) * solPrice).toFixed(2)}`
+                                                    : `≈ ${(parseFloat(depositAmount) / solPrice).toFixed(4)} SOL`}
                                             </div>
                                         )}
                                     </div>
@@ -360,10 +360,10 @@ export default function Lobby() {
                                     <div style={{ width: '100%' }}>
                                         <div className="label" style={{ marginBottom: '4px' }}>Recipient Address</div>
                                         <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
-                                            {depositAddress || 'Generatingâ€¦'}
+                                            {depositAddress || 'Generating…'}
                                         </div>
                                         <button
-                                            onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('âœ… Address copied!'); }}
+                                            onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
                                             style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: 700, borderRadius: 'var(--r-md)', cursor: 'pointer', letterSpacing: '0.04em' }}
                                         >
                                             COPY ADDRESS
@@ -373,7 +373,7 @@ export default function Lobby() {
                             )}
                         </>
                     ) : (
-                        /* No wallet connected â€“ show QR + address + connect button */
+                        /* No wallet connected – show QR + address + connect button */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
                             {/* QR code */}
                             <div ref={qrRef} className="qr-container" />
@@ -382,10 +382,10 @@ export default function Lobby() {
                             <div style={{ width: '100%' }}>
                                 <div className="label" style={{ marginBottom: '4px' }}>Deposit Address</div>
                                 <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
-                                    {depositAddress || 'Generatingâ€¦'}
+                                    {depositAddress || 'Generating…'}
                                 </div>
                                 <button
-                                    onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('âœ… Address copied!'); }}
+                                    onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
                                     style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: 700, borderRadius: 'var(--r-md)', cursor: 'pointer', letterSpacing: '0.04em' }}
                                 >
                                     COPY ADDRESS
@@ -438,7 +438,7 @@ export default function Lobby() {
                 )}
             </div>
 
-            {/* â”€â”€ Footer â”€â”€ */}
+            {/* ── Footer ── */}
             <AppFooter />
         </div>
     );
