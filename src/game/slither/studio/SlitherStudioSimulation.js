@@ -6,7 +6,7 @@ import {
     segmentSpacingForBalance,
     radiusScaleForSegmentCount,
     scaleForSegmentCount,
-} from '../../../../../phantom-game-server/slither-engine.js';
+} from './engine/slither-engine.js';
 
 const TICK_RATE = SLITHER.serverTickRate;
 const TICK_MS = 1000 / TICK_RATE;
