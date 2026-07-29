@@ -433,15 +433,6 @@ export class SurvivRenderer {
         this._fpsFrames = 0;
         this._fpsLastSampleAt = performance.now();
         this._fpsDisplay = 0;
-        this._adaptiveResolutionScale = 1;
-        this._adaptiveSlowSamples = 0;
-        this._adaptiveFastSamples = 0;
-        this._adaptiveLastSampleAt = performance.now();
-        this._adaptiveLastChangeAt = performance.now();
-        this._adaptiveWarmupUntil = this._adaptiveLastChangeAt + 8000;
-        this._frameIntervals = new Float32Array(120);
-        this._frameIntervalCount = 0;
-        this._frameIntervalIndex = 0;
         this._onResize = () => this.resize();
         window.addEventListener('resize', this._onResize);
 
@@ -540,7 +531,9 @@ export class SurvivRenderer {
         // The previous 0.75 floor defeated the pixel budget on ultrawide/4K
         // displays (4.7M pixels at 4K). Keep the cost consistent across monitors.
         const minimumDpr = this.isMobileLayout ? 0.6 : 0.4;
-        const dpr = Math.max(minimumDpr, baseDpr * this._adaptiveResolutionScale);
+        // Resolution stays stable for the whole match. Dynamically changing the
+        // backing canvas made graphics visibly soften a few seconds after join.
+        const dpr = Math.max(minimumDpr, baseDpr);
         this.renderDpr = dpr;
         this.canvas.width = Math.round(w * dpr);
         this.canvas.height = Math.round(h * dpr);
@@ -570,58 +563,10 @@ export class SurvivRenderer {
             if (!this.running) return;
             const dt = Math.min(0.05, Math.max(0.001, (now - this._lastFrameAt) / 1000));
             this._lastFrameAt = now;
-            this.trackFramePacing(dt, now);
             this.draw(dt);
             this._raf = requestAnimationFrame(loop);
         };
         this._raf = requestAnimationFrame(loop);
-    }
-
-    trackFramePacing(dt, now) {
-        if (document.hidden || dt < 0.004 || dt > 0.04) return;
-        this._frameIntervals[this._frameIntervalIndex] = dt * 1000;
-        this._frameIntervalIndex = (this._frameIntervalIndex + 1) % this._frameIntervals.length;
-        this._frameIntervalCount = Math.min(this._frameIntervalCount + 1, this._frameIntervals.length);
-        if (now - this._adaptiveLastSampleAt < 1000 || this._frameIntervalCount < 30) return;
-        this._adaptiveLastSampleAt = now;
-
-        const intervals = Array.from(this._frameIntervals.subarray(0, this._frameIntervalCount));
-        intervals.sort((a, b) => a - b);
-        // A lower-quartile sample ignores isolated short rAF intervals that
-        // otherwise make a stable 120 Hz display look like a missed 240 Hz target.
-        const refreshInterval = intervals[Math.floor(intervals.length * 0.25)];
-        const expectedFps = Math.min(240, 1000 / Math.max(4, refreshInterval));
-        const averageInterval = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
-        const actualFps = 1000 / averageInterval;
-        if (now < this._adaptiveWarmupUntil) {
-            this._adaptiveSlowSamples = 0;
-            this._adaptiveFastSamples = 0;
-            return;
-        }
-        const canChange = now - this._adaptiveLastChangeAt >= 4000;
-
-        if (actualFps < expectedFps * 0.72) {
-            this._adaptiveSlowSamples++;
-            this._adaptiveFastSamples = 0;
-            if (canChange && this._adaptiveSlowSamples >= 2 && this._adaptiveResolutionScale > 0.78) {
-                this._adaptiveResolutionScale = Math.max(0.78, this._adaptiveResolutionScale - 0.1);
-                this._adaptiveLastChangeAt = now;
-                this._adaptiveSlowSamples = 0;
-                this.resize();
-            }
-        } else if (actualFps >= expectedFps * 0.92) {
-            this._adaptiveFastSamples++;
-            this._adaptiveSlowSamples = 0;
-            if (canChange && this._adaptiveFastSamples >= 20 && this._adaptiveResolutionScale < 1) {
-                this._adaptiveResolutionScale = Math.min(1, this._adaptiveResolutionScale + 0.05);
-                this._adaptiveLastChangeAt = now;
-                this._adaptiveFastSamples = 0;
-                this.resize();
-            }
-        } else {
-            this._adaptiveSlowSamples = 0;
-            this._adaptiveFastSamples = 0;
-        }
     }
 
     pause() {
