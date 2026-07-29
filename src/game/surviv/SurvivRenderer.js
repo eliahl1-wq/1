@@ -2288,13 +2288,18 @@ export class SurvivRenderer {
             // most once per frame, avoiding a large loading hitch.
             for (const o of visibleFields) this.drawObstacle(ctx, o);
             for (const o of visibleWater) this.drawObstacleShore(ctx, o);
-            for (const o of visibleRoads) this.drawRoadShoulder(ctx, o);
+            for (const o of visibleRoads) this.drawRoadShoulder(ctx, o, false);
             for (const o of visibleWater) this.drawObstacleBody(ctx, o);
-            for (const o of visibleRoads) this.drawRoadBody(ctx, o);
-            for (const o of visibleRoads) this.drawRoadMarkings(ctx, o);
+            for (const o of visibleRoads) this.drawRoadBody(ctx, o, false);
+            for (const o of visibleRoads) this.drawRoadMarkings(ctx, o, false);
         } else {
-            // Static water is baked into the chunk; only its subtle movement
-            // remains dynamic.
+            // Roads stay dynamic and world-anchored. Baking long roads into
+            // independent terrain chunks can leave only an edge/shoulder in one
+            // tile, making the road appear to change shape at a chunk boundary.
+            for (const o of visibleRoads) this.drawRoadShoulder(ctx, o, false);
+            for (const o of visibleRoads) this.drawRoadBody(ctx, o, false);
+            for (const o of visibleRoads) this.drawRoadMarkings(ctx, o, false);
+            // Static water is baked into the chunk; only its subtle movement remains dynamic.
             for (const o of visibleWater) this.drawWaterAnimation(ctx, o);
         }
         // Draw blood decals on the ground
@@ -4164,12 +4169,8 @@ export class SurvivRenderer {
         const water = this.waterObstacles.filter(o => (
             this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 50)
         ));
-        const roads = this.roadObstacles.filter(o => (
-            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 40)
-        ));
-
         const key = gridX + ':' + gridY;
-        if (!fields.length && !water.length && !roads.length) {
+        if (!fields.length && !water.length) {
             const emptySprite = { canvas: null, pixels: 0, left, top };
             this._surfaceChunkCache.set(key, emptySprite);
             return emptySprite;
@@ -4198,10 +4199,7 @@ export class SurvivRenderer {
         try {
             for (const o of fields) this.drawObstacle(cacheCtx, o, false);
             for (const o of water) this.drawObstacleShore(cacheCtx, o, false);
-            for (const o of roads) this.drawRoadShoulder(cacheCtx, o, false);
             for (const o of water) this.drawObstacleBody(cacheCtx, o, false);
-            for (const o of roads) this.drawRoadBody(cacheCtx, o, false);
-            for (const o of roads) this.drawRoadMarkings(cacheCtx, o, false);
         } finally {
             [this._viewLeft, this._viewTop, this._viewRight, this._viewBottom] = previousBounds;
             this._buildingSurfaceChunk = previousBuildingChunk;
