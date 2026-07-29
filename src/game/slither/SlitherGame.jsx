@@ -479,13 +479,15 @@ export default function SlitherGame() {
                 inp.dx === lastInputSentRef.dx
                 && inp.dy === lastInputSentRef.dy
                 && inp.boost === lastInputSentRef.boost
-                && (now - (lastInputSentRef.time || 0)) < 250
+                && (now - (lastInputSentRef.time || 0)) < 100
             ) return;
             lastInputSentRef.dx = inp.dx;
             lastInputSentRef.dy = inp.dy;
             lastInputSentRef.boost = inp.boost;
             lastInputSentRef.time = now;
-            socketRef.current.emit('slitherInput', inp);
+            // Movement is superseded by the next packet; dropping an old packet
+            // is better than queueing stale steering behind congested snapshots.
+            socketRef.current.volatile.emit('slitherInput', inp);
         };
 
         renderer.setInputEmitter(emitInput);
@@ -499,8 +501,9 @@ export default function SlitherGame() {
 
         const socket = io(API_URL, {
             auth: { token: authToken, presenceId: getOrCreatePresenceId() },
-            // Polling first — more reliable on Railway; upgrades to websocket when ready
-            transports: ['polling', 'websocket'],
+            // WebSocket first for low-latency play; fall back to polling when necessary
+            transports: ['websocket', 'polling'],
+            tryAllTransports: true,
             upgrade: true,
             rememberUpgrade: true,
             reconnection: true,

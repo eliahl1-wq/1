@@ -448,7 +448,7 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
     // damped follow preserves velocity across server updates, so bends do not
     // produce the speed pulses that a plain position lerp creates in the tail.
     const frameDt = Math.min(Math.max(dt || 0, 0), 0.1);
-    const smoothTime = 0.06;
+    const smoothTime = Math.max(0.012, Number(options.smoothTime) || 0.06);
     const omega = 2 / smoothTime;
     const x = omega * frameDt;
     const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
@@ -473,7 +473,8 @@ export function stepSnakeBody(state, meta, serverSegments, serverAngle, dt, nowM
         seg.x = target.x + (changeX + tempX) * decay;
         seg.y = target.y + (changeY + tempY) * decay;
     }
-    const follow = 1 - Math.exp(-frameDt / 0.045);
+    const angleSmoothTime = Math.max(0.01, Number(options.angleSmoothTime) || 0.045);
+    const follow = 1 - Math.exp(-frameDt / angleSmoothTime);
     state.angle = lerpAngle(state.angle || 0, serverAngle || 0, follow);
 
     if (options.skipDensify) return;

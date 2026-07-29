@@ -1,11 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
   plugins: [react()],
   server: {
+    fs: {
+      // Slither Studio imports the authoritative engine from the sibling server project.
+      allow: [fileURLToPath(new URL('..', import.meta.url))],
+    },
     proxy: {
       '/api': 'http://localhost:5000',
       '/socket.io': { target: 'http://localhost:5000', ws: true },

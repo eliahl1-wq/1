@@ -117,6 +117,9 @@ export class SlitherRenderer {
     constructor(canvas, options = {}) {
         this.canvas = canvas;
         this._resizeToCanvas = options.resizeToCanvas === true;
+        this._fixedViewWidth = Number(options.fixedViewWidth) || 0;
+        this._fixedViewHeight = Number(options.fixedViewHeight) || 0;
+        this._fixedDpr = Number(options.fixedDpr) || 0;
         this._externalCameraGetter = null;
         this._sortDirty = true;
         this._foodAnimCache = new Map();
@@ -129,7 +132,9 @@ export class SlitherRenderer {
         this._mouseRafQueued = false;
         this._lastMouseX = 0;
         this._lastMouseY = 0;
-        this.isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+        this.isMobile = typeof options.forceMobile === 'boolean'
+            ? options.forceMobile
+            : ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
         this.ctx = canvas.getContext('2d', { alpha: false });
@@ -177,6 +182,8 @@ export class SlitherRenderer {
         this._inputEnabled = true;
         this.spectatorMode = false;
         this.hideOverlays = false;
+        this._hideMinimap = !!options.hideMinimap;
+        this._balanceBadgeScale = Math.max(0.4, Math.min(1.5, Number(options.balanceBadgeScale) || 1));
         this.hideNames = localStorage.getItem('hide_player_names') === 'true';
         this._inputEmitQueued = false;
         this._lastTapAt = 0;
@@ -274,6 +281,7 @@ export class SlitherRenderer {
     }
 
     _pickDpr() {
+        if (this._fixedDpr > 0) return this._fixedDpr;
         const rawDpr = window.devicePixelRatio || 1;
         const pixelBudgetDpr = Math.sqrt(2_400_000 / Math.max(1, (this.W || window.innerWidth) * (this.H || window.innerHeight)));
         // Keep phones crisp while preventing tablets and desktop canvases from exceeding the GPU budget.
@@ -300,7 +308,10 @@ export class SlitherRenderer {
     resize() {
         let width;
         let height;
-        if (this._resizeToCanvas) {
+        if (this._fixedViewWidth > 0 && this._fixedViewHeight > 0) {
+            width = this._fixedViewWidth;
+            height = this._fixedViewHeight;
+        } else if (this._resizeToCanvas) {
             const parent = this.canvas.parentElement;
             width = parent?.clientWidth || this.canvas.clientWidth || window.innerWidth;
             height = parent?.clientHeight || this.canvas.clientHeight || window.innerHeight;
@@ -732,7 +743,13 @@ export class SlitherRenderer {
                 delete s._extrapY;
             }
             // Densify is done in _interpolateSnakeDrawPath at render time — skip here.
-            stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), { skipDensify: true });
+            stepSnakeBody(s, meta, tgt, snake.angle || 0, dt, performance.now(), {
+                skipDensify: true,
+                // The local snake already includes network latency. Do not add the
+                // full remote-snake smoothing delay on top of the player's input.
+                smoothTime: snake.isYou ? 0.024 : 0.06,
+                angleSmoothTime: snake.isYou ? 0.018 : 0.045,
+            });
         }
 
         for (const id of this.smooth.keys()) {
@@ -2129,7 +2146,15 @@ export class SlitherRenderer {
                 const displayBalance = isYou 
                     ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance) 
                     : (snake.dollarBalance ?? snake.balance);
-                drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
+                if (this._balanceBadgeScale === 1) {
+                    drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
+                } else {
+                    ctx.save();
+                    ctx.translate(hx, pillY);
+                    ctx.scale(this._balanceBadgeScale, this._balanceBadgeScale);
+                    drawBalanceBadge(ctx, 0, 0, displayBalance, isYou);
+                    ctx.restore();
+                }
             }
 
             if (snake.cashoutHoldActive || (isYou && this._holdStartAt)) {
@@ -2177,14 +2202,16 @@ export class SlitherRenderer {
         drawBalanceBadge(ctx, screenX, screenY, balance, isMe);
     }
 
-    draw() {
+    draw(forcedDt = null) {
         const { worldHalf } = this.state;
         const ctx = this.ctx;
         const W = this.W;
         const H = this.H;
 
         const now = performance.now();
-        let dt = this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 1 / 60;
+        let dt = Number.isFinite(forcedDt) && forcedDt > 0
+            ? forcedDt
+            : (this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 1 / 60);
         this._lastFrameTime = now;
         if (dt > 0.1) dt = 0.1;
 
@@ -2391,7 +2418,7 @@ export class SlitherRenderer {
 
 
 
-        if (!this.hideOverlays && (me?.segments?.[0] || this.spectatorMode)) {
+        if (!this.hideOverlays && !this._hideMinimap && (me?.segments?.[0] || this.spectatorMode)) {
             const viewHalfW = W / (2 * zoom);
             const viewHalfH = H / (2 * zoom);
             if ((this._minimapFrame++ & 7) === 0 && !this._cashoutActive && !this._holdActive) {

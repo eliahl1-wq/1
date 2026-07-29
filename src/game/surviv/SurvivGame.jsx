@@ -1225,9 +1225,8 @@ export default function SurvivGame() {
                     gap: 8,
                     padding: '8px',
                     borderRadius: 8,
-                    background: 'rgba(10, 14, 12, 0.72)',
+                    background: 'rgba(10, 14, 12, 0.9)',
                     border: '1px solid rgba(255,255,255,0.14)',
-                    backdropFilter: 'blur(8px)',
                 }}>
                     <button type="button" onClick={handleAdminSpawnBot} style={{
                         border: '1px solid rgba(255,255,255,0.16)',

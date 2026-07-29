@@ -2861,6 +2861,41 @@ body.game-session-active #root {
 }
 
 
+/*
+ * Keep permanent Surviv HUD layers cheap to composite over the animated
+ * canvas. Backdrop blur forces the browser to re-sample the game behind every
+ * panel on every frame and is especially expensive on integrated GPUs.
+ */
+.surviv-game-page .surviv-hud-status-bars {
+    background: rgba(6, 9, 7, 0.88);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.surviv-game-page .surviv-leaderboard {
+    background: rgba(8, 11, 9, 0.84);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.surviv-game-page .surviv-kills-badge,
+.surviv-game-page .surviv-alive-badge,
+.surviv-game-page .game-cashout-securing {
+    background-color: rgba(8, 11, 9, 0.86);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.surviv-game-page .surviv-inventory-modal,
+.surviv-game-page .surviv-inventory-container {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.surviv-game-page .surviv-inventory-container {
+    background: rgba(9, 12, 10, 0.94);
+}
+
 /* Launch-critical safe-zone and controls feedback */
 .surviv-zone-warning {
     position: fixed;

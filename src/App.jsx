@@ -9,6 +9,8 @@ import Profile from './pages/Profile';
 import Game from './game/agar/Game'; // Uppdaterad sökväg
 import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
 const SurvivGame = lazy(() => import('./game/surviv/SurvivGame'));
+const SlitherStudio = lazy(() => import('./game/slither/studio/SlitherStudio'));
+const SlitherStudioRender = lazy(() => import('./game/slither/studio/SlitherStudioRender'));
 import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
 import AdminDashboard from './pages/AdminDashboard';
@@ -141,6 +143,19 @@ function App() {
                 <Route path="/pre-game" element={<PreGame />} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
                 <Route path="/slither-game" element={<ArenaRoute><SlitherGame /></ArenaRoute>} />
+                <Route
+                  path="/studio/slither"
+                  element={import.meta.env.DEV
+                    ? <Suspense fallback={<AppLoadingScreen />}><SlitherStudio /></Suspense>
+                    : <Navigate to="/pre-game" replace />}
+                />
+                <Route
+                  path="/studio/slither/render"
+                  element={import.meta.env.DEV
+                    ? <Suspense fallback={<AppLoadingScreen />}><SlitherStudioRender /></Suspense>
+                    : <Navigate to="/pre-game" replace />}
+                />
+
                 <Route path="/surviv-game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><SurvivGame /></Suspense></ArenaRoute>} />
                 <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
                 <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
