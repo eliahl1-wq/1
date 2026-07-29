@@ -1023,7 +1023,7 @@ export default function SurvivGame() {
             lastInputSentAt = now;
             if (hasAction) socket.emit('survivInput', payload);
             else socket.volatile.emit('survivInput', payload);
-        }, 1000 / 30);
+        }, 1000 / 60);
 
         if (blockAutoJoinRef.current && worldUpdatesEnabledRef.current) renderer.start();
 

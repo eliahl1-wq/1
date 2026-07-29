@@ -437,7 +437,8 @@ export class SurvivRenderer {
         this._adaptiveSlowSamples = 0;
         this._adaptiveFastSamples = 0;
         this._adaptiveLastSampleAt = performance.now();
-        this._adaptiveLastChangeAt = 0;
+        this._adaptiveLastChangeAt = performance.now();
+        this._adaptiveWarmupUntil = this._adaptiveLastChangeAt + 8000;
         this._frameIntervals = new Float32Array(120);
         this._frameIntervalCount = 0;
         this._frameIntervalIndex = 0;
@@ -484,6 +485,7 @@ export class SurvivRenderer {
         this._minimapCtx = null;
         this._nextMinimapRenderAt = 0;
         this._roofSpriteCache = new Map();
+        this._roofCachePixels = 0;
         this._roofCacheBuildsThisFrame = 0;
         this._obstacleSpriteCache = new Map();
         this._obstacleCachePixels = 0;
@@ -529,7 +531,10 @@ export class SurvivRenderer {
         // Keep phone-sized Retina canvases sharp while capping total GPU pixels.
         const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
         this.isMobileLayout = coarsePointer || w < 760;
-        const pixelBudgetDpr = Math.sqrt(1_850_000 / Math.max(1, w * h));
+        // Native pixels on 1080p and near-native pixels on 1440p keep weapon,
+        // prop and text edges crisp. The adaptive scaler can still fall back to
+        // roughly the previous budget on slower 4K/integrated-GPU systems.
+        const pixelBudgetDpr = Math.sqrt(3_200_000 / Math.max(1, w * h));
         const dprCap = this.isMobileLayout ? 1.4 : 1.2;
         const baseDpr = Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr);
         // The previous 0.75 floor defeated the pixel budget on ultrawide/4K
@@ -582,17 +587,24 @@ export class SurvivRenderer {
 
         const intervals = Array.from(this._frameIntervals.subarray(0, this._frameIntervalCount));
         intervals.sort((a, b) => a - b);
-        const refreshInterval = intervals[Math.floor(intervals.length * 0.1)];
+        // A lower-quartile sample ignores isolated short rAF intervals that
+        // otherwise make a stable 120 Hz display look like a missed 240 Hz target.
+        const refreshInterval = intervals[Math.floor(intervals.length * 0.25)];
         const expectedFps = Math.min(240, 1000 / Math.max(4, refreshInterval));
         const averageInterval = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
         const actualFps = 1000 / averageInterval;
+        if (now < this._adaptiveWarmupUntil) {
+            this._adaptiveSlowSamples = 0;
+            this._adaptiveFastSamples = 0;
+            return;
+        }
         const canChange = now - this._adaptiveLastChangeAt >= 4000;
 
         if (actualFps < expectedFps * 0.72) {
             this._adaptiveSlowSamples++;
             this._adaptiveFastSamples = 0;
-            if (canChange && this._adaptiveSlowSamples >= 2 && this._adaptiveResolutionScale > 0.75) {
-                this._adaptiveResolutionScale = Math.max(0.75, this._adaptiveResolutionScale - 0.1);
+            if (canChange && this._adaptiveSlowSamples >= 2 && this._adaptiveResolutionScale > 0.78) {
+                this._adaptiveResolutionScale = Math.max(0.78, this._adaptiveResolutionScale - 0.1);
                 this._adaptiveLastChangeAt = now;
                 this._adaptiveSlowSamples = 0;
                 this.resize();
@@ -677,6 +689,7 @@ export class SurvivRenderer {
         this._obstacleRenderSignature = '';
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
+        this._roofCachePixels = 0;
         this._obstacleSpriteCache.clear();
         this._obstacleCachePixels = 0;
         this._surfaceSpriteCache.clear();
@@ -787,6 +800,9 @@ export class SurvivRenderer {
                 serverY: me.y,
                 vx: 0,
                 vy: 0,
+                predictionInputX: 0,
+                predictionInputY: 0,
+                inputChangedAt: receivedAt,
                 stationarySnapshots: 0,
                 receivedAt,
             };
@@ -844,13 +860,23 @@ export class SurvivRenderer {
         // measured velocity that previously caused pull-backs after key release.
         const moveInput = this._getLocalMoveVector();
         const hasMoveInput = Math.abs(moveInput.dx) > 0.001 || Math.abs(moveInput.dy) > 0.001;
+        const inputChanged = Math.hypot(
+            moveInput.dx - (state.predictionInputX || 0),
+            moveInput.dy - (state.predictionInputY || 0),
+        ) > 0.02;
+        if (inputChanged) {
+            state.predictionInputX = moveInput.dx;
+            state.predictionInputY = moveInput.dy;
+            state.inputChangedAt = now;
+        }
         const canPredictMovement = hasMoveInput && (state.stationarySnapshots || 0) < 2;
+        const predictionStartedAt = Math.max(state.receivedAt, state.inputChangedAt || 0);
         const leadSeconds = canPredictMovement
-            ? clamp((now - state.receivedAt) / 1000, 0, 0.05)
+            ? clamp((now - predictionStartedAt) / 1000, 0, 0.05)
             : 0;
         const targetX = state.targetX + moveInput.dx * 208 * leadSeconds;
         const targetY = state.targetY + moveInput.dy * 208 * leadSeconds;
-        const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 48);
+        const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 32);
         const angleAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 42);
         state.x = lerp(state.x, targetX, positionAlpha);
         state.y = lerp(state.y, targetY, positionAlpha);
@@ -2388,15 +2414,24 @@ export class SurvivRenderer {
             if (!this._terrainTexture) {
                 const tile = 96;
                 const size = tile * 8;
+                const textureScale = 1.5;
                 const texture = document.createElement('canvas');
-                texture.width = size;
-                texture.height = size;
+                texture.width = Math.round(size * textureScale);
+                texture.height = Math.round(size * textureScale);
                 const textureCtx = texture.getContext('2d');
                 if (!textureCtx) return null;
+                textureCtx.scale(textureScale, textureScale);
                 this._terrainTexture = texture;
+                this._terrainTextureScale = textureScale;
                 this.drawTerrain(textureCtx, size / 2, size / 2, size, size, 1, false);
             }
             this._terrainPattern = ctx.createPattern(this._terrainTexture, 'repeat');
+            if (this._terrainPattern?.setTransform && typeof DOMMatrix !== 'undefined') {
+                const textureScale = this._terrainTextureScale || 1;
+                this._terrainPattern.setTransform(new DOMMatrix([
+                    1 / textureScale, 0, 0, 1 / textureScale, 0, 0,
+                ]));
+            }
         } catch {
             this._terrainPattern = null;
         }
@@ -4317,7 +4352,10 @@ export class SurvivRenderer {
         const maxCacheH = kind === 'houseFloor' ? 1400 : 320;
         if (o.w > maxCacheW || o.h > maxCacheH || !o.w || !o.h) return false;
 
-        const key = [o.id, kind, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || ''].join(':');
+        // Cache at the same physical density the world is displayed at. The old
+        // 1x sprites were enlarged by camera zoom, making props and floors soft.
+        const scale = Math.min(1.6, Math.max(1, (this.targetZoom || 1) * (this.renderDpr || 1)));
+        const key = [o.id, kind, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || '', scale.toFixed(2)].join(':');
         let sprite = this._obstacleSpriteCache.get(key);
         if (sprite) {
             this._obstacleSpriteCache.delete(key);
@@ -4331,17 +4369,23 @@ export class SurvivRenderer {
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
             const extent = rotated ? Math.hypot(o.w, o.h) : 0;
-            const width = Math.ceil((rotated ? extent : o.w) + 40);
-            const height = Math.ceil((rotated ? extent : o.h) + 46);
+            const worldWidth = Math.ceil((rotated ? extent : o.w) + 40);
+            const worldHeight = Math.ceil((rotated ? extent : o.h) + 46);
+            const width = Math.ceil(worldWidth * scale);
+            const height = Math.ceil(worldHeight * scale);
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
             const cacheCtx = canvas.getContext('2d', { alpha: true });
             if (!cacheCtx) return false;
-            cacheCtx.translate(width / 2 - o.x, height / 2 - o.y);
+            cacheCtx.imageSmoothingEnabled = true;
+            cacheCtx.imageSmoothingQuality = 'high';
+            cacheCtx.translate(width / 2, height / 2);
+            cacheCtx.scale(scale, scale);
+            cacheCtx.translate(-o.x, -o.y);
             this.drawObstacle(cacheCtx, o, false);
             const pixels = width * height;
-            sprite = { canvas, width, height, pixels };
+            sprite = { canvas, width, height, worldWidth, worldHeight, pixels };
 
             const maxPixels = 12_000_000;
             while (this._obstacleSpriteCache.size && (
@@ -4360,12 +4404,13 @@ export class SurvivRenderer {
         const shake = this.getObstacleHitShake(o);
         ctx.drawImage(
             sprite.canvas,
-            Math.round(o.x + shake.x - sprite.width / 2),
-            Math.round(o.y + shake.y - sprite.height / 2),
+            Math.round(o.x + shake.x - sprite.worldWidth / 2),
+            Math.round(o.y + shake.y - sprite.worldHeight / 2),
+            sprite.worldWidth,
+            sprite.worldHeight,
         );
         return true;
     }
-
     drawChestBursts(ctx, currentHouse = null, currentRoom = null) {
         if (!this.chestBursts.length) return;
         const now = this._frameNow;
@@ -6494,8 +6539,13 @@ export class SurvivRenderer {
         // custom roof is uncommon, while normal houses gain most from caching.
         if (o.w > 2000 || o.h > 1400) return false;
 
-        const key = [o.id, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.label || '', o.landmarkType || ''].join(':');
+        const scale = Math.min(1.6, Math.max(1, (this.targetZoom || 1) * (this.renderDpr || 1)));
+        const key = [o.id, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.label || '', o.landmarkType || '', scale.toFixed(2)].join(':');
         let sprite = this._roofSpriteCache.get(key);
+        if (sprite) {
+            this._roofSpriteCache.delete(key);
+            this._roofSpriteCache.set(key, sprite);
+        }
         if (!sprite) {
             // Spread cache creation across frames to avoid an entry stutter
             // when several roofs enter the viewport at the same time.
@@ -6504,32 +6554,49 @@ export class SurvivRenderer {
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
             const extent = rotated ? Math.hypot(o.w, o.h) : 0;
-            const width = Math.ceil((rotated ? extent : o.w) + 72);
-            const height = Math.ceil((rotated ? extent : o.h) + 72);
+            const worldWidth = Math.ceil((rotated ? extent : o.w) + 72);
+            const worldHeight = Math.ceil((rotated ? extent : o.h) + 72);
+            const width = Math.ceil(worldWidth * scale);
+            const height = Math.ceil(worldHeight * scale);
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
             const cacheCtx = canvas.getContext('2d', { alpha: true });
             if (!cacheCtx) return false;
-            cacheCtx.translate(width / 2 - o.x, height / 2 - o.y);
+            cacheCtx.imageSmoothingEnabled = true;
+            cacheCtx.imageSmoothingQuality = 'high';
+            cacheCtx.translate(width / 2, height / 2);
+            cacheCtx.scale(scale, scale);
+            cacheCtx.translate(-o.x, -o.y);
             this.drawHouseRoof(cacheCtx, o, false);
-            sprite = { canvas, width, height };
+            const pixels = width * height;
+            sprite = { canvas, width, height, worldWidth, worldHeight, pixels };
 
-            if (this._roofSpriteCache.size >= 128) {
+            // Higher-resolution roofs stay bounded so sharp graphics do not
+            // turn into runaway GPU memory usage after crossing the whole map.
+            const maxPixels = 12_000_000;
+            while (this._roofSpriteCache.size && (
+                this._roofSpriteCache.size >= 128
+                || this._roofCachePixels + pixels > maxPixels
+            )) {
                 const oldestKey = this._roofSpriteCache.keys().next().value;
+                const oldest = this._roofSpriteCache.get(oldestKey);
+                this._roofCachePixels -= oldest?.pixels || 0;
                 this._roofSpriteCache.delete(oldestKey);
             }
             this._roofSpriteCache.set(key, sprite);
+            this._roofCachePixels += pixels;
         }
 
         ctx.drawImage(
             sprite.canvas,
-            Math.round(o.x - sprite.width / 2),
-            Math.round(o.y - sprite.height / 2),
+            Math.round(o.x - sprite.worldWidth / 2),
+            Math.round(o.y - sprite.worldHeight / 2),
+            sprite.worldWidth,
+            sprite.worldHeight,
         );
         return true;
     }
-
     drawVignette(ctx, W, H) {
         ctx.save();
         const radius = Math.max(W, H) * 0.72;
