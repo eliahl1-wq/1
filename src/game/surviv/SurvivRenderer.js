@@ -366,9 +366,16 @@ export class SurvivRenderer {
         this._interiorFogHouseIds = new Set();
         this._losSegmentsByHouseId = new Map();
         this._nearbyLosSegments = [];
+        this._losDisplayPolygon = [];
+        this._losDisplayHouseId = null;
+        this._losDisplayPlayerX = NaN;
+        this._losDisplayPlayerY = NaN;
         this._renderObstaclesByHouseId = new Map();
         this._collisionBuckets = new Map();
         this._houseBuckets = new Map();
+        this._housesById = new Map();
+        this._stableCurrentHouseId = null;
+        this._stableCurrentRoomId = null;
         this._houseBucketSize = 800;
         this._playersById = new Map();
         this._visibleFields = [];
@@ -487,6 +494,8 @@ export class SurvivRenderer {
         this._surfaceChunkCache = new Map();
         this._surfaceChunkCachePixels = 0;
         this._surfaceChunkBuildsThisFrame = 0;
+        this._lastSurfaceCamX = NaN;
+        this._lastSurfaceCamY = NaN;
         // Smaller tiles keep first-time cache builds under a 140 Hz frame
         // budget while preserving the same 1.5x texture resolution.
         this._surfaceChunkTileSize = 512;
@@ -612,6 +621,12 @@ export class SurvivRenderer {
         this._losLastPlayerY = NaN;
         this._losRayDirections = null;
         this._losWorkingPolygon = [];
+        this._losDisplayPolygon = [];
+        this._losDisplayHouseId = null;
+        this._losDisplayPlayerX = NaN;
+        this._losDisplayPlayerY = NaN;
+        this._stableCurrentHouseId = null;
+        this._stableCurrentRoomId = null;
         this.surfaceObstacles = [];
         this.fieldObstacles = [];
         this.waterObstacles = [];
@@ -1533,6 +1548,11 @@ export class SurvivRenderer {
         }
 
         const housesById = new Map(this.houseFloors.map(h => [h.id, h]));
+        this._housesById = housesById;
+        if (!housesById.has(this._stableCurrentHouseId)) {
+            this._stableCurrentHouseId = null;
+            this._stableCurrentRoomId = null;
+        }
         const solid = [];
         for (const o of this.obstacles) {
             if (o.kind === 'roomZone') continue;
@@ -1691,15 +1711,20 @@ export class SurvivRenderer {
             && y >= o.y - o.h / 2 - pad && y <= o.y + o.h / 2 + pad;
     }
 
-    findHouseContainingPoint(x, y) {
+    findHouseContainingPoint(x, y, inset = -2) {
         const cell = this._houseBucketSize;
         const bucket = this._houseBuckets.get(Math.floor(x / cell) + ',' + Math.floor(y / cell));
-        return bucket?.find(house => this.pointInsideRect(house, x, y, -2)) || null;
+        return bucket?.find(house => this.pointInsideRect(house, x, y, inset)) || null;
     }
 
     getCurrentHouse() {
         if (!this.me) return null;
-        return this.findHouseContainingPoint(this.me.x, this.me.y);
+        const previous = this._housesById.get(this._stableCurrentHouseId);
+        if (previous && this.pointInsideRect(previous, this.me.x, this.me.y, 10)) return previous;
+        const next = this.findHouseContainingPoint(this.me.x, this.me.y, -6);
+        if ((next?.id || null) !== this._stableCurrentHouseId) this._stableCurrentRoomId = null;
+        this._stableCurrentHouseId = next?.id || null;
+        return next;
     }
 
     findRoomContainingPoint(x, y, house = null) {
@@ -1709,8 +1734,16 @@ export class SurvivRenderer {
     }
 
     getCurrentRoom(currentHouse) {
-        if (!this.me || !currentHouse) return null;
-        return this.findRoomContainingPoint(this.me.x, this.me.y, currentHouse);
+        if (!this.me || !currentHouse) {
+            this._stableCurrentRoomId = null;
+            return null;
+        }
+        const rooms = this._roomZonesByHouseId.get(currentHouse.id) || [];
+        const previous = rooms.find(room => room.id === this._stableCurrentRoomId);
+        if (previous && this.pointInsideRect(previous, this.me.x, this.me.y, 10)) return previous;
+        const next = rooms.find(room => this.pointInsideRect(room, this.me.x, this.me.y, -4)) || null;
+        this._stableCurrentRoomId = next?.id || null;
+        return next;
     }
 
     usesInteriorFog(house) {
@@ -1925,7 +1958,9 @@ export class SurvivRenderer {
      * makes interpolation visibly jump inside large buildings.
      */
     _buildVisibilityPolygon(px, py, segments, maxDist) {
-        const rayCount = 256;
+        // 192 evenly spaced rays are visually continuous at the current zoom,
+        // while leaving substantially more of a 144 Hz frame for structures.
+        const rayCount = 192;
         let directions = this._losRayDirections;
         if (!directions || directions.length !== rayCount) {
             const angleStep = (Math.PI * 2) / rayCount;
@@ -1944,6 +1979,46 @@ export class SurvivRenderer {
         return polygon;
     }
 
+    _smoothVisibilityPolygon(rawPolygon, currentHouse, playerX, playerY) {
+        const display = this._losDisplayPolygon;
+        const playerJumped = !Number.isFinite(this._losDisplayPlayerX)
+            || Math.hypot(playerX - this._losDisplayPlayerX, playerY - this._losDisplayPlayerY) > 80;
+        const needsReset = this._losDisplayHouseId !== currentHouse.id
+            || display.length !== rawPolygon.length
+            || playerJumped;
+
+        if (needsReset) {
+            display.length = rawPolygon.length;
+            for (let i = 0; i < rawPolygon.length; i++) {
+                const source = rawPolygon[i];
+                const point = display[i] || (display[i] = { x: 0, y: 0 });
+                point.x = source.x;
+                point.y = source.y;
+            }
+        } else {
+            // Smooth only the visual mask. Gameplay visibility keeps using the
+            // newest raw polygon, so this cannot reveal hidden moving entities.
+            const alpha = 1 - Math.exp(-Math.min(this._frameDt || 1 / 60, 0.05) * 26);
+            for (let i = 0; i < rawPolygon.length; i++) {
+                const source = rawPolygon[i];
+                const point = display[i];
+                // Smooth the polygon shape relative to the player, not its
+                // absolute world coordinates. Smoothing absolute coordinates
+                // makes the shadow trail behind a camera-locked player.
+                const previousOffsetX = point.x - this._losDisplayPlayerX;
+                const previousOffsetY = point.y - this._losDisplayPlayerY;
+                const targetOffsetX = source.x - playerX;
+                const targetOffsetY = source.y - playerY;
+                point.x = playerX + lerp(previousOffsetX, targetOffsetX, alpha);
+                point.y = playerY + lerp(previousOffsetY, targetOffsetY, alpha);
+            }
+        }
+
+        this._losDisplayHouseId = currentHouse.id;
+        this._losDisplayPlayerX = playerX;
+        this._losDisplayPlayerY = playerY;
+        return display;
+    }
     /**
      * Draw Among Us-style line-of-sight shadows using even-odd fill.
      * A large outer rectangle + the visibility polygon are drawn with 'evenodd'
@@ -1981,9 +2056,9 @@ export class SurvivRenderer {
         this._currentVisibilityPolygon = polygon;
         this._currentVisibilityHouseId = currentHouse.id;
 
-        // The polygon is rebuilt from the interpolated local player position.
-        // Drawing it directly keeps the shadow locked to every rendered frame.
-        const displayPolygon = polygon;
+        // Gameplay uses the exact polygon above; the rendered edge is smoothed
+        // independently so wall-endpoint changes do not shake at high refresh rates.
+        const displayPolygon = this._smoothVisibilityPolygon(polygon, currentHouse, px, py);
 
         ctx.save();
 
@@ -4157,6 +4232,38 @@ export class SurvivRenderer {
         return sprite;
     }
 
+    prefetchSurfaceChunkAhead(camX, camY, minGridX, maxGridX, minGridY, maxGridY) {
+        const previousX = this._lastSurfaceCamX;
+        const previousY = this._lastSurfaceCamY;
+        this._lastSurfaceCamX = camX;
+        this._lastSurfaceCamY = camY;
+        if (!Number.isFinite(previousX) || !Number.isFinite(previousY)
+            || this._surfaceChunkBuildsThisFrame >= 1) return;
+
+        const dx = camX - previousX;
+        const dy = camY - previousY;
+        if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return;
+        const candidates = [];
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            const gridX = dx >= 0 ? maxGridX + 1 : minGridX - 1;
+            for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
+                candidates.push({ gridX, gridY, distance: Math.abs((gridY + 0.5) * this._surfaceChunkTileSize - camY) });
+            }
+        } else {
+            const gridY = dy >= 0 ? maxGridY + 1 : minGridY - 1;
+            for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
+                candidates.push({ gridX, gridY, distance: Math.abs((gridX + 0.5) * this._surfaceChunkTileSize - camX) });
+            }
+        }
+        candidates.sort((a, b) => a.distance - b.distance);
+        for (const candidate of candidates) {
+            const key = candidate.gridX + ':' + candidate.gridY;
+            if (this._surfaceChunkCache.has(key)) continue;
+            this._surfaceChunkBuildsThisFrame++;
+            this.buildSurfaceChunk(candidate.gridX, candidate.gridY);
+            break;
+        }
+    }
     drawSurfaceChunks(ctx, camX, camY, viewW, viewH, zoom) {
         if (typeof document === 'undefined' || !this.surfaceObstacles.length) return false;
         const tile = this._surfaceChunkTileSize;
@@ -4203,6 +4310,7 @@ export class SurvivRenderer {
                 tile,
             );
         }
+        this.prefetchSurfaceChunkAhead(camX, camY, minGridX, maxGridX, minGridY, maxGridY);
         return true;
     }
 
