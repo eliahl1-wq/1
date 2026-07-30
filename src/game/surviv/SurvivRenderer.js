@@ -366,10 +366,6 @@ export class SurvivRenderer {
         this._interiorFogHouseIds = new Set();
         this._losSegmentsByHouseId = new Map();
         this._nearbyLosSegments = [];
-        this._losDisplayPolygon = [];
-        this._losDisplayHouseId = null;
-        this._losDisplayPlayerX = NaN;
-        this._losDisplayPlayerY = NaN;
         this._renderObstaclesByHouseId = new Map();
         this._collisionBuckets = new Map();
         this._houseBuckets = new Map();
@@ -621,10 +617,6 @@ export class SurvivRenderer {
         this._losLastPlayerY = NaN;
         this._losRayDirections = null;
         this._losWorkingPolygon = [];
-        this._losDisplayPolygon = [];
-        this._losDisplayHouseId = null;
-        this._losDisplayPlayerX = NaN;
-        this._losDisplayPlayerY = NaN;
         this._stableCurrentHouseId = null;
         this._stableCurrentRoomId = null;
         this.surfaceObstacles = [];
@@ -1979,46 +1971,6 @@ export class SurvivRenderer {
         return polygon;
     }
 
-    _smoothVisibilityPolygon(rawPolygon, currentHouse, playerX, playerY) {
-        const display = this._losDisplayPolygon;
-        const playerJumped = !Number.isFinite(this._losDisplayPlayerX)
-            || Math.hypot(playerX - this._losDisplayPlayerX, playerY - this._losDisplayPlayerY) > 80;
-        const needsReset = this._losDisplayHouseId !== currentHouse.id
-            || display.length !== rawPolygon.length
-            || playerJumped;
-
-        if (needsReset) {
-            display.length = rawPolygon.length;
-            for (let i = 0; i < rawPolygon.length; i++) {
-                const source = rawPolygon[i];
-                const point = display[i] || (display[i] = { x: 0, y: 0 });
-                point.x = source.x;
-                point.y = source.y;
-            }
-        } else {
-            // Smooth only the visual mask. Gameplay visibility keeps using the
-            // newest raw polygon, so this cannot reveal hidden moving entities.
-            const alpha = 1 - Math.exp(-Math.min(this._frameDt || 1 / 60, 0.05) * 26);
-            for (let i = 0; i < rawPolygon.length; i++) {
-                const source = rawPolygon[i];
-                const point = display[i];
-                // Smooth the polygon shape relative to the player, not its
-                // absolute world coordinates. Smoothing absolute coordinates
-                // makes the shadow trail behind a camera-locked player.
-                const previousOffsetX = point.x - this._losDisplayPlayerX;
-                const previousOffsetY = point.y - this._losDisplayPlayerY;
-                const targetOffsetX = source.x - playerX;
-                const targetOffsetY = source.y - playerY;
-                point.x = playerX + lerp(previousOffsetX, targetOffsetX, alpha);
-                point.y = playerY + lerp(previousOffsetY, targetOffsetY, alpha);
-            }
-        }
-
-        this._losDisplayHouseId = currentHouse.id;
-        this._losDisplayPlayerX = playerX;
-        this._losDisplayPlayerY = playerY;
-        return display;
-    }
     /**
      * Draw Among Us-style line-of-sight shadows using even-odd fill.
      * A large outer rectangle + the visibility polygon are drawn with 'evenodd'
@@ -2056,9 +2008,9 @@ export class SurvivRenderer {
         this._currentVisibilityPolygon = polygon;
         this._currentVisibilityHouseId = currentHouse.id;
 
-        // Gameplay uses the exact polygon above; the rendered edge is smoothed
-        // independently so wall-endpoint changes do not shake at high refresh rates.
-        const displayPolygon = this._smoothVisibilityPolygon(polygon, currentHouse, px, py);
+        // Fixed ray directions and the interpolated local player position keep the
+        // shadow stable without rounding or softening wall corners.
+        const displayPolygon = polygon;
 
         ctx.save();
 
