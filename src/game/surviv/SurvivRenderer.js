@@ -472,7 +472,7 @@ export class SurvivRenderer {
         this._losCachedPolygon = null;
         this._losLastPlayerX = NaN;
         this._losLastPlayerY = NaN;
-        this._losRayDirections = null;
+        this._losWorkingAngles = [];
         this._losWorkingPolygon = [];
         this._frameDt = 1 / 60;
         this._minimapCanvas = null;
@@ -615,7 +615,7 @@ export class SurvivRenderer {
         this._losCachedPolygon = null;
         this._losLastPlayerX = NaN;
         this._losLastPlayerY = NaN;
-        this._losRayDirections = null;
+        this._losWorkingAngles = [];
         this._losWorkingPolygon = [];
         this._stableCurrentHouseId = null;
         this._stableCurrentRoomId = null;
@@ -1925,7 +1925,9 @@ export class SurvivRenderer {
         if (Math.abs(denom) < 1e-10) return Infinity;
         const t = ((ax - rx) * dy - (ay - ry) * dx) / denom;
         const u = ((ax - rx) * rdy - (ay - ry) * rdx) / denom;
-        if (t >= 0 && u >= 0 && u <= 1) return t;
+        // Keep endpoint hits stable when floating-point rounding puts u a tiny
+        // fraction outside the segment on alternating frames.
+        if (t >= 0 && u >= -1e-7 && u <= 1 + 1e-7) return t;
         return Infinity;
     }
 
@@ -1945,32 +1947,45 @@ export class SurvivRenderer {
     }
 
     /**
-     * Build a fixed-size visibility polygon. Stable ray indices are important:
-     * endpoint-driven polygons change length/order as the player moves, which
-     * makes interpolation visibly jump inside large buildings.
+     * Build a visibility polygon from wall corners plus a coarse range circle.
+     * Rays immediately beside each corner stop the visible edge from jumping
+     * between fixed angular samples while the player moves.
      */
     _buildVisibilityPolygon(px, py, segments, maxDist) {
-        // 192 evenly spaced rays are visually continuous at the current zoom,
-        // while leaving substantially more of a 144 Hz frame for structures.
-        const rayCount = 192;
-        let directions = this._losRayDirections;
-        if (!directions || directions.length !== rayCount) {
-            const angleStep = (Math.PI * 2) / rayCount;
-            directions = Array.from({ length: rayCount }, (_, i) => ({
-                x: Math.cos(i * angleStep),
-                y: Math.sin(i * angleStep),
-            }));
-            this._losRayDirections = directions;
+        const baseRayCount = 96;
+        const endpointEpsilon = 0.00003;
+        const maxEndpointDistSq = (maxDist + 2) * (maxDist + 2);
+        const angles = this._losWorkingAngles;
+        angles.length = 0;
+        for (let i = 0; i < baseRayCount; i++) {
+            angles.push((i / baseRayCount) * Math.PI * 2 - Math.PI);
         }
+        for (const segment of segments) {
+            for (let endpointIndex = 0; endpointIndex < 2; endpointIndex++) {
+                const x = endpointIndex === 0 ? segment.ax : segment.bx;
+                const y = endpointIndex === 0 ? segment.ay : segment.by;
+                const dx = x - px;
+                const dy = y - py;
+                if (dx * dx + dy * dy > maxEndpointDistSq) continue;
+                const angle = Math.atan2(dy, dx);
+                angles.push(angle - endpointEpsilon, angle, angle + endpointEpsilon);
+            }
+        }
+        angles.sort((a, b) => a - b);
+
         const polygon = this._losWorkingPolygon;
-        for (let i = 0; i < rayCount; i++) {
-            const point = polygon[i] || (polygon[i] = { x: 0, y: 0 });
-            const direction = directions[i];
-            this._castRay(px, py, direction.x, direction.y, segments, maxDist, point);
+        let pointCount = 0;
+        let previousAngle = -Infinity;
+        for (const angle of angles) {
+            if (angle - previousAngle < 1e-8) continue;
+            previousAngle = angle;
+            const point = polygon[pointCount] || (polygon[pointCount] = { x: 0, y: 0 });
+            this._castRay(px, py, Math.cos(angle), Math.sin(angle), segments, maxDist, point);
+            pointCount++;
         }
+        polygon.length = pointCount;
         return polygon;
     }
-
     /**
      * Draw Among Us-style line-of-sight shadows using even-odd fill.
      * A large outer rectangle + the visibility polygon are drawn with 'evenodd'
