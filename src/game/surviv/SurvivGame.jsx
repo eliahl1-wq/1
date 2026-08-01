@@ -226,7 +226,6 @@ export default function SurvivGame() {
     const pickupWeaponPendingRef = useRef(false);
     const equipSlotPendingRef = useRef(null);
     const openChestPendingRef = useRef(null);
-    const chestHoldIdRef = useRef(null);
     const takeChestItemPendingRef = useRef(null);
     const prevOpenedContainerIdRef = useRef(null);
     const closeChestPendingRef = useRef(false);
@@ -605,16 +604,6 @@ export default function SurvivGame() {
                 if (inventoryOpenRef.current) handleCloseInventory();
                 return;
             }
-            if (k === 'f') {
-                e.preventDefault();
-                if (e.repeat) return;
-                const chest = renderer.getNearbyChest();
-                if (chest?.id) {
-                    chestHoldIdRef.current = chest.id;
-                    renderer.setChestHold(chest.id, Date.now());
-                    return;
-                }
-            }
             const action = renderer.handleKeyDown(e);
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
@@ -625,10 +614,6 @@ export default function SurvivGame() {
             }
         };
         const onKeyUp = (e) => {
-            if (e.key.toLowerCase() === 'f') {
-                chestHoldIdRef.current = null;
-                renderer.setChestHold(null);
-            }
             renderer.handleKeyUp(e);
         };
         const onPointerMove = (e) => {
@@ -664,8 +649,6 @@ export default function SurvivGame() {
         const neutralizeInput = () => {
             renderer.clearInput();
             clearPendingActions();
-            chestHoldIdRef.current = null;
-            renderer.setChestHold(null);
             if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
                 const neutral = renderer.getInputPayload();
                 neutral.dx = 0;
@@ -768,7 +751,7 @@ export default function SurvivGame() {
             }
             renderer.updateState(tick);
             if (IS_MOBILE) {
-                const nearby = !!renderer.getNearbyGroundWeapon() || !!renderer.getNearbyChest();
+                const nearby = !!renderer.getNearbyGroundWeapon();
                 setCanMobileInteract(previous => previous === nearby ? previous : nearby);
             }
             if (tick.you) {
@@ -945,14 +928,6 @@ export default function SurvivGame() {
             ) return;
 
             const payload = renderer.getInputPayload();
-            const heldChest = chestHoldIdRef.current
-                ? renderer.getNearbyChest()
-                : null;
-            if (chestHoldIdRef.current && heldChest?.id !== chestHoldIdRef.current) {
-                chestHoldIdRef.current = null;
-                renderer.setChestHold(null);
-            }
-            payload.chestHoldId = chestHoldIdRef.current;
             let hasAction = false;
             if (reloadPendingRef.current) {
                 payload.reload = true;
@@ -1015,7 +990,6 @@ export default function SurvivGame() {
                 Math.round((Number(payload.dy) || 0) * 1000),
                 Math.round((Number(payload.aimAngle) || 0) * 1000),
                 payload.shooting ? 1 : 0,
-                payload.chestHoldId || '',
             ].join(':');
             const now = Date.now();
             if (!hasAction && continuousSignature === lastContinuousInput && now - lastInputSentAt < 250) return;
@@ -1081,21 +1055,11 @@ export default function SurvivGame() {
     }, []);
 
     const handleMobileInteract = useCallback(() => {
-        const renderer = rendererRef.current;
-        const chest = renderer?.getNearbyChest();
-        if (chest?.id) {
-            chestHoldIdRef.current = chest.id;
-            renderer.setChestHold(chest.id, Date.now());
-            return;
-        }
-        const weapon = renderer?.getNearbyGroundWeapon();
+        const weapon = rendererRef.current?.getNearbyGroundWeapon();
         if (weapon?.id) pickupWeaponPendingRef.current = true;
     }, []);
 
-    const handleMobileInteractEnd = useCallback(() => {
-        chestHoldIdRef.current = null;
-        rendererRef.current?.setChestHold(null);
-    }, []);
+    const handleMobileInteractEnd = useCallback(() => {}, []);
 
     const handleAdminSpawnBot = useCallback(() => {
         if (!authToken) return;

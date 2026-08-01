@@ -389,9 +389,6 @@ export class SurvivRenderer {
         this._terrainPattern = null;
         this.zone = null;
         this.me = null;
-        this.hoveredChestId = null;
-        this.chestHoldId = null;
-        this.chestHoldStartedAt = 0;
         this.lootToast = null;
         this.lastLootId = null;
         this.hud = {
@@ -655,9 +652,6 @@ export class SurvivRenderer {
         this._waterAnimationGeometry = new WeakMap();
         this.me = null;
         this.zone = null;
-        this.hoveredChestId = null;
-        this.chestHoldId = null;
-        this.chestHoldStartedAt = 0;
         this.lootToast = null;
         this.lastLootId = null;
         this.particles = [];
@@ -844,6 +838,14 @@ export class SurvivRenderer {
     }
 
     _ingestLootSnapshots(nextLoot, receivedAt) {
+        const previousLoot = new Map(this.loot.map(item => [item.id, item]));
+        for (const item of nextLoot) {
+            const previous = previousLoot.get(item.id);
+            if (previous?._hitAt) item._hitAt = previous._hitAt;
+            if (previous && Number.isFinite(previous.hp) && Number(item.hp) < previous.hp) {
+                item._hitAt = receivedAt;
+            }
+        }
         for (const [id, state] of this._lootBurstStates) {
             if (receivedAt >= state.endAt) this._lootBurstStates.delete(id);
         }
@@ -1113,24 +1115,25 @@ export class SurvivRenderer {
         // ticks. Retain the last snapshot when omitted, and only rebuild the
         // expensive render cache when its actual contents changed.
         if (Array.isArray(tick.obstacles)) {
+            const nextObstacles = this.mergeObstaclePatch(tick.obstacles, tick.obstaclePatch);
             const previousObstacles = new Map(this.obstacles.map(obstacle => [obstacle.id, obstacle]));
-            for (const obstacle of tick.obstacles) {
+            for (const obstacle of nextObstacles) {
                 const previous = previousObstacles.get(obstacle.id);
                 if (previous?._hitAt) obstacle._hitAt = previous._hitAt;
                 if (previous && Number.isFinite(previous.hp) && obstacle.hp < previous.hp) {
                     obstacle._hitAt = receivedAt;
                 }
             }
-            const nextSignature = obstacleRenderSignature(tick.obstacles);
+            const nextSignature = obstacleRenderSignature(nextObstacles);
             if (nextSignature !== this._obstacleRenderSignature) {
-                this.obstacles = tick.obstacles;
+                this.obstacles = nextObstacles;
                 this._obstacleRenderSignature = nextSignature;
                 this.rebuildObstacleRenderCache();
             } else {
                 // Damage changes a prop's appearance but not its render geometry.
                 // Preserve cached identities instead of rebuilding every structure
                 // bucket and surface texture for a single HP update.
-                for (const obstacle of tick.obstacles) {
+                for (const obstacle of nextObstacles) {
                     const previous = previousObstacles.get(obstacle.id);
                     if (!previous) continue;
                     previous.hp = obstacle.hp;
@@ -1455,30 +1458,40 @@ export class SurvivRenderer {
         const w = this.screenToWorld(this.mouse.x, this.mouse.y);
         this.mouse.worldX = w.x;
         this.mouse.worldY = w.y;
-        this.hoveredChestId = this.findInteractChest()?.id || null;
     }
 
     handlePointerDown() {
         if (!this.inputEnabled || this.spectatorMode) return null;
-        const chest = this.findInteractChest();
-        if (chest) {
-            this.hoveredChestId = chest.id;
-            this.mouse.down = false;
-            return null;
-        }
         this.mouse.down = true;
         return null;
-    }
-
-    setChestHold(chestId, startedAt = 0) {
-        this.chestHoldId = chestId || null;
-        this.chestHoldStartedAt = chestId ? startedAt : 0;
     }
 
     handlePointerUp() {
         this.mouse.down = false;
     }
 
+    mergeObstaclePatch(incoming, patch) {
+        if (!Array.isArray(incoming)) return this.obstacles;
+        const patchX = Number(patch?.x);
+        const patchY = Number(patch?.y);
+        const patchRange = Number(patch?.range);
+        const retainRange = Math.max(patchRange, Number(patch?.retainRange) || patchRange);
+        const hasPatch = Number.isFinite(patchX) && Number.isFinite(patchY) && patchRange > 0;
+        const incomingById = new Map(incoming.map(obstacle => [obstacle.id, obstacle]));
+        if (hasPatch) {
+            for (const obstacle of this.obstacles) {
+                if (!obstacle?.id || incomingById.has(obstacle.id)) continue;
+                const halfW = Math.abs(Number(obstacle._renderHalfW ?? obstacle.w / 2) || 0);
+                const halfH = Math.abs(Number(obstacle._renderHalfH ?? obstacle.h / 2) || 0);
+                const intersectsPatch = Math.abs(obstacle.x - patchX) <= patchRange + halfW
+                    && Math.abs(obstacle.y - patchY) <= patchRange + halfH;
+                const insideRetention = Math.abs(obstacle.x - patchX) <= retainRange + halfW
+                    && Math.abs(obstacle.y - patchY) <= retainRange + halfH;
+                if (!intersectsPatch && insideRetention) incomingById.set(obstacle.id, obstacle);
+            }
+        }
+        return [...incomingById.values()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    }
     rebuildObstacleRenderCache() {
         this.houseFloors = [];
         this.roomZones = [];
@@ -2068,28 +2081,6 @@ export class SurvivRenderer {
         ctx.fill('evenodd');
         ctx.restore();
     }
-    findInteractChest(
-        requireCursor = true,
-        currentHouse = this.getCurrentHouse(),
-        currentRoom = this.getCurrentRoom(currentHouse),
-    ) {
-        if (!this.me) return null;
-        let best = null;
-        let bestCursor = Infinity;
-        for (const l of this.loot) {
-            if (l.type !== 'chest' && l.type !== 'deathCrate') continue;
-            if (this.isLootHidden(l, currentHouse, currentRoom)) continue;
-            if (Math.hypot(this.me.x - l.x, this.me.y - l.y) > 96) continue;
-            const cursorDist = requireCursor
-                ? Math.hypot(this.mouse.worldX - l.x, this.mouse.worldY - l.y)
-                : Math.hypot(this.me.x - l.x, this.me.y - l.y);
-            if ((!requireCursor || cursorDist < 34) && cursorDist < bestCursor) {
-                best = l;
-                bestCursor = cursorDist;
-            }
-        }
-        return best;
-    }
 
     getNearbyGroundWeapon() {
         if (!this.me) return null;
@@ -2106,9 +2097,6 @@ export class SurvivRenderer {
         return nearest;
     }
 
-    getNearbyChest() {
-        return this.findInteractChest(false);
-    }
 
     draw(dt = 1 / 60) {
         this._frameDt = dt;
@@ -2229,7 +2217,6 @@ export class SurvivRenderer {
         this.drawTerrain(ctx, camX, camY, W, H, z);
         const currentHouse = this.getCurrentHouse();
         const currentRoom = this.getCurrentRoom(currentHouse);
-        this.hoveredChestId = this.findInteractChest(true, currentHouse, currentRoom)?.id || null;
         const visibleFields = this.collectVisibleObstacles(
             this.fieldObstacles, this._visibleFields, 32, currentHouse, currentRoom,
         );
@@ -4422,8 +4409,8 @@ export class SurvivRenderer {
         const shake = this.getObstacleHitShake(o);
         ctx.drawImage(
             sprite.canvas,
-            Math.round(o.x + shake.x - sprite.worldWidth / 2),
-            Math.round(o.y + shake.y - sprite.worldHeight / 2),
+            o.x + shake.x - sprite.worldWidth / 2,
+            o.y + shake.y - sprite.worldHeight / 2,
             sprite.worldWidth,
             sprite.worldHeight,
         );
@@ -4484,6 +4471,91 @@ export class SurvivRenderer {
         this.chestBursts.length = liveCount;
     }
 
+    drawLootContainer(ctx, l) {
+        const type = l.type === 'deathCrate' ? 'death_crate' : (l.containerType || 'wood_crate');
+        const palettes = {
+            wood_crate: { top: '#a96b32', body: '#7a421f', trim: '#382014', mark: '#dca765' },
+            supply_crate: { top: '#b78442', body: '#7b5328', trim: '#31483a', mark: '#e8c47d' },
+            ammo_crate: { top: '#65734b', body: '#3f4b32', trim: '#20271b', mark: '#e7d76e' },
+            medical_crate: { top: '#e6e3d7', body: '#b9b9ae', trim: '#355847', mark: '#e7f5eb' },
+            armory_crate: { top: '#4b5657', body: '#283234', trim: '#12191a', mark: '#e0b84d' },
+            death_crate: { top: '#56396e', body: '#30203e', trim: '#17101f', mark: '#d8b4fe' },
+        };
+        const palette = palettes[type] || palettes.wood_crate;
+        const shake = this.getObstacleHitShake(l);
+        const hpRatio = clamp((Number(l.hp) || Number(l.maxHp) || 1) / Math.max(1, Number(l.maxHp) || 1), 0, 1);
+
+        ctx.save();
+        ctx.translate(shake.x, shake.y);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+        ctx.beginPath();
+        ctx.ellipse(0, 12, 23, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.rotate(type === 'medical_crate' ? 0.025 : -0.045);
+
+        ctx.fillStyle = palette.body;
+        ctx.strokeStyle = palette.trim;
+        ctx.lineWidth = 2.2;
+        roundRect(ctx, -21, -13, 42, 28, 2.5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = palette.top;
+        roundRect(ctx, -21, -14, 42, 11, 2.5);
+        ctx.fill();
+        ctx.stroke();
+
+        if (type === 'wood_crate' || type === 'supply_crate') {
+            ctx.strokeStyle = type === 'supply_crate' ? '#31483a' : '#4b2918';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-16, -8); ctx.lineTo(15, 11);
+            ctx.moveTo(16, -8); ctx.lineTo(-15, 11);
+            ctx.stroke();
+            ctx.fillStyle = palette.mark;
+            ctx.fillRect(-3, -14, 6, 29);
+        } else if (type === 'ammo_crate') {
+            ctx.fillStyle = palette.mark;
+            for (let x = -8; x <= 8; x += 8) {
+                roundRect(ctx, x - 2, -7, 4, 14, 1.5);
+                ctx.fill();
+            }
+            ctx.font = '900 6px system-ui';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('AMMO', 0, 11);
+        } else if (type === 'medical_crate') {
+            ctx.fillStyle = '#2f8f5b';
+            ctx.fillRect(-4, -10, 8, 20);
+            ctx.fillRect(-11, -4, 22, 8);
+        } else if (type === 'armory_crate') {
+            ctx.fillStyle = palette.mark;
+            ctx.fillRect(-18, -11, 5, 23);
+            ctx.fillRect(13, -11, 5, 23);
+            ctx.font = '900 7px system-ui';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('ARM', 0, 3);
+        } else {
+            ctx.strokeStyle = palette.mark;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-7, 0); ctx.lineTo(7, 0);
+            ctx.moveTo(0, -7); ctx.lineTo(0, 7);
+            ctx.stroke();
+        }
+
+        if (hpRatio < 0.74) {
+            ctx.strokeStyle = 'rgba(28, 18, 12, 0.82)';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.moveTo(-7, -12); ctx.lineTo(-2, -5); ctx.lineTo(-6, 2); ctx.lineTo(1, 9);
+            if (hpRatio < 0.38) {
+                ctx.moveTo(10, -10); ctx.lineTo(5, -2); ctx.lineTo(11, 5);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
     drawLoot(ctx, l) {
         const color = l.type === 'ammo' ? (AMMO_COLORS[l.ammoType] || LOOT_COLORS.ammo) : (LOOT_COLORS[l.type] || '#d5d5d5');
         const isChest = l.type === 'chest' || l.type === 'deathCrate';
@@ -4516,344 +4588,7 @@ export class SurvivRenderer {
         ctx.scale(pulse * burstScale, pulse * burstScale);
 
         if (isChest) {
-            const hovered = this.hoveredChestId === l.id;
-            const holding = this.chestHoldId === l.id;
-            const holdProgress = holding
-                ? clamp((this._frameNow - this.chestHoldStartedAt) / 2000, 0, 1)
-                : 0;
-            const isDeathCrate = l.type === 'deathCrate';
-            const tierColor = isDeathCrate ? '#a855f7' : (RARITY_COLORS[l.tier] || '#d7c396');
-            const glowRad = 34 + Math.sin(this._frameNow / 260 + l.x * 0.035) * 5;
-
-            // Base shadow
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
-            ctx.beginPath();
-            ctx.ellipse(0, 11, 23, 7, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Glow Aura
-            const glowGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, glowRad);
-            glowGrad.addColorStop(0, tierColor + '46');
-            glowGrad.addColorStop(0.5, tierColor + '18');
-            glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = glowGrad;
-            ctx.beginPath();
-            ctx.arc(0, 0, glowRad, 0, Math.PI * 2);
-            ctx.fill();
-
-            const palette = isDeathCrate
-                ? { lid: '#442e5d', body: '#2d203b', trim: '#a855f7', dark: '#150e1c', lock: '#f5d0fe', glow: '#bf7afc' }
-                : l.tier === 'military'
-                    ? { lid: '#485735', body: '#2f3b25', trim: '#1b2416', dark: '#0c120a', lock: '#a3e635', glow: '#bef264' }
-                    : l.tier === 'rare'
-                        ? { lid: '#22488a', body: '#162e5c', trim: '#fbbf24', dark: '#0a1730', lock: '#fef08a', glow: '#60a5fa' }
-                        : { lid: '#7c3a27', body: '#502315', trim: '#ca8a04', dark: '#2b1008', lock: '#fbbf24', glow: '#f59e0b' };
-
-            ctx.save();
-            const baseRotation = isDeathCrate ? 0.045 : -0.055;
-            const anticipation = holding ? Math.sin(this._frameNow / 34) * 0.025 * (0.35 + holdProgress) : 0;
-            ctx.translate(0, holding ? -Math.abs(Math.sin(this._frameNow / 70)) * holdProgress * 1.3 : 0);
-            ctx.rotate(baseRotation + anticipation);
-
-            // Apply interactive glow when hovered
-            if (hovered) {
-                ctx.shadowColor = palette.glow;
-                ctx.shadowBlur = 12 + Math.sin(this._frameNow / 110) * 3;
-            }
-
-            if (isDeathCrate) {
-                // Death Crate: Gothic Obsidian/Skull Coffin
-                // Body (lower part)
-                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
-                bodyGrad.addColorStop(0, palette.body);
-                bodyGrad.addColorStop(1, palette.dark);
-                ctx.fillStyle = bodyGrad;
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 2.2;
-                roundRect(ctx, -19, 0, 38, 12, 3);
-                ctx.fill();
-                ctx.stroke();
-
-                // Lid (upper part)
-                const lidGrad = ctx.createLinearGradient(0, -15, 0, -1);
-                lidGrad.addColorStop(0, palette.lid);
-                lidGrad.addColorStop(1, palette.body);
-                ctx.fillStyle = lidGrad;
-                roundRect(ctx, -20, -15, 40, 14, 4);
-                ctx.fill();
-                ctx.stroke();
-
-                // Bone/silver corners
-                ctx.fillStyle = '#94a3b8';
-                ctx.strokeStyle = '#1e293b';
-                ctx.lineWidth = 1;
-                // Top corners
-                roundRect(ctx, -20.5, -15.5, 6, 6, 1); ctx.fill(); ctx.stroke();
-                roundRect(ctx, 14.5, -15.5, 6, 6, 1); ctx.fill(); ctx.stroke();
-                // Bottom corners
-                roundRect(ctx, -19.5, 7, 5, 5.5, 1); ctx.fill(); ctx.stroke();
-                roundRect(ctx, 14.5, 7, 5, 5.5, 1); ctx.fill(); ctx.stroke();
-
-                // Glowing purple runes/skull on lid
-                ctx.save();
-                ctx.shadowColor = '#d8b4fe';
-                ctx.shadowBlur = 8;
-                ctx.strokeStyle = '#c084fc';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                // Draw a simple glowing stylized runic cross/emblem
-                ctx.moveTo(-7, -8); ctx.lineTo(7, -8);
-                ctx.moveTo(0, -12); ctx.lineTo(0, -4);
-                ctx.stroke();
-                ctx.restore();
-
-                // Neon trim line dividing lid & body
-                ctx.fillStyle = palette.trim;
-                roundRect(ctx, -21, -1, 42, 2.5, 1);
-                ctx.fill();
-
-                // Mystic Lock Gem
-                ctx.fillStyle = '#ec4899';
-                ctx.beginPath();
-                ctx.moveTo(0, -3);
-                ctx.lineTo(4, 1);
-                ctx.lineTo(0, 5);
-                ctx.lineTo(-4, 1);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-            }
-            else if (l.tier === 'military') {
-                // Military Container Crate
-                // Body (lower container)
-                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
-                bodyGrad.addColorStop(0, palette.body);
-                bodyGrad.addColorStop(1, palette.dark);
-                ctx.fillStyle = bodyGrad;
-                ctx.strokeStyle = '#0c120a';
-                ctx.lineWidth = 2.2;
-                roundRect(ctx, -19, 0, 38, 12, 2);
-                ctx.fill();
-                ctx.stroke();
-
-                // Hazard stripes on body
-                ctx.strokeStyle = '#a3e635';
-                ctx.lineWidth = 2.2;
-                ctx.beginPath();
-
-                ctx.moveTo(-10, 1); ctx.lineTo(-6, 11);
-                ctx.moveTo(-3, 1); ctx.lineTo(1, 11);
-                ctx.moveTo(4, 1); ctx.lineTo(8, 11);
-                ctx.stroke();
-
-                // Lid (armored top)
-                const lidGrad = ctx.createLinearGradient(0, -14, 0, -1);
-                lidGrad.addColorStop(0, '#5c6f44'); // highlight
-                lidGrad.addColorStop(0.5, palette.lid);
-                lidGrad.addColorStop(1, palette.body);
-                ctx.fillStyle = lidGrad;
-                ctx.strokeStyle = '#0c120a';
-                ctx.lineWidth = 2.2;
-                roundRect(ctx, -20, -14, 40, 13, 3);
-                ctx.fill();
-                ctx.stroke();
-
-                // Reinforcing structural ribs (vertical lines on lid)
-                ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                ctx.fillRect(-13, -13, 3, 11);
-                ctx.fillRect(-5, -13, 3, 11);
-                ctx.fillRect(3, -13, 3, 11);
-                ctx.fillRect(11, -13, 3, 11);
-
-                // Heavy black corner bindings
-                ctx.fillStyle = palette.trim;
-                ctx.fillRect(-20.5, -14.5, 4.5, 13.5);
-                ctx.fillRect(16, -14.5, 4.5, 13.5);
-                ctx.fillRect(-19.5, 0, 4, 12);
-                ctx.fillRect(15.5, 0, 4, 12);
-
-                // Lid lip / seal
-                ctx.fillStyle = '#1b2416';
-                roundRect(ctx, -21, -1.5, 42, 2.5, 1);
-                ctx.fill();
-                ctx.stroke();
-
-                // Center digital keypad / status LED
-                ctx.fillStyle = '#1e293b';
-                roundRect(ctx, -4, -3, 8, 8, 1.5);
-                ctx.fill();
-                ctx.stroke();
-                // Glowing LED
-                ctx.fillStyle = hovered ? '#22c55e' : '#ef4444';
-                ctx.beginPath();
-                ctx.arc(0, 1, 1.8, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            else if (l.tier === 'rare') {
-                // Rare Blue/Gold Chest
-                // Body (lower chest)
-                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
-                bodyGrad.addColorStop(0, palette.body);
-                bodyGrad.addColorStop(1, palette.dark);
-                ctx.fillStyle = bodyGrad;
-                ctx.strokeStyle = '#050f24';
-                ctx.lineWidth = 2.2;
-                roundRect(ctx, -19, 0, 38, 12, 2);
-                ctx.fill();
-                ctx.stroke();
-
-                // Lid (slanted/curved metallic blue)
-                const lidGrad = ctx.createLinearGradient(0, -14, 0, -1);
-                lidGrad.addColorStop(0, '#3b82f6'); // light blue highlight
-                lidGrad.addColorStop(0.5, palette.lid);
-                lidGrad.addColorStop(1, palette.body);
-                ctx.fillStyle = lidGrad;
-                ctx.strokeStyle = '#050f24';
-                ctx.lineWidth = 2.2;
-                roundRect(ctx, -20, -14, 40, 13, 3);
-                ctx.fill();
-                ctx.stroke();
-
-                // Diagonal metallic gloss lines
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(-12, -13); ctx.lineTo(-4, -2);
-                ctx.moveTo(4, -13); ctx.lineTo(12, -2);
-                ctx.stroke();
-
-                // Gold trim bands
-                ctx.fillStyle = palette.trim;
-                // Corner protectors
-                ctx.beginPath();
-                ctx.moveTo(-20, -14); ctx.lineTo(-14, -14); ctx.lineTo(-14, -11);
-                ctx.lineTo(-17, -11); ctx.lineTo(-17, -1); ctx.lineTo(-20, -1);
-                ctx.closePath(); ctx.fill(); ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(20, -14); ctx.lineTo(14, -14); ctx.lineTo(14, -11);
-                ctx.lineTo(17, -11); ctx.lineTo(17, -1); ctx.lineTo(20, -1);
-                ctx.closePath(); ctx.fill(); ctx.stroke();
-                // Bottom corners
-                ctx.fillRect(-19, 0, 4, 12); ctx.strokeRect(-19, 0, 4, 12);
-                ctx.fillRect(15, 0, 4, 12); ctx.strokeRect(15, 0, 4, 12);
-
-                // Lid dividing gold lip
-                ctx.fillStyle = palette.trim;
-                roundRect(ctx, -20.5, -1.5, 41, 2.5, 1);
-                ctx.fill();
-                ctx.stroke();
-
-                // Ornate silver plate with glowing cyan lock core
-                ctx.fillStyle = '#cbd5e1';
-                roundRect(ctx, -5, -4, 10, 9, 2);
-                ctx.fill();
-                ctx.stroke();
-                // Cyan energy core
-                ctx.save();
-                ctx.shadowColor = '#22d3ee';
-                ctx.shadowBlur = 8;
-                ctx.fillStyle = '#06b6d4';
-                ctx.beginPath();
-                ctx.arc(0, 0.5, 2.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            }
-            else {
-                // Common Wooden Chest
-                // Body (lower wood panel)
-                const bodyGrad = ctx.createLinearGradient(0, 0, 0, 12);
-                bodyGrad.addColorStop(0, palette.body);
-                bodyGrad.addColorStop(1, palette.dark);
-                ctx.fillStyle = bodyGrad;
-                ctx.strokeStyle = '#1a0802';
-                ctx.lineWidth = 2.2;
-                roundRect(ctx, -18, 0, 36, 12, 2);
-                ctx.fill();
-                ctx.stroke();
-
-                // Wood grain lines on body
-                ctx.strokeStyle = 'rgba(0,0,0,0.22)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(-17, 4); ctx.lineTo(17, 4);
-                ctx.moveTo(-17, 8); ctx.lineTo(17, 8);
-                ctx.stroke();
-
-                // Lid (curved wood top)
-                const lidGrad = ctx.createLinearGradient(0, -14, 0, -1);
-                lidGrad.addColorStop(0, '#92400e'); // rich warm wood highlight
-                lidGrad.addColorStop(0.48, palette.lid);
-                lidGrad.addColorStop(1, palette.body);
-                ctx.fillStyle = lidGrad;
-                ctx.strokeStyle = '#1a0802';
-                ctx.lineWidth = 2.2;
-                roundRect(ctx, -20, -14, 40, 13, 3);
-                ctx.fill();
-                ctx.stroke();
-
-                // Wood grain lines on lid
-                ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-                ctx.beginPath();
-                ctx.moveTo(-19, -9); ctx.lineTo(19, -9);
-                ctx.moveTo(-19, -5); ctx.lineTo(19, -5);
-                ctx.stroke();
-
-                // Dark rusty iron bands
-                ctx.fillStyle = '#374151';
-                ctx.fillRect(-13, -14, 4, 26);
-                ctx.fillRect(9, -14, 4, 26);
-                ctx.strokeStyle = '#111827';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(-13, -14, 4, 26);
-                ctx.strokeRect(9, -14, 4, 26);
-
-                // Lid dividing trim
-                ctx.fillStyle = '#5c3116';
-                roundRect(ctx, -20.5, -1.5, 41, 2.5, 1);
-                ctx.fill();
-                ctx.stroke();
-
-                // Brass Lock hasp & padlock
-                ctx.fillStyle = palette.trim; // Golden brass
-                roundRect(ctx, -4, -3, 8, 8, 2);
-                ctx.fill();
-                ctx.stroke();
-                // Keyhole
-                ctx.fillStyle = '#111827';
-                ctx.fillRect(-0.8, 0, 1.6, 4);
-                ctx.beginPath();
-                ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            ctx.restore();
-
-            const nearby = !!this.me && Math.hypot(this.me.x - l.x, this.me.y - l.y) <= 96;
-            if (nearby || holding) {
-                const progress = holdProgress;
-                ctx.fillStyle = 'rgba(7, 10, 8, 0.86)';
-                ctx.beginPath();
-                ctx.arc(0, -33, 12, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(255,255,255,0.32)';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-                if (progress > 0) {
-                    ctx.strokeStyle = '#f5cf7a';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.arc(0, -33, 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
-                    ctx.stroke();
-                }
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 11px system-ui';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('F', 0, -33);
-                ctx.font = 'bold 8px system-ui';
-                ctx.fillStyle = holding ? '#f5cf7a' : 'rgba(255,255,255,0.9)';
-                ctx.fillText(holding ? 'OPENING...' : 'HOLD TO OPEN', 0, -51);
-            }
+            this.drawLootContainer(ctx, l);
         } else {
             if (!isBursting) {
                 ctx.fillStyle = 'rgba(6, 9, 7, 0.34)';
@@ -5840,7 +5575,7 @@ export class SurvivRenderer {
         const x = this.mouse.x || this.viewW / 2;
         const y = this.mouse.y || this.viewH / 2;
         ctx.save();
-        ctx.strokeStyle = this.hoveredChestId ? 'rgba(245, 207, 122, 0.95)' : this.mouse.down ? 'rgba(255, 226, 122, 0.9)' : 'rgba(255,255,255,0.72)';
+        ctx.strokeStyle = this.mouse.down ? 'rgba(255, 226, 122, 0.9)' : 'rgba(255,255,255,0.72)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);
@@ -6608,8 +6343,8 @@ export class SurvivRenderer {
 
         ctx.drawImage(
             sprite.canvas,
-            Math.round(o.x - sprite.worldWidth / 2),
-            Math.round(o.y - sprite.worldHeight / 2),
+            o.x - sprite.worldWidth / 2,
+            o.y - sprite.worldHeight / 2,
             sprite.worldWidth,
             sprite.worldHeight,
         );

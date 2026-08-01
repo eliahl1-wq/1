@@ -44,9 +44,35 @@ const drawFood = (position, food, graph, highQuality = false) => {
         return;
     }
     graph.fillStyle = 'hsl(' + food.hue + ', 100%, 55%)';
-    graph.strokeStyle = 'hsl(' + food.hue + ', 100%, 42%)';
-    graph.lineWidth = 0;
-    drawRoundObject({ x: sx, y: sy }, r, graph);
+    graph.beginPath();
+    graph.arc(sx, sy, r, 0, FULL_ANGLE);
+    graph.fill();
+};
+
+const FOOD_HUE_BUCKETS = 18;
+
+/** Draw normal pellets in a handful of paths instead of one draw call per pellet. */
+const drawFoodBatch = (foods, graph) => {
+    if (!foods?.length) return;
+    const buckets = Array.from({ length: FOOD_HUE_BUCKETS }, () => []);
+
+    for (const food of foods) {
+        const hue = ((Number(food.hue) || 0) % 360 + 360) % 360;
+        const bucket = Math.min(FOOD_HUE_BUCKETS - 1, Math.floor(hue / (360 / FOOD_HUE_BUCKETS)));
+        buckets[bucket].push(food);
+    }
+
+    for (let bucket = 0; bucket < buckets.length; bucket++) {
+        const pellets = buckets[bucket];
+        if (pellets.length === 0) continue;
+        graph.fillStyle = `hsl(${bucket * (360 / FOOD_HUE_BUCKETS) + 10}, 100%, 55%)`;
+        graph.beginPath();
+        for (const pellet of pellets) {
+            graph.moveTo(pellet.x + pellet.radius, pellet.y);
+            graph.arc(pellet.x, pellet.y, pellet.radius, 0, FULL_ANGLE);
+        }
+        graph.fill();
+    }
 };
 
 const drawVirus = (position, virus, graph) => {
@@ -314,4 +340,4 @@ const drawErrorMessage = (message, graph, screen) => {
     graph.fillText(message, screen.width / 2, screen.height / 2);
 }
 
-export { drawFood, drawVirus, drawFireFood, drawCells, drawErrorMessage, drawGrid, drawBorder, drawOrganicCell, drawHUD };
+export { drawFood, drawFoodBatch, drawVirus, drawFireFood, drawCells, drawErrorMessage, drawGrid, drawBorder, drawOrganicCell, drawHUD };

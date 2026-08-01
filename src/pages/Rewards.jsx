@@ -145,7 +145,7 @@ export default function Rewards() {
     const affiliatePending = Number(affiliateMetrics.pendingCommissionUsd) || 0;
     const affiliateAvailable = Number(affiliateMetrics.availableCommissionUsd) || 0;
     const affiliateBalance = affiliatePending + affiliateAvailable;
-    const affiliateMinimum = Number(affiliateData?.config?.minimumPayoutUsd) || 25;
+    const affiliateMinimum = Number(affiliateData?.config?.minimumPayoutUsd) || 2;
     const affiliatePayoutActive = !!affiliateData?.payouts?.some(payout => ['requested', 'processing'].includes(payout.status));
     const affiliateRequestable = affiliateAvailable >= affiliateMinimum
         && !!affiliateData?.profile?.payoutWallet

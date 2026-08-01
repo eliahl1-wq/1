@@ -797,10 +797,16 @@ export default function Game() {
         const viewZoom = getMobileViewZoom() * cameraZoomRef.current;
         const dpr = IS_MOBILE ? getMobileCanvasDpr(width, height) : 1;
         canvasDprRef.current = dpr;
-        canvas.width = Math.round(width * dpr);
-        canvas.height = Math.round(height * dpr);
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
+        const pixelWidth = Math.round(width * dpr);
+        const pixelHeight = Math.round(height * dpr);
+        // Assigning either canvas dimension clears its current frame. Capture/fullscreen
+        // software can emit duplicate resize events, so only resize when it really changed.
+        if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+        if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+        const cssWidth = `${width}px`;
+        const cssHeight = `${height}px`;
+        if (canvas.style.width !== cssWidth) canvas.style.width = cssWidth;
+        if (canvas.style.height !== cssHeight) canvas.style.height = cssHeight;
         if (socketRef.current?.connected) {
             socketRef.current.emit('0', {
                 x: 0,
@@ -890,6 +896,7 @@ export default function Game() {
                 const halfW = screen.width / (2 * viewZoom) + 120;
                 const halfH = screen.height / (2 * viewZoom) + 120;
                 const myCells = users.find(u => u.id === myIdRef.current)?.cells || [];
+                const batchedFood = [];
                 for (const f of foodCacheRef.current.values()) {
                     if (Math.abs(f.x - camX) > halfW || Math.abs(f.y - camY) > halfH) continue;
                     const fr = (f.radius || 5);
@@ -898,8 +905,15 @@ export default function Game() {
                         return d < Math.max((c.radius || 0) - fr * 0.15, fr * 0.25);
                     });
                     if (underMe) continue;
-                    renderUtils.drawFood(worldToScreen(f.x, f.y), { ...f, radius: fr * viewZoom }, graph, IS_MOBILE);
+                    const point = worldToScreen(f.x, f.y);
+                    const screenFood = { x: point.x, y: point.y, radius: fr * viewZoom, hue: f.hue };
+                    if (f.golden || IS_MOBILE) {
+                        renderUtils.drawFood(point, { ...f, radius: screenFood.radius }, graph, IS_MOBILE);
+                    } else {
+                        batchedFood.push(screenFood);
+                    }
                 }
+                renderUtils.drawFoodBatch(batchedFood, graph);
 
                 (ejected || []).forEach(m => {
                     renderUtils.drawFireFood(worldToScreen(m.x, m.y), { ...m, radius: (m.radius || 5) * viewZoom }, { border: 6 * viewZoom }, graph);
@@ -981,22 +995,26 @@ export default function Game() {
 
                 const viewHalfW = screen.width / (2 * viewZoom);
                 const viewHalfH = screen.height / (2 * viewZoom);
-                const fallback = {
-                    players: users.map(u => ({
-                        x: u.x,
-                        y: u.y,
-                        isYou: u.id === myIdRef.current,
-                    })),
-                    food: Array.from(foodCacheRef.current.values()).map(f => ({
-                        x: f.x,
-                        y: f.y,
-                        golden: f.golden,
-                        hue: f.hue,
-                    })),
-                    viruses: (viruses || []).map(v => ({ x: v.x, y: v.y })),
-                    ejected: (ejected || []).map(m => ({ x: m.x, y: m.y })),
-                };
-                const minimap = normalizeMinimapData(gameData.current.rewardInfo?.minimap, fallback);
+                const rawMinimap = gameData.current.rewardInfo?.minimap;
+                // Server minimap data is normally present. Avoid rebuilding large fallback
+                // arrays every frame, especially after zooming out with a large cell.
+                const minimap = rawMinimap
+                    ? normalizeMinimapData(rawMinimap)
+                    : normalizeMinimapData(null, {
+                        players: users.map(u => ({
+                            x: u.x,
+                            y: u.y,
+                            isYou: u.id === myIdRef.current,
+                        })),
+                        food: Array.from(foodCacheRef.current.values()).slice(0, 600).map(f => ({
+                            x: f.x,
+                            y: f.y,
+                            golden: f.golden,
+                            hue: f.hue,
+                        })),
+                        viruses: (viruses || []).map(v => ({ x: v.x, y: v.y })),
+                        ejected: (ejected || []).map(m => ({ x: m.x, y: m.y })),
+                    });
                 drawGameMinimap(graph, {
                     screenW: screen.width,
                     screenH: screen.height,

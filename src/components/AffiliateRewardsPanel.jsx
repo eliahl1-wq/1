@@ -121,7 +121,7 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
     };
 
     const metrics = data?.metrics || {};
-    const minimum = Number(data?.config?.minimumPayoutUsd || 25);
+    const minimum = Number(data?.config?.minimumPayoutUsd || 2);
     const available = Number(metrics.availableCommissionUsd || 0);
     const activePayout = !!data?.payouts?.some(item => ['requested', 'processing'].includes(item.status));
     const hasWallet = !!data?.profile?.payoutWallet;
