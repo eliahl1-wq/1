@@ -287,3 +287,42 @@
         white-space: nowrap;
     }
 }
+
+/* --- Product polish overrides --- */
+.affiliate-hero { padding: 56px 28px 44px; text-align: left; max-width: 960px; }
+.affiliate-kicker { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.09em; }
+.affiliate-hero h1,
+.affiliate-dashboard-header h1 {
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 780;
+    letter-spacing: -0.05em;
+    line-height: 1.02;
+}
+.affiliate-hero p { margin-inline: 0; color: var(--text-muted); font-size: 0.92rem; line-height: 1.58; }
+.affiliate-hero-actions { justify-content: flex-start; }
+.affiliate-panel,
+.affiliate-stat-grid article,
+.affiliate-link-card,
+.affiliate-payout-card,
+.affiliate-table-panel,
+.affiliate-math-card,
+.affiliate-terms {
+    background: rgba(18, 19, 25, 0.9);
+    border-color: var(--border-2);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-surface);
+}
+.affiliate-panel { padding: 22px; }
+.affiliate-tier-chip { border-radius: var(--r-md); }
+.affiliate-link-card small,
+.affiliate-payout-card small,
+.affiliate-stat-grid small,
+.affiliate-stat-grid span,
+.affiliate-table th,
+.affiliate-table td { color: var(--text-subtle); }
+.affiliate-status { border-radius: var(--r-md); font-weight: 700; }
+
+@media (max-width: 720px) {
+    .affiliate-hero { padding: 40px 16px 32px; }
+    .affiliate-hero h1 { font-size: 2rem; }
+}

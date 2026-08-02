@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import ProductPageHeader from '../components/ProductPageHeader';
 import TournamentAdminPanel from '../components/TournamentAdminPanel';
 import AffiliateAdminPanel from '../components/AffiliateAdminPanel';
 import '../styles/ui.css';
@@ -251,95 +252,53 @@ function AdminFilterBar({ children, right }) {
 
 function WalletCard({ title, label, address, sol, usd, themeColor }) {
     return (
-        <div style={{
-            background: `linear-gradient(145deg, ${themeColor}15 0%, ${themeColor}05 100%)`,
-            border: `1px solid ${themeColor}30`,
-            borderRadius: 'var(--r-xl)',
-            padding: '24px',
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: `0 8px 32px -8px ${themeColor}20`
-        }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', position: 'relative', zIndex: 2 }}>
-                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-h)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</p>
-                {label && <span style={{ fontSize: '0.65rem', padding: '3px 10px', borderRadius: '12px', background: `${themeColor}20`, color: themeColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>}
+        <article className="admin-wallet-card" style={{ '--admin-wallet-accent': themeColor }}>
+            <div className="admin-wallet-card__header">
+                <p className="admin-wallet-card__title">{title}</p>
+                {label && <span className="admin-wallet-card__badge">{label}</span>}
             </div>
-            {address && <p className="mono" style={{ margin: '0 0 20px', fontSize: '0.75rem', color: 'var(--text-3)', position: 'relative', zIndex: 2 }}>{truncateAddr(address)}</p>}
-            
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', position: 'relative', zIndex: 2 }}>
-                <p style={{ margin: 0, fontSize: '2.4rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-1.5px', textShadow: `0 2px 10px ${themeColor}40` }}>{sol}</p>
-            </div>
-            <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-2)', position: 'relative', zIndex: 2 }}>{usd}</p>
-            
-            <div style={{
-                position: 'absolute',
-                right: '-40px',
-                bottom: '-40px',
-                width: '160px',
-                height: '160px',
-                background: themeColor,
-                opacity: 0.15,
-                filter: 'blur(40px)',
-                borderRadius: '50%',
-                pointerEvents: 'none',
-                zIndex: 1
-            }} />
-        </div>
+            {address && <p className="admin-wallet-card__address mono">{truncateAddr(address)}</p>}
+            <p className="admin-wallet-card__balance mono">{sol}</p>
+            <p className="admin-wallet-card__fiat mono">{usd}</p>
+        </article>
     );
 }
 
-function StatCard({ label, value, sub, accent }) {
+function StatCard({ label, value, sub }) {
     return (
-        <div className="admin-stat-card" style={accent ? { background: accent.background, borderColor: accent.border, boxShadow: accent.shadow } : undefined}>
-            <p className="label" style={{ marginBottom: '8px' }}>{label}</p>
-            <p style={{ margin: 0, fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-1px' }}>
-                {value}
-            </p>
-            {sub && <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-2)' }}>{sub}</p>}
-        </div>
+        <article className="admin-stat-card">
+            <p className="admin-stat-card__label">{label}</p>
+            <p className="admin-stat-card__value">{value}</p>
+            {sub && <p className="admin-stat-card__sub">{sub}</p>}
+        </article>
     );
 }
 
 function DataTable({ columns, rows, loading, emptyMessage }) {
     if (loading) {
         return (
-            <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>
-                <span className="spinner" style={{ marginRight: '8px' }} />
-                Loading…
+            <div className="admin-table-state" aria-live="polite">
+                <span className="spinner" />
+                <span>Loading…</span>
             </div>
         );
     }
     if (!rows?.length) {
-        return <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-2)' }}>{emptyMessage}</div>;
+        return <div className="admin-table-state">{emptyMessage}</div>;
     }
     return (
-        <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+        <div className="admin-table-wrap">
+            <table className="admin-data-table">
                 <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                        {columns.map(col => (
-                            <th key={col.key} style={{
-                                textAlign: 'left',
-                                padding: '12px 16px',
-                                color: 'var(--text-2)',
-                                fontWeight: 600,
-                                fontSize: '0.72rem',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.04em',
-                                whiteSpace: 'nowrap',
-                            }}>
-                                {col.label}
-                            </th>
-                        ))}
+                    <tr>
+                        {columns.map(col => <th key={col.key}>{col.label}</th>)}
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map((row, i) => (
-                        <tr key={row.id ?? i} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <tr key={row.id ?? i}>
                             {columns.map(col => (
-                                <td key={col.key} style={{ padding: '12px 16px', color: 'var(--text)' }}>
-                                    {col.render ? col.render(row) : row[col.key]}
-                                </td>
+                                <td key={col.key}>{col.render ? col.render(row) : row[col.key]}</td>
                             ))}
                         </tr>
                     ))}
@@ -351,18 +310,17 @@ function DataTable({ columns, rows, loading, emptyMessage }) {
 
 function Panel({ title, sub, children }) {
     return (
-        <div className="admin-panel" style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', overflow: 'hidden' }}>
+        <section className="admin-panel">
             {(title || sub) && (
-                <div className="admin-panel-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-                    {title && <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-h)' }}>{title}</p>}
-                    {sub && <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: 'var(--text-2)' }}>{sub}</p>}
-                </div>
+                <header className="admin-panel-header">
+                    {title && <h2>{title}</h2>}
+                    {sub && <p>{sub}</p>}
+                </header>
             )}
             {children}
-        </div>
+        </section>
     );
 }
-
 function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, onRefresh, onDeleted, actionLoading }) {
     const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -548,7 +506,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                 </div>
 
                 {error && (
-                    <div style={{ padding: '16px 20px', color: '#ef4444', fontSize: '0.85rem' }}>{error}</div>
+                    <div className="product-alert product-alert--error">{error}</div>
                 )}
 
                 {loading ? (
@@ -1184,59 +1142,37 @@ export default function AdminDashboard() {
             <Background />
             <AppTopbar />
 
-            <div className="page-content" style={{ maxWidth: '1200px' }}>
-                <div className="page-header-row">
-                    <div>
-                        <p className="label" style={{ marginBottom: '6px' }}>Admin</p>
-                        <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)' }}>
-                            Dashboard
-                        </h1>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <LiveIndicator active={tab === 'activity' || tab === 'overview'} />
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '10px', background: user?.personalFreePlay ? 'rgba(34,197,94,.12)' : 'rgba(255,255,255,.035)', color: 'var(--text-h)', fontSize: '.76rem', fontWeight: 800, cursor: actionLoading ? 'wait' : 'pointer' }}>
-                            <input
-                                type="checkbox"
-                                checked={!!user?.personalFreePlay}
-                                disabled={actionLoading}
-                                onChange={event => togglePersonalFreePlay(event.target.checked)}
-                            />
-                            Sandbox free play
-                        </label>
-                        <button className="btn btn-ghost" onClick={() => loadData()} disabled={loading} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
-                            {loading ? 'Refreshing…' : 'Refresh'}
-                        </button>
-                        <button className="btn btn-ghost" onClick={() => navigate('/pre-game')} style={{ padding: '9px 18px', fontSize: '0.78rem' }}>
-                            ← Back
-                        </button>
-                    </div>
-                </div>
+            <div className="page-content product-page--admin">
+                <ProductPageHeader
+                    eyebrow="Admin"
+                    title="Dashboard"
+                    onBack={() => navigate('/pre-game')}
+                    actions={(
+                        <>
+                            <LiveIndicator active={tab === 'activity' || tab === 'overview'} />
+                            <label className={`admin-free-play-toggle${user?.personalFreePlay ? ' is-active' : ''}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={!!user?.personalFreePlay}
+                                    disabled={actionLoading}
+                                    onChange={event => togglePersonalFreePlay(event.target.checked)}
+                                />
+                                Sandbox free play
+                            </label>
+                            <button className="btn btn-ghost admin-header-action" onClick={() => loadData()} disabled={loading}>
+                                {loading ? 'Refreshing…' : 'Refresh'}
+                            </button>
+                        </>
+                    )}
+                />
 
                 {actionMsg && (
-                    <div style={{
-                        background: actionMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                        border: `1px solid ${actionMsg.startsWith('✅') ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                        borderRadius: 'var(--r-lg)',
-                        padding: '14px 18px',
-                        marginBottom: '20px',
-                        color: actionMsg.startsWith('✅') ? 'var(--green)' : '#ef4444',
-                        fontSize: '0.85rem',
-                    }}>
-                        {actionMsg}
+                    <div className={`product-alert ${actionMsg.startsWith('✅') ? 'product-alert--success' : 'product-alert--error'}`}>{actionMsg}
                     </div>
                 )}
 
                 {error && (
-                    <div style={{
-                        background: 'rgba(239,68,68,0.1)',
-                        border: '1px solid rgba(239,68,68,0.3)',
-                        borderRadius: 'var(--r-lg)',
-                        padding: '14px 18px',
-                        marginBottom: '20px',
-                        color: '#ef4444',
-                        fontSize: '0.85rem',
-                    }}>
-                        {error}
+                    <div className="product-alert product-alert--error">{error}
                     </div>
                 )}
 
@@ -1256,7 +1192,7 @@ export default function AdminDashboard() {
 
                 {tab === 'overview' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                        <div style={{
+                        <div className="admin-override-panel" style={{
                             display: 'flex',
                             alignItems: 'flex-end',
                             flexWrap: 'wrap',
@@ -1291,9 +1227,7 @@ export default function AdminDashboard() {
                             </span>
                         </div>
                         <div>
-                            <h3 style={{ margin: '0 0 16px', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-h)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                🔗 Actual On-Chain Wallets
-                            </h3>
+                            <h2 className="admin-section-title">On-chain wallets</h2>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
                                 <WalletCard 
                                     title="Main House" 
@@ -1339,9 +1273,7 @@ export default function AdminDashboard() {
                         </div>
 
                         <div>
-                            <h3 style={{ margin: '0 0 16px', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-h)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                📊 Bookkeeping & Stats
-                            </h3>
+                            <h2 className="admin-section-title">Platform overview</h2>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
                                 <StatCard label="Online now" value={(activeUsers?.sitePresence?.length ?? 0) + (activeUsers?.currentlyInGame ?? 0)} sub={`${activeUsers?.currentlyInGame ?? 0} playing · ${activeUsers?.sitePresence?.length ?? 0} browsing`} />
                                 <StatCard label="Registered users" value={overview?.totalAccounts ?? '—'} sub={`${formatUsd(overview?.totalUserBalanceUsd)} held in balances`} />

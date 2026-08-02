@@ -70,6 +70,10 @@ const WEAPON_AMMO_TYPES = {
 
 const SURVIV_RELOAD_UI_STEP_MS = 100;
 
+function isTextEntryTarget(target) {
+    if (!(target instanceof Element)) return false;
+    return !!target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]');
+}
 function createSurvivUiSnapshot(player) {
     const reloadRemaining = Math.max(0, Number(player?.reloadRemainingMs) || 0);
     const medkitRemaining = Math.max(0, Number(player?.medkitRemainingMs) || 0);
@@ -98,6 +102,38 @@ function createSurvivUiSnapshot(player) {
         openedContainer: player?.openedContainer || null,
         outsideZone: !!player?.outsideZone,
     };
+}
+
+function survivUiSnapshotsEqual(previous, next) {
+    if (!previous || !next) return previous === next;
+    const scalarKeys = [
+        'hp', 'maxHp', 'armor', 'weapon', 'ammo', 'clipSize', 'reloading',
+        'reloadRemainingMs', 'reloadMs', 'medkitRemainingMs', 'medkitUseMs',
+        'dollarBalance', 'kills', 'activeWeaponSlot', 'outsideZone',
+    ];
+    if (scalarKeys.some(key => previous[key] !== next[key])) return false;
+
+    const previousInventory = previous.inventory || {};
+    const nextInventory = next.inventory || {};
+    const previousWeapons = previousInventory.weapons || [];
+    const nextWeapons = nextInventory.weapons || [];
+    if (previousWeapons.length !== nextWeapons.length
+        || previousWeapons.some((weapon, index) => weapon !== nextWeapons[index])) return false;
+    if ((previousInventory.meleeWeapon || 'fists') !== (nextInventory.meleeWeapon || 'fists')
+        || (previousInventory.medkits || 0) !== (nextInventory.medkits || 0)
+        || (previousInventory.grenades || 0) !== (nextInventory.grenades || 0)) return false;
+
+    const previousSlotAmmo = previous.weaponSlotAmmo || [];
+    const nextSlotAmmo = next.weaponSlotAmmo || [];
+    if (previousSlotAmmo.length !== nextSlotAmmo.length
+        || previousSlotAmmo.some((ammo, index) => ammo !== nextSlotAmmo[index])) return false;
+    for (const ammoType of Object.keys(AMMO_TYPES)) {
+        if ((previousInventory.ammoReserves?.[ammoType] || 0) !== (nextInventory.ammoReserves?.[ammoType] || 0)) return false;
+    }
+
+    if ((previous.openedContainer?.id || null) !== (next.openedContainer?.id || null)) return false;
+    if (next.openedContainer && JSON.stringify(previous.openedContainer) !== JSON.stringify(next.openedContainer)) return false;
+    return true;
 }
 
 function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
@@ -233,7 +269,9 @@ export default function SurvivGame() {
     const dropItemPendingRef = useRef(null);
     const throwGrenadePendingRef = useRef(false);
     const swapWeaponSlotsPendingRef = useRef(null);
-    const meUiSignatureRef = useRef('');
+    const meUiSnapshotRef = useRef(null);
+    const nearbyPickupValueRef = useRef(null);
+    const leaderboardSignatureRef = useRef('');
     const resetCountdownValueRef = useRef(null);
     const aliveCountValueRef = useRef(0);
 
@@ -318,7 +356,7 @@ export default function SurvivGame() {
         closeChestPendingRef.current = true;
     }, []);
     const [me, setMe] = useState(null);
-    const [canMobileInteract, setCanMobileInteract] = useState(false);
+    const [nearbyPickup, setNearbyPickup] = useState(null);
     const [aliveCount, setAliveCount] = useState(0);
     const spectateTargetsRef = useRef([]);
     const hideNames = localStorage.getItem('hide_player_names') === 'true';
@@ -559,6 +597,8 @@ export default function SurvivGame() {
         const clearPendingActions = () => {
             reloadPendingRef.current = false;
             useMedkitPendingRef.current = false;
+            throwGrenadePendingRef.current = false;
+            swapWeaponSlotsPendingRef.current = null;
             pickupWeaponPendingRef.current = false;
             equipSlotPendingRef.current = null;
             openChestPendingRef.current = null;
@@ -566,6 +606,11 @@ export default function SurvivGame() {
             putChestItemPendingRef.current = null;
             dropItemPendingRef.current = null;
             closeChestPendingRef.current = false;
+        };        const hideInventoryUi = () => {
+            inventoryOpenRef.current = false;
+            setIsInventoryOpen(false);
+            setInventoryDrag(null);
+            prevOpenedContainerIdRef.current = null;
         };
         const emitSurvivJoin = () => {
             if (!socket.connected || blockAutoJoinRef.current) return;
@@ -585,6 +630,7 @@ export default function SurvivGame() {
 
         const onKeyDown = (e) => {
             if (blockInputRef.current || cashoutActiveRef.current) return;
+            if (isTextEntryTarget(e.target)) return;
             const k = e.key.toLowerCase();
             if (k === 'tab' || k === 'i') {
                 e.preventDefault();
@@ -592,9 +638,14 @@ export default function SurvivGame() {
                 setIsInventoryOpen(prev => {
                     const next = !prev;
                     inventoryOpenRef.current = next;
-                    if (!next) {
-                        closeChestPendingRef.current = true;
-                    }
+                    if (next) {
+                        renderer.clearInput();
+                        reloadPendingRef.current = false;
+                        useMedkitPendingRef.current = false;
+                        pickupWeaponPendingRef.current = false;
+                        throwGrenadePendingRef.current = false;
+                        equipSlotPendingRef.current = null;
+                    } else closeChestPendingRef.current = true;
                     return next;
                 });
                 return;
@@ -604,6 +655,7 @@ export default function SurvivGame() {
                 if (inventoryOpenRef.current) handleCloseInventory();
                 return;
             }
+            if (inventoryOpenRef.current) return;
             const action = renderer.handleKeyDown(e);
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
@@ -617,11 +669,11 @@ export default function SurvivGame() {
             renderer.handleKeyUp(e);
         };
         const onPointerMove = (e) => {
-            if (cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
+            if (cashoutActiveRef.current || inventoryOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            if (cashoutActiveRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
+            if (cashoutActiveRef.current || inventoryOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
             renderer.handlePointerDown();
@@ -658,6 +710,9 @@ export default function SurvivGame() {
             }
         };
         const onWindowBlur = () => neutralizeInput();
+        const onFocusIn = (event) => {
+            if (isTextEntryTarget(event.target)) neutralizeInput();
+        };
         const onVisibilityChange = () => {
             if (document.hidden) neutralizeInput();
         };
@@ -669,6 +724,7 @@ export default function SurvivGame() {
         canvasRef.current.addEventListener('wheel', onWheel, { passive: false });
         window.addEventListener('pointerup', onPointerUp);
         window.addEventListener('blur', onWindowBlur);
+        document.addEventListener('focusin', onFocusIn);
         document.addEventListener('visibilitychange', onVisibilityChange);
 
         socket.on('connect', () => {
@@ -683,6 +739,7 @@ export default function SurvivGame() {
             }
         });
         socket.on('disconnect', () => {
+            hideInventoryUi();
             const cashoutWasActive = cashoutActiveRef.current;
             setIsConnected(false);
             renderer.clearInput();
@@ -712,11 +769,24 @@ export default function SurvivGame() {
         });
 
         socket.on('welcome', (player, world) => {
+            const isRejoin = !!world?.rejoin;
             awaitingWelcomeRef.current = false;
             playAgainPendingRef.current = false;
             blockAutoJoinRef.current = false;
             worldUpdatesEnabledRef.current = true;
             clearPendingResult('surviv');
+            if (!isRejoin) {
+                renderer.resetSession();
+                clearPendingActions();
+                setIsInventoryOpen(false);
+                inventoryOpenRef.current = false;
+                setInventoryDrag(null);
+                nearbyPickupValueRef.current = null;
+                setNearbyPickup(null);
+                prevOpenedContainerIdRef.current = null;
+                meUiSnapshotRef.current = null;
+                leaderboardSignatureRef.current = '';
+            }
             setIsDead(false);
             setCashedAmount(null);
             setShowResultModal(false);
@@ -726,7 +796,7 @@ export default function SurvivGame() {
             hasJoinedRef.current = true;
             myIdRef.current = player.id;
             renderer.setMyId(player.id);
-            if (!world?.rejoin || !sessionStartAtRef.current) sessionStartAtRef.current = Date.now();
+            if (!isRejoin || !sessionStartAtRef.current) sessionStartAtRef.current = Date.now();
             setCurrentBalance(player.dollarBalance ?? 0);
             setConnectionError('');
             setGameReady(true);
@@ -750,19 +820,27 @@ export default function SurvivGame() {
                 spectateTargetsRef.current = tick.spectateTargets;
             }
             renderer.updateState(tick);
-            if (IS_MOBILE) {
-                const nearby = !!renderer.getNearbyGroundWeapon();
-                setCanMobileInteract(previous => previous === nearby ? previous : nearby);
+            const nearbyWeapon = renderer.getNearbyGroundWeapon();
+            const nextNearbyPickup = nearbyWeapon
+                ? { id: nearbyWeapon.id, weaponType: nearbyWeapon.weaponType }
+                : null;
+            const previousNearbyPickup = nearbyPickupValueRef.current;
+            if (previousNearbyPickup?.id !== nextNearbyPickup?.id
+                || previousNearbyPickup?.weaponType !== nextNearbyPickup?.weaponType) {
+                nearbyPickupValueRef.current = nextNearbyPickup;
+                setNearbyPickup(nextNearbyPickup);
             }
             if (tick.you) {
                 const nextMe = createSurvivUiSnapshot(tick.you);
-                sessionStatsRef.current = {
-                    ...sessionStatsRef.current,
-                    eliminations: Number(nextMe.kills) || 0,
-                };
-                const nextMeSignature = JSON.stringify(nextMe);
-                if (nextMeSignature !== meUiSignatureRef.current) {
-                    meUiSignatureRef.current = nextMeSignature;
+                const nextEliminations = Number(nextMe.kills) || 0;
+                if (nextEliminations !== sessionStatsRef.current.eliminations) {
+                    sessionStatsRef.current = {
+                        ...sessionStatsRef.current,
+                        eliminations: nextEliminations,
+                    };
+                }
+                if (!survivUiSnapshotsEqual(meUiSnapshotRef.current, nextMe)) {
+                    meUiSnapshotRef.current = nextMe;
                     setMe(nextMe);
                 }
 
@@ -788,7 +866,15 @@ export default function SurvivGame() {
 
         socket.on('leaderboard', (data) => {
             if (!worldUpdatesEnabledRef.current) return;
-            if (data?.leaderboard) setLeaderboard(data.leaderboard);
+            if (data?.leaderboard) {
+                const signature = data.leaderboard
+                    .map(entry => `${entry.id || ''}:${entry.username || ''}:${entry.balance || 0}:${entry.kills || 0}:${entry.isBot ? 1 : 0}`)
+                    .join('|');
+                if (signature !== leaderboardSignatureRef.current) {
+                    leaderboardSignatureRef.current = signature;
+                    setLeaderboard(data.leaderboard);
+                }
+            }
         });
 
         socket.on('cashOutProcessing', () => {
@@ -810,6 +896,7 @@ export default function SurvivGame() {
         });
 
         socket.on('cashOutSuccess', ({ amount }) => {
+            hideInventoryUi();
             cashoutActiveRef.current = false;
             worldUpdatesEnabledRef.current = false;
             setCashoutPending(false);
@@ -833,6 +920,7 @@ export default function SurvivGame() {
         });
 
         socket.on('RIP', () => {
+            hideInventoryUi();
             worldUpdatesEnabledRef.current = false;
             cashoutActiveRef.current = false;
             setCashoutPending(false);
@@ -842,6 +930,7 @@ export default function SurvivGame() {
         });
 
         socket.on('died', (data) => {
+            hideInventoryUi();
             worldUpdatesEnabledRef.current = false;
             hasJoinedRef.current = false;
             const survived = Date.now() - (sessionStartAtRef.current || Date.now());
@@ -861,6 +950,7 @@ export default function SurvivGame() {
         });
 
         socket.on('forcedDisconnect', () => {
+            hideInventoryUi();
             worldUpdatesEnabledRef.current = false;
             blockAutoJoinRef.current = true;
             awaitingWelcomeRef.current = true;
@@ -1009,6 +1099,7 @@ export default function SurvivGame() {
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('pointerup', onPointerUp);
             window.removeEventListener('blur', onWindowBlur);
+            document.removeEventListener('focusin', onFocusIn);
             document.removeEventListener('visibilitychange', onVisibilityChange);
             canvasRef.current?.removeEventListener('pointermove', onPointerMove);
             canvasRef.current?.removeEventListener('pointerdown', onPointerDown);
@@ -1020,7 +1111,20 @@ export default function SurvivGame() {
     }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser, handleCloseInventory]);
 
     const handleHoldStart = useCallback(() => {
-        rendererRef.current?.setHoldStart(Date.now());
+        const renderer = rendererRef.current;
+        renderer?.clearInput();
+        renderer?.setHoldStart(Date.now());
+        reloadPendingRef.current = false;
+        useMedkitPendingRef.current = false;
+        pickupWeaponPendingRef.current = false;
+        equipSlotPendingRef.current = null;
+        throwGrenadePendingRef.current = false;
+        swapWeaponSlotsPendingRef.current = null;
+        openChestPendingRef.current = null;
+        takeChestItemPendingRef.current = null;
+        putChestItemPendingRef.current = null;
+        dropItemPendingRef.current = null;
+        closeChestPendingRef.current = false;
         socketRef.current?.emit('cashOutHold', true);
     }, []);
 
@@ -1042,6 +1146,14 @@ export default function SurvivGame() {
             if (previous) closeChestPendingRef.current = true;
             const next = !previous;
             inventoryOpenRef.current = next;
+            if (next) {
+                rendererRef.current?.clearInput();
+                reloadPendingRef.current = false;
+                useMedkitPendingRef.current = false;
+                pickupWeaponPendingRef.current = false;
+                throwGrenadePendingRef.current = false;
+                equipSlotPendingRef.current = null;
+            }
             return next;
         });
     }, []);
@@ -1087,6 +1199,7 @@ export default function SurvivGame() {
         && (Number(me.inventory?.medkits) || 0) > 0
         && (Number(me.hp) || 0) < (Number(me.maxHp) || 100)
         && medkitRemainingMs <= 0;
+    const canMobileInteract = !!nearbyPickup;
 
     return (
         <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}`} style={{
@@ -1116,6 +1229,7 @@ export default function SurvivGame() {
                     canReload={canMobileReload}
                     canHeal={canMobileHeal}
                     isReloading={!!me?.reloading}
+                    medkitCount={me?.inventory?.medkits || 0}
                 />
             )}
 
@@ -1175,7 +1289,21 @@ export default function SurvivGame() {
 
             {gameReady && !IS_MOBILE && !showResultModal && !isDead && !isSpectating && (
                 <div className="surviv-controls-hint" aria-label="Game controls">
-                    HOLD F OPEN / F PICKUP · R RELOAD · H HEAL · TAB INVENTORY
+                    <span><kbd>WASD</kbd> MOVE</span>
+                    <span><kbd>MOUSE</kbd> AIM / FIRE</span>
+                    <span><kbd>F</kbd> PICK UP</span>
+                    <span><kbd>R</kbd> RELOAD</span>
+                    <span><kbd>H</kbd> HEAL</span>
+                    <span><kbd>1-3</kbd> SLOTS</span>
+                    <span><kbd>G</kbd> GRENADE</span>
+                    <span><kbd>TAB</kbd> INVENTORY</span>
+                </div>
+            )}
+
+            {!IS_MOBILE && gameReady && me && nearbyPickup && !showResultModal && !isDead && !isSpectating && !isInventoryOpen && (
+                <div className="surviv-context-prompt" role="status" aria-live="polite">
+                    <kbd>F</kbd>
+                    <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
                 </div>
             )}
 
@@ -1477,7 +1605,11 @@ export default function SurvivGame() {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                                 </button>
                             </div>
-                            <div className="surviv-inventory-subtitle">{me.openedContainer ? 'Backpack & open chest' : 'Backpack · Tab to close'}</div>
+                            <div className="surviv-inventory-subtitle">
+                                {me.openedContainer
+                                    ? (IS_MOBILE ? 'Tap TAKE or STORE to move items' : 'Backpack & open chest · drag or use TAKE / STORE')
+                                    : (IS_MOBILE ? 'Tap a weapon to equip' : 'Backpack · Tab to close')}
+                            </div>
                         </div>
 
                         {/* Side-by-side grids */}
@@ -1564,26 +1696,39 @@ export default function SurvivGame() {
                                                                 </div>
                                                             </div>
                                                             {weaponId !== 'fists' && (
-                                                                <button 
-                                                                    className="slot-drop-btn" 
-                                                                    style={{
-                                                                        background: 'rgba(255, 59, 48, 0.16)',
-                                                                        border: '1px solid rgba(255, 59, 48, 0.3)',
-                                                                        borderRadius: '3px',
-                                                                        color: '#ff6b6b',
-                                                                        fontSize: '0.46rem',
-                                                                        padding: '1px 3px',
-                                                                        cursor: 'pointer',
-                                                                        fontWeight: 800,
-                                                                        alignSelf: 'center',
-                                                                    }}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        dropItemPendingRef.current = { itemKey: 'weapon', slotIdx };
-                                                                    }}
-                                                                >
-                                                                    DROP
-                                                                </button>
+                                                                <div className="weapon-card-actions">
+                                                                    {me.openedContainer?.id && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="slot-store-btn"
+                                                                            aria-label={`Store ${weaponLabel} in open crate`}
+                                                                            title="Store in crate"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                putChestItemPendingRef.current = {
+                                                                                    chestId: me.openedContainer.id,
+                                                                                    itemKey: 'weapon',
+                                                                                    weaponType: weaponId,
+                                                                                    slotIdx,
+                                                                                };
+                                                                            }}
+                                                                        >
+                                                                            STORE
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        type="button"
+                                                                        className="slot-drop-btn"
+                                                                        aria-label={`Drop ${weaponLabel} on the ground`}
+                                                                        title="Drop on ground"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            dropItemPendingRef.current = { itemKey: 'weapon', slotIdx };
+                                                                        }}
+                                                                    >
+                                                                        DROP
+                                                                    </button>
+                                                                </div>
                                                             )}
                                                         </div>
                                                     ) : (

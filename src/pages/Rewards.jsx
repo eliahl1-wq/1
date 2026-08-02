@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppTopbar from '../components/AppTopbar';
+import ProductPageHeader from '../components/ProductPageHeader';
 import Background from '../components/Background';
 import AffiliateRewardsPanel from '../components/AffiliateRewardsPanel';
 import { API_URL } from '../utils/apiBase';
@@ -254,19 +255,11 @@ export default function Rewards() {
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
             <AppTopbar />
-            <div className="page-content" style={{ maxWidth: '800px', width: '100%' }}>
-
-                <div className="page-header-row" style={{ marginBottom: '16px', marginTop: '20px' }}>
-                    <div>
-                        <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
-                        <h1 style={{ margin: 0, fontSize: 'clamp(1.8rem, 5vw, 2.8rem)', fontWeight: 800, letterSpacing: '-1px', color: 'var(--text-h)', lineHeight: 1 }}>
-                            Rewards
-                        </h1>
-                    </div>
-                </div>
-                <p style={{ margin: '0 0 32px', color: 'var(--text-2)', fontSize: '1.05rem', lineHeight: '1.5' }}>
-                    Complete challenges to unlock your earned rewards and claim free tickets.
-                </p>
+            <div className="page-content product-page--rewards">
+                <ProductPageHeader
+                    title="Rewards"
+                    description="Complete challenges to unlock earned rewards and claim free tickets."
+                />
 
                 {/* Unified Rewards Summary */}
                 <div className="rewards-summary-grid">
@@ -288,7 +281,7 @@ export default function Rewards() {
                     />
                 </div>
                 {user.rewardsDisabled && (
-                    <div className="panel" style={{ padding: '16px 18px', marginBottom: '24px', border: '1px solid rgba(239,68,68,0.35)', color: 'var(--red)' }}>
+                    <div className="product-alert product-alert--error">
                         Promotional rewards are disabled while an admin reviews accounts funded by the same external wallet. Retained game winnings can still be claimed.
                     </div>
                 )}
@@ -299,7 +292,7 @@ export default function Rewards() {
                     </h2>
 
                     {hasUnusedTicket ? (
-                        <div style={{
+                        <div className="rewards-ticket-card rewards-ticket-card--active" style={{
                             background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
                             border: '1px solid rgba(34, 197, 94, 0.2)',
                             borderRadius: '16px',
@@ -362,7 +355,7 @@ export default function Rewards() {
                             </button>
                         </div>
                     ) : (
-                        <div className="panel" style={{ padding: '24px', opacity: 0.8 }}>
+                        <div className="panel rewards-ticket-card rewards-ticket-card--used">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />

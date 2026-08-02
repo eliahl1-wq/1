@@ -72,7 +72,7 @@ export default function Lobby() {
             let alive = true;
             const check = async () => {
                 try {
-                                        const r = await fetch(`${apiUrl}/api/game-status?t=${Date.now()}`, {
+                                        const r = await fetch(`${API_URL}/api/game-status?t=${Date.now()}`, {
                         headers: { Authorization: `Bearer ${token}`, 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' }
                     });
                     if (r.ok && alive) {
@@ -177,70 +177,61 @@ export default function Lobby() {
             </AppTopbar>
 
             {/* ── Center Content ── */}
-            <div style={{ zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '72px 16px 40px', width: '100%', maxWidth: '440px', boxSizing: 'border-box' }}>
+            <main className="deposit-page">
 
                 {/* Header */}
-                <div style={{ textAlign: 'center', marginBottom: '4px' }}>
-                    <h1 style={{ margin: '0 0 6px 0', fontSize: 'clamp(1.8rem, 5vw, 2.8rem)', fontWeight: 900, letterSpacing: '-2px', color: 'var(--text-h)', lineHeight: 1.05 }}>
+                <header className="deposit-hero">
+                    <h1>
                         Fund Your Arena
                     </h1>
-                    <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 500 }}>
+                    <p>
                         {hasUnlockedFreeTicket(user) ? (
-                            <span style={{ color: 'var(--green)', fontWeight: 700 }}>✨ Free Ticket available! Enter the arena below.</span>
+                            <span className="deposit-ticket-note">✨ Free Ticket available! Enter the arena below.</span>
                         ) : (
                             `Deposit $${MIN_ENTRY_FEE} minimum to enter the arena.`
                         )}
                     </p>
-                </div>
+                </header>
 
                 {/* Deposit Card */}
-                <div style={{
-                    background: 'var(--bg-1)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-2xl)',
-                    padding: '22px',
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    boxShadow: 'var(--shadow-xl), inset 0 1px 0 rgba(255,255,255,0.03)',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <section className="product-surface deposit-card">
+                    <div className="deposit-card__header">
                         <span className="label">Deposit</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div className="deposit-card__status">
                             <div className="live-dot" />
-                            <span style={{ fontSize: '0.6rem', color: 'var(--text-3)', fontWeight: 600 }}>ARENA STAKE</span>
+                            <span>ARENA STAKE</span>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+                    <div className="deposit-card__body">
                         <div ref={qrRef} className="qr-container" />
-                        <div style={{ width: '100%' }}>
-                            <div className="label" style={{ marginBottom: '4px' }}>Deposit Address</div>
-                            <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
+                        <div className="deposit-address-field">
+                            <div className="label">Deposit Address</div>
+                            <div className="mono deposit-address-value">
                                 {depositAddress || 'Generating…'}
                             </div>
                             <button
                                 onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
-                                style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: 700, borderRadius: 'var(--r-md)', cursor: 'pointer', letterSpacing: '0.04em' }}
+                                className="btn btn-ghost deposit-copy-button"
                             >
                                 COPY ADDRESS
                             </button>
                         </div>
-                        <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '0.68rem', lineHeight: 1.5, textAlign: 'center' }}>
+                        <p className="deposit-card__help">
                             Send SOL to this address from any Solana wallet. Your balance updates automatically after confirmation.
                         </p>
                     </div>
 
                     {statusMsg && (
-                        <div className={`status-msg ${statusClass}`} style={{ marginTop: '10px' }}>
+                        <div className={`status-msg deposit-card__message ${statusClass}`}>
                             {statusMsg}
                         </div>
                     )}
-                </div>
+                </section>
 
                 {/* Enter game button */}
                 <button
-                    className="btn btn-primary"
-                    style={{ width: '100%', padding: '14px', fontSize: '0.9rem', borderRadius: 'var(--r-lg)', letterSpacing: '0.01em' }}
+                    className="btn btn-primary deposit-enter-button"
                     onClick={() => {
                         const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
                         const hasFreeTicket = hasUnlockedFreeTicket(user);
@@ -255,13 +246,13 @@ export default function Lobby() {
                 </button>
 
                 {arenaError && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--red)', fontWeight: 600, textAlign: 'center' }}>
+                    <div className="deposit-error" role="alert">
                         {arenaError}
                     </div>
                 )}
-            </div>
+            </main>
 
-            {/* ── Footer ── */}
+            {/* Footer */}
             <AppFooter />
         </div>
     );

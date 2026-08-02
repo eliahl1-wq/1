@@ -6,6 +6,16 @@
 ═══════════════════════════════════════════════ */
 
 :root {
+  /* Product rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
   /* Core palette — deep black with slight blue tint */
   --bg: #0C0D12;
   --bg-1: #121319;
@@ -24,6 +34,8 @@
   --text-3: rgba(255, 255, 255, 0.2);
   --text-h: rgba(255, 255, 255, 0.92);
   --text-bright: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.56);
+  --text-subtle: rgba(255, 255, 255, 0.4);
 
   /* Brand accent — brighter purple matching deposit button */
   --accent: #785eff;
@@ -67,6 +79,8 @@
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
   --shadow-xl: 0 32px 80px rgba(0, 0, 0, 0.7);
+  --shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 24px rgba(0, 0, 0, 0.16);
+  --shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.42);
 
   /* Radius — sharp trading-platform aesthetic */
   --r-xs: 2px;
@@ -76,6 +90,15 @@
   --r-xl: 10px;
   --r-2xl: 12px;
   --r-full: 999px;
+
+  /* Interaction */
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 44px;
+  --ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --focus-ring: 0 0 0 3px rgba(120, 94, 255, 0.18);
 
   font: 14px/1.5 var(--ui);
   letter-spacing: 0;
@@ -286,35 +309,43 @@ h2 {
 
 .label {
   font-family: var(--ui);
-  font-size: 0.6rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-3);
+  letter-spacing: 0.075em;
+  color: var(--text-subtle);
+  line-height: 1.35;
 }
 
 /* ─── Form inputs ─── */
 .input {
   width: 100%;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border);
+  min-height: var(--control-md);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-2);
   border-radius: var(--r-md);
-  padding: 10px 12px;
+  padding: 9px 12px;
   color: var(--text-h);
   font-size: 0.875rem;
   font-weight: 500;
   font-family: var(--ui);
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .input::placeholder {
   color: var(--text-3);
 }
 
+
+.input:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.035);
+}
 .input:focus {
-  border-color: rgba(153, 69, 255, 0.35);
-  box-shadow: 0 0 0 3px rgba(153, 69, 255, 0.06);
+  border-color: rgba(120, 94, 255, 0.68);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--focus-ring);
 }
 
 /* Number input — no spinners */
@@ -330,19 +361,20 @@ input[type=number] {
 
 /* ─── Buttons ─── */
 .btn {
+  min-height: var(--control-md);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  border: none;
+  gap: 7px;
+  border: 1px solid transparent;
   border-radius: var(--r-md);
   font-family: var(--ui);
-  font-weight: 600;
+  font-weight: 650;
   font-size: 0.8rem;
   cursor: pointer;
-  transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
   outline: none;
-  letter-spacing: 0;
+  letter-spacing: -0.005em;
 }
 
 .btn-primary,
@@ -413,12 +445,29 @@ input[type=number] {
 
 @media (max-width: 768px) {
   .btn {
-    min-height: 44px;
+    min-height: var(--control-lg);
   }
 
   .btn-icon {
-    width: 44px;
-    height: 44px;
+    width: var(--control-lg);
+    height: var(--control-lg);
+  }
+}
+
+.btn:focus-visible,
+.input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(151, 132, 255, 0.9);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -1080,3 +1129,48 @@ input[type=number] {
 .flag-skin-picker select:focus {
   border-color: var(--accent);
 }
+
+/* --- Product background --- */
+.app-background {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+}
+
+.app-background__grid,
+.app-background__wash,
+.app-background__vignette {
+  position: absolute;
+  inset: 0;
+}
+
+.app-background__grid {
+  opacity: 0.2;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.065) 0.75px, transparent 0.85px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent 78%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent 78%);
+}
+
+.app-background__wash {
+  background:
+    radial-gradient(ellipse 58% 44% at 50% -8%, rgba(120, 94, 255, 0.075), transparent 72%),
+    linear-gradient(180deg, rgba(18, 20, 30, 0.32), transparent 38%);
+}
+
+.app-background__vignette {
+  background: linear-gradient(90deg, rgba(5, 6, 9, 0.22), transparent 18%, transparent 82%, rgba(5, 6, 9, 0.22));
+}
+
+/* --- Final shared interaction layer --- */
+.btn-primary{background:#785eff;color:#fff;border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.09);font-family:var(--ui);font-weight:700}
+.btn-primary:hover:not(:disabled){background:#836bff;border-color:rgba(255,255,255,.14);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1);filter:none}
+.btn-green{background:#20c982;color:#061a12;border:1px solid rgba(255,255,255,.08);box-shadow:none;font-family:var(--ui);font-weight:730}
+.btn-green:hover:not(:disabled){background:#2bd18d;transform:translateY(-1px);box-shadow:none;filter:none}
+.guest-banner{background:rgba(18,19,26,.92);border-color:rgba(255,255,255,.11);box-shadow:var(--shadow-surface);animation:fadeUp var(--duration-base) var(--ease-standard)}
+.guest-banner-cta{border-radius:var(--r-md)}
+.guest-banner+.pre-game-grid{margin-top:28px}
+@media (max-width:768px){.guest-banner+.pre-game-grid{margin-top:18px}}

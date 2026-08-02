@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import ProductPageHeader from '../components/ProductPageHeader';
 import CustomDropdown from '../components/CustomDropdown';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
@@ -202,24 +203,10 @@ export default function Profile() {
             <div className="page-content" style={{ maxWidth: '780px' }}>
 
                 {/* ── Page header ── */}
-                <div className="page-header-row">
-                    <div>
-                        <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
-                        <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)', lineHeight: 1 }}>
-                            Account
-                        </h1>
-                    </div>
-                    <button
-                        className="btn btn-ghost"
-                        onClick={() => navigate(-1)}
-                        style={{ padding: '9px 18px', fontSize: '0.78rem', borderRadius: 'var(--r-full)' }}
-                    >
-                        ← Back
-                    </button>
-                </div>
+                <ProductPageHeader title="Account" onBack={() => navigate(-1)} />
 
-                {/* ── Main card ── */}
-                <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', boxShadow: 'var(--shadow-xl)' }}>
+                {/* Main card */}
+                <div className="product-surface profile-product-surface">
 
                     {/* ── Tab bar ── */}
                     <div className="profile-tabs">
@@ -237,14 +224,14 @@ export default function Profile() {
                         ))}
                     </div>
 
-                    <div style={{ padding: '24px' }}>
+                    <div className="product-surface__body">
                         {activeTab === 'stats' ? (
 
                             /* ══ Stats view ══ */
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                                 {/* Account Balance Banner */}
-                                <div style={{
+                                <div className="profile-balance-panel" style={{
                                     background: 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%)',
                                     border: '1px solid var(--border)',
                                     borderRadius: 'var(--r-xl)',
@@ -369,7 +356,7 @@ export default function Profile() {
                                 </div>
 
                                 {/* Secondary stats (smaller & less prominent) */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 8px', marginTop: '-8px', gap: '16px', flexWrap: 'wrap' }}>
+                                <div className="profile-secondary-stats" style={{ display: 'flex', justifyContent: 'space-between', padding: '0 8px', marginTop: '-8px', gap: '16px', flexWrap: 'wrap' }}>
                                     {[
                                         { label: 'Sessions', value: processedLogs.length },
                                         { label: 'Avg P&L', value: formatVal(avgPnL, true), color: avgPnL >= 0 ? 'var(--green)' : 'var(--red)' },
@@ -383,7 +370,7 @@ export default function Profile() {
                                 </div>
 
                                 {/* Equity chart */}
-                                <div style={{
+                                <div className="profile-equity-panel" style={{
                                     position: 'relative',
                                     background: 'rgba(0,0,0,0.25)',
                                     border: '1px solid var(--border)',

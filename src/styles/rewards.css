@@ -63,3 +63,28 @@
         font-size: 1.15rem;
     }
 }
+
+/* --- Product polish overrides --- */
+.rewards-summary-grid { gap: 10px; margin-bottom: 32px; }
+.rewards-stat-card {
+    padding: 16px 18px;
+    border-color: var(--border-2);
+    border-radius: var(--r-md);
+    background: rgba(18, 19, 25, 0.88);
+}
+.rewards-stat-label { color: var(--text-subtle); font-size: 0.66rem; font-weight: 650; }
+.rewards-stat-value { font-size: 1.4rem; font-weight: 750; }
+.rewards-stat-detail { color: var(--text-subtle); }
+.rewards-stat-card--claimable .rewards-stat-label,
+.rewards-stat-card--affiliate .rewards-stat-label { color: var(--text-subtle); }
+.rewards-stat-card--tournament .rewards-stat-label { color: var(--text-subtle); }
+
+/* --- Rewards page polish --- */
+.product-page--rewards{width:100%;max-width:800px}
+.product-page--rewards>section{margin-bottom:var(--space-9)!important}
+.product-page--rewards>section>h2{margin:0 0 var(--space-4)!important;color:var(--text-1)!important;font-size:1.02rem!important;font-weight:730!important;letter-spacing:-.015em}
+.rewards-ticket-card{padding:var(--space-6)!important;border-radius:var(--r-lg)!important;box-shadow:none!important}
+.rewards-ticket-card--active{background:rgba(34,197,94,.055)!important;border:1px solid rgba(34,197,94,.25)!important}
+.rewards-ticket-card--used{padding:var(--space-5)!important;background:rgba(255,255,255,.018)!important;opacity:.82!important}
+.product-page--rewards .panel{border-radius:var(--r-lg);box-shadow:none}
+@media (max-width:600px){.rewards-ticket-card{padding:var(--space-5)!important}.rewards-ticket-card button{min-width:100%}}

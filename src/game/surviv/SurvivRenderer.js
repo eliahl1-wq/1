@@ -172,6 +172,15 @@ const CACHEABLE_PROP_KINDS = new Set([
     'stump', 'fallenLog', 'hayBale', 'reeds', 'grassTuft', 'wildflowers', 'mushrooms',
 ]);
 
+function compactTimedItems(items, now) {
+    let liveCount = 0;
+    for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        if (now - item.spawnedAt < item.duration) items[liveCount++] = item;
+    }
+    items.length = liveCount;
+}
+
 function obstacleRenderSignature(obstacles) {
     let hash = 2166136261;
     const mixString = (value) => {
@@ -340,12 +349,15 @@ export class SurvivRenderer {
         this.zoom = 1;
         this.targetZoom = 1.58;
         this.isMobileLayout = false;
+        this.reducedMotion = false;
         this.worldHalf = 10000;
         this.myId = null;
         this.players = [];
         this.worldEmotes = new Map();
         this.worldChats = new Map();
         this.loot = [];
+        this._solidLootContainers = [];
+        this._groundWeapons = [];
         this.bullets = [];
         this.localShotTracers = [];
         this.obstacles = [];
@@ -365,6 +377,7 @@ export class SurvivRenderer {
         this._doorwaysByHouseId = new Map();
         this._interiorFogHouseIds = new Set();
         this._losSegmentsByHouseId = new Map();
+        this._losVerticesByHouseId = new Map();
         this._nearbyLosSegments = [];
         this._renderObstaclesByHouseId = new Map();
         this._collisionBuckets = new Map();
@@ -433,8 +446,17 @@ export class SurvivRenderer {
         this._fpsFrames = 0;
         this._fpsLastSampleAt = performance.now();
         this._fpsDisplay = 0;
-        this._onResize = () => this.resize();
+        this._resizeTimer = null;
+        this._onResize = () => {
+            if (this._resizeTimer) clearTimeout(this._resizeTimer);
+            this._resizeTimer = setTimeout(() => {
+                this._resizeTimer = null;
+                this.resize();
+            }, 90);
+        };
         window.addEventListener('resize', this._onResize);
+        window.addEventListener('gamelayoutchange', this._onResize);
+        window.visualViewport?.addEventListener('resize', this._onResize);
 
         // --- New visual feedback systems ---
         // Particle system (muzzle flash, bullet impacts, debris)
@@ -449,7 +471,7 @@ export class SurvivRenderer {
         // Floating damage numbers
         this.damageNumbers = [];
         // Camera shake
-        this.cameraShake = { x: 0, y: 0, intensity: 0, decay: 0.88 };
+        this.cameraShake = { x: 0, y: 0, intensity: 0, decay: 0.88, phase: 0 };
         // Kill feed and server-synced death presentation
         this.killFeed = [];
         this.deathMarkers = [];
@@ -487,6 +509,8 @@ export class SurvivRenderer {
         this._surfaceChunkCache = new Map();
         this._surfaceChunkCachePixels = 0;
         this._surfaceChunkBuildsThisFrame = 0;
+        this._surfaceChunkRequired = [];
+        this._surfacePrefetchCandidates = [];
         this._cacheBuildsThisFrame = 0;
         this._lastSurfaceCamX = NaN;
         this._lastSurfaceCamY = NaN;
@@ -524,22 +548,43 @@ export class SurvivRenderer {
         const h = parent?.clientHeight || window.innerHeight;
         // Keep phone-sized Retina canvases sharp while capping total GPU pixels.
         const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
-        this.isMobileLayout = coarsePointer || w < 760;
+        const nextMobileLayout = coarsePointer || w < 760;
+        const nextReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false;
         // Surviv redraws the whole canvas every frame. Keep the backing surface
-        // below roughly 1.8M pixels so 120/144 Hz displays do not become
+        // below roughly 2.2M pixels so 120/144 Hz displays do not become
         // fill-rate bound even when several translucent world layers overlap.
-        const pixelBudgetDpr = Math.sqrt(1_800_000 / Math.max(1, w * h));
-        const dprCap = this.isMobileLayout ? 1.15 : 0.9;
+        const pixelBudgetDpr = Math.sqrt(2_200_000 / Math.max(1, w * h));
+        const dprCap = nextMobileLayout ? 1.2 : 0.95;
         const baseDpr = Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr);
         // The previous 0.75 floor defeated the pixel budget on ultrawide/4K
         // displays (4.7M pixels at 4K). Keep the cost consistent across monitors.
-        const minimumDpr = this.isMobileLayout ? 0.58 : 0.5;
+        const minimumDpr = nextMobileLayout ? 0.58 : 0.5;
         // Resolution stays stable for the whole match. Dynamically changing the
         // backing canvas made graphics visibly soften a few seconds after join.
         const dpr = Math.max(minimumDpr, baseDpr);
+        const backingWidth = Math.round(w * dpr);
+        const backingHeight = Math.round(h * dpr);
+        const firstResize = !Number.isFinite(this.viewW) || !Number.isFinite(this.viewH);
+        const layoutChanged = this.isMobileLayout !== nextMobileLayout;
+        const dprChanged = !Number.isFinite(this.renderDpr) || Math.abs(this.renderDpr - dpr) >= 0.0001;
+        this.isMobileLayout = nextMobileLayout;
+        this.reducedMotion = nextReducedMotion;
+        this.targetZoom = this.isMobileLayout ? 1.18 : 1.58;
+
+        if (!dprChanged
+            && this.canvas.width === backingWidth
+            && this.canvas.height === backingHeight
+            && this.viewW === w
+            && this.viewH === h) {
+            const canvasRect = this.canvas.getBoundingClientRect();
+            this._canvasLeft = canvasRect.left;
+            this._canvasTop = canvasRect.top;
+            if (!this.spectatorMode && layoutChanged) this.zoom = this.targetZoom;
+            return;
+        }
         this.renderDpr = dpr;
-        this.canvas.width = Math.round(w * dpr);
-        this.canvas.height = Math.round(h * dpr);
+        this.canvas.width = backingWidth;
+        this.canvas.height = backingHeight;
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
         const canvasRect = this.canvas.getBoundingClientRect();
@@ -547,17 +592,21 @@ export class SurvivRenderer {
         this._canvasTop = canvasRect.top;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'low';
+        this.ctx.imageSmoothingQuality = 'medium';
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;
-        this.targetZoom = this.isMobileLayout ? 1.18 : 1.58;
-        if (!this.spectatorMode) this.zoom = this.targetZoom;
+        if (!this.spectatorMode && (firstResize || layoutChanged || !Number.isFinite(this.zoom))) {
+            this.zoom = this.targetZoom;
+        }
     }
 
     destroy() {
         this.pause();
+        if (this._resizeTimer) clearTimeout(this._resizeTimer);
         window.removeEventListener('resize', this._onResize);
+        window.removeEventListener('gamelayoutchange', this._onResize);
+        window.visualViewport?.removeEventListener('resize', this._onResize);
     }
 
     start() {
@@ -598,6 +647,8 @@ export class SurvivRenderer {
         this.worldEmotes.clear();
         this.worldChats.clear();
         this.loot = [];
+        this._solidLootContainers = [];
+        this._groundWeapons = [];
         this.bullets = [];
         this.localShotTracers = [];
         this.deathMarkers = [];
@@ -607,6 +658,7 @@ export class SurvivRenderer {
         this._graveFirstSeenAt.clear();
         this.obstacles = [];
         this.minimap = { players: [], food: [], obstacles: [] };
+        this._nextMinimapRenderAt = 0;
         this.houseFloors = [];
         this.roomZones = [];
         this.doorways = [];
@@ -631,7 +683,9 @@ export class SurvivRenderer {
         this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
         this._losSegmentsByHouseId.clear();
+        this._losVerticesByHouseId.clear();
         this._renderObstaclesByHouseId.clear();
+        this._collisionBuckets.clear();
         this._houseBuckets.clear();
         this._playersById.clear();
         this._visibleFields.length = 0;
@@ -674,6 +728,16 @@ export class SurvivRenderer {
         this._prevHp = 100;
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
+        this._weaponSwitchT = 0;
+        this._weaponSwitchFrom = 'fists';
+        this._muzzleFlash = 0;
+        this._lowAmmoPulse = 0;
+        this.cameraShake.x = 0;
+        this.cameraShake.y = 0;
+        this.cameraShake.intensity = 0;
+        this.cameraShake.phase = 0;
+        this.inventoryOpen = false;
+        this.aliveCount = 0;
         this.camera.x = 0;
         this.camera.y = 0;
         this.hud = {
@@ -824,8 +888,15 @@ export class SurvivRenderer {
         const leadSeconds = canPredictMovement
             ? clamp((now - predictionStartedAt) / 1000, 0, 0.05)
             : 0;
-        const targetX = state.targetX + moveInput.dx * 208 * leadSeconds;
-        const targetY = state.targetY + moveInput.dy * 208 * leadSeconds;
+        const predictedTarget = this._resolvePredictedLootContainerCollision(
+            state.targetX + moveInput.dx * 208 * leadSeconds,
+            state.targetY + moveInput.dy * 208 * leadSeconds,
+            Number(this.me.radius) || 14,
+            moveInput.dx,
+            moveInput.dy,
+        );
+        const targetX = predictedTarget.x;
+        const targetY = predictedTarget.y;
         const positionAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 32);
         const angleAlpha = 1 - Math.exp(-Math.min(dt, 0.05) * 42);
         state.x = lerp(state.x, targetX, positionAlpha);
@@ -839,6 +910,30 @@ export class SurvivRenderer {
             this.camera.x = state.x;
             this.camera.y = state.y;
         }
+    }
+
+    _resolvePredictedLootContainerCollision(x, y, playerRadius, moveX = 1, moveY = 0) {
+        let resolvedX = x;
+        let resolvedY = y;
+        for (const item of this._solidLootContainers) {
+            if (Math.abs(item.x - resolvedX) > 72 || Math.abs(item.y - resolvedY) > 72) continue;
+            const itemRadius = Number(item.hitRadius) || 24;
+            const minimumDistance = playerRadius + itemRadius;
+            const dx = resolvedX - item.x;
+            const dy = resolvedY - item.y;
+            const distance = Math.hypot(dx, dy);
+            if (distance >= minimumDistance) continue;
+            if (distance < 0.0001) {
+                const moveLength = Math.hypot(moveX, moveY) || 1;
+                resolvedX = item.x - (moveX / moveLength) * minimumDistance;
+                resolvedY = item.y - (moveY / moveLength) * minimumDistance;
+                continue;
+            }
+            const scale = minimumDistance / distance;
+            resolvedX = item.x + dx * scale;
+            resolvedY = item.y + dy * scale;
+        }
+        return { x: resolvedX, y: resolvedY };
     }
 
     _ingestLootSnapshots(nextLoot, receivedAt) {
@@ -910,6 +1005,8 @@ export class SurvivRenderer {
             }
             this.cameraShake.intensity = Math.min(5, this.cameraShake.intensity + 1.25);
         }
+        this._solidLootContainers = nextLoot.filter(item => item.type === 'chest' || item.type === 'deathCrate');
+        this._groundWeapons = nextLoot.filter(item => item.type === 'weapon' && item.weaponType);
         return nextLoot;
     }
 
@@ -1185,35 +1282,44 @@ export class SurvivRenderer {
             const hpDelta = (me.hp || 0) - this._prevHp;
             if (hpDelta < -0.5 && this._prevHp > 0) {
                 const dmgAmt = Math.abs(hpDelta);
-                // Camera shake proportional to damage
-                this.cameraShake.intensity += clamp(dmgAmt * 0.3, 1, 8);
-                // Damage direction indicator (try to find nearest enemy direction)
-                let damageAngle = Math.random() * Math.PI * 2;
-                const enemies = rawPlayers.filter(p => !p.isYou && p.id !== this.myId && (p.hp || 0) > 0);
-                if (enemies.length > 0) {
-                    let closest = enemies[0];
-                    let closestDist = Infinity;
-                    for (const e of enemies) {
-                        const d = Math.hypot(e.x - me.x, e.y - me.y);
-                        if (d < closestDist) { closestDist = d; closest = e; }
+                const hasServerSource = Number.isFinite(tick.damageTaken?.sourceX)
+                    && Number.isFinite(tick.damageTaken?.sourceY);
+                const isZoneDamage = !hasServerSource && me.outsideZone;
+                if (!isZoneDamage) {
+                    // Camera shake proportional to direct combat damage.
+                    this.cameraShake.intensity += clamp(dmgAmt * 0.3, 1, 8);
+                    let damageAngle = null;
+                    if (hasServerSource) {
+                        damageAngle = Math.atan2(tick.damageTaken.sourceY - me.y, tick.damageTaken.sourceX - me.x);
+                    } else {
+                        const enemies = rawPlayers.filter(p => !p.isYou && p.id !== this.myId && (p.hp || 0) > 0);
+                        if (enemies.length > 0) {
+                            let closest = enemies[0];
+                            let closestDist = Infinity;
+                            for (const enemy of enemies) {
+                                const distance = Math.hypot(enemy.x - me.x, enemy.y - me.y);
+                                if (distance < closestDist) { closestDist = distance; closest = enemy; }
+                            }
+                            damageAngle = Math.atan2(closest.y - me.y, closest.x - me.x);
+                        }
                     }
-                    damageAngle = Math.atan2(closest.y - me.y, closest.x - me.x);
+                    if (damageAngle != null) {
+                        this.damageIndicators.push({
+                            angle: damageAngle,
+                            spawnedAt: Date.now(),
+                            duration: 900,
+                            intensity: clamp(dmgAmt / 30, 0.4, 1),
+                        });
+                    }
+                    this.damageNumbers.push({
+                        x: me.x + (Math.random() - 0.5) * 16,
+                        y: me.y - 20,
+                        amount: Math.round(dmgAmt),
+                        spawnedAt: Date.now(),
+                        duration: 900,
+                        color: '#ff4444',
+                    });
                 }
-                this.damageIndicators.push({
-                    angle: damageAngle,
-                    spawnedAt: Date.now(),
-                    duration: 900,
-                    intensity: clamp(dmgAmt / 30, 0.4, 1),
-                });
-                // Damage number on self
-                this.damageNumbers.push({
-                    x: me.x + (Math.random() - 0.5) * 16,
-                    y: me.y - 20,
-                    amount: Math.round(dmgAmt),
-                    spawnedAt: Date.now(),
-                    duration: 900,
-                    color: '#ff4444',
-                });
             }
             this._prevHp = me.hp || 0;
 
@@ -1305,7 +1411,11 @@ export class SurvivRenderer {
         }
         // Detect hit events
         if (tick.hitConfirm) {
-            this.hitMarkers.push({ spawnedAt: Date.now(), duration: 350, kill: false });
+            this.hitMarkers.push({
+                spawnedAt: Date.now(),
+                duration: tick.hitConfirm.kill ? 560 : 350,
+                kill: !!tick.hitConfirm.kill,
+            });
             // Spawn damage number on target
             if (tick.hitConfirm.targetX != null) {
                 this.damageNumbers.push({
@@ -1509,6 +1619,7 @@ export class SurvivRenderer {
         this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
         this._losSegmentsByHouseId.clear();
+        this._losVerticesByHouseId.clear();
         this._renderObstaclesByHouseId.clear();
         this._collisionBuckets.clear();
         this._houseBuckets.clear();
@@ -1657,7 +1768,25 @@ export class SurvivRenderer {
                     { ax: left, ay: bottom, bx: left, by: top },
                 );
             }
+            const vertices = [];
+            const seenVertices = new Set();
+            for (const segment of segments) {
+                segment._losDx = segment.bx - segment.ax;
+                segment._losDy = segment.by - segment.ay;
+                segment._losMinX = Math.min(segment.ax, segment.bx);
+                segment._losMaxX = Math.max(segment.ax, segment.bx);
+                segment._losMinY = Math.min(segment.ay, segment.by);
+                segment._losMaxY = Math.max(segment.ay, segment.by);
+                const endpointPairs = [[segment.ax, segment.ay], [segment.bx, segment.by]];
+                for (const [x, y] of endpointPairs) {
+                    const key = x + ':' + y;
+                    if (seenVertices.has(key)) continue;
+                    seenVertices.add(key);
+                    vertices.push({ x, y });
+                }
+            }
             this._losSegmentsByHouseId.set(house.id, segments);
+            this._losVerticesByHouseId.set(house.id, vertices);
         }
         this._obstacleRevision++;
         this._losCacheKey = '';
@@ -1923,8 +2052,8 @@ export class SurvivRenderer {
         const top = py - range;
         const bottom = py + range;
         for (const segment of source) {
-            if (Math.max(segment.ax, segment.bx) < left || Math.min(segment.ax, segment.bx) > right
-                || Math.max(segment.ay, segment.by) < top || Math.min(segment.ay, segment.by) > bottom) continue;
+            if (segment._losMaxX < left || segment._losMinX > right
+                || segment._losMaxY < top || segment._losMinY > bottom) continue;
             target.push(segment);
         }
         return target;
@@ -1954,8 +2083,16 @@ export class SurvivRenderer {
         let closest = maxDist;
         for (let i = 0; i < segments.length; i++) {
             const s = segments[i];
-            const t = this._raySegmentIntersect(px, py, rdx, rdy, s.ax, s.ay, s.bx, s.by);
-            if (t < closest) closest = t;
+            const segmentDx = s._losDx;
+            const segmentDy = s._losDy;
+            const denominator = rdx * segmentDy - rdy * segmentDx;
+            if (Math.abs(denominator) < 1e-10) continue;
+            const originDx = s.ax - px;
+            const originDy = s.ay - py;
+            const t = (originDx * segmentDy - originDy * segmentDx) / denominator;
+            if (t < 0 || t >= closest) continue;
+            const u = (originDx * rdy - originDy * rdx) / denominator;
+            if (u >= -1e-7 && u <= 1 + 1e-7) closest = t;
         }
         out.x = px + rdx * closest;
         out.y = py + rdy * closest;
@@ -1967,7 +2104,7 @@ export class SurvivRenderer {
      * Rays immediately beside each corner stop the visible edge from jumping
      * between fixed angular samples while the player moves.
      */
-    _buildVisibilityPolygon(px, py, segments, maxDist) {
+    _buildVisibilityPolygon(px, py, segments, vertices, maxDist) {
         const baseRayCount = 96;
         const endpointEpsilon = 0.00003;
         const maxEndpointDistSq = (maxDist + 2) * (maxDist + 2);
@@ -1976,16 +2113,12 @@ export class SurvivRenderer {
         for (let i = 0; i < baseRayCount; i++) {
             angles.push((i / baseRayCount) * Math.PI * 2 - Math.PI);
         }
-        for (const segment of segments) {
-            for (let endpointIndex = 0; endpointIndex < 2; endpointIndex++) {
-                const x = endpointIndex === 0 ? segment.ax : segment.bx;
-                const y = endpointIndex === 0 ? segment.ay : segment.by;
-                const dx = x - px;
-                const dy = y - py;
-                if (dx * dx + dy * dy > maxEndpointDistSq) continue;
-                const angle = Math.atan2(dy, dx);
-                angles.push(angle - endpointEpsilon, angle, angle + endpointEpsilon);
-            }
+        for (const vertex of vertices) {
+            const dx = vertex.x - px;
+            const dy = vertex.y - py;
+            if (dx * dx + dy * dy > maxEndpointDistSq) continue;
+            const angle = Math.atan2(dy, dx);
+            angles.push(angle - endpointEpsilon, angle, angle + endpointEpsilon);
         }
         angles.sort((a, b) => a - b);
 
@@ -2028,7 +2161,8 @@ export class SurvivRenderer {
             || playerMoved;
         if (needsRebuild) {
             const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse, px, py, maxDist);
-            polygon = this._buildVisibilityPolygon(px, py, segments, maxDist);
+            const vertices = this._losVerticesByHouseId.get(currentHouse.id) || [];
+            polygon = this._buildVisibilityPolygon(px, py, segments, vertices, maxDist);
             this._losCacheKey = cacheKey;
             this._losCachedPolygon = polygon;
             this._losLastPlayerX = px;
@@ -2088,13 +2222,14 @@ export class SurvivRenderer {
     getNearbyGroundWeapon() {
         if (!this.me) return null;
         let nearest = null;
-        let nearestDist = 58;
-        for (const item of this.loot) {
-            if (item.type !== 'weapon' || !item.weaponType) continue;
-            const distance = Math.hypot(this.me.x - item.x, this.me.y - item.y);
-            if (distance < nearestDist) {
+        let nearestDistanceSq = 58 * 58;
+        for (const item of this._groundWeapons) {
+            const dx = this.me.x - item.x;
+            const dy = this.me.y - item.y;
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq < nearestDistanceSq) {
                 nearest = item;
-                nearestDist = distance;
+                nearestDistanceSq = distanceSq;
             }
         }
         return nearest;
@@ -2136,8 +2271,18 @@ export class SurvivRenderer {
 
         // Update camera shake
         if (this.cameraShake.intensity > 0.05) {
-            this.cameraShake.x = (Math.random() - 0.5) * this.cameraShake.intensity * 2;
-            this.cameraShake.y = (Math.random() - 0.5) * this.cameraShake.intensity * 2;
+            this.cameraShake.phase += Math.min(dt, 0.05) * 34;
+            const phase = this.cameraShake.phase;
+            const motionScale = this.reducedMotion ? 0 : (this.isMobileLayout ? 0.72 : 1);
+            const intensity = this.cameraShake.intensity * motionScale;
+            this.cameraShake.x = (
+                Math.sin(phase) * 0.72
+                + Math.sin(phase * 2.17 + 0.8) * 0.28
+            ) * intensity;
+            this.cameraShake.y = (
+                Math.cos(phase * 1.31 + 0.35) * 0.72
+                + Math.sin(phase * 2.73) * 0.28
+            ) * intensity;
             this.cameraShake.intensity *= Math.pow(this.cameraShake.decay, dt * 60);
         } else {
             this.cameraShake.x = 0;
@@ -4230,18 +4375,29 @@ export class SurvivRenderer {
         const dx = camX - previousX;
         const dy = camY - previousY;
         if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return;
-        const candidates = [];
+        const candidates = this._surfacePrefetchCandidates;
+        candidates.length = 0;
+        let candidateCount = 0;
         if (Math.abs(dx) >= Math.abs(dy)) {
             const gridX = dx >= 0 ? maxGridX + 1 : minGridX - 1;
             for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
-                candidates.push({ gridX, gridY, distance: Math.abs((gridY + 0.5) * this._surfaceChunkTileSize - camY) });
+                const candidate = candidates[candidateCount] || (candidates[candidateCount] = {});
+                candidate.gridX = gridX;
+                candidate.gridY = gridY;
+                candidate.distance = Math.abs((gridY + 0.5) * this._surfaceChunkTileSize - camY);
+                candidateCount++;
             }
         } else {
             const gridY = dy >= 0 ? maxGridY + 1 : minGridY - 1;
             for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
-                candidates.push({ gridX, gridY, distance: Math.abs((gridX + 0.5) * this._surfaceChunkTileSize - camX) });
+                const candidate = candidates[candidateCount] || (candidates[candidateCount] = {});
+                candidate.gridX = gridX;
+                candidate.gridY = gridY;
+                candidate.distance = Math.abs((gridX + 0.5) * this._surfaceChunkTileSize - camX);
+                candidateCount++;
             }
         }
+        candidates.length = candidateCount;
         candidates.sort((a, b) => a.distance - b.distance);
         for (const candidate of candidates) {
             const key = candidate.gridX + ':' + candidate.gridY;
@@ -4261,7 +4417,9 @@ export class SurvivRenderer {
         const maxGridX = Math.floor((camX + halfW - 0.001) / tile);
         const minGridY = Math.floor((camY - halfH) / tile);
         const maxGridY = Math.floor((camY + halfH - 0.001) / tile);
-        const required = [];
+        const required = this._surfaceChunkRequired;
+        required.length = 0;
+        let requiredCount = 0;
         let allReady = true;
         this._surfaceChunkRequiredCount = (maxGridX - minGridX + 1) * (maxGridY - minGridY + 1);
 
@@ -4278,9 +4436,13 @@ export class SurvivRenderer {
                     allReady = false;
                     continue;
                 }
-                required.push({ key, sprite });
+                const requiredEntry = required[requiredCount] || (required[requiredCount] = {});
+                requiredEntry.key = key;
+                requiredEntry.sprite = sprite;
+                requiredCount++;
             }
         }
+        required.length = requiredCount;
         if (!allReady) return false;
 
         for (const { key, sprite } of required) {
@@ -6618,7 +6780,7 @@ export class SurvivRenderer {
 
     drawGrenadeExplosions(ctx, currentHouse = null, currentRoom = null) {
         const now = this._frameNow || performance.now();
-        this.grenadeExplosions = this.grenadeExplosions.filter((explosion) => now - explosion.spawnedAt < explosion.duration);
+        compactTimedItems(this.grenadeExplosions, now);
         if (this.grenadeExplosions.length === 0) return;
 
         ctx.save();
@@ -6709,7 +6871,7 @@ export class SurvivRenderer {
 
     drawDamageNumbers(ctx, currentHouse = null, currentRoom = null) {
         const now = this._frameNow;
-        this.damageNumbers = this.damageNumbers.filter(d => now - d.spawnedAt < d.duration);
+        compactTimedItems(this.damageNumbers, now);
         if (this.damageNumbers.length === 0) return;
         ctx.save();
         for (const d of this.damageNumbers) {
@@ -6740,7 +6902,7 @@ export class SurvivRenderer {
 
     drawDamageIndicators(ctx, W, H) {
         const now = this._frameNow;
-        this.damageIndicators = this.damageIndicators.filter(d => now - d.spawnedAt < d.duration);
+        compactTimedItems(this.damageIndicators, now);
         if (this.damageIndicators.length === 0) return;
         const cx = W / 2;
         const cy = H / 2;
@@ -6780,7 +6942,7 @@ export class SurvivRenderer {
 
     drawHitMarkers(ctx, W, H) {
         const now = this._frameNow;
-        this.hitMarkers = this.hitMarkers.filter(h => now - h.spawnedAt < h.duration);
+        compactTimedItems(this.hitMarkers, now);
         if (this.hitMarkers.length === 0) return;
         const cx = W / 2;
         const cy = H / 2;
@@ -6818,7 +6980,7 @@ export class SurvivRenderer {
 
     drawKillAnimation(ctx, W, H) {
         const now = this._frameNow;
-        this.killAnimations = this.killAnimations.filter(animation => now - animation.spawnedAt < animation.duration);
+        compactTimedItems(this.killAnimations, now);
         const animation = this.killAnimations[this.killAnimations.length - 1];
         if (!animation) return;
 
@@ -6860,11 +7022,13 @@ export class SurvivRenderer {
     drawKillFeed(ctx, W, H) {
         if (this.killFeed.length === 0) return;
         const now = this._frameNow;
-        const maxShow = 5;
+        const maxShow = this.isMobileLayout ? (H <= 330 ? 2 : 3) : 5;
         const entries = this.killFeed.slice(-maxShow);
 
         ctx.save();
-        let y = 56;
+        // React owns the top-right leaderboard layer, while the desktop minimap
+        // occupies the first 146 px on the left. Keep the feed below either HUD.
+        let y = this.isMobileLayout ? (H <= 390 ? 142 : 170) : 158;
         for (let i = 0; i < entries.length; i++) {
             const e = entries[i];
             const age = now - e.shownAt;
@@ -6872,9 +7036,12 @@ export class SurvivRenderer {
             if (alpha <= 0) continue;
 
             ctx.globalAlpha = alpha;
-            const text = `${e.killer || '?'}  ⊕  ${e.victim || '?'}`;
-            const tw = Math.min(220, text.length * 7 + 32);
-            const x = W - tw - 14;
+            const killerDisplay = this.hideNames ? '???' : (e.killer || '?');
+            const victimDisplay = this.hideNames ? '???' : (e.victim || '?');
+            const weaponDisplay = String(e.weapon || 'fists').toUpperCase();
+            const text = `${killerDisplay} ☠ ${victimDisplay} · ${weaponDisplay}`;
+            const tw = Math.min(this.isMobileLayout ? 210 : 260, Math.max(128, text.length * 5.6 + 24));
+            const x = this.isMobileLayout ? W - tw - 14 : 14;
 
             ctx.fillStyle = 'rgba(8, 10, 9, 0.72)';
             roundRect(ctx, x, y, tw, 22, 4);
@@ -6885,7 +7052,6 @@ export class SurvivRenderer {
             ctx.textBaseline = 'middle';
 
             // Killer name
-            const killerDisplay = this.hideNames ? '???' : (e.killer || '?');
             ctx.fillStyle = '#ff6b6b';
             ctx.fillText(killerDisplay, x + 8, y + 11);
 
@@ -6894,10 +7060,19 @@ export class SurvivRenderer {
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.fillText(' ☠ ', x + 8 + killerW, y + 11);
 
-            // Victim name
+            // Victim name and weapon source
             const midW = ctx.measureText(' ☠ ').width;
+            const victimX = x + 8 + killerW + midW;
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.fillText(this.hideNames ? '???' : (e.victim || '?'), x + 8 + killerW + midW, y + 11);
+            ctx.fillText(victimDisplay, victimX, y + 11);
+            const victimW = ctx.measureText(victimDisplay).width;
+            const weaponX = victimX + victimW;
+            const weaponSpace = Math.max(0, x + tw - 7 - weaponX);
+            if (weaponSpace > 12) {
+                ctx.fillStyle = 'rgba(215, 195, 150, 0.68)';
+                ctx.font = '800 8px system-ui, sans-serif';
+                ctx.fillText(` · ${weaponDisplay}`, weaponX, y + 11, weaponSpace);
+            }
 
             y += 26;
         }

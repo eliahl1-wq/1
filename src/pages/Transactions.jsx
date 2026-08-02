@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
+import ProductPageHeader from '../components/ProductPageHeader';
 import AppFooter from '../components/AppFooter';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
@@ -92,45 +93,25 @@ export default function Transactions() {
             <Background />
             <AppTopbar />
 
-            <div className="page-content" style={{ maxWidth: '860px' }}>
+            <div className="page-content product-page--transactions">
 
                 {/* ── Header ── */}
-                <div className="page-header-row">
-                    <div>
-                        <p className="label" style={{ marginBottom: '6px' }}>AgarStake</p>
-                        <h1 style={{ margin: 0, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 900, letterSpacing: '-1.5px', color: 'var(--text-h)', lineHeight: 1 }}>
-                            Transaction History
-                        </h1>
-                        <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-2)' }}>
-                            Personal deposits, withdrawals, and reward claims
-                        </p>
-                    </div>
-                    <button
-                        className="btn btn-ghost"
-                        onClick={() => navigate(-1)}
-                        style={{ padding: '9px 18px', fontSize: '0.78rem', borderRadius: 'var(--r-full)' }}
-                    >
-                        ← Back
-                    </button>
-                </div>
+                <ProductPageHeader
+                    title="Transaction History"
+                    description="Personal deposits, withdrawals, and reward claims."
+                    onBack={() => navigate(-1)}
+                />
 
-                {/* ── Table card ── */}
-                <div style={{
-                    background: 'var(--bg-1)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-2xl)',
-                    overflow: 'hidden',
-                    boxShadow: 'var(--shadow-lg)',
-                }}>
+                {/* Transaction ledger */}
+                <div className="product-surface transaction-ledger">
                     {loading ? (
-                        <div style={{ padding: '80px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', color: 'var(--text-2)' }}>
+                        <div className="product-empty-state transaction-ledger__loading">
                             <span className="spinner" style={{ width: 14, height: 14 }} />
                             <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Syncing with blockchain…</span>
                         </div>
                     ) : txs.length === 0 ? (
-                        <div style={{ padding: '80px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '2rem', marginBottom: '12px', opacity: 0.2 }}>⬡</div>
-                            <div style={{ fontSize: '0.82rem', color: 'var(--text-3)', fontWeight: 600 }}>No transactions yet.</div>
+                        <div className="product-empty-state">
+                            <svg className="product-empty-state__icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M6 7h12M6 12h12M6 17h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg><p className="product-empty-state__title">No transactions yet.</p>
                         </div>
                     ) : (
                         <>
@@ -294,7 +275,7 @@ export default function Transactions() {
                 </div>
 
                 {/* Footer */}
-                <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.58rem', color: 'var(--text-3)', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                <div className="product-helper">
                     Secure Terminal · AgarStake
                 </div>
             </div>
