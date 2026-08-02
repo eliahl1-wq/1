@@ -192,6 +192,33 @@ export default function Profile() {
         }
         setIsUpdatingUsername(false);
     };
+    const handleUpdateWallet = async () => {
+        const trimmed = walletInput.trim();
+        if (!trimmed || trimmed === (user?.walletAddress || '')) return;
+
+        setIsUpdating(true);
+        setUpdateMsg('');
+        try {
+            const res = await fetch(`${API_URL}/api/update-profile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ walletAddress: trimmed }),
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok && data.user) {
+                login(data.user, token);
+                setWalletInput(data.user.walletAddress || trimmed);
+                setUpdateMsg('success');
+            } else {
+                setUpdateMsg(data.message || 'error');
+            }
+        } catch {
+            setUpdateMsg('error');
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
 
     // ── Render ─────────────────────────────────────────
