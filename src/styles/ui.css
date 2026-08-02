@@ -4411,3 +4411,41 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 .admin-user-modal-stats .admin-stat-card__value{font-size:1.25rem}
 .admin-user-modal .admin-tabs{border-bottom:1px solid var(--border)}
 @media (max-width:680px){.admin-user-modal-backdrop{padding:8px}.admin-user-modal{max-height:calc(100dvh - 16px)}.admin-user-modal-header{padding:15px 14px 10px}.admin-user-modal-stats{padding:12px 14px}.admin-user-modal-body{padding:0 14px 16px}.admin-user-modal>.product-alert{margin:12px 14px 0}}
+
+/* --- Purposeful action hierarchy --- */
+.wallet-card{width:226px;padding:12px;border-radius:9px;box-shadow:0 14px 36px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.025);animation:fadeUp var(--duration-fast) var(--ease-standard)}
+.wallet-card-header{display:flex;min-height:28px;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.wallet-card-history{min-height:26px;padding:0 7px;border:0;border-radius:5px;background:transparent;color:var(--text-subtle);font:680 .64rem/1 var(--ui);letter-spacing:.055em;text-transform:uppercase;cursor:pointer;transition:color var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard)}
+.wallet-card-history:hover{background:rgba(255,255,255,.04);color:var(--text-h)}
+.wallet-card .dropdown-trigger{min-height:28px;padding:0 8px;border-radius:5px;font-size:.65rem}
+.wallet-card .dropdown-item{min-height:28px;font-size:.68rem}
+.wallet-card-balance{justify-content:center;min-height:34px;font-size:1.42rem;font-weight:760;letter-spacing:-.045em}
+.wallet-card-sub{margin-top:4px;color:var(--text-subtle);font-size:.68rem;text-align:center}
+.wallet-card-actions{gap:6px;margin-top:10px}
+.wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:31px;padding:0 9px;border-radius:6px;font-size:.68rem;font-weight:710;gap:5px}
+.wallet-card-actions .btn svg{width:12px;height:12px}
+.wallet-card-actions .btn-primary{background:#7358e8}
+.wallet-card-actions .btn-primary:hover:not(:disabled){background:#7d64eb}
+.wallet-card-actions .btn-ghost{background:rgba(255,255,255,.025)}
+.play-btn{position:relative;display:flex;min-height:52px;align-items:center;justify-content:center;gap:9px;padding:0 20px;border-radius:8px;font-size:1rem;font-weight:800;line-height:1;letter-spacing:.02em;box-shadow:inset 0 1px 0 rgba(255,255,255,.11)}
+.play-btn-label{display:inline-flex;align-items:center;justify-content:center;min-width:0}
+.play-button-icon{width:18px;height:18px;filter:none;transition:transform var(--duration-fast) var(--ease-standard)}
+.play-btn:hover:not(:disabled) .play-button-icon{transform:translateX(1px)}
+.play-btn-ready{background:#22c982;border:1px solid rgba(88,255,185,.2);color:#041a11;box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
+.play-btn-ready:hover:not(:disabled){background:#2dd18c}
+.play-btn-login,.play-btn-rejoin{background:#7459ed;border:1px solid rgba(255,255,255,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.11)}
+.play-btn-login:hover:not(:disabled),.play-btn-rejoin:hover:not(:disabled){background:#7d65ef}
+.play-btn-disabled{font-size:.8rem;font-weight:700;letter-spacing:.01em;box-shadow:none}
+.mode-card-action{min-height:41px;font-size:.82rem;font-weight:750;letter-spacing:.005em}
+.gm-card-right .gm-play-btn{font-size:.73rem;font-weight:750;letter-spacing:.025em}
+.lobby-tier-btn{min-height:36px;border-radius:7px;font-size:.76rem;transition:transform var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+.lobby-tier-btn--active,.lobby-tier-btn--active:hover:not(:disabled){background:rgba(34,201,130,.085);border-color:rgba(34,201,130,.58);box-shadow:none}
+.user-menu-item{min-height:35px;padding:0 12px;font-size:.76rem}
+.hiw-toggle{min-height:36px;font-size:.67rem}
+.nav-deposit-btn{height:34px;border-radius:7px;font-size:.76rem;font-weight:730}
+@media (max-width:768px){.wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:34px;font-size:.7rem}.play-btn{min-height:54px;font-size:1.02rem}.play-btn-disabled{font-size:.8rem}.nav-deposit-btn{height:36px}}
+
+/* Main actions carry the strongest type scale. */
+.play-btn{font-size:1.08rem}
+.mode-card-action{font-size:.86rem}
+@media (max-width:768px){.play-btn{font-size:1.1rem}.play-btn-disabled{font-size:.8rem}}

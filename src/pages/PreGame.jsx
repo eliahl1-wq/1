@@ -84,6 +84,23 @@ const WalletIcon = ({ size = 14, style }) => (
 );
 
 /* ── Currency toggle options ── */
+const PlayIcon = ({ size = 18 }) => (
+    <svg className="play-button-icon" width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6.75 4.9v10.2c0 .83.92 1.32 1.6.85l7.15-5.1a1.04 1.04 0 0 0 0-1.7l-7.15-5.1c-.68-.47-1.6.02-1.6.85Z" fill="currentColor" />
+    </svg>
+);
+
+const DepositIcon = ({ size = 14 }) => (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M10 3.5v8M6.75 8.25 10 11.5l3.25-3.25M4 14.5h12" />
+    </svg>
+);
+
+const WithdrawIcon = ({ size = 14 }) => (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M10 16.5v-8M6.75 11.75 10 8.5l3.25 3.25M4 5.5h12" />
+    </svg>
+);
 const CUR_OPTIONS = [
     { label: 'USD', value: 'USD' },
     { label: 'SOL', value: 'SOL' },
@@ -949,6 +966,11 @@ export default function PreGame() {
                         : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
                             : 'Deposit to Play';
 
+    const showPlayIcon = !isMatchmaking && (
+        !isAuthenticated ||
+        (isAlreadyInGame && canRejoinThisMode) ||
+        (!isAlreadyInGame && selectedEntryFee !== null)
+    );
     const panelOpen = isWalletExpanded || isWithdrawExpanded;
 
     // ── Render ─────────────────────────────────────────
@@ -1020,12 +1042,10 @@ export default function PreGame() {
                                     {isWalletOpen && (
                                         <div ref={walletDropRef} className="wallet-card">
                                             {/* Header row */}
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                            <div className="wallet-card-header">
                                                 <button
+                                                    className="wallet-card-history"
                                                     onClick={() => { setIsWalletOpen(false); navigate('/transactions'); }}
-                                                    style={{ background: 'none', border: 'none', color: 'var(--text-2)', fontSize: '0.65rem', fontWeight: '700', cursor: 'pointer', padding: '2px 0', letterSpacing: '0.04em', textTransform: 'uppercase', transition: 'color 0.1s' }}
-                                                    onMouseEnter={e => e.target.style.color = 'var(--text-h)'}
-                                                    onMouseLeave={e => e.target.style.color = 'var(--text-2)'}
                                                 >
                                                     History
                                                 </button>
@@ -1047,7 +1067,7 @@ export default function PreGame() {
                                             </div>
 
                                             {/* Balance */}
-                                            <div className="wallet-card-balance" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div className="wallet-card-balance">
                                                 {isCurSOL ? (
                                                     <SolLogo size={28} />
                                                 ) : (
@@ -1068,19 +1088,21 @@ export default function PreGame() {
                                             {/* Action buttons */}
                                             <div className="wallet-card-actions">
                                                 <button
-                                                    className="btn btn-primary"
+                                                    className="btn btn-primary wallet-card-action"
                                                     onClick={() => {
                                                         trackMixpanelEvent('deposit_clicked', { source: 'wallet_menu', platform: 'web' });
                                                         setIsWalletOpen(false); setIsWithdrawExpanded(false); setIsWalletExpanded(true);
                                                     }}
                                                 >
-                                                    Deposit
+                                                    <DepositIcon />
+                                                    <span>Deposit</span>
                                                 </button>
                                                 <button
-                                                    className="btn btn-ghost"
+                                                    className="btn btn-ghost wallet-card-action"
                                                     onClick={() => { setIsWalletOpen(false); setIsWalletExpanded(false); setIsWithdrawExpanded(true); }}
                                                 >
-                                                    Withdraw
+                                                    <WithdrawIcon />
+                                                    <span>Withdraw</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -1467,7 +1489,8 @@ export default function PreGame() {
                                     disabled={!canPlayTournament}
                                     onClick={playTournament}
                                 >
-                                    Play $1
+                                    <PlayIcon />
+                                    <span className="play-btn-label">Play $1</span>
                                 </button>
                             </div>
 
@@ -1586,9 +1609,9 @@ export default function PreGame() {
                                     className={playBtnClass}
                                     onClick={handleStartMatch}
                                     disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode) || (isAuthenticated && !isAlreadyInGame && selectedEntryFee === null)}
-                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                                 >
-                                    {playBtnLabel}
+                                    {showPlayIcon && <PlayIcon />}
+                                    <span className="play-btn-label">{playBtnLabel}</span>
                                 </button>
 
                                 {isAlreadyInGame && currentGameMode && (

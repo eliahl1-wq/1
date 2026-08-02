@@ -1303,3 +1303,7 @@
     .shop-hero h1 { font-size: 2rem; }
     .shop-products { grid-template-columns: 1fr; }
 }
+
+/* --- Shop action hierarchy --- */
+.shop-buy-button{min-height:43px;border-radius:7px;font-size:.82rem;font-weight:760;letter-spacing:.005em}
+.shop-cancel-button{min-height:39px;border-radius:7px;font-size:.77rem;font-weight:680}

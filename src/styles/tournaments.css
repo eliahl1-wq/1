@@ -656,3 +656,7 @@
     .tournament-title { font-size: 2rem; }
     .tournament-card { flex-basis: calc(100vw - 32px); min-height: 0; }
 }
+
+/* --- Tournament action hierarchy --- */
+.tournament-primary-btn{min-height:42px;border-radius:7px;font-size:.82rem;font-weight:760;letter-spacing:.005em}
+.tournament-secondary-btn{min-height:38px;border-radius:7px;font-size:.77rem;font-weight:680}
