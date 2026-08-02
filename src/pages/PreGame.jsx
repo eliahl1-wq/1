@@ -39,7 +39,7 @@ const SolLogo = ({ size = 13, style }) => (
     <img
         src="/solana-sol-logo.png"
         alt="SOL"
-        style={{ height: size, width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, ...style }}
+        style={{ height: size, width: 'auto', objectFit: 'contain', display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
     />
 );
 
@@ -85,7 +85,7 @@ const WalletIcon = ({ size = 14, style }) => (
 
 /* ── Currency toggle options ── */
 const PlayIcon = ({ size = 18 }) => (
-    <svg className="play-button-icon" width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <svg className="play-button-icon" width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, marginTop: '-1px' }}>
         <path d="M6.75 4.9v10.2c0 .83.92 1.32 1.6.85l7.15-5.1a1.04 1.04 0 0 0 0-1.7l-7.15-5.1c-.68-.47-1.6.02-1.6.85Z" fill="currentColor" />
     </svg>
 );
@@ -1439,7 +1439,7 @@ export default function PreGame() {
                                 </div>
                             )}
 
-                            <div className="game-card main-card" ref={mainCardRef} style={{ flexGrow: 1 }}>
+                            <div className="game-card main-card" ref={mainCardRef}>
                                 <div style={{ marginBottom: '18px' }}>
                                     <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
                                         Nickname

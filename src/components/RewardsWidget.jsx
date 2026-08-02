@@ -11,7 +11,7 @@ const SolLogo = ({ size = 13, style }) => (
     <img
         src="/solana-sol-logo.png"
         alt="SOL"
-        style={{ height: size, width: 'auto', objectFit: 'contain', verticalAlign: 'middle', flexShrink: 0, ...style }}
+        style={{ height: size, width: 'auto', objectFit: 'contain', display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }}
     />
 );
 

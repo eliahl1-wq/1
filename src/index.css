@@ -16,12 +16,12 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  /* Core palette — deep obsidian black with slate tone */
-  --bg: #08090d;
-  --bg-1: #0e1017;
-  --bg-2: #141722;
-  --bg-3: #1b1f2e;
-  --bg-elevated: rgba(23, 26, 38, 0.96);
+  /* Core palette — deep black with slight blue tint */
+  --bg: #0C0D12;
+  --bg-1: #121319;
+  --bg-2: #171820;
+  --bg-3: #1C1D27;
+  --bg-elevated: rgba(28, 29, 37, 0.95);
 
   /* Borders — razor thin with subtle micro-reflect */
   --border: rgba(255, 255, 255, 0.08);
