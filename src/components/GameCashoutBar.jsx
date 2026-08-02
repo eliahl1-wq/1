@@ -132,11 +132,14 @@ export default function GameCashoutBar({
 
     const handleHoldStart = (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget?.setPointerCapture?.(e.pointerId);
         startHold();
     };
 
     const handleHoldEnd = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         cancelHold();
     };
 
@@ -165,12 +168,11 @@ export default function GameCashoutBar({
                     type="button"
                     className={`game-cashout-btn btn btn-primary${isHolding ? ' game-cashout-btn--holding' : ''}`}
                     style={{ '--cashout-hold-ms': `${CASHOUT_HOLD_MS}ms` }}
-                    onMouseDown={handleHoldStart}
-                    onMouseUp={handleHoldEnd}
-                    onMouseLeave={handleHoldEnd}
-                    onTouchStart={handleHoldStart}
-                    onTouchEnd={handleHoldEnd}
-                    onTouchCancel={handleHoldEnd}
+                    onPointerDown={handleHoldStart}
+                    onPointerUp={handleHoldEnd}
+                    onPointerCancel={handleHoldEnd}
+                    onLostPointerCapture={handleHoldEnd}
+                    onDragStart={(e) => e.preventDefault()}
                     onContextMenu={(e) => e.preventDefault()}
                     disabled={disabled}
                 >

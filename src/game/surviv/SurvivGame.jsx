@@ -1180,7 +1180,7 @@ export default function SurvivGame() {
             )}
 
             {user?.isAdmin && gameReady && !showResultModal && (
-                <div style={{
+                <div className="game-admin-controls" style={{
                     position: 'absolute',
                     left: 14,
                     top: 96,

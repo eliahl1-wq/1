@@ -33,6 +33,7 @@ import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
+import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
 
@@ -141,6 +142,7 @@ export default function PreGame() {
         openAgarModal,
         walletBalance: agarBalance,
         balanceLoading: agarBalanceLoading,
+        launchReady: agarLaunchReady,
     } = useAgarToken();
 
     // ── Tournament States ───────────────────────────────
@@ -495,7 +497,7 @@ export default function PreGame() {
     const freePlay = !!user?.freePlay;
 
     const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
-    const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+    const hasFreeTicket = hasUnlockedFreeTicket(user);
     const canJoin = selectedEntryFee !== null && (freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
 
     // ── Format helpers ─────────────────────────────────
@@ -863,7 +865,7 @@ export default function PreGame() {
 
         // Use Free Ticket check
         const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
-        const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+        const hasFreeTicket = hasUnlockedFreeTicket(user);
         if (!isAlreadyInGame && isNormal5 && hasFreeTicket) {
             localStorage.setItem('use_free_ticket', 'true');
         } else {
@@ -1051,17 +1053,19 @@ export default function PreGame() {
                                 type="button"
                                 className="agar-nav-balance"
                                 onClick={() => openAgarModal({ action: 'BUY' })}
-                                aria-label="Buy AGAR with account balance"
-                                title="Exchange account SOL for AGAR"
+                                aria-label={agarLaunchReady ? 'Buy AGAR with account balance' : 'AGAR Coming Soon'}
+                                title={agarLaunchReady ? 'Exchange account SOL for AGAR' : 'Coming Soon'}
                             >
                                 <AgarLogo size={22} />
                                 <span className="agar-nav-balance__symbol">{AGAR.symbol}</span>
                                 <strong className="mono">
-                                    {agarBalanceLoading
-                                        ? '…'
-                                        : formatAgarAmount(agarBalance)}
+                                    {!agarLaunchReady
+                                        ? 'Coming Soon'
+                                        : agarBalanceLoading
+                                            ? '…'
+                                            : formatAgarAmount(agarBalance)}
                                 </strong>
-                                <span className="agar-nav-balance__add" aria-hidden="true">+</span>
+                                {agarLaunchReady && <span className="agar-nav-balance__add" aria-hidden="true">+</span>}
                             </button>
 
                             {/* Balance pill */}
@@ -1699,7 +1703,7 @@ export default function PreGame() {
                                             const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
                                             const active = entryFeeForSession === tier;
                                             const isNormal5 = tier === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
-                                            const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+                                            const hasFreeTicket = hasUnlockedFreeTicket(user);
                                             const isFreeTicketButton = isNormal5 && hasFreeTicket;
 
                                             return (
@@ -1715,7 +1719,7 @@ export default function PreGame() {
                                             );
                                         })}
                                     </div>
-                                    {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && user?.hasFreeTicket && !user?.freeTicketUsed) && (
+                                    {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user)) && (
                                         <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
                                             ✨ free ticket available
                                         </div>

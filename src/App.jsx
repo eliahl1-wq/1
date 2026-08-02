@@ -30,6 +30,7 @@ import { BraveWalletAdapter } from '@solana/wallet-adapter-brave';
 import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { MIN_ENTRY_FEE } from './constants/economy';
+import { hasUnlockedFreeTicket } from './utils/freeTicket';
 import { isBattleRoyaleAvailable } from './constants/features';
 import useSitePresence from './hooks/useSitePresence';
 import AgarTokenExperience from './features/agar/ui/AgarTokenExperience';
@@ -94,7 +95,7 @@ function ArenaRoute({ children }) {
   if (user?.freePlay) return children;
   if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
   if (isTournamentSession()) return children;
-  const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+  const hasFreeTicket = hasUnlockedFreeTicket(user);
   // The server consumes the ticket during join, so the auth refresh can set freeTicketUsed before the game route renders.
   const hasFreeTicketSession = location.state?.useFreeTicket === true
     || (typeof window !== 'undefined' && localStorage.getItem('use_free_ticket') === 'true');
@@ -107,7 +108,7 @@ function PublicRoute({ children }) {
   if (loading) return <AppLoadingScreen />;
   if (isAuthenticated) {
     const balanceUsd = user?.balanceUsd || (user?.balanceSol * (user?.solPrice || 57)) || 0;
-    const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+    const hasFreeTicket = hasUnlockedFreeTicket(user);
     if (user?.freePlay || hasFreeTicket || balanceUsd >= MIN_ENTRY_FEE) return <Navigate to="/pre-game" />;
     return <Navigate to="/lobby" />;
   }

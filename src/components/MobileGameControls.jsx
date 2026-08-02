@@ -55,6 +55,13 @@ function MobileBtn({ children, ariaLabel, onPress, onRelease, onTap }) {
                 setActive(false);
                 onRelease?.();
             }}
+            onLostPointerCapture={(e) => {
+                stopPointer(e);
+                setActive(false);
+                onRelease?.();
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
         >
             {children}
         </button>

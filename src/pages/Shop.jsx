@@ -129,7 +129,7 @@ export default function Shop() {
 
     const load = useCallback(async () => {
         const [catalogResponse, inventoryResponse] = await Promise.all([
-            fetch(`${API_URL}/api/shop/catalog`, { cache: 'no-store' }),
+            fetch(`${API_URL}/api/shop/catalog`, { cache: 'no-store', headers: authHeaders(token) }),
             fetch(`${API_URL}/api/shop/inventory`, {
                 cache: 'no-store',
                 headers: authHeaders(token),
@@ -236,7 +236,8 @@ export default function Shop() {
         localStorage.setItem(storageKey, 'random');
         navigate('/pre-game', { state: { mode: product.gameMode } });
     };
-    const shopReady = catalog?.ready === true && publicConfig?.shopReady === true;
+    const agarAccess = publicConfig?.accessGranted === true;
+    const shopReady = agarAccess && catalog?.ready === true && publicConfig?.shopReady === true;
 
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll shop-page">
@@ -260,14 +261,15 @@ export default function Shop() {
                         </div>
                         <div className="shop-balance-copy">
                             <span>YOUR AGAR BALANCE</span>
-                            <strong className="mono">{balanceLoading ? '...' : formatAgarAmount(walletBalance)}</strong>
-                            <small>Available to spend</small>
+                            <strong className="mono">{!agarAccess ? 'Coming Soon' : balanceLoading ? '...' : formatAgarAmount(walletBalance)}</strong>
+                            <small>{agarAccess ? 'Available to spend' : 'Admin preview only'}</small>
                         </div>
                         <button
                             type="button"
                             className="shop-balance-add"
                             aria-label="Buy AGAR"
-                            title="Buy AGAR"
+                            title={agarAccess ? 'Buy AGAR' : 'Coming Soon'}
+                            disabled={!agarAccess}
                             onClick={() => openAgarModal({ action: 'BUY' })}
                         >
                             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -323,7 +325,7 @@ export default function Shop() {
                                                 <path d="m7 12.5 3 3 7-8" />
                                             </svg>
                                         )}
-                                        {owned ? 'OWNED' : 'PREMIUM'}
+                                        {!agarAccess ? 'COMING SOON' : owned ? 'OWNED' : 'PREMIUM'}
                                     </span>
                                 </div>
                                 {product.skinId === 'flags'
@@ -355,7 +357,11 @@ export default function Shop() {
                                     </div>
                                     <small><b>{'$' + Number(product.usdPrice).toFixed(2)}</b> live-price target</small>
                                 </div>
-                                {owned ? (
+                                {!agarAccess ? (
+                                    <button type="button" className="shop-buy-button" disabled>
+                                        <span>Coming Soon</span>
+                                    </button>
+                                ) : owned ? (
                                     <button type="button" className="shop-buy-button shop-buy-button--owned" onClick={() => useSkin(product)}>
                                         <span>Use skin</span>
                                         <svg viewBox="0 0 24 24" aria-hidden="true">

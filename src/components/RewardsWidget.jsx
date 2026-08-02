@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
@@ -62,7 +63,8 @@ export default function RewardsWidget() {
     const allowedPaths = ['/pre-game', '/agar', '/slither', '/surviv', '/competitive-slither', '/competitive-agar'];
     if (!allowedPaths.includes(location.pathname)) return null;
 
-    const hasUnusedTicket = user.hasFreeTicket && !user.freeTicketUsed;
+    const hasUnusedTicket = hasUnlockedFreeTicket(user);
+    const hasTicketChallenge = !user.freeTicketChallengeCompleted && !user.freeTicketUsed && !user.rewardsDisabled;
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
     const totalBalance = promoBalance + rentFallbackBalance;
@@ -81,11 +83,11 @@ export default function RewardsWidget() {
     const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
     const hasActiveChallenge = user.freeTicketUsed && !isCompleted && !user.rewardsDisabled;
     const showReward = user.freeTicketUsed && (totalBalance > 0 || !isCompleted);
-    const hasAnyContent = hasUnusedTicket || showReward || hasActiveChallenge || canClaim || user.rewardClaimInProgress;
+    const hasAnyContent = hasTicketChallenge || hasUnusedTicket || showReward || hasActiveChallenge || canClaim || user.rewardClaimInProgress;
 
-    const challengeKey = `${normal5Progress}_${req5}_${normal10Progress}_${req10}_${user.freeTicketUsed}`;
+    const challengeKey = `${user.freeTicketChallengeCompleted}_${normal5Progress}_${req5}_${normal10Progress}_${req10}_${user.freeTicketUsed}`;
     const hasUnhoveredChallenge = hasActiveChallenge && (hoveredKey !== challengeKey);
-    const hasNotification = ((hasUnusedTicket || hasBalance) && !hasSeen) || hasUnhoveredChallenge || canClaim;
+    const hasNotification = ((hasTicketChallenge || hasUnusedTicket || hasBalance) && !hasSeen) || hasUnhoveredChallenge || canClaim;
 
     const handleChallengeHover = () => {
         if (hasUnhoveredChallenge) {
@@ -200,6 +202,15 @@ export default function RewardsWidget() {
                         ✕
                     </button>
                 </div>
+
+                {hasTicketChallenge && (
+                    <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(139, 92, 246, 0.10)', borderRadius: 'var(--r-md)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', color: '#a78bfa', fontSize: '0.8rem', fontWeight: 800 }}>
+                            <span>FREE TICKET CHALLENGE</span><span>0 / 1</span>
+                        </div>
+                        <p style={{ margin: '6px 0 0', color: 'var(--text-2)', fontSize: '0.78rem', lineHeight: 1.45 }}>Complete any Normal game. Slither Arena does not count.</p>
+                    </div>
+                )}
 
                 {hasUnusedTicket && (
                     <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(34, 197, 94, 0.08)', borderRadius: 'var(--r-md)', border: '1px solid var(--green-border)' }}>

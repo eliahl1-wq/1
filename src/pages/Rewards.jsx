@@ -5,6 +5,7 @@ import AppTopbar from '../components/AppTopbar';
 import Background from '../components/Background';
 import AffiliateRewardsPanel from '../components/AffiliateRewardsPanel';
 import { API_URL } from '../utils/apiBase';
+import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import '../styles/rewards.css';
 
 function RewardStatCard({ label, value, detail, tone = 'default' }) {
@@ -129,7 +130,8 @@ export default function Rewards() {
         return null;
     }
 
-    const hasUnusedTicket = user.hasFreeTicket && !user.freeTicketUsed;
+    const hasUnusedTicket = hasUnlockedFreeTicket(user);
+    const hasTicketChallenge = !user.freeTicketChallengeCompleted && !user.freeTicketUsed && !user.rewardsDisabled;
     const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
 
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
@@ -342,6 +344,22 @@ export default function Rewards() {
                                     Use on Slither
                                 </button>
                             </div>
+                        </div>
+                    ) : hasTicketChallenge ? (
+                        <div className="panel" style={{ padding: '24px', border: '1px solid rgba(139, 92, 246, 0.32)', background: 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.04))' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                <div>
+                                    <p className="label" style={{ margin: '0 0 6px', color: '#a78bfa' }}>FREE TICKET CHALLENGE</p>
+                                    <h3 style={{ margin: '0 0 8px', color: 'var(--text-h)' }}>Complete 1 Normal game</h3>
+                                    <p style={{ margin: 0, color: 'var(--text-2)', lineHeight: 1.55 }}>
+                                        Finish any Agar, Slither or Surviv Normal match. Slither Arena, Battle Royale, tournaments and free-ticket games do not count.
+                                    </p>
+                                </div>
+                                <strong className="mono" style={{ color: '#a78bfa', whiteSpace: 'nowrap' }}>0 / 1</strong>
+                            </div>
+                            <button className="btn btn-primary" type="button" onClick={() => navigate('/gamemodes')}>
+                                Choose Normal Game
+                            </button>
                         </div>
                     ) : (
                         <div className="panel" style={{ padding: '24px', opacity: 0.8 }}>

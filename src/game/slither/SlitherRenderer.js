@@ -176,6 +176,8 @@ export class SlitherRenderer {
         this._bgPatternScale = 0;
         this._loadBgTile();
         this._touchSteering = false;
+        this._steerTouchId = null;
+        this._boostTouchId = null;
         this.inputDx = 0;
         this.inputDy = 0;
         this.boost = false;
@@ -239,31 +241,51 @@ export class SlitherRenderer {
         // the head); boost is a double-tap-and-hold or a second finger — a plain
         // touch must NOT boost, otherwise steering bleeds mass on every turn.
         this._onTouchMove = (e) => {
-            if (!this._inputEnabled || this.spectatorMode) return;
+            if (!this._inputEnabled || this.spectatorMode || this._steerTouchId == null) return;
+            const t = Array.from(e.touches || []).find(touch => touch.identifier === this._steerTouchId);
+            if (!t) return;
             e.preventDefault();
             this._touchSteering = true;
-            const t = e.touches[0];
-            if (t) this._setInputFromScreen(t.clientX, t.clientY);
+            this._setInputFromScreen(t.clientX, t.clientY);
         };
         this._onTouchStart = (e) => {
-            if (!this._inputEnabled || this.spectatorMode) return;
+            if (!this._inputEnabled || this.spectatorMode || e.target !== this.canvas) return;
+            const t = Array.from(e.changedTouches || []).find(touch => touch.target === this.canvas)
+                || e.changedTouches?.[0];
+            if (!t) return;
+            e.preventDefault();
             unlockGameAudio();
-            this._touchSteering = true;
-            const t = e.touches[0];
-            if (t) this._setInputFromScreen(t.clientX, t.clientY);
-            const now = Date.now();
-            if (e.touches.length >= 2 || (now - this._lastTapAt) < 300) {
+            if (this._steerTouchId == null) this._steerTouchId = t.identifier;
+            if (t.identifier !== this._steerTouchId) {
+                this._boostTouchId = t.identifier;
                 this.boost = true;
+                this._emitInput?.();
+                return;
             }
+            this._touchSteering = true;
+            this._setInputFromScreen(t.clientX, t.clientY);
+            const now = Date.now();
+            if ((now - this._lastTapAt) < 300) this.boost = true;
             this._lastTapAt = now;
             this._emitInput?.();
         };
         this._onTouchEnd = (e) => {
-            if (!this._inputEnabled || this.spectatorMode) return;
-            if (!e?.touches || e.touches.length === 0) {
+            if (!this._inputEnabled || this.spectatorMode || this._steerTouchId == null) return;
+            const endedTouches = Array.from(e.changedTouches || []);
+            const boostEnded = this._boostTouchId != null
+                && endedTouches.some(touch => touch.identifier === this._boostTouchId);
+            if (boostEnded) {
+                this._boostTouchId = null;
                 this.boost = false;
-                this._touchSteering = false;
             }
+            const steeringEnded = endedTouches.some(touch => touch.identifier === this._steerTouchId);
+            if (boostEnded && !steeringEnded) this._emitInput?.();
+            if (!steeringEnded) return;
+            e.preventDefault();
+            this._steerTouchId = null;
+            this._boostTouchId = null;
+            this.boost = false;
+            this._touchSteering = false;
             this._emitInput?.();
         };
 
@@ -276,6 +298,7 @@ export class SlitherRenderer {
         document.addEventListener('touchmove', this._onTouchMove, { passive: false });
         document.addEventListener('touchstart', this._onTouchStart, { passive: false });
         document.addEventListener('touchend', this._onTouchEnd);
+        document.addEventListener('touchcancel', this._onTouchEnd);
 
         this.resize();
     }
@@ -2473,5 +2496,6 @@ export class SlitherRenderer {
         document.removeEventListener('touchmove', this._onTouchMove);
         document.removeEventListener('touchstart', this._onTouchStart);
         document.removeEventListener('touchend', this._onTouchEnd);
+        document.removeEventListener('touchcancel', this._onTouchEnd);
     }
 }

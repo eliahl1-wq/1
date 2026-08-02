@@ -76,10 +76,12 @@ export default function AgarTokenCard({
                     <span className="agar-token-card__balance">
                         <span>AGAR Balance</span>
                         <strong>
-                            {balanceLoading
-                                ? '…'
-                                : formatAgarAmount(walletBalance)}
-                            {' '}{config.symbol}
+                            {!launchReady
+                                ? config.messages.comingSoon
+                                : balanceLoading
+                                    ? '…'
+                                    : formatAgarAmount(walletBalance)}
+                            {launchReady ? ` ${config.symbol}` : ''}
                         </strong>
                     </span>
                 )}

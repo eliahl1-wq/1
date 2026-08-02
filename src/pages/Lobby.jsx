@@ -13,6 +13,7 @@ import AppFooter from '../components/AppFooter';
 import { MIN_ENTRY_FEE } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { API_URL } from '../utils/apiBase';
+import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 
 const SolLogo = ({ size = 13, style }) => (
     <img src="/solana-sol-logo.png" alt="SOL"
@@ -126,13 +127,13 @@ export default function Lobby() {
     // here until the wallet is actually funded.
     useEffect(() => {
         const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
-        const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+        const hasFreeTicket = hasUnlockedFreeTicket(user);
         const depositIntent = location.state?.depositIntent === true;
         const requiredBalanceUsd = Number(location.state?.requiredBalanceUsd) || MIN_ENTRY_FEE;
         if (user?.freePlay || balanceUsd >= requiredBalanceUsd || (hasFreeTicket && !depositIntent)) {
             navigate('/pre-game', { state: { selectedMode: location.state?.selectedMode } });
         }
-    }, [user?.freePlay, user?.hasFreeTicket, user?.freeTicketUsed, user?.balanceUsd, user?.balanceSol, user?.solPrice, location.state, navigate, solPrice]);
+    }, [user?.freePlay, user?.hasFreeTicket, user?.freeTicketUsed, user?.freeTicketChallengeCompleted, user?.rewardsDisabled, user?.balanceUsd, user?.balanceSol, user?.solPrice, location.state, navigate, solPrice]);
 
     const handleDeposit = async () => {
         if (!publicKey || !connected) { setStatusMsg('Connect your wallet first.'); return; }
@@ -252,7 +253,7 @@ export default function Lobby() {
                         Fund Your Arena
                     </h1>
                     <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.85rem', fontWeight: 500 }}>
-                        {user?.hasFreeTicket && !user?.freeTicketUsed ? (
+                        {hasUnlockedFreeTicket(user) ? (
                             <span style={{ color: 'var(--green)', fontWeight: 700 }}>✨ Free Ticket available! Enter the arena below.</span>
                         ) : (
                             `Deposit $${MIN_ENTRY_FEE} minimum to enter the arena.`
@@ -420,7 +421,7 @@ export default function Lobby() {
                     onClick={() => {
                         if (!connected) { setArenaError('Connect your wallet first.'); return; }
                         const balanceUsd = user?.balanceUsd ?? ((user?.balanceSol || 0) * (user?.solPrice || solPrice));
-                        const hasFreeTicket = user?.hasFreeTicket && !user?.freeTicketUsed;
+                        const hasFreeTicket = hasUnlockedFreeTicket(user);
                         if (!isAlreadyInGame && !hasFreeTicket && balanceUsd < MIN_ENTRY_FEE) {
                             setArenaError(`Deposit at least $${MIN_ENTRY_FEE} to enter.`); return;
                         }

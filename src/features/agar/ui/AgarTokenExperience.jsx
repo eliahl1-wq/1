@@ -20,14 +20,22 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
 
     useEffect(() => {
         let active = true;
+        setPublicConfig(null);
+        if (!token) {
+            setPublicConfig(null);
+            return () => { active = false; };
+        }
         const load = async () => {
             try {
-                const response = await fetch(`${API_URL}/api/agar/config`, { cache: 'no-store' });
+                const response = await fetch(`${API_URL}/api/agar/config`, {
+                    cache: 'no-store',
+                    headers: { Authorization: `Bearer ${token}` },
+                });
                 if (!response.ok) return;
                 const payload = await response.json();
                 if (active) setPublicConfig(payload);
             } catch {
-                // Build-time configuration remains the safe Coming Soon fallback.
+                // The safe fallback keeps every AGAR feature in Coming Soon mode.
             }
         };
         load();
@@ -36,12 +44,12 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
             active = false;
             window.clearInterval(interval);
         };
-    }, []);
+    }, [token]);
 
     const runtimeConfig = useMemo(() => ({
         ...config,
-        enabled: publicConfig?.enabled ?? config.enabled,
-        mint: publicConfig?.mint ?? config.mint,
+        enabled: publicConfig?.accessGranted === true && publicConfig?.enabled === true,
+        mint: publicConfig?.accessGranted === true ? (publicConfig?.mint || '') : '',
         decimals: publicConfig?.decimals ?? config.decimals,
         name: publicConfig?.name ?? config.name,
         symbol: publicConfig?.symbol ?? config.symbol,

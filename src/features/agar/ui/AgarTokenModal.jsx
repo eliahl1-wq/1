@@ -222,7 +222,7 @@ export default function AgarTokenModal({
                             <span>Chart</span>
                             <span>{launchReady && marketLoading ? 'Loading…' : launchReady ? 'Live' : config.messages.comingSoon}</span>
                         </div>
-                        <AgarPriceChart launchReady={launchReady} />
+                        <AgarPriceChart launchReady={launchReady} authToken={authToken} />
                     </div>
 
                     <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}`}>
@@ -241,9 +241,11 @@ export default function AgarTokenModal({
                         <div className="agar-modal__wallet-row">
                             <span>{config.symbol} Balance</span>
                             <strong>
-                                {balanceLoading
-                                    ? `… ${config.symbol}`
-                                    : `${formatAgarAmount(walletBalance)} ${config.symbol}`}
+                                {!launchReady
+                                    ? config.messages.comingSoon
+                                    : balanceLoading
+                                        ? `… ${config.symbol}`
+                                        : `${formatAgarAmount(walletBalance)} ${config.symbol}`}
                             </strong>
                         </div>
                         <div className="agar-modal__wallet-row">
@@ -310,13 +312,15 @@ export default function AgarTokenModal({
                             type="button"
                             className={`agar-modal__trade ${tradeSide === 'BUY' ? 'agar-modal__trade--buy' : 'agar-modal__trade--sell'}`}
                             onClick={() => handleTrade(tradeSide)}
-                            disabled={submitting}
+                            disabled={submitting || !launchReady}
                         >
-                            {submitting
-                                ? 'Confirming…'
-                                : tradeSide === 'BUY'
-                                    ? `Buy ${config.symbol}`
-                                    : `Sell ${config.symbol}`}
+                            {!launchReady
+                                ? config.messages.comingSoon
+                                : submitting
+                                    ? 'Confirming…'
+                                    : tradeSide === 'BUY'
+                                        ? `Buy ${config.symbol}`
+                                        : `Sell ${config.symbol}`}
                         </button>
 
                         <div
@@ -360,7 +364,7 @@ export default function AgarTokenModal({
                     {!launchReady && (
                         <div className="agar-modal__launch-note">
                             <span className="agar-modal__launch-dot" />
-                            Contract not configured · All AGAR features remain disabled
+                            AGAR features are coming soon · Trading remains disabled
                         </div>
                     )}
                 </div>

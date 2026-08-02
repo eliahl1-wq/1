@@ -34,7 +34,7 @@ function buildGeometry(points, width, height) {
     return { min, max, coordinates, line, area };
 }
 
-export default function AgarPriceChart({ launchReady }) {
+export default function AgarPriceChart({ launchReady, authToken = '' }) {
     const canvasRef = useRef(null);
     const [size, setSize] = useState({ width: 700, height: 292 });
     const [range, setRange] = useState('24H');
@@ -56,6 +56,7 @@ export default function AgarPriceChart({ launchReady }) {
                 const response = await fetch(`${API_URL}/api/agar/candles?range=${range}`, {
                     cache: 'no-store',
                     signal: controller.signal,
+                    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
                 });
                 const payload = await response.json();
                 if (!response.ok) throw new Error(payload?.message || 'Chart data unavailable');
@@ -73,7 +74,7 @@ export default function AgarPriceChart({ launchReady }) {
             controller.abort();
             window.clearInterval(interval);
         };
-    }, [launchReady, range]);
+    }, [authToken, launchReady, range]);
 
     useEffect(() => {
         const element = canvasRef.current;

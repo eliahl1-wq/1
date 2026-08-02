@@ -112,24 +112,24 @@ function drawAgarPreview(ctx, W, H, { battleRoyale = false } = {}) {
     }
 
     drawAgarCell(ctx, {
-        x: W * 0.28, y: H * 0.55, radius: 28,
+        id: 'agar-preview-blue', x: W * 0.28, y: H * 0.55, radius: 28,
         color: 'hsl(210, 100%, 55%)', borderColor: 'hsl(210, 100%, 38%)',
         vX: 2, vY: -1,
     });
     drawAgarCell(ctx, {
-        x: W * 0.68, y: H * 0.58, radius: 36,
+        id: 'agar-preview-pink', x: W * 0.68, y: H * 0.58, radius: 36,
         color: 'hsl(330, 100%, 58%)', borderColor: 'hsl(330, 100%, 40%)',
         vX: -1.5, vY: 1,
     });
     if (!battleRoyale) {
         drawAgarCell(ctx, {
-            x: W * 0.5, y: H * 0.42, radius: 42,
+            id: 'agar-preview-you', name: 'You', x: W * 0.5, y: H * 0.42, radius: 42,
             color: 'hsl(145, 100%, 50%)', borderColor: 'hsl(145, 100%, 35%)',
             vX: 0.5, vY: 2, isMe: true, balance: 18.75,
         });
     } else {
         drawAgarCell(ctx, {
-            x: W * 0.5, y: H * 0.42, radius: 38,
+            id: 'agar-preview-br-you', name: 'You', x: W * 0.5, y: H * 0.42, radius: 38,
             color: 'hsl(145, 100%, 50%)', borderColor: 'hsl(145, 100%, 35%)',
             vX: 0.5, vY: 2,
         });
