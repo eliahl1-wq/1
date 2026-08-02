@@ -709,13 +709,11 @@ export default function PreGame() {
         return () => { alive = false; clearInterval(id); };
     }, [API_URL, leaderboardTab]);
 
-    // Balance poll
+    // AuthContext owns the shared balance poll. Keep one immediate route refresh
+    // without starting a second interval for the same account.
     useEffect(() => {
         refreshUser();
-        const id = setInterval(refreshUser, 20000); // Minska polling till var 20:e sekund
-        return () => clearInterval(id);
     }, [refreshUser]);
-
     // Game status — poll so rejoin button stays accurate
     useEffect(() => {
         if (!token) {

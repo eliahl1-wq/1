@@ -202,7 +202,7 @@ export const AuthProvider = ({ children }) => {
             if (document.hidden || window.location.pathname === '/surviv-game') return;
             refreshUser();
         };
-        const interval = setInterval(poll, 6000);
+        const interval = setInterval(poll, 15000);
         const onVisibility = () => { if (!document.hidden) poll(); };
         window.addEventListener('focus', poll);
         window.addEventListener('online', poll);

@@ -101,8 +101,8 @@ export default function Lobby() {
             };
             check();
             const statusId = setInterval(check, 10000);
-            const balanceId = setInterval(refreshUser, 5000);
-            return () => { alive = false; clearInterval(statusId); clearInterval(balanceId); };
+
+            return () => { alive = false; clearInterval(statusId); };
         }
     }, [token, refreshUser]);
 
