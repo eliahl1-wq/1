@@ -101,7 +101,7 @@ export const SEO = {
     },
     lobby: {
         tabTitle: 'AgarStake | Game Lobby',
-        description: 'Connect your wallet and manage your funds. Deposit Solana (SOL) to enter the arenas and track your live balance.',
+        description: 'Manage your funds and deposit Solana (SOL) using your personal address or QR code to enter the arenas.',
         keywords: `${BASE_KEYWORDS}, deposit solana, crypto game lobby`,
         path: '/lobby',
     },

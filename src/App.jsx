@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -22,51 +22,16 @@ import Shop from './pages/Shop';
 import ReferralCapture from './components/ReferralCapture';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
-import { BraveWalletAdapter } from '@solana/wallet-adapter-brave';
-import { WalletConnectWalletAdapter } from '@solana/wallet-adapter-walletconnect';
-import '@solana/wallet-adapter-react-ui/styles.css';
+
 import { MIN_ENTRY_FEE } from './constants/economy';
 import { hasUnlockedFreeTicket } from './utils/freeTicket';
 import { isBattleRoyaleAvailable } from './constants/features';
 import useSitePresence from './hooks/useSitePresence';
 import AgarTokenExperience from './features/agar/ui/AgarTokenExperience';
 
-const SOLANA_RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL?.trim()
-  || 'https://api.mainnet.solana.com';
-
 function SitePresenceRunner() {
   useSitePresence();
   return null;
-}
-
-function buildWalletAdapters() {
-  const adapters = [
-    new WalletConnectWalletAdapter({
-      network: WalletAdapterNetwork.Mainnet,
-      options: {
-        projectId: '8b2f78d206bbaec981376e03d9d15376',
-        metadata: {
-          name: 'AgarStake',
-          description: 'Competitive Agar.io, Slither.io, and Surviv with Solana stakes.',
-          url: 'https://agararena.space',
-          icons: ['https://agararena.space/logo-512.png'],
-        },
-      },
-    }),
-    // Auto-detects Brave browser wallet via window.braveSolana
-    new BraveWalletAdapter(),
-  ];
-
-  // Phantom extension only — not injected when only Brave wallet is present
-  if (typeof window !== 'undefined' && window.phantom?.solana?.isPhantom) {
-    adapters.push(new PhantomWalletAdapter());
-  }
-
-  return adapters;
 }
 
 function PrivateRoute({ children }) {
@@ -124,15 +89,8 @@ function AdminRoute({ children }) {
 }
 
 function App() {
-  const endpoint = useMemo(() => SOLANA_RPC_URL, []);
-
-  const wallets = useMemo(() => buildWalletAdapters(), []);
-
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <Router>
+    <Router>
             <AuthProvider>
               <SitePresenceRunner />
               <ReferralCapture />
@@ -178,10 +136,7 @@ function App() {
               </Routes>
               </AgarTokenExperience>
             </AuthProvider>
-          </Router>
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    </Router>
   );
 }
 

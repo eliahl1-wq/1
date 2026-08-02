@@ -12,7 +12,7 @@ const FAQ_ITEMS = [
     },
     {
         q: 'How do I deposit?',
-        a: 'After creating an account, go to the lobby and deposit via connected wallet (Phantom, Brave, WalletConnect) or send SOL directly to your personal deposit address shown in the QR panel.',
+        a: 'After creating an account, go to the lobby and send SOL to your personal deposit address by copying the address or scanning its QR code.',
     },
     {
         q: 'How does cashing out work?',
@@ -35,8 +35,8 @@ const FAQ_ITEMS = [
         a: 'Deposits are held in a custodial wallet system secured on Solana. Withdrawals are processed on-chain. Never share your password or deposit address with anyone claiming to be support.',
     },
     {
-        q: 'What wallets are supported?',
-        a: 'Phantom, Brave Wallet, and WalletConnect-compatible wallets. You can also deposit manually by sending SOL to your deposit address without connecting a wallet.',
+        q: 'Which wallets can I deposit from?',
+        a: 'You can send SOL from any Solana wallet to your personal deposit address. No wallet connection is required.',
     },
     {
         q: 'Can I play on mobile?',

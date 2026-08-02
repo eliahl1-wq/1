@@ -338,7 +338,7 @@ export class SurvivRenderer {
         this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
-        this.targetZoom = 1.4;
+        this.targetZoom = 1.58;
         this.isMobileLayout = false;
         this.worldHalf = 10000;
         this.myId = null;
@@ -408,6 +408,8 @@ export class SurvivRenderer {
         };
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
+        this._canvasLeft = 0;
+        this._canvasTop = 0;
         this.mobileMove = { x: 0, y: 0 };
         this._localMoveVector = { dx: 0, dy: 0 };
         this.mobileAim = { angle: 0, strength: 0, active: false, shooting: false };
@@ -421,8 +423,6 @@ export class SurvivRenderer {
         this._lastFrameAt = performance.now();
         this._frameNow = Date.now();
         // Cached gradients to avoid per-frame allocation
-        this._cachedZoneGlowGrad = null;
-        this._cachedZoneGlowKey = '';
         this._cachedVignetteGrad = null;
         this._cachedVignetteKey = '';
         this._cachedDangerGrad = null;
@@ -487,6 +487,7 @@ export class SurvivRenderer {
         this._surfaceChunkCache = new Map();
         this._surfaceChunkCachePixels = 0;
         this._surfaceChunkBuildsThisFrame = 0;
+        this._cacheBuildsThisFrame = 0;
         this._lastSurfaceCamX = NaN;
         this._lastSurfaceCamY = NaN;
         // Smaller tiles keep first-time cache builds under a 140 Hz frame
@@ -524,15 +525,15 @@ export class SurvivRenderer {
         // Keep phone-sized Retina canvases sharp while capping total GPU pixels.
         const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
         this.isMobileLayout = coarsePointer || w < 760;
-        // Native pixels on 1080p and near-native pixels on 1440p keep weapon,
-        // prop and text edges crisp. The adaptive scaler can still fall back to
-        // roughly the previous budget on slower 4K/integrated-GPU systems.
-        const pixelBudgetDpr = Math.sqrt(3_200_000 / Math.max(1, w * h));
-        const dprCap = this.isMobileLayout ? 1.4 : 1.2;
+        // Surviv redraws the whole canvas every frame. Keep the backing surface
+        // below roughly 1.8M pixels so 120/144 Hz displays do not become
+        // fill-rate bound even when several translucent world layers overlap.
+        const pixelBudgetDpr = Math.sqrt(1_800_000 / Math.max(1, w * h));
+        const dprCap = this.isMobileLayout ? 1.15 : 0.9;
         const baseDpr = Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr);
         // The previous 0.75 floor defeated the pixel budget on ultrawide/4K
         // displays (4.7M pixels at 4K). Keep the cost consistent across monitors.
-        const minimumDpr = this.isMobileLayout ? 0.6 : 0.4;
+        const minimumDpr = this.isMobileLayout ? 0.58 : 0.5;
         // Resolution stays stable for the whole match. Dynamically changing the
         // backing canvas made graphics visibly soften a few seconds after join.
         const dpr = Math.max(minimumDpr, baseDpr);
@@ -541,13 +542,16 @@ export class SurvivRenderer {
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
+        const canvasRect = this.canvas.getBoundingClientRect();
+        this._canvasLeft = canvasRect.left;
+        this._canvasTop = canvasRect.top;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'medium';
+        this.ctx.imageSmoothingQuality = 'low';
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;
-        this.targetZoom = this.isMobileLayout ? 1.08 : 1.4;
+        this.targetZoom = this.isMobileLayout ? 1.18 : 1.58;
         if (!this.spectatorMode) this.zoom = this.targetZoom;
     }
 
@@ -1452,12 +1456,11 @@ export class SurvivRenderer {
     }
 
     handlePointerMove(clientX, clientY) {
-        const rect = this.canvas.getBoundingClientRect();
-        this.mouse.x = clientX - rect.left;
-        this.mouse.y = clientY - rect.top;
-        const w = this.screenToWorld(this.mouse.x, this.mouse.y);
-        this.mouse.worldX = w.x;
-        this.mouse.worldY = w.y;
+        // Do not force a layout read for every high-polling-rate mouse event.
+        // World coordinates are recalculated from the latest screen position in
+        // getInputPayload, where they are actually consumed.
+        this.mouse.x = clientX - this._canvasLeft;
+        this.mouse.y = clientY - this._canvasTop;
     }
 
     handlePointerDown() {
@@ -2105,6 +2108,9 @@ export class SurvivRenderer {
         this._obstacleCacheBuildsThisFrame = 0;
         this._surfaceCacheBuildsThisFrame = 0;
         this._surfaceChunkBuildsThisFrame = 0;
+        // A shared budget prevents terrain, props and roofs from all creating
+        // large offscreen canvases during the same 7 ms frame.
+        this._cacheBuildsThisFrame = 0;
         // FPS counter
         this._fpsFrames++;
         const fpsSampleElapsed = performance.now() - this._fpsLastSampleAt;
@@ -2247,13 +2253,8 @@ export class SurvivRenderer {
             for (const o of visibleRoads) this.drawRoadBody(ctx, o, false);
             for (const o of visibleRoads) this.drawRoadMarkings(ctx, o, false);
         } else {
-            // Roads stay dynamic and world-anchored. Baking long roads into
-            // independent terrain chunks can leave only an edge/shoulder in one
-            // tile, making the road appear to change shape at a chunk boundary.
-            for (const o of visibleRoads) this.drawRoadShoulder(ctx, o, false);
-            for (const o of visibleRoads) this.drawRoadBody(ctx, o, false);
-            for (const o of visibleRoads) this.drawRoadMarkings(ctx, o, false);
-            // Static water is baked into the chunk; only its subtle movement remains dynamic.
+            // Fields, water and roads are baked into world-anchored chunks. Only
+            // the subtle water movement remains dynamic in the steady state.
             for (const o of visibleWater) this.drawWaterAnimation(ctx, o);
         }
         // Draw blood decals on the ground
@@ -2521,50 +2522,77 @@ export class SurvivRenderer {
         const { x, y, radius, targetX, targetY, targetRadius } = this.zone;
         if (!radius || radius <= 0) return;
 
+        const left = this._viewLeft;
+        const right = this._viewRight;
+        const top = this._viewTop;
+        const bottom = this._viewBottom;
+        const nearestX = clamp(x, left, right);
+        const nearestY = clamp(y, top, bottom);
+        const minViewDistance = Math.hypot(nearestX - x, nearestY - y);
+        const maxViewDistance = Math.max(
+            Math.hypot(left - x, top - y),
+            Math.hypot(right - x, top - y),
+            Math.hypot(left - x, bottom - y),
+            Math.hypot(right - x, bottom - y),
+        );
+        const borderVisible = minViewDistance <= radius + 28 && maxViewDistance >= radius - 28;
+        const viewInsideSafeZone = maxViewDistance < radius - 24;
+        const viewOutsideSafeZone = minViewDistance > radius + 24;
+
         ctx.save();
-        // Draw danger zone fog outside safe circle
-        const wh = this.worldHalf + 200;
-        ctx.fillStyle = 'rgba(180, 40, 20, 0.22)';
-        ctx.beginPath();
-        ctx.rect(-wh, -wh, wh * 2, wh * 2);
-        ctx.arc(x, y, radius, 0, Math.PI * 2, true);
-        ctx.fill();
-
-        // Animated zone border
-        const pulse = 0.5 + Math.sin(this._frameNow / 400) * 0.5;
-        ctx.strokeStyle = `rgba(255, 80, 40, ${0.5 + pulse * 0.3})`;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([12, 8]);
-        ctx.lineDashOffset = -(this._frameNow / 40) % 20;
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Inner glow
-        const glowGrad = ctx.createRadialGradient(x, y, radius - 20, x, y, radius + 8);
-        glowGrad.addColorStop(0, 'rgba(255, 60, 30, 0)');
-        glowGrad.addColorStop(0.7, 'rgba(255, 60, 30, 0.08)');
-        glowGrad.addColorStop(1, 'rgba(255, 60, 30, 0.18)');
-        ctx.fillStyle = glowGrad;
-        ctx.beginPath();
-        ctx.arc(x, y, radius + 8, 0, Math.PI * 2);
-        ctx.arc(x, y, Math.max(0, radius - 20), 0, Math.PI * 2, true);
-        ctx.fill();
-
-        // Draw target zone if shrinking
-        if (targetRadius != null && targetRadius > 0 && targetRadius < radius) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([6, 6]);
+        if (!viewInsideSafeZone) {
+            ctx.fillStyle = 'rgba(180, 40, 20, 0.22)';
             ctx.beginPath();
-            ctx.arc(targetX ?? x, targetY ?? y, targetRadius, 0, Math.PI * 2);
+            ctx.rect(left - 4, top - 4, right - left + 8, bottom - top + 8);
+            if (!viewOutsideSafeZone) ctx.arc(x, y, radius, 0, Math.PI * 2, true);
+            ctx.fill();
+        }
+
+        if (borderVisible) {
+            // A wide translucent stroke gives the same edge glow without
+            // allocating and rasterizing a large radial gradient every frame.
+            ctx.setLineDash([]);
+            ctx.strokeStyle = 'rgba(255, 60, 30, 0.11)';
+            ctx.lineWidth = 28;
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(0, radius - 6), 0, Math.PI * 2);
+            ctx.stroke();
+
+            const pulse = 0.5 + Math.sin(this._frameNow / 400) * 0.5;
+            ctx.strokeStyle = `rgba(255, 80, 40, ${0.5 + pulse * 0.3})`;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([12, 8]);
+            ctx.lineDashOffset = -(this._frameNow / 40) % 20;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
             ctx.stroke();
             ctx.setLineDash([]);
         }
+
+        if (targetRadius != null && targetRadius > 0 && targetRadius < radius) {
+            const tx = targetX ?? x;
+            const ty = targetY ?? y;
+            const targetNearestX = clamp(tx, left, right);
+            const targetNearestY = clamp(ty, top, bottom);
+            const targetMinDistance = Math.hypot(targetNearestX - tx, targetNearestY - ty);
+            const targetMaxDistance = Math.max(
+                Math.hypot(left - tx, top - ty),
+                Math.hypot(right - tx, top - ty),
+                Math.hypot(left - tx, bottom - ty),
+                Math.hypot(right - tx, bottom - ty),
+            );
+            if (targetMinDistance <= targetRadius + 10 && targetMaxDistance >= targetRadius - 10) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([6, 6]);
+                ctx.beginPath();
+                ctx.arc(tx, ty, targetRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
         ctx.restore();
     }
-
     drawObstacleShore(ctx, o, allowCache = true) {
         if (allowCache && this.drawCachedSurfaceLayer(ctx, o, 'waterShore', cacheCtx => this.drawObstacleShore(cacheCtx, o, false))) return;
         const kind = o.kind || 'crate';
@@ -4108,7 +4136,7 @@ export class SurvivRenderer {
     buildSurfaceChunk(gridX, gridY) {
         if (typeof document === 'undefined') return null;
         const tile = this._surfaceChunkTileSize;
-        const scale = 1.5;
+        const scale = 1.25;
         const bleed = 4;
         const left = gridX * tile;
         const top = gridY * tile;
@@ -4123,8 +4151,11 @@ export class SurvivRenderer {
         const water = this.waterObstacles.filter(o => (
             this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 50)
         ));
+        const roads = this.roadObstacles.filter(o => (
+            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 64)
+        ));
         const key = gridX + ':' + gridY;
-        if (!fields.length && !water.length) {
+        if (!fields.length && !water.length && !roads.length) {
             const emptySprite = { canvas: null, pixels: 0, left, top };
             this._surfaceChunkCache.set(key, emptySprite);
             return emptySprite;
@@ -4153,7 +4184,10 @@ export class SurvivRenderer {
         try {
             for (const o of fields) this.drawObstacle(cacheCtx, o, false);
             for (const o of water) this.drawObstacleShore(cacheCtx, o, false);
+            for (const o of roads) this.drawRoadShoulder(cacheCtx, o, false);
             for (const o of water) this.drawObstacleBody(cacheCtx, o, false);
+            for (const o of roads) this.drawRoadBody(cacheCtx, o, false);
+            for (const o of roads) this.drawRoadMarkings(cacheCtx, o, false);
         } finally {
             [this._viewLeft, this._viewTop, this._viewRight, this._viewBottom] = previousBounds;
             this._buildingSurfaceChunk = previousBuildingChunk;
@@ -4190,7 +4224,8 @@ export class SurvivRenderer {
         this._lastSurfaceCamX = camX;
         this._lastSurfaceCamY = camY;
         if (!Number.isFinite(previousX) || !Number.isFinite(previousY)
-            || this._surfaceChunkBuildsThisFrame >= 1) return;
+            || this._surfaceChunkBuildsThisFrame >= 1
+            || this._cacheBuildsThisFrame >= 1) return;
 
         const dx = camX - previousX;
         const dy = camY - previousY;
@@ -4212,6 +4247,7 @@ export class SurvivRenderer {
             const key = candidate.gridX + ':' + candidate.gridY;
             if (this._surfaceChunkCache.has(key)) continue;
             this._surfaceChunkBuildsThisFrame++;
+            this._cacheBuildsThisFrame++;
             this.buildSurfaceChunk(candidate.gridX, candidate.gridY);
             break;
         }
@@ -4233,8 +4269,9 @@ export class SurvivRenderer {
             for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
                 const key = gridX + ':' + gridY;
                 let sprite = this._surfaceChunkCache.get(key);
-                if (!sprite && this._surfaceChunkBuildsThisFrame < 1) {
+                if (!sprite && this._surfaceChunkBuildsThisFrame < 1 && this._cacheBuildsThisFrame < 1) {
                     this._surfaceChunkBuildsThisFrame++;
+                    this._cacheBuildsThisFrame++;
                     sprite = this.buildSurfaceChunk(gridX, gridY);
                 }
                 if (!sprite) {
@@ -4305,8 +4342,9 @@ export class SurvivRenderer {
         if (!sprite) {
             // Large canvases are intentionally built one at a time so entering a
             // new area cannot turn one frame into a long cache-generation spike.
-            if (this._surfaceCacheBuildsThisFrame >= 1) return false;
+            if (this._surfaceCacheBuildsThisFrame >= 1 || this._cacheBuildsThisFrame >= 1) return false;
             this._surfaceCacheBuildsThisFrame++;
+            this._cacheBuildsThisFrame++;
 
             const width = Math.ceil(worldWidth * scale);
             const height = Math.ceil(worldHeight * scale);
@@ -4369,8 +4407,9 @@ export class SurvivRenderer {
         if (!sprite) {
             // Spread cold prop-cache creation across frames. The vector fallback
             // is visually identical, while avoiding a burst when a town enters view.
-            if (this._obstacleCacheBuildsThisFrame >= 3) return false;
+            if (this._obstacleCacheBuildsThisFrame >= 1 || this._cacheBuildsThisFrame >= 1) return false;
             this._obstacleCacheBuildsThisFrame++;
+            this._cacheBuildsThisFrame++;
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
             const extent = rotated ? Math.hypot(o.w, o.h) : 0;
@@ -6302,8 +6341,9 @@ export class SurvivRenderer {
         if (!sprite) {
             // Spread cache creation across frames to avoid an entry stutter
             // when several roofs enter the viewport at the same time.
-            if (this._roofCacheBuildsThisFrame >= 4) return false;
+            if (this._roofCacheBuildsThisFrame >= 1 || this._cacheBuildsThisFrame >= 1) return false;
             this._roofCacheBuildsThisFrame++;
+            this._cacheBuildsThisFrame++;
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
             const extent = rotated ? Math.hypot(o.w, o.h) : 0;
@@ -6497,14 +6537,6 @@ export class SurvivRenderer {
     drawMinimapPanel(ctx, W, H) {
         const viewHalfW = W / (2 * this.zoom);
         const viewHalfH = H / (2 * this.zoom);
-        const lootDots = this.minimap.food?.length
-            ? this.minimap.food
-            : this.loot
-                .filter(l => l.type === 'chest' || l.type === 'deathCrate' || l.type === 'money')
-                .map(l => ({ x: l.x, y: l.y, golden: l.type !== 'chest' }));
-        const minimapPlayers = this.minimap.players?.length
-            ? this.minimap.players
-            : this.players.map(p => ({ x: p.x, y: p.y, isYou: p.isYou || p.id === this.myId }));
         const isMobile = this.isMobileLayout;
         const cacheSize = isMobile ? 96 : 160;
         if (!this._minimapCanvas && typeof document !== 'undefined') {
@@ -6528,6 +6560,14 @@ export class SurvivRenderer {
             targetCtx.clearRect(0, 0, cacheSize, cacheSize);
             this._nextMinimapRenderAt = now + (1000 / 12);
         }
+        const lootDots = this.minimap.food?.length
+            ? this.minimap.food
+            : this.loot
+                .filter(l => l.type === 'chest' || l.type === 'deathCrate' || l.type === 'money')
+                .map(l => ({ x: l.x, y: l.y, golden: l.type !== 'chest' }));
+        const minimapPlayers = this.minimap.players?.length
+            ? this.minimap.players
+            : this.players.map(p => ({ x: p.x, y: p.y, isYou: p.isYou || p.id === this.myId }));
         drawGameMinimap(targetCtx, {
             screenW: shouldCache ? cacheSize : W,
             screenH: shouldCache ? cacheSize : H,

@@ -192,26 +192,6 @@ export default function Profile() {
         setIsUpdatingUsername(false);
     };
 
-    const handleUpdateWallet = async () => {
-        if (!walletInput || walletInput === user?.walletAddress) return;
-        setIsUpdating(true);
-        setUpdateMsg('');
-        try {
-            const res = await fetch(`${API_URL}/api/update-profile`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ walletAddress: walletInput })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.user) {
-                login(data.user, token);
-                setUpdateMsg('success');
-            } else {
-                setUpdateMsg(data.message || 'error');
-            }
-        } catch { setUpdateMsg('error'); }
-        setIsUpdating(false);
-    };
 
     // ── Render ─────────────────────────────────────────
     return (
@@ -760,10 +740,9 @@ export default function Profile() {
                                         </div>
                                     </div>
                                 )}
-
-                                {/* Wallet link */}
+                                {/* Payout address (manual entry only; this does not connect a browser wallet) */}
                                 <div>
-                                    <label className="label" style={{ display: 'block', marginBottom: '6px' }}>Linked Wallet Address</label>
+                                    <label className="label" style={{ display: 'block', marginBottom: '6px' }}>Payout Wallet Address</label>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                         <input
                                             value={walletInput}
@@ -778,22 +757,23 @@ export default function Profile() {
                                             disabled={isUpdating || walletInput === user?.walletAddress || !walletInput}
                                             style={{ padding: '0 18px', fontSize: '0.75rem', flexShrink: 0, borderRadius: 'var(--r-md)' }}
                                         >
-                                            {isUpdating ? <span className="spinner" /> : 'Link'}
+                                            {isUpdating ? <span className="spinner" /> : 'Save'}
                                         </button>
                                     </div>
                                     {updateMsg && (
                                         <div className={`status-msg ${updateMsg === 'success' ? 'success' : 'error'}`} style={{ marginTop: '8px' }}>
                                             {updateMsg === 'success'
-                                                ? '✅ Wallet linked! Manual deposits will be tracked.'
+                                                ? '✅ Payout address saved.'
                                                 : updateMsg === 'error'
-                                                    ? '❌ Failed to link. Check address format.'
+                                                    ? '❌ Failed to save. Check the address format.'
                                                     : `❌ ${updateMsg}`}
                                         </div>
                                     )}
                                     <p style={{ margin: '8px 0 0', fontSize: '0.67rem', color: 'var(--text-3)', lineHeight: 1.5 }}>
-                                        Link the wallet you intend to deposit from. This helps us auto-identify your manual deposits.
+                                        Used for affiliate payouts. Entering an address does not connect your wallet to AgarStake.
                                     </p>
                                 </div>
+
                             </div>
                         )}
                     </div>

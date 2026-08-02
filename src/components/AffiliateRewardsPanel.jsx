@@ -111,7 +111,7 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(payload.message || 'Affiliate payout request failed');
-            setMessage('Payout requested. An admin will review and send it to your connected wallet.');
+            setMessage('Payout requested. An admin will review and send it to your saved payout address.');
             await Promise.all([load(), refreshUser()]);
         } catch (error) {
             setMessage(error.message);
@@ -199,11 +199,11 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
 
                         <div className="affiliate-payout-meta">
                             <span>{money(metrics.pendingCommissionUsd)} pending for {data.config.holdingPeriodDays} days</span>
-                            <span>{hasWallet ? `Wallet: ${shortWallet(data.profile.payoutWallet)}` : 'Payout wallet not connected'}</span>
+                            <span>{hasWallet ? `Wallet: ${shortWallet(data.profile.payoutWallet)}` : 'Payout address missing'}</span>
                         </div>
 
                         {!hasWallet ? (
-                            <button className="btn btn-primary" onClick={() => navigate('/profile')}>Connect payout wallet</button>
+                            <button className="btn btn-primary" onClick={() => navigate('/profile')}>Add payout address</button>
                         ) : (
                             <button
                                 className="btn btn-green"

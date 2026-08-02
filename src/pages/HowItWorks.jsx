@@ -17,7 +17,7 @@ const STEPS = [
     {
         num: '02',
         title: 'Deposit Solana',
-        desc: 'Send SOL to your personal deposit address or connect Phantom/Brave wallet. Funds appear in your balance within seconds.',
+        desc: 'Send SOL to your personal deposit address by copying it or scanning the QR code. Funds appear after Solana confirmation.',
         icon: '◎',
     },
     {
