@@ -58,13 +58,39 @@ export default function RewardsWidget() {
         const id = setInterval(poll, 3000);
         return () => { cancelled = true; clearInterval(id); };
     }, [user?.rewardClaimInProgress, refreshUser]);
+
+    const hasTicketChallenge = Boolean(
+        user
+        && !user.freeTicketChallengeCompleted
+        && !user.freeTicketUsed
+        && !user.rewardsDisabled
+    );
+    const hasUnusedTicket = Boolean(user && hasUnlockedFreeTicket(user));
+
+    useEffect(() => {
+        if (!isInitialized || !user || (!hasTicketChallenge && !hasUnusedTicket)) return;
+
+        const accountKey = user._id || user.id || user.username || 'account';
+        const state = hasTicketChallenge ? 'challenge' : 'unlocked';
+        const stateTimestamp = hasTicketChallenge
+            ? user.freeTicketChallengeCheckedAt
+            : user.freeTicketChallengeCompletedAt;
+        const popupKey = `free_ticket_popup_v2:${accountKey}:${state}:${stateTimestamp || 'initial'}`;
+
+        if (localStorage.getItem(popupKey) === 'shown') return;
+
+        setExpanded(true);
+        setHasSeen(false);
+        localStorage.setItem('rewards_widget_expanded', 'true');
+        localStorage.removeItem('rewards_notif_seen');
+        localStorage.setItem(popupKey, 'shown');
+    }, [hasTicketChallenge, hasUnusedTicket, isInitialized, user]);
+
     if (!user || !isInitialized) return null;
 
     const allowedPaths = ['/pre-game', '/agar', '/slither', '/surviv', '/competitive-slither', '/competitive-agar'];
     if (!allowedPaths.includes(location.pathname)) return null;
 
-    const hasUnusedTicket = hasUnlockedFreeTicket(user);
-    const hasTicketChallenge = !user.freeTicketChallengeCompleted && !user.freeTicketUsed && !user.rewardsDisabled;
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
     const totalBalance = promoBalance + rentFallbackBalance;
@@ -204,11 +230,25 @@ export default function RewardsWidget() {
                 </div>
 
                 {hasTicketChallenge && (
-                    <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(139, 92, 246, 0.10)', borderRadius: 'var(--r-md)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', color: '#a78bfa', fontSize: '0.8rem', fontWeight: 800 }}>
-                            <span>FREE TICKET CHALLENGE</span><span>0 / 1</span>
+                    <div className="challenge-pulse-animation" style={{ marginBottom: '16px', padding: '14px', background: 'rgba(139, 92, 246, 0.12)', borderRadius: 'var(--r-md)', border: '1px solid rgba(139, 92, 246, 0.45)' }}>
+                        <div style={{ color: '#a78bfa', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', marginBottom: '5px' }}>
+                            NEW CHALLENGE
                         </div>
-                        <p style={{ margin: '6px 0 0', color: 'var(--text-2)', fontSize: '0.78rem', lineHeight: 1.45 }}>Complete any Normal game. Slither Arena does not count.</p>
+                        <div style={{ color: 'var(--text-h)', fontSize: '0.94rem', fontWeight: 800 }}>
+                            Unlock a Free Ticket
+                        </div>
+                        <p style={{ margin: '6px 0 10px', color: 'var(--text-2)', fontSize: '0.78rem', lineHeight: 1.45 }}>
+                            Complete 1 Normal game in Agar, Slither or Surviv to earn your free ticket. Arena games do not count.
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-1)', fontSize: '0.76rem', fontWeight: 700, marginBottom: '6px' }}>
+                            <span>Normal games played</span><span>0 / 1</span>
+                        </div>
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.10)', borderRadius: '999px', overflow: 'hidden', marginBottom: '10px' }}>
+                            <div style={{ width: '0%', height: '100%', background: '#a78bfa' }} />
+                        </div>
+                        <div style={{ color: 'var(--green)', fontSize: '0.76rem', fontWeight: 800 }}>
+                            REWARD: 1 FREE TICKET
+                        </div>
                     </div>
                 )}
 
