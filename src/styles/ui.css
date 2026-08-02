@@ -270,29 +270,34 @@
 
 .gm-nav-link {
   background: transparent;
-  border: none;
-  color: #fff;
+  border: 1px solid transparent;
+  color: var(--text);
   font-family: var(--ui);
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.88rem;
+  font-weight: 500;
   cursor: pointer;
-  padding: 7px 14px;
-  border-radius: var(--r-sm);
+  padding: 6px 13px;
+  border-radius: var(--r-md);
   letter-spacing: 0.01em;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: all 0.18s var(--ease-standard);
+  position: relative;
 }
 .gm-nav-link:not(.gm-nav-link--active):hover {
-  color: var(--accent);
-  background-color: rgba(124, 58, 255, 0.16);
+  color: var(--text-h);
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 .gm-nav-link--active {
-  color: var(--accent);
+  color: #ffffff;
   font-weight: 600;
-  background: transparent;
+  background: rgba(120, 94, 255, 0.14);
+  border-color: rgba(120, 94, 255, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 .gm-nav-link--active:hover {
-  color: var(--accent);
-  background-color: rgba(124, 58, 255, 0.16);
+  color: #ffffff;
+  background-color: rgba(120, 94, 255, 0.2);
+  border-color: rgba(120, 94, 255, 0.45);
 }
 .gm-nav-link--notification {
   display: inline-flex;
@@ -300,12 +305,12 @@
   gap: 7px;
 }
 .gm-nav-notification-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 7px;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
   border-radius: 50%;
   background: #a855f7;
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2), 0 0 10px rgba(168, 85, 247, 0.9);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2), 0 0 8px rgba(168, 85, 247, 0.9);
 }
 
 .mode-title {
@@ -4444,6 +4449,49 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 .lobby-tier-btn{min-height:34px;border-radius:var(--r-md);font-size:.75rem;transition:transform var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
 .lobby-tier-btn--active,.lobby-tier-btn--active:hover:not(:disabled){background:linear-gradient(180deg,rgba(34,201,130,.12),rgba(34,201,130,.065));border-color:rgba(34,201,130,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
 .user-menu-item{min-height:35px;padding:0 12px;font-size:.76rem}
+.btn:active, .mode-card-action:active, .play-btn:active:not(:disabled), .nav-deposit-btn:active, .lobby-tier-btn:active:not(:disabled) {
+  transform: scale(0.98) translateY(1px) !important;
+}
+
+/* --- Rank Badges --- */
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+.rank-badge-1 {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.22), rgba(255, 180, 0, 0.1));
+  border-color: rgba(255, 215, 0, 0.45);
+  color: #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.15);
+}
+.rank-badge-2 {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.22), rgba(160, 160, 160, 0.1));
+  border-color: rgba(192, 192, 192, 0.45);
+  color: #e0e0e0;
+}
+.rank-badge-3 {
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.22), rgba(160, 90, 30, 0.1));
+  border-color: rgba(205, 127, 50, 0.45);
+  color: #cd7f32;
+}
+
+/* --- Table Polish --- */
+.leaderboard-table tr, .transactions-table tr, .admin-data-table tr {
+  transition: background-color 0.15s ease;
+}
+.leaderboard-table tbody tr:hover, .transactions-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
 .hiw-toggle{min-height:36px;font-size:.67rem}
 .nav-deposit-btn{height:32px;padding-inline:14px;border-radius:var(--r-full);background:linear-gradient(180deg,#8069f2,#7058df);border:1px solid rgba(255,255,255,.12);font-size:.76rem;font-weight:730;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 3px 8px rgba(0,0,0,.13)}
 .nav-deposit-btn:hover{background:linear-gradient(180deg,#8973f5,#7760e5);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 4px 10px rgba(0,0,0,.16)}

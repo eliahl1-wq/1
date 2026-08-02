@@ -660,3 +660,13 @@
 /* --- Tournament action hierarchy --- */
 .tournament-primary-btn{min-height:42px;border-radius:7px;font-size:.82rem;font-weight:760;letter-spacing:.004em;box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 3px 8px rgba(0,0,0,.14)}
 .tournament-secondary-btn{min-height:38px;border-radius:7px;font-size:.77rem;font-weight:680}
+
+.mode-card--tournament {
+    position: relative;
+    overflow: hidden;
+    height: auto;
+    min-height: 260px;
+    background: linear-gradient(180deg, rgba(249, 115, 22, 0.06) 0%, rgba(14, 16, 23, 0.98) 100%);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+    border-radius: var(--r-lg);
+}

@@ -16,31 +16,32 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  /* Core palette — deep black with slight blue tint */
-  --bg: #0C0D12;
-  --bg-1: #121319;
-  --bg-2: #171820;
-  --bg-3: #1C1D27;
-  --bg-elevated: rgba(28, 29, 37, 0.95);
+  /* Core palette — deep obsidian black with slate tone */
+  --bg: #08090d;
+  --bg-1: #0e1017;
+  --bg-2: #141722;
+  --bg-3: #1b1f2e;
+  --bg-elevated: rgba(23, 26, 38, 0.96);
 
-  /* Borders — razor thin */
-  --border: rgba(255, 255, 255, 0.065);
-  --border-2: rgba(255, 255, 255, 0.09);
-  --border-accent: rgba(124, 58, 255, 0.2);
+  /* Borders — razor thin with subtle micro-reflect */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-2: rgba(255, 255, 255, 0.13);
+  --border-accent: rgba(124, 58, 255, 0.3);
 
-  /* Typography */
-  --text: rgba(255, 255, 255, 0.5);
-  --text-2: rgba(255, 255, 255, 0.35);
-  --text-3: rgba(255, 255, 255, 0.2);
-  --text-h: rgba(255, 255, 255, 0.92);
+  /* Typography — crisp contrast for human readability */
+  --text: rgba(255, 255, 255, 0.66);
+  --text-2: rgba(255, 255, 255, 0.46);
+  --text-3: rgba(255, 255, 255, 0.32);
+  --text-h: rgba(255, 255, 255, 0.96);
   --text-bright: #ffffff;
-  --text-muted: rgba(255, 255, 255, 0.56);
-  --text-subtle: rgba(255, 255, 255, 0.4);
+  --text-muted: rgba(255, 255, 255, 0.62);
+  --text-subtle: rgba(255, 255, 255, 0.42);
 
-  /* Brand accent — brighter purple matching deposit button */
+  /* Brand accent — vibrant purple */
   --accent: #785eff;
-  --accent-dim: rgba(124, 58, 255, 0.12);
-  --accent-border: rgba(104, 30, 223, 0.678);
+  --accent-hover: #8870ff;
+  --accent-dim: rgba(124, 58, 255, 0.15);
+  --accent-border: rgba(120, 94, 255, 0.4);
 
   /* Solana green — profit/success */
   --green: #14F195;

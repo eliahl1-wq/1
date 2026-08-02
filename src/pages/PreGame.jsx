@@ -1339,20 +1339,13 @@ export default function PreGame() {
                 <div className={tournamentId ? "pre-game-grid pre-game-grid--tournament" : "pre-game-grid"}>
                     {/* Left Column */}
                     {tournamentId ? (
-                        <div className="mode-card" ref={modeCardRef} style={{ position: 'relative', overflow: 'hidden', height: 'auto' }}>
+                        <div className="mode-card mode-card--tournament" ref={modeCardRef}>
                             <img
                                 src="/normal slither.png"
                                 alt=""
-                                style={{
-                                    position: 'absolute', inset: 0, width: '100%', height: '100%',
-                                    objectFit: 'cover', opacity: 0.15, filter: 'blur(2px)', pointerEvents: 'none'
-                                }}
+                                className="mode-card-preview"
+                                style={{ opacity: 0.15, filter: 'blur(2px)' }}
                             />
-                            <div style={{
-                                position: 'absolute', bottom: '-40px', left: '50%', transform: 'translateX(-50%)',
-                                width: '240px', height: '240px', background: 'radial-gradient(circle, rgba(249, 115, 22, 0.18) 0%, rgba(249, 115, 22, 0) 70%)',
-                                zIndex: 0, pointerEvents: 'none'
-                            }} />
 
                             <div className="mode-card-overlay" style={{ zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', padding: '24px' }}>
                                 <div className="mode-card-header">
