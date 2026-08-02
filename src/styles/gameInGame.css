@@ -3428,3 +3428,88 @@ body.game-session-active #root {
         line-height: 26px;
     }
 }
+/* Surviv final compact HUD hierarchy */
+.surviv-game-page .surviv-controls-hint {
+    left: 20px;
+    bottom: 4px;
+    max-width: min(520px, calc(50vw - 40px));
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow: hidden;
+    color: rgba(224, 231, 226, 0.46);
+    font-size: 0.47rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.surviv-game-page .surviv-controls-hint span {
+    flex: 0 0 auto;
+    gap: 3px;
+}
+
+.surviv-game-page .surviv-controls-hint kbd {
+    min-width: 14px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.42);
+    font-size: 0.46rem;
+}
+
+.surviv-game-page:not(.game-viewport--mobile) .surviv-hud-status-bars {
+    bottom: 24px;
+    width: 220px;
+    gap: 6px;
+    padding: 8px 10px;
+    border-color: rgba(225, 204, 150, 0.13);
+    border-radius: 8px;
+    background: rgba(6, 9, 7, 0.84);
+    box-shadow: 0 7px 20px rgba(0, 0, 0, 0.38);
+    contain: layout paint;
+}
+
+.surviv-game-page:not(.game-viewport--mobile) .surviv-match-stats {
+    top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid rgba(225, 204, 150, 0.12);
+    border-radius: 8px;
+    background: rgba(7, 10, 8, 0.82);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.34);
+    contain: layout paint;
+}
+
+.surviv-game-page:not(.game-viewport--mobile) .surviv-match-stats .surviv-kills-badge,
+.surviv-game-page:not(.game-viewport--mobile) .surviv-match-stats .surviv-alive-badge {
+    min-height: 22px;
+    padding: 3px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.6rem;
+    letter-spacing: 0.055em;
+    animation: none;
+}
+
+.surviv-game-page:not(.game-viewport--mobile) .surviv-match-stats .surviv-kills-badge {
+    background: rgba(239, 84, 79, 0.09);
+}
+
+.surviv-game-page:not(.game-viewport--mobile) .surviv-leaderboard {
+    border-color: rgba(225, 204, 150, 0.12);
+    border-radius: 8px;
+    background: rgba(8, 11, 9, 0.8);
+    box-shadow: 0 7px 20px rgba(0, 0, 0, 0.34);
+    contain: layout paint;
+}
+
+@media (max-width: 1050px) and (pointer: fine) {
+    .surviv-game-page .surviv-controls-hint {
+        max-width: calc(50vw - 62px);
+    }
+
+    .surviv-game-page .surviv-controls-hint span:nth-child(4),
+    .surviv-game-page .surviv-controls-hint span:nth-child(5) {
+        display: none;
+    }
+}

@@ -4411,12 +4411,15 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 .admin-user-modal-stats .admin-stat-card__value{font-size:1.25rem}
 .admin-user-modal .admin-tabs{border-bottom:1px solid var(--border)}
 @media (max-width:680px){.admin-user-modal-backdrop{padding:8px}.admin-user-modal{max-height:calc(100dvh - 16px)}.admin-user-modal-header{padding:15px 14px 10px}.admin-user-modal-stats{padding:12px 14px}.admin-user-modal-body{padding:0 14px 16px}.admin-user-modal>.product-alert{margin:12px 14px 0}}
-
-/* --- Purposeful action hierarchy --- */
-.wallet-card{width:226px;padding:12px;border-radius:9px;box-shadow:0 14px 36px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.025);animation:fadeUp var(--duration-fast) var(--ease-standard)}
+/* --- Purposeful action hierarchy and surface depth --- */
+.game-card,.stats-card,.leaderboard-card,.mode-card,.gm-card,.product-surface,.panel{background:linear-gradient(180deg,rgba(21,22,29,.98),rgba(16,17,23,.98));border-color:rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 28px rgba(0,0,0,.16)}
+.game-card:hover,.leaderboard-card:hover,.gm-card:hover{border-color:rgba(255,255,255,.125)}
+.input,.nickname-input,.admin-input,.admin-filter-input,.admin-filter-select{background:linear-gradient(180deg,rgba(4,5,8,.34),rgba(10,11,15,.24));box-shadow:inset 0 1px 2px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.018)}
+.input:focus,.nickname-input:focus,.admin-input:focus,.admin-filter-input:focus,.admin-filter-select:focus{box-shadow:var(--focus-ring),inset 0 1px 2px rgba(0,0,0,.2)}
+.wallet-card{width:226px;padding:12px;border-radius:9px;background:linear-gradient(180deg,rgba(25,26,34,.99),rgba(17,18,24,.99));border-color:rgba(255,255,255,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 14px 36px rgba(0,0,0,.34);animation:fadeUp var(--duration-fast) var(--ease-standard)}
 .wallet-card-header{display:flex;min-height:28px;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .wallet-card-history{min-height:26px;padding:0 7px;border:0;border-radius:5px;background:transparent;color:var(--text-subtle);font:680 .64rem/1 var(--ui);letter-spacing:.055em;text-transform:uppercase;cursor:pointer;transition:color var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard)}
-.wallet-card-history:hover{background:rgba(255,255,255,.04);color:var(--text-h)}
+.wallet-card-history:hover{background:rgba(255,255,255,.045);color:var(--text-h)}
 .wallet-card .dropdown-trigger{min-height:28px;padding:0 8px;border-radius:5px;font-size:.65rem}
 .wallet-card .dropdown-item{min-height:28px;font-size:.68rem}
 .wallet-card-balance{justify-content:center;min-height:34px;font-size:1.42rem;font-weight:760;letter-spacing:-.045em}
@@ -4424,28 +4427,24 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 .wallet-card-actions{gap:6px;margin-top:10px}
 .wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:31px;padding:0 9px;border-radius:6px;font-size:.68rem;font-weight:710;gap:5px}
 .wallet-card-actions .btn svg{width:12px;height:12px}
-.wallet-card-actions .btn-primary{background:#7358e8}
-.wallet-card-actions .btn-primary:hover:not(:disabled){background:#7d64eb}
-.wallet-card-actions .btn-ghost{background:rgba(255,255,255,.025)}
-.play-btn{position:relative;display:flex;min-height:52px;align-items:center;justify-content:center;gap:9px;padding:0 20px;border-radius:8px;font-size:1rem;font-weight:800;line-height:1;letter-spacing:.02em;box-shadow:inset 0 1px 0 rgba(255,255,255,.11)}
+.wallet-card-actions .btn-primary{background:linear-gradient(180deg,#7d67ed,#6d56d8)}
+.wallet-card-actions .btn-primary:hover:not(:disabled){background:linear-gradient(180deg,#8671f0,#745de0)}
+.play-btn{position:relative;display:flex;min-height:44px;align-items:center;justify-content:center;gap:8px;padding:0 18px;border-radius:var(--r-md);font-size:.96rem;font-weight:800;line-height:1;letter-spacing:.018em;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 3px 8px rgba(0,0,0,.14)}
 .play-btn-label{display:inline-flex;align-items:center;justify-content:center;min-width:0}
-.play-button-icon{width:18px;height:18px;filter:none;transition:transform var(--duration-fast) var(--ease-standard)}
+.play-button-icon{width:16px;height:16px;filter:none;transition:transform var(--duration-fast) var(--ease-standard)}
 .play-btn:hover:not(:disabled) .play-button-icon{transform:translateX(1px)}
-.play-btn-ready{background:#22c982;border:1px solid rgba(88,255,185,.2);color:#041a11;box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
-.play-btn-ready:hover:not(:disabled){background:#2dd18c}
-.play-btn-login,.play-btn-rejoin{background:#7459ed;border:1px solid rgba(255,255,255,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.11)}
-.play-btn-login:hover:not(:disabled),.play-btn-rejoin:hover:not(:disabled){background:#7d65ef}
-.play-btn-disabled{font-size:.8rem;font-weight:700;letter-spacing:.01em;box-shadow:none}
-.mode-card-action{min-height:41px;font-size:.82rem;font-weight:750;letter-spacing:.005em}
-.gm-card-right .gm-play-btn{font-size:.73rem;font-weight:750;letter-spacing:.025em}
-.lobby-tier-btn{min-height:36px;border-radius:7px;font-size:.76rem;transition:transform var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
-.lobby-tier-btn--active,.lobby-tier-btn--active:hover:not(:disabled){background:rgba(34,201,130,.085);border-color:rgba(34,201,130,.58);box-shadow:none}
+.play-btn-ready{background:linear-gradient(180deg,#2bd18c,#1fbc7c);border:1px solid rgba(120,255,196,.24);color:#041a11;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 3px 8px rgba(5,52,34,.16)}
+.play-btn-ready:hover:not(:disabled){background:linear-gradient(180deg,#34d994,#25c483)}
+.play-btn-login,.play-btn-rejoin{background:linear-gradient(180deg,#8069f2,#7058df);border:1px solid rgba(255,255,255,.12)}
+.play-btn-login:hover:not(:disabled),.play-btn-rejoin:hover:not(:disabled){background:linear-gradient(180deg,#8973f5,#7760e5)}
+.play-btn-disabled{font-size:.79rem;font-weight:700;letter-spacing:.01em;box-shadow:none}
+.mode-card-action{min-height:40px;border-radius:var(--r-md);background:linear-gradient(180deg,#8069f2,#7058df);border:1px solid rgba(255,255,255,.11);font-size:.83rem;font-weight:760;letter-spacing:.004em;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 3px 8px rgba(0,0,0,.14)}
+.mode-card-action:hover{background:linear-gradient(180deg,#8973f5,#7760e5);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 10px rgba(0,0,0,.16)}
+.gm-card-right .gm-play-btn{font-size:.73rem;font-weight:760;letter-spacing:.025em}
+.lobby-tier-btn{min-height:34px;border-radius:var(--r-md);font-size:.75rem;transition:transform var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+.lobby-tier-btn--active,.lobby-tier-btn--active:hover:not(:disabled){background:linear-gradient(180deg,rgba(34,201,130,.12),rgba(34,201,130,.065));border-color:rgba(34,201,130,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
 .user-menu-item{min-height:35px;padding:0 12px;font-size:.76rem}
 .hiw-toggle{min-height:36px;font-size:.67rem}
-.nav-deposit-btn{height:34px;border-radius:7px;font-size:.76rem;font-weight:730}
-@media (max-width:768px){.wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:34px;font-size:.7rem}.play-btn{min-height:54px;font-size:1.02rem}.play-btn-disabled{font-size:.8rem}.nav-deposit-btn{height:36px}}
-
-/* Main actions carry the strongest type scale. */
-.play-btn{font-size:1.08rem}
-.mode-card-action{font-size:.86rem}
-@media (max-width:768px){.play-btn{font-size:1.1rem}.play-btn-disabled{font-size:.8rem}}
+.nav-deposit-btn{height:32px;padding-inline:14px;border-radius:var(--r-full);background:linear-gradient(180deg,#8069f2,#7058df);border:1px solid rgba(255,255,255,.12);font-size:.76rem;font-weight:730;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 3px 8px rgba(0,0,0,.13)}
+.nav-deposit-btn:hover{background:linear-gradient(180deg,#8973f5,#7760e5);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 4px 10px rgba(0,0,0,.16)}
+@media(max-width:768px){.wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:32px;font-size:.69rem}.play-btn{min-height:46px;font-size:.98rem}.play-btn-disabled{font-size:.79rem}.nav-deposit-btn{height:32px;border-radius:var(--r-full)}}

@@ -638,14 +638,7 @@ export default function SurvivGame() {
                 setIsInventoryOpen(prev => {
                     const next = !prev;
                     inventoryOpenRef.current = next;
-                    if (next) {
-                        renderer.clearInput();
-                        reloadPendingRef.current = false;
-                        useMedkitPendingRef.current = false;
-                        pickupWeaponPendingRef.current = false;
-                        throwGrenadePendingRef.current = false;
-                        equipSlotPendingRef.current = null;
-                    } else closeChestPendingRef.current = true;
+                    if (!next) closeChestPendingRef.current = true;
                     return next;
                 });
                 return;
@@ -655,7 +648,6 @@ export default function SurvivGame() {
                 if (inventoryOpenRef.current) handleCloseInventory();
                 return;
             }
-            if (inventoryOpenRef.current) return;
             const action = renderer.handleKeyDown(e);
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
@@ -1290,12 +1282,10 @@ export default function SurvivGame() {
             {gameReady && !IS_MOBILE && !showResultModal && !isDead && !isSpectating && (
                 <div className="surviv-controls-hint" aria-label="Game controls">
                     <span><kbd>WASD</kbd> MOVE</span>
-                    <span><kbd>MOUSE</kbd> AIM / FIRE</span>
+                    <span><kbd>LMB</kbd> FIRE</span>
                     <span><kbd>F</kbd> PICK UP</span>
                     <span><kbd>R</kbd> RELOAD</span>
                     <span><kbd>H</kbd> HEAL</span>
-                    <span><kbd>1-3</kbd> SLOTS</span>
-                    <span><kbd>G</kbd> GRENADE</span>
                     <span><kbd>TAB</kbd> INVENTORY</span>
                 </div>
             )}
