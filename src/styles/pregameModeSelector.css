@@ -95,43 +95,79 @@
     font-size: 0.6rem;
 }
 
+.mode-selector-carousel {
+    position: relative;
+    margin-inline: -14px;
+}
+
 .mode-selector-grid {
     display: flex;
-    gap: 9px;
-    margin: 0 -14px;
-    padding: 0 14px 8px;
+    gap: 7px;
+    padding: 1px 34px 3px;
     overflow-x: auto;
     overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(124, 111, 240, 0.48) rgba(255, 255, 255, 0.04);
+    scrollbar-width: none;
+    scroll-behavior: smooth;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(90deg, transparent 0, #000 12%, #000 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12%, #000 88%, transparent 100%);
 }
 
 .mode-selector-grid::-webkit-scrollbar {
-    height: 5px;
+    display: none;
 }
 
-.mode-selector-grid::-webkit-scrollbar-track {
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
+.mode-selector-arrow {
+    position: absolute;
+    z-index: 4;
+    top: 50%;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    transform: translateY(-50%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 50%;
+    background: rgba(10, 10, 16, 0.9);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 5px 16px rgba(0, 0, 0, 0.4);
+    transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
-.mode-selector-grid::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(124, 111, 240, 0.48);
+.mode-selector-arrow:hover {
+    border-color: rgba(124, 111, 240, 0.8);
+    background: #7c6ff0;
+    transform: translateY(-50%) scale(1.06);
 }
 
+.mode-selector-arrow--left {
+    left: 6px;
+}
+
+.mode-selector-arrow--right {
+    right: 6px;
+}
+
+.mode-selector-arrow svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
 .mode-mini-card {
     position: relative;
-    width: 118px;
-    height: 158px;
-    flex: 0 0 118px;
+    width: 88px;
+    height: 122px;
+    flex: 0 0 88px;
     display: block;
     padding: 0;
     overflow: hidden;
-    scroll-snap-align: start;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     background: #07070b;
@@ -203,7 +239,7 @@
     flex-direction: column;
     justify-content: flex-end;
     gap: 2px;
-    padding: 42px 9px 10px;
+    padding: 32px 7px 7px;
     background: linear-gradient(180deg, transparent 0%, rgba(7, 7, 11, 0.9) 56%, rgba(7, 7, 11, 0.98) 100%);
 }
 
@@ -217,7 +253,7 @@
 .mode-mini-card-title-row strong {
     overflow: hidden;
     color: #fff;
-    font-size: 0.78rem;
+    font-size: 0.67rem;
     font-weight: 800;
     line-height: 1.15;
     text-overflow: ellipsis;
@@ -225,16 +261,23 @@
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.72);
 }
 
+.mode-mini-card-badge {
+    position: absolute;
+    z-index: 2;
+    top: 5px;
+    left: 5px;
+}
+
 .mode-mini-card .gm-mode-badge {
-    flex-shrink: 0;
     padding: 1px 4px;
-    font-size: 0.4rem;
+    font-size: 0.38rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .mode-mini-card-subtype {
     overflow: hidden;
     color: rgba(255, 255, 255, 0.68);
-    font-size: 0.61rem;
+    font-size: 0.54rem;
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -246,7 +289,7 @@
     gap: 4px;
     margin-top: 3px;
     color: rgba(255, 255, 255, 0.84);
-    font-size: 0.6rem;
+    font-size: 0.53rem;
     font-weight: 650;
     white-space: nowrap;
 }
@@ -268,10 +311,10 @@
 .mode-mini-card-check {
     position: absolute;
     z-index: 2;
-    top: 7px;
-    right: 7px;
-    width: 18px;
-    height: 18px;
+    top: 5px;
+    right: 5px;
+    width: 16px;
+    height: 16px;
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -281,8 +324,8 @@
 }
 
 .mode-mini-card-check svg {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -317,14 +360,25 @@
         display: none;
     }
 
-    .mode-selector-grid {
+    .mode-selector-carousel {
         margin-inline: -12px;
-        padding-inline: 12px;
+    }
+
+    .mode-selector-grid {
+        padding-inline: 31px;
+    }
+
+    .mode-selector-arrow--left {
+        left: 4px;
+    }
+
+    .mode-selector-arrow--right {
+        right: 4px;
     }
 
     .mode-mini-card {
-        width: 112px;
-        height: 152px;
-        flex-basis: 112px;
+        width: 82px;
+        height: 114px;
+        flex-basis: 82px;
     }
 }

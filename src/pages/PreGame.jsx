@@ -387,10 +387,10 @@ export default function PreGame() {
             setSelectedMode(resolvePreGameMode('/slither', location.state?.selectedMode, !!user?.isAdmin));
         } else if (location.pathname === '/agar') {
             setSelectedMode('agar');
-        } else if (location.state?.selectedMode && location.state.selectedMode !== selectedMode) {
+        } else if (location.state?.selectedMode) {
             setSelectedMode(normalizeGamemodeForLobby(location.state.selectedMode, !!user?.isAdmin));
         }
-    }, [location.pathname, location.state?.selectedMode, selectedMode, user?.isAdmin]);
+    }, [location.pathname, location.state?.selectedMode, user?.isAdmin]);
 
     useEffect(() => {
         if (currentGameMode) {

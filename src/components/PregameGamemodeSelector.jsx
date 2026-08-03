@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import GamemodeBadge from './GamemodeBadge';
 import GamemodePreview from './GamemodePreview';
 import { GAMEMODE_CATALOG } from '../constants/gamemodes';
@@ -37,7 +37,28 @@ export default function PregameGamemodeSelector({
     cardRef,
 }) {
     const selectedPresentation = MODE_PRESENTATION[selectedMode] || MODE_PRESENTATION.agar;
+    const railRef = useRef(null);
 
+    const scrollModes = (direction) => {
+        railRef.current?.scrollBy({
+            left: direction * Math.max(railRef.current.clientWidth * 0.62, 150),
+            behavior: 'smooth',
+        });
+    };
+
+    useLayoutEffect(() => {
+        const rail = railRef.current;
+        const selectedCard = rail?.querySelector('.mode-mini-card[aria-pressed="true"]');
+        if (!rail || !selectedCard) return undefined;
+
+        const railRect = rail.getBoundingClientRect();
+        const cardRect = selectedCard.getBoundingClientRect();
+        const targetLeft = rail.scrollLeft
+            + (cardRect.left + cardRect.width / 2)
+            - (railRect.left + railRect.width / 2);
+        rail.scrollLeft = targetLeft;
+        return undefined;
+    }, [selectedMode]);
     return (
         <section className="mode-card mode-selector-card" ref={cardRef} aria-label="Choose gamemode">
             <div className="mode-selector-hero">
@@ -67,9 +88,18 @@ export default function PregameGamemodeSelector({
             <div className="mode-selector-grid-wrap">
                 <div className="mode-selector-grid-heading">
                     <span>Gamemodes</span>
-                    <small>Scroll sideways to browse</small>
+                    <small>Use arrows to browse</small>
                 </div>
-                <div className="mode-selector-grid">
+                <div className="mode-selector-carousel">
+                    <button
+                        type="button"
+                        className="mode-selector-arrow mode-selector-arrow--left"
+                        aria-label="Previous gamemodes"
+                        onClick={() => scrollModes(-1)}
+                    >
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4.5-5 5.5 5 5.5" /></svg>
+                    </button>
+                    <div className="mode-selector-grid" ref={railRef}>
                     {GAMEMODE_CATALOG.map((mode) => {
                         const selected = mode.id === selectedMode;
                         const comingSoon = !!mode.brOnly && !brAvailable;
@@ -88,10 +118,12 @@ export default function PregameGamemodeSelector({
                                 <span className="mode-mini-card-preview">
                                     <GamemodePreview mode={mode.id} className="mode-mini-card-preview-canvas" fit />
                                 </span>
+                                {mode.badge && !comingSoon && (
+                                    <span className="mode-mini-card-badge"><GamemodeBadge type={mode.badge} /></span>
+                                )}
                                 <span className="mode-mini-card-copy">
                                     <span className="mode-mini-card-title-row">
                                         <strong>{presentation.name}</strong>
-                                        {mode.badge && !comingSoon && <GamemodeBadge type={mode.badge} />}
                                     </span>
                                     <span className="mode-mini-card-subtype">{presentation.subtype}</span>
                                     <span className="mode-mini-card-playing">
@@ -109,6 +141,15 @@ export default function PregameGamemodeSelector({
                             </button>
                         );
                     })}
+                    </div>
+                    <button
+                        type="button"
+                        className="mode-selector-arrow mode-selector-arrow--right"
+                        aria-label="Next gamemodes"
+                        onClick={() => scrollModes(1)}
+                    >
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4.5 5 5.5-5 5.5" /></svg>
+                    </button>
                 </div>
             </div>
         </section>
