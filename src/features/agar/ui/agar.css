@@ -565,8 +565,8 @@
     min-height: 28px;
     color: var(--text-2);
     font-family: var(--ui);
-    font-size: 0.64rem;
-    font-weight: 800;
+    font-size: 0.7rem;
+    font-weight: 700;
     background: transparent;
     border: 0;
     border-radius: var(--r-sm);
@@ -971,8 +971,8 @@
     border: 0;
     border-radius: 6px;
     font-family: var(--mono);
-    font-size: 0.56rem;
-    font-weight: 750;
+    font-size: 0.64rem;
+    font-weight: 700;
     cursor: pointer;
 }
 
@@ -980,8 +980,8 @@
 
 .agar-price-chart__toolbar button.active {
     color: #fff;
-    background: linear-gradient(135deg, rgba(176, 70, 255, 0.7), rgba(102, 135, 255, 0.65));
-    box-shadow: 0 4px 14px rgba(118, 91, 255, 0.22);
+    background: rgba(120, 94, 255, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .agar-price-chart__canvas {

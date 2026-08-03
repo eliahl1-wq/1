@@ -301,6 +301,19 @@ export function fitSpineToArcLength(segments, targetArc, maxExtension = 0) {
 /** Subdivide long edges so turns stay round on large snakes (Catmull-Rom Spline). */
 export function densifySpine(spine, maxEdgeLen) {
     if (!spine || spine.length < 2 || maxEdgeLen <= 0) return spine;
+    // Large snakes already arrive with closely packed server points. Returning
+    // the original spine avoids allocating/copying hundreds or thousands of
+    // identical points every render frame.
+    const maxEdgeSq = maxEdgeLen * maxEdgeLen;
+    let needsSubdivision = false;
+    for (let i = 1; i < spine.length; i++) {
+        if (distSq(spine[i - 1].x, spine[i - 1].y, spine[i].x, spine[i].y) > maxEdgeSq) {
+            needsSubdivision = true;
+            break;
+        }
+    }
+    if (!needsSubdivision) return spine;
+
     const out = [{ x: spine[0].x, y: spine[0].y }];
     for (let i = 1; i < spine.length; i++) {
         const p1 = spine[i - 1];

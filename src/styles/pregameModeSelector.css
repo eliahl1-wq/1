@@ -1,0 +1,295 @@
+.pre-game-grid:not(.pre-game-grid--tournament) {
+    grid-template-columns: 340px minmax(320px, 420px) 250px;
+}
+
+.mode-selector-card {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
+    background: #121218;
+}
+
+.mode-selector-hero {
+    position: relative;
+    height: 190px;
+    overflow: hidden;
+    background: #07070b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mode-selector-hero .mode-card-preview {
+    opacity: 0.42;
+}
+
+.mode-selector-hero-overlay {
+    padding: 20px;
+    background:
+        linear-gradient(180deg, rgba(7, 7, 11, 0.32) 0%, rgba(7, 7, 11, 0.72) 58%, rgba(7, 7, 11, 0.96) 100%);
+}
+
+.mode-selector-hero-footer {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.mode-selector-hero-footer .mode-playing-count {
+    margin: 0;
+    justify-content: flex-start;
+    font-size: 0.8rem;
+}
+
+.mode-selector-fee {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 7px 9px;
+    border: 1px solid rgba(52, 211, 153, 0.28);
+    border-radius: 8px;
+    background: rgba(52, 211, 153, 0.08);
+}
+
+.mode-selector-fee span {
+    color: var(--text-3);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.mode-selector-fee strong {
+    color: #34d399;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.mode-selector-grid-wrap {
+    padding: 14px;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(124, 111, 240, 0.07), transparent 52%),
+        #121218;
+}
+
+.mode-selector-grid-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 1px 10px;
+}
+
+.mode-selector-grid-heading > span {
+    color: var(--text-h);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.065em;
+    text-transform: uppercase;
+}
+
+.mode-selector-grid-heading small {
+    color: var(--text-3);
+    font-size: 0.6rem;
+}
+
+.mode-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.mode-mini-card {
+    position: relative;
+    min-width: 0;
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 7px;
+    padding: 5px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.022);
+    color: var(--text-h);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        border-color 150ms ease,
+        background-color 150ms ease,
+        transform 150ms ease,
+        box-shadow 150ms ease;
+}
+
+.mode-mini-card:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(124, 111, 240, 0.5);
+    background: rgba(124, 111, 240, 0.07);
+}
+
+.mode-mini-card--selected {
+    border-color: rgba(124, 111, 240, 0.76);
+    background: rgba(124, 111, 240, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(124, 111, 240, 0.12), 0 5px 16px rgba(73, 57, 179, 0.12);
+}
+
+.mode-mini-card--coming-soon {
+    opacity: 0.42;
+    cursor: not-allowed;
+    filter: saturate(0.45);
+}
+
+.mode-mini-card-preview {
+    display: block;
+    min-width: 0;
+    height: 44px;
+    overflow: hidden;
+    align-self: center;
+    border-radius: 7px;
+    background: #07070b;
+}
+
+.mode-mini-card-preview-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mode-mini-card-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+}
+
+.mode-mini-card-title-row {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mode-mini-card-title-row strong {
+    overflow: hidden;
+    color: var(--text-h);
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mode-mini-card .gm-mode-badge {
+    flex-shrink: 0;
+    padding: 1px 4px;
+    font-size: 0.4rem;
+}
+
+.mode-mini-card-subtype {
+    overflow: hidden;
+    color: var(--text-3);
+    font-size: 0.6rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mode-mini-card-playing {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 3px;
+    color: var(--text-2);
+    font-size: 0.6rem;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.mode-mini-card-playing i {
+    width: 5px;
+    height: 5px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 7px rgba(52, 211, 153, 0.72);
+}
+
+.mode-mini-card--coming-soon .mode-mini-card-playing i {
+    background: var(--text-3);
+    box-shadow: none;
+}
+
+.mode-mini-card-check {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #7c6ff0;
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(7, 7, 11, 0.72);
+}
+
+.mode-mini-card-check svg {
+    width: 11px;
+    height: 11px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+@media (max-width: 1120px) {
+    .pre-game-grid:not(.pre-game-grid--tournament) {
+        grid-template-columns: 1fr;
+    }
+
+    .mode-selector-card {
+        width: 100%;
+        max-width: 620px;
+    }
+}
+
+@media (max-width: 480px) {
+    .mode-selector-hero {
+        height: 190px;
+    }
+
+    .mode-selector-hero-overlay {
+        padding: 16px;
+    }
+
+    .mode-selector-grid-wrap {
+        padding: 12px;
+    }
+
+    .mode-selector-grid-heading small {
+        display: none;
+    }
+
+    .mode-mini-card {
+        grid-template-columns: 44px minmax(0, 1fr);
+        min-height: 62px;
+        gap: 6px;
+        padding: 6px;
+    }
+
+    .mode-mini-card-preview {
+        height: 44px;
+    }
+}
+
+@media (max-width: 340px) {
+    .mode-selector-grid {
+        grid-template-columns: 1fr;
+    }
+}

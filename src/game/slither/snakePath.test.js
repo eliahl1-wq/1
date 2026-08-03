@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fitSpineToArcLength, stepSnakeBody, updateBodyAlongPath } from './snakePath.js';
+import { densifySpine, fitSpineToArcLength, stepSnakeBody, updateBodyAlongPath } from './snakePath.js';
+
+test('an already dense large spine is reused without per-frame allocations', () => {
+    const spine = Array.from({ length: 1200 }, (_, index) => ({ x: -index * 5, y: Math.sin(index * 0.03) * 20 }));
+    assert.equal(densifySpine(spine, 8), spine);
+});
+
+test('long network edges are still subdivided for smooth bends', () => {
+    const spine = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 30, y: 10 }];
+    const dense = densifySpine(spine, 6);
+    assert.notEqual(dense, spine);
+    assert.ok(dense.length > spine.length);
+});
 
 test('downsampled curve loss cannot become a long rigid tail extension', () => {
     const spine = [{ x: 0, y: 0 }, { x: -4, y: 0 }, { x: -8, y: 0 }];

@@ -5,15 +5,15 @@ import { createQR } from '@solana/pay';
 import '../styles/ui.css';
 import '../styles/tournaments.css';
 import '../styles/slitherSpecialSkins.css';
+import '../styles/pregameModeSelector.css';
 import CustomDropdown from '../components/CustomDropdown';
 import PregameGameBackground from '../components/PregameGameBackground';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
-import GamemodeDiscoveryPrompt from '../components/GamemodeDiscoveryPrompt';
+import PregameGamemodeSelector, { getGamemodePlayingCount } from '../components/PregameGamemodeSelector';
 import RewardsWidget from '../components/RewardsWidget';
-import GamemodePreview from '../components/GamemodePreview';
-import { markGamemodePlayed, shouldShowDiscoveryPrompt } from '../constants/gamemodes';
+import { markGamemodePlayed } from '../constants/gamemodes';
 import { ENTRY_TIERS, BR_ENTRY_TIERS, COMPETITIVE_ENTRY_TIERS, SURVIV_ENTRY_TIERS, DEFAULT_ENTRY_FEE, DEFAULT_BR_ENTRY_FEE, DEFAULT_COMPETITIVE_ENTRY_FEE, DEFAULT_SURVIV_ENTRY_FEE, tierEconomy, competitiveTierEconomy, survivTierEconomy, formatUsd } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { trackMixpanelEvent } from '../utils/mixpanel';
@@ -85,7 +85,7 @@ const WalletIcon = ({ size = 14, style }) => (
 
 /* ── Currency toggle options ── */
 const PlayIcon = ({ size = 18 }) => (
-    <svg className="play-button-icon" width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, marginTop: '-1px' }}>
+    <svg className="play-button-icon" width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" style={{ display: 'block', flexShrink: 0 }}>
         <path d="M6.75 4.9v10.2c0 .83.92 1.32 1.6.85l7.15-5.1a1.04 1.04 0 0 0 0-1.7l-7.15-5.1c-.68-.47-1.6.02-1.6.85Z" fill="currentColor" />
     </svg>
 );
@@ -255,7 +255,6 @@ export default function PreGame() {
     const [pregamePlayingOverride, setPregamePlayingOverride] = useState(null);
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
-    const [showDiscovery, setShowDiscovery] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
     const [statusMsg, setStatusMsg] = useState(''); // Moved here to avoid conflicts
     const [leaderboardData, setLeaderboardData] = useState({ alltime: [], week: [], globalEarningsUsd: 0 });
@@ -459,23 +458,19 @@ export default function PreGame() {
             ? COMPETITIVE_ENTRY_TIERS
             : (isBattleRoyaleMode ? BR_ENTRY_TIERS : ENTRY_TIERS);
 
-    useEffect(() => {
-        if (selectedEntryFee !== null) {
-            if (isSurvivMode && !SURVIV_ENTRY_TIERS.includes(selectedEntryFee)) {
-                setSelectedEntryFee(DEFAULT_SURVIV_ENTRY_FEE);
-            }
-            if (isCompetitiveSlitherMode && !COMPETITIVE_ENTRY_TIERS.includes(selectedEntryFee)) {
-                setSelectedEntryFee(DEFAULT_COMPETITIVE_ENTRY_FEE);
-            }
-            if (isBattleRoyaleMode && !BR_ENTRY_TIERS.includes(selectedEntryFee)) {
-                setSelectedEntryFee(DEFAULT_BR_ENTRY_FEE);
-            }
-        }
-    }, [selectedMode, isBattleRoyaleMode, isCompetitiveSlitherMode, isSurvivMode, selectedEntryFee]);
+    const defaultEntryFeeForMode = isSurvivMode
+        ? DEFAULT_SURVIV_ENTRY_FEE
+        : isCompetitiveSlitherMode
+            ? DEFAULT_COMPETITIVE_ENTRY_FEE
+            : isBattleRoyaleMode
+                ? DEFAULT_BR_ENTRY_FEE
+                : DEFAULT_ENTRY_FEE;
 
     useEffect(() => {
-        setShowDiscovery(isAuthenticated && shouldShowDiscoveryPrompt(selectedMode, brAvailable));
-    }, [selectedMode, brAvailable, isAuthenticated]);
+        if (selectedEntryFee !== null && !tierOptions.includes(selectedEntryFee)) {
+            setSelectedEntryFee(defaultEntryFeeForMode);
+        }
+    }, [selectedMode, selectedEntryFee, tierOptions, defaultEntryFeeForMode]);
 
     useEffect(() => {
         const raw = localStorage.getItem('selected_gamemode');
@@ -1317,19 +1312,6 @@ export default function PreGame() {
 
             {!isAuthenticated && <GuestWelcomeBanner />}
 
-            {isAuthenticated && showDiscovery && (
-                <GamemodeDiscoveryPrompt
-                    currentMode={selectedMode}
-                    brAvailable={brAvailable}
-                    playersByGamemode={liveStats.playersByGamemode}
-                    onSelectMode={(modeId) => {
-                        setSelectedMode(normalizeGamemodeForLobby(modeId, !!user?.isAdmin));
-                        setShowDiscovery(false);
-                    }}
-                    onDismiss={() => setShowDiscovery(false)}
-                />
-            )}
-
             {tournamentId && tournamentLoading ? (
                 <div className="tournament-empty" style={{ margin: '15vh auto', maxWidth: 520, textAlign: 'center', color: 'var(--text-2)' }}>
                     <span className="spinner" style={{ marginRight: 8 }} />
@@ -1386,34 +1368,38 @@ export default function PreGame() {
                             </div>
                         </div>
                     ) : (
-                        <div className="mode-card" ref={modeCardRef}>
-                            <GamemodePreview mode={selectedMode} className="mode-card-preview" />
-                            <div className="mode-card-overlay">
-                                <div className="mode-card-header">
-                                    <span className="mode-card-label">Gamemode</span>
-                                    <div className="mode-card-title mode-card-title--stacked">
-                                        {modeCardTitle.toUpperCase()}
-                                    </div>
-                                    <div className="mode-card-subtitle">{modeSubtitle}</div>
-                                </div>
-
-                                <div className="mode-card-footer">
-                                    <div className="mode-playing-count">
-                                        <span className="live-dot" aria-hidden="true" />
-                                        <span>
-                                            Playing: <span className="mono">{pregamePlayingCount}</span>
-                                        </span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="mode-card-action"
-                                        onClick={() => navigate('/gamemodes', { state: { selectedMode: isBattleRoyaleMode ? brVariant : selectedMode } })}
-                                    >
-                                        Change
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <PregameGamemodeSelector
+                            selectedMode={selectedMode}
+                            brAvailable={brAvailable}
+                            playersByGamemode={liveStats.playersByGamemode}
+                            heroPlayingCount={pregamePlayingOverride ?? getGamemodePlayingCount(liveStats.playersByGamemode, selectedMode)}
+                            entryFeeLabel={freePlay
+                                ? 'FREE'
+                                : entryFeeForSession != null
+                                    ? formatUsd(entryFeeForSession)
+                                    : `From ${formatUsd(Math.min(...tierOptions))}`}
+                            onSelectMode={(modeId) => {
+                                if (isBRGamemode(modeId) && !brAvailable) return;
+                                const nextMode = normalizeGamemodeForLobby(modeId, !!user?.isAdmin);
+                                const nextTiers = nextMode === 'surviv'
+                                    ? SURVIV_ENTRY_TIERS
+                                    : nextMode === 'competitive-slither'
+                                        ? COMPETITIVE_ENTRY_TIERS
+                                        : isBRGamemode(nextMode)
+                                            ? BR_ENTRY_TIERS
+                                            : ENTRY_TIERS;
+                                const nextDefault = nextMode === 'surviv'
+                                    ? DEFAULT_SURVIV_ENTRY_FEE
+                                    : nextMode === 'competitive-slither'
+                                        ? DEFAULT_COMPETITIVE_ENTRY_FEE
+                                        : isBRGamemode(nextMode)
+                                            ? DEFAULT_BR_ENTRY_FEE
+                                            : DEFAULT_ENTRY_FEE;
+                                setSelectedEntryFee((current) => current === null || nextTiers.includes(current) ? current : nextDefault);
+                                setSelectedMode(nextMode);
+                            }}
+                            cardRef={modeCardRef}
+                        />
                     )}
 
                     {/* Center Column */}

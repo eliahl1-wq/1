@@ -1847,20 +1847,43 @@ export class SlitherRenderer {
         const s = this.smooth.get(snake.id);
         const sc = snake.sc ?? ((snake.radius || SLITHER_BASE_R) / SLITHER_BASE_R);
         const bodyRadiusWorld = snake.radius || (SLITHER_BASE_R * sc);
-        let segs = snake.segments || [];
+        let segs = s?.segments || snake.segments || [];
+        if (segs.length === 0) {
+            ctx.restore();
+            return;
+        }
+
+        // Cull against the cheap smoothed/server spine before densifying or
+        // fitting its visual arc. This matters most for huge off-screen snakes.
+        const cx = this.camera.x;
+        const cy = this.camera.y;
+        const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 160 + bodyRadiusWorld * 2;
+        const viewR2 = viewR * viewR;
+        let onScreen = false;
+        for (let i = 0; i < segs.length; i++) {
+            const dx = segs[i].x - cx;
+            const dy = segs[i].y - cy;
+            if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
+        }
+        if (!onScreen) {
+            const tail = segs[segs.length - 1];
+            const dx = tail.x - cx;
+            const dy = tail.y - cy;
+            onScreen = dx * dx + dy * dy <= viewR2;
+        }
+        if (!onScreen) {
+            ctx.restore();
+            return;
+        }
+
         if (s && s.visualArcLen) {
-            const rawSegs = s.segments || snake.segments || [];
             // Network spines are downsampled. Smooth only to a radius-relative
             // resolution; spacing-relative subdivision created thousands of
             // temporary points per large snake every frame.
             const curveEdge = Math.max(2.4, bodyRadiusWorld * 0.55);
-            const dense = densifySpine(rawSegs, curveEdge);
+            const dense = densifySpine(segs, curveEdge);
             const fractionalTail = Math.max(0, Math.min(1, snake.fam ?? 0)) * (s.visualSpacing || 3.6);
             segs = fitSpineToArcLength(dense, s.visualArcLen, fractionalTail);
-        }
-        if (segs.length === 0) {
-            ctx.restore();
-            return;
         }
 
         const gsc = zoom;
@@ -1878,31 +1901,12 @@ export class SlitherRenderer {
         const boosting = !!snake.boost;
         const pulse = 0.85 + 0.15 * Math.sin(this._frame * 0.16);
 
-        // Cheap on-screen cull straight from the world-space spine before any resampling.
-        const cx = this.camera.x;
-        const cy = this.camera.y;
-        const viewR = Math.hypot(this.W, this.H) / (2 * zoom) + 160;
-        const viewR2 = viewR * viewR;
-        let onScreen = false;
-        const checkStride = Math.max(1, Math.floor(segs.length / 12));
-        for (let i = 0; i < segs.length; i += checkStride) {
-            const dx = segs[i].x - cx;
-            const dy = segs[i].y - cy;
-            if (dx * dx + dy * dy <= viewR2) { onScreen = true; break; }
-        }
-        if (!onScreen) {
-            const tail = segs[segs.length - 1];
-            const dx = tail.x - cx;
-            const dy = tail.y - cy;
-            if (dx * dx + dy * dy <= viewR2) onScreen = true;
-        }
-        if (!onScreen) {
-            ctx.restore();
-            return;
-        }
 
         const renderStepMultiplier = Math.max(1, Number(snake.renderStepMultiplier) || 1);
-        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * 0.42) * renderStepMultiplier;
+        // Large bodies use a wider detail interval. The continuous tube below
+        // keeps bends seamless while reducing the number of sprite draw calls.
+        const bodyStepRatio = bodyRadiusWorld >= 12 ? 0.52 : 0.42;
+        const stampStepWorld = Math.max(1.15, bodyRadiusWorld * bodyStepRatio) * renderStepMultiplier;
         const q = this._quality;
         const holdActive = this._holdActive;
         const qMul = Math.max(this.isMobile ? 0.72 : 0.78, q);
@@ -2014,6 +2018,42 @@ export class SlitherRenderer {
                 ctx.globalAlpha = (1 - t / trail.length) * 0.12 * pulse;
                 ctx.drawImage(trailGlow, tr.x - halfT, tr.y - halfT);
             }
+            ctx.restore();
+        }
+
+        // One round stroke seals the scalloped outer edge that separate circular
+        // segment sprites expose in tight turns. This is cheaper than greatly
+        // increasing the stamp count on every large snake.
+        if (bumpCount > 1) {
+            const bodyBaseColor = isRainbow ? '#a070e8' : cs;
+            const bodyBase = shadeColor(parseColor(bodyBaseColor), -12);
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = rgb(bodyBase);
+            ctx.lineWidth = bodyRadius * 1.96;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            const edgePad = bodyRadius * 2.2;
+            let drawingRun = false;
+            for (let i = 0; i < bumpCount; i++) {
+                const p = bumps[i];
+                const visible = p.x >= -edgePad && p.y >= -edgePad
+                    && p.x <= this.W + edgePad && p.y <= this.H + edgePad;
+                if (visible) {
+                    if (!drawingRun) {
+                        const previous = bumps[Math.max(0, i - 1)];
+                        ctx.moveTo(previous.x, previous.y);
+                        drawingRun = true;
+                    }
+                    ctx.lineTo(p.x, p.y);
+                } else if (drawingRun) {
+                    ctx.lineTo(p.x, p.y);
+                    drawingRun = false;
+                }
+            }
+            ctx.stroke();
             ctx.restore();
         }
 

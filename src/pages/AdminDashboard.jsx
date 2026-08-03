@@ -536,7 +536,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                         type="button"
                                         className={`tab-btn${subTab === id ? ' active' : ''}`}
                                         onClick={() => setSubTab(id)}
-                                        style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+
                                     >
                                         {id === 'overview' ? 'Overview' : id === 'transactions' ? 'Transactions' : 'Game activity'}
                                     </button>
@@ -1183,7 +1183,7 @@ export default function AdminDashboard() {
                             type="button"
                             className={`tab-btn${tab === t.id ? ' active' : ''}`}
                             onClick={() => setTab(t.id)}
-                            style={{ padding: '8px 14px', fontSize: '0.78rem' }}
+
                         >
                             {t.label}
                         </button>

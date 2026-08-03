@@ -4414,83 +4414,145 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 .admin-user-modal-stats .admin-stat-card__value{font-size:1.25rem}
 .admin-user-modal .admin-tabs{border-bottom:1px solid var(--border)}
 @media (max-width:680px){.admin-user-modal-backdrop{padding:8px}.admin-user-modal{max-height:calc(100dvh - 16px)}.admin-user-modal-header{padding:15px 14px 10px}.admin-user-modal-stats{padding:12px 14px}.admin-user-modal-body{padding:0 14px 16px}.admin-user-modal>.product-alert{margin:12px 14px 0}}
-/* --- Purposeful action hierarchy and surface depth --- */
-.game-card,.stats-card,.leaderboard-card,.mode-card,.gm-card,.product-surface,.panel{background:linear-gradient(180deg,rgba(21,22,29,.98),rgba(16,17,23,.98));border-color:rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 28px rgba(0,0,0,.16)}
-.game-card:hover,.leaderboard-card:hover,.gm-card:hover{border-color:rgba(255,255,255,.125)}
-.input,.nickname-input,.admin-input,.admin-filter-input,.admin-filter-select{background:linear-gradient(180deg,rgba(4,5,8,.34),rgba(10,11,15,.24));box-shadow:inset 0 1px 2px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.018)}
+/* --- Final component alignment and visual consistency --- */
+.game-card,
+.stats-card,
+.leaderboard-card,
+.mode-card,
+.gm-card,
+.product-surface,
+.panel{
+  background:rgba(18,19,25,.97);
+  border-color:rgba(255,255,255,.09);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 26px rgba(0,0,0,.17);
+}
+.game-card:hover,.leaderboard-card:hover,.gm-card:hover{border-color:rgba(255,255,255,.13)}
+.input,.nickname-input,.admin-input,.admin-filter-input,.admin-filter-select{
+  background:rgba(7,8,12,.46);
+  border-color:rgba(255,255,255,.095);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.22);
+}
+.input:hover:not(:disabled),.nickname-input:hover:not(:disabled),.admin-input:hover:not(:disabled),.admin-filter-input:hover:not(:disabled),.admin-filter-select:hover:not(:disabled){background:rgba(10,11,16,.58);border-color:rgba(255,255,255,.14)}
 .input:focus,.nickname-input:focus,.admin-input:focus,.admin-filter-input:focus,.admin-filter-select:focus{box-shadow:var(--focus-ring),inset 0 1px 2px rgba(0,0,0,.2)}
-.wallet-card{width:226px;padding:12px;border-radius:9px;background:linear-gradient(180deg,rgba(25,26,34,.99),rgba(17,18,24,.99));border-color:rgba(255,255,255,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 14px 36px rgba(0,0,0,.34);animation:fadeUp var(--duration-fast) var(--ease-standard)}
+
+.wallet-card{width:226px;padding:12px;border-radius:9px;background:rgba(21,22,29,.99);border-color:rgba(255,255,255,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 16px 38px rgba(0,0,0,.36);animation:fadeUp var(--duration-fast) var(--ease-standard)}
 .wallet-card-header{display:flex;min-height:28px;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-.wallet-card-history{min-height:26px;padding:0 7px;border:0;border-radius:5px;background:transparent;color:var(--text-subtle);font:680 .64rem/1 var(--ui);letter-spacing:.055em;text-transform:uppercase;cursor:pointer;transition:color var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard)}
+.wallet-card-history{min-height:26px;padding:0 7px;border:0;border-radius:5px;background:transparent;color:var(--text-subtle);font:680 .66rem/1 var(--ui);letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:color var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard)}
 .wallet-card-history:hover{background:rgba(255,255,255,.045);color:var(--text-h)}
-.wallet-card .dropdown-trigger{min-height:28px;padding:0 8px;border-radius:5px;font-size:.65rem}
-.wallet-card .dropdown-item{min-height:28px;font-size:.68rem}
-.wallet-card-balance{display:flex;align-items:center;justify-content:center;min-height:34px;font-size:1.42rem;font-weight:760;letter-spacing:-.045em}
-.wallet-card-sub{margin-top:4px;color:var(--text-subtle);font-size:.68rem;text-align:center}
+.wallet-card .dropdown-trigger{min-height:28px;padding:0 8px;border-radius:5px;font-size:.68rem}
+.wallet-card .dropdown-item{min-height:29px;font-size:.7rem}
+.wallet-card-balance{display:flex;min-height:34px;align-items:center;justify-content:center;font-size:1.42rem;font-weight:760;letter-spacing:-.045em}
+.wallet-card-sub{margin-top:4px;color:var(--text-subtle);font-size:.69rem;text-align:center}
 .wallet-card-actions{gap:6px;margin-top:10px}
-.wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:31px;padding:0 9px;border-radius:6px;font-size:.68rem;font-weight:710;gap:5px}
+.wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:31px;padding:0 9px;border-radius:6px;font-size:.72rem;font-weight:690;gap:5px}
 .wallet-card-actions .btn svg{width:12px;height:12px}
-.wallet-card-actions .btn-primary{background:linear-gradient(180deg,#7d67ed,#6d56d8)}
-.wallet-card-actions .btn-primary:hover:not(:disabled){background:linear-gradient(180deg,#8671f0,#745de0)}
-.play-btn{position:relative;display:flex;min-height:44px;align-items:center;justify-content:center;gap:8px;padding:0 18px;border-radius:var(--r-md);font-size:.96rem;font-weight:800;line-height:1;letter-spacing:.018em;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 3px 8px rgba(0,0,0,.14)}
-.play-btn-label{display:inline-flex;align-items:center;justify-content:center;min-width:0}
-.play-button-icon{width:16px;height:16px;filter:none;transition:transform var(--duration-fast) var(--ease-standard)}
+.wallet-card-actions .btn-primary{background:#765ee8}
+.wallet-card-actions .btn-primary:hover:not(:disabled){background:#816bf0}
+
+.game-card.main-card{padding:22px 24px 14px}
+.game-card.main-card .hiw-wrap{margin-top:8px}
+.game-card.main-card .hiw-toggle{min-height:27px;font-size:.68rem;line-height:1}
+.play-btn{
+  position:relative;
+  display:flex;
+  width:100%;
+  min-height:44px;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:0 18px;
+  border-radius:var(--r-md);
+  font-family:var(--ui);
+  font-size:.94rem;
+  font-weight:780;
+  line-height:1;
+  letter-spacing:.015em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 2px 7px rgba(0,0,0,.15);
+}
+.play-btn-label{display:inline-flex;min-width:0;align-items:center;justify-content:center;line-height:1}
+.play-button-icon{display:block;width:15px;height:15px;margin:0;flex:0 0 15px;filter:none;transition:transform var(--duration-fast) var(--ease-standard)}
 .play-btn:hover:not(:disabled) .play-button-icon{transform:translateX(1px)}
-.play-btn-ready{background:linear-gradient(180deg,#2bd18c,#1fbc7c);border:1px solid rgba(120,255,196,.24);color:#041a11;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 3px 8px rgba(5,52,34,.16)}
-.play-btn-ready:hover:not(:disabled){background:linear-gradient(180deg,#34d994,#25c483)}
-.play-btn-login,.play-btn-rejoin{background:linear-gradient(180deg,#8069f2,#7058df);border:1px solid rgba(255,255,255,.12)}
-.play-btn-login:hover:not(:disabled),.play-btn-rejoin:hover:not(:disabled){background:linear-gradient(180deg,#8973f5,#7760e5)}
-.play-btn-disabled{font-size:.79rem;font-weight:700;letter-spacing:.01em;box-shadow:none}
-.mode-card-action{min-height:40px;border-radius:var(--r-md);background:linear-gradient(180deg,#8069f2,#7058df);border:1px solid rgba(255,255,255,.11);font-size:.83rem;font-weight:760;letter-spacing:.004em;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 3px 8px rgba(0,0,0,.14)}
-.mode-card-action:hover{background:linear-gradient(180deg,#8973f5,#7760e5);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 10px rgba(0,0,0,.16)}
-.gm-card-right .gm-play-btn{font-size:.73rem;font-weight:760;letter-spacing:.025em}
-.lobby-tier-btn{min-height:34px;border-radius:var(--r-md);font-size:.75rem;transition:transform var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
-.lobby-tier-btn--active,.lobby-tier-btn--active:hover:not(:disabled){background:linear-gradient(180deg,rgba(34,201,130,.12),rgba(34,201,130,.065));border-color:rgba(34,201,130,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
-.user-menu-item{min-height:35px;padding:0 12px;font-size:.76rem}
-.btn:active, .mode-card-action:active, .play-btn:active:not(:disabled), .nav-deposit-btn:active, .lobby-tier-btn:active:not(:disabled) {
-  transform: scale(0.98) translateY(1px) !important;
-}
+.play-btn-ready{background:#25c985;border:1px solid rgba(111,255,190,.2);color:#041a11;box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 2px 7px rgba(5,52,34,.15)}
+.play-btn-ready:hover:not(:disabled){background:#2fd38e;filter:none}
+.play-btn-login,.play-btn-rejoin{background:#765ee8;border:1px solid rgba(255,255,255,.11);color:#fff}
+.play-btn-login:hover:not(:disabled),.play-btn-rejoin:hover:not(:disabled){background:#816bf0;filter:none}
+.play-btn-disabled{font-size:.81rem;font-weight:690;letter-spacing:.008em;box-shadow:none}
 
-/* --- Rank Badges --- */
-.rank-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--text-2);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
+.mode-card-action{
+  min-height:38px;
+  padding:0 14px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:var(--r-md);
+  background:#765ee8;
+  color:#fff;
+  font-family:var(--ui);
+  font-size:.86rem;
+  font-weight:720;
+  line-height:1;
+  letter-spacing:-.004em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 6px rgba(0,0,0,.14);
 }
-.rank-badge-1 {
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.22), rgba(255, 180, 0, 0.1));
-  border-color: rgba(255, 215, 0, 0.45);
-  color: #ffd700;
-  box-shadow: 0 0 8px rgba(255, 215, 0, 0.15);
-}
-.rank-badge-2 {
-  background: linear-gradient(135deg, rgba(192, 192, 192, 0.22), rgba(160, 160, 160, 0.1));
-  border-color: rgba(192, 192, 192, 0.45);
-  color: #e0e0e0;
-}
-.rank-badge-3 {
-  background: linear-gradient(135deg, rgba(205, 127, 50, 0.22), rgba(160, 90, 30, 0.1));
-  border-color: rgba(205, 127, 50, 0.45);
-  color: #cd7f32;
-}
+.mode-card-action:hover{background:#816bf0;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 10px rgba(0,0,0,.17)}
+.gm-play-btn,.gm-card-right .gm-play-btn{min-height:36px;padding:0 16px;border-radius:var(--r-md);background:#765ee8;border:1px solid rgba(255,255,255,.1);font-family:var(--ui);font-size:.79rem;font-weight:720;line-height:1;letter-spacing:.015em;box-shadow:inset 0 1px 0 rgba(255,255,255,.11),0 2px 6px rgba(0,0,0,.12)}
+.gm-play-btn:hover{background:#816bf0;border-color:rgba(255,255,255,.15);box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 4px 10px rgba(0,0,0,.16);filter:none}
+.lobby-tier-btn{min-height:34px;border-radius:var(--r-md);font-size:.77rem;font-weight:650;transition:transform var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+.lobby-tier-btn--active,.lobby-tier-btn--active:hover:not(:disabled){background:rgba(34,201,130,.095);border-color:rgba(34,201,130,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.user-menu-item{min-height:35px;padding:0 12px;font-size:.78rem}
 
-/* --- Table Polish --- */
-.leaderboard-table tr, .transactions-table tr, .admin-data-table tr {
-  transition: background-color 0.15s ease;
+.tab-bar{gap:3px;padding:3px;border:1px solid rgba(255,255,255,.075);border-radius:7px;background:rgba(5,6,9,.42)}
+.tab-btn{min-height:28px;padding:0 11px;border:1px solid transparent;border-radius:5px;font-family:var(--ui);font-size:.74rem;font-weight:650;line-height:1;letter-spacing:-.003em;transition:color var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),box-shadow var(--duration-fast) var(--ease-standard)}
+.tab-btn.active{background:rgba(255,255,255,.075);border-color:rgba(255,255,255,.07);color:var(--text-h);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.tab-btn:not(.active){background:transparent;color:var(--text-subtle)}
+.tab-btn:not(.active):hover{background:rgba(255,255,255,.035);color:var(--text-muted)}
+
+.profile-tabs,.gm-tabs,.product-page--admin .admin-tabs{display:flex;align-items:flex-end;gap:22px;padding:0 4px;border-bottom:1px solid var(--border);background:transparent;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.profile-tabs::-webkit-scrollbar,.gm-tabs::-webkit-scrollbar,.product-page--admin .admin-tabs::-webkit-scrollbar{display:none}
+.profile-tabs{padding-inline:12px}
+.gm-tabs{margin-bottom:var(--space-6)}
+.product-page--admin .admin-tabs{margin-bottom:var(--space-6);flex-wrap:nowrap}
+.profile-tab-btn,.gm-tab,.product-page--admin .admin-tabs .tab-btn{
+  flex:0 0 auto;
+  min-height:41px;
+  margin:0!important;
+  padding:0 2px!important;
+  border:0;
+  border-bottom:2px solid transparent;
+  border-radius:0;
+  background:transparent;
+  color:var(--text-subtle);
+  font-family:var(--ui);
+  font-size:.79rem!important;
+  font-weight:640;
+  line-height:1;
+  letter-spacing:0;
+  box-shadow:none;
+  white-space:nowrap;
 }
-.leaderboard-table tbody tr:hover, .transactions-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.025);
+.profile-tab-btn:hover,.gm-tab:hover,.product-page--admin .admin-tabs .tab-btn:not(.active):hover{background:transparent;color:var(--text-h)}
+.profile-tab-btn--active,.gm-tab--active,.product-page--admin .admin-tabs .tab-btn.active{border-bottom-color:#8d78f1;background:transparent;color:var(--text-h);box-shadow:none;font-weight:700}
+
+.nav-deposit-btn{height:32px;padding-inline:14px;border-radius:var(--r-full);background:#765ee8;border:1px solid rgba(255,255,255,.11);font-size:.78rem;font-weight:710;box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 2px 6px rgba(0,0,0,.13)}
+.nav-deposit-btn:hover{background:#816bf0;border-color:rgba(255,255,255,.15);box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 3px 8px rgba(0,0,0,.16);filter:none}
+.gm-nav-link--active{background:rgba(120,94,255,.075);box-shadow:inset 0 0 0 1px rgba(151,132,255,.07)}
+.btn:active,.mode-card-action:active,.play-btn:active:not(:disabled),.nav-deposit-btn:active,.lobby-tier-btn:active:not(:disabled){transform:scale(.985) translateY(0)!important}
+
+/* --- Rank badges --- */
+.rank-badge{display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:50%;background:rgba(255,255,255,.04);color:var(--text-2);font-family:var(--mono);font-size:.72rem;font-weight:700}
+.rank-badge-1{background:linear-gradient(135deg,rgba(255,215,0,.22),rgba(255,180,0,.1));border-color:rgba(255,215,0,.45);color:#ffd700;box-shadow:0 0 8px rgba(255,215,0,.15)}
+.rank-badge-2{background:linear-gradient(135deg,rgba(192,192,192,.22),rgba(160,160,160,.1));border-color:rgba(192,192,192,.45);color:#e0e0e0}
+.rank-badge-3{background:linear-gradient(135deg,rgba(205,127,50,.22),rgba(160,90,30,.1));border-color:rgba(205,127,50,.45);color:#cd7f32}
+.leaderboard-table tr,.transactions-table tr,.admin-data-table tr{transition:background-color var(--duration-fast) var(--ease-standard)}
+.leaderboard-table tbody tr:hover,.transactions-table tbody tr:hover{background:rgba(255,255,255,.025)}
+
+@media(max-width:768px){
+  .wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:32px;font-size:.73rem}
+  .game-card.main-card{padding:18px 18px 12px}
+  .game-card.main-card .hiw-wrap{margin-top:7px}
+  .game-card.main-card .hiw-toggle{min-height:27px}
+  .play-btn{min-height:46px;font-size:.96rem}
+  .play-btn-disabled{font-size:.82rem}
+  .mode-card-action{min-height:40px;font-size:.87rem}
+  .nav-deposit-btn{height:32px;border-radius:var(--r-full)}
+  .profile-tabs,.gm-tabs,.product-page--admin .admin-tabs{gap:20px}
+  .profile-tab-btn,.gm-tab,.product-page--admin .admin-tabs .tab-btn{min-height:42px;font-size:.81rem!important}
 }
-.hiw-toggle{min-height:36px;font-size:.67rem}
-.nav-deposit-btn{height:32px;padding-inline:14px;border-radius:var(--r-full);background:linear-gradient(180deg,#8069f2,#7058df);border:1px solid rgba(255,255,255,.12);font-size:.76rem;font-weight:730;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 3px 8px rgba(0,0,0,.13)}
-.nav-deposit-btn:hover{background:linear-gradient(180deg,#8973f5,#7760e5);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 4px 10px rgba(0,0,0,.16)}
-@media(max-width:768px){.wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:32px;font-size:.69rem}.play-btn{min-height:46px;font-size:.98rem}.play-btn-disabled{font-size:.79rem}.nav-deposit-btn{height:32px;border-radius:var(--r-full)}}
