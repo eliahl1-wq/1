@@ -1,90 +1,135 @@
-.rewards-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px;
-    margin-bottom: 40px;
+.product-page--rewards{
+    width:100%;
+    max-width:880px;
+    padding-bottom:72px;
 }
 
-.rewards-stat-card {
-    min-width: 0;
-    padding: 17px 19px;
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    background: var(--bg-1);
+.product-page--rewards .product-page-header{
+    margin-bottom:30px;
 }
 
-.rewards-stat-label {
-    margin-bottom: 8px;
-    color: var(--text-3);
-    font-size: .68rem;
-    font-weight: 750;
-    letter-spacing: .055em;
-    text-transform: uppercase;
+.rewards-summary-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+    margin:0 0 48px;
 }
 
-.rewards-stat-value {
-    overflow: hidden;
-    color: var(--text-h);
-    font-size: 1.55rem;
-    font-weight: 900;
-    text-overflow: ellipsis;
+.rewards-stat-card{
+    min-width:0;
+    min-height:122px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:18px 20px;
+    border:1px solid var(--border-2);
+    border-radius:var(--r-lg);
+    background:rgba(18,19,25,.94);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
 }
 
-.rewards-stat-detail {
-    margin-top: 6px;
-    color: var(--text-3);
-    font-size: .72rem;
-    line-height: 1.35;
+.rewards-stat-label{
+    margin:0 0 9px;
+    color:var(--text-subtle);
+    font-size:.68rem;
+    font-weight:680;
+    line-height:1.25;
+    letter-spacing:.055em;
+    text-transform:uppercase;
 }
 
-.rewards-stat-card--claimable .rewards-stat-label,
+.rewards-stat-value{
+    overflow:hidden;
+    color:var(--text-h);
+    font-size:1.45rem;
+    font-weight:780;
+    line-height:1.08;
+    text-overflow:ellipsis;
+}
+
+.rewards-stat-detail{
+    margin-top:8px;
+    color:var(--text-subtle);
+    font-size:.73rem;
+    line-height:1.4;
+}
+
 .rewards-stat-card--claimable .rewards-stat-value,
-.rewards-stat-card--affiliate .rewards-stat-label,
-.rewards-stat-card--affiliate .rewards-stat-value {
-    color: var(--green);
+.rewards-stat-card--affiliate .rewards-stat-value{color:var(--green)}
+.rewards-stat-card--tournament .rewards-stat-value{color:var(--yellow)}
+
+.product-page--rewards>.product-alert{
+    margin:-22px 0 40px;
 }
 
-.rewards-stat-card--tournament .rewards-stat-label,
-.rewards-stat-card--tournament .rewards-stat-value {
-    color: var(--yellow);
+.rewards-section{
+    width:100%;
+    margin:0 0 50px;
 }
 
-@media (max-width: 520px) {
-    .rewards-summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-    }
-
-    .rewards-stat-card {
-        padding: 14px 12px;
-    }
-
-    .rewards-stat-value {
-        font-size: 1.15rem;
-    }
+.rewards-section-title{
+    margin:0 0 18px;
+    color:var(--text-h);
+    font-size:1.08rem;
+    font-weight:720;
+    line-height:1.25;
+    letter-spacing:-.018em;
 }
 
-/* --- Product polish overrides --- */
-.rewards-summary-grid { gap: 10px; margin-bottom: 32px; }
-.rewards-stat-card {
-    padding: 16px 18px;
-    border-color: var(--border-2);
-    border-radius: var(--r-md);
-    background: rgba(18, 19, 25, 0.88);
+.rewards-section>.panel,
+.rewards-section>.rewards-ticket-card{
+    width:100%;
+    border-color:var(--border-2);
+    border-radius:var(--r-lg);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
 }
-.rewards-stat-label { color: var(--text-subtle); font-size: 0.66rem; font-weight: 650; }
-.rewards-stat-value { font-size: 1.4rem; font-weight: 750; }
-.rewards-stat-detail { color: var(--text-subtle); }
-.rewards-stat-card--claimable .rewards-stat-label,
-.rewards-stat-card--affiliate .rewards-stat-label { color: var(--text-subtle); }
-.rewards-stat-card--tournament .rewards-stat-label { color: var(--text-subtle); }
 
-/* --- Rewards page polish --- */
-.product-page--rewards{width:100%;max-width:800px}
-.product-page--rewards>section{margin-bottom:var(--space-9)!important}
-.product-page--rewards>section>h2{margin:0 0 var(--space-4)!important;color:var(--text-1)!important;font-size:1.02rem!important;font-weight:730!important;letter-spacing:-.015em}
-.rewards-ticket-card{padding:var(--space-6)!important;border-radius:var(--r-lg)!important;box-shadow:none!important}
-.rewards-ticket-card--active{background:rgba(34,197,94,.055)!important;border:1px solid rgba(34,197,94,.25)!important}
-.rewards-ticket-card--used{padding:var(--space-5)!important;background:rgba(255,255,255,.018)!important;opacity:.82!important}
-.product-page--rewards .panel{border-radius:var(--r-lg);box-shadow:none}
-@media (max-width:600px){.rewards-ticket-card{padding:var(--space-5)!important}.rewards-ticket-card button{min-width:100%}}
+.rewards-section>.panel{padding:22px!important}
+.rewards-ticket-card{padding:22px!important}
+.rewards-ticket-card--active{
+    background:rgba(34,197,94,.055)!important;
+    border:1px solid rgba(34,197,94,.25)!important;
+    border-radius:var(--r-lg)!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important;
+}
+.rewards-ticket-card--used{
+    padding:20px!important;
+    background:rgba(255,255,255,.018)!important;
+    opacity:.84!important;
+}
+
+.rewards-info-card{
+    padding:22px!important;
+    border:1px solid var(--border-2)!important;
+    background:rgba(255,255,255,.018)!important;
+}
+
+.product-page--rewards>.affiliate-rewards-embedded{
+    margin:0 0 50px;
+    padding-top:0;
+    border-top:0;
+}
+.product-page--rewards>.affiliate-rewards-embedded>.affiliate-section-heading{
+    margin-bottom:18px;
+}
+.product-page--rewards>.affiliate-rewards-embedded>.affiliate-section-heading h2{
+    margin:5px 0 0;
+    font-size:1.08rem;
+    font-weight:720;
+    letter-spacing:-.018em;
+}
+.product-page--rewards .affiliate-admin-stack{gap:16px}
+
+@media(max-width:700px){
+    .product-page--rewards{padding-bottom:48px}
+    .product-page--rewards .product-page-header{margin-bottom:24px}
+    .rewards-summary-grid{grid-template-columns:1fr;gap:10px;margin-bottom:40px}
+    .rewards-stat-card{min-height:0;padding:16px 18px}
+    .rewards-stat-value{font-size:1.3rem}
+    .product-page--rewards>.product-alert{margin:-16px 0 34px}
+    .rewards-section{margin-bottom:40px}
+    .rewards-section-title{margin-bottom:14px;font-size:1.03rem}
+    .rewards-section>.panel,.rewards-ticket-card,.rewards-info-card{padding:18px!important}
+    .rewards-ticket-card button{min-width:100%}
+    .product-page--rewards>.affiliate-rewards-embedded{margin-bottom:40px}
+}

@@ -66,8 +66,8 @@ export default function PregameGamemodeSelector({
 
             <div className="mode-selector-grid-wrap">
                 <div className="mode-selector-grid-heading">
-                    <span>All gamemodes</span>
-                    <small>Select to preview and play</small>
+                    <span>Gamemodes</span>
+                    <small>Scroll sideways to browse</small>
                 </div>
                 <div className="mode-selector-grid">
                     {GAMEMODE_CATALOG.map((mode) => {

@@ -179,7 +179,7 @@ export default function GameCashoutBar({
                     <span className="game-cashout-btn-progress" aria-hidden />
                     <span className="game-cashout-btn-content">
                         <DollarIcon />
-                        Cash Out
+                        <span className="game-cashout-label">Cash Out</span>
                     </span>
                 </button>
                 {!IS_MOBILE && (

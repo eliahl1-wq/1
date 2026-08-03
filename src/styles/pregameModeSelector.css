@@ -96,60 +96,89 @@
 }
 
 .mode-selector-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    display: flex;
+    gap: 9px;
+    margin: 0 -14px;
+    padding: 0 14px 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(124, 111, 240, 0.48) rgba(255, 255, 255, 0.04);
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mode-selector-grid::-webkit-scrollbar {
+    height: 5px;
+}
+
+.mode-selector-grid::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.mode-selector-grid::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(124, 111, 240, 0.48);
 }
 
 .mode-mini-card {
     position: relative;
-    min-width: 0;
-    min-height: 56px;
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
-    align-items: stretch;
-    gap: 7px;
-    padding: 5px;
+    width: 118px;
+    height: 158px;
+    flex: 0 0 118px;
+    display: block;
+    padding: 0;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.075);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.022);
+    scroll-snap-align: start;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: #07070b;
     color: var(--text-h);
     text-align: left;
     cursor: pointer;
+    isolation: isolate;
     transition:
         border-color 150ms ease,
-        background-color 150ms ease,
         transform 150ms ease,
         box-shadow 150ms ease;
 }
 
 .mode-mini-card:hover:not(:disabled) {
-    transform: translateY(-1px);
-    border-color: rgba(124, 111, 240, 0.5);
-    background: rgba(124, 111, 240, 0.07);
+    transform: translateY(-2px);
+    border-color: rgba(124, 111, 240, 0.62);
+    box-shadow: 0 9px 24px rgba(0, 0, 0, 0.28);
 }
 
 .mode-mini-card--selected {
-    border-color: rgba(124, 111, 240, 0.76);
-    background: rgba(124, 111, 240, 0.12);
-    box-shadow: inset 0 0 0 1px rgba(124, 111, 240, 0.12), 0 5px 16px rgba(73, 57, 179, 0.12);
+    border-color: #7c6ff0;
+    box-shadow:
+        inset 0 0 0 1px rgba(124, 111, 240, 0.5),
+        0 0 20px rgba(124, 111, 240, 0.22);
 }
 
 .mode-mini-card--coming-soon {
-    opacity: 0.42;
+    opacity: 0.44;
     cursor: not-allowed;
-    filter: saturate(0.45);
+    filter: saturate(0.35);
 }
 
 .mode-mini-card-preview {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
     display: block;
-    min-width: 0;
-    height: 44px;
     overflow: hidden;
-    align-self: center;
-    border-radius: 7px;
     background: #07070b;
+}
+
+.mode-mini-card-preview::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, rgba(7, 7, 11, 0.04) 20%, rgba(7, 7, 11, 0.35) 52%, rgba(7, 7, 11, 0.98) 100%);
 }
 
 .mode-mini-card-preview-canvas {
@@ -157,14 +186,25 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transform: scale(1.03);
+    transition: transform 220ms ease, filter 180ms ease;
+}
+
+.mode-mini-card:hover:not(:disabled) .mode-mini-card-preview-canvas {
+    transform: scale(1.08);
 }
 
 .mode-mini-card-copy {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 1px;
+    justify-content: flex-end;
+    gap: 2px;
+    padding: 42px 9px 10px;
+    background: linear-gradient(180deg, transparent 0%, rgba(7, 7, 11, 0.9) 56%, rgba(7, 7, 11, 0.98) 100%);
 }
 
 .mode-mini-card-title-row {
@@ -176,12 +216,13 @@
 
 .mode-mini-card-title-row strong {
     overflow: hidden;
-    color: var(--text-h);
-    font-size: 0.72rem;
+    color: #fff;
+    font-size: 0.78rem;
     font-weight: 800;
     line-height: 1.15;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.72);
 }
 
 .mode-mini-card .gm-mode-badge {
@@ -192,8 +233,8 @@
 
 .mode-mini-card-subtype {
     overflow: hidden;
-    color: var(--text-3);
-    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.61rem;
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -204,7 +245,7 @@
     align-items: center;
     gap: 4px;
     margin-top: 3px;
-    color: var(--text-2);
+    color: rgba(255, 255, 255, 0.84);
     font-size: 0.6rem;
     font-weight: 650;
     white-space: nowrap;
@@ -220,34 +261,34 @@
 }
 
 .mode-mini-card--coming-soon .mode-mini-card-playing i {
-    background: var(--text-3);
+    background: rgba(255, 255, 255, 0.5);
     box-shadow: none;
 }
 
 .mode-mini-card-check {
     position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 16px;
-    height: 16px;
+    z-index: 2;
+    top: 7px;
+    right: 7px;
+    width: 18px;
+    height: 18px;
     display: grid;
     place-items: center;
     border-radius: 50%;
     background: #7c6ff0;
     color: #fff;
-    box-shadow: 0 0 0 2px rgba(7, 7, 11, 0.72);
+    box-shadow: 0 0 0 2px rgba(7, 7, 11, 0.72), 0 3px 10px rgba(0, 0, 0, 0.35);
 }
 
 .mode-mini-card-check svg {
-    width: 11px;
-    height: 11px;
+    width: 12px;
+    height: 12px;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
-
 @media (max-width: 1120px) {
     .pre-game-grid:not(.pre-game-grid--tournament) {
         grid-template-columns: 1fr;
@@ -276,20 +317,14 @@
         display: none;
     }
 
-    .mode-mini-card {
-        grid-template-columns: 44px minmax(0, 1fr);
-        min-height: 62px;
-        gap: 6px;
-        padding: 6px;
-    }
-
-    .mode-mini-card-preview {
-        height: 44px;
-    }
-}
-
-@media (max-width: 340px) {
     .mode-selector-grid {
-        grid-template-columns: 1fr;
+        margin-inline: -12px;
+        padding-inline: 12px;
+    }
+
+    .mode-mini-card {
+        width: 112px;
+        height: 152px;
+        flex-basis: 112px;
     }
 }

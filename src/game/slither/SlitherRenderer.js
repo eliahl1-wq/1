@@ -1903,9 +1903,9 @@ export class SlitherRenderer {
 
 
         const renderStepMultiplier = Math.max(1, Number(snake.renderStepMultiplier) || 1);
-        // Large bodies use a wider detail interval. The continuous tube below
-        // keeps bends seamless while reducing the number of sprite draw calls.
-        const bodyStepRatio = bodyRadiusWorld >= 12 ? 0.52 : 0.42;
+        // Large bodies use a modestly wider detail interval. Their sprites are
+        // stretched along the tangent below, keeping overlap without extra draws.
+        const bodyStepRatio = bodyRadiusWorld >= 12 ? 0.46 : 0.42;
         const stampStepWorld = Math.max(1.15, bodyRadiusWorld * bodyStepRatio) * renderStepMultiplier;
         const q = this._quality;
         const holdActive = this._holdActive;
@@ -2021,42 +2021,6 @@ export class SlitherRenderer {
             ctx.restore();
         }
 
-        // One round stroke seals the scalloped outer edge that separate circular
-        // segment sprites expose in tight turns. This is cheaper than greatly
-        // increasing the stamp count on every large snake.
-        if (bumpCount > 1) {
-            const bodyBaseColor = isRainbow ? '#a070e8' : cs;
-            const bodyBase = shadeColor(parseColor(bodyBaseColor), -12);
-            ctx.save();
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.globalAlpha = 1;
-            ctx.strokeStyle = rgb(bodyBase);
-            ctx.lineWidth = bodyRadius * 1.96;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-            const edgePad = bodyRadius * 2.2;
-            let drawingRun = false;
-            for (let i = 0; i < bumpCount; i++) {
-                const p = bumps[i];
-                const visible = p.x >= -edgePad && p.y >= -edgePad
-                    && p.x <= this.W + edgePad && p.y <= this.H + edgePad;
-                if (visible) {
-                    if (!drawingRun) {
-                        const previous = bumps[Math.max(0, i - 1)];
-                        ctx.moveTo(previous.x, previous.y);
-                        drawingRun = true;
-                    }
-                    ctx.lineTo(p.x, p.y);
-                } else if (drawingRun) {
-                    ctx.lineTo(p.x, p.y);
-                    drawingRun = false;
-                }
-            }
-            ctx.stroke();
-            ctx.restore();
-        }
-
         // Glow (underneath the body segments for a clean outline)
         if (boosting && prNeeds.glow && (glow || isPatternSkin)) {
             ctx.save();
@@ -2086,8 +2050,8 @@ export class SlitherRenderer {
         // Body stamps — all snakes
         const dw = normal ? normal.width / stampScale : 0;
         const dh = normal ? normal.height / stampScale : 0;
-        const half = dw / 2;
-
+        const longitudinalScale = bodyRadiusWorld >= 12 ? 1.1 : 1;
+        const renderDpr = this._dpr;
         for (let i = bumpCount - 1; i >= 0; i--) {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -2096,7 +2060,6 @@ export class SlitherRenderer {
             let currentStampScale = stampScale;
             let currentDw = dw;
             let currentDh = dh;
-            let currentHalf = half;
 
             if (isPatternSkin) {
                 const stamp = patternPack.stamps[getPatternIndex(i)];
@@ -2104,7 +2067,6 @@ export class SlitherRenderer {
                 currentStampScale = stamp.bodySS * (cacheR / bodyRadius);
                 currentDw = sprite.width / currentStampScale;
                 currentDh = sprite.height / currentStampScale;
-                currentHalf = currentDw / 2;
             } else {
                 sprite = (boosting && i === 0) ? boostBody : normal;
             }
@@ -2112,17 +2074,14 @@ export class SlitherRenderer {
             // Removed segment wiggling scale wave here for authentic smooth body look
 
             const tangent = this._bumpTangent(bumps, i);
+            const drawWidth = currentDw * longitudinalScale;
 
-            if (tangent === 0) {
-                ctx.drawImage(sprite, (p.x - currentHalf) | 0, (p.y - currentHalf) | 0, currentDw, currentDh);
-            } else {
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(tangent);
-                ctx.drawImage(sprite, -currentDw / 2, -currentDh / 2, currentDw, currentDh);
-                ctx.restore();
-            }
+            const cos = Math.cos(tangent);
+            const sin = Math.sin(tangent);
+            ctx.setTransform(renderDpr * cos, renderDpr * sin, -renderDpr * sin, renderDpr * cos, renderDpr * p.x, renderDpr * p.y);
+            ctx.drawImage(sprite, -drawWidth / 2, -currentDh / 2, drawWidth, currentDh);
         }
+        ctx.setTransform(renderDpr, 0, 0, renderDpr, 0, 0);
 
         // Spine highlight baked into the radial gradient. No separate blit pass needed.
 
