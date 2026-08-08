@@ -551,10 +551,10 @@ export class SurvivRenderer {
         const nextMobileLayout = coarsePointer || w < 760;
         const nextReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false;
         // Surviv redraws the whole canvas every frame. Keep the backing surface
-        // below roughly 2.2M pixels so 120/144 Hz displays do not become
+        // below roughly 3M pixels so 120/144 Hz displays do not become
         // fill-rate bound even when several translucent world layers overlap.
-        const pixelBudgetDpr = Math.sqrt(2_200_000 / Math.max(1, w * h));
-        const dprCap = nextMobileLayout ? 1.2 : 0.95;
+        const pixelBudgetDpr = Math.sqrt(3_000_000 / Math.max(1, w * h));
+        const dprCap = nextMobileLayout ? 1.45 : 0.95;
         const baseDpr = Math.min(window.devicePixelRatio || 1, dprCap, pixelBudgetDpr);
         // The previous 0.75 floor defeated the pixel budget on ultrawide/4K
         // displays (4.7M pixels at 4K). Keep the cost consistent across monitors.
@@ -592,7 +592,7 @@ export class SurvivRenderer {
         this._canvasTop = canvasRect.top;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.ctx.imageSmoothingEnabled = true;
-        this.ctx.imageSmoothingQuality = 'medium';
+        this.ctx.imageSmoothingQuality = this.isMobileLayout ? 'high' : 'medium';
         this.viewW = w;
         this.viewH = h;
         this._terrainPattern = null;
@@ -7175,4 +7175,3 @@ export class SurvivRenderer {
         }
     }
 }
-

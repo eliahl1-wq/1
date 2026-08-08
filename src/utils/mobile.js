@@ -13,7 +13,7 @@ export function getMobileCanvasDpr(width, height, maxDpr = 2) {
     if (typeof window === 'undefined') return 1;
     const safeWidth = Number(width) || window.innerWidth;
     const safeHeight = Number(height) || window.innerHeight;
-    const pixelBudget = 2_400_000;
+    const pixelBudget = 3_200_000;
     const budgetDpr = Math.sqrt(pixelBudget / Math.max(1, safeWidth * safeHeight));
     return Math.max(1, Math.min(maxDpr, window.devicePixelRatio || 1, budgetDpr));
 }

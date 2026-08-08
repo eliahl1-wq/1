@@ -11,6 +11,17 @@ import { API_URL } from '../utils/apiBase';
 
 const API_BASE = API_URL;
 
+const PREGAME_PLAYING_MODES = [
+    { key: 'agar', label: 'Agar · Normal' },
+    { key: 'slither', label: 'Slither · Normal' },
+    { key: 'competitiveSlither', label: 'Slither · Arena' },
+    { key: 'surviv', label: 'Surviv · Normal' },
+    { key: 'brAgar', label: 'Agar · Battle Royale' },
+    { key: 'brSlither', label: 'Slither · Battle Royale' },
+];
+
+const EMPTY_PREGAME_PLAYING = Object.freeze(Object.fromEntries(PREGAME_PLAYING_MODES.map(({ key }) => [key, 0])));
+
 const TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: 'Users' },
@@ -779,7 +790,7 @@ export default function AdminDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
     const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
-    const [pregamePlayingOverride, setPregamePlayingOverride] = useState('');
+    const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -861,7 +872,7 @@ export default function AdminDashboard() {
             setSweeps(sw.sweeps ?? []);
             setRewardAlerts(security.alerts ?? []);
             setPendingRewardClaims(security.pendingClaims ?? []);
-            setPregamePlayingOverride(pregameDisplay.playingOverride ?? '');
+            setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(pregameDisplay.playingOffsets || {}) });
             await Promise.all([
                 fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded),
                 fetchLiveFeed(true),
@@ -920,18 +931,16 @@ export default function AdminDashboard() {
         }
     };
 
-    const savePregamePlayingOverride = async (nextValue = pregamePlayingOverride) => {
+    const savePregamePlayingOffsets = async (nextValues = pregamePlayingOffsets) => {
         setActionLoading(true);
         setActionMsg('');
         try {
             const result = await fetchAdmin('/api/admin/pregame/display-settings', {
                 method: 'PUT',
-                body: JSON.stringify({ playingOverride: nextValue }),
+                body: JSON.stringify({ playingOffsets: nextValues }),
             });
-            setPregamePlayingOverride(result.playingOverride ?? '');
-            setActionMsg(result.playingOverride == null
-                ? '✅ Pregame Playing is automatic again.'
-                : `✅ Pregame Playing now shows ${result.playingOverride} for everyone.`);
+            setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(result.playingOffsets || {}) });
+            setActionMsg('✅ Pregame Playing base values saved for every gamemode.');
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
         } finally {
@@ -1193,38 +1202,44 @@ export default function AdminDashboard() {
                 {tab === 'overview' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                         <div className="admin-override-panel" style={{
-                            display: 'flex',
-                            alignItems: 'flex-end',
-                            flexWrap: 'wrap',
+                            display: 'grid',
                             gap: '12px',
                             padding: '18px',
                             border: '1px solid var(--border)',
                             borderRadius: 'var(--r-lg)',
                             background: 'rgba(139,92,246,0.08)',
                         }}>
-                            <label style={{ display: 'grid', gap: '7px', minWidth: '220px' }}>
-                                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--text-h)' }}>Pregame “Playing”</span>
-                                <input
-                                    className="admin-input"
-                                    type="number"
-                                    min="0"
-                                    max="999999"
-                                    step="1"
-                                    value={pregamePlayingOverride}
-                                    placeholder="Automatic"
-                                    onChange={event => setPregamePlayingOverride(event.target.value)}
-                                    style={{ width: '100%', padding: '9px 11px' }}
-                                />
-                            </label>
-                            <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => savePregamePlayingOverride()}>
-                                Save for everyone
-                            </button>
-                            <button type="button" className="btn btn-ghost" disabled={actionLoading} onClick={() => savePregamePlayingOverride('')}>
-                                Use automatic
-                            </button>
-                            <span style={{ color: 'var(--text-3)', fontSize: '0.72rem', maxWidth: '420px' }}>
-                                Only changes the number shown in the left pregame gamemode card. Dashboard and real player statistics are unaffected.
-                            </span>
+                            <div>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-h)' }}>Pregame “Playing” base values</div>
+                                <div style={{ marginTop: '4px', color: 'var(--text-3)', fontSize: '0.72rem' }}>
+                                    Each value is added to that gamemode’s live players. Set 10 and the display becomes 11 when one real player joins.
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
+                                {PREGAME_PLAYING_MODES.map(mode => (
+                                    <label key={mode.key} style={{ display: 'grid', gap: '6px' }}>
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 750, color: 'var(--text-2)' }}>{mode.label}</span>
+                                        <input
+                                            className="admin-input"
+                                            type="number"
+                                            min="0"
+                                            max="999999"
+                                            step="1"
+                                            value={pregamePlayingOffsets[mode.key] ?? 0}
+                                            onChange={event => setPregamePlayingOffsets(current => ({ ...current, [mode.key]: event.target.value }))}
+                                            style={{ width: '100%', padding: '9px 11px' }}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                                <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => savePregamePlayingOffsets()}>
+                                    Save for everyone
+                                </button>
+                                <button type="button" className="btn btn-ghost" disabled={actionLoading} onClick={() => savePregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING })}>
+                                    Reset all to 0
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <h2 className="admin-section-title">On-chain wallets</h2>
@@ -1899,4 +1914,3 @@ export default function AdminDashboard() {
         </div>
     );
 }
-

@@ -252,7 +252,7 @@ export default function PreGame() {
         playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0, competitiveSlither: 0, surviv: 0 },
         siteUsersOnline: 0,
     });
-    const [pregamePlayingOverride, setPregamePlayingOverride] = useState(null);
+    const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({});
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
@@ -488,8 +488,13 @@ export default function PreGame() {
     }, [user?.isAdmin, brAvailable, isAlreadyInGame]);
 
 
-    const siteUsersOnline = (liveStats.siteUsersOnline ?? liveStats.totalPlayersOnline ?? 0) + (liveStats.totalBotsOnline ?? 0);
-    const pregamePlayingCount = pregamePlayingOverride ?? siteUsersOnline;
+    const displayedPlayersByGamemode = Object.fromEntries(
+        Object.entries(liveStats.playersByGamemode || {}).map(([key, value]) => [
+            key,
+            Math.max(0, Number(value) || 0) + Math.max(0, Number(pregamePlayingOffsets[key]) || 0),
+        ]),
+    );
+    const pregamePlayingCount = getGamemodePlayingCount(displayedPlayersByGamemode, selectedMode);
     const globalCashoutTotalUsd =
         liveStats.globalPlayerEarningsUsd
         ?? liveStats.totalUserBalanceUsd
@@ -627,7 +632,9 @@ export default function PreGame() {
                 if (r.ok && alive) setLiveStats(await r.json());
                 if (displaySettingsResponse.ok && alive) {
                     const settings = await displaySettingsResponse.json();
-                    setPregamePlayingOverride(Number.isInteger(settings.playingOverride) ? settings.playingOverride : null);
+                    setPregamePlayingOffsets(settings.playingOffsets && typeof settings.playingOffsets === 'object'
+                        ? settings.playingOffsets
+                        : {});
                 }
             } catch { }
         };
@@ -1371,8 +1378,8 @@ export default function PreGame() {
                         <PregameGamemodeSelector
                             selectedMode={selectedMode}
                             brAvailable={brAvailable}
-                            playersByGamemode={liveStats.playersByGamemode}
-                            heroPlayingCount={pregamePlayingOverride ?? getGamemodePlayingCount(liveStats.playersByGamemode, selectedMode)}
+                            playersByGamemode={displayedPlayersByGamemode}
+                            heroPlayingCount={pregamePlayingCount}
                             entryFeeLabel={freePlay
                                 ? 'FREE'
                                 : entryFeeForSession != null
@@ -1449,14 +1456,14 @@ export default function PreGame() {
                                     </span>
                                 </div>
 
-                                <div style={{ marginBottom: '18px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.72rem' }}>
+                                <div className="tournament-attempts-block">
+                                    <div className="tournament-attempts-head">
                                         <span className="label">Attempts Tracker</span>
                                         <span className="mono" style={{ color: 'var(--text-2)' }}>{attemptsRemaining} left</span>
                                     </div>
-                                    <div className="tournament-attempts" style={{ margin: 0, gap: '6px' }}>
+                                    <div className="tournament-attempts tournament-attempts--pregame">
                                         {Array.from({ length: maxTournamentAttempts }, (_, index) => (
-                                            <span key={index} className={`tournament-attempt-dot${index < attemptsUsed ? ' tournament-attempt-dot--used' : ''}`} style={{ height: '8px' }} />
+                                            <span key={index} className={`tournament-attempt-dot${index < attemptsUsed ? ' tournament-attempt-dot--used' : ''}`} />
                                         ))}
                                     </div>
                                 </div>

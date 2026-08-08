@@ -3516,31 +3516,31 @@ body.game-session-active #root {
 /* --- Final game action alignment --- */
 .game-cashout-stack{gap:7px}
 .game-cashout-btn{
-    width:128px;
-    height:42px;
-    min-height:42px;
+    width:110px;
+    height:40px;
+    min-height:40px;
     padding:0!important;
     border:1px solid rgba(255,255,255,.15)!important;
-    border-radius:7px!important;
-    background:linear-gradient(180deg,#826bee 0%,#7359df 100%)!important;
+    border-radius:8px!important;
+    background:linear-gradient(180deg,#876ff0 0%,#7057dc 100%)!important;
     color:#fff!important;
     font-family:var(--ui);
-    font-size:.98rem!important;
-    font-weight:750!important;
+    font-size:1rem!important;
+    font-weight:790!important;
     line-height:1!important;
     letter-spacing:-.006em;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 4px 11px rgba(35,22,91,.28)!important;
 }
 .game-cashout-btn:hover:not(:disabled){background:linear-gradient(180deg,#8b75f2 0%,#7b62e6 100%)!important;border-color:rgba(255,255,255,.2)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 5px 14px rgba(35,22,91,.32)!important}
 .game-cashout-btn-content{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;line-height:1}
-.game-cashout-label{display:block;line-height:1;transform:translateY(-.25px)}
-.game-cashout-dollar{position:absolute;left:15px;top:50%;display:flex;width:14px;height:14px;align-items:center;justify-content:center;font-size:.92rem;line-height:1;transform:translateY(-50%)}
+.game-cashout-label{position:absolute;left:50%;top:50%;display:block;line-height:1;transform:translate(-50%,-50%)}
+.game-cashout-dollar{position:absolute;left:12px;top:50%;display:flex;width:14px;height:14px;align-items:center;justify-content:center;font-size:.94rem;line-height:1;transform:translateY(-50%)}
 .game-cashout-hint{font-size:.72rem;line-height:1.25}
 .game-result-btn{min-height:38px;padding:0 12px;font-size:.76rem;line-height:1}
 .game-result-btn--play{padding:0 12px!important;font-size:.78rem!important}
 @media(max-width:768px){
-    .game-viewport--mobile .game-cashout-btn{width:132px;height:44px;min-height:44px;padding:0!important;font-size:1rem!important}
-    .game-viewport--mobile .game-cashout-dollar{left:16px;font-size:.94rem}
+    .game-viewport--mobile .game-cashout-btn{width:110px;height:40px;min-height:40px;padding:0!important;font-size:1rem!important}
+    .game-viewport--mobile .game-cashout-dollar{left:12px;font-size:.94rem}
     .game-viewport--mobile .game-result-btn{min-height:42px;font-size:.8rem}
     .game-viewport--mobile .game-result-btn--play{font-size:.82rem!important}
 }

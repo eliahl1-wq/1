@@ -142,7 +142,7 @@ export class SlitherRenderer {
         this.ctx.imageSmoothingQuality = 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
         // which gives crisp, well-antialiased snake edges instead of upscaled-blurry ones.
-        this._bodySS = this.isMobile ? 1.5 : 2;
+        this._bodySS = this.isMobile ? 1.75 : 2;
         this.state = { snakes: [], food: [], you: null, worldHalf: 2400, zone: null, minimap: [], circularMap: true };
         // Latest authoritative snakes from the server + smoothed render copies (interpolation)
         this.targetSnakes = [];
@@ -306,10 +306,10 @@ export class SlitherRenderer {
     _pickDpr() {
         if (this._fixedDpr > 0) return this._fixedDpr;
         const rawDpr = window.devicePixelRatio || 1;
-        const pixelBudgetDpr = Math.sqrt(2_400_000 / Math.max(1, (this.W || window.innerWidth) * (this.H || window.innerHeight)));
+        const pixelBudgetDpr = Math.sqrt(3_200_000 / Math.max(1, (this.W || window.innerWidth) * (this.H || window.innerHeight)));
         // Keep phones crisp while preventing tablets and desktop canvases from exceeding the GPU budget.
         return this.isMobile
-            ? Math.max(1, Math.min(1.6, rawDpr, pixelBudgetDpr))
+            ? Math.max(1, Math.min(2, rawDpr, pixelBudgetDpr))
             : Math.min(1.5, rawDpr);
     }
 
@@ -2245,7 +2245,7 @@ export class SlitherRenderer {
 
         this._applyCanvasDpr(this.W, this.H);
 
-        if (this._quality >= 0.9 && !this.isMobile) {
+        if (this._quality >= 0.9) {
             this.ctx.imageSmoothingQuality = 'high';
         } else if (this._quality < 0.65) {
             this.ctx.imageSmoothingQuality = 'low';
