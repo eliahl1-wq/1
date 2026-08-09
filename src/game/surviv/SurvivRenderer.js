@@ -42,6 +42,22 @@ const WEAPON_FIRE_RATE = {
     assault: 150, dmr: 350, sniper: 1400, lmg: 110,
 };
 
+const MELEE_ANIMATION_MS = 280;
+
+const smoothstep01 = (value) => {
+    const t = clamp(value, 0, 1);
+    return t * t * (3 - 2 * t);
+};
+
+function meleeStrikeMotion(progress, windupEnd = 0.18, contactAt = 0.46) {
+    const t = clamp(progress, 0, 1);
+    if (t < windupEnd) return -0.16 * smoothstep01(t / windupEnd);
+    if (t < contactAt) {
+        return -0.16 + 1.16 * smoothstep01((t - windupEnd) / (contactAt - windupEnd));
+    }
+    return 1 - smoothstep01((t - contactAt) / (1 - contactAt));
+}
+
 const WEAPON_SHAKE = {
     fists: 0, knife: 0.25, pistol: 0.3, revolver: 0.8, smg: 0.15, shotgun: 1.0,
     assault: 0.3, dmr: 0.6, sniper: 1.4, lmg: 0.25,
@@ -1065,18 +1081,27 @@ export class SurvivRenderer {
         const withLocalClocks = (player) => {
             if (!player) return null;
             const meleeRemainingMs = Number(player.meleeRemainingMs) || 0;
+            const meleeHand = player.meleeHand || 'top';
+            const previousPlayer = this._playersById.get(player.id);
+            const continuingMelee = meleeRemainingMs > 0
+                && previousPlayer?.meleeUntil > receivedAt
+                && previousPlayer.meleeStartedAt > 0
+                && previousPlayer.meleeHand === meleeHand
+                && previousPlayer.weapon === player.weapon;
+            const estimatedMeleeStartedAt = receivedAt
+                - Math.max(0, MELEE_ANIMATION_MS - meleeRemainingMs);
             return {
                 ...player,
                 reloadEndAtLocal: player.reloading
                     ? receivedAt + Math.max(0, Number(player.reloadRemainingMs) || 0)
                     : 0,
                 meleeStartedAt: meleeRemainingMs > 0
-                    ? receivedAt - Math.max(0, 280 - meleeRemainingMs)
+                    ? continuingMelee ? previousPlayer.meleeStartedAt : estimatedMeleeStartedAt
                     : player.meleeStartedAt || 0,
                 meleeUntil: meleeRemainingMs > 0
-                    ? receivedAt + meleeRemainingMs
+                    ? continuingMelee ? previousPlayer.meleeUntil : estimatedMeleeStartedAt + MELEE_ANIMATION_MS
                     : player.meleeUntil || 0,
-                meleeHand: player.meleeHand || 'top',
+                meleeHand,
             };
         };
 
@@ -3387,6 +3412,8 @@ export class SurvivRenderer {
                 mansion: { main: '#596168', dark: '#474f55', line: 'rgba(215,228,232,0.07)' },
                 warehouse: { main: '#515e64', dark: '#414c52', line: 'rgba(200,220,228,0.07)' },
                 ironworks: { main: '#3f4a4f', dark: '#293237', line: 'rgba(190,218,226,0.11)' },
+                brick: { main: '#6c625b', dark: '#514943', line: 'rgba(235,213,190,0.08)' },
+                lodge: { main: '#625c4d', dark: '#48443a', line: 'rgba(227,218,180,0.08)' },
             };
             const fc = floorColors[o.variant] || { main: '#62676a', dark: '#50565a', line: 'rgba(215,225,228,0.06)' };
             const floorGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
@@ -3491,6 +3518,8 @@ export class SurvivRenderer {
                 warehouse: { main: '#48565e', dark: '#374249', highlight: 'rgba(160,185,200,0.10)' },
                 metal: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
                 ironworks: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
+                brick: { main: '#835447', dark: '#5d3931', highlight: 'rgba(235,194,169,0.13)' },
+                lodge: { main: '#53614b', dark: '#354137', highlight: 'rgba(203,220,177,0.12)' },
             };
             const wc = wallColors[o.variant] || { main: '#596268', dark: '#424b50', highlight: 'rgba(208,224,230,0.11)' };
             const wallGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
@@ -3521,6 +3550,29 @@ export class SurvivRenderer {
                         ctx.beginPath();
                         ctx.moveTo(bx, -o.h / 2 + 3);
                         ctx.lineTo(bx, o.h / 2 - 3);
+                        ctx.stroke();
+                    }
+                }
+            } else if (o.variant === 'brick') {
+                ctx.strokeStyle = 'rgba(38, 20, 16, 0.20)';
+                ctx.lineWidth = 0.9;
+                const course = 12;
+                if (o.w > o.h) {
+                    for (let bx = -o.w / 2 + 16; bx < o.w / 2; bx += 32) {
+                        ctx.beginPath();
+                        ctx.moveTo(bx, -o.h / 2 + 2);
+                        ctx.lineTo(bx, o.h / 2 - 2);
+                        ctx.stroke();
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(-o.w / 2 + 2, 0);
+                    ctx.lineTo(o.w / 2 - 2, 0);
+                    ctx.stroke();
+                } else {
+                    for (let by = -o.h / 2 + course; by < o.h / 2; by += course) {
+                        ctx.beginPath();
+                        ctx.moveTo(-o.w / 2 + 2, by);
+                        ctx.lineTo(o.w / 2 - 2, by);
                         ctx.stroke();
                     }
                 }
@@ -5598,23 +5650,34 @@ export class SurvivRenderer {
             const punching = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const thrust = punching ? Math.sin(progress * Math.PI) : 0;
+            const strike = punching ? meleeStrikeMotion(progress, 0.2, 0.46) : 0;
+            const extension = Math.max(0, strike);
             const leadTop = meleeHand !== 'bottom';
+            const leadSide = leadTop ? -1 : 1;
 
-            // Keep one fist planted while the other punches; each melee attack
-            // alternates hands on the server so it reads as one clean swing.
-            const idleReach = r * 0.76;
-            const punchReach = idleReach + r * 0.98 * thrust;
-            const topReach = leadTop ? punchReach : idleReach;
-            const bottomReach = leadTop ? idleReach : punchReach;
+            // The rear hand remains a stable guard while the lead hand pulls
+            // back, snaps forward, and eases home. Keeping the hand radius
+            // constant avoids the size flicker that made punches look shaky.
+            const guardReach = r * 0.7;
+            const leadReach = r * 0.74 + r * 1.04 * strike;
+            const leadY = leadSide * (6.5 - extension * 2.1);
+            const guardY = -leadSide * 7;
+            const topHand = leadTop
+                ? { x: leadReach, y: leadY, lead: true }
+                : { x: guardReach, y: guardY, lead: false };
+            const bottomHand = leadTop
+                ? { x: guardReach, y: guardY, lead: false }
+                : { x: leadReach, y: leadY, lead: true };
 
-            if (punching && thrust > 0.12) {
+            if (punching && extension > 0.18) {
                 ctx.save();
-                ctx.globalAlpha = thrust * 0.48;
-                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-                ctx.lineWidth = 2.5;
+                ctx.globalAlpha = extension * 0.34;
+                ctx.strokeStyle = 'rgba(224, 241, 235, 0.72)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
                 ctx.beginPath();
-                ctx.arc(r * 0.66, leadTop ? -7 : 7, r * (0.72 + thrust * 0.35), -0.5, 0.5);
+                ctx.moveTo(r * 0.78, leadY);
+                ctx.lineTo(leadReach - r * 0.2, leadY);
                 ctx.stroke();
                 ctx.restore();
             }
@@ -5624,16 +5687,19 @@ export class SurvivRenderer {
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(r * 0.3, -6);
-            ctx.lineTo(topReach, -6);
+            ctx.lineTo(topHand.x, topHand.y);
             ctx.moveTo(r * 0.3, 6);
-            ctx.lineTo(bottomReach, 6);
+            ctx.lineTo(bottomHand.x, bottomHand.y);
             ctx.stroke();
-            ctx.fillStyle = playerColor;
-            ctx.strokeStyle = 'rgba(255,255,255,0.34)';
-            ctx.lineWidth = punching ? 2 : 1.5;
-            for (const hand of [{ x: topReach, y: -6 }, { x: bottomReach, y: 6 }]) {
+
+            for (const hand of [topHand, bottomHand]) {
+                ctx.fillStyle = playerColor;
+                ctx.strokeStyle = hand.lead && punching
+                    ? 'rgba(255,255,255,0.62)'
+                    : 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = hand.lead && punching ? 1.9 : 1.5;
                 ctx.beginPath();
-                ctx.arc(hand.x, hand.y, punching ? 6.2 : 5.5, 0, Math.PI * 2);
+                ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
@@ -5642,29 +5708,98 @@ export class SurvivRenderer {
 
         if (weapon === 'knife') {
             const now = this._frameNow;
-            const swinging = meleeUntil > now && meleeStartedAt > 0;
+            const stabbing = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
-            const progress = swinging ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const swing = swinging ? Math.sin(progress * Math.PI) : 0;
-            ctx.save();
-            ctx.rotate(-0.35 + swing * 0.95);
-            ctx.strokeStyle = '#dbeafe';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(r * 0.28, 1);
-            ctx.lineTo(r * 1.5, -2);
-            ctx.stroke();
-            ctx.strokeStyle = '#7c4a21';
+            const progress = stabbing ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
+            const stab = stabbing ? meleeStrikeMotion(progress, 0.22, 0.43) : 0;
+            const extension = Math.max(0, stab);
+            const weaponOffsetX = r * (0.16 + stab * 0.92);
+            const weaponOffsetY = 3.5 - extension * 1.8;
+            const knifeAngle = -0.08 + Math.max(0, -stab) * 0.32 - extension * 0.035;
+            const knifeHand = { x: weaponOffsetX + r * 0.28, y: weaponOffsetY + 0.5 };
+            const guardHand = { x: r * 0.58, y: -7 };
+
+            // A straight highlight makes the attack read as a stab instead of
+            // the old wide rotation, without adding particles every frame.
+            if (stabbing && extension > 0.2) {
+                ctx.save();
+                ctx.globalAlpha = extension * 0.38;
+                ctx.strokeStyle = '#d8f2ff';
+                ctx.lineWidth = 3.2;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(r * 1.2, weaponOffsetY);
+                ctx.lineTo(r * (1.55 + extension * 0.9), weaponOffsetY);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
             ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(r * 0.15, 2);
-            ctx.lineTo(r * 0.43, 1);
+            ctx.moveTo(r * 0.28, 5.5);
+            ctx.lineTo(knifeHand.x, knifeHand.y);
+            ctx.moveTo(r * 0.28, -5.5);
+            ctx.lineTo(guardHand.x, guardHand.y);
             ctx.stroke();
-            ctx.fillStyle = playerColor;
+
+            ctx.save();
+            ctx.translate(weaponOffsetX, weaponOffsetY);
+            ctx.rotate(knifeAngle);
+
+            // Handle and guard.
+            ctx.strokeStyle = '#3a2417';
+            ctx.lineWidth = 6.5;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.arc(r * 0.12, 5, 5.7, 0, Math.PI * 2);
+            ctx.moveTo(r * 0.08, 0.8);
+            ctx.lineTo(r * 0.55, 0.2);
+            ctx.stroke();
+            ctx.strokeStyle = '#c69252';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(r * 0.54, -5);
+            ctx.lineTo(r * 0.57, 5);
+            ctx.stroke();
+
+            // Tapered steel blade with a bright spine and dark cutting edge.
+            const bladeStart = r * 0.56;
+            const bladeEnd = r * 1.92;
+            const bladeTip = r * 2.08;
+            // A solid blade plus a drawn highlight keeps this cheap for every
+            // visible player, unlike allocating a new gradient each frame.
+            ctx.fillStyle = '#aebfc6';
+            ctx.strokeStyle = '#26343b';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(bladeStart, -3.6);
+            ctx.lineTo(bladeEnd, -2.5);
+            ctx.lineTo(bladeTip, 0);
+            ctx.lineTo(bladeEnd, 3.2);
+            ctx.lineTo(bladeStart, 3.5);
+            ctx.closePath();
             ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,255,255,0.78)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(bladeStart + 2, -2.2);
+            ctx.lineTo(bladeEnd, -1.4);
+            ctx.stroke();
             ctx.restore();
+
+            for (const hand of [guardHand, knifeHand]) {
+                ctx.fillStyle = playerColor;
+                ctx.strokeStyle = hand === knifeHand && stabbing
+                    ? 'rgba(255,255,255,0.58)'
+                    : 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1.7;
+                ctx.beginPath();
+                ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
             return;
         }
 
@@ -6043,6 +6178,136 @@ export class SurvivRenderer {
             roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 6);
             ctx.stroke();
 
+        } else if (variant === 'brick') {
+            // --- MOTEL / BRICK SHOP: low flat roof with a raised masonry parapet ---
+            const roofGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            roofGrad.addColorStop(0, '#72584d');
+            roofGrad.addColorStop(0.52, '#4b3c37');
+            roofGrad.addColorStop(1, '#665046');
+            ctx.fillStyle = roofGrad;
+            roundRect(ctx, -hw - 4, -hh - 4, o.w + 8, o.h + 8, 5);
+            ctx.fill();
+
+            ctx.save();
+            roundRect(ctx, -hw, -hh, o.w, o.h, 3);
+            ctx.clip();
+            ctx.strokeStyle = 'rgba(25, 15, 12, 0.20)';
+            ctx.lineWidth = 1;
+            for (let yy = -hh + 14; yy < hh; yy += 14) {
+                ctx.beginPath();
+                ctx.moveTo(-hw, yy);
+                ctx.lineTo(hw, yy);
+                ctx.stroke();
+            }
+            for (let yy = -hh + 14, row = 0; yy < hh; yy += 14, row++) {
+                const offset = row % 2 ? 14 : 0;
+                for (let xx = -hw + offset; xx < hw; xx += 28) {
+                    ctx.beginPath();
+                    ctx.moveTo(xx, yy - 14);
+                    ctx.lineTo(xx, yy);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+
+            ctx.strokeStyle = '#3b2822';
+            ctx.lineWidth = 10;
+            roundRect(ctx, -hw - 1, -hh - 1, o.w + 2, o.h + 2, 4);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(231, 185, 155, 0.24)';
+            ctx.lineWidth = 2;
+            roundRect(ctx, -hw + 6, -hh + 6, o.w - 12, o.h - 12, 2);
+            ctx.stroke();
+
+            // Static roof equipment keeps every motel wing recognizable while
+            // remaining fully compatible with the existing roof sprite cache.
+            const unitCount = o.w >= 500 ? 2 : 1;
+            for (let i = 0; i < unitCount; i++) {
+                const ux = unitCount === 1 ? hw * 0.25 : (i === 0 ? -hw * 0.35 : hw * 0.35);
+                const uy = -hh * 0.12;
+                ctx.fillStyle = 'rgba(0,0,0,0.27)';
+                roundRect(ctx, ux - 22 + 4, uy - 15 + 5, 44, 30, 4);
+                ctx.fill();
+                ctx.fillStyle = '#657176';
+                ctx.strokeStyle = '#272f32';
+                ctx.lineWidth = 2.5;
+                roundRect(ctx, ux - 22, uy - 15, 44, 30, 4);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(20,27,29,0.7)';
+                ctx.lineWidth = 1.5;
+                for (let sx = ux - 14; sx <= ux + 14; sx += 7) {
+                    ctx.beginPath();
+                    ctx.moveTo(sx, uy - 9);
+                    ctx.lineTo(sx, uy + 9);
+                    ctx.stroke();
+                }
+            }
+
+            if (o.role === 'reception') {
+                ctx.fillStyle = 'rgba(47, 22, 18, 0.92)';
+                ctx.strokeStyle = '#d19a62';
+                ctx.lineWidth = 2.5;
+                roundRect(ctx, -82, -18, 164, 36, 5);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#f3d7a1';
+                ctx.font = '900 16px ui-sans-serif, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('SUNSET MOTEL', 0, 1);
+            }
+
+        } else if (variant === 'lodge') {
+            // --- RANGER LODGE: muted green standing-seam roof ---
+            const lodgeGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            lodgeGrad.addColorStop(0, '#596b55');
+            lodgeGrad.addColorStop(0.5, '#34463b');
+            lodgeGrad.addColorStop(1, '#52634e');
+            ctx.fillStyle = lodgeGrad;
+            roundRect(ctx, -hw - 6, -hh - 5, o.w + 12, o.h + 10, 6);
+            ctx.fill();
+
+            ctx.save();
+            roundRect(ctx, -hw - 2, -hh - 2, o.w + 4, o.h + 4, 4);
+            ctx.clip();
+            const seamStep = 30;
+            for (let xx = -hw + seamStep; xx < hw; xx += seamStep) {
+                ctx.strokeStyle = 'rgba(14, 27, 20, 0.35)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(xx, -hh);
+                ctx.lineTo(xx, hh);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(223, 236, 206, 0.10)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(xx + 2, -hh);
+                ctx.lineTo(xx + 2, hh);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            const skyW = Math.min(74, o.w * 0.18);
+            const skyH = Math.min(42, o.h * 0.20);
+            ctx.fillStyle = 'rgba(74, 132, 142, 0.66)';
+            ctx.strokeStyle = '#213137';
+            ctx.lineWidth = 3;
+            roundRect(ctx, -skyW / 2, -skyH / 2, skyW, skyH, 4);
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(224, 246, 239, 0.28)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-skyW * 0.35, -skyH * 0.25);
+            ctx.lineTo(skyW * 0.18, skyH * 0.25);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#23332a';
+            ctx.lineWidth = 4;
+            roundRect(ctx, -hw - 6, -hh - 5, o.w + 12, o.h + 10, 6);
+            ctx.stroke();
+
         } else if (variant === 'mansion' || variant === 'guesthouse') {
             // --- MANSION & GUESTHOUSE: Elegant Slate Tiles ---
             const baseColor = variant === 'mansion' ? '#434c54' : '#495b6c';
@@ -6418,7 +6683,7 @@ export class SurvivRenderer {
 
         // One restrained steel inset ties old houses to the newer landmarks
         // without adding noisy roof props or another expensive texture pass.
-        if (variant !== 'ironworks') {
+        if (variant !== 'ironworks' && variant !== 'brick') {
             ctx.strokeStyle = 'rgba(202, 220, 226, 0.18)';
             ctx.lineWidth = 1.5;
             roundRect(ctx, -hw + 5, -hh + 5, o.w - 10, o.h - 10, 4);
@@ -6426,7 +6691,7 @@ export class SurvivRenderer {
         }
 
         // --- RIDGE LINE ---
-        if (variant !== 'ironworks') {
+        if (variant !== 'ironworks' && variant !== 'brick') {
             const ridgeColor = variant === 'warehouse' ? '#8b9aa0' : variant === 'mansion' ? '#7f9098' : variant === 'barn' ? '#d3dcdf' : '#89989e';
             ctx.strokeStyle = ridgeColor;
             ctx.lineWidth = 4;
