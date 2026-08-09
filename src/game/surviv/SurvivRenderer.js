@@ -68,6 +68,39 @@ const WEAPON_BULLET_SPEED = {
     assault: 42, dmr: 48, sniper: 58, lmg: 40,
 };
 
+const WEAPON_MUZZLE_SCALE = Object.freeze({
+    pistol: 1.30,
+    revolver: 1.48,
+    smg: 1.68,
+    shotgun: 2.12,
+    assault: 2.02,
+    dmr: 2.38,
+    sniper: 2.72,
+    lmg: 2.28,
+});
+
+function weaponMuzzleDistance(weapon, playerRadius = 14) {
+    return playerRadius * (WEAPON_MUZZLE_SCALE[weapon] || 1.3);
+}
+
+function drawGunPart(ctx, x, y, w, h, fill, radius = 1.6, stroke = '#11181b', lineWidth = 1.15) {
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineWidth;
+    roundRect(ctx, x, y, w, h, radius);
+    ctx.fill();
+    ctx.stroke();
+}
+
+function drawGunHighlight(ctx, x1, y1, x2, y2, alpha = 0.32) {
+    ctx.strokeStyle = `rgba(231, 242, 242, ${alpha})`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+}
+
 const WEAPON_BULLET_SPECS = {
     shotgun: {
         trailLen: 12,
@@ -1355,7 +1388,7 @@ export class SurvivRenderer {
                 this.cameraShake.intensity += shakeAmt;
                 // Spawn muzzle flash particles
                 const angle = me.angle || 0;
-                const barrelDist = me.weapon === 'sniper' ? 38 : me.weapon === 'shotgun' ? 30 : 24;
+                const barrelDist = weaponMuzzleDistance(me.weapon);
                 const bx = me.x + Math.cos(angle) * barrelDist;
                 const by = me.y + Math.sin(angle) * barrelDist;
                 // Predict a short local tracer immediately. A close-range shot can
@@ -5547,7 +5580,7 @@ export class SurvivRenderer {
 
         // Muzzle flash on self
         if (isMe && this._muzzleFlash > 0.1) {
-            const barrelDist = p.weapon === 'sniper' ? r * 2.2 : p.weapon === 'shotgun' ? r * 1.5 : r * 1.1;
+            const barrelDist = weaponMuzzleDistance(p.weapon, r);
             ctx.save();
             ctx.globalAlpha = this._muzzleFlash * 0.9;
             const flashGrad = ctx.createRadialGradient(barrelDist, 0, 1, barrelDist, 0, 12);
@@ -5638,7 +5671,7 @@ export class SurvivRenderer {
         }
     }
 
-    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8', walkBob = 0, meleeHand = 'top') {
+    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8', walkBob = 0, _meleeHand = 'top') {
         ctx.fillStyle = '#222823';
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
@@ -5652,22 +5685,15 @@ export class SurvivRenderer {
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const strike = punching ? meleeStrikeMotion(progress, 0.2, 0.46) : 0;
             const extension = Math.max(0, strike);
-            const leadTop = meleeHand !== 'bottom';
-            const leadSide = leadTop ? -1 : 1;
 
-            // The rear hand remains a stable guard while the lead hand pulls
-            // back, snaps forward, and eases home. Keeping the hand radius
-            // constant avoids the size flicker that made punches look shaky.
+            // One dedicated hand throws one readable punch. The lower hand is
+            // always a guard, so repeated attacks never resemble a two-hit
+            // alternating combo.
             const guardReach = r * 0.7;
             const leadReach = r * 0.74 + r * 1.04 * strike;
-            const leadY = leadSide * (6.5 - extension * 2.1);
-            const guardY = -leadSide * 7;
-            const topHand = leadTop
-                ? { x: leadReach, y: leadY, lead: true }
-                : { x: guardReach, y: guardY, lead: false };
-            const bottomHand = leadTop
-                ? { x: guardReach, y: guardY, lead: false }
-                : { x: leadReach, y: leadY, lead: true };
+            const leadY = -7 + extension * 3.1;
+            const topHand = { x: leadReach, y: leadY, lead: true };
+            const bottomHand = { x: guardReach, y: 7, lead: false };
 
             if (punching && extension > 0.18) {
                 ctx.save();
@@ -5679,6 +5705,22 @@ export class SurvivRenderer {
                 ctx.moveTo(r * 0.78, leadY);
                 ctx.lineTo(leadReach - r * 0.2, leadY);
                 ctx.stroke();
+                ctx.restore();
+            }
+
+            if (punching && extension > 0.9) {
+                const impactAlpha = (extension - 0.9) * 5.5;
+                ctx.save();
+                ctx.globalAlpha = impactAlpha;
+                ctx.strokeStyle = 'rgba(255, 232, 162, 0.9)';
+                ctx.lineWidth = 1.8;
+                ctx.lineCap = 'round';
+                for (const offsetY of [-6, 0, 6]) {
+                    ctx.beginPath();
+                    ctx.moveTo(leadReach + 7, leadY + offsetY * 0.45);
+                    ctx.lineTo(leadReach + 12, leadY + offsetY);
+                    ctx.stroke();
+                }
                 ctx.restore();
             }
 
@@ -5811,56 +5853,265 @@ export class SurvivRenderer {
         ctx.rotate(bobAngle);
 
         if (weapon === 'shotgun') {
-            roundRect(ctx, r * 0.25, -3, r * 1.35, 6, 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = '#8c5b2f';
-            ctx.fillRect(r * 0.3, 2, 10, 4);
-            hands = [{ x: r * 0.4, y: -4.5 }, { x: r * 1.1, y: 4.5 }];
-        } else if (weapon === 'smg') {
-            roundRect(ctx, r * 0.2, -4, r * 1.0, 8, 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillRect(r * 0.68, 3, 5, 8);
-            hands = [{ x: r * 0.35, y: -4.5 }, { x: r * 0.9, y: 4.5 }];
-        } else if (weapon === 'assault' || weapon === 'dmr') {
-            roundRect(ctx, r * 0.2, -4, r * (weapon === 'dmr' ? 1.8 : 1.55), 8, 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillRect(r * 0.58, 3, 7, 9);
-            if (weapon === 'dmr') ctx.fillRect(r * 1.25, -8, 10, 3);
-            hands = [{ x: r * 0.4, y: -5 }, { x: r * (weapon === 'dmr' ? 1.35 : 1.2), y: 5 }];
-        } else if (weapon === 'sniper') {
-            roundRect(ctx, r * 0.16, -3, r * 2.05, 6, 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = '#4a545a';
-            ctx.fillRect(r * 0.65, -9, 18, 4);
-            hands = [{ x: r * 0.35, y: -4.5 }, { x: r * 1.45, y: 4.5 }];
-        } else if (weapon === 'lmg') {
-            roundRect(ctx, r * 0.12, -5, r * 1.75, 10, 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillRect(r * 0.5, 5, 12, 10);
-            ctx.fillRect(r * 1.22, -2, 16, 4);
-            hands = [{ x: r * 0.35, y: -5.5 }, { x: r * 1.3, y: 5.5 }];
-        } else if (weapon === 'revolver') {
-            roundRect(ctx, r * 0.22, -3, r * 0.98, 6, 2);
-            ctx.fill();
-            ctx.stroke();
+            // Pump shotgun: walnut stock, steel receiver, ribbed fore-end and long barrel.
+            ctx.fillStyle = '#744522';
+            ctx.strokeStyle = '#2d1b10';
+            ctx.lineWidth = 1.2;
             ctx.beginPath();
-            ctx.arc(r * 0.42, 0, 5, 0, Math.PI * 2);
+            ctx.moveTo(1, -4.2);
+            ctx.lineTo(8.5, -3.5);
+            ctx.lineTo(11, 1.2);
+            ctx.lineTo(5, 5.6);
+            ctx.lineTo(0, 4.1);
+            ctx.closePath();
+            ctx.fill();
             ctx.stroke();
-            hands = [{ x: r * 0.45, y: -4.5 }, { x: r * 0.55, y: 4.5 }];
+            drawGunHighlight(ctx, 2.5, -2.9, 8, -2.2, 0.24);
+            drawGunPart(ctx, 8, -4.1, 10, 8.2, '#30383b', 1.6);
+            drawGunPart(ctx, 16.5, -2.6, 12.2, 5.2, '#222a2e', 1.2);
+            drawGunPart(ctx, 28, -3.2, 2.3, 6.4, '#0d1214', 0.8);
+            drawGunPart(ctx, 17, 1.4, 8.5, 4.8, '#8b572d', 1.5, '#352012');
+            ctx.strokeStyle = 'rgba(35,20,10,0.62)';
+            ctx.lineWidth = 0.8;
+            for (let x = 19; x <= 23; x += 2) {
+                ctx.beginPath();
+                ctx.moveTo(x, 2);
+                ctx.lineTo(x, 5.3);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#aeb9bc';
+            ctx.fillRect(24, -3.7, 1.6, 1.2);
+            hands = [{ x: 10.5, y: -5.1 }, { x: 20.5, y: 5.3 }];
+        } else if (weapon === 'smg') {
+            // Compact SMG: folding stock, polymer receiver and curved magazine.
+            ctx.strokeStyle = '#1a2225';
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(1, -3.5);
+            ctx.lineTo(7, -6.2);
+            ctx.lineTo(8.5, -2.5);
+            ctx.moveTo(1, 3.5);
+            ctx.lineTo(7, 6.2);
+            ctx.lineTo(8.5, 2.5);
+            ctx.stroke();
+            drawGunPart(ctx, 6.5, -4.5, 12.5, 9, '#2b3738', 2);
+            drawGunPart(ctx, 17.5, -2.6, 5.4, 5.2, '#192225', 1.1);
+            drawGunPart(ctx, 22.3, -3.1, 1.8, 6.2, '#0d1315', 0.7);
+            ctx.fillStyle = '#202b2e';
+            ctx.strokeStyle = '#101719';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(11.5, 3.2);
+            ctx.lineTo(17, 3.2);
+            ctx.lineTo(15.4, 12.2);
+            ctx.lineTo(11.3, 11.2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            drawGunPart(ctx, 17, 2.2, 3.1, 7.5, '#263134', 1);
+            drawGunPart(ctx, 10, -7, 6.8, 2.4, '#59676b', 1);
+            drawGunHighlight(ctx, 8.5, -3.1, 17, -3.1, 0.34);
+            hands = [{ x: 9.5, y: -5.2 }, { x: 18.3, y: 5.2 }];
+        } else if (weapon === 'assault' || weapon === 'dmr') {
+            const isDmr = weapon === 'dmr';
+            const receiverColor = isDmr ? '#4a4335' : '#303b39';
+            const stockColor = isDmr ? '#795633' : '#26332f';
+            const receiverEnd = isDmr ? 18.5 : 17;
+            const handguardEnd = isDmr ? 29.5 : 25.5;
+            const muzzleX = isDmr ? 33.3 : 28.3;
+
+            // Tapered shoulder stock keeps the rifle anchored against the body.
+            ctx.fillStyle = stockColor;
+            ctx.strokeStyle = '#151d1b';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(0.5, -5);
+            ctx.lineTo(8.5, -3.8);
+            ctx.lineTo(10.5, 2.8);
+            ctx.lineTo(3.5, 5.5);
+            ctx.lineTo(0.5, 3.8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            drawGunPart(ctx, 7.5, -4.7, receiverEnd - 7.5, 9.4, receiverColor, 1.8);
+            drawGunPart(ctx, receiverEnd - 1, -3.3, handguardEnd - receiverEnd + 2, 6.6, isDmr ? '#514a3a' : '#293537', 1.2);
+            drawGunPart(ctx, handguardEnd, -1.8, muzzleX - handguardEnd, 3.6, '#151d20', 0.8);
+            drawGunPart(ctx, muzzleX - 0.8, -2.7, 2, 5.4, '#0c1113', 0.7);
+
+            // Curved detachable magazine and pistol grip.
+            ctx.fillStyle = isDmr ? '#3b3429' : '#1c2726';
+            ctx.strokeStyle = '#101615';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(11.2, 3.5);
+            ctx.lineTo(16.8, 3.5);
+            ctx.lineTo(16, 11.6);
+            ctx.lineTo(12.2, 13);
+            ctx.lineTo(10.7, 8.8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            drawGunPart(ctx, 7.2, 2.3, 3.7, 8, stockColor, 1.2);
+            drawGunHighlight(ctx, 9, -3.3, handguardEnd - 1.5, -2.2, 0.3);
+
+            if (isDmr) {
+                drawGunPart(ctx, 12, -9, 12.5, 3.3, '#1b2427', 1.4);
+                ctx.fillStyle = '#6f858a';
+                ctx.beginPath();
+                ctx.arc(13, -7.35, 2.5, 0, Math.PI * 2);
+                ctx.arc(23.5, -7.35, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#18282e';
+                ctx.beginPath();
+                ctx.arc(13, -7.35, 1.4, 0, Math.PI * 2);
+                ctx.arc(23.5, -7.35, 1.4, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                drawGunPart(ctx, 13, -7.1, 6.5, 2.3, '#667478', 0.9);
+            }
+            hands = [{ x: 9.5, y: -5.4 }, { x: isDmr ? 23.5 : 20.5, y: 5.2 }];
+        } else if (weapon === 'sniper') {
+            // Bolt-action sniper: skeleton stock, long free-floating barrel and optic.
+            ctx.fillStyle = '#303b3d';
+            ctx.strokeStyle = '#12191b';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(0.5, -5.2);
+            ctx.lineTo(9, -3.2);
+            ctx.lineTo(10, 2.5);
+            ctx.lineTo(3, 6);
+            ctx.lineTo(0.5, 4.1);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#172022';
+            ctx.beginPath();
+            ctx.moveTo(3.2, -2.5);
+            ctx.lineTo(7.2, -1.7);
+            ctx.lineTo(7.5, 1.5);
+            ctx.lineTo(4, 3.1);
+            ctx.closePath();
+            ctx.fill();
+            drawGunPart(ctx, 8, -4.1, 11.5, 8.2, '#465256', 1.7);
+            drawGunPart(ctx, 18.5, -2.7, 14.8, 5.4, '#252e32', 1.1);
+            drawGunPart(ctx, 32.5, -1.55, 4.4, 3.1, '#111719', 0.6);
+            drawGunPart(ctx, 36.3, -2.5, 2.4, 5, '#080d0f', 0.7);
+            drawGunPart(ctx, 11, -9.2, 15.5, 3.8, '#202a2e', 1.5);
+            ctx.fillStyle = '#70868d';
+            ctx.strokeStyle = '#162126';
+            ctx.lineWidth = 1;
+            for (const sx of [11.5, 25.5]) {
+                ctx.beginPath();
+                ctx.arc(sx, -7.3, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#17313a';
+                ctx.beginPath();
+                ctx.arc(sx, -7.3, 1.6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#70868d';
+            }
+            drawGunPart(ctx, 12.2, 3, 4.2, 9.5, '#293438', 1.2);
+            drawGunHighlight(ctx, 19, -1.8, 34.5, -1.1, 0.42);
+            hands = [{ x: 10, y: -5.1 }, { x: 24, y: 4.8 }];
+        } else if (weapon === 'lmg') {
+            // Belt-fed LMG: heavy receiver, box magazine and vented heat shield.
+            ctx.fillStyle = '#334039';
+            ctx.strokeStyle = '#131b18';
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.moveTo(0.2, -5.5);
+            ctx.lineTo(8, -4);
+            ctx.lineTo(9.5, 3.7);
+            ctx.lineTo(2.5, 6.2);
+            ctx.lineTo(0.2, 4.4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            drawGunPart(ctx, 7, -5.6, 13.5, 11.2, '#394649', 2);
+            drawGunPart(ctx, 19, -3.8, 9.8, 7.6, '#283335', 1.2);
+            drawGunPart(ctx, 27.8, -1.8, 3.6, 3.6, '#12191b', 0.7);
+            drawGunPart(ctx, 31, -2.7, 2.1, 5.4, '#090e10', 0.7);
+            drawGunPart(ctx, 8.5, 4.3, 10.5, 11.5, '#263033', 1.7);
+            ctx.fillStyle = '#546165';
+            ctx.strokeStyle = '#11181b';
+            ctx.lineWidth = 1;
+            for (let x = 21; x <= 26; x += 2.5) {
+                ctx.beginPath();
+                ctx.arc(x, 0, 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            drawGunPart(ctx, 11.5, -8.2, 8, 2.8, '#667579', 1);
+            drawGunHighlight(ctx, 9, -4.1, 27, -2.6, 0.3);
+            ctx.strokeStyle = '#1b2426';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(25.2, 3);
+            ctx.lineTo(22.5, 9.2);
+            ctx.moveTo(26.8, 3);
+            ctx.lineTo(29.5, 9.2);
+            ctx.stroke();
+            hands = [{ x: 9.5, y: -6 }, { x: 22.5, y: 5.7 }];
+        } else if (weapon === 'revolver') {
+            // Revolver: visible cylinder, hammer, ventilated barrel and wood grip.
+            drawGunPart(ctx, 7, -3.2, 13.5, 6.4, '#3f4a4e', 1.5);
+            drawGunPart(ctx, 18.8, -2.1, 2.3, 4.2, '#12191b', 0.7);
+            ctx.fillStyle = '#566368';
+            ctx.strokeStyle = '#131b1e';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(8.5, 0, 5.1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#202a2d';
+            for (let i = 0; i < 5; i++) {
+                const angle = (i / 5) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.arc(8.5 + Math.cos(angle) * 2.7, Math.sin(angle) * 2.7, 0.75, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.fillStyle = '#86532f';
+            ctx.strokeStyle = '#321e12';
+            ctx.beginPath();
+            ctx.moveTo(5, 3.2);
+            ctx.lineTo(11.5, 3.2);
+            ctx.lineTo(9.4, 12.2);
+            ctx.lineTo(4.5, 10.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#20292c';
+            ctx.beginPath();
+            ctx.moveTo(3.5, -3.1);
+            ctx.lineTo(5.5, -6.7);
+            ctx.lineTo(8, -3.3);
+            ctx.closePath();
+            ctx.fill();
+            drawGunHighlight(ctx, 12.5, -2, 19, -1.3, 0.46);
+            hands = [{ x: 6.4, y: -4.8 }, { x: 8.1, y: 5.2 }];
         } else if (weapon === 'pistol') {
-            roundRect(ctx, r * 0.25, -3, r * 0.82, 6, 2);
+            // Service pistol: separate slide, frame, sights and angled magazine grip.
+            drawGunPart(ctx, 5, -4.3, 12.8, 6.3, '#414d52', 1.5);
+            drawGunPart(ctx, 6, 1, 10.4, 3.1, '#242e31', 1.1);
+            drawGunPart(ctx, 16.8, -2.8, 1.7, 4.2, '#0d1315', 0.6);
+            ctx.fillStyle = '#283235';
+            ctx.strokeStyle = '#111719';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(7, 3.2);
+            ctx.lineTo(13.2, 3.2);
+            ctx.lineTo(11.1, 12);
+            ctx.lineTo(6.2, 11);
+            ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            hands = [{ x: r * 0.45, y: -4.5 }, { x: r * 0.55, y: 4.5 }];
+            ctx.fillStyle = '#a6b2b5';
+            ctx.fillRect(6.8, -5.3, 1.5, 1.2);
+            ctx.fillRect(15, -5.1, 1.4, 1.1);
+            drawGunHighlight(ctx, 7, -3.1, 15.8, -3.1, 0.43);
+            hands = [{ x: 7.2, y: -4.9 }, { x: 9.3, y: 5.2 }];
         } else {
-            roundRect(ctx, r * 0.25, -3, r * 0.82, 6, 2);
-            ctx.fill();
-            ctx.stroke();
+            drawGunPart(ctx, r * 0.25, -3, r * 0.82, 6, '#293337', 2);
             hands = [{ x: r * 0.4, y: -4.5 }, { x: r * 0.8, y: 4.5 }];
         }
 
