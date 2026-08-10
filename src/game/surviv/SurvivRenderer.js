@@ -5671,7 +5671,7 @@ export class SurvivRenderer {
         }
     }
 
-    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8', walkBob = 0, _meleeHand = 'top') {
+    drawWeapon(ctx, weapon, r, meleeStartedAt = 0, meleeUntil = 0, playerColor = '#77c7c8', walkBob = 0, meleeHand = 'top') {
         ctx.fillStyle = '#222823';
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
@@ -5686,43 +5686,22 @@ export class SurvivRenderer {
             const strike = punching ? meleeStrikeMotion(progress, 0.2, 0.46) : 0;
             const extension = Math.max(0, strike);
 
-            // One dedicated hand throws one readable punch. The lower hand is
-            // always a guard, so repeated attacks never resemble a two-hit
-            // alternating combo.
-            const guardReach = r * 0.7;
+            // The server alternates meleeHand for every accepted attack. Keep
+            // that hand active for the full animation instead of always using
+            // the upper hand. The slight inward curve makes the punch feel
+            // physical without a separate trail or impact effect.
+            const leadSide = meleeHand === 'bottom' ? 1 : -1;
+            const windup = Math.max(0, -strike);
             const leadReach = r * 0.74 + r * 1.04 * strike;
-            const leadY = -7 + extension * 3.1;
-            const topHand = { x: leadReach, y: leadY, lead: true };
-            const bottomHand = { x: guardReach, y: 7, lead: false };
-
-            if (punching && extension > 0.18) {
-                ctx.save();
-                ctx.globalAlpha = extension * 0.34;
-                ctx.strokeStyle = 'rgba(224, 241, 235, 0.72)';
-                ctx.lineWidth = 3;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(r * 0.78, leadY);
-                ctx.lineTo(leadReach - r * 0.2, leadY);
-                ctx.stroke();
-                ctx.restore();
-            }
-
-            if (punching && extension > 0.9) {
-                const impactAlpha = (extension - 0.9) * 5.5;
-                ctx.save();
-                ctx.globalAlpha = impactAlpha;
-                ctx.strokeStyle = 'rgba(255, 232, 162, 0.9)';
-                ctx.lineWidth = 1.8;
-                ctx.lineCap = 'round';
-                for (const offsetY of [-6, 0, 6]) {
-                    ctx.beginPath();
-                    ctx.moveTo(leadReach + 7, leadY + offsetY * 0.45);
-                    ctx.lineTo(leadReach + 12, leadY + offsetY);
-                    ctx.stroke();
-                }
-                ctx.restore();
-            }
+            const leadY = leadSide * (7 + windup * 5 - extension * 3.2);
+            const guardReach = r * (0.7 - extension * 0.06);
+            const guardY = -leadSide * (7 + extension * 0.7);
+            const topHand = leadSide < 0
+                ? { x: leadReach, y: leadY, lead: true }
+                : { x: guardReach, y: guardY, lead: false };
+            const bottomHand = leadSide > 0
+                ? { x: leadReach, y: leadY, lead: true }
+                : { x: guardReach, y: guardY, lead: false };
 
             ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
             ctx.lineWidth = 5;
@@ -5736,10 +5715,8 @@ export class SurvivRenderer {
 
             for (const hand of [topHand, bottomHand]) {
                 ctx.fillStyle = playerColor;
-                ctx.strokeStyle = hand.lead && punching
-                    ? 'rgba(255,255,255,0.62)'
-                    : 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = hand.lead && punching ? 1.9 : 1.5;
+                ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
+                ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
                 ctx.fill();
@@ -5755,34 +5732,21 @@ export class SurvivRenderer {
             const progress = stabbing ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const stab = stabbing ? meleeStrikeMotion(progress, 0.22, 0.43) : 0;
             const extension = Math.max(0, stab);
-            const weaponOffsetX = r * (0.16 + stab * 0.92);
-            const weaponOffsetY = 3.5 - extension * 1.8;
-            const knifeAngle = -0.08 + Math.max(0, -stab) * 0.32 - extension * 0.035;
-            const knifeHand = { x: weaponOffsetX + r * 0.28, y: weaponOffsetY + 0.5 };
-            const guardHand = { x: r * 0.58, y: -7 };
-
-            // A straight highlight makes the attack read as a stab instead of
-            // the old wide rotation, without adding particles every frame.
-            if (stabbing && extension > 0.2) {
-                ctx.save();
-                ctx.globalAlpha = extension * 0.38;
-                ctx.strokeStyle = '#d8f2ff';
-                ctx.lineWidth = 3.2;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(r * 1.2, weaponOffsetY);
-                ctx.lineTo(r * (1.55 + extension * 0.9), weaponOffsetY);
-                ctx.stroke();
-                ctx.restore();
-            }
+            const knifeSide = meleeHand === 'bottom' ? 1 : -1;
+            const windup = Math.max(0, -stab);
+            const weaponOffsetX = r * (0.12 + stab * 0.86);
+            const weaponOffsetY = knifeSide * (4.4 + windup * 3.5 - extension * 1.6);
+            const knifeAngle = knifeSide * (-0.055 - windup * 0.25 + extension * 0.025);
+            const knifeHand = { x: weaponOffsetX + r * 0.24, y: weaponOffsetY };
+            const guardHand = { x: r * (0.6 - extension * 0.04), y: -knifeSide * 7 };
 
             ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
             ctx.lineWidth = 5;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(r * 0.28, 5.5);
+            ctx.moveTo(r * 0.28, knifeSide * 5.5);
             ctx.lineTo(knifeHand.x, knifeHand.y);
-            ctx.moveTo(r * 0.28, -5.5);
+            ctx.moveTo(r * 0.28, -knifeSide * 5.5);
             ctx.lineTo(guardHand.x, guardHand.y);
             ctx.stroke();
 
@@ -5790,53 +5754,71 @@ export class SurvivRenderer {
             ctx.translate(weaponOffsetX, weaponOffsetY);
             ctx.rotate(knifeAngle);
 
-            // Handle and guard.
-            ctx.strokeStyle = '#3a2417';
-            ctx.lineWidth = 6.5;
+            // Compact textured handle, steel guard and pommel.
+            ctx.strokeStyle = '#171d1b';
+            ctx.lineWidth = 5.4;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(r * 0.08, 0.8);
-            ctx.lineTo(r * 0.55, 0.2);
+            ctx.moveTo(r * 0.08, 0.4);
+            ctx.lineTo(r * 0.47, 0);
             ctx.stroke();
-            ctx.strokeStyle = '#c69252';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#4c5a54';
+            ctx.lineWidth = 1.15;
+            for (let gripX = r * 0.14; gripX < r * 0.44; gripX += r * 0.1) {
+                ctx.beginPath();
+                ctx.moveTo(gripX, -2.1);
+                ctx.lineTo(gripX + 1.2, 2.1);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#303b38';
+            ctx.strokeStyle = '#111816';
+            ctx.lineWidth = 1.1;
             ctx.beginPath();
-            ctx.moveTo(r * 0.54, -5);
-            ctx.lineTo(r * 0.57, 5);
+            ctx.arc(r * 0.06, 0.4, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.strokeStyle = '#7e8c88';
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(r * 0.47, -4.2);
+            ctx.lineTo(r * 0.49, 4.2);
             ctx.stroke();
 
-            // Tapered steel blade with a bright spine and dark cutting edge.
-            const bladeStart = r * 0.56;
-            const bladeEnd = r * 1.92;
-            const bladeTip = r * 2.08;
-            // A solid blade plus a drawn highlight keeps this cheap for every
-            // visible player, unlike allocating a new gradient each frame.
-            ctx.fillStyle = '#aebfc6';
-            ctx.strokeStyle = '#26343b';
-            ctx.lineWidth = 1.4;
+            // A narrower drop-point blade with a visible spine, bevel and a
+            // genuinely sharp tip. Flat fills keep it cheap to render.
+            const bladeStart = r * 0.5;
+            const bladeShoulder = r * 1.22;
+            const bladeTip = r * 1.58;
+            ctx.fillStyle = '#9eabb0';
+            ctx.strokeStyle = '#202b30';
+            ctx.lineWidth = 1.25;
             ctx.beginPath();
-            ctx.moveTo(bladeStart, -3.6);
-            ctx.lineTo(bladeEnd, -2.5);
+            ctx.moveTo(bladeStart, -2.7);
+            ctx.lineTo(bladeShoulder, -2.45);
             ctx.lineTo(bladeTip, 0);
-            ctx.lineTo(bladeEnd, 3.2);
-            ctx.lineTo(bladeStart, 3.5);
+            ctx.lineTo(bladeStart, 2.85);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,255,255,0.78)';
-            ctx.lineWidth = 1;
+            ctx.fillStyle = '#cbd3d5';
             ctx.beginPath();
-            ctx.moveTo(bladeStart + 2, -2.2);
-            ctx.lineTo(bladeEnd, -1.4);
+            ctx.moveTo(bladeStart + 1.2, 0.65);
+            ctx.lineTo(bladeTip, 0);
+            ctx.lineTo(bladeStart + 1.2, 2.15);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(237,244,245,0.82)';
+            ctx.lineWidth = 0.85;
+            ctx.beginPath();
+            ctx.moveTo(bladeStart + 1.4, -1.65);
+            ctx.lineTo(bladeShoulder, -1.5);
             ctx.stroke();
             ctx.restore();
 
             for (const hand of [guardHand, knifeHand]) {
                 ctx.fillStyle = playerColor;
-                ctx.strokeStyle = hand === knifeHand && stabbing
-                    ? 'rgba(255,255,255,0.58)'
-                    : 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = 1.7;
+                ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
+                ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
                 ctx.fill();
