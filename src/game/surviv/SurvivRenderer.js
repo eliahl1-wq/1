@@ -43,6 +43,9 @@ const WEAPON_FIRE_RATE = {
 };
 
 const MELEE_ANIMATION_MS = 280;
+const PLAYER_HAND_OUTLINE = 'rgba(255,255,255,0.42)';
+const PLAYER_HAND_OUTLINE_WIDTH = 1.6;
+const PLAYER_HAND_RADIUS = 5.7;
 
 const smoothstep01 = (value) => {
     const t = clamp(value, 0, 1);
@@ -213,6 +216,15 @@ const WEAPON_BULLET_SPECS = {
 };
 
 const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
+// These details sit directly on the ground and deliberately stay shadow-free.
+// Everything with meaningful height is handled by the persistent cast-shadow
+// pass below, so newly added obstacle kinds automatically receive a shadow.
+const CAST_SHADOW_EXEMPT_KINDS = new Set([
+    'road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path',
+    'roomZone', 'bush', 'fallenLog', 'grassTuft', 'wildflowers', 'mushrooms', 'reeds', 'stump',
+]);
+const ROUND_CAST_SHADOW_KINDS = new Set(['tree', 'rock', 'barrel', 'lampPost']);
+const TALL_CAST_SHADOW_KINDS = new Set(['tree', 'container', 'tent', 'signpost', 'lampPost', 'mailbox']);
 const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
 const CACHEABLE_PROP_KINDS = new Set([
@@ -458,6 +470,9 @@ export class SurvivRenderer {
         this._housesById = new Map();
         this._stableCurrentHouseId = null;
         this._stableCurrentRoomId = null;
+        this._doorRevealHouseId = null;
+        this._doorRevealDoorId = null;
+        this._doorRevealProgress = 0;
         this._houseBucketSize = 800;
         this._playersById = new Map();
         this._visibleFields = [];
@@ -746,6 +761,9 @@ export class SurvivRenderer {
         this._losWorkingPolygon = [];
         this._stableCurrentHouseId = null;
         this._stableCurrentRoomId = null;
+        this._doorRevealHouseId = null;
+        this._doorRevealDoorId = null;
+        this._doorRevealProgress = 0;
         this.surfaceObstacles = [];
         this.fieldObstacles = [];
         this.waterObstacles = [];
@@ -1964,6 +1982,84 @@ export class SurvivRenderer {
         return next;
     }
 
+    getDoorRevealPreview(currentHouse) {
+        if (!this.me || currentHouse) {
+            this._doorRevealHouseId = null;
+            this._doorRevealDoorId = null;
+            this._doorRevealProgress = 0;
+            return null;
+        }
+
+        const revealStartDistance = 190;
+        let nearestDoor = null;
+        let nearestDistance = revealStartDistance;
+        for (const door of this.doorways) {
+            const house = this._housesById.get(door.houseId);
+            if (!house || !this.isObstacleInView(house, 120)) continue;
+            const side = door.orientation || door.role;
+            const onOutsideApproach = side === 'north' ? this.me.y <= door.y + 36
+                : side === 'south' ? this.me.y >= door.y - 36
+                    : side === 'west' ? this.me.x <= door.x + 36
+                        : side === 'east' ? this.me.x >= door.x - 36
+                            : true;
+            if (!onOutsideApproach) continue;
+            const distance = Math.hypot(this.me.x - door.x, this.me.y - door.y);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestDoor = door;
+            }
+        }
+
+        if (nearestDoor) {
+            if (this._doorRevealDoorId !== nearestDoor.id) this._doorRevealProgress = 0;
+            this._doorRevealDoorId = nearestDoor.id;
+            this._doorRevealHouseId = nearestDoor.houseId;
+        }
+
+        const target = nearestDoor ? clamp((revealStartDistance - nearestDistance) / 82, 0, 1) : 0;
+        const blend = 1 - Math.exp(-10 * Math.max(0.001, this._frameDt || 1 / 60));
+        this._doorRevealProgress += (target - this._doorRevealProgress) * blend;
+        if (!nearestDoor && this._doorRevealProgress < 0.015) {
+            this._doorRevealHouseId = null;
+            this._doorRevealDoorId = null;
+            this._doorRevealProgress = 0;
+            return null;
+        }
+
+        const house = this._housesById.get(this._doorRevealHouseId);
+        const door = nearestDoor || this.doorways.find(candidate => candidate.id === this._doorRevealDoorId);
+        if (!house || !door) return null;
+        return { house, door, progress: this._doorRevealProgress };
+    }
+
+    drawDoorRevealPreview(ctx, preview) {
+        if (!preview || preview.progress <= 0.01) return;
+        const { house, door, progress } = preview;
+        const side = door.orientation || door.role;
+        const inwardX = side === 'west' ? 1 : side === 'east' ? -1 : 0;
+        const inwardY = side === 'north' ? 1 : side === 'south' ? -1 : 0;
+        const eased = progress * progress * (3 - 2 * progress);
+        const maxRadius = Math.hypot(house.w, house.h) * 0.72;
+        const radius = 26 + maxRadius * eased;
+        const centerX = door.x + inwardX * radius * 0.24;
+        const centerY = door.y + inwardY * radius * 0.24;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(house.x - house.w / 2, house.y - house.h / 2, house.w, house.h);
+        ctx.clip();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.globalAlpha = Math.min(1, 0.3 + eased * 0.7);
+        this.drawObstacle(ctx, house);
+        for (const obstacle of this._renderObstaclesByHouseId.get(house.id) || []) {
+            if (obstacle.kind === 'roomZone' || !this.isObstacleInView(obstacle, 50)) continue;
+            this.drawObstacle(ctx, obstacle);
+        }
+        ctx.restore();
+    }
+
     findRoomContainingPoint(x, y, house = null) {
         const houseId = house?.id || this.findHouseContainingPoint(x, y)?.id;
         if (!houseId) return null;
@@ -2467,6 +2563,7 @@ export class SurvivRenderer {
 
         this.drawTerrain(ctx, camX, camY, W, H, z);
         const currentHouse = this.getCurrentHouse();
+        const doorRevealPreview = this.getDoorRevealPreview(currentHouse);
         const currentRoom = this.getCurrentRoom(currentHouse);
         const visibleFields = this.collectVisibleObstacles(
             this.fieldObstacles, this._visibleFields, 32, currentHouse, currentRoom,
@@ -2519,6 +2616,7 @@ export class SurvivRenderer {
                 if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
             }
         }
+        this.drawDoorRevealPreview(ctx, doorRevealPreview);
         for (const o of visibleWorldObstacles) {
             this.drawObstacle(ctx, o);
         }
@@ -3554,6 +3652,75 @@ export class SurvivRenderer {
         };
     }
 
+    drawPersistentCastShadow(ctx, o) {
+        const kind = o.kind || 'crate';
+        const width = Math.abs(Number(o.w) || 0);
+        const height = Math.abs(Number(o.h) || 0);
+        if (!width || !height || CAST_SHADOW_EXEMPT_KINDS.has(kind)) return;
+
+        // The light direction is fixed in world space. Convert it to the
+        // obstacle's local space so rotating a prop never rotates its shadow.
+        const rotation = Number(o.rotation) || 0;
+        const minSize = Math.min(width, height);
+        const tall = TALL_CAST_SHADOW_KINDS.has(kind);
+        const distance = kind === 'bridge' ? 5
+            : kind === 'wall' || kind === 'interiorWall' || kind === 'door' ? 6
+                : clamp(minSize * (tall ? 0.21 : 0.15), tall ? 8 : 5, tall ? 18 : 13);
+        const worldOffsetX = distance * 0.62;
+        const worldOffsetY = distance;
+        const localOffsetX = Math.cos(rotation) * worldOffsetX + Math.sin(rotation) * worldOffsetY;
+        const localOffsetY = -Math.sin(rotation) * worldOffsetX + Math.cos(rotation) * worldOffsetY;
+        const softPad = Math.min(7, Math.max(2.5, minSize * 0.12));
+        const coreAlpha = kind === 'wall' || kind === 'interiorWall' ? 0.17
+            : kind === 'bridge' ? 0.18
+                : tall ? 0.25 : 0.22;
+
+        const traceShadowShape = (padding) => {
+            if (ROUND_CAST_SHADOW_KINDS.has(kind)) {
+                const radiusX = width / 2 + padding;
+                const radiusY = kind === 'tree'
+                    ? height * 0.36 + padding
+                    : height * 0.42 + padding;
+                ctx.beginPath();
+                ctx.ellipse(0, kind === 'tree' ? height * -0.05 : 0, radiusX, radiusY, 0.16, 0, Math.PI * 2);
+                return;
+            }
+            if (kind === 'tent') {
+                ctx.beginPath();
+                ctx.moveTo(-width / 2 - padding, height / 2 + padding);
+                ctx.lineTo(-width * 0.08, -height / 2 - padding);
+                ctx.lineTo(width * 0.08, -height / 2 - padding);
+                ctx.lineTo(width / 2 + padding, height / 2 + padding);
+                ctx.closePath();
+                return;
+            }
+            roundRect(
+                ctx,
+                -width / 2 - padding,
+                -height / 2 - padding,
+                width + padding * 2,
+                height + padding * 2,
+                Math.min(9, Math.max(2, minSize * 0.22 + padding * 0.35)),
+            );
+        };
+
+        // A wide low-opacity silhouette plus a tighter contact silhouette
+        // produces a soft readable shadow without an expensive per-frame blur.
+        ctx.save();
+        ctx.translate(localOffsetX * 1.16, localOffsetY * 1.16);
+        ctx.fillStyle = 'rgba(7, 12, 8, 0.09)';
+        traceShadowShape(softPad);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(localOffsetX * 0.78, localOffsetY * 0.78);
+        ctx.fillStyle = `rgba(7, 11, 8, ${coreAlpha})`;
+        traceShadowShape(Math.min(2.5, softPad * 0.42));
+        ctx.fill();
+        ctx.restore();
+    }
+
     drawObstacle(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
         if (allowCache && (kind === 'field' || kind === 'bridge')
@@ -3567,10 +3734,11 @@ export class SurvivRenderer {
         ctx.save();
         ctx.translate(o.x + shake.x, o.y + shake.y);
         ctx.rotate(o.rotation || 0);
-        const useSoftShadow = false; // Shadows baked into sprite cache instead
-        ctx.shadowColor = useSoftShadow ? 'rgba(18, 22, 18, 0.32)' : 'transparent';
-        ctx.shadowBlur = useSoftShadow ? 5 : 0;
-        ctx.shadowOffsetY = useSoftShadow ? 4 : 0;
+        this.drawPersistentCastShadow(ctx, o);
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
         if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
@@ -3644,42 +3812,20 @@ export class SurvivRenderer {
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
             const industrial = o.variant === 'ironworks' || o.variant === 'metal';
-            const frame = industrial ? '#11191d' : o.variant === 'warehouse' ? '#26343a' : o.variant === 'mansion' ? '#303a40' : '#354045';
-            // Light spill from inside
-            const lightGrad = ctx.createRadialGradient(0, -o.h * 0.15, 4, 0, 0, Math.max(o.w, o.h) * 0.8);
-            lightGrad.addColorStop(0, industrial ? 'rgba(157, 220, 235, 0.22)' : 'rgba(255, 220, 140, 0.18)');
-            lightGrad.addColorStop(0.5, industrial ? 'rgba(95, 180, 205, 0.08)' : 'rgba(255, 200, 100, 0.06)');
-            lightGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = lightGrad;
-            ctx.fillRect(-o.w * 0.7, -o.h * 0.7, o.w * 1.4, o.h * 1.4);
-            // Dark doorway opening
-            ctx.fillStyle = 'rgba(6, 5, 3, 0.85)';
-            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
-            ctx.fill();
-            // Frame
-            ctx.strokeStyle = frame;
-            ctx.lineWidth = 5;
-            roundRect(ctx, -o.w / 2 + 2, -o.h / 2 + 2, o.w - 4, o.h - 4, 4);
-            ctx.stroke();
-            // Threshold warm light
-            ctx.fillStyle = industrial ? 'rgba(118, 205, 224, 0.32)' : 'rgba(238, 205, 138, 0.28)';
             const doorSide = o.orientation || o.role;
             const verticalDoor = doorSide === 'east' || doorSide === 'west';
+            // Surviv-style doorway: just an opening cut through the wall and a
+            // thin threshold. No top-down door slab, frame or artificial glow.
+            ctx.fillStyle = industrial ? 'rgba(8, 13, 15, 0.82)' : 'rgba(13, 11, 8, 0.76)';
+            ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h);
+            ctx.fillStyle = industrial ? 'rgba(133, 168, 176, 0.50)' : 'rgba(176, 151, 104, 0.48)';
             if (verticalDoor) {
-                const thresholdX = doorSide === 'west' ? -o.w / 2 : o.w / 2 - 8;
-                roundRect(ctx, thresholdX, -o.h / 2 + 10, 8, o.h - 20, 3);
+                const thresholdX = doorSide === 'west' ? -o.w / 2 + 2 : o.w / 2 - 5;
+                ctx.fillRect(thresholdX, -o.h / 2 + 7, 3, Math.max(5, o.h - 14));
             } else {
-                const thresholdY = doorSide === 'north' ? -o.h / 2 : o.h / 2 - 8;
-                roundRect(ctx, -o.w / 2 + 10, thresholdY, o.w - 20, 8, 3);
+                const thresholdY = doorSide === 'north' ? -o.h / 2 + 2 : o.h / 2 - 5;
+                ctx.fillRect(-o.w / 2 + 7, thresholdY, Math.max(5, o.w - 14), 3);
             }
-            ctx.fill();
-            // Top highlight
-            ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(-o.w / 2 + 10, -o.h / 2 + 9);
-            ctx.lineTo(o.w / 2 - 10, -o.h / 2 + 9);
-            ctx.stroke();
         } else if (kind === 'wall' || kind === 'interiorWall') {
             // Wall with gradient and brick/stone texture
             const wallColors = {
@@ -3896,13 +4042,6 @@ export class SurvivRenderer {
             const r = Math.max(o.w, o.h) / 2;
             const treeVariant = o.variant || 'grove';
             const hue = o.hue ?? 118;
-            // Ground shadow
-            ctx.shadowBlur = 0;
-
-            ctx.fillStyle = 'rgba(10, 18, 8, 0.22)';
-            ctx.beginPath();
-            ctx.ellipse(r * 0.05, r * 0.35, r * 0.72, r * 0.32, 0.15, 0, Math.PI * 2);
-            ctx.fill();
             // Trunk
             ctx.fillStyle = treeVariant === 'birch' ? '#c6bfa7' : '#5c3a1e';
             roundRect(ctx, -r * 0.14, -r * 0.05, r * 0.28, r * 0.52, r * 0.07);
@@ -3999,10 +4138,6 @@ export class SurvivRenderer {
             const r = Math.max(o.w, o.h) / 2;
             const hue = o.hue ?? 105;
             ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(10, 18, 8, 0.18)';
-            ctx.beginPath();
-            ctx.ellipse(2, r * 0.23, r * 0.72, r * 0.27, 0.1, 0, Math.PI * 2);
-            ctx.fill();
 
             if (o.variant === 'juniper') {
                 for (let layer = 0; layer < 3; layer++) {
@@ -4078,10 +4213,6 @@ export class SurvivRenderer {
         } else if (kind === 'grassTuft') {
             const halfW = o.w / 2;
             const halfH = o.h / 2;
-            ctx.fillStyle = 'rgba(18, 36, 15, 0.12)';
-            ctx.beginPath();
-            ctx.ellipse(0, halfH * 0.42, halfW * 0.72, halfH * 0.28, 0, 0, Math.PI * 2);
-            ctx.fill();
             ctx.lineCap = 'round';
             for (let i = 0; i < 11; i++) {
                 const t = i / 10;
@@ -4124,10 +4255,6 @@ export class SurvivRenderer {
         } else if (kind === 'reeds') {
             const halfW = o.w / 2;
             const halfH = o.h / 2;
-            ctx.fillStyle = 'rgba(20, 43, 27, 0.14)';
-            ctx.beginPath();
-            ctx.ellipse(0, halfH * 0.38, halfW * 0.8, halfH * 0.26, 0, 0, Math.PI * 2);
-            ctx.fill();
             for (let i = 0; i < 10; i++) {
                 const x = -halfW * 0.75 + (i / 9) * halfW * 1.5;
                 const topY = -halfH * (0.45 + (i % 4) * 0.14);
@@ -4145,10 +4272,6 @@ export class SurvivRenderer {
             }
         } else if (kind === 'stump') {
             const r = Math.min(o.w, o.h) / 2;
-            ctx.fillStyle = 'rgba(18, 20, 13, 0.22)';
-            ctx.beginPath();
-            ctx.ellipse(2, r * 0.32, r * 0.88, r * 0.42, 0, 0, Math.PI * 2);
-            ctx.fill();
             ctx.fillStyle = '#604126';
             ctx.beginPath();
             ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2);
@@ -4172,26 +4295,6 @@ export class SurvivRenderer {
         } else if (kind === 'fallenLog') {
             const halfW = o.w / 2;
             const halfH = o.h / 2;
-            // Keep the cast shadow pointing down-right in world space even though
-            // the log itself is rotated. This matches trees, rocks and crates.
-            const rotation = o.rotation || 0;
-            const shadowWorldX = 3.5;
-            const shadowWorldY = 6;
-            const shadowLocalX = Math.cos(rotation) * shadowWorldX + Math.sin(rotation) * shadowWorldY;
-            const shadowLocalY = -Math.sin(rotation) * shadowWorldX + Math.cos(rotation) * shadowWorldY;
-            ctx.save();
-            ctx.translate(shadowLocalX, shadowLocalY);
-            ctx.shadowColor = 'rgba(8, 13, 8, 0.18)';
-            ctx.shadowBlur = 4;
-            ctx.fillStyle = 'rgba(11, 16, 10, 0.25)';
-            roundRect(ctx, -halfW + 2, -halfH + 2, o.w - 4, o.h - 4, halfH * 0.78);
-            ctx.fill();
-            ctx.restore();
-
-            // A tighter contact shadow grounds the trunk without creating a dark halo.
-            ctx.fillStyle = 'rgba(18, 20, 13, 0.18)';
-            roundRect(ctx, -halfW + 5, halfH * 0.2, o.w - 10, halfH * 0.62, halfH * 0.3);
-            ctx.fill();
             const logGradient = ctx.createLinearGradient(0, -halfH, 0, halfH);
             logGradient.addColorStop(0, o.variant === 'birch' ? '#c0b69c' : '#725035');
             logGradient.addColorStop(0.42, o.variant === 'birch' ? '#aaa188' : '#68472f');
@@ -4243,9 +4346,6 @@ export class SurvivRenderer {
                 ctx.fill();
             }
         } else if (kind === 'roadMarker') {
-            ctx.fillStyle = 'rgba(19, 20, 17, 0.22)';
-            roundRect(ctx, -o.w * 0.34 + 3, -o.h * 0.42 + 4, o.w * 0.68, o.h * 0.88, 4);
-            ctx.fill();
             ctx.fillStyle = '#c9c5b3';
             roundRect(ctx, -o.w * 0.34, -o.h * 0.46, o.w * 0.68, o.h * 0.88, 4);
             ctx.fill();
@@ -4257,10 +4357,6 @@ export class SurvivRenderer {
             ctx.fill();
         } else if (kind === 'lampPost') {
             const lampRadius = Math.min(o.w, o.h) * 0.30;
-            ctx.fillStyle = 'rgba(18, 20, 18, 0.22)';
-            ctx.beginPath();
-            ctx.ellipse(4, 5, lampRadius * 1.25, lampRadius * 0.85, 0, 0, Math.PI * 2);
-            ctx.fill();
             ctx.fillStyle = '#343a38';
             ctx.beginPath();
             ctx.arc(0, 0, lampRadius, 0, Math.PI * 2);
@@ -4280,9 +4376,6 @@ export class SurvivRenderer {
             ctx.fill();
         } else if (kind === 'mailbox') {
             const boxColor = o.hue === 205 ? '#42697b' : o.hue === 2 ? '#8a4d42' : '#596a4c';
-            ctx.fillStyle = 'rgba(19, 18, 14, 0.22)';
-            roundRect(ctx, -o.w * 0.42 + 3, -o.h * 0.25 + 4, o.w * 0.84, o.h * 0.52, 4);
-            ctx.fill();
             ctx.fillStyle = '#63472c';
             roundRect(ctx, -2.8, -o.h * 0.08, 5.6, o.h * 0.54, 2);
             ctx.fill();
@@ -4300,9 +4393,6 @@ export class SurvivRenderer {
             ctx.lineTo(o.w * 0.38, -o.h * 0.48);
             ctx.stroke();
         } else if (kind === 'bench') {
-            ctx.fillStyle = 'rgba(20, 19, 15, 0.20)';
-            roundRect(ctx, -o.w * 0.48 + 3, -o.h * 0.30 + 4, o.w * 0.96, o.h * 0.62, 3);
-            ctx.fill();
             ctx.fillStyle = '#4a4d48';
             for (const x of [-o.w * 0.34, o.w * 0.34]) {
                 roundRect(ctx, x - 2.5, -o.h * 0.36, 5, o.h * 0.72, 2);
@@ -4320,9 +4410,6 @@ export class SurvivRenderer {
             ctx.lineTo(0, -o.h * 0.23 + 3);
             ctx.stroke();
         } else if (kind === 'picnicTable') {
-            ctx.fillStyle = 'rgba(21, 18, 13, 0.20)';
-            roundRect(ctx, -o.w * 0.49 + 4, -o.h * 0.42 + 5, o.w * 0.98, o.h * 0.84, 4);
-            ctx.fill();
             ctx.fillStyle = '#735236';
             for (const y of [-o.h * 0.36, o.h * 0.36]) {
                 roundRect(ctx, -o.w * 0.47, y - o.h * 0.09, o.w * 0.94, o.h * 0.18, 3);
@@ -4340,9 +4427,6 @@ export class SurvivRenderer {
                 ctx.stroke();
             }
         } else if (kind === 'signpost') {
-            ctx.fillStyle = 'rgba(17, 18, 13, 0.24)';
-            roundRect(ctx, -3, -o.h * 0.36 + 4, 8, o.h * 0.82, 3);
-            ctx.fill();
             ctx.fillStyle = '#5d4027';
             roundRect(ctx, -3, -o.h * 0.42, 6, o.h * 0.84, 2);
             ctx.fill();
@@ -4573,6 +4657,72 @@ export class SurvivRenderer {
             // Top highlight
             ctx.fillStyle = 'rgba(255,255,255,0.06)';
             ctx.fillRect(-o.w / 2 + 12, -o.h / 2 + 3, o.w - 24, 3);
+        } else if (kind === 'bridge') {
+            const halfW = o.w / 2;
+            const halfH = o.h / 2;
+            const deck = ctx.createLinearGradient(0, -halfH, 0, halfH);
+            deck.addColorStop(0, '#555956');
+            deck.addColorStop(0.48, '#444947');
+            deck.addColorStop(1, '#343a38');
+            ctx.fillStyle = '#2b302f';
+            roundRect(ctx, -halfW - 7, -halfH - 8, o.w + 14, o.h + 16, 8);
+            ctx.fill();
+            ctx.fillStyle = deck;
+            roundRect(ctx, -halfW, -halfH, o.w, o.h, 5);
+            ctx.fill();
+
+            // Concrete end caps and expansion joints make the crossing feel
+            // connected to the road instead of like a generic rectangular prop.
+            ctx.fillStyle = '#77786e';
+            for (const x of [-halfW + 11, halfW - 21]) {
+                roundRect(ctx, x, -halfH + 5, 10, o.h - 10, 2);
+                ctx.fill();
+            }
+            ctx.strokeStyle = 'rgba(21, 25, 24, 0.55)';
+            ctx.lineWidth = 2;
+            for (let x = -halfW + 54; x < halfW - 32; x += 58) {
+                ctx.beginPath();
+                ctx.moveTo(x, -halfH + 8);
+                ctx.lineTo(x, halfH - 8);
+                ctx.stroke();
+            }
+
+            // Raised rails cast their own tight edge shade and retain a small
+            // sun-facing highlight for depth at every zoom level.
+            for (const side of [-1, 1]) {
+                const y = side * (halfH - 8);
+                ctx.strokeStyle = 'rgba(11, 15, 14, 0.48)';
+                ctx.lineWidth = 11;
+                ctx.beginPath();
+                ctx.moveTo(-halfW + 10, y + 4);
+                ctx.lineTo(halfW - 10, y + 4);
+                ctx.stroke();
+                ctx.strokeStyle = '#7d8580';
+                ctx.lineWidth = 7;
+                ctx.beginPath();
+                ctx.moveTo(-halfW + 10, y);
+                ctx.lineTo(halfW - 10, y);
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(224, 231, 222, 0.30)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-halfW + 12, y - 2.5);
+                ctx.lineTo(halfW - 12, y - 2.5);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = 'rgba(225, 211, 151, 0.72)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([22, 17]);
+            ctx.beginPath();
+            ctx.moveTo(-halfW + 24, 0);
+            ctx.lineTo(halfW - 24, 0);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.strokeStyle = 'rgba(12, 16, 15, 0.62)';
+            ctx.lineWidth = 2;
+            roundRect(ctx, -halfW, -halfH, o.w, o.h, 5);
+            ctx.stroke();
         } else if (kind === 'field') {
             this.drawOrganicField(ctx, o);
         } else {
@@ -5908,10 +6058,13 @@ export class SurvivRenderer {
             ctx.scale(s, s);
         }
 
-        // Shadow — cheap opaque ellipse instead of expensive shadowBlur
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        // Match the world's fixed top-left light even while the player turns.
+        const playerRotation = Number(p.angle) || 0;
+        const playerShadowX = Math.cos(playerRotation) * 5.5 + Math.sin(playerRotation) * 8;
+        const playerShadowY = -Math.sin(playerRotation) * 5.5 + Math.cos(playerRotation) * 8;
+        ctx.fillStyle = 'rgba(5, 9, 6, 0.27)';
         ctx.beginPath();
-        ctx.ellipse(0, 5, r * 0.85, r * 0.35, 0, 0, Math.PI * 2);
+        ctx.ellipse(playerShadowX, playerShadowY, r * 0.9, r * 0.38, -playerRotation, 0, Math.PI * 2);
         ctx.fill();
 
         // Body circle — surviv.io style thick outline
@@ -6074,10 +6227,10 @@ export class SurvivRenderer {
 
             for (const hand of [topHand, bottomHand]) {
                 ctx.fillStyle = playerColor;
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = PLAYER_HAND_OUTLINE;
+                ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
                 ctx.beginPath();
-                ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
+                ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
@@ -6178,10 +6331,10 @@ export class SurvivRenderer {
 
             for (const hand of [guardHand, knifeHand]) {
                 ctx.fillStyle = playerColor;
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = PLAYER_HAND_OUTLINE;
+                ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
                 ctx.beginPath();
-                ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
+                ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
@@ -6461,11 +6614,11 @@ export class SurvivRenderer {
         // Draw hands gripping the gun (two-handed/one-handed)
         if (weapon !== 'fists' && hands) {
             ctx.fillStyle = playerColor;
-            ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
-            ctx.lineWidth = 1.8;
+            ctx.strokeStyle = PLAYER_HAND_OUTLINE;
+            ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
             for (const hand of hands) {
                 ctx.beginPath();
-                ctx.arc(hand.x, hand.y, 5.8, 0, Math.PI * 2);
+                ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
@@ -6531,17 +6684,25 @@ export class SurvivRenderer {
         const hw = o.w / 2;
         const hh = o.h / 2;
 
-        // Drop shadow for the entire roof
-        ctx.shadowColor = 'rgba(10, 14, 10, 0.45)';
-        ctx.shadowBlur = 18;
-        ctx.shadowOffsetY = 12;
-        ctx.fillStyle = 'rgba(15, 12, 10, 0.6)';
-        roundRect(ctx, -hw - 10, -hh - 8, o.w + 20, o.h + 18, 9);
+        // Stable two-stage roof shadow. Its direction stays fixed in world
+        // space even if a future building is rotated.
+        const roofRotation = Number(o.rotation) || 0;
+        const roofWorldShadowX = 11;
+        const roofWorldShadowY = 16;
+        const roofLocalShadowX = Math.cos(roofRotation) * roofWorldShadowX + Math.sin(roofRotation) * roofWorldShadowY;
+        const roofLocalShadowY = -Math.sin(roofRotation) * roofWorldShadowX + Math.cos(roofRotation) * roofWorldShadowY;
+        ctx.save();
+        ctx.translate(roofLocalShadowX * 1.16, roofLocalShadowY * 1.16);
+        ctx.fillStyle = 'rgba(7, 11, 8, 0.13)';
+        roundRect(ctx, -hw - 14, -hh - 13, o.w + 28, o.h + 26, 12);
         ctx.fill();
-        ctx.shadowBlur = 0; // Turn off shadows for interior details
-        ctx.shadowColor = 'transparent';
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
+        ctx.restore();
+        ctx.save();
+        ctx.translate(roofLocalShadowX * 0.78, roofLocalShadowY * 0.78);
+        ctx.fillStyle = 'rgba(7, 10, 8, 0.34)';
+        roundRect(ctx, -hw - 7, -hh - 7, o.w + 14, o.h + 14, 9);
+        ctx.fill();
+        ctx.restore();
 
         if (variant === 'ironworks') {
             // --- IRONWORKS: giant saw-tooth steel roof for the indoor PvP landmark ---
@@ -7301,46 +7462,23 @@ export class SurvivRenderer {
             ctx.stroke();
         }
 
-        // --- DOORWAY HIGHLIGHTS ---
-        // Large landmarks can have several entrances; render every one and keep
-        // vertical service doors aligned with their actual wall orientation.
+        // Keep exterior entrances readable as simple gaps in the roof edge.
+        // The nearby reveal handles all interior feedback instead of drawing a
+        // fake door panel from above.
         const roofDoors = this._doorwaysByHouseId.get(o.id) || [];
         for (const door of roofDoors) {
             const doorX = door.x - o.x;
             const doorY = door.y - o.y;
             const doorSide = door.orientation || door.role;
             const verticalDoor = doorSide === 'east' || doorSide === 'west';
-            const entryW = verticalDoor ? Math.max(28, door.w * 1.15) : Math.max(door.w, 86);
-            const entryH = verticalDoor ? Math.max(door.h, 86) : Math.max(28, door.h * 1.15);
-            const industrialEntry = variant === 'ironworks' || variant === 'warehouse' || variant === 'garage';
-
-            ctx.fillStyle = 'rgba(10, 8, 5, 0.88)';
-            roundRect(ctx, doorX - entryW / 2, doorY - entryH / 2, entryW, entryH, 6);
-            ctx.fill();
-
-            const trimColor = industrialEntry ? '#10181c' : variant === 'mansion' ? '#263238' : '#29353a';
-            ctx.strokeStyle = trimColor;
-            ctx.lineWidth = industrialEntry ? 9 : 7;
-            roundRect(ctx, doorX - entryW / 2 - 3, doorY - entryH / 2 - 3, entryW + 6, entryH + 6, 7);
-            ctx.stroke();
-
-            const glowRadius = Math.max(entryW, entryH) * 0.9;
-            const entryGlow = ctx.createRadialGradient(doorX, doorY, 4, doorX, doorY, glowRadius);
-            entryGlow.addColorStop(0, industrialEntry ? 'rgba(112, 206, 226, 0.28)' : 'rgba(255, 215, 130, 0.24)');
-            entryGlow.addColorStop(0.5, industrialEntry ? 'rgba(72, 161, 185, 0.10)' : 'rgba(255, 200, 110, 0.08)');
-            entryGlow.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = entryGlow;
-            ctx.fillRect(doorX - glowRadius, doorY - glowRadius, glowRadius * 2, glowRadius * 2);
-
-            ctx.fillStyle = industrialEntry ? 'rgba(232, 174, 48, 0.72)' : 'rgba(236, 205, 140, 0.32)';
+            const entryW = verticalDoor ? Math.max(18, door.w) : Math.max(door.w, 76);
+            const entryH = verticalDoor ? Math.max(door.h, 76) : Math.max(18, door.h);
+            ctx.fillStyle = 'rgba(10, 9, 7, 0.80)';
             if (verticalDoor) {
-                const thresholdX = doorSide === 'west' ? doorX - entryW / 2 : doorX + entryW / 2 - 8;
-                roundRect(ctx, thresholdX, doorY - entryH / 2 + 10, 8, entryH - 20, 3);
+                ctx.fillRect(doorX - entryW / 2, doorY - entryH / 2, entryW, entryH);
             } else {
-                const thresholdY = doorSide === 'north' ? doorY - entryH / 2 : doorY + entryH / 2 - 8;
-                roundRect(ctx, doorX - entryW / 2 + 10, thresholdY, entryW - 20, 8, 3);
+                ctx.fillRect(doorX - entryW / 2, doorY - entryH / 2, entryW, entryH);
             }
-            ctx.fill();
         }
 
         ctx.restore();
