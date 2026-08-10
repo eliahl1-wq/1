@@ -219,6 +219,7 @@ const CACHEABLE_PROP_KINDS = new Set([
     'houseFloor', 'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
     'door', 'furniture', 'machine', 'sandbag', 'signpost',
     'stump', 'fallenLog', 'hayBale', 'reeds', 'grassTuft', 'wildflowers', 'mushrooms',
+    'lampPost', 'bench', 'mailbox', 'roadMarker', 'picnicTable',
 ]);
 
 function compactTimedItems(items, now) {
@@ -261,8 +262,31 @@ function obstacleRenderSignature(obstacles) {
         mixNumber(o.rotation);
         mixNumber(o.width);
         mixNumber(o.collidable === false ? 0 : 1);
+        if (o.points?.length) {
+            mixNumber(o.points.length);
+            for (const point of o.points) {
+                mixNumber(point.x);
+                mixNumber(point.y);
+            }
+        }
     }
     return `${obstacles.length}:${hash >>> 0}`;
+}
+
+function hasSameSurfaceGeometry(previous, next) {
+    if (!previous || !next) return false;
+    if (previous.kind !== next.kind || previous.variant !== next.variant
+        || previous.x !== next.x || previous.y !== next.y
+        || previous.w !== next.w || previous.h !== next.h
+        || previous.width !== next.width || previous.rotation !== next.rotation) return false;
+    const previousPoints = previous.points || [];
+    const nextPoints = next.points || [];
+    if (previousPoints.length !== nextPoints.length) return false;
+    for (let index = 0; index < previousPoints.length; index++) {
+        if (previousPoints[index].x !== nextPoints[index].x
+            || previousPoints[index].y !== nextPoints[index].y) return false;
+    }
+    return true;
 }
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -560,6 +584,7 @@ export class SurvivRenderer {
         this._surfaceChunkBuildsThisFrame = 0;
         this._surfaceChunkRequired = [];
         this._surfacePrefetchCandidates = [];
+        this._surfaceChunkSources = new Map();
         this._cacheBuildsThisFrame = 0;
         this._lastSurfaceCamX = NaN;
         this._lastSurfaceCamY = NaN;
@@ -752,6 +777,7 @@ export class SurvivRenderer {
         this._surfaceCachePixels = 0;
         this._surfaceChunkCache.clear();
         this._surfaceChunkCachePixels = 0;
+        this._surfaceChunkSources.clear();
         this._surfaceCacheKeyByObject = new WeakMap();
         this._surfacePathCache = new WeakMap();
         this._pathSampleCache = new WeakMap();
@@ -1285,6 +1311,21 @@ export class SurvivRenderer {
             }
             const nextSignature = obstacleRenderSignature(nextObstacles);
             if (nextSignature !== this._obstacleRenderSignature) {
+                // Streamed map patches can add a road or terrain spline to an
+                // area whose chunk was previously cached as empty. Invalidate
+                // only the affected tiles; keeping unrelated chunks prevents a
+                // full-screen cache flash whenever the player enters a new area.
+                for (const obstacle of nextObstacles) {
+                    const previous = previousObstacles.get(obstacle.id);
+                    if (SURFACE_KINDS.has(obstacle.kind)) {
+                        if (!hasSameSurfaceGeometry(previous, obstacle)) {
+                            this.invalidateSurfaceChunksForObstacle(previous);
+                            this.invalidateSurfaceChunksForObstacle(obstacle);
+                        }
+                    } else if (SURFACE_KINDS.has(previous?.kind)) {
+                        this.invalidateSurfaceChunksForObstacle(previous);
+                    }
+                }
                 this.obstacles = nextObstacles;
                 this._obstacleRenderSignature = nextSignature;
                 this.rebuildObstacleRenderCache();
@@ -1769,6 +1810,7 @@ export class SurvivRenderer {
         }
         const roadLayer = obstacle => obstacle.kind === 'trail_path' ? 0 : obstacle.kind === 'road' ? 1 : 2;
         this.roadObstacles.sort((a, b) => roadLayer(a) - roadLayer(b));
+        this.rebuildSurfaceChunkSources();
         this.sortedWorldObstacles = solid.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
         for (const obstacle of this.sortedWorldObstacles) {
             if (!obstacle._insideHouseId) continue;
@@ -2840,11 +2882,18 @@ export class SurvivRenderer {
             ctx.restore();
             return;
         }
-        if (o.variant !== 'asphalt') {
+        const shoulderColors = {
+            asphalt: '#655745',
+            service: '#5b574e',
+            cobblestone: '#62594c',
+            gravel: '#625d50',
+            rail: '#49473f',
+        };
+        if (!shoulderColors[o.variant]) {
             ctx.restore();
             return;
         }
-        ctx.fillStyle = '#655745';
+        ctx.fillStyle = shoulderColors[o.variant];
         if (o.kind === 'roadJunction') {
             roundRect(ctx, -o.w / 2 - 12, -o.h / 2 - 12, o.w + 24, o.h + 24, 16);
             ctx.fill();
@@ -3042,8 +3091,14 @@ export class SurvivRenderer {
         const start = Math.max(-halfLength, visible.start);
         const end = Math.min(halfLength, visible.end);
 
-        if (end > start && o.variant === 'asphalt') {
-            ctx.fillStyle = '#2b2c28'; // Dark asphalt gray
+        const hardSurfaceColors = {
+            asphalt: '#2b2c28',
+            service: '#454844',
+            cobblestone: '#69655d',
+            rail: '#5a554c',
+        };
+        if (end > start && hardSurfaceColors[o.variant]) {
+            ctx.fillStyle = hardSurfaceColors[o.variant];
             if (isHorizontal) {
                 roundRect(ctx, start, -o.h / 2, end - start, o.h, 5);
             } else {
@@ -3053,7 +3108,7 @@ export class SurvivRenderer {
         } else if (end > start) {
             // Dirt-road detail is generated only for the camera-visible segment.
             // Samples remain anchored to the road origin, so edges never slide.
-            ctx.fillStyle = '#7a684c';
+            ctx.fillStyle = o.variant === 'gravel' ? '#777266' : '#7a684c';
             ctx.beginPath();
             const step = 28;
             const roadId = Math.round(o.x + o.y);
@@ -3207,6 +3262,75 @@ export class SurvivRenderer {
                 }
                 ctx.stroke();
             }
+        } else if (o.variant === 'rail') {
+            // Sleepers and twin rails turn the depot surface into an actual
+            // rail line instead of a narrow brown road.
+            const sleeperStep = 30;
+            const firstSleeper = Math.ceil(start / sleeperStep) * sleeperStep;
+            ctx.strokeStyle = 'rgba(48, 34, 24, 0.82)';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            for (let axis = firstSleeper; axis <= end; axis += sleeperStep) {
+                if (isHorizontal) {
+                    ctx.moveTo(axis, -width * 0.43);
+                    ctx.lineTo(axis, width * 0.43);
+                } else {
+                    ctx.moveTo(-width * 0.43, axis);
+                    ctx.lineTo(width * 0.43, axis);
+                }
+            }
+            ctx.stroke();
+            ctx.strokeStyle = '#aab0ae';
+            ctx.lineWidth = 3.2;
+            ctx.beginPath();
+            line(start, end, -width * 0.23);
+            line(start, end, width * 0.23);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255,255,255,0.26)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            line(start, end, -width * 0.23 - 1);
+            line(start, end, width * 0.23 - 1);
+            ctx.stroke();
+        } else if (o.variant === 'cobblestone') {
+            const stoneStep = 24;
+            const firstStone = Math.ceil(start / stoneStep) * stoneStep;
+            ctx.strokeStyle = 'rgba(39, 37, 33, 0.34)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            for (let axis = firstStone; axis <= end; axis += stoneStep) {
+                const stagger = Math.round(axis / stoneStep) % 2 === 0 ? width * 0.08 : -width * 0.08;
+                if (isHorizontal) {
+                    ctx.moveTo(axis, -width / 2 + 5);
+                    ctx.lineTo(axis + stagger, width / 2 - 5);
+                } else {
+                    ctx.moveTo(-width / 2 + 5, axis);
+                    ctx.lineTo(width / 2 - 5, axis + stagger);
+                }
+            }
+            line(start, end, -width * 0.24);
+            line(start, end, width * 0.24);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(224, 218, 198, 0.13)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            line(start, end, 0);
+            ctx.stroke();
+        } else if (o.variant === 'service') {
+            ctx.strokeStyle = 'rgba(225, 226, 214, 0.3)';
+            ctx.lineWidth = 1.6;
+            ctx.setLineDash([26, 20]);
+            ctx.beginPath();
+            line(start, end, -width * 0.36);
+            line(start, end, width * 0.36);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.strokeStyle = 'rgba(20, 23, 21, 0.32)';
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            line(start, end, -width * 0.14);
+            line(start, end, width * 0.14);
+            ctx.stroke();
         } else {
             ctx.strokeStyle = '#524330';
             ctx.lineWidth = 3.5;
@@ -3215,6 +3339,18 @@ export class SurvivRenderer {
             line(start, end, -trackOff);
             line(start, end, trackOff);
             ctx.stroke();
+            if (o.variant === 'gravel') {
+                ctx.fillStyle = 'rgba(210, 204, 187, 0.24)';
+                const pebbleStep = 68;
+                const firstPebble = Math.ceil(start / pebbleStep) * pebbleStep;
+                for (let axis = firstPebble; axis <= end; axis += pebbleStep) {
+                    const offset = (seededNoise(axis * 0.02, o.x + o.y) - 0.5) * width * 0.58;
+                    ctx.beginPath();
+                    if (isHorizontal) ctx.ellipse(axis, offset, 2.8, 1.8, 0.2, 0, Math.PI * 2);
+                    else ctx.ellipse(offset, axis, 1.8, 2.8, 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
         }
         ctx.restore();
     }
@@ -3758,6 +3894,8 @@ export class SurvivRenderer {
             }
         } else if (kind === 'tree') {
             const r = Math.max(o.w, o.h) / 2;
+            const treeVariant = o.variant || 'grove';
+            const hue = o.hue ?? 118;
             // Ground shadow
             ctx.shadowBlur = 0;
 
@@ -3766,38 +3904,97 @@ export class SurvivRenderer {
             ctx.ellipse(r * 0.05, r * 0.35, r * 0.72, r * 0.32, 0.15, 0, Math.PI * 2);
             ctx.fill();
             // Trunk
-            ctx.fillStyle = '#5c3a1e';
+            ctx.fillStyle = treeVariant === 'birch' ? '#c6bfa7' : '#5c3a1e';
             roundRect(ctx, -r * 0.14, -r * 0.05, r * 0.28, r * 0.52, r * 0.07);
             ctx.fill();
-            ctx.fillStyle = 'rgba(90, 65, 35, 0.45)';
+            ctx.fillStyle = treeVariant === 'birch' ? 'rgba(66, 60, 52, 0.52)' : 'rgba(90, 65, 35, 0.45)';
             roundRect(ctx, -r * 0.06, 0, r * 0.12, r * 0.38, r * 0.04);
             ctx.fill();
-            // Main canopy (bottom layer, darker)
-            ctx.fillStyle = `hsl(${o.hue ?? 118}, 36%, 26%)`;
-            ctx.beginPath();
-            ctx.arc(0, -r * 0.12, r * 0.82, 0, Math.PI * 2);
-            ctx.fill();
-            // Mid canopy layer
-            ctx.fillStyle = `hsl(${(o.hue ?? 118) + 4}, 40%, 32%)`;
-            ctx.beginPath();
-            ctx.arc(-r * 0.08, -r * 0.18, r * 0.62, 0, Math.PI * 2);
-            ctx.fill();
-            // Top highlight canopy
-            ctx.fillStyle = `hsl(${(o.hue ?? 118) + 10}, 44%, 38%)`;
-            ctx.beginPath();
-            ctx.arc(-r * 0.16, -r * 0.28, r * 0.38, 0, Math.PI * 2);
-            ctx.fill();
-            // Light highlight spot
-            ctx.fillStyle = `hsl(${(o.hue ?? 118) + 14}, 48%, 44%)`;
-            ctx.beginPath();
-            ctx.arc(-r * 0.22, -r * 0.34, r * 0.16, 0, Math.PI * 2);
-            ctx.fill();
-            // Canopy outline
-            ctx.strokeStyle = 'rgba(16, 30, 14, 0.32)';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.arc(0, -r * 0.12, r * 0.82, 0, Math.PI * 2);
-            ctx.stroke();
+            if (treeVariant === 'pine' || treeVariant === 'giantPine') {
+                // Layered, irregular conifer rings remain readable from above.
+                const layers = treeVariant === 'giantPine' ? 4 : 3;
+                for (let layer = 0; layer < layers; layer++) {
+                    const layerRadius = r * (0.9 - layer * 0.15);
+                    const points = 18;
+                    ctx.fillStyle = `hsl(${hue + layer * 3}, ${34 + layer * 3}%, ${22 + layer * 6}%)`;
+                    ctx.beginPath();
+                    for (let point = 0; point < points; point++) {
+                        const angle = (point / points) * Math.PI * 2 + layer * 0.19;
+                        const radius = layerRadius * (point % 2 === 0 ? 1 : 0.68);
+                        const px = Math.cos(angle) * radius - layer * r * 0.035;
+                        const py = Math.sin(angle) * radius * 0.9 - r * (0.1 + layer * 0.05);
+                        if (point === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.fillStyle = `hsl(${hue + 12}, 42%, 42%)`;
+                ctx.beginPath();
+                ctx.arc(-r * 0.2, -r * 0.4, r * 0.13, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (treeVariant === 'ancientOak') {
+                // Several broad lobes make old oaks look massive without a
+                // larger collision box or any animated foliage.
+                ctx.fillStyle = `hsl(${hue}, 40%, 24%)`;
+                for (let lobe = 0; lobe < 8; lobe++) {
+                    const angle = (lobe / 8) * Math.PI * 2 + 0.18;
+                    ctx.beginPath();
+                    ctx.arc(Math.cos(angle) * r * 0.34, Math.sin(angle) * r * 0.29 - r * 0.12, r * 0.51, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.fillStyle = `hsl(${hue + 7}, 43%, 34%)`;
+                for (let lobe = 0; lobe < 5; lobe++) {
+                    const angle = (lobe / 5) * Math.PI * 2 - 0.42;
+                    ctx.beginPath();
+                    ctx.arc(Math.cos(angle) * r * 0.25 - r * 0.08, Math.sin(angle) * r * 0.22 - r * 0.23, r * 0.34, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (treeVariant === 'willowTree') {
+                ctx.fillStyle = `hsl(${hue}, 42%, 25%)`;
+                for (let lobe = 0; lobe < 10; lobe++) {
+                    const angle = (lobe / 10) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.ellipse(Math.cos(angle) * r * 0.34, Math.sin(angle) * r * 0.3 - r * 0.08,
+                        r * 0.48, r * 0.24, angle, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.strokeStyle = `hsl(${hue + 8}, 44%, 37%)`;
+                ctx.lineWidth = Math.max(1.5, r * 0.045);
+                for (let branch = 0; branch < 8; branch++) {
+                    const angle = (branch / 8) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -r * 0.12);
+                    ctx.quadraticCurveTo(Math.cos(angle) * r * 0.42, Math.sin(angle) * r * 0.3,
+                        Math.cos(angle) * r * 0.72, Math.sin(angle) * r * 0.62);
+                    ctx.stroke();
+                }
+            } else {
+                const birchLight = treeVariant === 'birch' ? 7 : 0;
+                ctx.fillStyle = `hsl(${hue}, 36%, ${26 + birchLight}%)`;
+                ctx.beginPath();
+                ctx.arc(0, -r * 0.12, r * 0.82, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `hsl(${hue + 4}, 40%, ${32 + birchLight}%)`;
+                ctx.beginPath();
+                ctx.arc(-r * 0.08, -r * 0.18, r * 0.62, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `hsl(${hue + 10}, 44%, ${38 + birchLight}%)`;
+                ctx.beginPath();
+                ctx.arc(-r * 0.16, -r * 0.28, r * 0.38, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `hsl(${hue + 14}, 48%, ${44 + birchLight}%)`;
+                ctx.beginPath();
+                ctx.arc(-r * 0.22, -r * 0.34, r * 0.16, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            if (treeVariant !== 'pine' && treeVariant !== 'giantPine' && treeVariant !== 'willowTree') {
+                ctx.strokeStyle = 'rgba(16, 30, 14, 0.32)';
+                ctx.lineWidth = Math.max(2.2, r * 0.045);
+                ctx.beginPath();
+                ctx.arc(0, -r * 0.12, r * 0.84, 0, Math.PI * 2);
+                ctx.stroke();
+            }
         } else if (kind === 'bush') {
             const r = Math.max(o.w, o.h) / 2;
             const hue = o.hue ?? 105;
@@ -4044,6 +4241,103 @@ export class SurvivRenderer {
                 ctx.beginPath();
                 ctx.ellipse(x, y, 4, 2.6, angle, Math.PI, Math.PI * 2);
                 ctx.fill();
+            }
+        } else if (kind === 'roadMarker') {
+            ctx.fillStyle = 'rgba(19, 20, 17, 0.22)';
+            roundRect(ctx, -o.w * 0.34 + 3, -o.h * 0.42 + 4, o.w * 0.68, o.h * 0.88, 4);
+            ctx.fill();
+            ctx.fillStyle = '#c9c5b3';
+            roundRect(ctx, -o.w * 0.34, -o.h * 0.46, o.w * 0.68, o.h * 0.88, 4);
+            ctx.fill();
+            ctx.fillStyle = '#e8e2c9';
+            roundRect(ctx, -o.w * 0.23, -o.h * 0.39, o.w * 0.46, o.h * 0.20, 2);
+            ctx.fill();
+            ctx.fillStyle = o.variant === 'trail' ? '#d7a84e' : '#cc5b43';
+            roundRect(ctx, -o.w * 0.20, -o.h * 0.36, o.w * 0.40, o.h * 0.11, 2);
+            ctx.fill();
+        } else if (kind === 'lampPost') {
+            const lampRadius = Math.min(o.w, o.h) * 0.30;
+            ctx.fillStyle = 'rgba(18, 20, 18, 0.22)';
+            ctx.beginPath();
+            ctx.ellipse(4, 5, lampRadius * 1.25, lampRadius * 0.85, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#343a38';
+            ctx.beginPath();
+            ctx.arc(0, 0, lampRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#e1c67b';
+            ctx.beginPath();
+            ctx.arc(0, 0, lampRadius * 0.58, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#1f2423';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, lampRadius * 0.82, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = '#252b29';
+            ctx.beginPath();
+            ctx.arc(0, 0, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (kind === 'mailbox') {
+            const boxColor = o.hue === 205 ? '#42697b' : o.hue === 2 ? '#8a4d42' : '#596a4c';
+            ctx.fillStyle = 'rgba(19, 18, 14, 0.22)';
+            roundRect(ctx, -o.w * 0.42 + 3, -o.h * 0.25 + 4, o.w * 0.84, o.h * 0.52, 4);
+            ctx.fill();
+            ctx.fillStyle = '#63472c';
+            roundRect(ctx, -2.8, -o.h * 0.08, 5.6, o.h * 0.54, 2);
+            ctx.fill();
+            ctx.fillStyle = boxColor;
+            roundRect(ctx, -o.w * 0.44, -o.h * 0.34, o.w * 0.88, o.h * 0.48, 5);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(24, 27, 24, 0.62)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.strokeStyle = '#b55446';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(o.w * 0.24, -o.h * 0.24);
+            ctx.lineTo(o.w * 0.24, -o.h * 0.48);
+            ctx.lineTo(o.w * 0.38, -o.h * 0.48);
+            ctx.stroke();
+        } else if (kind === 'bench') {
+            ctx.fillStyle = 'rgba(20, 19, 15, 0.20)';
+            roundRect(ctx, -o.w * 0.48 + 3, -o.h * 0.30 + 4, o.w * 0.96, o.h * 0.62, 3);
+            ctx.fill();
+            ctx.fillStyle = '#4a4d48';
+            for (const x of [-o.w * 0.34, o.w * 0.34]) {
+                roundRect(ctx, x - 2.5, -o.h * 0.36, 5, o.h * 0.72, 2);
+                ctx.fill();
+            }
+            ctx.fillStyle = '#87623b';
+            for (const y of [-o.h * 0.23, 0, o.h * 0.23]) {
+                roundRect(ctx, -o.w * 0.48, y - 3.2, o.w * 0.96, 6.4, 2);
+                ctx.fill();
+            }
+            ctx.strokeStyle = 'rgba(45, 29, 17, 0.45)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, -o.h * 0.23 - 3);
+            ctx.lineTo(0, -o.h * 0.23 + 3);
+            ctx.stroke();
+        } else if (kind === 'picnicTable') {
+            ctx.fillStyle = 'rgba(21, 18, 13, 0.20)';
+            roundRect(ctx, -o.w * 0.49 + 4, -o.h * 0.42 + 5, o.w * 0.98, o.h * 0.84, 4);
+            ctx.fill();
+            ctx.fillStyle = '#735236';
+            for (const y of [-o.h * 0.36, o.h * 0.36]) {
+                roundRect(ctx, -o.w * 0.47, y - o.h * 0.09, o.w * 0.94, o.h * 0.18, 3);
+                ctx.fill();
+            }
+            ctx.fillStyle = '#987047';
+            roundRect(ctx, -o.w * 0.36, -o.h * 0.24, o.w * 0.72, o.h * 0.48, 4);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(50, 32, 18, 0.46)';
+            ctx.lineWidth = 1.2;
+            for (const y of [-o.h * 0.08, o.h * 0.08]) {
+                ctx.beginPath();
+                ctx.moveTo(-o.w * 0.34, y);
+                ctx.lineTo(o.w * 0.34, y);
+                ctx.stroke();
             }
         } else if (kind === 'signpost') {
             ctx.fillStyle = 'rgba(17, 18, 13, 0.24)';
@@ -4356,11 +4650,59 @@ export class SurvivRenderer {
         }
     }
 
-    surfaceObstacleIntersectsBounds(o, left, top, right, bottom, padding = 0) {
-        const halfW = (o._renderHalfW ?? Math.abs(Number(o.w) || 0) / 2) + padding;
-        const halfH = (o._renderHalfH ?? Math.abs(Number(o.h) || 0) / 2) + padding;
-        return o.x + halfW >= left && o.x - halfW <= right
-            && o.y + halfH >= top && o.y - halfH <= bottom;
+    rebuildSurfaceChunkSources() {
+        const tile = this._surfaceChunkTileSize;
+        const buckets = this._surfaceChunkSources;
+        buckets.clear();
+        const add = (obstacle, type, padding) => {
+            const halfW = (obstacle._renderHalfW ?? Math.abs(Number(obstacle.w) || 0) / 2) + padding;
+            const halfH = (obstacle._renderHalfH ?? Math.abs(Number(obstacle.h) || 0) / 2) + padding;
+            const minGridX = Math.floor((obstacle.x - halfW) / tile);
+            const maxGridX = Math.floor((obstacle.x + halfW - 0.001) / tile);
+            const minGridY = Math.floor((obstacle.y - halfH) / tile);
+            const maxGridY = Math.floor((obstacle.y + halfH - 0.001) / tile);
+            for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
+                for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
+                    const key = gridX + ':' + gridY;
+                    let bucket = buckets.get(key);
+                    if (!bucket) {
+                        bucket = { fields: [], water: [], roads: [] };
+                        buckets.set(key, bucket);
+                    }
+                    bucket[type].push(obstacle);
+                }
+            }
+        };
+        for (const obstacle of this.fieldObstacles) add(obstacle, 'fields', 40);
+        for (const obstacle of this.waterObstacles) add(obstacle, 'water', 50);
+        // roadObstacles is already layer-sorted, so every bucket preserves the
+        // exact trail -> road -> junction draw order.
+        for (const obstacle of this.roadObstacles) add(obstacle, 'roads', 64);
+    }
+
+    invalidateSurfaceChunksForObstacle(obstacle) {
+        if (!obstacle || !SURFACE_KINDS.has(obstacle.kind)) return;
+        const tile = this._surfaceChunkTileSize;
+        const rotation = Number(obstacle.rotation) || 0;
+        const cos = Math.abs(Math.cos(rotation));
+        const sin = Math.abs(Math.sin(rotation));
+        const rawHalfW = Math.abs(Number(obstacle.w) || 0) / 2;
+        const rawHalfH = Math.abs(Number(obstacle.h) || 0) / 2;
+        const halfW = cos * rawHalfW + sin * rawHalfH + 64;
+        const halfH = sin * rawHalfW + cos * rawHalfH + 64;
+        const minGridX = Math.floor((obstacle.x - halfW) / tile);
+        const maxGridX = Math.floor((obstacle.x + halfW - 0.001) / tile);
+        const minGridY = Math.floor((obstacle.y - halfH) / tile);
+        const maxGridY = Math.floor((obstacle.y + halfH - 0.001) / tile);
+        for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
+            for (let gridX = minGridX; gridX <= maxGridX; gridX++) {
+                const key = gridX + ':' + gridY;
+                const sprite = this._surfaceChunkCache.get(key);
+                if (!sprite) continue;
+                this._surfaceChunkCachePixels -= sprite.pixels || 0;
+                this._surfaceChunkCache.delete(key);
+            }
+        }
     }
 
     buildSurfaceChunk(gridX, gridY) {
@@ -4375,16 +4717,11 @@ export class SurvivRenderer {
         const expandedRight = left + tile + bleed;
         const expandedBottom = top + tile + bleed;
 
-        const fields = this.fieldObstacles.filter(o => (
-            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 40)
-        ));
-        const water = this.waterObstacles.filter(o => (
-            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 50)
-        ));
-        const roads = this.roadObstacles.filter(o => (
-            this.surfaceObstacleIntersectsBounds(o, expandedLeft, expandedTop, expandedRight, expandedBottom, 64)
-        ));
         const key = gridX + ':' + gridY;
+        const sources = this._surfaceChunkSources.get(key);
+        const fields = sources?.fields || [];
+        const water = sources?.water || [];
+        const roads = sources?.roads || [];
         if (!fields.length && !water.length && !roads.length) {
             const emptySprite = { canvas: null, pixels: 0, left, top };
             this._surfaceChunkCache.set(key, emptySprite);
@@ -4493,6 +4830,25 @@ export class SurvivRenderer {
             break;
         }
     }
+
+    drawSurfaceChunkFallback(ctx, gridX, gridY) {
+        const key = gridX + ':' + gridY;
+        const sources = this._surfaceChunkSources.get(key);
+        if (!sources) return;
+        const tile = this._surfaceChunkTileSize;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(gridX * tile, gridY * tile, tile, tile);
+        ctx.clip();
+        for (const obstacle of sources.fields) this.drawObstacle(ctx, obstacle, false);
+        for (const obstacle of sources.water) this.drawObstacleShore(ctx, obstacle, false);
+        for (const obstacle of sources.roads) this.drawRoadShoulder(ctx, obstacle, false);
+        for (const obstacle of sources.water) this.drawObstacleBody(ctx, obstacle, false);
+        for (const obstacle of sources.roads) this.drawRoadBody(ctx, obstacle, false);
+        for (const obstacle of sources.roads) this.drawRoadMarkings(ctx, obstacle, false);
+        ctx.restore();
+    }
+
     drawSurfaceChunks(ctx, camX, camY, viewW, viewH, zoom) {
         if (typeof document === 'undefined' || !this.surfaceObstacles.length) return false;
         const tile = this._surfaceChunkTileSize;
@@ -4505,7 +4861,6 @@ export class SurvivRenderer {
         const required = this._surfaceChunkRequired;
         required.length = 0;
         let requiredCount = 0;
-        let allReady = true;
         this._surfaceChunkRequiredCount = (maxGridX - minGridX + 1) * (maxGridY - minGridY + 1);
 
         for (let gridY = minGridY; gridY <= maxGridY; gridY++) {
@@ -4517,20 +4872,24 @@ export class SurvivRenderer {
                     this._cacheBuildsThisFrame++;
                     sprite = this.buildSurfaceChunk(gridX, gridY);
                 }
-                if (!sprite) {
-                    allReady = false;
-                    continue;
-                }
                 const requiredEntry = required[requiredCount] || (required[requiredCount] = {});
                 requiredEntry.key = key;
                 requiredEntry.sprite = sprite;
+                requiredEntry.gridX = gridX;
+                requiredEntry.gridY = gridY;
                 requiredCount++;
             }
         }
         required.length = requiredCount;
-        if (!allReady) return false;
 
-        for (const { key, sprite } of required) {
+        for (const { key, sprite, gridX, gridY } of required) {
+            // Never switch the entire viewport back to expensive vector
+            // rendering because one edge tile is cold. Only that tile uses the
+            // clipped fallback, keeping every already-cached road pixel stable.
+            if (!sprite) {
+                this.drawSurfaceChunkFallback(ctx, gridX, gridY);
+                continue;
+            }
             this._surfaceChunkCache.delete(key);
             this._surfaceChunkCache.set(key, sprite);
             if (!sprite.canvas) continue;
@@ -5715,7 +6074,7 @@ export class SurvivRenderer {
 
             for (const hand of [topHand, bottomHand]) {
                 ctx.fillStyle = playerColor;
-                ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
@@ -5732,7 +6091,9 @@ export class SurvivRenderer {
             const progress = stabbing ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const stab = stabbing ? meleeStrikeMotion(progress, 0.22, 0.43) : 0;
             const extension = Math.max(0, stab);
-            const knifeSide = meleeHand === 'bottom' ? 1 : -1;
+            // A knife stays in the lower hand between attacks. Only unarmed
+            // punches alternate; swapping the weapon itself looked unnatural.
+            const knifeSide = 1;
             const windup = Math.max(0, -stab);
             const weaponOffsetX = r * (0.12 + stab * 0.86);
             const weaponOffsetY = knifeSide * (4.4 + windup * 3.5 - extension * 1.6);
@@ -5817,7 +6178,7 @@ export class SurvivRenderer {
 
             for (const hand of [guardHand, knifeHand]) {
                 ctx.fillStyle = playerColor;
-                ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.arc(hand.x, hand.y, 5.7, 0, Math.PI * 2);
