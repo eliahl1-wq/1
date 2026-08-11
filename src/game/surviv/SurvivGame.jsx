@@ -256,7 +256,7 @@ export default function SurvivGame() {
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const cashOutEndAtRef = useRef(0);
     const sessionStartAtRef = useRef(null);
-    const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 5 });
+    const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 5, adminFreeSurvivEntry: false });
     const reloadPendingRef = useRef(false);
     const useMedkitPendingRef = useRef(false);
     const pickupWeaponPendingRef = useRef(false);
@@ -363,7 +363,13 @@ export default function SurvivGame() {
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const entryFeeUsd = normalizeSurvivEntryFee(localStorage.getItem('selected_entry_fee'));
-    joinParamsRef.current = { nickname: matchNickname, entryFeeUsd };
+    // Preserve the requested join type across a direct refresh. The server
+    // remains authoritative and ignores this flag for every non-admin account.
+    const adminFreeSurvivEntry = (
+        location.state?.adminFreeSurvivEntry === true
+        || localStorage.getItem('admin_free_surviv_entry') === 'true'
+    );
+    joinParamsRef.current = { nickname: matchNickname, entryFeeUsd, adminFreeSurvivEntry };
 
     const { camRef: specCamRef, seed: seedSpecCam } = useSpectatorCamera({
         active: isSpectating,
@@ -454,6 +460,7 @@ export default function SurvivGame() {
                 token: authToken,
                 mode: 'surviv',
                 entryFeeUsd: joinParamsRef.current.entryFeeUsd,
+                adminFreeSurvivEntry: joinParamsRef.current.adminFreeSurvivEntry,
                 skinColor: preferredSkin,
             });
         }
@@ -624,6 +631,7 @@ export default function SurvivGame() {
                 token: authToken,
                 mode: 'surviv',
                 entryFeeUsd,
+                adminFreeSurvivEntry,
                 skinColor: preferredSkin,
             });
         };
@@ -1100,7 +1108,7 @@ export default function SurvivGame() {
             socket.off();
             socket.disconnect();
         };
-    }, [liveSession, authToken, matchNickname, entryFeeUsd, navigate, startCashoutCountdown, refreshUser, handleCloseInventory]);
+    }, [liveSession, authToken, matchNickname, entryFeeUsd, adminFreeSurvivEntry, navigate, startCashoutCountdown, refreshUser, handleCloseInventory]);
 
     const handleHoldStart = useCallback(() => {
         const renderer = rendererRef.current;
@@ -1234,7 +1242,7 @@ export default function SurvivGame() {
                         <p style={{ opacity: 0.62, lineHeight: 1.5 }}>
                             {connectionError || (isRejoining
                                 ? 'Your player is protected briefly while the connection recovers.'
-                                : `Entry: ${formatUsd(entryFeeUsd)}. Waiting for the server to confirm your session.`)}
+                                : `Entry: ${adminFreeSurvivEntry ? 'FREE ADMIN · PUBLIC MATCH' : formatUsd(entryFeeUsd)}. Waiting for the server to confirm your session.`)}
                         </p>
                     </div>
                 </div>
@@ -2016,4 +2024,3 @@ export default function SurvivGame() {
         </div>
     );
 }
-

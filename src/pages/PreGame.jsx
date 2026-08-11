@@ -365,6 +365,9 @@ export default function PreGame() {
         const stored = localStorage.getItem('selected_entry_fee');
         return (stored && stored !== 'null') ? Number(stored) : null;
     });
+    const [adminFreeSurvivEntry, setAdminFreeSurvivEntry] = useState(
+        () => localStorage.getItem('admin_free_surviv_entry') === 'true'
+    );
     const [activeEntryFee, setActiveEntryFee] = useState(null);
     const [currentGameMode, setCurrentGameMode] = useState(
         () => localStorage.getItem('current_game_mode') || null
@@ -422,6 +425,7 @@ export default function PreGame() {
         && (brAvailable || (isAlreadyInGame && isBRGamemode(currentGameMode)));
     const isCompetitiveSlitherMode = selectedMode === 'competitive-slither';
     const isSurvivMode = selectedMode === 'surviv';
+    const useAdminFreeSurvivEntry = !!user?.isAdmin && isSurvivMode && adminFreeSurvivEntry;
     const economyFeeForDisplay = entryFeeForSession || (
         isSurvivMode
             ? DEFAULT_SURVIV_ENTRY_FEE
@@ -505,9 +509,19 @@ export default function PreGame() {
     const balanceUsd = user?.balanceUsd ?? (balanceSol * solPrice);
     const freePlay = !!user?.freePlay;
 
+    useEffect(() => {
+        if (!user?.isAdmin) {
+            setAdminFreeSurvivEntry(false);
+            localStorage.removeItem('admin_free_surviv_entry');
+            return;
+        }
+        if (adminFreeSurvivEntry) localStorage.setItem('admin_free_surviv_entry', 'true');
+        else localStorage.removeItem('admin_free_surviv_entry');
+    }, [user?.isAdmin, adminFreeSurvivEntry]);
+
     const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
     const hasFreeTicket = hasUnlockedFreeTicket(user);
-    const canJoin = selectedEntryFee !== null && (freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
+    const canJoin = selectedEntryFee !== null && (freePlay || useAdminFreeSurvivEntry || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -842,6 +856,7 @@ export default function PreGame() {
         trackMixpanelEvent('game_started', {
             mode: selectedMode,
             entry_fee_usd: entryFeeForSession,
+            admin_free_surviv_entry: useAdminFreeSurvivEntry,
             is_battle_royale: isBattleRoyaleMode,
             is_rejoin: isAlreadyInGame && canRejoinThisMode,
             platform: 'web',
@@ -851,6 +866,7 @@ export default function PreGame() {
         refreshUser();
         localStorage.setItem('match_nickname', nickname);
         localStorage.setItem('selected_entry_fee', String(entryFeeForSession));
+        if (useAdminFreeSurvivEntry) localStorage.setItem('admin_free_surviv_entry', 'true');
 
         // Use Free Ticket check
         const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
@@ -898,6 +914,7 @@ export default function PreGame() {
                 nickname,
                 selectedMode: baseMode,
                 useFreeTicket: !isAlreadyInGame && isNormal5 && hasFreeTicket,
+                adminFreeSurvivEntry: !isAlreadyInGame && useAdminFreeSurvivEntry,
             },
         }), 1200);
     };
@@ -1380,7 +1397,9 @@ export default function PreGame() {
                             brAvailable={brAvailable}
                             playersByGamemode={displayedPlayersByGamemode}
                             heroPlayingCount={pregamePlayingCount}
-                            entryFeeLabel={freePlay
+                            entryFeeLabel={useAdminFreeSurvivEntry
+                                ? 'FREE PUBLIC'
+                                : freePlay
                                 ? 'FREE'
                                 : entryFeeForSession != null
                                     ? formatUsd(entryFeeForSession)
@@ -1554,7 +1573,11 @@ export default function PreGame() {
                                 <div className="entry-row" style={{ marginBottom: '14px' }}>
                                     <span className="label">Entry Fee</span>
                                     <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                                        {freePlay ? 'FREE (Test)' : (entryFeeForSession != null ? formatUsd(entryFeeForSession) : '—')}
+                                        {useAdminFreeSurvivEntry
+                                            ? 'FREE (Admin · Public)'
+                                            : freePlay
+                                                ? 'FREE (Test)'
+                                                : (entryFeeForSession != null ? formatUsd(entryFeeForSession) : '—')}
                                     </span>
                                 </div>
 
@@ -1579,11 +1602,48 @@ export default function PreGame() {
                                                     disabled={locked || isMatchmaking}
                                                     onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
                                                 >
-                                                    {freePlay ? 'FREE' : (isFreeTicketButton ? 'Free Ticket' : `$${tier}`)}
+                                                    {useAdminFreeSurvivEntry
+                                                        ? 'FREE PUBLIC'
+                                                        : freePlay
+                                                            ? 'FREE'
+                                                            : (isFreeTicketButton ? 'Free Ticket' : `$${tier}`)}
                                                 </button>
                                             );
                                         })}
                                     </div>
+                                    {user?.isAdmin && isSurvivMode && !isAlreadyInGame && (
+                                        <label
+                                            htmlFor="admin-free-surviv-entry"
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '9px',
+                                                marginTop: '10px',
+                                                padding: '10px 11px',
+                                                borderRadius: '8px',
+                                                border: '1px solid rgba(144,153,255,0.25)',
+                                                background: 'rgba(144,153,255,0.07)',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            <input
+                                                id="admin-free-surviv-entry"
+                                                type="checkbox"
+                                                checked={adminFreeSurvivEntry}
+                                                onChange={event => setAdminFreeSurvivEntry(event.target.checked)}
+                                                disabled={isMatchmaking}
+                                                style={{ accentColor: '#9099ff', marginTop: '2px', flexShrink: 0 }}
+                                            />
+                                            <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <span style={{ color: 'var(--text-h)', fontSize: '0.7rem', fontWeight: 750 }}>
+                                                    Join public Surviv for free
+                                                </span>
+                                                <span style={{ color: 'var(--text-3)', fontSize: '0.61rem', lineHeight: 1.4 }}>
+                                                    Same match as paid players. Your entry adds $0 to map loot and cannot produce a real payout.
+                                                </span>
+                                            </span>
+                                        </label>
+                                    )}
                                     {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user)) && (
                                         <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
                                             ✨ free ticket available
