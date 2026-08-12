@@ -1643,18 +1643,17 @@ export default function PreGame() {
                                             );
                                         })}
                                     </div>
-                                    {user?.isAdmin && !isAlreadyInGame && (
+                                    {user?.isAdmin && isSurvivMode && !isAlreadyInGame && (
                                         <label
                                             htmlFor="admin-free-surviv-entry"
-                                            className={`admin-free-surviv-option${isSurvivMode ? '' : ' admin-free-surviv-option--placeholder'}`}
-                                            aria-hidden={!isSurvivMode}
+                                            className="admin-free-surviv-option"
                                         >
                                             <input
                                                 id="admin-free-surviv-entry"
                                                 type="checkbox"
                                                 checked={adminFreeSurvivEntry}
                                                 onChange={event => setAdminFreeSurvivEntry(event.target.checked)}
-                                                disabled={!isSurvivMode || isMatchmaking}
+                                                disabled={isMatchmaking}
                                                 style={{ accentColor: '#9099ff', marginTop: '2px', flexShrink: 0 }}
                                             />
                                             <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
