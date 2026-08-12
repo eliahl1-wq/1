@@ -52,6 +52,15 @@ function isTournamentSession() {
   return mode === 'tournament-slither' && !!localStorage.getItem('current_tournament_id');
 }
 
+function hasStoredActiveGameSession() {
+  if (typeof window === 'undefined') return false;
+  // This is only a client-side route allowance. The game server remains the
+  // source of truth and will only rejoin a real active match for this account.
+  return ['agar', 'slither', 'competitive-slither', 'surviv'].includes(
+    localStorage.getItem('current_game_mode') || ''
+  );
+}
+
 function ArenaRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   const location = useLocation();
@@ -60,6 +69,10 @@ function ArenaRoute({ children }) {
   if (user?.freePlay) return children;
   if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
   if (isTournamentSession()) return children;
+  // Rejoining an existing match must not require another entry fee. In
+  // particular, an active $2 Slither Arena game can leave the account below
+  // the normal $5 route threshold after its original entry was reserved.
+  if (hasStoredActiveGameSession()) return children;
   const hasFreeTicket = hasUnlockedFreeTicket(user);
   // The server consumes the ticket during join, so the auth refresh can set freeTicketUsed before the game route renders.
   const hasFreeTicketSession = location.state?.useFreeTicket === true
