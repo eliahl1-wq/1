@@ -35,8 +35,10 @@ export default function PregameGamemodeSelector({
     entryFeeLabel,
     onSelectMode,
     cardRef,
+    guideSelection = false,
 }) {
-    const selectedPresentation = MODE_PRESENTATION[selectedMode] || MODE_PRESENTATION.agar;
+    const selectedPresentation = selectedMode ? (MODE_PRESENTATION[selectedMode] || MODE_PRESENTATION.agar) : null;
+    const showSelectionGuide = guideSelection && !selectedMode;
     const railRef = useRef(null);
 
     const scrollModes = (direction) => {
@@ -62,33 +64,37 @@ export default function PregameGamemodeSelector({
     return (
         <section className="mode-card mode-selector-card" ref={cardRef} aria-label="Choose gamemode">
             <div className="mode-selector-hero">
-                <GamemodePreview mode={selectedMode} className="mode-card-preview" />
+                {selectedMode && <GamemodePreview mode={selectedMode} className="mode-card-preview" />}
                 <div className="mode-card-overlay mode-selector-hero-overlay">
                     <div className="mode-card-header">
                         <span className="mode-card-label">Gamemode</span>
                         <div className="mode-card-title mode-card-title--stacked">
-                            {selectedPresentation.name.toUpperCase()}
+                            {selectedPresentation ? selectedPresentation.name.toUpperCase() : 'CHOOSE A GAME'}
                         </div>
-                        <div className="mode-card-subtitle">{selectedPresentation.subtype}</div>
+                        <div className="mode-card-subtitle">
+                            {selectedPresentation ? selectedPresentation.subtype : 'Select one below to continue'}
+                        </div>
                     </div>
 
                     <div className="mode-selector-hero-footer">
-                        <div className="mode-playing-count">
-                            <span className="live-dot" aria-hidden="true" />
-                            <span>Playing: <span className="mono">{heroPlayingCount}</span></span>
-                        </div>
+                        {selectedMode ? (
+                            <div className="mode-playing-count">
+                                <span className="live-dot" aria-hidden="true" />
+                                <span>Playing: <span className="mono">{heroPlayingCount}</span></span>
+                            </div>
+                        ) : <div />}
                         <div className="mode-selector-fee">
                             <span>Entry fee</span>
-                            <strong className="mono">{entryFeeLabel}</strong>
+                            <strong className="mono">{selectedMode ? entryFeeLabel : '—'}</strong>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="mode-selector-grid-wrap">
+            <div className={`mode-selector-grid-wrap${showSelectionGuide ? ' selection-step selection-step--active' : ''}`}>
                 <div className="mode-selector-grid-heading">
-                    <span>Gamemodes</span>
-                    <small>Use arrows to browse</small>
+                    <span>{showSelectionGuide ? 'Step 1 · Choose gamemode' : 'Gamemodes'}</span>
+                    <small>{showSelectionGuide ? 'Select one to continue' : 'Use arrows to browse'}</small>
                 </div>
                 <div className="mode-selector-carousel">
                     <button

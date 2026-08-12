@@ -68,10 +68,23 @@
 }
 
 .mode-selector-grid-wrap {
+    position: relative;
     padding: 14px;
     background:
         radial-gradient(circle at 50% 0%, rgba(124, 111, 240, 0.07), transparent 52%),
         #121218;
+}
+
+.mode-selector-grid-wrap.selection-step--active {
+    z-index: 1;
+    box-shadow:
+        inset 0 0 0 1px rgba(144, 153, 255, 0.48),
+        inset 0 0 28px rgba(124, 111, 240, 0.08);
+    animation: pregame-selection-pulse 2.2s ease-in-out infinite;
+}
+
+.mode-selector-grid-wrap.selection-step--active .mode-selector-grid-heading > span {
+    color: #c9c7ff;
 }
 
 .mode-selector-grid-heading {

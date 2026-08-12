@@ -4450,6 +4450,15 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 .wallet-card-actions .btn-primary:hover:not(:disabled){background:#816bf0}
 
 .game-card.main-card{padding:22px 24px 14px}
+.pregame-nickname-block{margin-bottom:14px}
+.lobby-stake-selection{position:relative;margin-bottom:16px}
+.lobby-stake-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.lobby-stake-heading .label{margin:0}
+.lobby-stake-current{color:var(--text-h);font-size:.82rem;font-weight:720}
+.lobby-stake-selection.selection-step--active{margin-inline:-12px;padding:11px 12px 12px;border:1px solid rgba(144,153,255,.42);border-radius:var(--r-md);background:rgba(124,111,240,.055);box-shadow:0 0 0 1px rgba(124,111,240,.035),0 0 22px rgba(124,111,240,.08);animation:pregame-selection-pulse 2.2s ease-in-out infinite}
+.lobby-stake-selection.selection-step--active .label{color:#c9c7ff}
+@keyframes pregame-selection-pulse{0%,100%{filter:brightness(1);box-shadow:0 0 0 1px rgba(124,111,240,.035),0 0 14px rgba(124,111,240,.045)}50%{filter:brightness(1.06);box-shadow:0 0 0 1px rgba(144,153,255,.09),0 0 24px rgba(124,111,240,.14)}}
+@media (prefers-reduced-motion:reduce){.selection-step--active{animation:none!important}}
 .game-card.main-card .hiw-wrap{margin-top:8px}
 .game-card.main-card .hiw-toggle{min-height:27px;font-size:.68rem;line-height:1}
 .play-btn{
@@ -4547,6 +4556,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 @media(max-width:768px){
   .wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:32px;font-size:.73rem}
   .game-card.main-card{padding:18px 18px 12px}
+  .lobby-stake-selection.selection-step--active{margin-inline:-8px;padding-inline:8px}
   .game-card.main-card .hiw-wrap{margin-top:7px}
   .game-card.main-card .hiw-toggle{min-height:27px}
   .play-btn{min-height:46px;font-size:.96rem}

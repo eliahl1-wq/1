@@ -120,7 +120,7 @@ function resolvePreGameMode(pathname, locationStateMode, isAdmin = false) {
         return 'slither';
     }
     if (pathname === '/surviv') return 'surviv';
-    const raw = stored || locationStateMode || 'agar';
+    const raw = locationStateMode || stored || 'agar';
     return normalizeGamemodeForLobby(raw, isAdmin);
 }
 
@@ -372,10 +372,38 @@ export default function PreGame() {
     const [currentGameMode, setCurrentGameMode] = useState(
         () => localStorage.getItem('current_game_mode') || null
     );
+    const freshSelectionInitializedRef = useRef(false);
+    const freshSelectionPendingRef = useRef(false);
 
     useEffect(() => {
-        localStorage.setItem('selected_gamemode', selectedMode);
+        if (selectedMode) {
+            localStorage.setItem('selected_gamemode', selectedMode);
+        } else {
+            localStorage.removeItem('selected_gamemode');
+        }
     }, [selectedMode]);
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            freshSelectionInitializedRef.current = false;
+            freshSelectionPendingRef.current = false;
+            return;
+        }
+        if (freshSelectionInitializedRef.current) return;
+        freshSelectionInitializedRef.current = true;
+
+        const isPlainPregameVisit = location.pathname === '/pre-game'
+            && !location.state?.selectedMode
+            && !tournamentId;
+        if (!isPlainPregameVisit) return;
+
+        freshSelectionPendingRef.current = true;
+        if (!isAlreadyInGame) {
+            setSelectedMode(null);
+            setSelectedEntryFee(null);
+            freshSelectionPendingRef.current = false;
+        }
+    }, [isAuthenticated, isAlreadyInGame, location.pathname, location.state?.selectedMode, tournamentId]);
 
     useEffect(() => {
         if (selectedEntryFee !== null && !isNaN(selectedEntryFee)) {
@@ -521,7 +549,7 @@ export default function PreGame() {
 
     const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
     const hasFreeTicket = hasUnlockedFreeTicket(user);
-    const canJoin = selectedEntryFee !== null && (freePlay || useAdminFreeSurvivEntry || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
+    const canJoin = !!selectedMode && selectedEntryFee !== null && (freePlay || useAdminFreeSurvivEntry || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = (v) => {
@@ -754,13 +782,15 @@ export default function PreGame() {
                     localStorage.setItem('selected_gamemode', d.mode);
                     if (d.entryFeeUsd) localStorage.setItem('selected_entry_fee', String(d.entryFeeUsd));
                 } else if (r.ok) {
-                    // Only clear active session — keep selected_gamemode so lobby shows the last mode played
                     setCurrentGameMode(null);
                     setActiveGameBalance(null);
                     setActiveEntryFee(null);
                     localStorage.removeItem('current_game_mode');
-                    const savedMode = localStorage.getItem('selected_gamemode');
-                    if (savedMode) setSelectedMode(normalizeGamemodeForLobby(savedMode, !!user?.isAdmin));
+                    if (freshSelectionPendingRef.current) {
+                        setSelectedMode(null);
+                        setSelectedEntryFee(null);
+                        freshSelectionPendingRef.current = false;
+                    }
                 }
             } catch { /* ignore */ }
         };
@@ -845,6 +875,7 @@ export default function PreGame() {
     // ── Handlers ───────────────────────────────────────
     const handleStartMatch = () => {
         if (!isAuthenticated) { navigate('/login'); return; }
+        if (!selectedMode) return;
 
         if (isAlreadyInGame && !canRejoinThisMode) return;
 
@@ -959,7 +990,7 @@ export default function PreGame() {
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
         : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
             : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
-                : selectedEntryFee === null ? 'play-btn play-btn-disabled'
+                : !selectedMode || selectedEntryFee === null ? 'play-btn play-btn-disabled'
                     : canJoin ? 'play-btn play-btn-ready'
                         : 'play-btn play-btn-disabled';
 
@@ -980,7 +1011,9 @@ export default function PreGame() {
                 ? 'Rejoin'
                 : (isAlreadyInGame && !canRejoinThisMode)
                     ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'surviv' ? 'Surviv' : currentGameMode === 'slither' || currentGameMode === 'competitive-slither' ? 'Slither' : 'Agar')} — switch mode`
-                    : selectedEntryFee === null
+                    : !selectedMode
+                        ? 'Choose Gamemode'
+                        : selectedEntryFee === null
                         ? (isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake')
                         : canJoin ? (isBattleRoyaleMode ? 'Find Match' : 'Play')
                             : 'Deposit to Play';
@@ -988,7 +1021,7 @@ export default function PreGame() {
     const showPlayIcon = !isMatchmaking && (
         !isAuthenticated ||
         (isAlreadyInGame && canRejoinThisMode) ||
-        (!isAlreadyInGame && selectedEntryFee !== null)
+        (!isAlreadyInGame && !!selectedMode && selectedEntryFee !== null)
     );
     const panelOpen = isWalletExpanded || isWithdrawExpanded;
 
@@ -1397,6 +1430,7 @@ export default function PreGame() {
                             brAvailable={brAvailable}
                             playersByGamemode={displayedPlayersByGamemode}
                             heroPlayingCount={pregamePlayingCount}
+                            guideSelection={isAuthenticated && !isAlreadyInGame}
                             entryFeeLabel={useAdminFreeSurvivEntry
                                 ? 'FREE PUBLIC'
                                 : freePlay
@@ -1407,21 +1441,7 @@ export default function PreGame() {
                             onSelectMode={(modeId) => {
                                 if (isBRGamemode(modeId) && !brAvailable) return;
                                 const nextMode = normalizeGamemodeForLobby(modeId, !!user?.isAdmin);
-                                const nextTiers = nextMode === 'surviv'
-                                    ? SURVIV_ENTRY_TIERS
-                                    : nextMode === 'competitive-slither'
-                                        ? COMPETITIVE_ENTRY_TIERS
-                                        : isBRGamemode(nextMode)
-                                            ? BR_ENTRY_TIERS
-                                            : ENTRY_TIERS;
-                                const nextDefault = nextMode === 'surviv'
-                                    ? DEFAULT_SURVIV_ENTRY_FEE
-                                    : nextMode === 'competitive-slither'
-                                        ? DEFAULT_COMPETITIVE_ENTRY_FEE
-                                        : isBRGamemode(nextMode)
-                                            ? DEFAULT_BR_ENTRY_FEE
-                                            : DEFAULT_ENTRY_FEE;
-                                setSelectedEntryFee((current) => current === null || nextTiers.includes(current) ? current : nextDefault);
+                                setSelectedEntryFee(null);
                                 setSelectedMode(nextMode);
                             }}
                             cardRef={modeCardRef}
@@ -1452,7 +1472,7 @@ export default function PreGame() {
                             )}
 
                             <div className="game-card main-card" ref={mainCardRef}>
-                                <div style={{ marginBottom: '18px' }}>
+                                <div className="pregame-nickname-block">
                                     <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
                                         Nickname
                                     </label>
@@ -1568,24 +1588,22 @@ export default function PreGame() {
                                     </label>
                                 </div>
 
-                                <div className="divider" style={{ marginBottom: '14px' }} />
-
-                                <div className="entry-row" style={{ marginBottom: '14px' }}>
-                                    <span className="label">Entry Fee</span>
-                                    <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                                        {useAdminFreeSurvivEntry
-                                            ? 'FREE (Admin · Public)'
-                                            : freePlay
-                                                ? 'FREE (Test)'
-                                                : (entryFeeForSession != null ? formatUsd(entryFeeForSession) : '—')}
-                                    </span>
-                                </div>
-
                                 {/* Stake Selection Selector */}
-                                <div className="lobby-stake-selection" style={{ marginBottom: '18px' }}>
-                                    <label className="label" style={{ display: 'block', marginBottom: '8px' }}>
-                                        {isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake'}
-                                    </label>
+                                <div className={`lobby-stake-selection${isAuthenticated && selectedMode && selectedEntryFee === null && !isAlreadyInGame ? ' selection-step selection-step--active' : ''}`}>
+                                    <div className="lobby-stake-heading">
+                                        <label className="label">
+                                            {isAuthenticated && selectedMode && selectedEntryFee === null && !isAlreadyInGame
+                                                ? 'Step 2 · Choose amount'
+                                                : isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake'}
+                                        </label>
+                                        <span className="lobby-stake-current mono">
+                                            {useAdminFreeSurvivEntry
+                                                ? 'FREE'
+                                                : freePlay
+                                                    ? 'FREE'
+                                                    : (entryFeeForSession != null ? formatUsd(entryFeeForSession) : '—')}
+                                        </span>
+                                    </div>
                                     <div className="lobby-tier-row">
                                         {tierOptions.map(tier => {
                                             const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
@@ -1599,7 +1617,7 @@ export default function PreGame() {
                                                     key={tier}
                                                     type="button"
                                                     className={`lobby-tier-btn${active ? ' lobby-tier-btn--active' : ''}${locked ? ' lobby-tier-btn--locked' : ''}`}
-                                                    disabled={locked || isMatchmaking}
+                                                    disabled={!selectedMode || locked || isMatchmaking}
                                                     onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
                                                 >
                                                     {useAdminFreeSurvivEntry
@@ -1644,7 +1662,7 @@ export default function PreGame() {
                                             </span>
                                         </label>
                                     )}
-                                    {(!isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user)) && (
+                                    {(selectedMode && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user)) && (
                                         <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
                                             ✨ free ticket available
                                         </div>
@@ -1654,7 +1672,7 @@ export default function PreGame() {
                                 <button
                                     className={playBtnClass}
                                     onClick={handleStartMatch}
-                                    disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode) || (isAuthenticated && !isAlreadyInGame && selectedEntryFee === null)}
+                                    disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode) || (isAuthenticated && !isAlreadyInGame && (!selectedMode || selectedEntryFee === null))}
                                 >
                                     {showPlayIcon && <PlayIcon />}
                                     <span className="play-btn-label">{playBtnLabel}</span>
@@ -1669,12 +1687,12 @@ export default function PreGame() {
                                 )}
 
 
-                                <div className="hiw-wrap">
+                                {selectedMode && <div className="hiw-wrap">
                                     <div
                                         className="hiw-toggle"
                                         onClick={() => setShowHowItWorks(v => !v)}
                                     >
-                                        <span>How it works</span>
+                                        <span>Game details</span>
                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
                                             style={{ transform: showHowItWorks ? 'rotate(180deg)' : 'rotate(0)', transition: '0.2s' }}>
                                             <path d="M6 9l6 6 6-6" />
@@ -1752,7 +1770,7 @@ export default function PreGame() {
                                             )}
                                         </div>
                                     </div>
-                                </div>
+                                </div>}
                             </div>
 
                             {/* Customize Lobby Card */}
