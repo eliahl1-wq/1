@@ -3329,29 +3329,33 @@ export class SurvivRenderer {
             }
 
             if (markingIntervals.length) {
-                ctx.strokeStyle = 'rgba(235, 185, 60, 0.76)';
-                ctx.lineWidth = 2.5;
-                // Draw explicit world-anchored dashes. A native dashed path restarts
-                // at the camera-clipped path edge, which makes the markings appear
-                // to slide as that edge moves with the player.
-                const dashLength = 18;
-                const dashPeriod = 36;
-                const roadAxisStart = -length / 2;
-                ctx.beginPath();
-                for (const interval of markingIntervals) {
-                    const firstDashIndex = Math.floor((interval.start - roadAxisStart) / dashPeriod);
-                    for (let dashIndex = firstDashIndex; ; dashIndex++) {
-                        const dashStart = roadAxisStart + dashIndex * dashPeriod;
-                        if (dashStart >= interval.end) break;
-                        const clippedStart = Math.max(interval.start, dashStart);
-                        const clippedEnd = Math.min(interval.end, dashStart + dashLength);
-                        if (clippedEnd > clippedStart) line(clippedStart, clippedEnd, 0);
+                const isNetworkRoad = o.role === 'networkRoad';
+                if (isNetworkRoad) {
+                    ctx.strokeStyle = 'rgba(235, 185, 60, 0.76)';
+                    ctx.lineWidth = 2.5;
+                    // Explicit world-anchored dashes never slide when the
+                    // camera-clipped drawing range changes.
+                    const dashLength = 18;
+                    const dashPeriod = 36;
+                    const roadAxisStart = -length / 2;
+                    ctx.beginPath();
+                    for (const interval of markingIntervals) {
+                        const firstDashIndex = Math.floor((interval.start - roadAxisStart) / dashPeriod);
+                        for (let dashIndex = firstDashIndex; ; dashIndex++) {
+                            const dashStart = roadAxisStart + dashIndex * dashPeriod;
+                            if (dashStart >= interval.end) break;
+                            const clippedStart = Math.max(interval.start, dashStart);
+                            const clippedEnd = Math.min(interval.end, dashStart + dashLength);
+                            if (clippedEnd > clippedStart) line(clippedStart, clippedEnd, 0);
+                        }
                     }
+                    ctx.stroke();
                 }
-                ctx.stroke();
 
-                ctx.strokeStyle = 'rgba(240, 240, 240, 0.52)';
-                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = isNetworkRoad
+                    ? 'rgba(240, 240, 240, 0.52)'
+                    : 'rgba(224, 226, 220, 0.24)';
+                ctx.lineWidth = isNetworkRoad ? 1.5 : 1.2;
                 const edge = width / 2 - 8;
                 ctx.beginPath();
                 for (const interval of markingIntervals) {
@@ -3570,6 +3574,40 @@ export class SurvivRenderer {
 
         ctx.save();
         ctx.shadowBlur = 0;
+        if (o.variant === 'parkingLot') {
+            ctx.fillStyle = '#3b3d3a';
+            roundRect(ctx, -hw, -hh, o.w, o.h, 18);
+            ctx.fill();
+            ctx.strokeStyle = '#646057';
+            ctx.lineWidth = 10;
+            roundRect(ctx, -hw + 5, -hh + 5, o.w - 10, o.h - 10, 14);
+            ctx.stroke();
+
+            // Restrained parking bays make the gas forecourt read as a real
+            // paved lot instead of a road passing underneath the building.
+            ctx.strokeStyle = 'rgba(224, 220, 192, 0.36)';
+            ctx.lineWidth = 2;
+            const bayDepth = Math.min(135, o.h * 0.22);
+            for (let x = -hw + 100; x <= hw - 100; x += 115) {
+                ctx.beginPath();
+                ctx.moveTo(x, hh - 18);
+                ctx.lineTo(x, hh - bayDepth);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = 'rgba(18, 19, 18, 0.36)';
+            ctx.lineWidth = 1.4;
+            for (let i = 0; i < 7; i++) {
+                const x = -hw * 0.76 + seededNoise(o.x * 0.01 + i * 7, o.y * 0.01) * o.w * 0.72;
+                const y = -hh * 0.56 + seededNoise(o.y * 0.01 + i * 11, o.x * 0.01) * o.h * 0.58;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + 15, y + 8);
+                ctx.lineTo(x + 25, y + 3);
+                ctx.stroke();
+            }
+            ctx.restore();
+            return;
+        }
         ctx.beginPath();
         for (let i = 0; i <= steps; i++) {
             const t = i / steps;
@@ -3807,25 +3845,14 @@ export class SurvivRenderer {
             roundRect(ctx, -o.w / 2 + 3, -o.h / 2 + 3, o.w - 6, o.h - 6, 4);
             ctx.stroke();
         } else if (kind === 'door') {
+            // Door entities define traversal and visibility only. From a
+            // top-down view the opening is already formed by the surrounding
+            // wall geometry, so drawing a slab, threshold or dark rectangle
+            // here would look like an artificial door marker.
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
-            const industrial = o.variant === 'ironworks' || o.variant === 'metal';
-            const doorSide = o.orientation || o.role;
-            const verticalDoor = doorSide === 'east' || doorSide === 'west';
-            // Surviv-style doorway: just an opening cut through the wall and a
-            // thin threshold. No top-down door slab, frame or artificial glow.
-            ctx.fillStyle = industrial ? 'rgba(8, 13, 15, 0.82)' : 'rgba(13, 11, 8, 0.76)';
-            ctx.fillRect(-o.w / 2, -o.h / 2, o.w, o.h);
-            ctx.fillStyle = industrial ? 'rgba(133, 168, 176, 0.50)' : 'rgba(176, 151, 104, 0.48)';
-            if (verticalDoor) {
-                const thresholdX = doorSide === 'west' ? -o.w / 2 + 2 : o.w / 2 - 5;
-                ctx.fillRect(thresholdX, -o.h / 2 + 7, 3, Math.max(5, o.h - 14));
-            } else {
-                const thresholdY = doorSide === 'north' ? -o.h / 2 + 2 : o.h / 2 - 5;
-                ctx.fillRect(-o.w / 2 + 7, thresholdY, Math.max(5, o.w - 14), 3);
-            }
         } else if (kind === 'wall' || kind === 'interiorWall') {
             // Wall with gradient and brick/stone texture
             const wallColors = {
@@ -6793,19 +6820,6 @@ export class SurvivRenderer {
             roundRect(ctx, -hw + 5, -hh + 5, o.w - 10, o.h - 10, 5);
             ctx.stroke();
 
-            ctx.save();
-            ctx.fillStyle = 'rgba(9, 15, 18, 0.66)';
-            roundRect(ctx, -170, -32, 340, 64, 7);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(232, 174, 48, 0.72)';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.fillStyle = 'rgba(226, 235, 236, 0.90)';
-            ctx.font = '900 30px ui-sans-serif, system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(o.label || 'IRONWORKS', 0, 1);
-            ctx.restore();
         } else if (variant === 'warehouse') {
             // --- WAREHOUSE: Corrugated sheet metal roof ---
             const mainColor = '#5c6b73';
@@ -6997,20 +7011,6 @@ export class SurvivRenderer {
                     ctx.lineTo(sx, uy + 9);
                     ctx.stroke();
                 }
-            }
-
-            if (o.role === 'reception') {
-                ctx.fillStyle = 'rgba(47, 22, 18, 0.92)';
-                ctx.strokeStyle = '#d19a62';
-                ctx.lineWidth = 2.5;
-                roundRect(ctx, -82, -18, 164, 36, 5);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = '#f3d7a1';
-                ctx.font = '900 16px ui-sans-serif, system-ui, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('SUNSET MOTEL', 0, 1);
             }
 
         } else if (variant === 'lodge') {
@@ -7460,25 +7460,6 @@ export class SurvivRenderer {
             ctx.moveTo(-hw + 14, -1);
             ctx.lineTo(hw - 14, -1);
             ctx.stroke();
-        }
-
-        // Keep exterior entrances readable as simple gaps in the roof edge.
-        // The nearby reveal handles all interior feedback instead of drawing a
-        // fake door panel from above.
-        const roofDoors = this._doorwaysByHouseId.get(o.id) || [];
-        for (const door of roofDoors) {
-            const doorX = door.x - o.x;
-            const doorY = door.y - o.y;
-            const doorSide = door.orientation || door.role;
-            const verticalDoor = doorSide === 'east' || doorSide === 'west';
-            const entryW = verticalDoor ? Math.max(18, door.w) : Math.max(door.w, 76);
-            const entryH = verticalDoor ? Math.max(door.h, 76) : Math.max(18, door.h);
-            ctx.fillStyle = 'rgba(10, 9, 7, 0.80)';
-            if (verticalDoor) {
-                ctx.fillRect(doorX - entryW / 2, doorY - entryH / 2, entryW, entryH);
-            } else {
-                ctx.fillRect(doorX - entryW / 2, doorY - entryH / 2, entryW, entryH);
-            }
         }
 
         ctx.restore();
