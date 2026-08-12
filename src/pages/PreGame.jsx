@@ -372,13 +372,19 @@ export default function PreGame() {
     const [currentGameMode, setCurrentGameMode] = useState(
         () => localStorage.getItem('current_game_mode') || null
     );
+    const modeSelectionMadeRef = useRef(Boolean(
+        localStorage.getItem('selected_gamemode')
+        || localStorage.getItem('current_game_mode')
+        || location.state?.selectedMode
+        || ['/agar', '/slither', '/surviv'].includes(location.pathname)
+    ));
     const freshSelectionInitializedRef = useRef(false);
     const freshSelectionPendingRef = useRef(false);
 
     useEffect(() => {
-        if (selectedMode) {
+        if (selectedMode && modeSelectionMadeRef.current) {
             localStorage.setItem('selected_gamemode', selectedMode);
-        } else {
+        } else if (!selectedMode) {
             localStorage.removeItem('selected_gamemode');
         }
     }, [selectedMode]);
@@ -397,8 +403,13 @@ export default function PreGame() {
             && !tournamentId;
         if (!isPlainPregameVisit) return;
 
+        // A real user choice survives reloads. Only a completely fresh lobby
+        // should begin with no selected gamemode or amount.
+        if (localStorage.getItem('selected_gamemode')) return;
+
         freshSelectionPendingRef.current = true;
         if (!isAlreadyInGame) {
+            modeSelectionMadeRef.current = false;
             setSelectedMode(null);
             setSelectedEntryFee(null);
             freshSelectionPendingRef.current = false;
@@ -787,6 +798,7 @@ export default function PreGame() {
                     setActiveEntryFee(null);
                     localStorage.removeItem('current_game_mode');
                     if (freshSelectionPendingRef.current) {
+                        modeSelectionMadeRef.current = false;
                         setSelectedMode(null);
                         setSelectedEntryFee(null);
                         freshSelectionPendingRef.current = false;
@@ -1441,6 +1453,8 @@ export default function PreGame() {
                             onSelectMode={(modeId) => {
                                 if (isBRGamemode(modeId) && !brAvailable) return;
                                 const nextMode = normalizeGamemodeForLobby(modeId, !!user?.isAdmin);
+                                modeSelectionMadeRef.current = true;
+                                localStorage.setItem('selected_gamemode', nextMode);
                                 setSelectedEntryFee(null);
                                 setSelectedMode(nextMode);
                             }}
@@ -1555,7 +1569,7 @@ export default function PreGame() {
                         </div>
                     ) : (
                         <div className="center-panel-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-                            <div className="game-card main-card">
+                            <div className="game-card main-card pregame-play-card">
                                 {/* Nickname field */}
                                 <div style={{ marginBottom: '18px' }}>
                                     <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
@@ -1629,27 +1643,18 @@ export default function PreGame() {
                                             );
                                         })}
                                     </div>
-                                    {user?.isAdmin && isSurvivMode && !isAlreadyInGame && (
+                                    {user?.isAdmin && !isAlreadyInGame && (
                                         <label
                                             htmlFor="admin-free-surviv-entry"
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'flex-start',
-                                                gap: '9px',
-                                                marginTop: '10px',
-                                                padding: '10px 11px',
-                                                borderRadius: '8px',
-                                                border: '1px solid rgba(144,153,255,0.25)',
-                                                background: 'rgba(144,153,255,0.07)',
-                                                cursor: 'pointer',
-                                            }}
+                                            className={`admin-free-surviv-option${isSurvivMode ? '' : ' admin-free-surviv-option--placeholder'}`}
+                                            aria-hidden={!isSurvivMode}
                                         >
                                             <input
                                                 id="admin-free-surviv-entry"
                                                 type="checkbox"
                                                 checked={adminFreeSurvivEntry}
                                                 onChange={event => setAdminFreeSurvivEntry(event.target.checked)}
-                                                disabled={isMatchmaking}
+                                                disabled={!isSurvivMode || isMatchmaking}
                                                 style={{ accentColor: '#9099ff', marginTop: '2px', flexShrink: 0 }}
                                             />
                                             <span style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -1662,11 +1667,11 @@ export default function PreGame() {
                                             </span>
                                         </label>
                                     )}
-                                    {(selectedMode && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user)) && (
-                                        <div style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
-                                            ✨ free ticket available
-                                        </div>
-                                    )}
+                                    <div className="lobby-stake-note" aria-live="polite">
+                                        {(selectedMode && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user))
+                                            ? '✨ free ticket available'
+                                            : '\u00a0'}
+                                    </div>
                                 </div>
 
                                 <button
@@ -1687,10 +1692,10 @@ export default function PreGame() {
                                 )}
 
 
-                                {selectedMode && <div className="hiw-wrap">
+                                <div className={`hiw-wrap${selectedMode ? '' : ' hiw-wrap--placeholder'}`} aria-hidden={!selectedMode}>
                                     <div
                                         className="hiw-toggle"
-                                        onClick={() => setShowHowItWorks(v => !v)}
+                                        onClick={() => selectedMode && setShowHowItWorks(v => !v)}
                                     >
                                         <span>Game details</span>
                                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
@@ -1770,7 +1775,7 @@ export default function PreGame() {
                                             )}
                                         </div>
                                     </div>
-                                </div>}
+                                </div>
                             </div>
 
                             {/* Customize Lobby Card */}
