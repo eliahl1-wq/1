@@ -1666,11 +1666,11 @@ export default function PreGame() {
                                             </span>
                                         </label>
                                     )}
-                                    <div className="lobby-stake-note" aria-live="polite">
-                                        {(selectedMode && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user))
-                                            ? '✨ free ticket available'
-                                            : '\u00a0'}
-                                    </div>
+                                    {selectedMode && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode && hasUnlockedFreeTicket(user) && (
+                                        <div className="lobby-stake-note" aria-live="polite">
+                                            ✨ free ticket available
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button
