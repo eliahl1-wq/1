@@ -251,7 +251,7 @@ export default function GameSocialOverlay({ socket, disabled = false, onEmote, o
                             value={draft}
                             maxLength={180}
                             onChange={(event) => setDraft(event.target.value)}
-                            placeholder="Skriv till spelarna..."
+                            placeholder="Type a message..."
                             onKeyDown={(event) => event.stopPropagation()}
                             style={{ flex: 1, minWidth: 0, padding: '10px 12px', color: '#fff', background: 'transparent', border: 0, outline: 0, fontSize: 13 }}
                         />
