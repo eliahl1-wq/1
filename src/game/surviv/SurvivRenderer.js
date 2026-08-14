@@ -434,6 +434,26 @@ const lerpAngle = (a, b, t) => {
     return a + diff * t;
 };
 
+function getDoorCollisionRect(door) {
+    if (!door?.isOpen) return door;
+    const horizontal = door.w >= door.h;
+    const length = horizontal ? door.w : door.h;
+    const thickness = horizontal ? door.h : door.w;
+    const baseRotation = (Number(door.rotation) || 0) + (horizontal ? 0 : Math.PI / 2);
+    const swing = (Number(door.openDirection) === -1 ? -1 : 1) * Math.PI / 2;
+    const hingeX = door.x - Math.cos(baseRotation) * length / 2;
+    const hingeY = door.y - Math.sin(baseRotation) * length / 2;
+    const rotation = baseRotation + swing;
+    return {
+        ...door,
+        x: hingeX + Math.cos(rotation) * length / 2,
+        y: hingeY + Math.sin(rotation) * length / 2,
+        w: length,
+        h: thickness,
+        rotation,
+    };
+}
+
 function pointInsideRotatedObstacle(obstacle, x, y, padding = 0) {
     const rotation = Number(obstacle?.rotation) || 0;
     const dx = x - (Number(obstacle?.x) || 0);
@@ -2401,8 +2421,14 @@ export class SurvivRenderer {
             const sin = Math.abs(Math.sin(rotation));
             const halfW = Math.abs(Number(o.w) || 0) / 2;
             const halfH = Math.abs(Number(o.h) || 0) / 2;
-            o._renderHalfW = cos * halfW + sin * halfH;
-            o._renderHalfH = sin * halfW + cos * halfH;
+            if (o.kind === 'door') {
+                const swingExtent = Math.max(halfW * 2, halfH * 2) + Math.min(halfW, halfH);
+                o._renderHalfW = swingExtent;
+                o._renderHalfH = swingExtent;
+            } else {
+                o._renderHalfW = cos * halfW + sin * halfH;
+                o._renderHalfH = sin * halfW + cos * halfH;
+            }
 
             if (!SURFACE_KINDS.has(o.kind) && o.kind !== 'roomZone') {
                 const house = o.houseId
@@ -2481,17 +2507,24 @@ export class SurvivRenderer {
             const houseObstacles = this._renderObstaclesByHouseId.get(house.id) || [];
             for (const obstacle of houseObstacles) {
                 if (!LOS_BLOCKING_KINDS.has(obstacle.kind)) continue;
-                if (obstacle.kind === 'door' && obstacle.isOpen) continue;
-                const left = obstacle.x - obstacle.w / 2;
-                const right = obstacle.x + obstacle.w / 2;
-                const top = obstacle.y - obstacle.h / 2;
-                const bottom = obstacle.y + obstacle.h / 2;
-                segments.push(
-                    { ax: left, ay: top, bx: right, by: top },
-                    { ax: right, ay: top, bx: right, by: bottom },
-                    { ax: right, ay: bottom, bx: left, by: bottom },
-                    { ax: left, ay: bottom, bx: left, by: top },
-                );
+                const shape = obstacle.kind === 'door' ? getDoorCollisionRect(obstacle) : obstacle;
+                const rotation = Number(shape.rotation) || 0;
+                const cos = Math.cos(rotation);
+                const sin = Math.sin(rotation);
+                const halfW = shape.w / 2;
+                const halfH = shape.h / 2;
+                const corners = [
+                    [-halfW, -halfH], [halfW, -halfH],
+                    [halfW, halfH], [-halfW, halfH],
+                ].map(([localX, localY]) => ({
+                    x: shape.x + localX * cos - localY * sin,
+                    y: shape.y + localX * sin + localY * cos,
+                }));
+                for (let index = 0; index < corners.length; index++) {
+                    const start = corners[index];
+                    const end = corners[(index + 1) % corners.length];
+                    segments.push({ ax: start.x, ay: start.y, bx: end.x, by: end.y });
+                }
             }
             const vertices = [];
             const seenVertices = new Set();
@@ -2529,8 +2562,8 @@ export class SurvivRenderer {
                 for (const obstacle of bucket) {
                     if (seen.has(obstacle.id)) continue;
                     seen.add(obstacle.id);
-                    if (obstacle.kind === 'door' && obstacle.isOpen) continue;
-                    if (this.pointInsideRect(obstacle, x, y, padding)) return obstacle;
+                    const collisionShape = obstacle.kind === 'door' ? getDoorCollisionRect(obstacle) : obstacle;
+                    if (this.pointInsideRect(collisionShape, x, y, padding)) return obstacle;
                 }
             }
         }
@@ -2570,8 +2603,18 @@ export class SurvivRenderer {
     }
 
     pointInsideRect(o, x, y, pad = 0) {
-        return x >= o.x - o.w / 2 - pad && x <= o.x + o.w / 2 + pad
-            && y >= o.y - o.h / 2 - pad && y <= o.y + o.h / 2 + pad;
+        const rotation = -(Number(o.rotation) || 0);
+        if (Math.abs(rotation) < 0.00001) {
+            return x >= o.x - o.w / 2 - pad && x <= o.x + o.w / 2 + pad
+                && y >= o.y - o.h / 2 - pad && y <= o.y + o.h / 2 + pad;
+        }
+        const dx = x - o.x;
+        const dy = y - o.y;
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+        return Math.abs(localX) <= o.w / 2 + pad && Math.abs(localY) <= o.h / 2 + pad;
     }
 
     findHouseContainingPoint(x, y, inset = -2) {
@@ -3279,11 +3322,11 @@ export class SurvivRenderer {
                     this.drawHouseRoof(ctx, o);
                 }
             }
-            // From outdoors the roof hides the panel. Only a slim threshold at
-            // the wall edge remains visible, matching a top-down house silhouette.
+            // Exterior doors are clipped to the outside of the roof. A closed
+            // door leaves a small lip; an outward-open door shows its full leaf.
             for (const door of this.doorways) {
                 if (door.entranceRole !== 'interiorDoor' && this.isObstacleInView(door, 40)) {
-                    this.drawExteriorDoorEdge(ctx, door);
+                    this.drawExteriorDoorOutside(ctx, door);
                 }
             }
         }
@@ -4478,6 +4521,34 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawExteriorDoorOutside(ctx, door) {
+        const house = this._housesById.get(door.houseId);
+        if (!house) {
+            this.drawExteriorDoorEdge(ctx, door);
+            return;
+        }
+
+        // Roof art overhangs the floor footprint by roughly five pixels. Use an
+        // even-odd clip so the door can exist outside while no part bleeds
+        // through the opaque roof. Inward swings therefore stay hidden.
+        const roofOverhang = 6;
+        const extent = Math.max(this.viewW, this.viewH) / Math.max(0.2, this.zoom) + 600;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(house.x - extent, house.y - extent, extent * 2, extent * 2);
+        ctx.rect(
+            house.x - house.w / 2 - roofOverhang,
+            house.y - house.h / 2 - roofOverhang,
+            house.w + roofOverhang * 2,
+            house.h + roofOverhang * 2,
+        );
+        ctx.clip('evenodd');
+        this.drawObstacle(ctx, door);
+        ctx.restore();
+
+        this.drawExteriorDoorEdge(ctx, door);
+    }
+
     drawNearbyDoorPrompt(ctx) {
         const door = this.getNearbyDoor();
         if (!door) return;
@@ -4771,7 +4842,7 @@ export class SurvivRenderer {
 
             const swingDirection = Number(o.openDirection) === -1 ? -1 : 1;
             ctx.translate(-panelLength / 2, 0);
-            ctx.rotate(swingDirection * progress * Math.PI * 0.48);
+            ctx.rotate(swingDirection * progress * Math.PI / 2);
             const doorGrad = ctx.createLinearGradient(0, -panelThickness / 2, 0, panelThickness / 2);
             doorGrad.addColorStop(0, panelColor);
             doorGrad.addColorStop(1, panelDark);
