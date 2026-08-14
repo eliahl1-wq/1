@@ -30,14 +30,14 @@ const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
 const WEAPON_LABELS = {
     fists: 'Fists',
     knife: 'Combat Knife',
-    pistol: 'M9 Pistol',
-    revolver: 'R8 Revolver',
-    smg: 'Vector SMG',
-    shotgun: 'Pump Shotgun',
-    assault: 'Scout Rifle',
-    dmr: 'Falcon DMR',
-    sniper: 'AWM Sniper',
-    lmg: 'M249 LMG',
+    pistol: 'M9',
+    revolver: 'OT-38',
+    smg: 'MP5',
+    shotgun: 'M870',
+    assault: 'M416',
+    dmr: 'M39 EMR',
+    sniper: 'Mosin-Nagant',
+    lmg: 'M249',
 };
 
 // Server slots stay 0/1 for firearms and 2 for melee. The HUD/key order is melee first.
@@ -50,10 +50,10 @@ const WEAPON_CLIP_SIZES = {
     revolver: 6,
     smg: 30,
     shotgun: 6,
-    assault: 22,
+    assault: 30,
     dmr: 10,
     sniper: 5,
-    lmg: 45,
+    lmg: 100,
 };
 
 const AMMO_TYPES = {
@@ -677,9 +677,21 @@ export default function SurvivGame() {
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
             renderer.handlePointerDown();
-
+            if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
+                const payload = renderer.getInputPayload();
+                payload.shooting = true;
+                socket.emit('survivInput', payload);
+            }
         };
-        const onPointerUp = () => { if (!cashoutActiveRef.current) renderer.handlePointerUp(); };
+        const onPointerUp = () => {
+            if (cashoutActiveRef.current) return;
+            renderer.handlePointerUp();
+            if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
+                const payload = renderer.getInputPayload();
+                payload.shooting = false;
+                socket.emit('survivInput', payload);
+            }
+        };
         let lastWeaponWheelAt = 0;
         let wheelWeaponSlot = null;
         const onWheel = (e) => {

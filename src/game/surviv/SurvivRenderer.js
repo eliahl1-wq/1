@@ -10,14 +10,14 @@ import { drawGameMinimap } from '../minimap.js';
 const WEAPON_LABELS = {
     fists: 'Fists',
     knife: 'Combat Knife',
-    pistol: 'M9 Pistol',
-    revolver: 'R8 Revolver',
-    smg: 'Vector SMG',
-    shotgun: 'Pump Shotgun',
-    assault: 'Scout Rifle',
-    dmr: 'Falcon DMR',
-    sniper: 'AWM Sniper',
-    lmg: 'M249 LMG',
+    pistol: 'M9',
+    revolver: 'OT-38',
+    smg: 'MP5',
+    shotgun: 'M870',
+    assault: 'M416',
+    dmr: 'M39 EMR',
+    sniper: 'Mosin-Nagant',
+    lmg: 'M249',
 };
 
 const RARITY_COLORS = {
@@ -38,14 +38,15 @@ const LOOT_COLORS = {
 const AMMO_COLORS = { '9mm': '#f5d547', '12g': '#f05a5a', '556': '#63d471', '762': '#5aa9f8' };
 
 const WEAPON_FIRE_RATE = {
-    fists: 0, knife: 340, pistol: 280, revolver: 600, smg: 80, shotgun: 750,
-    assault: 150, dmr: 350, sniper: 1400, lmg: 110,
+    fists: 0, knife: 340, pistol: 120, revolver: 520, smg: 90, shotgun: 750,
+    assault: 75, dmr: 360, sniper: 950, lmg: 105,
 };
 
 const MELEE_ANIMATION_MS = 280;
 const PLAYER_HAND_OUTLINE = 'rgba(255,255,255,0.42)';
 const PLAYER_HAND_OUTLINE_WIDTH = 1.6;
 const PLAYER_HAND_RADIUS = 5.7;
+const FULL_AUTO_MOVE_MULTIPLIERS = Object.freeze({ smg: 0.78, assault: 0.74, lmg: 0.66 });
 
 const smoothstep01 = (value) => {
     const t = clamp(value, 0, 1);
@@ -106,9 +107,9 @@ function drawGunHighlight(ctx, x1, y1, x2, y2, alpha = 0.32) {
 
 const WEAPON_BULLET_SPECS = {
     shotgun: {
-        trailLen: 12,
-        slugLen: 3,
-        thickness: 1.4,
+        trailLen: 7,
+        slugLen: 2.4,
+        thickness: 0.9,
         glowColorStart: 'rgba(240, 120, 30, 0)',
         glowColorMid: 'rgba(240, 120, 30, 0.15)',
         glowColorEnd: 'rgba(240, 120, 30, 0.4)',
@@ -118,9 +119,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(255, 200, 100, 0.9)'
     },
     sniper: {
-        trailLen: 38,
-        slugLen: 6,
-        thickness: 2.8,
+        trailLen: 17,
+        slugLen: 4.2,
+        thickness: 1.45,
         glowColorStart: 'rgba(0, 140, 255, 0)',
         glowColorMid: 'rgba(0, 140, 255, 0.18)',
         glowColorEnd: 'rgba(0, 140, 255, 0.45)',
@@ -130,9 +131,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(230, 245, 255, 0.95)'
     },
     revolver: {
-        trailLen: 22,
-        slugLen: 5,
-        thickness: 2.2,
+        trailLen: 12,
+        slugLen: 3.4,
+        thickness: 1.2,
         glowColorStart: 'rgba(255, 110, 20, 0)',
         glowColorMid: 'rgba(255, 110, 20, 0.15)',
         glowColorEnd: 'rgba(255, 110, 20, 0.4)',
@@ -142,9 +143,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(255, 235, 180, 0.9)'
     },
     pistol: {
-        trailLen: 18,
-        slugLen: 4,
-        thickness: 1.6,
+        trailLen: 9,
+        slugLen: 2.8,
+        thickness: 1,
         glowColorStart: 'rgba(230, 160, 40, 0)',
         glowColorMid: 'rgba(230, 160, 40, 0.12)',
         glowColorEnd: 'rgba(230, 160, 40, 0.35)',
@@ -154,9 +155,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(255, 245, 200, 0.9)'
     },
     assault: {
-        trailLen: 26,
-        slugLen: 5,
-        thickness: 2.1,
+        trailLen: 12,
+        slugLen: 3.2,
+        thickness: 1.15,
         glowColorStart: 'rgba(255, 180, 50, 0)',
         glowColorMid: 'rgba(255, 180, 50, 0.15)',
         glowColorEnd: 'rgba(255, 180, 50, 0.38)',
@@ -166,9 +167,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(255, 255, 240, 0.9)'
     },
     dmr: {
-        trailLen: 28,
-        slugLen: 5,
-        thickness: 2.3,
+        trailLen: 14,
+        slugLen: 3.6,
+        thickness: 1.3,
         glowColorStart: 'rgba(255, 190, 60, 0)',
         glowColorMid: 'rgba(255, 190, 60, 0.15)',
         glowColorEnd: 'rgba(255, 190, 60, 0.4)',
@@ -178,9 +179,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(255, 255, 245, 0.9)'
     },
     smg: {
-        trailLen: 16,
-        slugLen: 4,
-        thickness: 1.7,
+        trailLen: 8,
+        slugLen: 2.6,
+        thickness: 0.95,
         glowColorStart: 'rgba(255, 140, 40, 0)',
         glowColorMid: 'rgba(255, 140, 40, 0.12)',
         glowColorEnd: 'rgba(255, 140, 40, 0.35)',
@@ -190,9 +191,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(255, 240, 210, 0.9)'
     },
     lmg: {
-        trailLen: 18,
-        slugLen: 4,
-        thickness: 1.8,
+        trailLen: 10,
+        slugLen: 2.9,
+        thickness: 1.05,
         glowColorStart: 'rgba(255, 150, 50, 0)',
         glowColorMid: 'rgba(255, 150, 50, 0.12)',
         glowColorEnd: 'rgba(255, 150, 50, 0.35)',
@@ -202,9 +203,9 @@ const WEAPON_BULLET_SPECS = {
         coreColorEnd: 'rgba(255, 235, 200, 0.9)'
     },
     default: {
-        trailLen: 22,
-        slugLen: 5,
-        thickness: 1.8,
+        trailLen: 10,
+        slugLen: 3,
+        thickness: 1.05,
         glowColorStart: 'rgba(200, 200, 200, 0)',
         glowColorMid: 'rgba(200, 200, 200, 0.1)',
         glowColorEnd: 'rgba(200, 200, 200, 0.3)',
@@ -432,7 +433,7 @@ export class SurvivRenderer {
         this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
-        this.targetZoom = 1.58;
+        this.targetZoom = 1.72;
         this.isMobileLayout = false;
         this.reducedMotion = false;
         this.worldHalf = 10000;
@@ -658,7 +659,7 @@ export class SurvivRenderer {
         const dprChanged = !Number.isFinite(this.renderDpr) || Math.abs(this.renderDpr - dpr) >= 0.0001;
         this.isMobileLayout = nextMobileLayout;
         this.reducedMotion = nextReducedMotion;
-        this.targetZoom = this.isMobileLayout ? 1.18 : 1.58;
+        this.targetZoom = this.isMobileLayout ? 1.28 : 1.72;
 
         if (!dprChanged
             && this.canvas.width === backingWidth
@@ -981,9 +982,18 @@ export class SurvivRenderer {
         const leadSeconds = canPredictMovement
             ? clamp((now - predictionStartedAt) / 1000, 0, 0.05)
             : 0;
+        const heldWeapon = this.me.weapon;
+        const fullAutoMultiplier = FULL_AUTO_MOVE_MULTIPLIERS[heldWeapon];
+        const firingFullAuto = !!(
+            fullAutoMultiplier
+            && (this.mouse.down || this.mobileAim.shooting)
+            && Number(this.me.ammo) > 0
+            && !this.me.reloading
+        );
+        const predictedMoveSpeed = 208 * (firingFullAuto ? fullAutoMultiplier : 1);
         const predictedTarget = this._resolvePredictedLootContainerCollision(
-            state.targetX + moveInput.dx * 208 * leadSeconds,
-            state.targetY + moveInput.dy * 208 * leadSeconds,
+            state.targetX + moveInput.dx * predictedMoveSpeed * leadSeconds,
+            state.targetY + moveInput.dy * predictedMoveSpeed * leadSeconds,
             Number(this.me.radius) || 14,
             moveInput.dx,
             moveInput.dy,
@@ -2056,6 +2066,15 @@ export class SurvivRenderer {
         for (const obstacle of this._renderObstaclesByHouseId.get(house.id) || []) {
             if (obstacle.kind === 'roomZone' || !this.isObstacleInView(obstacle, 50)) continue;
             this.drawObstacle(ctx, obstacle);
+        }
+        // Static loot containers belong to the previewed interior too. Keep
+        // loose pickups and moving entities hidden, but let players read chest
+        // and crate positions before crossing the doorway.
+        for (const item of this.loot) {
+            if (item.type !== 'chest' && item.type !== 'deathCrate') continue;
+            const belongsToHouse = item.houseId === house.id
+                || this.pointInsideRect(house, item.x, item.y, -2);
+            if (belongsToHouse && this.isObstacleInView(item, 70)) this.drawLoot(ctx, item);
         }
         ctx.restore();
     }
@@ -5437,7 +5456,7 @@ export class SurvivRenderer {
 
             if (l.type === 'weapon') {
                 if (l.weaponType === 'pistol') {
-                    // M9 Pistol
+                    // M9
                     ctx.rotate(-0.22);
 
                     // Gunmetal gray slide
@@ -5471,7 +5490,7 @@ export class SurvivRenderer {
                     ctx.fillStyle = '#111827';
                     ctx.fillRect(8, -3, 2, 2.5);
                 } else if (l.weaponType === 'revolver') {
-                    // R8 Revolver
+                    // OT-38
                     ctx.rotate(-0.15);
 
                     // Steel cylinder
@@ -5514,7 +5533,7 @@ export class SurvivRenderer {
                     ctx.stroke();
                     ctx.restore();
                 } else if (l.weaponType === 'smg') {
-                    // Vector SMG
+                    // MP5
                     ctx.rotate(-0.25);
 
                     // Skeletal stock
@@ -5560,7 +5579,7 @@ export class SurvivRenderer {
                     ctx.stroke();
                     ctx.restore();
                 } else if (l.weaponType === 'shotgun') {
-                    // Pump Shotgun
+                    // M870
                     ctx.rotate(-0.18);
 
                     // Wooden Stock
@@ -5592,7 +5611,7 @@ export class SurvivRenderer {
                     ctx.fill();
                     ctx.stroke();
                 } else if (l.weaponType === 'assault') {
-                    // Scout Rifle
+                    // M416
                     ctx.rotate(-0.2);
 
                     // Composite stock
@@ -5639,7 +5658,7 @@ export class SurvivRenderer {
                     ctx.fillRect(-6, -7.8, 1.8, 4.6);
                     ctx.fillRect(3.5, -7.8, 1.8, 4.6);
                 } else if (l.weaponType === 'dmr') {
-                    // Falcon DMR
+                    // M39 EMR
                     ctx.rotate(-0.18);
 
                     // Tan Crane stock
@@ -5689,7 +5708,7 @@ export class SurvivRenderer {
                     ctx.fillStyle = '#3b82f6'; // lens reflect
                     ctx.fillRect(-8, -8.5, 1, 4.5);
                 } else if (l.weaponType === 'sniper') {
-                    // AWM Sniper
+                    // Mosin-Nagant
                     ctx.rotate(-0.2);
 
                     // Olive stock
@@ -5745,7 +5764,7 @@ export class SurvivRenderer {
                     ctx.fillStyle = '#60a5fa'; // lens glint
                     ctx.fillRect(-10.2, -10.3, 1, 5.8);
                 } else if (l.weaponType === 'lmg') {
-                    // M249 LMG
+                    // M249
                     ctx.rotate(-0.16);
 
                     // Skeletal stock
@@ -6122,14 +6141,14 @@ export class SurvivRenderer {
             const barrelDist = weaponMuzzleDistance(p.weapon, r);
             ctx.save();
             ctx.globalAlpha = this._muzzleFlash * 0.9;
-            const flashGrad = ctx.createRadialGradient(barrelDist, 0, 1, barrelDist, 0, 12);
+            const flashGrad = ctx.createRadialGradient(barrelDist, 0, 0.8, barrelDist, 0, 8);
             flashGrad.addColorStop(0, '#ffffff');
             flashGrad.addColorStop(0.3, '#ffee88');
             flashGrad.addColorStop(0.7, '#ff8800');
             flashGrad.addColorStop(1, 'rgba(255, 136, 0, 0)');
             ctx.fillStyle = flashGrad;
             ctx.beginPath();
-            ctx.arc(barrelDist, 0, 12, 0, Math.PI * 2);
+            ctx.arc(barrelDist, 0, 8, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.restore();
@@ -6242,16 +6261,6 @@ export class SurvivRenderer {
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
 
-            ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
-            ctx.lineWidth = 5;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(r * 0.3, -6);
-            ctx.lineTo(topHand.x, topHand.y);
-            ctx.moveTo(r * 0.3, 6);
-            ctx.lineTo(bottomHand.x, bottomHand.y);
-            ctx.stroke();
-
             for (const hand of [topHand, bottomHand]) {
                 ctx.fillStyle = playerColor;
                 ctx.strokeStyle = PLAYER_HAND_OUTLINE;
@@ -6280,16 +6289,6 @@ export class SurvivRenderer {
             const knifeAngle = knifeSide * (-0.055 - windup * 0.25 + extension * 0.025);
             const knifeHand = { x: weaponOffsetX + r * 0.24, y: weaponOffsetY };
             const guardHand = { x: r * (0.6 - extension * 0.04), y: -knifeSide * 7 };
-
-            ctx.strokeStyle = 'rgba(14, 20, 18, 0.78)';
-            ctx.lineWidth = 5;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(r * 0.28, knifeSide * 5.5);
-            ctx.lineTo(knifeHand.x, knifeHand.y);
-            ctx.moveTo(r * 0.28, -knifeSide * 5.5);
-            ctx.lineTo(guardHand.x, guardHand.y);
-            ctx.stroke();
 
             ctx.save();
             ctx.translate(weaponOffsetX, weaponOffsetY);
@@ -6406,7 +6405,7 @@ export class SurvivRenderer {
             ctx.fillRect(24, -3.7, 1.6, 1.2);
             hands = [{ x: 10.5, y: -5.1 }, { x: 20.5, y: 5.3 }];
         } else if (weapon === 'smg') {
-            // Compact SMG: folding stock, polymer receiver and curved magazine.
+            // MP5: compact receiver, retractable stock and straight 9mm magazine.
             ctx.strokeStyle = '#1a2225';
             ctx.lineWidth = 2.2;
             ctx.beginPath();
@@ -6424,10 +6423,10 @@ export class SurvivRenderer {
             ctx.strokeStyle = '#101719';
             ctx.lineWidth = 1.1;
             ctx.beginPath();
-            ctx.moveTo(11.5, 3.2);
-            ctx.lineTo(17, 3.2);
-            ctx.lineTo(15.4, 12.2);
-            ctx.lineTo(11.3, 11.2);
+            ctx.moveTo(11.8, 3.2);
+            ctx.lineTo(16.2, 3.2);
+            ctx.lineTo(15.5, 12.4);
+            ctx.lineTo(11.9, 12.4);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
@@ -6494,49 +6493,40 @@ export class SurvivRenderer {
             }
             hands = [{ x: 9.5, y: -5.4 }, { x: isDmr ? 23.5 : 20.5, y: 5.2 }];
         } else if (weapon === 'sniper') {
-            // Bolt-action sniper: skeleton stock, long free-floating barrel and optic.
-            ctx.fillStyle = '#303b3d';
-            ctx.strokeStyle = '#12191b';
+            // Mosin-Nagant: long walnut stock, exposed steel barrel, bolt and
+            // iron sights. The clean silhouette matches surviv.io's top-down gun.
+            ctx.fillStyle = '#754725';
+            ctx.strokeStyle = '#2a190e';
             ctx.lineWidth = 1.2;
             ctx.beginPath();
-            ctx.moveTo(0.5, -5.2);
-            ctx.lineTo(9, -3.2);
-            ctx.lineTo(10, 2.5);
-            ctx.lineTo(3, 6);
-            ctx.lineTo(0.5, 4.1);
+            ctx.moveTo(0.5, -5.4);
+            ctx.lineTo(17.5, -3.8);
+            ctx.lineTo(27, -2.8);
+            ctx.lineTo(27, 2.8);
+            ctx.lineTo(15, 4.2);
+            ctx.lineTo(4, 6);
+            ctx.lineTo(0.5, 4.2);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            ctx.fillStyle = '#172022';
+            drawGunHighlight(ctx, 3, -3.8, 24, -2.4, 0.24);
+            drawGunPart(ctx, 14.5, -3.2, 9.5, 6.4, '#465154', 1.2);
+            drawGunPart(ctx, 23, -1.65, 14.5, 3.3, '#1c2528', 0.7);
+            drawGunPart(ctx, 36.5, -2.25, 2.2, 4.5, '#0b1113', 0.6);
+            // Bolt handle and simple iron sights.
+            ctx.strokeStyle = '#79878a';
+            ctx.lineWidth = 1.7;
             ctx.beginPath();
-            ctx.moveTo(3.2, -2.5);
-            ctx.lineTo(7.2, -1.7);
-            ctx.lineTo(7.5, 1.5);
-            ctx.lineTo(4, 3.1);
-            ctx.closePath();
+            ctx.moveTo(18.5, 2.2);
+            ctx.lineTo(20.5, 6.5);
+            ctx.stroke();
+            ctx.fillStyle = '#657276';
+            ctx.beginPath();
+            ctx.arc(20.8, 7, 1.8, 0, Math.PI * 2);
             ctx.fill();
-            drawGunPart(ctx, 8, -4.1, 11.5, 8.2, '#465256', 1.7);
-            drawGunPart(ctx, 18.5, -2.7, 14.8, 5.4, '#252e32', 1.1);
-            drawGunPart(ctx, 32.5, -1.55, 4.4, 3.1, '#111719', 0.6);
-            drawGunPart(ctx, 36.3, -2.5, 2.4, 5, '#080d0f', 0.7);
-            drawGunPart(ctx, 11, -9.2, 15.5, 3.8, '#202a2e', 1.5);
-            ctx.fillStyle = '#70868d';
-            ctx.strokeStyle = '#162126';
-            ctx.lineWidth = 1;
-            for (const sx of [11.5, 25.5]) {
-                ctx.beginPath();
-                ctx.arc(sx, -7.3, 3, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = '#17313a';
-                ctx.beginPath();
-                ctx.arc(sx, -7.3, 1.6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#70868d';
-            }
-            drawGunPart(ctx, 12.2, 3, 4.2, 9.5, '#293438', 1.2);
-            drawGunHighlight(ctx, 19, -1.8, 34.5, -1.1, 0.42);
-            hands = [{ x: 10, y: -5.1 }, { x: 24, y: 4.8 }];
+            ctx.fillRect(14.8, -5.2, 1.4, 2.2);
+            ctx.fillRect(33.5, -4.1, 1.3, 2.5);
+            hands = [{ x: 11.5, y: -5.1 }, { x: 24, y: 4.7 }];
         } else if (weapon === 'lmg') {
             // Belt-fed LMG: heavy receiver, box magazine and vented heat shield.
             ctx.fillStyle = '#334039';

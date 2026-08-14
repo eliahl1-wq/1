@@ -32,7 +32,7 @@ import AgarLogo from '../features/agar/ui/AgarLogo';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 
-const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.com/';
+const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.gg/m5mWMu8aF';
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
