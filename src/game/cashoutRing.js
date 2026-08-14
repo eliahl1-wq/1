@@ -18,8 +18,7 @@ export function getCashoutRingProgress(endAtMs, totalSeconds) {
  * Timer drains clockwise; hold-to-cashout fills counter-clockwise.
  */
 export function drawCashoutProgressRing(ctx, x, y, radius, progress, opts = {}) {
-    const { counterClockwise = false, showTrack = true } = opts;
-    const lineWidth = 3.5;
+    const { counterClockwise = false, showTrack = true, lineWidth = 3.5 } = opts;
 
     if (progress <= 0) return;
 

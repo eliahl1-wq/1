@@ -240,6 +240,7 @@ export default function SurvivGame() {
     const blockAutoJoinRef = useRef(!!pendingAtMount);
 
     const canvasRef = useRef(null);
+    const balanceCanvasRef = useRef(null);
     const viewportRef = useRef(null);
     const socketRef = useRef(null);
     const rendererRef = useRef(null);
@@ -587,7 +588,7 @@ export default function SurvivGame() {
             socketRef.current = null;
         }
 
-        const renderer = new SurvivRenderer(canvasRef.current);
+        const renderer = new SurvivRenderer(canvasRef.current, balanceCanvasRef.current);
         renderer.worldHalf = WORLD_HALF;
         renderer.hideNames = hideNames;
         rendererRef.current = renderer;
@@ -1225,6 +1226,16 @@ export default function SurvivGame() {
             fontFamily: 'system-ui',
         }}>
             <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
+            <canvas ref={balanceCanvasRef} aria-hidden="true" style={{
+                display: 'block',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: 2,
+                pointerEvents: 'none',
+                visibility: 'hidden',
+                willChange: 'transform',
+            }} />
 
             <MobileGameSession containerRef={viewportRef} orientation="landscape" />
 

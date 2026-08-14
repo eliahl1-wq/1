@@ -43,9 +43,31 @@ const WEAPON_FIRE_RATE = {
 };
 
 const MELEE_ANIMATION_MS = 280;
-const PLAYER_HAND_OUTLINE = 'rgba(255,255,255,0.42)';
-const PLAYER_HAND_OUTLINE_WIDTH = 1.6;
-const PLAYER_HAND_RADIUS = 5.7;
+const PLAYER_HAND_OUTLINE = '#effff3';
+const PLAYER_HAND_OUTLINE_WIDTH = 1.7;
+const PLAYER_HAND_RADIUS = 5.4;
+
+function drawPlayerHand(ctx, hand, playerColor) {
+    ctx.fillStyle = playerColor;
+    ctx.strokeStyle = PLAYER_HAND_OUTLINE;
+    ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
+    ctx.beginPath();
+    ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Match the body's top-left light and lower rim. These solid, compact
+    // details stay crisp when the game canvas is rendered below native DPR.
+    ctx.fillStyle = 'rgba(255,255,255,0.24)';
+    ctx.beginPath();
+    ctx.arc(hand.x - 1.45, hand.y - 1.55, 1.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(10,24,19,0.20)';
+    ctx.lineWidth = 1.05;
+    ctx.beginPath();
+    ctx.arc(hand.x + 0.15, hand.y + 0.25, PLAYER_HAND_RADIUS - 0.85, 0.18, Math.PI - 0.18);
+    ctx.stroke();
+}
 const FULL_AUTO_MOVE_MULTIPLIERS = Object.freeze({ smg: 0.78, assault: 0.74, lmg: 0.66 });
 
 const smoothstep01 = (value) => {
@@ -426,14 +448,20 @@ function biomeAt() {
 }
 
 export class SurvivRenderer {
-    constructor(canvas) {
+    constructor(canvas, balanceCanvas = null) {
         this.canvas = canvas;
         // The game paints every pixel each frame, so an opaque low-latency
         // context avoids unnecessary alpha compositing with the DOM.
         this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        this.balanceCanvas = balanceCanvas;
+        this.balanceCtx = balanceCanvas?.getContext('2d', { alpha: true }) || null;
+        this._balanceCanvasCssWidth = 112;
+        this._balanceCanvasCssHeight = 31;
+        this._balanceCanvasDpr = 0;
+        this._renderedBalance = null;
         this.camera = { x: 0, y: 0 };
         this.zoom = 1;
-        this.targetZoom = 1.72;
+        this.targetZoom = 1.82;
         this.isMobileLayout = false;
         this.reducedMotion = false;
         this.worldHalf = 10000;
@@ -632,6 +660,41 @@ export class SurvivRenderer {
         this.resize();
     }
 
+    configureBalanceCanvas() {
+        if (!this.balanceCanvas || !this.balanceCtx) return;
+        const dpr = Math.max(1, Math.min(2.5, window.devicePixelRatio || 1));
+        const width = Math.round(this._balanceCanvasCssWidth * dpr);
+        const height = Math.round(this._balanceCanvasCssHeight * dpr);
+        if (this.balanceCanvas.width !== width || this.balanceCanvas.height !== height) {
+            this.balanceCanvas.width = width;
+            this.balanceCanvas.height = height;
+            this.balanceCanvas.style.width = `${this._balanceCanvasCssWidth}px`;
+            this.balanceCanvas.style.height = `${this._balanceCanvasCssHeight}px`;
+            this._renderedBalance = null;
+        }
+        this._balanceCanvasDpr = dpr;
+        this.balanceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.balanceCtx.imageSmoothingEnabled = true;
+        this.balanceCtx.imageSmoothingQuality = 'high';
+    }
+
+    drawLocalBalanceBadge(screenX, screenY, balance) {
+        if (!this.balanceCanvas || !this.balanceCtx) return false;
+        this.configureBalanceCanvas();
+        const amount = Number(balance) || 0;
+        if (this._renderedBalance !== amount) {
+            const ctx = this.balanceCtx;
+            ctx.clearRect(0, 0, this._balanceCanvasCssWidth, this._balanceCanvasCssHeight);
+            drawBalanceBadge(ctx, this._balanceCanvasCssWidth / 2, 2, amount, true);
+            this._renderedBalance = amount;
+        }
+        const left = Math.round(screenX - this._balanceCanvasCssWidth / 2);
+        const top = Math.round(screenY - 2);
+        this.balanceCanvas.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        this.balanceCanvas.style.visibility = 'visible';
+        return true;
+    }
+
     resize() {
         const parent = this.canvas.parentElement;
         const w = parent?.clientWidth || window.innerWidth;
@@ -659,7 +722,7 @@ export class SurvivRenderer {
         const dprChanged = !Number.isFinite(this.renderDpr) || Math.abs(this.renderDpr - dpr) >= 0.0001;
         this.isMobileLayout = nextMobileLayout;
         this.reducedMotion = nextReducedMotion;
-        this.targetZoom = this.isMobileLayout ? 1.28 : 1.72;
+        this.targetZoom = this.isMobileLayout ? 1.36 : 1.82;
 
         if (!dprChanged
             && this.canvas.width === backingWidth
@@ -693,6 +756,7 @@ export class SurvivRenderer {
 
     destroy() {
         this.pause();
+        if (this.balanceCanvas) this.balanceCanvas.style.visibility = 'hidden';
         if (this._resizeTimer) clearTimeout(this._resizeTimer);
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener('gamelayoutchange', this._onResize);
@@ -1849,10 +1913,12 @@ export class SurvivRenderer {
         const collisionCell = 400;
         for (const obstacle of solid) {
             if (obstacle.collidable === false || !obstacle.w || !obstacle.h) continue;
-            const minX = Math.floor((obstacle.x - obstacle.w / 2) / collisionCell);
-            const maxX = Math.floor((obstacle.x + obstacle.w / 2) / collisionCell);
-            const minY = Math.floor((obstacle.y - obstacle.h / 2) / collisionCell);
-            const maxY = Math.floor((obstacle.y + obstacle.h / 2) / collisionCell);
+            const collisionHalfW = obstacle._renderHalfW ?? obstacle.w / 2;
+            const collisionHalfH = obstacle._renderHalfH ?? obstacle.h / 2;
+            const minX = Math.floor((obstacle.x - collisionHalfW) / collisionCell);
+            const maxX = Math.floor((obstacle.x + collisionHalfW) / collisionCell);
+            const minY = Math.floor((obstacle.y - collisionHalfH) / collisionCell);
+            const maxY = Math.floor((obstacle.y + collisionHalfH) / collisionCell);
             for (let gx = minX; gx <= maxX; gx++) {
                 for (let gy = minY; gy <= maxY; gy++) {
                     const key = gx + ',' + gy;
@@ -2732,8 +2798,14 @@ export class SurvivRenderer {
         const localPlayer = this.me || this._playersById.get(this.myId);
         if (localPlayer && !this.isPlayerHidden(localPlayer, currentHouse, currentRoom)) {
             const screenX = Math.round((localPlayer.x - this.camera.x) * z + W / 2);
-            const screenY = Math.round((localPlayer.y - this.camera.y + (localPlayer.radius || 14) + 15) * z + H / 2);
-            drawBalanceBadge(ctx, screenX, screenY, this.hud.balance ?? localPlayer.dollarBalance ?? 0, true);
+            const playerScreenY = (localPlayer.y - this.camera.y) * z + H / 2;
+            const screenY = Math.round(playerScreenY + (localPlayer.radius || 14) * z + 7);
+            const balance = this.hud.balance ?? localPlayer.dollarBalance ?? 0;
+            if (!this.drawLocalBalanceBadge(screenX, screenY, balance)) {
+                drawBalanceBadge(ctx, screenX, screenY, balance, true);
+            }
+        } else if (this.balanceCanvas) {
+            this.balanceCanvas.style.visibility = 'hidden';
         }
         this.drawMobileAimGuide(ctx);
         this.drawCrosshair(ctx);
@@ -3780,6 +3852,10 @@ export class SurvivRenderer {
 
     drawObstacle(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
+        // Bridge rails are authoritative collision shapes. Their matching
+        // visuals are drawn directly with the bridge deck so no detached wall
+        // sprites can drift or double-render on top of the crossing.
+        if (kind === 'wall' && o.role === 'bridgeRail') return;
         if (allowCache && (kind === 'field' || kind === 'bridge')
             && this.drawCachedSurfaceLayer(ctx, o, kind, cacheCtx => this.drawObstacle(cacheCtx, o, false))) return;
         if (allowCache && this.drawCachedObstacle(ctx, o, kind)) return;
@@ -4765,6 +4841,22 @@ export class SurvivRenderer {
             ctx.lineTo(halfW - 24, 0);
             ctx.stroke();
             ctx.setLineDash([]);
+
+            // Continue the highway edge lines across the deck so both ends
+            // visually lock onto the underlying road rather than reading as a
+            // separate prop placed on top of it.
+            ctx.strokeStyle = 'rgba(238, 240, 232, 0.46)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            for (const y of [-halfH + 21, halfH - 21]) {
+                ctx.moveTo(-halfW + 8, y);
+                ctx.lineTo(halfW - 8, y);
+            }
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(205, 207, 194, 0.28)';
+            ctx.fillRect(-halfW + 8, -halfH + 14, 5, o.h - 28);
+            ctx.fillRect(halfW - 13, -halfH + 14, 5, o.h - 28);
             ctx.strokeStyle = 'rgba(12, 16, 15, 0.62)';
             ctx.lineWidth = 2;
             roundRect(ctx, -halfW, -halfH, o.w, o.h, 5);
@@ -6116,7 +6208,7 @@ export class SurvivRenderer {
         // Body circle — surviv.io style thick outline
         ctx.fillStyle = p.color || '#77c7c8';
         ctx.strokeStyle = isMe ? '#ffffff' : 'rgba(14, 20, 18, 0.78)';
-        ctx.lineWidth = isMe ? 3.5 : 2.5;
+        ctx.lineWidth = isMe ? 2.35 : 1.85;
         ctx.beginPath();
         ctx.arc(0, 0, r, 0, Math.PI * 2);
         ctx.fill();
@@ -6225,7 +6317,13 @@ export class SurvivRenderer {
             const progress = startedAt
                 ? Math.min(1, Math.max(0, (this._frameNow - startedAt) / CASHOUT_HOLD_MS))
                 : 0;
-            drawCashoutProgressRing(ctx, p.x, p.y, r + 12, progress, { counterClockwise: true });
+            // Keep this HUD ring at the same screen size when camera zoom changes.
+            const baselineZoom = this.isMobileLayout ? 1.28 : 1.72;
+            const overlayScale = baselineZoom / Math.max(0.01, this.zoom);
+            drawCashoutProgressRing(ctx, p.x, p.y, (r + 12) * overlayScale, progress, {
+                counterClockwise: true,
+                lineWidth: 3.5 * overlayScale,
+            });
         }
     }
 
@@ -6250,10 +6348,10 @@ export class SurvivRenderer {
             // physical without a separate trail or impact effect.
             const leadSide = meleeHand === 'bottom' ? 1 : -1;
             const windup = Math.max(0, -strike);
-            const leadReach = r * 0.74 + r * 1.04 * strike;
-            const leadY = leadSide * (7 + windup * 5 - extension * 3.2);
-            const guardReach = r * (0.7 - extension * 0.06);
-            const guardY = -leadSide * (7 + extension * 0.7);
+            const leadReach = r * 0.62 + r * 1.16 * strike;
+            const leadY = leadSide * (10.8 + windup * 3.8 - extension * 7.1);
+            const guardReach = r * (0.62 - extension * 0.035);
+            const guardY = -leadSide * (10.8 + extension * 0.45);
             const topHand = leadSide < 0
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
@@ -6261,15 +6359,7 @@ export class SurvivRenderer {
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
 
-            for (const hand of [topHand, bottomHand]) {
-                ctx.fillStyle = playerColor;
-                ctx.strokeStyle = PLAYER_HAND_OUTLINE;
-                ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
-                ctx.beginPath();
-                ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            }
+            for (const hand of [topHand, bottomHand]) drawPlayerHand(ctx, hand, playerColor);
             return;
         }
 
@@ -6284,11 +6374,11 @@ export class SurvivRenderer {
             // punches alternate; swapping the weapon itself looked unnatural.
             const knifeSide = 1;
             const windup = Math.max(0, -stab);
-            const weaponOffsetX = r * (0.12 + stab * 0.86);
-            const weaponOffsetY = knifeSide * (4.4 + windup * 3.5 - extension * 1.6);
-            const knifeAngle = knifeSide * (-0.055 - windup * 0.25 + extension * 0.025);
-            const knifeHand = { x: weaponOffsetX + r * 0.24, y: weaponOffsetY };
-            const guardHand = { x: r * (0.6 - extension * 0.04), y: -knifeSide * 7 };
+            const weaponOffsetX = r * (0.16 + stab * 0.92);
+            const weaponOffsetY = knifeSide * (8.6 + windup * 4.1 - extension * 5.8);
+            const knifeAngle = knifeSide * (-0.2 - windup * 0.28 + extension * 0.06);
+            const knifeHand = { x: weaponOffsetX + r * 0.25, y: weaponOffsetY };
+            const guardHand = { x: r * (0.56 - extension * 0.035), y: -knifeSide * 10.6 };
 
             ctx.save();
             ctx.translate(weaponOffsetX, weaponOffsetY);
@@ -6355,15 +6445,7 @@ export class SurvivRenderer {
             ctx.stroke();
             ctx.restore();
 
-            for (const hand of [guardHand, knifeHand]) {
-                ctx.fillStyle = playerColor;
-                ctx.strokeStyle = PLAYER_HAND_OUTLINE;
-                ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
-                ctx.beginPath();
-                ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            }
+            for (const hand of [guardHand, knifeHand]) drawPlayerHand(ctx, hand, playerColor);
             return;
         }
 
@@ -6630,15 +6712,7 @@ export class SurvivRenderer {
 
         // Draw hands gripping the gun (two-handed/one-handed)
         if (weapon !== 'fists' && hands) {
-            ctx.fillStyle = playerColor;
-            ctx.strokeStyle = PLAYER_HAND_OUTLINE;
-            ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
-            for (const hand of hands) {
-                ctx.beginPath();
-                ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            }
+            for (const hand of hands) drawPlayerHand(ctx, hand, playerColor);
         }
 
         ctx.restore();
