@@ -65,11 +65,12 @@ const smoothstep01 = (value) => {
     return t * t * (3 - 2 * t);
 };
 
-function meleeStrikeMotion(progress, contactAt = 0.28, releaseAt = 0.48) {
+function meleeStrikeMotion(progress, contactAt = 0.28) {
     const t = clamp(progress, 0, 1);
     if (t < contactAt) return smoothstep01(t / contactAt);
-    if (t < releaseAt) return 1;
-    return 1 - smoothstep01((t - releaseAt) / (1 - releaseAt));
+    // Hold at full extension. Snapping back when the server animation ends
+    // cannot be mistaken for a second punch travelling through the target.
+    return 1;
 }
 
 const WEAPON_SHAKE = {
@@ -6585,10 +6586,12 @@ export class SurvivRenderer {
             // Keep this HUD ring at the same screen size when camera zoom changes.
             const baselineZoom = this.isMobileLayout ? 1.28 : 1.72;
             const overlayScale = baselineZoom / Math.max(0.01, this.zoom);
-            drawCashoutProgressRing(ctx, p.x, p.y, (r + 12) * overlayScale, progress, {
-                counterClockwise: true,
-                lineWidth: 3.5 * overlayScale,
-            });
+            if (progress > 0 && progress < 0.995) {
+                drawCashoutProgressRing(ctx, p.x, p.y, (r + 5.5) * overlayScale, progress, {
+                    counterClockwise: true,
+                    lineWidth: 2.7 * overlayScale,
+                });
+            }
         }
     }
 
@@ -6604,16 +6607,15 @@ export class SurvivRenderer {
             const punching = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const strike = punching ? meleeStrikeMotion(progress, 0.27, 0.47) : 0;
+            const strike = punching ? meleeStrikeMotion(progress, 0.27) : 0;
 
-            // The server alternates meleeHand for every accepted attack. Keep
-            // that hand active for the full animation instead of always using
-            // the upper hand. It travels forward exactly once; the other hand
-            // stays tucked in guard instead of joining the attack.
+            // The server selects one consistent striking hand. It travels
+            // forward exactly once; the other hand stays tucked beside the
+            // body instead of joining the attack.
             const leadSide = meleeHand === 'bottom' ? 1 : -1;
             const leadReach = r * 0.58 + r * 1.18 * strike;
             const leadY = leadSide * (10.8 - strike * 6.6);
-            const guardReach = r * 0.48;
+            const guardReach = r * 0.22;
             const guardY = -leadSide * 11.2;
             const topHand = leadSide < 0
                 ? { x: leadReach, y: leadY, lead: true }
@@ -6631,7 +6633,7 @@ export class SurvivRenderer {
             const stabbing = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = stabbing ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const stab = stabbing ? meleeStrikeMotion(progress, 0.25, 0.46) : 0;
+            const stab = stabbing ? meleeStrikeMotion(progress, 0.25) : 0;
             // A knife stays in the lower hand between attacks. Only unarmed
             // punches alternate; swapping the weapon itself looked unnatural.
             const knifeSide = 1;
