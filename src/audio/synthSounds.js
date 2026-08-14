@@ -146,5 +146,64 @@ export function playFoodEatSound() {
     spark.stop(t + 0.028);
 }
 
+/**
+ * Lightweight procedural Surviv footsteps. Keeping these synthesized avoids
+ * loading several audio files at match start while still giving every surface
+ * a clearly different texture.
+ */
+export function playSurvivFootstep(surface = 'ground', stepIndex = 0) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return;
+
+    const t = ctx.currentTime;
+    const alternatingPitch = stepIndex % 2 === 0 ? 1 : 0.94;
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, t);
+    bus.gain.linearRampToValueAtTime(surface === 'water' ? 0.055 : 0.038, t + 0.004);
+    bus.gain.exponentialRampToValueAtTime(0.0001, t + (surface === 'water' ? 0.16 : 0.1));
+    bus.connect(ctx.destination);
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = getNoiseBuffer(ctx, 0.03);
+    const filter = ctx.createBiquadFilter();
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = surface === 'water' ? 0.9 : surface === 'indoor' ? 0.42 : 0.62;
+    filter.type = surface === 'water' ? 'bandpass' : 'lowpass';
+    filter.frequency.value = (surface === 'water' ? 1450 : surface === 'indoor' ? 1050 : 620) * alternatingPitch;
+    filter.Q.value = surface === 'water' ? 0.65 : 0.85;
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(bus);
+    noise.start(t);
+    noise.stop(t + 0.04);
+
+    const body = ctx.createOscillator();
+    const bodyGain = ctx.createGain();
+    body.type = surface === 'indoor' ? 'triangle' : 'sine';
+    const startHz = (surface === 'water' ? 155 : surface === 'indoor' ? 205 : 105) * alternatingPitch;
+    body.frequency.setValueAtTime(startHz, t);
+    body.frequency.exponentialRampToValueAtTime(Math.max(48, startHz * 0.55), t + 0.075);
+    bodyGain.gain.setValueAtTime(surface === 'water' ? 0.22 : 0.38, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+    body.connect(bodyGain);
+    bodyGain.connect(bus);
+    body.start(t);
+    body.stop(t + 0.1);
+
+    if (surface === 'water') {
+        const drop = ctx.createOscillator();
+        const dropGain = ctx.createGain();
+        drop.type = 'sine';
+        drop.frequency.setValueAtTime(520 * alternatingPitch, t + 0.012);
+        drop.frequency.exponentialRampToValueAtTime(230, t + 0.11);
+        dropGain.gain.setValueAtTime(0.0001, t);
+        dropGain.gain.linearRampToValueAtTime(0.16, t + 0.014);
+        dropGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+        drop.connect(dropGain);
+        dropGain.connect(bus);
+        drop.start(t);
+        drop.stop(t + 0.13);
+    }
+}
 
 

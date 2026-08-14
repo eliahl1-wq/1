@@ -6,6 +6,7 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
+import { playSurvivFootstep, unlockGameAudio } from '../../audio/synthSounds.js';
 
 const WEAPON_LABELS = {
     fists: 'Fists',
@@ -46,6 +47,7 @@ const MELEE_ANIMATION_MS = 280;
 const PLAYER_HAND_OUTLINE = '#effff3';
 const PLAYER_HAND_OUTLINE_WIDTH = 1.7;
 const PLAYER_HAND_RADIUS = 5.4;
+const WATER_MOVE_MULTIPLIER = 0.68;
 
 function drawPlayerHand(ctx, hand, playerColor) {
     ctx.fillStyle = playerColor;
@@ -310,31 +312,24 @@ function drawHeldWeaponTopDown(ctx, weapon) {
     return [{ x: 6.5, y: -4.6 }, { x: 10.5, y: 4.6 }];
 }
 
-const makeBulletSpec = (trailLen, slugLen, thickness, rgb = '255, 248, 218') => ({
+const makeBulletSpec = (trailLen, tipLen, thickness, rgb = '255, 251, 232') => ({
     trailLen,
-    slugLen,
+    tipLen,
     thickness,
-    glowColorStart: `rgba(${rgb}, 0)`,
-    glowColorMid: `rgba(${rgb}, 0.07)`,
-    glowColorEnd: `rgba(${rgb}, 0.24)`,
-    glowColorTip: `rgba(${rgb}, 0.42)`,
-    coreColorStart: `rgba(${rgb}, 0)`,
-    coreColorMid: `rgba(${rgb}, 0.2)`,
-    coreColorEnd: `rgba(${rgb}, 0.92)`,
+    rgb,
 });
 
-// Surviv-style tracers: a long, soft tail with a short white-hot leading edge.
-// These are intentionally elongated instead of drawing bullets as tiny dots.
+// One clean Surviv-style tracer per projectile: no stacked glow/core strokes.
 const WEAPON_BULLET_SPECS = {
-    shotgun: makeBulletSpec(58, 5.5, 1.1),
-    sniper: makeBulletSpec(150, 11, 1.8, '238, 248, 255'),
-    revolver: makeBulletSpec(110, 9, 1.55),
-    pistol: makeBulletSpec(90, 7, 1.35),
-    assault: makeBulletSpec(105, 8, 1.45),
-    dmr: makeBulletSpec(130, 10, 1.65),
-    smg: makeBulletSpec(75, 6, 1.2),
-    lmg: makeBulletSpec(92, 7, 1.35),
-    default: makeBulletSpec(90, 7, 1.35),
+    shotgun: makeBulletSpec(38, 3.5, 0.85),
+    sniper: makeBulletSpec(100, 6, 1.3, '245, 251, 255'),
+    revolver: makeBulletSpec(70, 5, 1.1),
+    pistol: makeBulletSpec(55, 4, 0.95),
+    assault: makeBulletSpec(65, 4.5, 1),
+    dmr: makeBulletSpec(82, 5.5, 1.15),
+    smg: makeBulletSpec(48, 3.5, 0.9),
+    lmg: makeBulletSpec(58, 4, 0.95),
+    default: makeBulletSpec(55, 4, 0.95),
 };
 
 const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
@@ -343,7 +338,7 @@ const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor
 // pass below, so newly added obstacle kinds automatically receive a shadow.
 const CAST_SHADOW_EXEMPT_KINDS = new Set([
     'road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path',
-    'roomZone', 'bush', 'fallenLog', 'grassTuft', 'wildflowers', 'mushrooms', 'reeds', 'stump',
+    'roomZone', 'door', 'bush', 'fallenLog', 'grassTuft', 'wildflowers', 'mushrooms', 'reeds', 'stump',
 ]);
 const ROUND_CAST_SHADOW_KINDS = new Set(['tree', 'rock', 'barrel', 'lampPost']);
 const TALL_CAST_SHADOW_KINDS = new Set(['tree', 'container', 'tent', 'signpost', 'lampPost', 'mailbox']);
@@ -651,6 +646,11 @@ export class SurvivRenderer {
         this._raf = null;
         this._lastFrameAt = performance.now();
         this._frameNow = Date.now();
+        this._footstepX = NaN;
+        this._footstepY = NaN;
+        this._footstepDistance = 0;
+        this._footstepIndex = 0;
+        this._footstepSurface = 'ground';
         // Cached gradients to avoid per-frame allocation
         this._cachedVignetteGrad = null;
         this._cachedVignetteKey = '';
@@ -753,6 +753,11 @@ export class SurvivRenderer {
         this._muzzleFlash = 0;
         // Low ammo pulse
         this._lowAmmoPulse = 0;
+        this._footstepX = NaN;
+        this._footstepY = NaN;
+        this._footstepDistance = 0;
+        this._footstepIndex = 0;
+        this._footstepSurface = 'ground';
         // Player alive count
         this.aliveCount = 0;
 
@@ -1153,7 +1158,8 @@ export class SurvivRenderer {
             && Number(this.me.ammo) > 0
             && !this.me.reloading
         );
-        const predictedMoveSpeed = 208 * (firingFullAuto ? fullAutoMultiplier : 1);
+        const surfaceMultiplier = this.me.surface === 'water' ? WATER_MOVE_MULTIPLIER : 1;
+        const predictedMoveSpeed = 208 * surfaceMultiplier * (firingFullAuto ? fullAutoMultiplier : 1);
         const predictedTarget = this._resolvePredictedLootContainerCollision(
             state.targetX + moveInput.dx * predictedMoveSpeed * leadSeconds,
             state.targetY + moveInput.dy * predictedMoveSpeed * leadSeconds,
@@ -1734,6 +1740,7 @@ export class SurvivRenderer {
     }
 
     setMobileMove(dx, dy) {
+        if (Math.hypot(Number(dx) || 0, Number(dy) || 0) > 0.08) unlockGameAudio();
         this.mobileMove.x = clamp(Number(dx) || 0, -1, 1);
         this.mobileMove.y = clamp(Number(dy) || 0, -1, 1);
     }
@@ -1830,6 +1837,7 @@ export class SurvivRenderer {
             e.preventDefault();
             return null;
         }
+        if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(k)) unlockGameAudio();
         if (k === 'w' || k === 'arrowup') this.keys.w = true;
         if (k === 'a' || k === 'arrowleft') this.keys.a = true;
         if (k === 's' || k === 'arrowdown') this.keys.s = true;
@@ -1865,12 +1873,89 @@ export class SurvivRenderer {
 
     handlePointerDown() {
         if (!this.inputEnabled || this.spectatorMode) return null;
+        unlockGameAudio();
         this.mouse.down = true;
         return null;
     }
 
     handlePointerUp() {
         this.mouse.down = false;
+    }
+
+    updateMovementFeedback() {
+        if (!this.me || this.spectatorMode || !this.inputEnabled) {
+            this._footstepX = NaN;
+            this._footstepY = NaN;
+            this._footstepDistance = 0;
+            return;
+        }
+
+        const x = Number(this.me.x);
+        const y = Number(this.me.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        if (!Number.isFinite(this._footstepX) || !Number.isFinite(this._footstepY)) {
+            this._footstepX = x;
+            this._footstepY = y;
+            return;
+        }
+
+        const moved = Math.hypot(x - this._footstepX, y - this._footstepY);
+        this._footstepX = x;
+        this._footstepY = y;
+        const moveInput = this._getLocalMoveVector();
+        const inputStrength = Math.hypot(moveInput.dx, moveInput.dy);
+        if (inputStrength < 0.08 || moved < 0.001 || moved > 24) {
+            if (inputStrength < 0.08 || moved > 24) this._footstepDistance = 0;
+            return;
+        }
+
+        const surface = this.me.surface === 'water'
+            ? 'water'
+            : this.me.surface === 'indoor' ? 'indoor' : 'ground';
+        if (surface !== this._footstepSurface) {
+            this._footstepSurface = surface;
+            this._footstepDistance = 0;
+        }
+        this._footstepDistance += moved;
+        const stride = surface === 'water' ? 37 : surface === 'indoor' ? 46 : 52;
+        if (this._footstepDistance < stride) return;
+        this._footstepDistance %= stride;
+        this._footstepIndex += 1;
+        playSurvivFootstep(surface, this._footstepIndex);
+        if (surface === 'water') this.spawnWaterStepSplash(x, y, moveInput);
+    }
+
+    spawnWaterStepSplash(x, y, moveInput) {
+        const side = this._footstepIndex % 2 === 0 ? -1 : 1;
+        const originX = x - moveInput.dy * side * 6;
+        const originY = y + moveInput.dx * side * 6;
+        this.particles.push({
+            x: originX,
+            y: originY,
+            vx: 0,
+            vy: 0,
+            life: 0.42,
+            maxLife: 0.42,
+            size: 7.5,
+            color: '#a9e7f5',
+            type: 'waterRing',
+        });
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.atan2(moveInput.dy, moveInput.dx)
+                + Math.PI + (i - 1) * 0.62 + (Math.random() - 0.5) * 0.24;
+            const speed = 22 + Math.random() * 20;
+            this.particles.push({
+                x: originX,
+                y: originY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 0.26 + Math.random() * 0.09,
+                maxLife: 0.35,
+                size: 1.7 + Math.random() * 1.4,
+                color: '#c5f1fa',
+                type: 'waterDroplet',
+            });
+        }
     }
 
     mergeObstaclePatch(incoming, patch) {
@@ -2169,6 +2254,7 @@ export class SurvivRenderer {
         let nearestDoor = null;
         let nearestDistance = revealStartDistance;
         for (const door of this.doorways) {
+            if (door.entranceRole === 'interiorDoor') continue;
             const house = this._housesById.get(door.houseId);
             if (!house || !this.isObstacleInView(house, 120)) continue;
             const side = door.orientation || door.role;
@@ -2648,6 +2734,7 @@ export class SurvivRenderer {
         const animationNow = performance.now();
         this._advanceInterpolatedWorld(dt, animationNow);
         this._advanceBulletInterpolation(dt, animationNow);
+        this.updateMovementFeedback();
 
         // Update camera shake
         if (this.cameraShake.intensity > 0.05) {
@@ -2798,6 +2885,13 @@ export class SurvivRenderer {
         if (!currentHouse) {
             for (const o of this.houseFloors) {
                 if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
+            }
+            // Main entrances sit on top of the roof edge so a building reads as
+            // enterable before the interior reveal begins. Interior doors stay hidden.
+            for (const door of this.doorways) {
+                if (door.entranceRole !== 'interiorDoor' && this.isObstacleInView(door, 40)) {
+                    this.drawObstacle(ctx, door);
+                }
             }
         }
         this.drawDoorRevealPreview(ctx, doorRevealPreview);
@@ -3983,6 +4077,10 @@ export class SurvivRenderer {
                 ironworks: { main: '#3f4a4f', dark: '#293237', line: 'rgba(190,218,226,0.11)' },
                 brick: { main: '#6c625b', dark: '#514943', line: 'rgba(235,213,190,0.08)' },
                 lodge: { main: '#625c4d', dark: '#48443a', line: 'rgba(227,218,180,0.08)' },
+                cabin: { main: '#766b59', dark: '#5f5648', line: 'rgba(236,220,187,0.10)' },
+                barn: { main: '#75665a', dark: '#5c5048', line: 'rgba(235,216,196,0.09)' },
+                town: { main: '#69766c', dark: '#566259', line: 'rgba(220,234,222,0.09)' },
+                house: { main: '#6d766e', dark: '#59635b', line: 'rgba(224,236,226,0.08)' },
             };
             const fc = floorColors[o.variant] || { main: '#62676a', dark: '#50565a', line: 'rgba(215,225,228,0.06)' };
             const floorGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
@@ -3991,22 +4089,43 @@ export class SurvivRenderer {
             ctx.fillStyle = floorGrad;
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
             ctx.fill();
-            // Plank/tile lines
+            // Alternating square plates make industrial interiors readable;
+            // homes use staggered boards so every building is not the same grid.
             ctx.strokeStyle = fc.line;
             ctx.lineWidth = 1;
-            const tileStep = o.variant === 'ironworks' ? 72 : o.variant === 'warehouse' ? 64 : 58;
-            for (let ix = -o.w / 2 + tileStep; ix < o.w / 2; ix += tileStep) {
-                ctx.beginPath();
-                ctx.moveTo(ix, -o.h / 2 + 8);
-                ctx.lineTo(ix, o.h / 2 - 8);
-                ctx.stroke();
-            }
-            ctx.strokeStyle = 'rgba(25, 20, 15, 0.14)';
-            for (let iy = -o.h / 2 + tileStep; iy < o.h / 2; iy += tileStep) {
-                ctx.beginPath();
-                ctx.moveTo(-o.w / 2 + 8, iy);
-                ctx.lineTo(o.w / 2 - 8, iy);
-                ctx.stroke();
+            const tiled = ['ironworks', 'warehouse', 'mansion', 'brick'].includes(o.variant);
+            const tileStep = o.variant === 'ironworks' ? 72 : o.variant === 'warehouse' ? 62 : 54;
+            if (tiled) {
+                let row = 0;
+                for (let iy = -o.h / 2 + 7; iy < o.h / 2 - 7; iy += tileStep, row++) {
+                    let column = 0;
+                    for (let ix = -o.w / 2 + 7; ix < o.w / 2 - 7; ix += tileStep, column++) {
+                        ctx.fillStyle = (row + column) % 2 === 0
+                            ? 'rgba(255,255,255,0.025)'
+                            : 'rgba(8,12,14,0.035)';
+                        ctx.fillRect(ix, iy, Math.min(tileStep, o.w / 2 - 7 - ix), Math.min(tileStep, o.h / 2 - 7 - iy));
+                        ctx.strokeStyle = fc.line;
+                        ctx.strokeRect(ix, iy, Math.min(tileStep, o.w / 2 - 7 - ix), Math.min(tileStep, o.h / 2 - 7 - iy));
+                    }
+                }
+            } else {
+                const boardH = 28;
+                for (let iy = -o.h / 2 + boardH; iy < o.h / 2; iy += boardH) {
+                    ctx.beginPath();
+                    ctx.moveTo(-o.w / 2 + 7, iy);
+                    ctx.lineTo(o.w / 2 - 7, iy);
+                    ctx.stroke();
+                }
+                ctx.strokeStyle = 'rgba(25,20,15,0.10)';
+                for (let row = 0, iy = -o.h / 2; iy < o.h / 2; row++, iy += boardH) {
+                    const stagger = row % 2 ? 55 : 0;
+                    for (let ix = -o.w / 2 + 110 - stagger; ix < o.w / 2; ix += 110) {
+                        ctx.beginPath();
+                        ctx.moveTo(ix, iy + 2);
+                        ctx.lineTo(ix, Math.min(iy + boardH - 2, o.h / 2 - 7));
+                        ctx.stroke();
+                    }
+                }
             }
             if (o.variant === 'ironworks') {
                 // Broad central combat lane with readable steel plates and hazard borders.
@@ -4039,14 +4158,48 @@ export class SurvivRenderer {
             roundRect(ctx, -o.w / 2 + 3, -o.h / 2 + 3, o.w - 6, o.h - 6, 4);
             ctx.stroke();
         } else if (kind === 'door') {
-            // Door entities define traversal and visibility only. From a
-            // top-down view the opening is already formed by the surrounding
-            // wall geometry, so drawing a slab, threshold or dark rectangle
-            // here would look like an artificial door marker.
-            ctx.shadowBlur = 0;
-            ctx.shadowColor = 'transparent';
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
+            const horizontal = o.w >= o.h;
+            const longSize = horizontal ? o.w : o.h;
+            const shortSize = horizontal ? o.h : o.w;
+            const panelLength = clamp(longSize * (o.entranceRole === 'interiorDoor' ? 0.72 : 0.58), 34, 76);
+            const panelThickness = clamp(shortSize * 0.28, 6, 9);
+            const industrial = ['warehouse', 'metal', 'ironworks'].includes(o.variant);
+            const wooden = ['cabin', 'lodge', 'barn'].includes(o.variant);
+            const panelColor = industrial ? '#9fc8d1' : wooden ? '#c7aa77' : '#dce2df';
+            const panelDark = industrial ? '#6f99a3' : wooden ? '#96754a' : '#aeb9b5';
+            const drawW = horizontal ? panelLength : panelThickness;
+            const drawH = horizontal ? panelThickness : panelLength;
+
+            ctx.fillStyle = '#11161a';
+            roundRect(ctx, -drawW / 2 - 4, -drawH / 2 - 4, drawW + 8, drawH + 8, 3);
+            ctx.fill();
+            const doorGrad = horizontal
+                ? ctx.createLinearGradient(0, -drawH / 2, 0, drawH / 2)
+                : ctx.createLinearGradient(-drawW / 2, 0, drawW / 2, 0);
+            doorGrad.addColorStop(0, panelColor);
+            doorGrad.addColorStop(1, panelDark);
+            ctx.fillStyle = doorGrad;
+            roundRect(ctx, -drawW / 2, -drawH / 2, drawW, drawH, 1.5);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.38)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            if (horizontal) {
+                ctx.moveTo(-drawW / 2 + 4, -drawH / 2 + 1.5);
+                ctx.lineTo(drawW / 2 - 4, -drawH / 2 + 1.5);
+            } else {
+                ctx.moveTo(-drawW / 2 + 1.5, -drawH / 2 + 4);
+                ctx.lineTo(-drawW / 2 + 1.5, drawH / 2 - 4);
+            }
+            ctx.stroke();
+            ctx.fillStyle = '#252c30';
+            if (horizontal) {
+                ctx.fillRect(-drawW / 2 - 7, -drawH / 2 - 2, 4, drawH + 4);
+                ctx.fillRect(drawW / 2 + 3, -drawH / 2 - 2, 4, drawH + 4);
+            } else {
+                ctx.fillRect(-drawW / 2 - 2, -drawH / 2 - 7, drawW + 4, 4);
+                ctx.fillRect(-drawW / 2 - 2, drawH / 2 + 3, drawW + 4, 4);
+            }
         } else if (kind === 'wall' || kind === 'interiorWall') {
             // Wall with gradient and brick/stone texture
             const wallColors = {
@@ -4133,8 +4286,8 @@ export class SurvivRenderer {
                 }
             }
             // Outline
-            ctx.strokeStyle = 'rgba(24,20,16,0.42)';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#171d21';
+            ctx.lineWidth = kind === 'interiorWall' ? 2.5 : 3;
             roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
             ctx.stroke();
         } else if (kind === 'furniture' || kind === 'machine') {
@@ -6146,30 +6299,12 @@ export class SurvivRenderer {
     initBulletGradients(ctx) {
         this.bulletGradients = {};
         for (const [wt, spec] of Object.entries(WEAPON_BULLET_SPECS)) {
-            const { trailLen, slugLen } = spec;
-
-            // 1. Glow Gradient
-            const glowGrad = ctx.createLinearGradient(-trailLen, 0, slugLen, 0);
-            glowGrad.addColorStop(0, spec.glowColorStart);
-            glowGrad.addColorStop(0.35, spec.glowColorMid);
-            glowGrad.addColorStop(0.75, spec.glowColorEnd);
-            glowGrad.addColorStop(1, spec.glowColorTip);
-
-            // 2. Core Gradient
-            const coreGrad = ctx.createLinearGradient(-trailLen * 0.75, 0, slugLen, 0);
-            coreGrad.addColorStop(0, spec.coreColorStart);
-            coreGrad.addColorStop(0.45, spec.coreColorMid);
-            coreGrad.addColorStop(0.85, spec.coreColorEnd);
-            coreGrad.addColorStop(1, '#ffffff');
-
-            // A narrow white-hot leading streak keeps the projectile readable
-            // over light roads and indoor floors without an expensive shadowBlur.
-            const hotGrad = ctx.createLinearGradient(-trailLen * 0.42, 0, slugLen, 0);
-            hotGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-            hotGrad.addColorStop(0.58, 'rgba(255, 255, 255, 0.72)');
-            hotGrad.addColorStop(1, '#ffffff');
-
-            this.bulletGradients[wt] = { glowGrad, coreGrad, hotGrad };
+            const tracer = ctx.createLinearGradient(-spec.trailLen, 0, spec.tipLen, 0);
+            tracer.addColorStop(0, `rgba(${spec.rgb}, 0)`);
+            tracer.addColorStop(0.48, `rgba(${spec.rgb}, 0.18)`);
+            tracer.addColorStop(0.84, `rgba(${spec.rgb}, 0.76)`);
+            tracer.addColorStop(1, '#ffffff');
+            this.bulletGradients[wt] = tracer;
         }
     }
 
@@ -6202,32 +6337,14 @@ export class SurvivRenderer {
 
         const wt = b.weaponType;
         const spec = WEAPON_BULLET_SPECS[wt] || WEAPON_BULLET_SPECS.default;
-        const grads = this.bulletGradients[wt] || this.bulletGradients.default;
+        const tracerGradient = this.bulletGradients[wt] || this.bulletGradients.default;
 
         ctx.lineCap = 'round';
-
-        // 1. Outer motion-blur glow (wide stroke)
-        ctx.beginPath();
-        ctx.strokeStyle = grads.glowGrad;
-        ctx.lineWidth = spec.thickness * 3.2;
-        ctx.moveTo(-spec.trailLen, 0);
-        ctx.lineTo(spec.slugLen, 0);
-        ctx.stroke();
-
-        // 2. Inner sharp bullet core (narrower stroke)
-        ctx.beginPath();
-        ctx.strokeStyle = grads.coreGrad;
+        ctx.strokeStyle = tracerGradient;
         ctx.lineWidth = spec.thickness;
-        ctx.moveTo(-spec.trailLen * 0.75, 0);
-        ctx.lineTo(spec.slugLen, 0);
-        ctx.stroke();
-
-        // 3. Bright leading filament, matching the long white reference tracer.
         ctx.beginPath();
-        ctx.strokeStyle = grads.hotGrad;
-        ctx.lineWidth = Math.max(0.65, spec.thickness * 0.56);
-        ctx.moveTo(-spec.trailLen * 0.42, 0);
-        ctx.lineTo(spec.slugLen, 0);
+        ctx.moveTo(-spec.trailLen, 0);
+        ctx.lineTo(spec.tipLen, 0);
         ctx.stroke();
 
         ctx.restore();
@@ -7762,6 +7879,20 @@ export class SurvivRenderer {
                 ctx.globalAlpha = alpha * 0.42;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size * (1.35 - alpha * 0.35), 0, Math.PI * 2);
+                ctx.fill();
+            } else if (p.type === 'waterRing') {
+                const age = 1 - alpha;
+                ctx.globalAlpha = alpha * 0.72;
+                ctx.strokeStyle = p.color || '#a9e7f5';
+                ctx.lineWidth = 1.25;
+                ctx.beginPath();
+                ctx.ellipse(p.x, p.y, p.size * (1 + age * 1.6), p.size * (0.38 + age * 0.55), 0, 0, Math.PI * 2);
+                ctx.stroke();
+            } else if (p.type === 'waterDroplet') {
+                ctx.fillStyle = p.color || '#c5f1fa';
+                ctx.globalAlpha = alpha * 0.88;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, Math.max(0.5, p.size * alpha), 0, Math.PI * 2);
                 ctx.fill();
             } else {
                 ctx.fillStyle = p.color || '#ffdd44';
