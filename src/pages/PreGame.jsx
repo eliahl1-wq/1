@@ -1607,7 +1607,7 @@ export default function PreGame() {
                                     <div className="lobby-stake-heading">
                                         <label className="label">
                                             {isAuthenticated && selectedMode && selectedEntryFee === null && !isAlreadyInGame
-                                                ? 'Step 2 · Choose amount'
+                                                ? 'Choose amount'
                                                 : isBattleRoyaleMode ? 'Select Entry Fee' : 'Select Entry Stake'}
                                         </label>
                                         <span className="lobby-stake-current mono">

@@ -1,6 +1,7 @@
 let audioCtx = null;
 let unlocked = false;
 const noiseBuffers = new Map();
+const footstepNoiseBuffers = new Map();
 let footstepMaster = null;
 
 const THROTTLE_MS = 38;
@@ -39,6 +40,31 @@ function getNoiseBuffer(ctx, durationSec = 0.03, variation = 0) {
         data[i] = ((state >>> 0) / 0x80000000) - 1;
     }
     noiseBuffers.set(key, buffer);
+    return buffer;
+}
+
+function getFootstepNoiseBuffer(ctx, durationSec, variation, roughness = 0.55) {
+    const durationKey = Math.ceil(durationSec * 1000);
+    const roughnessKey = Math.round(roughness * 10);
+    const key = `${ctx.sampleRate}:${durationKey}:${variation & 31}:${roughnessKey}`;
+    const cached = footstepNoiseBuffers.get(key);
+    if (cached) return cached;
+
+    const len = Math.ceil(ctx.sampleRate * durationSec);
+    const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let state = (0x6d2b79f5 ^ Math.imul((variation | 0) + 7, 0x27d4eb2d) ^ len) >>> 0;
+    let softNoise = 0;
+    const dryAmount = Math.max(0.12, Math.min(0.88, roughness));
+    for (let i = 0; i < len; i++) {
+        state ^= state << 13;
+        state ^= state >>> 17;
+        state ^= state << 5;
+        const whiteNoise = ((state >>> 0) / 0x80000000) - 1;
+        softNoise += (whiteNoise - softNoise) * 0.16;
+        data[i] = whiteNoise * dryAmount + softNoise * (1 - dryAmount);
+    }
+    footstepNoiseBuffers.set(key, buffer);
     return buffer;
 }
 
@@ -159,32 +185,46 @@ export function playFoodEatSound() {
 
 const FOOTSTEP_PROFILES = Object.freeze({
     grass: {
-        duration: 0.15, volume: 0.068, impactHz: 165, contactHz: 560, textureHz: 1900,
-        impactGain: 0.72, contactGain: 0.55, textureGain: 0.13, grains: 3, thumpHz: 76,
+        duration: 0.18, volume: 0.09, bodyLowpass: 230, bodyGain: 0.72,
+        contactHighpass: 90, contactLowpass: 1250, contactGain: 0.66,
+        toeHighpass: 340, toeLowpass: 2050, toeGain: 0.22,
+        grainHighpass: 620, grainLowpass: 2900, textureGain: 0.075, grains: 4, roughness: 0.34,
     },
     dirt: {
-        duration: 0.15, volume: 0.071, impactHz: 190, contactHz: 720, textureHz: 2250,
-        impactGain: 0.76, contactGain: 0.58, textureGain: 0.17, grains: 4, thumpHz: 82,
+        duration: 0.16, volume: 0.088, bodyLowpass: 280, bodyGain: 0.78,
+        contactHighpass: 80, contactLowpass: 1420, contactGain: 0.7,
+        toeHighpass: 260, toeLowpass: 1800, toeGain: 0.18,
+        grainHighpass: 480, grainLowpass: 2650, textureGain: 0.082, grains: 4, roughness: 0.42,
     },
     gravel: {
-        duration: 0.17, volume: 0.066, impactHz: 245, contactHz: 1180, textureHz: 3400,
-        impactGain: 0.72, contactGain: 0.52, textureGain: 0.22, grains: 7, thumpHz: 88,
+        duration: 0.19, volume: 0.082, bodyLowpass: 340, bodyGain: 0.7,
+        contactHighpass: 140, contactLowpass: 2300, contactGain: 0.62,
+        toeHighpass: 480, toeLowpass: 2950, toeGain: 0.2,
+        grainHighpass: 680, grainLowpass: 4100, textureGain: 0.095, grains: 8, roughness: 0.72,
     },
     asphalt: {
-        duration: 0.12, volume: 0.066, impactHz: 280, contactHz: 980, textureHz: 2500,
-        impactGain: 0.78, contactGain: 0.68, textureGain: 0.11, grains: 2, thumpHz: 92,
+        duration: 0.125, volume: 0.083, bodyLowpass: 310, bodyGain: 0.82,
+        contactHighpass: 145, contactLowpass: 1650, contactGain: 0.72,
+        toeHighpass: 410, toeLowpass: 2150, toeGain: 0.13,
+        grainHighpass: 700, grainLowpass: 3100, textureGain: 0.055, grains: 2, roughness: 0.56,
     },
     indoor: {
-        duration: 0.13, volume: 0.061, impactHz: 315, contactHz: 1320, textureHz: 2850,
-        impactGain: 0.72, contactGain: 0.76, textureGain: 0.10, grains: 2, thumpHz: 102,
+        duration: 0.13, volume: 0.078, bodyLowpass: 295, bodyGain: 0.76,
+        contactHighpass: 165, contactLowpass: 1750, contactGain: 0.7,
+        toeHighpass: 330, toeLowpass: 2050, toeGain: 0.13,
+        grainHighpass: 720, grainLowpass: 2900, textureGain: 0.045, grains: 1, roughness: 0.46,
     },
     wood: {
-        duration: 0.15, volume: 0.064, impactHz: 225, contactHz: 820, textureHz: 2050,
-        impactGain: 0.72, contactGain: 0.63, textureGain: 0.12, grains: 3, thumpHz: 96,
+        duration: 0.16, volume: 0.081, bodyLowpass: 265, bodyGain: 0.84,
+        contactHighpass: 110, contactLowpass: 1380, contactGain: 0.7,
+        toeHighpass: 280, toeLowpass: 1900, toeGain: 0.16,
+        grainHighpass: 600, grainLowpass: 2600, textureGain: 0.052, grains: 2, roughness: 0.36,
     },
     water: {
-        duration: 0.25, volume: 0.082, impactHz: 240, contactHz: 1120, textureHz: 3100,
-        impactGain: 0.64, contactGain: 0.86, textureGain: 0.18, grains: 5, thumpHz: 68,
+        duration: 0.28, volume: 0.098, bodyLowpass: 205, bodyGain: 0.48,
+        contactHighpass: 65, contactLowpass: 1850, contactGain: 0.72,
+        toeHighpass: 320, toeLowpass: 2750, toeGain: 0.34,
+        grainHighpass: 760, grainLowpass: 3900, textureGain: 0.075, grains: 5, roughness: 0.66,
     },
 });
 
@@ -218,46 +258,36 @@ function getFootstepMaster(ctx) {
 
 function addFootstepNoise(ctx, destination, options) {
     const {
-        at, duration, attack = 0.003, gain, filterType = 'bandpass', frequency,
-        q = 0.75, variation = 0, playbackRate = 1,
+        at, duration, attack = 0.003, gain, highpass = 45, lowpass = 2000,
+        q = 0.36, variation = 0, playbackRate = 1, roughness = 0.55,
     } = options;
     const source = ctx.createBufferSource();
-    source.buffer = getNoiseBuffer(ctx, duration + 0.025, variation);
+    source.buffer = getFootstepNoiseBuffer(ctx, duration + 0.035, variation, roughness);
     source.playbackRate.value = playbackRate;
-    const filter = ctx.createBiquadFilter();
-    filter.type = filterType;
-    filter.frequency.setValueAtTime(Math.max(45, frequency), at);
-    filter.Q.value = q;
+    const highFilter = ctx.createBiquadFilter();
+    highFilter.type = 'highpass';
+    highFilter.frequency.setValueAtTime(Math.max(30, highpass), at);
+    highFilter.Q.value = q;
+    const lowFilter = ctx.createBiquadFilter();
+    lowFilter.type = 'lowpass';
+    lowFilter.frequency.setValueAtTime(Math.max(highpass + 80, lowpass), at);
+    lowFilter.Q.value = q;
     const envelope = ctx.createGain();
     envelope.gain.setValueAtTime(0.0001, at);
     envelope.gain.linearRampToValueAtTime(Math.max(0.0001, gain), at + attack);
     envelope.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-    source.connect(filter);
-    filter.connect(envelope);
+    source.connect(highFilter);
+    highFilter.connect(lowFilter);
+    lowFilter.connect(envelope);
     envelope.connect(destination);
     source.start(at);
-    source.stop(at + duration + 0.015);
-}
-
-function addFootstepThump(ctx, destination, at, duration, frequency, gain) {
-    const oscillator = ctx.createOscillator();
-    const envelope = ctx.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(Math.max(48, frequency), at);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(42, frequency * 0.58), at + duration * 0.72);
-    envelope.gain.setValueAtTime(0.0001, at);
-    envelope.gain.linearRampToValueAtTime(gain, at + 0.002);
-    envelope.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-    oscillator.connect(envelope);
-    envelope.connect(destination);
-    oscillator.start(at);
-    oscillator.stop(at + duration + 0.012);
+    source.stop(at + duration + 0.025);
 }
 
 /**
- * Layered Surviv footsteps: heel impact, sole contact and several tiny surface
- * grains. Each material has its own spectral profile, while deterministic
- * variation and alternating stereo placement prevent a repetitive loop.
+ * Layered Surviv footsteps made entirely from softly coloured noise. Broad,
+ * low-resonance filters avoid a metallic ring while separate body, sole,
+ * toe-off and loose-surface layers keep each material recognisable.
  */
 export function playSurvivFootstep(surface = 'ground', stepIndex = 0, intensity = 1) {
     const ctx = getCtx();
@@ -266,9 +296,9 @@ export function playSurvivFootstep(surface = 'ground', stepIndex = 0, intensity 
     const material = normalizeFootstepSurface(surface);
     const profile = FOOTSTEP_PROFILES[material];
     const t = ctx.currentTime;
-    const strength = Math.max(0.68, Math.min(1.08, Number(intensity) || 1));
-    const pitchJitter = 0.94 + footstepVariation(stepIndex, 1) * 0.12;
-    const alternatingPitch = stepIndex % 2 === 0 ? 1.018 : 0.982;
+    const strength = Math.max(0.64, Math.min(1.06, Number(intensity) || 1));
+    const pitchJitter = 0.965 + footstepVariation(stepIndex, 1) * 0.07;
+    const alternatingPitch = stepIndex % 2 === 0 ? 1.008 : 0.992;
     const pitch = pitchJitter * alternatingPitch;
 
     const bus = ctx.createGain();
@@ -277,76 +307,89 @@ export function playSurvivFootstep(surface = 'ground', stepIndex = 0, intensity 
     if (typeof ctx.createStereoPanner === 'function') {
         const panner = ctx.createStereoPanner();
         const side = stepIndex % 2 === 0 ? -1 : 1;
-        panner.pan.value = side * (0.045 + footstepVariation(stepIndex, 3) * 0.025);
+        panner.pan.value = side * (0.018 + footstepVariation(stepIndex, 3) * 0.014);
         bus.connect(panner);
         panner.connect(master);
     } else {
         bus.connect(master);
     }
 
-    // Heel: a short filtered impact backed by a restrained low-frequency body.
+    // Heel/body: coloured low noise feels like weight hitting a surface. A
+    // tonal oscillator is deliberately avoided because it sounds synthetic.
     addFootstepNoise(ctx, bus, {
         at: t,
-        duration: material === 'water' ? 0.075 : 0.047,
-        attack: 0.0015,
-        gain: profile.impactGain,
-        filterType: 'lowpass',
-        frequency: profile.impactHz * pitch,
-        q: 0.68,
+        duration: material === 'water' ? 0.09 : 0.058,
+        attack: 0.0025,
+        gain: profile.bodyGain,
+        highpass: 38,
+        lowpass: profile.bodyLowpass * pitch,
+        q: 0.32,
         variation: stepIndex * 3,
         playbackRate: pitch,
+        roughness: 0.22,
     });
-    addFootstepThump(
-        ctx,
-        bus,
-        t,
-        material === 'water' ? 0.105 : 0.075,
-        profile.thumpHz * pitch,
-        material === 'water' ? 0.15 : 0.21,
-    );
 
-    // Sole contact arrives just after the heel and supplies most of the shoe or
-    // splash character without producing the old electronic pitch sweep.
+    // The broad sole layer provides contact and friction without a narrow,
+    // resonant band that can ring like metal.
     addFootstepNoise(ctx, bus, {
         at: t + (material === 'water' ? 0.009 : 0.007),
         duration: profile.duration,
-        attack: material === 'water' ? 0.012 : 0.005,
+        attack: material === 'water' ? 0.014 : 0.006,
         gain: profile.contactGain,
-        filterType: 'bandpass',
-        frequency: profile.contactHz * pitch,
-        q: material === 'indoor' ? 1.05 : 0.72,
+        highpass: profile.contactHighpass * pitch,
+        lowpass: profile.contactLowpass * pitch,
+        q: 0.36,
         variation: stepIndex * 3 + 1,
-        playbackRate: 0.96 + footstepVariation(stepIndex, 5) * 0.1,
+        playbackRate: 0.975 + footstepVariation(stepIndex, 5) * 0.05,
+        roughness: profile.roughness,
     });
 
-    // Toe-off gives the step a second, quieter movement instead of one flat hit.
+    // A softer scrape at toe-off makes the foot roll over the ground.
     addFootstepNoise(ctx, bus, {
         at: t + (material === 'water' ? 0.07 : 0.045),
-        duration: material === 'water' ? 0.15 : 0.07,
-        attack: 0.005,
-        gain: profile.contactGain * (material === 'water' ? 0.36 : 0.2),
-        filterType: material === 'grass' ? 'highpass' : 'bandpass',
-        frequency: profile.contactHz * (material === 'grass' ? 1.35 : 0.82) * pitch,
-        q: 0.62,
+        duration: material === 'water' ? 0.17 : 0.085,
+        attack: material === 'water' ? 0.018 : 0.009,
+        gain: profile.toeGain,
+        highpass: profile.toeHighpass * pitch,
+        lowpass: profile.toeLowpass * pitch,
+        q: 0.34,
         variation: stepIndex * 3 + 2,
-        playbackRate: 0.9 + footstepVariation(stepIndex, 7) * 0.15,
+        playbackRate: 0.96 + footstepVariation(stepIndex, 7) * 0.08,
+        roughness: Math.min(0.78, profile.roughness + 0.08),
     });
+
+    // A plank gives slightly under the heel, but stays muted instead of ringing.
+    if (material === 'wood') {
+        addFootstepNoise(ctx, bus, {
+            at: t + 0.018,
+            duration: 0.065,
+            attack: 0.004,
+            gain: 0.19,
+            highpass: 55,
+            lowpass: 520 * pitch,
+            q: 0.3,
+            variation: stepIndex * 5 + 4,
+            playbackRate: pitch,
+            roughness: 0.2,
+        });
+    }
 
     // Small independently timed grains sell gravel, dirt, grass and droplets.
     for (let grain = 0; grain < profile.grains; grain++) {
         const grainNoise = footstepVariation(stepIndex * 11 + grain, 9);
-        const grainAt = t + 0.018 + grain * (material === 'water' ? 0.024 : 0.012) + grainNoise * 0.011;
-        const grainDuration = (material === 'water' ? 0.026 : 0.011) + grainNoise * 0.012;
+        const grainAt = t + 0.02 + grain * (material === 'water' ? 0.026 : 0.013) + grainNoise * 0.012;
+        const grainDuration = (material === 'water' ? 0.032 : 0.014) + grainNoise * 0.014;
         addFootstepNoise(ctx, bus, {
             at: grainAt,
             duration: grainDuration,
-            attack: 0.001,
-            gain: profile.textureGain * (0.72 + grainNoise * 0.5),
-            filterType: 'bandpass',
-            frequency: profile.textureHz * (0.74 + grainNoise * 0.62),
-            q: material === 'gravel' ? 2.2 : material === 'water' ? 1.3 : 1.55,
+            attack: 0.002,
+            gain: profile.textureGain * (0.7 + grainNoise * 0.42),
+            highpass: profile.grainHighpass * (0.82 + grainNoise * 0.18),
+            lowpass: profile.grainLowpass * (0.88 + grainNoise * 0.16),
+            q: 0.3,
             variation: stepIndex + grain + 6,
-            playbackRate: 0.88 + grainNoise * 0.28,
+            playbackRate: 0.94 + grainNoise * 0.12,
+            roughness: Math.min(0.86, profile.roughness + 0.12),
         });
     }
     return true;

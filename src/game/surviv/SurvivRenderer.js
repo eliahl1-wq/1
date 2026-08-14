@@ -391,6 +391,7 @@ function obstacleRenderSignature(obstacles) {
         mixNumber(o.width);
         mixNumber(o.collidable === false ? 0 : 1);
         mixNumber(o.isOpen ? 1 : 0);
+        mixNumber(o.openDirection || 0);
         if (o.points?.length) {
             mixNumber(o.points.length);
             for (const point of o.points) {
@@ -620,6 +621,7 @@ export class SurvivRenderer {
         this._doorOpenProgress = new Map();
         this._houseBucketSize = 800;
         this._playersById = new Map();
+        this._meleeAnimations = new Map();
         this._visibleFields = [];
         this._visibleWater = [];
         this._visibleRoads = [];
@@ -973,6 +975,7 @@ export class SurvivRenderer {
         this._collisionBuckets.clear();
         this._houseBuckets.clear();
         this._playersById.clear();
+        this._meleeAnimations.clear();
         this._visibleFields.length = 0;
         this._visibleWater.length = 0;
         this._visibleRoads.length = 0;
@@ -1362,26 +1365,39 @@ export class SurvivRenderer {
             if (!player) return null;
             const meleeRemainingMs = Number(player.meleeRemainingMs) || 0;
             const meleeHand = player.meleeHand || 'top';
-            const previousPlayer = this._playersById.get(player.id);
-            const continuingMelee = meleeRemainingMs > 0
-                && previousPlayer?.meleeUntil > receivedAt
-                && previousPlayer.meleeStartedAt > 0
-                && previousPlayer.meleeHand === meleeHand
-                && previousPlayer.weapon === player.weapon;
+            const meleeAttackId = Number(player.meleeAttackId) || 0;
             const estimatedMeleeStartedAt = receivedAt
                 - Math.max(0, MELEE_ANIMATION_MS - meleeRemainingMs);
+            let meleeAnimation = this._meleeAnimations.get(player.id);
+            if (meleeRemainingMs > 0 && (!meleeAnimation || meleeAnimation.attackId !== meleeAttackId)) {
+                meleeAnimation = {
+                    attackId: meleeAttackId,
+                    startedAt: estimatedMeleeStartedAt,
+                    until: estimatedMeleeStartedAt + MELEE_ANIMATION_MS,
+                    hand: meleeHand,
+                    weapon: player.weapon,
+                };
+                this._meleeAnimations.set(player.id, meleeAnimation);
+            } else if (meleeRemainingMs <= 0 && meleeAnimation?.until <= receivedAt) {
+                this._meleeAnimations.delete(player.id);
+                meleeAnimation = null;
+            }
+            const continuingMelee = meleeRemainingMs > 0
+                && meleeAnimation?.attackId === meleeAttackId
+                && meleeAnimation.weapon === player.weapon;
             return {
                 ...player,
                 reloadEndAtLocal: player.reloading
                     ? receivedAt + Math.max(0, Number(player.reloadRemainingMs) || 0)
                     : 0,
                 meleeStartedAt: meleeRemainingMs > 0
-                    ? continuingMelee ? previousPlayer.meleeStartedAt : estimatedMeleeStartedAt
+                    ? continuingMelee ? meleeAnimation.startedAt : estimatedMeleeStartedAt
                     : player.meleeStartedAt || 0,
                 meleeUntil: meleeRemainingMs > 0
-                    ? continuingMelee ? previousPlayer.meleeUntil : estimatedMeleeStartedAt + MELEE_ANIMATION_MS
+                    ? continuingMelee ? meleeAnimation.until : estimatedMeleeStartedAt + MELEE_ANIMATION_MS
                     : player.meleeUntil || 0,
-                meleeHand,
+                meleeHand: continuingMelee ? meleeAnimation.hand : meleeHand,
+                meleeAttackId,
             };
         };
 
@@ -1449,6 +1465,9 @@ export class SurvivRenderer {
         }
         for (const playerId of this._prevPlayers.keys()) {
             if (!activePlayerIds.has(playerId)) this._prevPlayers.delete(playerId);
+        }
+        for (const playerId of this._meleeAnimations.keys()) {
+            if (!activePlayerIds.has(playerId)) this._meleeAnimations.delete(playerId);
         }
         while (this._seenDeathMarkerIds.size > 200) {
             this._seenDeathMarkerIds.delete(this._seenDeathMarkerIds.values().next().value);
@@ -3090,6 +3109,9 @@ export class SurvivRenderer {
 
         // Softly shade the exterior while all moving entities stay hidden.
         this.drawExteriorHouseShadow(ctx, camX, camY, W, H, z, currentHouse);
+        // Keep the contextual label attached to the doorway and above players,
+        // loot, particles and house shading.
+        this.drawNearbyDoorPrompt(ctx);
 
         ctx.restore();
 
@@ -4154,7 +4176,7 @@ export class SurvivRenderer {
 
     drawExteriorDoorEdge(ctx, o) {
         const horizontal = o.w >= o.h;
-        const length = Math.max(24, (horizontal ? o.w : o.h) - 12);
+        const length = Math.max(24, (horizontal ? o.w : o.h) + 2);
         const industrial = ['warehouse', 'metal', 'ironworks'].includes(o.variant);
         const wooden = ['cabin', 'lodge', 'barn'].includes(o.variant);
         const color = industrial ? '#71848a' : wooden ? '#806140' : '#9a9690';
@@ -4175,6 +4197,27 @@ export class SurvivRenderer {
         ctx.moveTo(-length / 2 + 2, 0);
         ctx.lineTo(length / 2 - 2, 0);
         ctx.stroke();
+        ctx.restore();
+    }
+
+    drawNearbyDoorPrompt(ctx) {
+        const door = this.getNearbyDoor();
+        if (!door) return;
+        const label = door.isOpen ? 'F TO CLOSE' : 'F TO OPEN';
+        ctx.save();
+        ctx.translate(door.x, door.y);
+        ctx.font = '800 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const width = Math.ceil(ctx.measureText(label).width) + 18;
+        ctx.fillStyle = 'rgba(9, 13, 15, 0.88)';
+        roundRect(ctx, -width / 2, -10, width, 20, 5);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(232, 239, 235, 0.62)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#f4f7f4';
+        ctx.fillText(label, 0, 0.5);
         ctx.restore();
     }
 
@@ -4427,8 +4470,8 @@ export class SurvivRenderer {
         } else if (kind === 'door') {
             const horizontal = o.w >= o.h;
             const longSize = horizontal ? o.w : o.h;
-            const panelLength = Math.max(24, longSize - 4);
-            const panelThickness = o.entranceRole === 'interiorDoor' ? 5 : 6;
+            const panelLength = Math.max(24, longSize + 2);
+            const panelThickness = Math.max(6, (horizontal ? o.h : o.w));
             const doorPalette = {
                 warehouse: ['#48565e', '#374249'],
                 metal: ['#38464d', '#222c31'],
@@ -4458,7 +4501,7 @@ export class SurvivRenderer {
             ctx.lineTo(longSize / 2, 0);
             ctx.stroke();
 
-            const swingDirection = (String(o.id).charCodeAt(String(o.id).length - 1) % 2 ? 1 : -1);
+            const swingDirection = Number(o.openDirection) === -1 ? -1 : 1;
             ctx.translate(-panelLength / 2, 0);
             ctx.rotate(swingDirection * progress * Math.PI * 0.48);
             const doorGrad = ctx.createLinearGradient(0, -panelThickness / 2, 0, panelThickness / 2);
@@ -6894,13 +6937,12 @@ export class SurvivRenderer {
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const strike = punching ? meleeStrikeMotion(progress, 0.27) : 0;
 
-            // The server selects one consistent striking hand. It travels
-            // forward exactly once; the other hand stays tucked beside the
-            // body instead of joining the attack.
+            // One hand attacks per accepted attack id. The server alternates
+            // which hand is selected for the next distinct click.
             const leadSide = meleeHand === 'bottom' ? 1 : -1;
             const leadReach = r * 0.58 + r * 1.18 * strike;
             const leadY = leadSide * (10.8 - strike * 6.6);
-            const guardReach = r * 0.22;
+            const guardReach = r * 0.54;
             const guardY = -leadSide * 11.2;
             const topHand = leadSide < 0
                 ? { x: leadReach, y: leadY, lead: true }

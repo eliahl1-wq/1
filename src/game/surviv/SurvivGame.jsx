@@ -1349,12 +1349,10 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {!IS_MOBILE && gameReady && me && nearbyPickup && !showResultModal && !isDead && !isSpectating && !isInventoryOpen && (
+            {!IS_MOBILE && gameReady && me && nearbyPickup && nearbyPickup.kind !== 'door' && !showResultModal && !isDead && !isSpectating && !isInventoryOpen && (
                 <div className="surviv-context-prompt" role="status" aria-live="polite">
                     <kbd>F</kbd>
-                    {nearbyPickup.kind === 'door'
-                        ? <span>{nearbyPickup.isOpen ? 'CLOSE' : 'OPEN'} <strong>DOOR</strong></span>
-                        : <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>}
+                    <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
                 </div>
             )}
 
