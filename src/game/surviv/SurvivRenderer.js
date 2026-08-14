@@ -68,8 +68,14 @@ const smoothstep01 = (value) => {
 function meleeStrikeMotion(progress, contactAt = 0.28) {
     const t = clamp(progress, 0, 1);
     if (t < contactAt) return smoothstep01(t / contactAt);
-    if (t < 0.5) return 1;
-    return 1 - smoothstep01((t - 0.5) / 0.5);
+    return 1;
+}
+
+function meleeStabMotion(progress, contactAt = 0.25, releaseAt = 0.5) {
+    const t = clamp(progress, 0, 1);
+    if (t < contactAt) return smoothstep01(t / contactAt);
+    if (t < releaseAt) return 1;
+    return 1 - smoothstep01((t - releaseAt) / (1 - releaseAt));
 }
 
 const WEAPON_SHAKE = {
@@ -340,7 +346,7 @@ const CAST_SHADOW_EXEMPT_KINDS = new Set([
 ]);
 const ROUND_CAST_SHADOW_KINDS = new Set(['tree', 'rock', 'barrel', 'lampPost']);
 const TALL_CAST_SHADOW_KINDS = new Set(['tree', 'container', 'tent', 'signpost', 'lampPost', 'mailbox']);
-const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate']);
+const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'door', 'container', 'crate']);
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
 const CACHEABLE_PROP_KINDS = new Set([
     'houseFloor', 'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
@@ -557,6 +563,250 @@ function traceOrganicPond(ctx, obstacle, padding = 0, scale = 1) {
         points.push({ x: Math.cos(angle) * rx * wobble, y: Math.sin(angle) * ry * wobble });
     }
     traceSmoothPath(ctx, points, 0, 0, true);
+}
+
+function drawFurnitureTopDown(ctx, o, variant) {
+    const w = o.w;
+    const h = o.h;
+    const hw = w / 2;
+    const hh = h / 2;
+    const drawBox = (fill, stroke = '#252725', radius = 4, inset = 0) => {
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 2;
+        roundRect(ctx, -hw + inset, -hh + inset, w - inset * 2, h - inset * 2, radius);
+        ctx.fill();
+        ctx.stroke();
+    };
+    const drawChair = (x, y, width, height, rotation = 0, color = '#6d543d') => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.fillStyle = '#3b2c20';
+        roundRect(ctx, -width / 2, -height / 2, width, height, 3);
+        ctx.fill();
+        ctx.fillStyle = color;
+        roundRect(ctx, -width / 2 + 2, -height / 2 + 3, width - 4, height - 7, 2);
+        ctx.fill();
+        ctx.fillStyle = '#2b2119';
+        ctx.fillRect(-width / 2, -height / 2, width, Math.max(3, height * 0.18));
+        ctx.restore();
+    };
+    const drawWoodGrain = (alpha = 0.18) => {
+        ctx.strokeStyle = `rgba(245, 218, 167, ${alpha})`;
+        ctx.lineWidth = 1;
+        for (let line = -0.2; line <= 0.2; line += 0.2) {
+            ctx.beginPath();
+            if (w >= h) {
+                ctx.moveTo(-hw + 7, line * h);
+                ctx.bezierCurveTo(-w * 0.12, line * h - 2, w * 0.12, line * h + 2, hw - 7, line * h);
+            } else {
+                ctx.moveTo(line * w, -hh + 7);
+                ctx.bezierCurveTo(line * w - 2, -h * 0.12, line * w + 2, h * 0.12, line * w, hh - 7);
+            }
+            ctx.stroke();
+        }
+    };
+
+    if (variant === 'sofa' || variant === 'armchair') {
+        const horizontal = w >= h;
+        drawBox('#33453f', '#1c2824', Math.min(9, Math.min(w, h) * 0.2));
+        ctx.fillStyle = '#60756c';
+        roundRect(ctx, -hw + 6, -hh + 6, w - 12, h - 12, 5);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(222, 235, 226, 0.18)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        if (horizontal) {
+            ctx.moveTo(0, -hh + 7);
+            ctx.lineTo(0, hh - 7);
+        } else {
+            ctx.moveTo(-hw + 7, 0);
+            ctx.lineTo(hw - 7, 0);
+        }
+        ctx.stroke();
+        ctx.fillStyle = '#26342f';
+        if (horizontal) {
+            roundRect(ctx, -hw + 2, -hh + 3, 7, h - 6, 3); ctx.fill();
+            roundRect(ctx, hw - 9, -hh + 3, 7, h - 6, 3); ctx.fill();
+        } else {
+            roundRect(ctx, -hw + 3, -hh + 2, w - 6, 7, 3); ctx.fill();
+            roundRect(ctx, -hw + 3, hh - 9, w - 6, 7, 3); ctx.fill();
+        }
+    } else if (variant === 'bed' || variant === 'hospitalBed') {
+        drawBox(variant === 'hospitalBed' ? '#c8d3cf' : '#5b402b', '#2b2c29', 5);
+        ctx.fillStyle = variant === 'hospitalBed' ? '#dce7e2' : '#71869a';
+        roundRect(ctx, -hw + 4, -hh + 4, w - 8, h - 8, 4);
+        ctx.fill();
+        const horizontal = w >= h;
+        ctx.fillStyle = '#eee8d8';
+        if (horizontal) roundRect(ctx, -hw + 7, -hh + 8, Math.max(12, w * 0.24), h - 16, 5);
+        else roundRect(ctx, -hw + 8, -hh + 7, w - 16, Math.max(12, h * 0.24), 5);
+        ctx.fill();
+        ctx.strokeStyle = variant === 'hospitalBed' ? '#71817e' : 'rgba(27, 39, 46, 0.28)';
+        ctx.lineWidth = variant === 'hospitalBed' ? 2 : 1.2;
+        ctx.beginPath();
+        if (horizontal) {
+            ctx.moveTo(-hw + w * 0.34, -hh + 5); ctx.lineTo(-hw + w * 0.34, hh - 5);
+        } else {
+            ctx.moveTo(-hw + 5, -hh + h * 0.34); ctx.lineTo(hw - 5, -hh + h * 0.34);
+        }
+        ctx.stroke();
+        if (variant === 'hospitalBed') {
+            ctx.strokeStyle = '#61706d';
+            ctx.lineWidth = 2.3;
+            ctx.beginPath();
+            if (horizontal) {
+                ctx.moveTo(-hw + 5, -hh - 1); ctx.lineTo(hw - 5, -hh - 1);
+                ctx.moveTo(-hw + 5, hh + 1); ctx.lineTo(hw - 5, hh + 1);
+            } else {
+                ctx.moveTo(-hw - 1, -hh + 5); ctx.lineTo(-hw - 1, hh - 5);
+                ctx.moveTo(hw + 1, -hh + 5); ctx.lineTo(hw + 1, hh - 5);
+            }
+            ctx.stroke();
+        }
+    } else if (variant === 'diningTable') {
+        const horizontal = w >= h;
+        const tableW = horizontal ? w * 0.62 : w * 0.58;
+        const tableH = horizontal ? h * 0.54 : h * 0.64;
+        const chairW = Math.min(22, horizontal ? tableW * 0.22 : w * 0.40);
+        const chairH = Math.min(20, horizontal ? h * 0.24 : tableH * 0.20);
+        drawChair(0, -hh + chairH / 2, chairW, chairH, Math.PI, '#816548');
+        drawChair(0, hh - chairH / 2, chairW, chairH, 0, '#816548');
+        if (horizontal) {
+            drawChair(-hw + chairH / 2, 0, chairW, chairH, Math.PI / 2, '#816548');
+            drawChair(hw - chairH / 2, 0, chairW, chairH, -Math.PI / 2, '#816548');
+        }
+        ctx.fillStyle = '#755235';
+        ctx.strokeStyle = '#39291e';
+        ctx.lineWidth = 2;
+        roundRect(ctx, -tableW / 2, -tableH / 2, tableW, tableH, 5);
+        ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = 'rgba(244, 216, 165, 0.18)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-tableW / 2 + 7, 0); ctx.lineTo(tableW / 2 - 7, 0); ctx.stroke();
+        ctx.fillStyle = '#b58c56';
+        ctx.beginPath(); ctx.arc(0, 0, Math.min(5, tableH * 0.12), 0, Math.PI * 2); ctx.fill();
+    } else if (variant === 'coffeeTable' || variant === 'nightstand' || variant === 'table') {
+        const fill = variant === 'coffeeTable' ? '#76543b' : '#69503b';
+        drawBox(fill, '#392b21', 5);
+        drawWoodGrain(0.16);
+        ctx.fillStyle = '#30241b';
+        const radius = Math.min(3, Math.min(w, h) * 0.1);
+        for (const [x, y] of [[-hw + 6, -hh + 6], [hw - 6, -hh + 6], [-hw + 6, hh - 6], [hw - 6, hh - 6]]) {
+            ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+        }
+    } else if (variant === 'kitchenCounter') {
+        drawBox('#7c7a70', '#353b3b', 4);
+        ctx.fillStyle = '#aaa99e';
+        roundRect(ctx, -hw + 4, -hh + 4, w - 8, h - 8, 3); ctx.fill();
+        const horizontal = w >= h;
+        ctx.fillStyle = '#4c5c5e';
+        if (horizontal) roundRect(ctx, -hw + w * 0.12, -h * 0.22, w * 0.27, h * 0.44, 3);
+        else roundRect(ctx, -w * 0.22, -hh + h * 0.12, w * 0.44, h * 0.27, 3);
+        ctx.fill();
+        ctx.strokeStyle = '#394244'; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(horizontal ? hw * 0.48 : 0, horizontal ? 0 : hh * 0.48, 4, 0, Math.PI * 2);
+        ctx.arc(horizontal ? hw * 0.72 : 0, horizontal ? 0 : hh * 0.72, 4, 0, Math.PI * 2);
+        ctx.stroke();
+    } else if (variant === 'desk') {
+        drawBox('#75543a', '#34271e', 4);
+        drawWoodGrain(0.14);
+        const horizontal = w >= h;
+        ctx.fillStyle = '#2f3838';
+        if (horizontal) roundRect(ctx, -w * 0.20, -h * 0.22, w * 0.40, h * 0.28, 2);
+        else roundRect(ctx, -w * 0.22, -h * 0.20, w * 0.28, h * 0.40, 2);
+        ctx.fill();
+        drawChair(horizontal ? 0 : hw * 0.72, horizontal ? hh * 0.72 : 0, 22, 20, horizontal ? 0 : -Math.PI / 2, '#53645d');
+    } else if (['bookshelf', 'displayShelf', 'storageShelf'].includes(variant)) {
+        const industrial = variant === 'storageShelf';
+        drawBox(industrial ? '#48565a' : '#65472f', industrial ? '#242e31' : '#322319', 3);
+        ctx.strokeStyle = industrial ? '#78878a' : 'rgba(225, 190, 135, 0.28)';
+        ctx.lineWidth = 2;
+        const horizontal = w >= h;
+        const shelves = 3;
+        for (let index = 1; index < shelves; index++) {
+            ctx.beginPath();
+            if (horizontal) {
+                const x = -hw + (index / shelves) * w;
+                ctx.moveTo(x, -hh + 3); ctx.lineTo(x, hh - 3);
+            } else {
+                const y = -hh + (index / shelves) * h;
+                ctx.moveTo(-hw + 3, y); ctx.lineTo(hw - 3, y);
+            }
+            ctx.stroke();
+        }
+        const colors = industrial ? ['#a87a43', '#777c73', '#657a83'] : ['#8a4d3f', '#446272', '#947548', '#596b48'];
+        for (let index = 0; index < 5; index++) {
+            ctx.fillStyle = colors[index % colors.length];
+            if (horizontal) ctx.fillRect(-hw + 6 + index * (w - 14) / 5, -hh + 6, Math.max(3, (w - 18) / 7), h - 12);
+            else ctx.fillRect(-hw + 6, -hh + 6 + index * (h - 14) / 5, w - 12, Math.max(3, (h - 18) / 7));
+        }
+    } else if (variant === 'salesCounter') {
+        drawBox('#70513a', '#30251f', 4);
+        ctx.fillStyle = '#9a7859';
+        roundRect(ctx, -hw + 4, -hh + 4, w - 8, h - 8, 3); ctx.fill();
+        ctx.fillStyle = '#333c3c';
+        const horizontal = w >= h;
+        if (horizontal) roundRect(ctx, w * 0.16, -h * 0.22, w * 0.22, h * 0.44, 2);
+        else roundRect(ctx, -w * 0.22, h * 0.16, w * 0.44, h * 0.22, 2);
+        ctx.fill();
+        ctx.fillStyle = '#d7c274';
+        ctx.fillRect(horizontal ? w * 0.23 : -2, horizontal ? -2 : h * 0.23, 4, 4);
+    } else if (['dresser', 'locker', 'toolCabinet', 'medicalCabinet', 'cabinet'].includes(variant)) {
+        const metal = ['locker', 'toolCabinet', 'medicalCabinet'].includes(variant);
+        const fill = variant === 'medicalCabinet' ? '#d9e1dd' : metal ? '#526167' : '#735139';
+        drawBox(fill, metal ? '#293438' : '#38271d', 3);
+        ctx.strokeStyle = metal ? 'rgba(28, 40, 43, 0.55)' : 'rgba(49, 31, 20, 0.55)';
+        ctx.lineWidth = 1.2;
+        const horizontal = w >= h;
+        ctx.beginPath();
+        if (horizontal) { ctx.moveTo(0, -hh + 3); ctx.lineTo(0, hh - 3); }
+        else { ctx.moveTo(-hw + 3, 0); ctx.lineTo(hw - 3, 0); }
+        ctx.stroke();
+        ctx.fillStyle = variant === 'medicalCabinet' ? '#c64b4b' : '#c4a271';
+        if (variant === 'medicalCabinet') {
+            ctx.fillRect(-5, -2, 10, 4); ctx.fillRect(-2, -5, 4, 10);
+        } else {
+            ctx.beginPath(); ctx.arc(horizontal ? -3 : 0, horizontal ? 0 : -3, 2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(horizontal ? 3 : 0, horizontal ? 0 : 3, 2, 0, Math.PI * 2); ctx.fill();
+        }
+    } else if (variant === 'workbench') {
+        drawBox('#3c4546', '#1c2527', 4);
+        ctx.fillStyle = '#895e39';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, 3); ctx.fill();
+        drawWoodGrain(0.17);
+        ctx.fillStyle = '#49575a';
+        ctx.fillRect(-w * 0.20, -3, w * 0.30, 6);
+        ctx.fillStyle = '#b4863e';
+        ctx.beginPath(); ctx.arc(w * 0.26, 0, 5, 0, Math.PI * 2); ctx.fill();
+    } else if (variant === 'controlConsole' || variant === 'machine' || variant === 'industrial') {
+        drawBox('#46545a', '#172024', 5);
+        ctx.fillStyle = '#202a2e';
+        roundRect(ctx, -hw + 7, -hh + 7, w - 14, h * 0.42, 3); ctx.fill();
+        ctx.fillStyle = '#72afad'; ctx.fillRect(-w * 0.30, -hh + 12, w * 0.23, 5);
+        ctx.fillStyle = '#d9a642';
+        for (let index = 0; index < 3; index++) {
+            ctx.beginPath(); ctx.arc(w * (0.08 + index * 0.12), -hh + 15, 3, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.strokeStyle = 'rgba(224, 234, 232, 0.25)'; ctx.lineWidth = 1;
+        for (let y = 2; y < hh - 5; y += 7) { ctx.beginPath(); ctx.moveTo(-hw + 8, y); ctx.lineTo(hw - 8, y); ctx.stroke(); }
+    } else if (variant === 'palletStack') {
+        drawBox('#5c442f', '#2d2118', 3);
+        ctx.fillStyle = '#8a663e';
+        const rows = 3;
+        for (let row = 0; row < rows; row++) {
+            const y = -hh + 6 + row * ((h - 12) / rows);
+            ctx.fillRect(-hw + 5, y, w - 10, Math.max(5, (h - 18) / rows));
+        }
+        ctx.strokeStyle = '#392a1e'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-w * 0.2, -hh + 5); ctx.lineTo(-w * 0.2, hh - 5);
+        ctx.moveTo(w * 0.2, -hh + 5); ctx.lineTo(w * 0.2, hh - 5); ctx.stroke();
+    } else {
+        drawBox('#705039', '#36271e', 4);
+        drawWoodGrain(0.15);
+    }
 }
 
 function biomeAt() {
@@ -2164,6 +2414,7 @@ export class SurvivRenderer {
                     ? houseRooms.find(r => this.pointInsideRect(r, o.x, o.y, 1))
                     : null;
                 o._insideRoomId = room?.id || null;
+                o._insideRoom = room || null;
             }
             if (SURFACE_KINDS.has(o.kind)) {
                 this.surfaceObstacles.push(o);
@@ -2210,9 +2461,8 @@ export class SurvivRenderer {
         }
 
         for (const house of this.houseFloors) {
-            const huge = house.w >= 430 || house.h >= 330;
-            const hasHallway = (this._roomZonesByHouseId.get(house.id) || []).some(r => r.variant === 'hallway');
-            if (huge && hasHallway && (house.variant === 'mansion' || house.variant === 'warehouse' || house.variant === 'ironworks')) {
+            const hasDoor = (this._doorwaysByHouseId.get(house.id) || []).length > 0;
+            if (hasDoor) {
                 this._interiorFogHouseIds.add(house.id);
             }
 
@@ -2231,6 +2481,7 @@ export class SurvivRenderer {
             const houseObstacles = this._renderObstaclesByHouseId.get(house.id) || [];
             for (const obstacle of houseObstacles) {
                 if (!LOS_BLOCKING_KINDS.has(obstacle.kind)) continue;
+                if (obstacle.kind === 'door' && obstacle.isOpen) continue;
                 const left = obstacle.x - obstacle.w / 2;
                 const right = obstacle.x + obstacle.w / 2;
                 const top = obstacle.y - obstacle.h / 2;
@@ -2495,7 +2746,14 @@ export class SurvivRenderer {
             const belongsToCurrentHouse = o._insideHouseId === currentHouse.id || o.houseId === currentHouse.id;
             if (!belongsToCurrentHouse) return false;
             if (HOUSE_BOUND_PROP_KINDS.has(o.kind) && o._insideRoomId && currentRoom) {
-                return o._insideRoomId === currentRoom.id;
+                const room = o._insideRoom;
+                if (!room) return true;
+                return this.roomVisibilityStrength(
+                    room,
+                    currentRoom,
+                    this.me?.x ?? currentRoom.x,
+                    this.me?.y ?? currentRoom.y,
+                ) > 0.18;
             }
             return true;
         }
@@ -2507,6 +2765,14 @@ export class SurvivRenderer {
         if (this.isPointHiddenByRooms(l.x, l.y, currentHouse, currentRoom)) return true;
         if (this.isPointHiddenByLineOfSight(l.x, l.y, currentHouse)) return true;
         return false;
+    }
+
+    shouldDrawIndoorContainerUnderShadow(item, currentHouse, currentRoom) {
+        if (!currentHouse || (item.type !== 'chest' && item.type !== 'deathCrate')) return false;
+        const belongsToHouse = item.houseId === currentHouse.id
+            || this.pointInsideRect(currentHouse, item.x, item.y, -2);
+        if (!belongsToHouse) return false;
+        return !this.isPointHiddenByRooms(item.x, item.y, currentHouse, currentRoom);
     }
 
     pointInPolygon(x, y, polygon) {
@@ -3027,6 +3293,15 @@ export class SurvivRenderer {
             this.drawObstacle(ctx, o);
         }
         this.drawDeathMarkers(ctx, currentHouse);
+        // Solid indoor containers are part of the room itself. Draw them before
+        // the darkness mask so closed doors dim both the object and its cast
+        // shadow instead of making the entire object pop out of existence.
+        for (const item of this.loot) {
+            if (this.isPointInView(item.x, item.y, 70)
+                && this.shouldDrawIndoorContainerUnderShadow(item, currentHouse, currentRoom)) {
+                this.drawLoot(ctx, item);
+            }
+        }
         // Only use the new LOS shadow system (replaces old room shadows)
         this.drawLineOfSightShadow(ctx, camX, camY, W, H, z, currentHouse);
 
@@ -3035,6 +3310,7 @@ export class SurvivRenderer {
 
         this.drawChestBursts(ctx, currentHouse, currentRoom);
         for (const l of this.loot) {
+            if (this.shouldDrawIndoorContainerUnderShadow(l, currentHouse, currentRoom)) continue;
             if (this.isPointInView(l.x, l.y, 70) && !this.isLootHidden(l, currentHouse, currentRoom)) this.drawLoot(ctx, l);
         }
         for (const b of this.bullets) {
@@ -4109,7 +4385,10 @@ export class SurvivRenderer {
         const kind = o.kind || 'crate';
         const width = Math.abs(Number(o.w) || 0);
         const height = Math.abs(Number(o.h) || 0);
-        if (!width || !height || CAST_SHADOW_EXEMPT_KINDS.has(kind)) return;
+        const indoorRaisedObject = !!o._insideHouseId
+            && !['wall', 'interiorWall', 'door'].includes(kind)
+            && Math.max(width, height) >= 20;
+        if (!width || !height || (CAST_SHADOW_EXEMPT_KINDS.has(kind) && !indoorRaisedObject)) return;
 
         // The light direction is fixed in world space. Convert it to the
         // obstacle's local space so rotating a prop never rotates its shadow.
@@ -4124,7 +4403,8 @@ export class SurvivRenderer {
         const localOffsetX = Math.cos(rotation) * worldOffsetX + Math.sin(rotation) * worldOffsetY;
         const localOffsetY = -Math.sin(rotation) * worldOffsetX + Math.cos(rotation) * worldOffsetY;
         const softPad = Math.min(7, Math.max(2.5, minSize * 0.12));
-        const coreAlpha = kind === 'wall' || kind === 'interiorWall' ? 0.17
+        const coreAlpha = indoorRaisedObject ? 0.29
+            : kind === 'wall' || kind === 'interiorWall' ? 0.17
             : kind === 'bridge' ? 0.18
                 : tall ? 0.25 : 0.22;
 
@@ -4177,9 +4457,7 @@ export class SurvivRenderer {
     drawExteriorDoorEdge(ctx, o) {
         const horizontal = o.w >= o.h;
         const length = Math.max(24, (horizontal ? o.w : o.h) + 2);
-        const industrial = ['warehouse', 'metal', 'ironworks'].includes(o.variant);
-        const wooden = ['cabin', 'lodge', 'barn'].includes(o.variant);
-        const color = industrial ? '#71848a' : wooden ? '#806140' : '#9a9690';
+        const color = '#f2f5f1';
         ctx.save();
         ctx.translate(o.x, o.y);
         ctx.rotate(o.rotation || 0);
@@ -4472,18 +4750,8 @@ export class SurvivRenderer {
             const longSize = horizontal ? o.w : o.h;
             const panelLength = Math.max(24, longSize + 2);
             const panelThickness = Math.max(6, (horizontal ? o.h : o.w));
-            const doorPalette = {
-                warehouse: ['#48565e', '#374249'],
-                metal: ['#38464d', '#222c31'],
-                ironworks: ['#38464d', '#222c31'],
-                brick: ['#835447', '#5d3931'],
-                lodge: ['#53614b', '#354137'],
-                cabin: ['#73583a', '#4f3928'],
-                barn: ['#735044', '#4d332c'],
-                mansion: ['#697278', '#4b545a'],
-                plaster: ['#667075', '#485157'],
-            };
-            const [panelColor, panelDark] = doorPalette[o.variant] || ['#596268', '#424b50'];
+            const panelColor = '#f5f7f3';
+            const panelDark = '#c9d0c9';
             const target = o.isOpen ? 1 : 0;
             const previous = this._doorOpenProgress.get(o.id) ?? target;
             const blend = 1 - Math.exp(-15 * Math.max(0.001, this._frameDt || 1 / 60));
@@ -4614,167 +4882,7 @@ export class SurvivRenderer {
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
             const furnitureVariant = kind === 'machine' ? 'machine' : o.variant;
-            if (furnitureVariant === 'machine' || furnitureVariant === 'industrial') {
-                const machineGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
-                machineGrad.addColorStop(0, '#526068');
-                machineGrad.addColorStop(1, '#273136');
-                ctx.fillStyle = machineGrad;
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 5);
-                ctx.fill();
-                ctx.strokeStyle = '#11181c';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-
-                ctx.fillStyle = '#141c20';
-                roundRect(ctx, -o.w * 0.32, -o.h * 0.24, o.w * 0.64, o.h * 0.30, 3);
-                ctx.fill();
-                ctx.fillStyle = '#65c5d8';
-                ctx.fillRect(-o.w * 0.24, -o.h * 0.16, o.w * 0.20, 5);
-                ctx.fillStyle = '#e0ad3e';
-                ctx.beginPath();
-                ctx.arc(o.w * 0.18, -o.h * 0.09, 4, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = 'rgba(234, 178, 52, 0.72)';
-                ctx.lineWidth = 5;
-                ctx.setLineDash([9, 7]);
-                ctx.beginPath();
-                ctx.moveTo(-o.w / 2 + 8, o.h / 2 - 9);
-                ctx.lineTo(o.w / 2 - 8, o.h / 2 - 9);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            } else if (furnitureVariant === 'locker') {
-                ctx.fillStyle = '#43535c';
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
-                ctx.fill();
-                ctx.strokeStyle = '#202a2f';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                const columns = Math.max(1, Math.round(o.w / 28));
-                for (let i = 1; i < columns; i++) {
-                    const x = -o.w / 2 + (i / columns) * o.w;
-                    ctx.beginPath();
-                    ctx.moveTo(x, -o.h / 2 + 3);
-                    ctx.lineTo(x, o.h / 2 - 3);
-                    ctx.stroke();
-                }
-                ctx.fillStyle = 'rgba(191, 216, 224, 0.36)';
-                for (let i = 0; i < columns; i++) {
-                    const x = -o.w / 2 + ((i + 0.5) / columns) * o.w;
-                    ctx.fillRect(x - 5, -o.h / 2 + 7, 10, 2);
-                    ctx.fillRect(x - 5, -o.h / 2 + 12, 10, 2);
-                }
-            } else if (furnitureVariant === 'workbench') {
-                ctx.fillStyle = '#29343a';
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
-                ctx.fill();
-                ctx.strokeStyle = '#11181b';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                ctx.fillStyle = '#8a5a34';
-                ctx.fillRect(-o.w / 2 + 5, -o.h / 2 + 5, o.w - 10, Math.max(8, o.h * 0.32));
-                ctx.fillStyle = '#cf9e3d';
-                ctx.fillRect(-o.w * 0.16, 1, o.w * 0.32, 4);
-                ctx.fillStyle = '#718089';
-                ctx.beginPath();
-                ctx.arc(o.w * 0.27, o.h * 0.12, 5, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (furnitureVariant === 'sofa') {
-                ctx.fillStyle = '#3c4542';
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 7);
-                ctx.fill();
-                ctx.strokeStyle = '#252b29';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.fillStyle = '#69746d';
-                roundRect(ctx, -o.w / 2 + 6, -o.h / 2 + 5, o.w - 12, o.h - 10, 5);
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(225,235,225,0.13)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(0, -o.h / 2 + 6);
-                ctx.lineTo(0, o.h / 2 - 6);
-                ctx.stroke();
-                ctx.fillStyle = '#303735';
-                ctx.fillRect(-o.w / 2 + 3, -o.h / 2 + 2, 5, o.h - 4);
-                ctx.fillRect(o.w / 2 - 8, -o.h / 2 + 2, 5, o.h - 4);
-            } else if (furnitureVariant === 'cabinet') {
-                const cabinetGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
-                cabinetGrad.addColorStop(0, '#76573b');
-                cabinetGrad.addColorStop(1, '#493522');
-                ctx.fillStyle = cabinetGrad;
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
-                ctx.fill();
-                ctx.strokeStyle = '#2d2118';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.strokeStyle = 'rgba(223,188,137,0.20)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                if (o.w >= o.h) {
-                    ctx.moveTo(0, -o.h / 2 + 3);
-                    ctx.lineTo(0, o.h / 2 - 3);
-                } else {
-                    ctx.moveTo(-o.w / 2 + 3, 0);
-                    ctx.lineTo(o.w / 2 - 3, 0);
-                }
-                ctx.stroke();
-                ctx.fillStyle = '#b99a63';
-                ctx.beginPath();
-                ctx.arc(o.w >= o.h ? -3 : 0, o.w >= o.h ? 0 : -3, 1.8, 0, Math.PI * 2);
-                ctx.arc(o.w >= o.h ? 3 : 0, o.w >= o.h ? 0 : 3, 1.8, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (furnitureVariant === 'bed') {
-                // Bed frame
-                ctx.fillStyle = '#5a4a36';
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
-                ctx.fill();
-                // Mattress/blanket
-                const bedGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
-                bedGrad.addColorStop(0, '#4a6878');
-                bedGrad.addColorStop(1, '#3d5868');
-                ctx.fillStyle = bedGrad;
-                roundRect(ctx, -o.w / 2 + 3, -o.h / 2 + 3, o.w - 6, o.h - 6, 3);
-                ctx.fill();
-                // Pillow
-                ctx.fillStyle = '#c8bfae';
-                roundRect(ctx, -o.w / 2 + 6, -o.h / 2 + 5, o.w - 12, Math.max(8, o.h * 0.25), 4);
-                ctx.fill();
-                // Blanket fold line
-                ctx.strokeStyle = 'rgba(255,255,255,0.10)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(-o.w / 2 + 8, o.h * 0.05);
-                ctx.lineTo(o.w / 2 - 8, o.h * 0.05);
-                ctx.stroke();
-            } else {
-                // Table
-                ctx.fillStyle = '#6d4a2f';
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
-                ctx.fill();
-                // Table surface highlight
-                const tableGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
-                tableGrad.addColorStop(0, 'rgba(255,240,200,0.12)');
-                tableGrad.addColorStop(0.5, 'rgba(255,240,200,0.04)');
-                tableGrad.addColorStop(1, 'rgba(0,0,0,0.06)');
-                ctx.fillStyle = tableGrad;
-                roundRect(ctx, -o.w / 2 + 2, -o.h / 2 + 2, o.w - 4, o.h - 4, 2);
-                ctx.fill();
-                // Legs (corner dots)
-                ctx.fillStyle = 'rgba(40, 28, 16, 0.55)';
-                const legR = 3;
-                ctx.beginPath();
-                ctx.arc(-o.w / 2 + 6, -o.h / 2 + 6, legR, 0, Math.PI * 2);
-                ctx.arc(o.w / 2 - 6, -o.h / 2 + 6, legR, 0, Math.PI * 2);
-                ctx.arc(-o.w / 2 + 6, o.h / 2 - 6, legR, 0, Math.PI * 2);
-                ctx.arc(o.w / 2 - 6, o.h / 2 - 6, legR, 0, Math.PI * 2);
-                ctx.fill();
-                // Outline
-                ctx.strokeStyle = 'rgba(30, 20, 10, 0.25)';
-                ctx.lineWidth = 1;
-                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
-                ctx.stroke();
-            }
+            drawFurnitureTopDown(ctx, o, furnitureVariant);
         } else if (kind === 'tree') {
             const r = Math.max(o.w, o.h) / 2;
             const treeVariant = o.variant || 'grove';
@@ -5922,8 +6030,8 @@ export class SurvivRenderer {
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
             const extent = rotated ? Math.hypot(o.w, o.h) : 0;
-            const worldWidth = Math.ceil((rotated ? extent : o.w) + 40);
-            const worldHeight = Math.ceil((rotated ? extent : o.h) + 46);
+            const worldWidth = Math.ceil((rotated ? extent : o.w) + 60);
+            const worldHeight = Math.ceil((rotated ? extent : o.h) + 66);
             const width = Math.ceil(worldWidth * scale);
             const height = Math.ceil(worldHeight * scale);
             const canvas = document.createElement('canvas');
@@ -6935,7 +7043,8 @@ export class SurvivRenderer {
             const punching = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const strike = punching ? meleeStrikeMotion(progress, 0.27) : 0;
+            const activeStrike = punching && progress < 0.62;
+            const strike = activeStrike ? meleeStrikeMotion(progress, 0.3) : 0;
 
             // One hand attacks per accepted attack id. The server alternates
             // which hand is selected for the next distinct click.
@@ -6951,7 +7060,30 @@ export class SurvivRenderer {
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
 
-            for (const hand of [topHand, bottomHand]) drawPlayerHand(ctx, hand, playerColor);
+            if (activeStrike) {
+                // The lead fist only travels outward. Fade it at full extension
+                // and restore the neutral pose without animating back through
+                // the target, which previously read as a second punch.
+                const leadAlpha = 1 - smoothstep01((progress - 0.46) / 0.16);
+                const guardHand = leadSide < 0 ? bottomHand : topHand;
+                drawPlayerHand(ctx, guardHand, playerColor);
+                ctx.save();
+                ctx.globalAlpha *= leadAlpha;
+                drawPlayerHand(ctx, leadSide < 0 ? topHand : bottomHand, playerColor);
+                ctx.restore();
+            } else {
+                const neutralLead = { x: r * 0.58, y: leadSide * 10.8 };
+                const neutralGuard = { x: r * 0.58, y: -leadSide * 10.8 };
+                drawPlayerHand(ctx, neutralGuard, playerColor);
+                if (punching) {
+                    ctx.save();
+                    ctx.globalAlpha *= smoothstep01((progress - 0.56) / 0.16);
+                    drawPlayerHand(ctx, neutralLead, playerColor);
+                    ctx.restore();
+                } else {
+                    drawPlayerHand(ctx, neutralLead, playerColor);
+                }
+            }
             return;
         }
 
@@ -6960,7 +7092,7 @@ export class SurvivRenderer {
             const stabbing = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = stabbing ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const stab = stabbing ? meleeStrikeMotion(progress, 0.25) : 0;
+            const stab = stabbing ? meleeStabMotion(progress, 0.25, 0.5) : 0;
             // A knife stays in the lower hand between attacks. Only unarmed
             // punches alternate; swapping the weapon itself looked unnatural.
             const knifeSide = 1;
