@@ -261,6 +261,7 @@ export default function SurvivGame() {
     const reloadPendingRef = useRef(false);
     const useMedkitPendingRef = useRef(false);
     const pickupWeaponPendingRef = useRef(false);
+    const toggleDoorPendingRef = useRef(null);
     const equipSlotPendingRef = useRef(null);
     const openChestPendingRef = useRef(null);
     const takeChestItemPendingRef = useRef(null);
@@ -613,6 +614,7 @@ export default function SurvivGame() {
             throwGrenadePendingRef.current = false;
             swapWeaponSlotsPendingRef.current = null;
             pickupWeaponPendingRef.current = false;
+            toggleDoorPendingRef.current = null;
             equipSlotPendingRef.current = null;
             openChestPendingRef.current = null;
             takeChestItemPendingRef.current = null;
@@ -666,6 +668,9 @@ export default function SurvivGame() {
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
             if (action === 'pickupWeapon') pickupWeaponPendingRef.current = true;
+            if (typeof action === 'string' && action.startsWith('toggleDoor:')) {
+                toggleDoorPendingRef.current = action.slice('toggleDoor:'.length);
+            }
             if (action === 'throwGrenade') throwGrenadePendingRef.current = true;
             if (typeof action === 'string' && action.startsWith('equipSlot:')) {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
@@ -838,13 +843,18 @@ export default function SurvivGame() {
                 spectateTargetsRef.current = tick.spectateTargets;
             }
             renderer.updateState(tick);
-            const nearbyWeapon = renderer.getNearbyGroundWeapon();
-            const nextNearbyPickup = nearbyWeapon
-                ? { id: nearbyWeapon.id, weaponType: nearbyWeapon.weaponType }
-                : null;
+            const nearbyDoor = renderer.getNearbyDoor();
+            const nearbyWeapon = nearbyDoor ? null : renderer.getNearbyGroundWeapon();
+            const nextNearbyPickup = nearbyDoor
+                ? { id: nearbyDoor.id, kind: 'door', isOpen: !!nearbyDoor.isOpen }
+                : nearbyWeapon
+                    ? { id: nearbyWeapon.id, kind: 'weapon', weaponType: nearbyWeapon.weaponType }
+                    : null;
             const previousNearbyPickup = nearbyPickupValueRef.current;
             if (previousNearbyPickup?.id !== nextNearbyPickup?.id
-                || previousNearbyPickup?.weaponType !== nextNearbyPickup?.weaponType) {
+                || previousNearbyPickup?.kind !== nextNearbyPickup?.kind
+                || previousNearbyPickup?.weaponType !== nextNearbyPickup?.weaponType
+                || previousNearbyPickup?.isOpen !== nextNearbyPickup?.isOpen) {
                 nearbyPickupValueRef.current = nextNearbyPickup;
                 setNearbyPickup(nextNearbyPickup);
             }
@@ -1052,6 +1062,11 @@ export default function SurvivGame() {
                 pickupWeaponPendingRef.current = false;
                 hasAction = true;
             }
+            if (toggleDoorPendingRef.current) {
+                payload.toggleDoorId = toggleDoorPendingRef.current;
+                toggleDoorPendingRef.current = null;
+                hasAction = true;
+            }
             if (throwGrenadePendingRef.current) {
                 payload.throwGrenade = true;
                 throwGrenadePendingRef.current = false;
@@ -1135,6 +1150,7 @@ export default function SurvivGame() {
         reloadPendingRef.current = false;
         useMedkitPendingRef.current = false;
         pickupWeaponPendingRef.current = false;
+        toggleDoorPendingRef.current = null;
         equipSlotPendingRef.current = null;
         throwGrenadePendingRef.current = false;
         swapWeaponSlotsPendingRef.current = null;
@@ -1169,6 +1185,7 @@ export default function SurvivGame() {
                 reloadPendingRef.current = false;
                 useMedkitPendingRef.current = false;
                 pickupWeaponPendingRef.current = false;
+                toggleDoorPendingRef.current = null;
                 throwGrenadePendingRef.current = false;
                 equipSlotPendingRef.current = null;
             }
@@ -1185,6 +1202,11 @@ export default function SurvivGame() {
     }, []);
 
     const handleMobileInteract = useCallback(() => {
+        const door = rendererRef.current?.getNearbyDoor();
+        if (door?.id) {
+            toggleDoorPendingRef.current = door.id;
+            return;
+        }
         const weapon = rendererRef.current?.getNearbyGroundWeapon();
         if (weapon?.id) pickupWeaponPendingRef.current = true;
     }, []);
@@ -1319,7 +1341,7 @@ export default function SurvivGame() {
                 <div className="surviv-controls-hint" aria-label="Game controls">
                     <span><kbd>WASD</kbd> MOVE</span>
                     <span><kbd>LMB</kbd> FIRE</span>
-                    <span><kbd>F</kbd> PICK UP</span>
+                    <span><kbd>F</kbd> INTERACT</span>
                     <span><kbd>R</kbd> RELOAD</span>
                     <span><kbd>H</kbd> HEAL</span>
                     <span><kbd>TAB</kbd> INVENTORY</span>
@@ -1329,7 +1351,9 @@ export default function SurvivGame() {
             {!IS_MOBILE && gameReady && me && nearbyPickup && !showResultModal && !isDead && !isSpectating && !isInventoryOpen && (
                 <div className="surviv-context-prompt" role="status" aria-live="polite">
                     <kbd>F</kbd>
-                    <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
+                    {nearbyPickup.kind === 'door'
+                        ? <span>{nearbyPickup.isOpen ? 'CLOSE' : 'OPEN'} <strong>DOOR</strong></span>
+                        : <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>}
                 </div>
             )}
 

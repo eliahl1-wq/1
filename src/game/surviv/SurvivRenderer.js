@@ -65,13 +65,11 @@ const smoothstep01 = (value) => {
     return t * t * (3 - 2 * t);
 };
 
-function meleeStrikeMotion(progress, windupEnd = 0.18, contactAt = 0.46) {
+function meleeStrikeMotion(progress, contactAt = 0.28, releaseAt = 0.48) {
     const t = clamp(progress, 0, 1);
-    if (t < windupEnd) return -0.16 * smoothstep01(t / windupEnd);
-    if (t < contactAt) {
-        return -0.16 + 1.16 * smoothstep01((t - windupEnd) / (contactAt - windupEnd));
-    }
-    return 1 - smoothstep01((t - contactAt) / (1 - contactAt));
+    if (t < contactAt) return smoothstep01(t / contactAt);
+    if (t < releaseAt) return 1;
+    return 1 - smoothstep01((t - releaseAt) / (1 - releaseAt));
 }
 
 const WEAPON_SHAKE = {
@@ -346,7 +344,7 @@ const LOS_BLOCKING_KINDS = new Set(['wall', 'interiorWall', 'container', 'crate'
 const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'crate', 'barrel']);
 const CACHEABLE_PROP_KINDS = new Set([
     'houseFloor', 'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
-    'door', 'furniture', 'machine', 'sandbag', 'signpost',
+    'furniture', 'machine', 'sandbag', 'signpost',
     'stump', 'fallenLog', 'hayBale', 'reeds', 'grassTuft', 'wildflowers', 'mushrooms',
     'lampPost', 'bench', 'mailbox', 'roadMarker', 'picnicTable',
 ]);
@@ -391,6 +389,7 @@ function obstacleRenderSignature(obstacles) {
         mixNumber(o.rotation);
         mixNumber(o.width);
         mixNumber(o.collidable === false ? 0 : 1);
+        mixNumber(o.isOpen ? 1 : 0);
         if (o.points?.length) {
             mixNumber(o.points.length);
             for (const point of o.points) {
@@ -596,6 +595,7 @@ export class SurvivRenderer {
         this._doorRevealHouseId = null;
         this._doorRevealDoorId = null;
         this._doorRevealProgress = 0;
+        this._doorOpenProgress = new Map();
         this._houseBucketSize = 800;
         this._playersById = new Map();
         this._visibleFields = [];
@@ -1847,7 +1847,10 @@ export class SurvivRenderer {
         }
         if (k === 'r') return 'reload';
         if (k === 'h') return 'useMedkit';
-        if (k === 'f') return 'pickupWeapon';
+        if (k === 'f') {
+            const door = this.getNearbyDoor();
+            return door ? `toggleDoor:${door.id}` : 'pickupWeapon';
+        }
         if (k === 'g') return 'throwGrenade';
         if (k === '1') return 'equipSlot:2';
         if (k === '2') return 'equipSlot:0';
@@ -2182,6 +2185,7 @@ export class SurvivRenderer {
                 for (const obstacle of bucket) {
                     if (seen.has(obstacle.id)) continue;
                     seen.add(obstacle.id);
+                    if (obstacle.kind === 'door' && obstacle.isOpen) continue;
                     if (this.pointInsideRect(obstacle, x, y, padding)) return obstacle;
                 }
             }
@@ -2696,6 +2700,29 @@ export class SurvivRenderer {
             if (distanceSq < nearestDistanceSq) {
                 nearest = item;
                 nearestDistanceSq = distanceSq;
+            }
+        }
+        return nearest;
+    }
+
+    getNearbyDoor() {
+        if (!this.me) return null;
+        let nearest = null;
+        let nearestDistance = 58;
+        for (const door of this.doorways) {
+            const angle = -(Number(door.rotation) || 0);
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const worldDx = this.me.x - door.x;
+            const worldDy = this.me.y - door.y;
+            const localX = worldDx * cos - worldDy * sin;
+            const localY = worldDx * sin + worldDy * cos;
+            const dx = Math.max(0, Math.abs(localX) - door.w / 2);
+            const dy = Math.max(0, Math.abs(localY) - door.h / 2);
+            const distance = Math.hypot(dx, dy);
+            if (distance < nearestDistance) {
+                nearest = door;
+                nearestDistance = distance;
             }
         }
         return nearest;
@@ -4161,45 +4188,52 @@ export class SurvivRenderer {
             const horizontal = o.w >= o.h;
             const longSize = horizontal ? o.w : o.h;
             const shortSize = horizontal ? o.h : o.w;
-            const panelLength = clamp(longSize * (o.entranceRole === 'interiorDoor' ? 0.72 : 0.58), 34, 76);
-            const panelThickness = clamp(shortSize * 0.28, 6, 9);
+            const panelLength = Math.max(26, longSize - 8);
+            const panelThickness = clamp(shortSize * 0.42, 7, 11);
             const industrial = ['warehouse', 'metal', 'ironworks'].includes(o.variant);
             const wooden = ['cabin', 'lodge', 'barn'].includes(o.variant);
             const panelColor = industrial ? '#9fc8d1' : wooden ? '#c7aa77' : '#dce2df';
             const panelDark = industrial ? '#6f99a3' : wooden ? '#96754a' : '#aeb9b5';
-            const drawW = horizontal ? panelLength : panelThickness;
-            const drawH = horizontal ? panelThickness : panelLength;
+            const target = o.isOpen ? 1 : 0;
+            const previous = this._doorOpenProgress.get(o.id) ?? target;
+            const blend = 1 - Math.exp(-15 * Math.max(0.001, this._frameDt || 1 / 60));
+            const progress = previous + (target - previous) * blend;
+            this._doorOpenProgress.set(o.id, Math.abs(target - progress) < 0.002 ? target : progress);
 
-            ctx.fillStyle = '#11161a';
-            roundRect(ctx, -drawW / 2 - 4, -drawH / 2 - 4, drawW + 8, drawH + 8, 3);
+            // The threshold fills the actual opening, while the panel begins
+            // at one wall edge and swings around that fixed hinge.
+            ctx.save();
+            if (!horizontal) ctx.rotate(Math.PI / 2);
+            ctx.fillStyle = 'rgba(20, 25, 27, 0.64)';
+            roundRect(ctx, -longSize / 2, -Math.max(3, shortSize * 0.18), longSize, Math.max(6, shortSize * 0.36), 2);
             ctx.fill();
-            const doorGrad = horizontal
-                ? ctx.createLinearGradient(0, -drawH / 2, 0, drawH / 2)
-                : ctx.createLinearGradient(-drawW / 2, 0, drawW / 2, 0);
+            ctx.fillStyle = '#252c30';
+            ctx.fillRect(-longSize / 2 - 3, -shortSize / 2 - 2, 6, shortSize + 4);
+            ctx.fillRect(longSize / 2 - 3, -shortSize / 2 - 2, 6, shortSize + 4);
+
+            const swingDirection = (String(o.id).charCodeAt(String(o.id).length - 1) % 2 ? 1 : -1);
+            ctx.translate(-panelLength / 2, 0);
+            ctx.rotate(swingDirection * progress * Math.PI * 0.48);
+            const doorGrad = ctx.createLinearGradient(0, -panelThickness / 2, 0, panelThickness / 2);
             doorGrad.addColorStop(0, panelColor);
             doorGrad.addColorStop(1, panelDark);
+            ctx.fillStyle = '#11161a';
+            roundRect(ctx, -3, -panelThickness / 2 - 3, panelLength + 6, panelThickness + 6, 3);
+            ctx.fill();
             ctx.fillStyle = doorGrad;
-            roundRect(ctx, -drawW / 2, -drawH / 2, drawW, drawH, 1.5);
+            roundRect(ctx, 0, -panelThickness / 2, panelLength, panelThickness, 1.5);
             ctx.fill();
             ctx.strokeStyle = 'rgba(255,255,255,0.38)';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            if (horizontal) {
-                ctx.moveTo(-drawW / 2 + 4, -drawH / 2 + 1.5);
-                ctx.lineTo(drawW / 2 - 4, -drawH / 2 + 1.5);
-            } else {
-                ctx.moveTo(-drawW / 2 + 1.5, -drawH / 2 + 4);
-                ctx.lineTo(-drawW / 2 + 1.5, drawH / 2 - 4);
-            }
+            ctx.moveTo(4, -panelThickness / 2 + 1.5);
+            ctx.lineTo(panelLength - 4, -panelThickness / 2 + 1.5);
             ctx.stroke();
             ctx.fillStyle = '#252c30';
-            if (horizontal) {
-                ctx.fillRect(-drawW / 2 - 7, -drawH / 2 - 2, 4, drawH + 4);
-                ctx.fillRect(drawW / 2 + 3, -drawH / 2 - 2, 4, drawH + 4);
-            } else {
-                ctx.fillRect(-drawW / 2 - 2, -drawH / 2 - 7, drawW + 4, 4);
-                ctx.fillRect(-drawW / 2 - 2, drawH / 2 + 3, drawW + 4, 4);
-            }
+            ctx.beginPath();
+            ctx.arc(2, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         } else if (kind === 'wall' || kind === 'interiorWall') {
             // Wall with gradient and brick/stone texture
             const wallColors = {
@@ -6570,19 +6604,17 @@ export class SurvivRenderer {
             const punching = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const strike = punching ? meleeStrikeMotion(progress, 0.2, 0.46) : 0;
-            const extension = Math.max(0, strike);
+            const strike = punching ? meleeStrikeMotion(progress, 0.27, 0.47) : 0;
 
             // The server alternates meleeHand for every accepted attack. Keep
             // that hand active for the full animation instead of always using
-            // the upper hand. The slight inward curve makes the punch feel
-            // physical without a separate trail or impact effect.
+            // the upper hand. It travels forward exactly once; the other hand
+            // stays tucked in guard instead of joining the attack.
             const leadSide = meleeHand === 'bottom' ? 1 : -1;
-            const windup = Math.max(0, -strike);
-            const leadReach = r * 0.62 + r * 1.16 * strike;
-            const leadY = leadSide * (10.8 + windup * 3.8 - extension * 7.1);
-            const guardReach = r * (0.62 - extension * 0.035);
-            const guardY = -leadSide * (10.8 + extension * 0.45);
+            const leadReach = r * 0.58 + r * 1.18 * strike;
+            const leadY = leadSide * (10.8 - strike * 6.6);
+            const guardReach = r * 0.48;
+            const guardY = -leadSide * 11.2;
             const topHand = leadSide < 0
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
@@ -6599,17 +6631,15 @@ export class SurvivRenderer {
             const stabbing = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = stabbing ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const stab = stabbing ? meleeStrikeMotion(progress, 0.22, 0.43) : 0;
-            const extension = Math.max(0, stab);
+            const stab = stabbing ? meleeStrikeMotion(progress, 0.25, 0.46) : 0;
             // A knife stays in the lower hand between attacks. Only unarmed
             // punches alternate; swapping the weapon itself looked unnatural.
             const knifeSide = 1;
-            const windup = Math.max(0, -stab);
             const weaponOffsetX = r * (0.16 + stab * 0.92);
-            const weaponOffsetY = knifeSide * (8.6 + windup * 4.1 - extension * 5.8);
-            const knifeAngle = knifeSide * (-0.2 - windup * 0.28 + extension * 0.06);
+            const weaponOffsetY = knifeSide * (8.6 - stab * 5.8);
+            const knifeAngle = knifeSide * (-0.2 + stab * 0.06);
             const knifeHand = { x: weaponOffsetX + r * 0.25, y: weaponOffsetY };
-            const guardHand = { x: r * (0.56 - extension * 0.035), y: -knifeSide * 10.6 };
+            const guardHand = { x: r * 0.52, y: -knifeSide * 10.6 };
 
             ctx.save();
             ctx.translate(weaponOffsetX, weaponOffsetY);
