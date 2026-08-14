@@ -68,9 +68,8 @@ const smoothstep01 = (value) => {
 function meleeStrikeMotion(progress, contactAt = 0.28) {
     const t = clamp(progress, 0, 1);
     if (t < contactAt) return smoothstep01(t / contactAt);
-    // Hold at full extension. Snapping back when the server animation ends
-    // cannot be mistaken for a second punch travelling through the target.
-    return 1;
+    if (t < 0.5) return 1;
+    return 1 - smoothstep01((t - 0.5) / 0.5);
 }
 
 const WEAPON_SHAKE = {
@@ -337,7 +336,7 @@ const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor
 // pass below, so newly added obstacle kinds automatically receive a shadow.
 const CAST_SHADOW_EXEMPT_KINDS = new Set([
     'road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path',
-    'roomZone', 'door', 'bush', 'fallenLog', 'grassTuft', 'wildflowers', 'mushrooms', 'reeds', 'stump',
+    'roomZone', 'entrancePad', 'door', 'bush', 'fallenLog', 'grassTuft', 'wildflowers', 'mushrooms', 'reeds', 'stump',
 ]);
 const ROUND_CAST_SHADOW_KINDS = new Set(['tree', 'rock', 'barrel', 'lampPost']);
 const TALL_CAST_SHADOW_KINDS = new Set(['tree', 'container', 'tent', 'signpost', 'lampPost', 'mailbox']);
@@ -346,6 +345,7 @@ const HOUSE_BOUND_PROP_KINDS = new Set(['furniture', 'machine', 'container', 'cr
 const CACHEABLE_PROP_KINDS = new Set([
     'houseFloor', 'tree', 'bush', 'rock', 'container', 'crate', 'barrel',
     'furniture', 'machine', 'sandbag', 'signpost',
+    'entrancePad',
     'stump', 'fallenLog', 'hayBale', 'reeds', 'grassTuft', 'wildflowers', 'mushrooms',
     'lampPost', 'bench', 'mailbox', 'roadMarker', 'picnicTable',
 ]);
@@ -426,6 +426,27 @@ const lerpAngle = (a, b, t) => {
     while (diff < -Math.PI) diff += Math.PI * 2;
     return a + diff * t;
 };
+
+function pointInsideRotatedObstacle(obstacle, x, y, padding = 0) {
+    const rotation = Number(obstacle?.rotation) || 0;
+    const dx = x - (Number(obstacle?.x) || 0);
+    const dy = y - (Number(obstacle?.y) || 0);
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const localX = dx * cos + dy * sin;
+    const localY = -dx * sin + dy * cos;
+    return Math.abs(localX) <= Math.abs(Number(obstacle?.w) || 0) / 2 + padding
+        && Math.abs(localY) <= Math.abs(Number(obstacle?.h) || 0) / 2 + padding;
+}
+
+function distanceToPathSegment(x, y, start, end) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSq = dx * dx + dy * dy;
+    if (lengthSq <= 0.0001) return Math.hypot(x - start.x, y - start.y);
+    const t = clamp(((x - start.x) * dx + (y - start.y) * dy) / lengthSq, 0, 1);
+    return Math.hypot(x - (start.x + dx * t), y - (start.y + dy * t));
+}
 
 function roundRect(ctx, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
@@ -633,6 +654,7 @@ export class SurvivRenderer {
         };
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
+        this._firePressId = 0;
         this._canvasLeft = 0;
         this._canvasTop = 0;
         this.mobileMove = { x: 0, y: 0 };
@@ -651,7 +673,7 @@ export class SurvivRenderer {
         this._footstepY = NaN;
         this._footstepDistance = 0;
         this._footstepIndex = 0;
-        this._footstepSurface = 'ground';
+        this._footstepSurface = 'grass';
         // Cached gradients to avoid per-frame allocation
         this._cachedVignetteGrad = null;
         this._cachedVignetteKey = '';
@@ -754,11 +776,12 @@ export class SurvivRenderer {
         this._muzzleFlash = 0;
         // Low ammo pulse
         this._lowAmmoPulse = 0;
+        this._firePressId = 0;
         this._footstepX = NaN;
         this._footstepY = NaN;
         this._footstepDistance = 0;
         this._footstepIndex = 0;
-        this._footstepSurface = 'ground';
+        this._footstepSurface = 'grass';
         // Player alive count
         this.aliveCount = 0;
 
@@ -1748,12 +1771,14 @@ export class SurvivRenderer {
 
     setMobileAim(dx, dy, magnitude = 0) {
         const strength = clamp(Number(magnitude) || 0, 0, 1);
+        const wasShooting = this.mobileAim.shooting;
         this.mobileAim.strength = strength;
         this.mobileAim.active = strength > 0.08;
         if (this.mobileAim.active) {
             this.mobileAim.angle = Math.atan2(Number(dy) || 0, Number(dx) || 0);
         }
         this.mobileAim.shooting = strength > 0.3;
+        if (this.mobileAim.shooting && !wasShooting) this._firePressId += 1;
     }
 
     clearMobileInput() {
@@ -1826,6 +1851,7 @@ export class SurvivRenderer {
             aimAngle,
             aimDistance,
             shooting: (this.mouse.down || this.mobileAim.shooting) && this.inputEnabled,
+            firePressId: this._firePressId,
             reload: false,
         };
     }
@@ -1878,12 +1904,52 @@ export class SurvivRenderer {
     handlePointerDown() {
         if (!this.inputEnabled || this.spectatorMode) return null;
         unlockGameAudio();
+        if (!this.mouse.down) this._firePressId += 1;
         this.mouse.down = true;
         return null;
     }
 
     handlePointerUp() {
         this.mouse.down = false;
+    }
+
+    getFootstepSurfaceAt(x, y) {
+        // Server-authoritative water/indoor states take priority. Static map
+        // geometry then provides the richer local material under the player.
+        if (this.me?.surface === 'water') return 'water';
+        if (this.me?.surface === 'indoor') return 'indoor';
+
+        for (const bridge of this.bridgeObstacles) {
+            if (pointInsideRotatedObstacle(bridge, x, y, 3)) return 'asphalt';
+        }
+        for (let index = this.roadObstacles.length - 1; index >= 0; index--) {
+            const road = this.roadObstacles[index];
+            if (road.kind === 'trail_path') continue;
+            if (!pointInsideRotatedObstacle(road, x, y, 3)) continue;
+            if (road.variant === 'dirt') return 'dirt';
+            if (road.variant === 'gravel' || road.variant === 'cobblestone' || road.variant === 'rail') return 'gravel';
+            return 'asphalt';
+        }
+        for (const trail of this.roadObstacles) {
+            if (trail.kind !== 'trail_path' || !trail.points?.length) continue;
+            const radius = Math.max(12, (Number(trail.width) || 50) / 2 + 3);
+            let onTrail = trail.points.length === 1
+                && Math.hypot(x - trail.points[0].x, y - trail.points[0].y) <= radius;
+            for (let point = 0; !onTrail && point < trail.points.length - 1; point++) {
+                onTrail = distanceToPathSegment(x, y, trail.points[point], trail.points[point + 1]) <= radius;
+            }
+            if (!onTrail) continue;
+            if (trail.variant === 'boardwalk') return 'wood';
+            if (trail.variant === 'gravel') return 'gravel';
+            return 'dirt';
+        }
+        for (const field of this.fieldObstacles) {
+            if (!pointInsideRotatedObstacle(field, x, y)) continue;
+            if (field.variant === 'parkingLot') return 'asphalt';
+            if (field.variant === 'industrial' || field.variant === 'quarry' || field.variant === 'ruins') return 'gravel';
+            if (field.variant === 'farm' || field.variant === 'crop') return 'dirt';
+        }
+        return 'grass';
     }
 
     updateMovementFeedback() {
@@ -1913,19 +1979,26 @@ export class SurvivRenderer {
             return;
         }
 
-        const surface = this.me.surface === 'water'
-            ? 'water'
-            : this.me.surface === 'indoor' ? 'indoor' : 'ground';
+        const surface = this.getFootstepSurfaceAt(x, y);
         if (surface !== this._footstepSurface) {
             this._footstepSurface = surface;
             this._footstepDistance = 0;
         }
         this._footstepDistance += moved;
-        const stride = surface === 'water' ? 37 : surface === 'indoor' ? 46 : 52;
+        const strideBySurface = {
+            water: 46,
+            indoor: 59,
+            wood: 58,
+            gravel: 57,
+            asphalt: 62,
+            dirt: 62,
+            grass: 64,
+        };
+        const stride = strideBySurface[surface] || 62;
         if (this._footstepDistance < stride) return;
         this._footstepDistance %= stride;
         this._footstepIndex += 1;
-        playSurvivFootstep(surface, this._footstepIndex);
+        playSurvivFootstep(surface, this._footstepIndex, inputStrength);
         if (surface === 'water') this.spawnWaterStepSplash(x, y, moveInput);
     }
 
@@ -2911,19 +2984,27 @@ export class SurvivRenderer {
             this.drawObstacle(ctx, currentHouse);
         }
         if (!currentHouse) {
-            for (const o of this.houseFloors) {
-                if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) this.drawHouseRoof(ctx, o);
+            // Entrance surfaces belong underneath the roof, not on top of it.
+            for (const o of visibleWorldObstacles) {
+                if (o.kind === 'entrancePad') this.drawObstacle(ctx, o);
             }
-            // Main entrances sit on top of the roof edge so a building reads as
-            // enterable before the interior reveal begins. Interior doors stay hidden.
+            for (const o of this.houseFloors) {
+                if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) {
+                    this.drawHouseEntrancePad(ctx, o);
+                    this.drawHouseRoof(ctx, o);
+                }
+            }
+            // From outdoors the roof hides the panel. Only a slim threshold at
+            // the wall edge remains visible, matching a top-down house silhouette.
             for (const door of this.doorways) {
                 if (door.entranceRole !== 'interiorDoor' && this.isObstacleInView(door, 40)) {
-                    this.drawObstacle(ctx, door);
+                    this.drawExteriorDoorEdge(ctx, door);
                 }
             }
         }
         this.drawDoorRevealPreview(ctx, doorRevealPreview);
         for (const o of visibleWorldObstacles) {
+            if (!currentHouse && o.kind === 'entrancePad') continue;
             this.drawObstacle(ctx, o);
         }
         this.drawDeathMarkers(ctx, currentHouse);
@@ -4071,6 +4152,60 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawExteriorDoorEdge(ctx, o) {
+        const horizontal = o.w >= o.h;
+        const length = Math.max(24, (horizontal ? o.w : o.h) - 12);
+        const industrial = ['warehouse', 'metal', 'ironworks'].includes(o.variant);
+        const wooden = ['cabin', 'lodge', 'barn'].includes(o.variant);
+        const color = industrial ? '#71848a' : wooden ? '#806140' : '#9a9690';
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.rotate(o.rotation || 0);
+        if (!horizontal) ctx.rotate(Math.PI / 2);
+        ctx.strokeStyle = 'rgba(12, 16, 18, 0.86)';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'butt';
+        ctx.beginPath();
+        ctx.moveTo(-length / 2, 0);
+        ctx.lineTo(length / 2, 0);
+        ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-length / 2 + 2, 0);
+        ctx.lineTo(length / 2 - 2, 0);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    drawHouseEntrancePad(ctx, house) {
+        const side = house.orientation;
+        if (!['north', 'south', 'east', 'west'].includes(side)) return;
+        const horizontal = side === 'north' || side === 'south';
+        const industrial = ['warehouse', 'metal', 'ironworks'].includes(house.variant);
+        const wooden = ['cabin', 'lodge', 'barn'].includes(house.variant);
+        const masonry = ['brick', 'mansion', 'town'].includes(house.variant);
+        const depth = industrial ? 54 : wooden ? 68 : 58;
+        const axisSize = horizontal ? house.w : house.h;
+        const doorSpan = clamp(axisSize * 0.32, 74, house.variant === 'mansion' || house.variant === 'warehouse' ? 132 : 104);
+        const span = Math.min(axisSize - 42, doorSpan + (wooden ? 54 : 42));
+        const x = side === 'west'
+            ? house.x - house.w / 2 - depth / 2 + 3
+            : side === 'east' ? house.x + house.w / 2 + depth / 2 - 3 : house.x;
+        const y = side === 'north'
+            ? house.y - house.h / 2 - depth / 2 + 3
+            : side === 'south' ? house.y + house.h / 2 + depth / 2 - 3 : house.y;
+        this.drawObstacle(ctx, {
+            kind: 'entrancePad',
+            x,
+            y,
+            w: horizontal ? span : depth,
+            h: horizontal ? depth : span,
+            variant: industrial ? 'steelPlate' : wooden ? 'woodDeck' : masonry ? 'brickPavers' : 'flagstone',
+            rotation: 0,
+        }, false);
+    }
+
     drawObstacle(ctx, o, allowCache = true) {
         const kind = o.kind || 'crate';
         // Bridge rails are authoritative collision shapes. Their matching
@@ -4093,7 +4228,53 @@ export class SurvivRenderer {
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
-        if (kind === 'houseFloor') {
+        if (kind === 'entrancePad') {
+            const palette = {
+                woodDeck: ['#765b3d', '#533c29', 'rgba(225,190,135,0.22)'],
+                steelPlate: ['#59686e', '#39464b', 'rgba(193,216,222,0.20)'],
+                brickPavers: ['#78675e', '#594b45', 'rgba(226,207,190,0.18)'],
+                flagstone: ['#89877d', '#66655e', 'rgba(229,226,211,0.18)'],
+            };
+            const [main, dark, line] = palette[o.variant] || palette.flagstone;
+            const grad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+            grad.addColorStop(0, main);
+            grad.addColorStop(1, dark);
+            ctx.fillStyle = grad;
+            roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(22,25,24,0.55)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.strokeStyle = line;
+            ctx.lineWidth = 1;
+            if (o.variant === 'woodDeck') {
+                const horizontalBoards = o.w >= o.h;
+                const length = horizontalBoards ? o.w : o.h;
+                for (let axis = -length / 2 + 18; axis < length / 2; axis += 18) {
+                    ctx.beginPath();
+                    if (horizontalBoards) {
+                        ctx.moveTo(axis, -o.h / 2 + 3);
+                        ctx.lineTo(axis, o.h / 2 - 3);
+                    } else {
+                        ctx.moveTo(-o.w / 2 + 3, axis);
+                        ctx.lineTo(o.w / 2 - 3, axis);
+                    }
+                    ctx.stroke();
+                }
+            } else {
+                const step = o.variant === 'steelPlate' ? 28 : 22;
+                for (let px = -o.w / 2 + step; px < o.w / 2; px += step) {
+                    ctx.beginPath();
+                    ctx.moveTo(px, -o.h / 2 + 3);
+                    ctx.lineTo(px, o.h / 2 - 3);
+                    ctx.stroke();
+                }
+                ctx.beginPath();
+                ctx.moveTo(-o.w / 2 + 3, 0);
+                ctx.lineTo(o.w / 2 - 3, 0);
+                ctx.stroke();
+            }
+        } else if (kind === 'houseFloor') {
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
             ctx.shadowOffsetX = 0;
@@ -4155,6 +4336,64 @@ export class SurvivRenderer {
                     }
                 }
             }
+            // Room-specific floor treatment makes the generated plan read like
+            // a house blueprint: runners connect doors, rugs anchor living and
+            // sleeping rooms, while utility rooms retain hard-wearing tile.
+            const rooms = this._roomZonesByHouseId.get(o.id) || [];
+            if (!rooms.length && !['warehouse', 'ironworks'].includes(o.variant)) {
+                const rugW = Math.min(150, o.w * 0.52);
+                const rugH = Math.min(100, o.h * 0.44);
+                ctx.fillStyle = 'rgba(91,55,43,0.42)';
+                roundRect(ctx, -rugW / 2, -rugH / 2, rugW, rugH, 7);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(221,177,118,0.20)';
+                ctx.lineWidth = 3;
+                roundRect(ctx, -rugW / 2 + 4, -rugH / 2 + 4, rugW - 8, rugH - 8, 5);
+                ctx.stroke();
+            }
+            for (const room of rooms) {
+                const roomX = room.x - o.x;
+                const roomY = room.y - o.y;
+                const insetW = Math.max(20, room.w - 18);
+                const insetH = Math.max(20, room.h - 18);
+                if (room.variant === 'hallway') {
+                    ctx.fillStyle = ['warehouse', 'ironworks'].includes(o.variant)
+                        ? 'rgba(25,34,38,0.22)'
+                        : 'rgba(92,50,39,0.34)';
+                    roundRect(ctx, roomX - insetW * 0.32, roomY - insetH * 0.32, insetW * 0.64, insetH * 0.64, 6);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(230,210,177,0.12)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else if (['bedroom', 'living-room', 'study', 'studio', 'north-room', 'south-room', 'mid-room'].includes(room.variant)) {
+                    const rugColors = room.variant === 'bedroom'
+                        ? ['rgba(55,88,102,0.48)', 'rgba(145,185,194,0.24)']
+                        : room.variant === 'living-room'
+                            ? ['rgba(114,64,46,0.46)', 'rgba(222,174,116,0.22)']
+                            : ['rgba(58,75,61,0.42)', 'rgba(160,186,153,0.20)'];
+                    const rugW = insetW * 0.62;
+                    const rugH = insetH * 0.56;
+                    ctx.fillStyle = rugColors[0];
+                    roundRect(ctx, roomX - rugW / 2, roomY - rugH / 2, rugW, rugH, 7);
+                    ctx.fill();
+                    ctx.strokeStyle = rugColors[1];
+                    ctx.lineWidth = 3;
+                    roundRect(ctx, roomX - rugW / 2 + 4, roomY - rugH / 2 + 4, rugW - 8, rugH - 8, 5);
+                    ctx.stroke();
+                } else if (['kitchen', 'storage', 'stockroom', 'shop-front', 'workshop', 'control-room', 'loading-bay', 'factory-floor'].includes(room.variant)) {
+                    ctx.fillStyle = 'rgba(24,30,31,0.10)';
+                    roundRect(ctx, roomX - insetW / 2, roomY - insetH / 2, insetW, insetH, 3);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(224,229,222,0.07)';
+                    ctx.lineWidth = 1;
+                    for (let iy = roomY - insetH / 2 + 24; iy < roomY + insetH / 2; iy += 24) {
+                        ctx.beginPath();
+                        ctx.moveTo(roomX - insetW / 2, iy);
+                        ctx.lineTo(roomX + insetW / 2, iy);
+                        ctx.stroke();
+                    }
+                }
+            }
             if (o.variant === 'ironworks') {
                 // Broad central combat lane with readable steel plates and hazard borders.
                 const laneW = Math.min(560, o.w * 0.34);
@@ -4188,29 +4427,36 @@ export class SurvivRenderer {
         } else if (kind === 'door') {
             const horizontal = o.w >= o.h;
             const longSize = horizontal ? o.w : o.h;
-            const shortSize = horizontal ? o.h : o.w;
-            const panelLength = Math.max(26, longSize - 8);
-            const panelThickness = clamp(shortSize * 0.42, 7, 11);
-            const industrial = ['warehouse', 'metal', 'ironworks'].includes(o.variant);
-            const wooden = ['cabin', 'lodge', 'barn'].includes(o.variant);
-            const panelColor = industrial ? '#9fc8d1' : wooden ? '#c7aa77' : '#dce2df';
-            const panelDark = industrial ? '#6f99a3' : wooden ? '#96754a' : '#aeb9b5';
+            const panelLength = Math.max(24, longSize - 4);
+            const panelThickness = o.entranceRole === 'interiorDoor' ? 5 : 6;
+            const doorPalette = {
+                warehouse: ['#48565e', '#374249'],
+                metal: ['#38464d', '#222c31'],
+                ironworks: ['#38464d', '#222c31'],
+                brick: ['#835447', '#5d3931'],
+                lodge: ['#53614b', '#354137'],
+                cabin: ['#73583a', '#4f3928'],
+                barn: ['#735044', '#4d332c'],
+                mansion: ['#697278', '#4b545a'],
+                plaster: ['#667075', '#485157'],
+            };
+            const [panelColor, panelDark] = doorPalette[o.variant] || ['#596268', '#424b50'];
             const target = o.isOpen ? 1 : 0;
             const previous = this._doorOpenProgress.get(o.id) ?? target;
             const blend = 1 - Math.exp(-15 * Math.max(0.001, this._frameDt || 1 / 60));
             const progress = previous + (target - previous) * blend;
             this._doorOpenProgress.set(o.id, Math.abs(target - progress) < 0.002 ? target : progress);
 
-            // The threshold fills the actual opening, while the panel begins
-            // at one wall edge and swings around that fixed hinge.
+            // A thin wall-matched slab is fixed to one side of the opening.
+            // There are no oversized posts or bright marker shapes.
             ctx.save();
             if (!horizontal) ctx.rotate(Math.PI / 2);
-            ctx.fillStyle = 'rgba(20, 25, 27, 0.64)';
-            roundRect(ctx, -longSize / 2, -Math.max(3, shortSize * 0.18), longSize, Math.max(6, shortSize * 0.36), 2);
-            ctx.fill();
-            ctx.fillStyle = '#252c30';
-            ctx.fillRect(-longSize / 2 - 3, -shortSize / 2 - 2, 6, shortSize + 4);
-            ctx.fillRect(longSize / 2 - 3, -shortSize / 2 - 2, 6, shortSize + 4);
+            ctx.strokeStyle = 'rgba(13,17,19,0.45)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-longSize / 2, 0);
+            ctx.lineTo(longSize / 2, 0);
+            ctx.stroke();
 
             const swingDirection = (String(o.id).charCodeAt(String(o.id).length - 1) % 2 ? 1 : -1);
             ctx.translate(-panelLength / 2, 0);
@@ -4218,21 +4464,15 @@ export class SurvivRenderer {
             const doorGrad = ctx.createLinearGradient(0, -panelThickness / 2, 0, panelThickness / 2);
             doorGrad.addColorStop(0, panelColor);
             doorGrad.addColorStop(1, panelDark);
-            ctx.fillStyle = '#11161a';
-            roundRect(ctx, -3, -panelThickness / 2 - 3, panelLength + 6, panelThickness + 6, 3);
-            ctx.fill();
             ctx.fillStyle = doorGrad;
-            roundRect(ctx, 0, -panelThickness / 2, panelLength, panelThickness, 1.5);
+            roundRect(ctx, 0, -panelThickness / 2, panelLength, panelThickness, 1);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.38)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(4, -panelThickness / 2 + 1.5);
-            ctx.lineTo(panelLength - 4, -panelThickness / 2 + 1.5);
+            ctx.strokeStyle = '#171d21';
+            ctx.lineWidth = 2;
             ctx.stroke();
-            ctx.fillStyle = '#252c30';
+            ctx.fillStyle = 'rgba(225,225,210,0.58)';
             ctx.beginPath();
-            ctx.arc(2, 0, 4, 0, Math.PI * 2);
+            ctx.arc(panelLength - 7, 0, 1.6, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
         } else if (kind === 'wall' || kind === 'interiorWall') {
@@ -4395,6 +4635,51 @@ export class SurvivRenderer {
                 ctx.fillStyle = '#718089';
                 ctx.beginPath();
                 ctx.arc(o.w * 0.27, o.h * 0.12, 5, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (furnitureVariant === 'sofa') {
+                ctx.fillStyle = '#3c4542';
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 7);
+                ctx.fill();
+                ctx.strokeStyle = '#252b29';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = '#69746d';
+                roundRect(ctx, -o.w / 2 + 6, -o.h / 2 + 5, o.w - 12, o.h - 10, 5);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(225,235,225,0.13)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, -o.h / 2 + 6);
+                ctx.lineTo(0, o.h / 2 - 6);
+                ctx.stroke();
+                ctx.fillStyle = '#303735';
+                ctx.fillRect(-o.w / 2 + 3, -o.h / 2 + 2, 5, o.h - 4);
+                ctx.fillRect(o.w / 2 - 8, -o.h / 2 + 2, 5, o.h - 4);
+            } else if (furnitureVariant === 'cabinet') {
+                const cabinetGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
+                cabinetGrad.addColorStop(0, '#76573b');
+                cabinetGrad.addColorStop(1, '#493522');
+                ctx.fillStyle = cabinetGrad;
+                roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 3);
+                ctx.fill();
+                ctx.strokeStyle = '#2d2118';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(223,188,137,0.20)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                if (o.w >= o.h) {
+                    ctx.moveTo(0, -o.h / 2 + 3);
+                    ctx.lineTo(0, o.h / 2 - 3);
+                } else {
+                    ctx.moveTo(-o.w / 2 + 3, 0);
+                    ctx.lineTo(o.w / 2 - 3, 0);
+                }
+                ctx.stroke();
+                ctx.fillStyle = '#b99a63';
+                ctx.beginPath();
+                ctx.arc(o.w >= o.h ? -3 : 0, o.w >= o.h ? 0 : -3, 1.8, 0, Math.PI * 2);
+                ctx.arc(o.w >= o.h ? 3 : 0, o.w >= o.h ? 0 : 3, 1.8, 0, Math.PI * 2);
                 ctx.fill();
             } else if (furnitureVariant === 'bed') {
                 // Bed frame

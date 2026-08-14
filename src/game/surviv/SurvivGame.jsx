@@ -1113,6 +1113,7 @@ export default function SurvivGame() {
                 Math.round((Number(payload.dy) || 0) * 1000),
                 Math.round((Number(payload.aimAngle) || 0) * 1000),
                 payload.shooting ? 1 : 0,
+                Number(payload.firePressId) || 0,
             ].join(':');
             const now = Date.now();
             if (!hasAction && continuousSignature === lastContinuousInput && now - lastInputSentAt < 250) return;
