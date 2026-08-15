@@ -843,12 +843,12 @@ export default function SurvivGame() {
                 spectateTargetsRef.current = tick.spectateTargets;
             }
             renderer.updateState(tick);
-            const nearbyDoor = renderer.getNearbyDoor();
-            const nearbyWeapon = nearbyDoor ? null : renderer.getNearbyGroundWeapon();
-            const nextNearbyPickup = nearbyDoor
-                ? { id: nearbyDoor.id, kind: 'door', isOpen: !!nearbyDoor.isOpen }
-                : nearbyWeapon
-                    ? { id: nearbyWeapon.id, kind: 'weapon', weaponType: nearbyWeapon.weaponType }
+            const nearbyInteraction = renderer.getNearbyInteraction();
+            const nearbyTarget = nearbyInteraction?.target;
+            const nextNearbyPickup = nearbyInteraction?.kind === 'door'
+                ? { id: nearbyTarget.id, kind: 'door', isOpen: !!nearbyTarget.isOpen }
+                : nearbyInteraction?.kind === 'weapon'
+                    ? { id: nearbyTarget.id, kind: 'weapon', weaponType: nearbyTarget.weaponType }
                     : null;
             const previousNearbyPickup = nearbyPickupValueRef.current;
             if (previousNearbyPickup?.id !== nextNearbyPickup?.id
@@ -1203,13 +1203,12 @@ export default function SurvivGame() {
     }, []);
 
     const handleMobileInteract = useCallback(() => {
-        const door = rendererRef.current?.getNearbyDoor();
-        if (door?.id) {
-            toggleDoorPendingRef.current = door.id;
+        const interaction = rendererRef.current?.getNearbyInteraction();
+        if (interaction?.kind === 'door' && interaction.target?.id) {
+            toggleDoorPendingRef.current = interaction.target.id;
             return;
         }
-        const weapon = rendererRef.current?.getNearbyGroundWeapon();
-        if (weapon?.id) pickupWeaponPendingRef.current = true;
+        if (interaction?.kind === 'weapon' && interaction.target?.id) pickupWeaponPendingRef.current = true;
     }, []);
 
     const handleMobileInteractEnd = useCallback(() => {}, []);

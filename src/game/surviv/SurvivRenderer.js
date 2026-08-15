@@ -454,6 +454,39 @@ function getDoorCollisionRect(door) {
     };
 }
 
+function getDoorRenderRect(door, progress) {
+    if (!door || progress <= 0.0001) return door;
+    const horizontal = door.w >= door.h;
+    const length = horizontal ? door.w : door.h;
+    const thickness = horizontal ? door.h : door.w;
+    const baseRotation = (Number(door.rotation) || 0) + (horizontal ? 0 : Math.PI / 2);
+    const swing = (Number(door.openDirection) === -1 ? -1 : 1) * Math.PI / 2 * progress;
+    const hingeX = door.x - Math.cos(baseRotation) * length / 2;
+    const hingeY = door.y - Math.sin(baseRotation) * length / 2;
+    const rotation = baseRotation + swing;
+    return {
+        ...door,
+        x: hingeX + Math.cos(rotation) * length / 2,
+        y: hingeY + Math.sin(rotation) * length / 2,
+        w: length,
+        h: thickness,
+        rotation,
+    };
+}
+
+function distanceFromPointToRect(x, y, rect) {
+    const rotation = -(Number(rect.rotation) || 0);
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const worldDx = x - rect.x;
+    const worldDy = y - rect.y;
+    const localX = worldDx * cos - worldDy * sin;
+    const localY = worldDx * sin + worldDy * cos;
+    const dx = Math.max(0, Math.abs(localX) - rect.w / 2);
+    const dy = Math.max(0, Math.abs(localY) - rect.h / 2);
+    return Math.hypot(dx, dy);
+}
+
 function pointInsideRotatedObstacle(obstacle, x, y, padding = 0) {
     const rotation = Number(obstacle?.rotation) || 0;
     const dx = x - (Number(obstacle?.x) || 0);
@@ -2164,8 +2197,9 @@ export class SurvivRenderer {
         if (k === 'r') return 'reload';
         if (k === 'h') return 'useMedkit';
         if (k === 'f') {
-            const door = this.getNearbyDoor();
-            return door ? `toggleDoor:${door.id}` : 'pickupWeapon';
+            const interaction = this.getNearbyInteraction();
+            if (interaction?.kind === 'door') return `toggleDoor:${interaction.target.id}`;
+            return interaction?.kind === 'weapon' ? 'pickupWeapon' : null;
         }
         if (k === 'g') return 'throwGrenade';
         if (k === '1') return 'equipSlot:2';
@@ -3112,22 +3146,34 @@ export class SurvivRenderer {
         let nearest = null;
         let nearestDistance = 58;
         for (const door of this.doorways) {
-            const angle = -(Number(door.rotation) || 0);
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            const worldDx = this.me.x - door.x;
-            const worldDy = this.me.y - door.y;
-            const localX = worldDx * cos - worldDy * sin;
-            const localY = worldDx * sin + worldDy * cos;
-            const dx = Math.max(0, Math.abs(localX) - door.w / 2);
-            const dy = Math.max(0, Math.abs(localY) - door.h / 2);
-            const distance = Math.hypot(dx, dy);
+            const shape = door.isOpen ? getDoorCollisionRect(door) : door;
+            const distance = door.isOpen
+                ? Math.min(
+                    distanceFromPointToRect(this.me.x, this.me.y, door),
+                    distanceFromPointToRect(this.me.x, this.me.y, shape),
+                )
+                : distanceFromPointToRect(this.me.x, this.me.y, door);
             if (distance < nearestDistance) {
                 nearest = door;
                 nearestDistance = distance;
             }
         }
         return nearest;
+    }
+
+    getNearbyInteraction() {
+        if (!this.me) return null;
+        const door = this.getNearbyDoor();
+        const weapon = this.getNearbyGroundWeapon();
+        const doorShape = door?.isOpen ? getDoorCollisionRect(door) : door;
+        // Compare object centres when both interactions are valid. Comparing a
+        // weapon centre with a door edge unfairly makes every broad doorway win.
+        const doorDistance = doorShape ? Math.hypot(this.me.x - doorShape.x, this.me.y - doorShape.y) : Infinity;
+        const weaponDistance = weapon ? Math.hypot(this.me.x - weapon.x, this.me.y - weapon.y) : Infinity;
+        if (weapon && weaponDistance < doorDistance) {
+            return { kind: 'weapon', target: weapon, distance: weaponDistance };
+        }
+        return door ? { kind: 'door', target: door, distance: doorDistance } : null;
     }
 
 
@@ -4497,34 +4543,10 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
-    drawExteriorDoorEdge(ctx, o) {
-        const horizontal = o.w >= o.h;
-        const length = Math.max(24, (horizontal ? o.w : o.h) + 2);
-        const color = '#f2f5f1';
-        ctx.save();
-        ctx.translate(o.x, o.y);
-        ctx.rotate(o.rotation || 0);
-        if (!horizontal) ctx.rotate(Math.PI / 2);
-        ctx.strokeStyle = 'rgba(12, 16, 18, 0.86)';
-        ctx.lineWidth = 7;
-        ctx.lineCap = 'butt';
-        ctx.beginPath();
-        ctx.moveTo(-length / 2, 0);
-        ctx.lineTo(length / 2, 0);
-        ctx.stroke();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-length / 2 + 2, 0);
-        ctx.lineTo(length / 2 - 2, 0);
-        ctx.stroke();
-        ctx.restore();
-    }
-
     drawExteriorDoorOutside(ctx, door) {
         const house = this._housesById.get(door.houseId);
         if (!house) {
-            this.drawExteriorDoorEdge(ctx, door);
+            this.drawObstacle(ctx, door);
             return;
         }
 
@@ -4545,16 +4567,18 @@ export class SurvivRenderer {
         ctx.clip('evenodd');
         this.drawObstacle(ctx, door);
         ctx.restore();
-
-        this.drawExteriorDoorEdge(ctx, door);
     }
 
     drawNearbyDoorPrompt(ctx) {
-        const door = this.getNearbyDoor();
-        if (!door) return;
+        const interaction = this.getNearbyInteraction();
+        if (interaction?.kind !== 'door') return;
+        const door = interaction.target;
         const label = door.isOpen ? 'F TO CLOSE' : 'F TO OPEN';
+        const target = door.isOpen ? 1 : 0;
+        const progress = this._doorOpenProgress.get(door.id) ?? target;
+        const renderRect = getDoorRenderRect(door, progress);
         ctx.save();
-        ctx.translate(door.x, door.y);
+        ctx.translate(renderRect.x, renderRect.y);
         ctx.font = '800 10px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
