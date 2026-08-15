@@ -1237,7 +1237,7 @@
 .shop-hero-points i,
 .shop-mode-badge i { box-shadow: none; }
 .shop-hero h1 {
-    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-size: clamp(1.85rem, 4vw, 2.45rem);
     font-weight: 780;
     letter-spacing: -0.05em;
     line-height: 1.02;
@@ -1248,7 +1248,7 @@
 
 .shop-balance-card {
     padding: 14px;
-    background: rgba(18, 19, 25, 0.96);
+    background: var(--bg-1);
     border-color: var(--border-2);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-surface);
@@ -1261,11 +1261,12 @@
 .shop-balance-copy small { color: var(--text-subtle); }
 .shop-balance-add {
     background: var(--accent);
+    color: var(--accent-ink);
     border-color: rgba(255, 255, 255, 0.1);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
     transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
-.shop-balance-add:hover { background: #836bff; border-color: rgba(255, 255, 255, 0.16); filter: none; }
+.shop-balance-add:hover { background: var(--accent-hover); border-color: rgba(255, 255, 255, 0.18); filter: none; }
 
 .shop-launch-banner,
 .shop-notice {
@@ -1277,7 +1278,7 @@
 .shop-products { gap: 12px; }
 .shop-product-card {
     padding: 14px;
-    background: rgba(18, 19, 25, 0.9);
+    background: var(--bg-1);
     border-color: var(--border-2);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-surface);
@@ -1286,7 +1287,7 @@
 .shop-product-card::after { display: none; }
 .shop-product-card:hover {
     border-color: rgba(151, 132, 255, 0.32);
-    background: rgba(21, 22, 29, 0.96);
+    background: var(--bg-2);
     box-shadow: var(--shadow-surface);
     transform: translateY(-1px);
 }
@@ -1305,6 +1306,6 @@
 }
 
 /* --- Shop action hierarchy --- */
-.shop-buy-button{min-height:42px;border:1px solid rgba(255,255,255,.11);border-radius:var(--r-md);background:#765ee8;font-size:.84rem;font-weight:720;line-height:1;letter-spacing:-.003em;box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 2px 7px rgba(0,0,0,.15)}
-.shop-buy-button:hover:not(:disabled){background:#816bf0;border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 4px 10px rgba(0,0,0,.18)}
+.shop-buy-button{min-height:42px;border:1px solid rgba(255,255,255,.14);border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);font-size:.84rem;font-weight:720;line-height:1;letter-spacing:-.003em;box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+.shop-buy-button:hover:not(:disabled){background:var(--accent-hover);border-color:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.22)}
 .shop-cancel-button{min-height:38px;border-radius:var(--r-md);font-size:.8rem;font-weight:660;line-height:1}

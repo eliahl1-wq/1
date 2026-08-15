@@ -40,47 +40,49 @@ export default function AppTopbar({ children }) {
             window.removeEventListener(TOURNAMENT_SEEN_EVENT, handleSeen);
         };
     }, []);
+    const isPathActive = (path) => {
+        if (path === '/pre-game') {
+            return ['/pre-game', '/agar', '/slither', '/surviv'].includes(location.pathname);
+        }
+        return location.pathname === path || location.pathname.startsWith(`${path}/`);
+    };
     const linkClass = (path) => (
-        `gm-nav-link${location.pathname === path ? ' gm-nav-link--active' : ''}`
+        `gm-nav-link${isPathActive(path) ? ' gm-nav-link--active' : ''}`
     );
+    const currentPage = (path) => (isPathActive(path) ? 'page' : undefined);
 
     const navItems = (
         <>
-            <button type="button" className={linkClass('/pre-game')} onClick={() => navigate('/pre-game')}>
+            <button type="button" className={linkClass('/pre-game')} aria-current={currentPage('/pre-game')} onClick={() => navigate('/pre-game')}>
                 Play
             </button>
-            <button type="button" className={linkClass('/gamemodes')} onClick={() => navigate('/gamemodes')}>
+            <button type="button" className={linkClass('/gamemodes')} aria-current={currentPage('/gamemodes')} onClick={() => navigate('/gamemodes')}>
                 Modes
             </button>
-            <button type="button" className={linkClass('/tournaments') + ' gm-nav-link--notification'} onClick={() => navigate('/tournaments')}>
+            <button type="button" className={linkClass('/tournaments') + ' gm-nav-link--notification'} aria-current={currentPage('/tournaments')} onClick={() => navigate('/tournaments')}>
                 <span>Tournaments</span>
                 {hasTournamentNotification && <span className="gm-nav-notification-dot" aria-label="New tournament" />}
             </button>
             {user && (
-                <button type="button" className={linkClass('/shop')} onClick={() => navigate('/shop')}>
+                <button type="button" className={linkClass('/shop')} aria-current={currentPage('/shop')} onClick={() => navigate('/shop')}>
                     Shop
                 </button>
             )}
             {user && (
-                <button type="button" className={linkClass('/rewards') + ' gm-nav-link--notification'} onClick={() => navigate('/rewards')}>
+                <button type="button" className={linkClass('/rewards') + ' gm-nav-link--notification'} aria-current={currentPage('/rewards')} onClick={() => navigate('/rewards')}>
                     <span>Rewards</span>
                     {user.affiliateRewardsAvailable && <span className="gm-nav-notification-dot" aria-label="Affiliate rewards available" />}
                 </button>
             )}
 
             {user && (
-                <button type="button" className={linkClass('/profile')} onClick={() => navigate('/profile')}>
+                <button type="button" className={linkClass('/profile')} aria-current={currentPage('/profile')} onClick={() => navigate('/profile')}>
                     Performance
                 </button>
             )}
             {user?.isAdmin && (
-                <button type="button" className={linkClass('/admin')} onClick={() => navigate('/admin')}>
+                <button type="button" className={linkClass('/admin')} aria-current={currentPage('/admin')} onClick={() => navigate('/admin')}>
                     Admin
-                </button>
-            )}
-            {!user && (
-                <button type="button" className={linkClass('/login')} onClick={() => navigate('/login')}>
-                    Login
                 </button>
             )}
         </>
@@ -110,21 +112,25 @@ export default function AppTopbar({ children }) {
                         </svg>
                     </button>
 
-                    <div className="logo" onClick={() => navigate('/pre-game')}>
+                    <button type="button" className="logo" aria-label="AgarStake home" onClick={() => navigate('/pre-game')}>
                         <div className="logo-dot" />
                         <span>
                             AGAR<span className="logo-accent">STAKE</span>
                         </span>
-                    </div>
+                    </button>
 
                     <div className="topbar-nav topbar-nav--desktop">
                         {navItems}
                     </div>
                 </div>
 
-                {children && (
+                {(children || !user) && (
                     <div className="topbar-right">
-                        {children}
+                        {children || (
+                            <button type="button" className="nav-deposit-btn" onClick={() => navigate('/login')}>
+                                Login
+                            </button>
+                        )}
                     </div>
                 )}
             </nav>

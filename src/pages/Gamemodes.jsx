@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
+import ProductPageHeader from '../components/ProductPageHeader';
 import GamemodePreview from '../components/GamemodePreview';
 import GamemodeBadge from '../components/GamemodeBadge';
 import '../styles/ui.css';
@@ -108,15 +109,16 @@ export default function Gamemodes() {
             <AppTopbar />
 
             <div className="page-content">
-                <div style={{ marginBottom: '36px' }}>
-                    <h1 className="gm-heading">Select Gamemode</h1>
-                    <p className="gm-sub">
-                        Choose your arena and start competing for real rewards.{' '}
-                        <button type="button" className="gm-sub-link" onClick={() => navigate('/how-it-works')}>
-                            How it works →
+                <ProductPageHeader
+                    eyebrow="Game catalog"
+                    title="Select gamemode"
+                    description="Choose a game and mode. Your selection carries directly into the pregame terminal."
+                    actions={(
+                        <button type="button" className="btn btn-ghost" onClick={() => navigate('/how-it-works')}>
+                            How it works
                         </button>
-                    </p>
-                </div>
+                    )}
+                />
 
                 <div className="gm-tabs">
                     <button
@@ -172,7 +174,10 @@ function ModeCard({ mode, title, desc, badge, playing, onPlay }) {
                     </div>
                     <div className="gm-card-desc">{desc}</div>
                     {playing != null && (
-                        <div className="gm-card-playing">{playing} playing</div>
+                        <div className={`gm-card-playing${Number(playing) > 0 ? ' is-live' : ''}`}>
+                            <span className="gm-card-playing-dot" aria-hidden="true" />
+                            <span className="mono">{playing}</span> playing
+                        </div>
                     )}
                 </div>
                 <div className="gm-card-right">
@@ -189,4 +194,3 @@ function ModeCard({ mode, title, desc, badge, playing, onPlay }) {
         </div>
     );
 }
-

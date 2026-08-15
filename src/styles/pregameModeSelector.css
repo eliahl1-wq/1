@@ -7,12 +7,12 @@
     height: auto;
     min-height: 0;
     overflow: hidden;
-    background: #121218;
+    background: var(--bg-1);
 }
 
 .mode-selector-hero {
     position: relative;
-    height: 190px;
+    height: 156px;
     overflow: hidden;
     background: #07070b;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -69,24 +69,18 @@
 
 .mode-selector-grid-wrap {
     position: relative;
-    padding: 14px;
-    background:
-        radial-gradient(circle at 50% 0%, rgba(124, 111, 240, 0.07), transparent 52%),
-        #121218;
+    padding: 12px 14px 14px;
+    background: var(--bg-1);
 }
 
 .mode-selector-grid-wrap.selection-step--active {
     z-index: 1;
-    box-shadow: inset 0 0 0 1px rgba(144, 153, 255, 0.58);
-    animation: pregame-selection-pulse 1.8s ease-in-out infinite;
+    box-shadow: inset 0 0 0 1px var(--accent-border);
+    animation: pregame-selection-pulse 2.2s ease-in-out infinite;
 }
 
 .mode-selector-grid-wrap.selection-step--active .mode-selector-grid-heading > span {
     color: #c9c7ff;
-}
-
-.mode-selector-grid-wrap.selection-step--active .mode-mini-card:not(:disabled) {
-    animation: pregame-choice-pulse 1.8s ease-in-out infinite;
 }
 
 .mode-selector-grid-heading {
@@ -144,18 +138,19 @@
     padding: 0;
     transform: translateY(-50%);
     border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 50%;
-    background: rgba(10, 10, 16, 0.9);
+    border-radius: var(--r-sm);
+    background: var(--bg-elevated);
     color: #fff;
     cursor: pointer;
-    box-shadow: 0 5px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-sm);
     transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
 .mode-selector-arrow:hover {
-    border-color: rgba(124, 111, 240, 0.8);
-    background: #7c6ff0;
-    transform: translateY(-50%) scale(1.06);
+    border-color: var(--accent-border);
+    background: var(--bg-3);
+    color: var(--accent);
+    transform: translateY(-50%);
 }
 
 .mode-selector-arrow--left {
@@ -177,14 +172,14 @@
 }
 .mode-mini-card {
     position: relative;
-    width: 88px;
-    height: 122px;
-    flex: 0 0 88px;
+    width: 86px;
+    height: 108px;
+    flex: 0 0 86px;
     display: block;
     padding: 0;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    border-radius: var(--r-md);
     background: #07070b;
     color: var(--text-h);
     text-align: left;
@@ -197,16 +192,14 @@
 }
 
 .mode-mini-card:hover:not(:disabled) {
-    transform: translateY(-2px);
-    border-color: rgba(124, 111, 240, 0.62);
-    box-shadow: 0 9px 24px rgba(0, 0, 0, 0.28);
+    transform: translateY(-1px);
+    border-color: var(--accent-border);
+    box-shadow: none;
 }
 
 .mode-mini-card--selected {
-    border-color: #7c6ff0;
-    box-shadow:
-        inset 0 0 0 1px rgba(124, 111, 240, 0.5),
-        0 0 20px rgba(124, 111, 240, 0.22);
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px rgba(173, 152, 255, 0.22);
 }
 
 .mode-mini-card--coming-soon {
@@ -242,7 +235,7 @@
 }
 
 .mode-mini-card:hover:not(:disabled) .mode-mini-card-preview-canvas {
-    transform: scale(1.08);
+    transform: scale(1.05);
 }
 
 .mode-mini-card-copy {
@@ -315,7 +308,7 @@
     flex: 0 0 auto;
     border-radius: 50%;
     background: #34d399;
-    box-shadow: 0 0 7px rgba(52, 211, 153, 0.72);
+    box-shadow: none;
 }
 
 .mode-mini-card--coming-soon .mode-mini-card-playing i {
@@ -333,9 +326,9 @@
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: #7c6ff0;
-    color: #fff;
-    box-shadow: 0 0 0 2px rgba(7, 7, 11, 0.72), 0 3px 10px rgba(0, 0, 0, 0.35);
+    background: var(--accent);
+    color: var(--accent-ink);
+    box-shadow: 0 0 0 2px rgba(7, 7, 11, 0.78);
 }
 
 .mode-mini-card-check svg {
@@ -360,7 +353,7 @@
 
 @media (max-width: 480px) {
     .mode-selector-hero {
-        height: 190px;
+        height: 148px;
     }
 
     .mode-selector-hero-overlay {
@@ -393,7 +386,7 @@
 
     .mode-mini-card {
         width: 82px;
-        height: 114px;
+        height: 104px;
         flex-basis: 82px;
     }
 }

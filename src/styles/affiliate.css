@@ -289,11 +289,11 @@
 }
 
 /* --- Product polish overrides --- */
-.affiliate-hero { padding: 56px 28px 44px; text-align: left; max-width: 960px; }
+.affiliate-hero { padding: 44px 28px 32px; text-align: left; max-width: 960px; }
 .affiliate-kicker { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.09em; }
 .affiliate-hero h1,
 .affiliate-dashboard-header h1 {
-    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-size: clamp(1.85rem, 4vw, 2.45rem);
     font-weight: 780;
     letter-spacing: -0.05em;
     line-height: 1.02;
@@ -307,7 +307,7 @@
 .affiliate-table-panel,
 .affiliate-math-card,
 .affiliate-terms {
-    background: rgba(18, 19, 25, 0.9);
+    background: var(--bg-1);
     border-color: var(--border-2);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-surface);

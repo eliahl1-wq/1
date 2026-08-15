@@ -73,7 +73,12 @@ export function AuthFooter({ prompt, to, action }) {
     return (
         <footer className="auth-footer">
             <p>{prompt} <Link to={to}>{action}</Link></p>
-            <Link to="/pre-game" className="auth-back-link">? Back to lobby</Link>
+            <Link to="/pre-game" className="auth-back-link">
+                <svg aria-hidden="true" viewBox="0 0 16 16" fill="none">
+                    <path d="M9.75 3.75 5.5 8l4.25 4.25M6 8h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Back to lobby</span>
+            </Link>
         </footer>
     );
 }

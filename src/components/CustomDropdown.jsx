@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 
 /**
  * CustomDropdown — axiom-style compact dropdown
@@ -11,17 +11,23 @@ import React, { useState, useRef, useEffect } from 'react';
 export default function CustomDropdown({ options, value, onChange, renderValue, renderOption }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
+    const listboxId = useId();
 
     useEffect(() => {
         if (!open) return;
         const handler = (e) => {
             if (ref.current && !ref.current.contains(e.target)) setOpen(false);
         };
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setOpen(false);
+        };
         document.addEventListener('mousedown', handler);
         document.addEventListener('touchstart', handler, { passive: true });
+        document.addEventListener('keydown', handleKeyDown);
         return () => {
             document.removeEventListener('mousedown', handler);
             document.removeEventListener('touchstart', handler);
+            document.removeEventListener('keydown', handleKeyDown);
         };
     }, [open]);
 
@@ -33,7 +39,9 @@ export default function CustomDropdown({ options, value, onChange, renderValue, 
                 className="dropdown-trigger"
                 onClick={() => setOpen(v => !v)}
                 type="button"
-                style={open ? { borderColor: 'var(--accent)', boxShadow: '0 0 12px var(--accent-border)' } : {}}
+                aria-expanded={open}
+                aria-haspopup="listbox"
+                aria-controls={listboxId}
             >
                 {renderValue ? renderValue(value) : (selected?.label ?? value)}
                 <svg
@@ -44,22 +52,23 @@ export default function CustomDropdown({ options, value, onChange, renderValue, 
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3"
-                    style={{ flexShrink: 0 }}
                 >
                     <path d="M6 9l6 6 6-6" />
                 </svg>
             </button>
 
-            <div className="dropdown-panel">
+            <div id={listboxId} className="dropdown-panel" role="listbox" aria-hidden={!open}>
                 {options.map(opt => (
-                    <div
+                    <button
+                        type="button"
+                        role="option"
+                        aria-selected={opt.value === value}
                         key={opt.value}
                         className={`dropdown-item${opt.value === value ? ' active' : ''}`}
                         onClick={() => { onChange(opt.value); setOpen(false); }}
-                        style={opt.value === value ? { color: '#fff', background: 'var(--accent-dim)' } : {}}
                     >
                         {renderOption ? renderOption(opt) : opt.label}
-                    </div>
+                    </button>
                 ))}
             </div>
         </div>

@@ -11,21 +11,21 @@
 .rewards-summary-grid{
     display:grid;
     grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:12px;
-    margin:0 0 48px;
+    gap:10px;
+    margin:0 0 32px;
 }
 
 .rewards-stat-card{
     min-width:0;
-    min-height:122px;
+    min-height:108px;
     display:flex;
     flex-direction:column;
     justify-content:center;
     padding:18px 20px;
     border:1px solid var(--border-2);
     border-radius:var(--r-lg);
-    background:rgba(18,19,25,.94);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+    background:var(--bg-1);
+    box-shadow:none;
 }
 
 .rewards-stat-label{
@@ -59,12 +59,12 @@
 .rewards-stat-card--tournament .rewards-stat-value{color:var(--yellow)}
 
 .product-page--rewards>.product-alert{
-    margin:-22px 0 40px;
+    margin:-18px 0 28px;
 }
 
 .rewards-section{
     width:100%;
-    margin:0 0 50px;
+    margin:0 0 34px;
 }
 
 .rewards-section-title{
@@ -81,7 +81,7 @@
     width:100%;
     border-color:var(--border-2);
     border-radius:var(--r-lg);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    box-shadow:none;
 }
 
 .rewards-section>.panel{padding:22px!important}
@@ -90,7 +90,7 @@
     background:rgba(34,197,94,.055)!important;
     border:1px solid rgba(34,197,94,.25)!important;
     border-radius:var(--r-lg)!important;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important;
+    box-shadow:none!important;
 }
 .rewards-ticket-card--used{
     padding:20px!important;
@@ -105,7 +105,7 @@
 }
 
 .product-page--rewards>.affiliate-rewards-embedded{
-    margin:0 0 50px;
+    margin:0 0 34px;
     padding-top:0;
     border-top:0;
 }

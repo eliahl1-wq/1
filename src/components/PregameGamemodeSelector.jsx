@@ -93,7 +93,7 @@ export default function PregameGamemodeSelector({
 
             <div className={`mode-selector-grid-wrap${showSelectionGuide ? ' selection-step selection-step--active' : ''}`}>
                 <div className="mode-selector-grid-heading">
-                    <span>{showSelectionGuide ? 'Step 1 · Choose gamemode' : 'Gamemodes'}</span>
+                    <span>{showSelectionGuide ? 'Choose gamemode' : 'Gamemodes'}</span>
                     <small>{showSelectionGuide ? 'Select one to continue' : 'Use arrows to browse'}</small>
                 </div>
                 <div className="mode-selector-carousel">

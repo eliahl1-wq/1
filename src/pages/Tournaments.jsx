@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import Background from '../components/Background';
+import ProductPageHeader from '../components/ProductPageHeader';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
 import { markActiveTournamentsSeen } from '../utils/tournamentNotifications';
@@ -33,6 +34,15 @@ export default function Tournaments() {
         const timer = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        if (!selectedRulesTournament) return undefined;
+        const closeOnEscape = (event) => {
+            if (event.key === 'Escape') setSelectedRulesTournament(null);
+        };
+        window.addEventListener('keydown', closeOnEscape);
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [selectedRulesTournament]);
 
     useEffect(() => {
         let active = true;
@@ -81,24 +91,25 @@ export default function Tournaments() {
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
             <AppTopbar />
-            <main className="page-content tournament-page" style={{ maxWidth: 1160 }}>
-                <section className="tournament-hero" style={{ marginBottom: 36 }}>
-                    <div>
-                        <p className="tournament-kicker">Live competition</p>
-                        <h1 className="tournament-title">Tournaments</h1>
-                    </div>
-                    <button className="tournament-secondary-btn" onClick={() => navigate('/rewards')}>
-                        View rewards
-                    </button>
-                </section>
+            <main className="page-content tournament-page">
+                <ProductPageHeader
+                    eyebrow="Live competition"
+                    title="Tournaments"
+                    description="Timed competitions with a shared prize pool, limited attempts and live standings."
+                    actions={(
+                        <button className="btn btn-ghost" type="button" onClick={() => navigate('/rewards')}>
+                            View rewards
+                        </button>
+                    )}
+                />
 
-                {error && <div className="tournament-ended-callout" style={{ borderColor: 'rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#fecaca' }}>{error}</div>}
+                {error && <div className="product-alert product-alert--error">{error}</div>}
 
                 <section className="tournament-list">
                     {loading && <div className="tournament-empty">Loading tournaments…</div>}
                     {!loading && ordered.length === 0 && (
                         <div className="tournament-empty">
-                            <strong style={{ display: 'block', color: 'var(--text-h)', marginBottom: 8 }}>No tournament scheduled</strong>
+                            <strong className="tournament-empty-title">No tournament scheduled</strong>
                             The next Balance Grab will appear here as soon as it is booked.
                         </div>
                     )}
@@ -147,7 +158,7 @@ export default function Tournaments() {
                                         <span className="label">Players</span>
                                         <strong>{tournament.participantCount}</strong>
                                     </div>
-                                    <div className="tournament-detail-item" style={{ gridColumn: 'span 2' }}>
+                                    <div className="tournament-detail-item tournament-detail-item--wide">
                                         <span className="label">Total Attempts</span>
                                         <strong>{tournament.totalAttempts}</strong>
                                     </div>
@@ -161,8 +172,7 @@ export default function Tournaments() {
                                     </button>
                                     <button
                                         type="button"
-                                        className="tournament-secondary-btn"
-                                        style={{ padding: '12px 14px', flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        className="tournament-secondary-btn tournament-rules-trigger"
                                         onClick={() => setSelectedRulesTournament(tournament)}
                                         title="Tournament Rules"
                                     >
@@ -181,68 +191,47 @@ export default function Tournaments() {
 
             {/* Rules Info Modal */}
             {selectedRulesTournament && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
-                    zIndex: 9999, padding: '20px', GxBackdropFilter: 'blur(8px)', backdropFilter: 'blur(8px)'
-                }} onClick={() => setSelectedRulesTournament(null)}>
-                    <div className="panel" style={{
-                        maxWidth: '480px', width: '100%', padding: '30px',
-                        border: '1px solid var(--border)', background: 'var(--bg-2)', borderRadius: 'var(--r-xl)',
-                        position: 'relative'
-                    }} onClick={e => e.stopPropagation()}>
+                <div className="tournament-rules-backdrop" onClick={() => setSelectedRulesTournament(null)}>
+                    <section className="tournament-rules-modal" role="dialog" aria-modal="true" aria-labelledby="tournament-rules-title" onClick={e => e.stopPropagation()}>
                         <button
+                            type="button"
+                            className="tournament-rules-close"
                             onClick={() => setSelectedRulesTournament(null)}
-                            style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '1.2rem', cursor: 'pointer' }}
+                            aria-label="Close tournament rules"
                         >
-                            ✕
+                            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
                         </button>
                         
-                        <h3 style={{ margin: '0 0 8px', color: 'var(--text-h)', fontSize: '1.4rem', fontWeight: 800 }}>
+                        <h3 id="tournament-rules-title">
                             {selectedRulesTournament.name}
                         </h3>
-                        <p style={{ color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 20px' }}>
+                        <p className="tournament-rules-eyebrow">
                             Balance Grab Rules & Info
                         </p>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', color: 'var(--text-2)', fontSize: '0.92rem', lineHeight: '1.6' }}>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
-                                <span>Start fee is <strong>$1.00</strong> per attempt. You can play a maximum of <strong>{selectedRulesTournament.maxAttempts} attempts</strong>.</span>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
-                                <span>Each run starts at a $1.00 stake. You can cash out at any point to save your current balance to the tournament leaderboard.</span>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
-                                <span>If you die during a run, you bank <strong>$0.00</strong> for that attempt.</span>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
-                                <span>Your total score is the sum of all your banked cashouts across the {selectedRulesTournament.maxAttempts} runs.</span>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>•</span>
-                                <span>The <strong>top 3 players</strong> on the leaderboard at the end of the tournament split the entire prize pot:
+                        <div className="tournament-rules-list">
+                            <p>Start fee is <strong>$1.00</strong> per attempt. You can play a maximum of <strong>{selectedRulesTournament.maxAttempts} attempts</strong>.</p>
+                            <p>Each run starts at a $1.00 stake. You can cash out at any point to save your current balance to the tournament leaderboard.</p>
+                            <p>If you die during a run, you bank <strong>$0.00</strong> for that attempt.</p>
+                            <p>Your total score is the sum of all your banked cashouts across the {selectedRulesTournament.maxAttempts} runs.</p>
+                            <p>The <strong>top 3 players</strong> on the leaderboard at the end of the tournament split the entire prize pot:
                                     <br />
                                     - 1st Place: <strong>60%</strong>
                                     <br />
                                     - 2nd Place: <strong>30%</strong>
                                     <br />
                                     - 3rd Place: <strong>10%</strong>
-                                </span>
-                            </div>
+                            </p>
                         </div>
 
                         <button
-                            className="btn btn-green"
+                            type="button"
+                            className="btn btn-primary tournament-rules-confirm"
                             onClick={() => setSelectedRulesTournament(null)}
-                            style={{ width: '100%', marginTop: '30px', padding: '12px', fontSize: '0.92rem', fontWeight: 700 }}
                         >
                             Got it
                         </button>
-                    </div>
+                    </section>
                 </div>
             )}
 

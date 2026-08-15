@@ -1054,7 +1054,7 @@ export default function PreGame() {
 
             <AppTopbar>
                 {/* Nav right */}
-                <div className="topbar-right">
+                <div className="pregame-topbar-actions">
                     {isAuthenticated ? (
                         <>
                             <button
@@ -1078,27 +1078,28 @@ export default function PreGame() {
 
                             {/* Balance pill */}
                             {(user?.balance || 0) > 0 && (
-                                <div style={{ position: 'relative' }}>
+                                <div className="topbar-popover-anchor">
                                     <button
                                         id="balance-pill"
-                                        className="balance-pill mono"
+                                        className={`balance-pill mono${isWalletOpen ? ' balance-pill--open' : ''}`}
                                         onClick={() => { setIsWalletOpen(v => !v); setStatusMsg(''); }}
-                                        style={isWalletOpen ? { borderColor: 'var(--accent)', boxShadow: '0 0 10px rgba(124, 58, 255, 0.15)' } : {}}
+                                        aria-expanded={isWalletOpen}
+                                        aria-haspopup="dialog"
                                     >
                                         <WalletIcon size={14} />
                                         {isCurSOL ? (
                                             <>
                                                 <SolLogo size={12} />
-                                                <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                                                <span className="balance-pill__value">
                                                     {fmt(balanceSol)}
                                                 </span>
                                             </>
                                         ) : (
-                                            <span style={{ color: 'var(--text-bright)', fontSize: '0.82rem' }}>
+                                            <span className="balance-pill__value">
                                                 ${fmt(balanceUsd)}
                                             </span>
                                         )}
-                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.35, marginLeft: 2 }}>
+                                        <svg className="balance-pill__chevron" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                                             <path d="M6 9l6 6 6-6" />
                                         </svg>
                                     </button>
@@ -1118,12 +1119,12 @@ export default function PreGame() {
                                                     value={isCurSOL ? 'SOL' : 'USD'}
                                                     onChange={v => setIsCurSOL(v === 'SOL')}
                                                     renderValue={v => (
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span className="currency-option currency-option--compact">
                                                             {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
                                                         </span>
                                                     )}
                                                     renderOption={opt => (
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span className="currency-option">
                                                             {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
                                                         </span>
                                                     )}
@@ -1135,9 +1136,9 @@ export default function PreGame() {
                                                 {isCurSOL ? (
                                                     <SolLogo size={28} />
                                                 ) : (
-                                                    <span style={{ fontSize: '0.9rem', opacity: 0.4, fontFamily: 'var(--sans)', fontWeight: 400 }}>$</span>
+                                                    <span className="wallet-card-currency-prefix">$</span>
                                                 )}
-                                                <span style={{ marginLeft: isCurSOL ? '10px' : '0' }}>
+                                                <span className={isCurSOL ? 'wallet-card-balance__with-logo' : undefined}>
                                                     {isCurSOL
                                                         ? fmt(balanceSol)
                                                         : fmt(balanceUsd)}
@@ -1189,16 +1190,20 @@ export default function PreGame() {
                             </button>
 
                             {/* User avatar pill */}
-                            <div style={{ position: 'relative' }}>
-                                <div
+                            <div className="topbar-popover-anchor">
+                                <button
+                                    type="button"
                                     ref={userPillRef}
                                     className={`user-pill${showUserMenu ? ' active' : ''}`}
                                     onClick={() => setShowUserMenu(v => !v)}
+                                    aria-label="Open account menu"
+                                    aria-expanded={showUserMenu}
+                                    aria-haspopup="menu"
                                 >
                                     <div className="avatar">
                                         {user?.username?.charAt(0).toUpperCase()}
                                     </div>
-                                </div>
+                                </button>
 
                                 {showUserMenu && (
                                     <div ref={userMenuRef} className="user-menu">
@@ -1245,24 +1250,25 @@ export default function PreGame() {
                         <button className="float-panel-close" onClick={() => { setIsWalletExpanded(false); setStatusMsg(''); }}>✕</button>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div className="deposit-address-card">
                         <div ref={qrRef} className="qr-container" />
-                        <div style={{ width: '100%' }}>
-                            <div className="label" style={{ marginBottom: '4px' }}>Deposit Address</div>
-                            <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', wordBreak: 'break-all', background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                        <div className="deposit-address-card__body">
+                            <div className="label deposit-address-card__label">Deposit Address</div>
+                            <div className="mono deposit-address-card__value">
                                 {depositAddress || 'Generating…'}
                             </div>
                             <button
+                                type="button"
                                 onClick={() => { if (depositAddress) navigator.clipboard.writeText(depositAddress); setStatusMsg('✅ Address copied!'); }}
-                                style={{ width: '100%', marginTop: '8px', padding: '8px', background: 'var(--blue-dim)', border: '1px solid var(--blue-border)', color: 'var(--blue)', fontSize: '0.67rem', fontWeight: '700', borderRadius: '6px', cursor: 'pointer', letterSpacing: '0.04em' }}
+                                className="deposit-address-card__copy"
                             >
-                                COPY ADDRESS
+                                Copy address
                             </button>
                         </div>
                     </div>
 
                     {statusMsg && <div className={`status-msg ${statusClass}`}>{statusMsg}</div>}
-                    <div style={{ textAlign: 'center', fontSize: '0.58rem', color: 'var(--text-3)', fontWeight: 600 }}>
+                    <div className="float-panel-note">
                         Custodial · Secure Processing
                     </div>
                 </div>
@@ -1281,11 +1287,11 @@ export default function PreGame() {
                         <button className="float-panel-close" onClick={() => { setIsWithdrawExpanded(false); setStatusMsg(''); }}>✕</button>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="withdraw-form">
                         {/* Address */}
                         <div>
-                            <div className="label" style={{ marginBottom: '5px' }}>Destination Address</div>
-                            <div style={{ position: 'relative' }}>
+                            <div className="label withdraw-form__label">Destination Address</div>
+                            <div className="withdraw-address-field">
                                 <input
                                     type="text"
                                     placeholder="Paste Solana address"
@@ -1293,22 +1299,14 @@ export default function PreGame() {
                                     onChange={e => setWithdrawAddress(e.target.value)}
                                     onFocus={() => setDisplayFullAddress(true)}
                                     onBlur={() => setDisplayFullAddress(false)}
-                                    className="amount-input"
-                                    style={{
-                                        paddingLeft: '12px',
-                                        paddingRight: '32px',
-                                        width: '100%',
-                                        fontFamily: 'var(--mono)',
-                                        fontSize: '0.75rem',
-                                        borderColor: !isValidWithdrawAddress ? 'rgba(255,59,48,0.4)' : undefined,
-                                    }}
+                                    className={`amount-input withdraw-address-input${!isValidWithdrawAddress ? ' withdraw-address-input--invalid' : ''}`}
                                 />
-                                <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                                <div className="withdraw-address-field__icon">
                                     <SolLogo size={11} />
                                 </div>
                             </div>
                             {!isValidWithdrawAddress && (
-                                <div style={{ fontSize: '0.65rem', color: 'var(--red)', marginTop: '3px' }}>
+                                <div className="withdraw-form__error">
                                     Invalid Solana address
                                 </div>
                             )}
@@ -1316,19 +1314,19 @@ export default function PreGame() {
 
                         {/* Amount */}
                         <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                            <div className="withdraw-form__row">
                                 <span className="label">Amount</span>
                                 <CustomDropdown
                                     options={CUR_OPTIONS}
                                     value={isCurSOL ? 'SOL' : 'USD'}
                                     onChange={v => setIsCurSOL(v === 'SOL')}
                                     renderValue={v => (
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span className="currency-option currency-option--compact">
                                             {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
                                         </span>
                                     )}
                                     renderOption={opt => (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span className="currency-option">
                                             {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
                                         </span>
                                     )}
@@ -1343,11 +1341,11 @@ export default function PreGame() {
                                     placeholder="0.00"
                                     value={withdrawAmount}
                                     onChange={e => setWithdrawAmount(e.target.value)}
-                                    className="amount-input"
-                                    style={{ paddingRight: '52px' }}
+                                    className="amount-input withdraw-amount-input"
                                 />
                                 <button
-                                    style={{ position: 'absolute', right: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', padding: '3px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: '700', cursor: 'pointer' }}
+                                    type="button"
+                                    className="amount-max-btn"
                                     onClick={() => setWithdrawAmount(isCurSOL ? balanceSol.toFixed(4) : balanceUsd.toFixed(2))}
                                 >
                                     MAX
@@ -1360,13 +1358,13 @@ export default function PreGame() {
                             </div>
                         </div>
 
-                        <button className="btn btn-primary" style={{ width: '100%', padding: '11px' }} onClick={handleWithdraw}>
+                        <button className="btn btn-primary withdraw-submit" onClick={handleWithdraw}>
                             Withdraw
                         </button>
                     </div>
 
                     {statusMsg && <div className={`status-msg ${statusClass}`}>{statusMsg}</div>}
-                    <div style={{ textAlign: 'center', fontSize: '0.58rem', color: 'var(--text-3)', fontWeight: 600 }}>
+                    <div className="float-panel-note">
                         Custodial · Secure Transfer
                     </div>
                 </div>
