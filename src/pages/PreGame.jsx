@@ -1629,7 +1629,6 @@ export default function PreGame() {
                                             </span>
                                             <span className="free-mode-option__copy">
                                                 <strong>Free mode</strong>
-                                                <small>{fixedFreeModeEntryFee === 5 ? '$5 simulated room' : '$10 simulated room'}</small>
                                             </span>
                                         </label>
                                     )}
@@ -1637,6 +1636,7 @@ export default function PreGame() {
                                         {tierOptions.map(tier => {
                                             const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
                                             const active = entryFeeForSession === tier;
+                                            const isFreeTier = freePlay && !isBattleRoyaleMode && tier === fixedFreeModeEntryFee;
                                             const needsSelection = isAuthenticated && !!selectedMode && selectedEntryFee === null && !isAlreadyInGame;
                                             const isNormal5 = tier === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
                                             const hasFreeTicket = hasUnlockedFreeTicket(user);
@@ -1646,11 +1646,16 @@ export default function PreGame() {
                                                 <button
                                                     key={tier}
                                                     type="button"
-                                                    className={`lobby-tier-btn${active ? ' lobby-tier-btn--active' : ''}${locked ? ' lobby-tier-btn--locked' : ''}${needsSelection ? ' lobby-tier-btn--needs-selection' : ''}`}
+                                                    className={`lobby-tier-btn${active ? ' lobby-tier-btn--active' : ''}${locked ? ' lobby-tier-btn--locked' : ''}${needsSelection ? ' lobby-tier-btn--needs-selection' : ''}${isFreeTier ? ' lobby-tier-btn--free-tier' : ''}`}
                                                     disabled={!selectedMode || locked || isMatchmaking || (freePlay && !isBattleRoyaleMode)}
                                                     onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
                                                 >
-                                                    {isFreeTicketButton && !freePlay ? 'Free Ticket' : `$${tier}`}
+                                                    {isFreeTier ? (
+                                                        <>
+                                                            <span className="lobby-tier-btn__free-price">${tier}</span>
+                                                            <span className="lobby-tier-btn__free-label">Free</span>
+                                                        </>
+                                                    ) : (isFreeTicketButton && !freePlay ? 'Free Ticket' : `$${tier}`)}
                                                 </button>
                                             );
                                         })}
