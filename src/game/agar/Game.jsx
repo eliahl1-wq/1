@@ -28,6 +28,7 @@ import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
 import { adjustPlayerWheelZoom } from '../../utils/gameWheel.js';
+import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -268,6 +269,7 @@ export default function Game() {
                 skinColor: preferredSkinAgar,
                 skinId: getPremiumSkinId(preferredSkinAgar),
                 useFreeTicket: false,
+                publicFreeMode: isPublicFreeModeEnabled(),
             });
         }
     }, [token, liveSession]);
@@ -427,8 +429,9 @@ export default function Game() {
                         mode: sessionMode,
                         entryFeeUsd,
                         skinColor: preferredSkinAgar,
-                skinId: getPremiumSkinId(preferredSkinAgar),
+                        skinId: getPremiumSkinId(preferredSkinAgar),
                         useFreeTicket,
+                        publicFreeMode: isPublicFreeModeEnabled(),
                     });
                 }
                 hasJoinedGameRef.current = true;
@@ -735,6 +738,7 @@ export default function Game() {
                         skinColor: localStorage.getItem('selected_skin_agar') || '#c080ff',
                         skinId: getPremiumSkinId(localStorage.getItem('selected_skin_agar') || '#c080ff'),
                         useFreeTicket: false,
+                        publicFreeMode: isPublicFreeModeEnabled(),
                     });
                 }
             }

@@ -28,6 +28,7 @@ import { hasUnlockedFreeTicket } from './utils/freeTicket';
 import { isBattleRoyaleAvailable } from './constants/features';
 import useSitePresence from './hooks/useSitePresence';
 import AgarTokenExperience from './features/agar/ui/AgarTokenExperience';
+import { isPublicFreeModeEnabled } from './utils/freeMode';
 
 function SitePresenceRunner() {
   useSitePresence();
@@ -67,6 +68,7 @@ function ArenaRoute({ children }) {
   if (loading) return <AppLoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.freePlay) return children;
+  if (isPublicFreeModeEnabled()) return children;
   if (isBattleRoyaleSession(!!user?.isAdmin)) return children;
   if (isTournamentSession()) return children;
   // Rejoining an existing match must not require another entry fee. In
@@ -85,10 +87,7 @@ function PublicRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return <AppLoadingScreen />;
   if (isAuthenticated) {
-    const balanceUsd = user?.balanceUsd || (user?.balanceSol * (user?.solPrice || 57)) || 0;
-    const hasFreeTicket = hasUnlockedFreeTicket(user);
-    if (user?.freePlay || hasFreeTicket || balanceUsd >= MIN_ENTRY_FEE) return <Navigate to="/pre-game" />;
-    return <Navigate to="/lobby" />;
+    return <Navigate to="/pre-game" />;
   }
   return children;
 }

@@ -20,6 +20,7 @@ import { markGamemodePlayed } from '../../constants/gamemodes';
 import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
 import { nextWeaponSlot } from '../../utils/gameWheel.js';
+import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -468,6 +469,7 @@ export default function SurvivGame() {
                 mode: 'surviv',
                 entryFeeUsd: joinParamsRef.current.entryFeeUsd,
                 adminFreeSurvivEntry: joinParamsRef.current.adminFreeSurvivEntry,
+                publicFreeMode: isPublicFreeModeEnabled(),
                 skinColor: preferredSkin,
             });
         }
@@ -640,6 +642,7 @@ export default function SurvivGame() {
                 mode: 'surviv',
                 entryFeeUsd,
                 adminFreeSurvivEntry,
+                publicFreeMode: isPublicFreeModeEnabled(),
                 skinColor: preferredSkin,
             });
         };

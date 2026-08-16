@@ -27,6 +27,7 @@ import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
 import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
+import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 
 
 const IS_MOBILE = isTouchDevice();
@@ -274,6 +275,7 @@ export default function SlitherGame() {
                 skinColor: preferredSkin,
                 skinId: getPremiumSkinId(preferredSkin),
                 useFreeTicket: false,
+                publicFreeMode: isPublicFreeModeEnabled(),
             });
         }
     }, [authToken, liveSession, navigate]);
@@ -540,8 +542,9 @@ export default function SlitherGame() {
                         mode: joinMode,
                         entryFeeUsd: fee,
                         skinColor: preferredSkin,
-                skinId: getPremiumSkinId(preferredSkin),
+                        skinId: getPremiumSkinId(preferredSkin),
                         useFreeTicket,
+                        publicFreeMode: isPublicFreeModeEnabled(),
                     });
                 }
                 hasJoinedRef.current = true;
@@ -893,6 +896,7 @@ export default function SlitherGame() {
                         skinColor: localStorage.getItem('selected_skin') || '#c080ff',
                         skinId: getPremiumSkinId(localStorage.getItem('selected_skin') || '#c080ff'),
                         useFreeTicket: false,
+                        publicFreeMode: isPublicFreeModeEnabled(),
                     });
                 }
             }

@@ -2393,6 +2393,20 @@
   overflow: visible;
 }
 
+/* Keep the signed-in lobby centred in the usable desktop viewport. Guest users
+   retain the introductory banner at the top, where the extra context belongs. */
+@media (min-width: 1121px) {
+  .page-shell--pregame > .pre-game-grid {
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+
+  .page-shell--pregame > .guest-banner + .pre-game-grid {
+    margin-top: 28px;
+    margin-bottom: 0;
+  }
+}
+
 .page-shell--scroll {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -4635,17 +4649,27 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 
 .game-card.main-card{padding:22px 24px 14px}
 .pregame-nickname-block{margin-bottom:14px}
-.lobby-stake-selection{position:relative;width:100%;margin:0 auto 7px;padding:9px 12px 4px;box-sizing:border-box;border:1px solid transparent;border-radius:var(--r-md)}
-.lobby-stake-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
-.lobby-stake-heading .label{margin:0}
-.lobby-stake-current{color:var(--text-h);font-size:.82rem;font-weight:720}
-.lobby-stake-selection.selection-step--active{width:100%;margin-inline:auto;border-color:rgba(144,153,255,.42);background:rgba(124,111,240,.045);animation:pregame-amount-pulse 2.2s ease-in-out infinite}
-.lobby-stake-selection.selection-step--active .label{color:#c9c7ff}
+.lobby-stake-selection{position:relative;width:100%;margin:0 auto 10px;padding:0;box-sizing:border-box;border:0;background:transparent}
+.free-mode-option{display:flex;min-height:40px;box-sizing:border-box;align-items:center;gap:10px;margin-bottom:9px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r-md);background:rgba(255,255,255,.022);cursor:pointer;transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard)}
+.free-mode-option:hover{border-color:var(--border-2);background:rgba(255,255,255,.04)}
+.free-mode-option>input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.free-mode-option__control{display:flex;width:20px;height:20px;flex:0 0 20px;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.17);border-radius:5px;background:rgba(5,6,9,.55);color:transparent;transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),color var(--duration-fast) var(--ease-standard)}
+.free-mode-option__control svg{width:12px;height:10px}
+.free-mode-option__copy{display:flex;min-width:0;flex:1;align-items:baseline;justify-content:space-between;gap:10px}
+.free-mode-option__copy strong{color:var(--text-h);font-size:.75rem;font-weight:730;line-height:1.2}
+.free-mode-option__copy small{color:var(--text-subtle);font-family:var(--mono);font-size:.62rem;font-weight:600;line-height:1.2}
+.free-mode-option--active{border-color:rgba(173,152,255,.38);background:rgba(173,152,255,.07)}
+.free-mode-option--active .free-mode-option__control{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.free-mode-option:has(input:focus-visible){box-shadow:var(--focus-ring)}
+.free-mode-option:has(input:disabled){cursor:default;opacity:.72}
 .lobby-stake-note{margin-top:7px;color:var(--accent);font-size:.7rem;font-weight:620;line-height:17px;text-align:center}
-.admin-free-surviv-option{display:flex;box-sizing:border-box;align-items:flex-start;gap:8px;margin-top:7px;padding:7px 9px;border:1px solid rgba(144,153,255,.25);border-radius:8px;background:rgba(144,153,255,.07);cursor:pointer}
-@keyframes pregame-selection-pulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(173,152,255,.22)}50%{box-shadow:inset 0 0 0 1px rgba(173,152,255,.52)}}
-@keyframes pregame-amount-pulse{0%,100%{border-color:rgba(173,152,255,.28);box-shadow:none}50%{border-color:rgba(173,152,255,.52);box-shadow:inset 0 0 0 1px rgba(173,152,255,.08)}}
-@media (prefers-reduced-motion:reduce){.selection-step--active,.selection-step--active .lobby-tier-btn,.selection-step--active .mode-mini-card{animation:none!important}}
+@keyframes amount-option-pulse{0%,100%{border-color:rgba(173,152,255,.18);background:rgba(173,152,255,.018);box-shadow:none}50%{border-color:rgba(173,152,255,.56);background:rgba(173,152,255,.065);box-shadow:inset 0 0 0 1px rgba(173,152,255,.07)}}
+.lobby-tier-btn--needs-selection{animation:amount-option-pulse 2.15s ease-in-out infinite}
+.lobby-tier-btn--needs-selection:nth-child(2){animation-delay:.12s}
+.lobby-tier-btn--needs-selection:nth-child(3){animation-delay:.24s}
+.lobby-tier-btn--needs-selection:nth-child(4){animation-delay:.36s}
+.free-mode-option--active+.lobby-tier-row .lobby-tier-btn--active:disabled{opacity:1;border-color:rgba(173,152,255,.52);background:rgba(173,152,255,.09);color:#d8d0ff;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important}
+@media (prefers-reduced-motion:reduce){.lobby-tier-btn--needs-selection,.selection-step--active,.selection-step--active .mode-mini-card{animation:none!important}}
 .game-card.main-card .hiw-wrap{margin-top:8px}
 .game-card.main-card .hiw-toggle{min-height:27px;font-size:.68rem;line-height:1}
 .game-card.main-card .hiw-wrap--placeholder{visibility:hidden;pointer-events:none}
@@ -4747,7 +4771,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   .pre-game-grid .stats-card,
   .pre-game-grid .leaderboard-card{width:100%}
   .game-card.main-card{padding:18px 18px 12px}
-  .lobby-stake-selection.selection-step--active{width:100%;margin-inline:auto;padding-inline:10px}
+  .free-mode-option{min-height:42px}
   .game-card.main-card .hiw-wrap{margin-top:7px}
   .game-card.main-card .hiw-toggle{min-height:27px}
   .play-btn{min-height:46px;font-size:.96rem}
