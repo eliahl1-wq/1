@@ -65,17 +65,61 @@ const smoothstep01 = (value) => {
     return t * t * (3 - 2 * t);
 };
 
-function meleeStrikeMotion(progress, contactAt = 0.28) {
+const easeOutCubic = value => 1 - Math.pow(1 - clamp(value, 0, 1), 3);
+
+function meleePunchPose(progress) {
     const t = clamp(progress, 0, 1);
-    if (t < contactAt) return smoothstep01(t / contactAt);
-    return 1;
+    if (t < 0.16) {
+        const windup = smoothstep01(t / 0.16);
+        return { reach: -0.12 * windup, lateral: 0.16 * windup, force: 0 };
+    }
+    if (t < 0.4) {
+        const strike = easeOutCubic((t - 0.16) / 0.24);
+        return {
+            reach: lerp(-0.12, 1, strike),
+            lateral: lerp(0.16, -0.42, strike),
+            force: strike,
+        };
+    }
+    if (t < 0.5) {
+        const contact = smoothstep01((t - 0.4) / 0.1);
+        return { reach: 1 - contact * 0.04, lateral: -0.42 + contact * 0.05, force: 1 };
+    }
+    const releaseLinear = clamp((t - 0.5) / 0.5, 0, 1);
+    const release = smoothstep01(releaseLinear);
+    return {
+        reach: lerp(0.96, 0, release),
+        // Retract around the side instead of travelling straight backwards
+        // through the target, which can read as a second punch from above.
+        lateral: lerp(-0.37, 0, release) + Math.sin(releaseLinear * Math.PI) * 0.34,
+        force: 1 - release,
+    };
 }
 
-function meleeStabMotion(progress, contactAt = 0.25, releaseAt = 0.5) {
+function meleeKnifePose(progress) {
     const t = clamp(progress, 0, 1);
-    if (t < contactAt) return smoothstep01(t / contactAt);
-    if (t < releaseAt) return 1;
-    return 1 - smoothstep01((t - releaseAt) / (1 - releaseAt));
+    if (t < 0.18) {
+        const windup = smoothstep01(t / 0.18);
+        return { reach: -0.1 * windup, lateral: 0.15 * windup, turn: -0.1 * windup, force: 0 };
+    }
+    if (t < 0.43) {
+        const thrust = easeOutCubic((t - 0.18) / 0.25);
+        return {
+            reach: lerp(-0.1, 1, thrust),
+            lateral: lerp(0.15, -0.34, thrust),
+            turn: lerp(-0.1, 0.08, thrust),
+            force: thrust,
+        };
+    }
+    if (t < 0.52) return { reach: 1, lateral: -0.34, turn: 0.08, force: 1 };
+    const releaseLinear = clamp((t - 0.52) / 0.48, 0, 1);
+    const release = smoothstep01(releaseLinear);
+    return {
+        reach: 1 - release,
+        lateral: lerp(-0.34, 0, release) + Math.sin(releaseLinear * Math.PI) * 0.24,
+        turn: lerp(0.08, 0, release),
+        force: 1 - release,
+    };
 }
 
 const WEAPON_SHAKE = {
@@ -3335,11 +3379,11 @@ export class SurvivRenderer {
             // Fallback while the nearby chunks warm up. Each chunk is built at
             // most once per frame, avoiding a large loading hitch.
             for (const o of visibleFields) this.drawObstacle(ctx, o);
-            for (const o of visibleWater) this.drawObstacleShore(ctx, o);
             for (const o of visibleRoads) this.drawRoadShoulder(ctx, o, false);
-            for (const o of visibleWater) this.drawObstacleBody(ctx, o);
             for (const o of visibleRoads) this.drawRoadBody(ctx, o, false);
             for (const o of visibleRoads) this.drawRoadMarkings(ctx, o, false);
+            for (const o of visibleWater) this.drawObstacleShore(ctx, o);
+            for (const o of visibleWater) this.drawObstacleBody(ctx, o);
         } else {
             // Fields, water and roads are baked into world-anchored chunks. Only
             // the subtle water movement remains dynamic in the steady state.
@@ -5856,11 +5900,11 @@ export class SurvivRenderer {
         cacheCtx.translate(-expandedLeft, -expandedTop);
         try {
             for (const o of fields) this.drawObstacle(cacheCtx, o, false);
-            for (const o of water) this.drawObstacleShore(cacheCtx, o, false);
             for (const o of roads) this.drawRoadShoulder(cacheCtx, o, false);
-            for (const o of water) this.drawObstacleBody(cacheCtx, o, false);
             for (const o of roads) this.drawRoadBody(cacheCtx, o, false);
             for (const o of roads) this.drawRoadMarkings(cacheCtx, o, false);
+            for (const o of water) this.drawObstacleShore(cacheCtx, o, false);
+            for (const o of water) this.drawObstacleBody(cacheCtx, o, false);
         } finally {
             [this._viewLeft, this._viewTop, this._viewRight, this._viewBottom] = previousBounds;
             this._buildingSurfaceChunk = previousBuildingChunk;
@@ -5947,11 +5991,11 @@ export class SurvivRenderer {
         ctx.rect(gridX * tile, gridY * tile, tile, tile);
         ctx.clip();
         for (const obstacle of sources.fields) this.drawObstacle(ctx, obstacle, false);
-        for (const obstacle of sources.water) this.drawObstacleShore(ctx, obstacle, false);
         for (const obstacle of sources.roads) this.drawRoadShoulder(ctx, obstacle, false);
-        for (const obstacle of sources.water) this.drawObstacleBody(ctx, obstacle, false);
         for (const obstacle of sources.roads) this.drawRoadBody(ctx, obstacle, false);
         for (const obstacle of sources.roads) this.drawRoadMarkings(ctx, obstacle, false);
+        for (const obstacle of sources.water) this.drawObstacleShore(ctx, obstacle, false);
+        for (const obstacle of sources.water) this.drawObstacleBody(ctx, obstacle, false);
         ctx.restore();
     }
 
@@ -7138,16 +7182,17 @@ export class SurvivRenderer {
             const punching = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const activeStrike = punching && progress < 0.62;
-            const strike = activeStrike ? meleeStrikeMotion(progress, 0.3) : 0;
+            const pose = punching
+                ? meleePunchPose(progress)
+                : { reach: 0, lateral: 0, force: 0 };
 
             // One hand attacks per accepted attack id. The server alternates
             // which hand is selected for the next distinct click.
             const leadSide = meleeHand === 'bottom' ? 1 : -1;
-            const leadReach = r * 0.58 + r * 1.18 * strike;
-            const leadY = leadSide * (10.8 - strike * 6.6);
-            const guardReach = r * 0.54;
-            const guardY = -leadSide * 11.2;
+            const leadReach = r * (0.58 + 1.18 * pose.reach);
+            const leadY = leadSide * (10.8 + r * pose.lateral);
+            const guardReach = r * (0.54 + pose.force * 0.07);
+            const guardY = -leadSide * (11.2 - pose.force * 1.1);
             const topHand = leadSide < 0
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
@@ -7155,30 +7200,10 @@ export class SurvivRenderer {
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
 
-            if (activeStrike) {
-                // The lead fist only travels outward. Fade it at full extension
-                // and restore the neutral pose without animating back through
-                // the target, which previously read as a second punch.
-                const leadAlpha = 1 - smoothstep01((progress - 0.46) / 0.16);
-                const guardHand = leadSide < 0 ? bottomHand : topHand;
-                drawPlayerHand(ctx, guardHand, playerColor);
-                ctx.save();
-                ctx.globalAlpha *= leadAlpha;
-                drawPlayerHand(ctx, leadSide < 0 ? topHand : bottomHand, playerColor);
-                ctx.restore();
-            } else {
-                const neutralLead = { x: r * 0.58, y: leadSide * 10.8 };
-                const neutralGuard = { x: r * 0.58, y: -leadSide * 10.8 };
-                drawPlayerHand(ctx, neutralGuard, playerColor);
-                if (punching) {
-                    ctx.save();
-                    ctx.globalAlpha *= smoothstep01((progress - 0.56) / 0.16);
-                    drawPlayerHand(ctx, neutralLead, playerColor);
-                    ctx.restore();
-                } else {
-                    drawPlayerHand(ctx, neutralLead, playerColor);
-                }
-            }
+            // Both hands stay solid and retain the same white outline. The lead
+            // fist follows one continuous path; there is no fade or respawn.
+            drawPlayerHand(ctx, leadSide < 0 ? bottomHand : topHand, playerColor);
+            drawPlayerHand(ctx, leadSide < 0 ? topHand : bottomHand, playerColor);
             return;
         }
 
@@ -7187,15 +7212,20 @@ export class SurvivRenderer {
             const stabbing = meleeUntil > now && meleeStartedAt > 0;
             const duration = Math.max(1, meleeUntil - meleeStartedAt);
             const progress = stabbing ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
-            const stab = stabbing ? meleeStabMotion(progress, 0.25, 0.5) : 0;
+            const pose = stabbing
+                ? meleeKnifePose(progress)
+                : { reach: 0, lateral: 0, turn: 0, force: 0 };
             // A knife stays in the lower hand between attacks. Only unarmed
             // punches alternate; swapping the weapon itself looked unnatural.
             const knifeSide = 1;
-            const weaponOffsetX = r * (0.16 + stab * 0.92);
-            const weaponOffsetY = knifeSide * (8.6 - stab * 5.8);
-            const knifeAngle = knifeSide * (-0.2 + stab * 0.06);
+            const weaponOffsetX = r * (0.16 + pose.reach * 0.96);
+            const weaponOffsetY = knifeSide * (8.6 + r * pose.lateral);
+            const knifeAngle = knifeSide * (-0.2 + pose.turn);
             const knifeHand = { x: weaponOffsetX + r * 0.25, y: weaponOffsetY };
-            const guardHand = { x: r * 0.52, y: -knifeSide * 10.6 };
+            const guardHand = {
+                x: r * (0.52 + pose.force * 0.06),
+                y: -knifeSide * (10.6 - pose.force * 0.8),
+            };
 
             ctx.save();
             ctx.translate(weaponOffsetX, weaponOffsetY);

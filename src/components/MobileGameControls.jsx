@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { isTouchDevice } from '../utils/mobile';
 
 const IS_MOBILE = isTouchDevice();
@@ -110,23 +110,3 @@ export function AgarMobileControls({ onSplit, onEject }) {
 }
 
 export { IS_MOBILE as isMobileGameClient };
-
-/** Double-tap on canvas → eject mass (mobile Agar only). */
-export function useMobileDoubleTapEject(enabled, onEject) {
-    const lastTapRef = useRef({ time: 0, x: 0, y: 0 });
-
-    return useCallback((clientX, clientY) => {
-        if (!enabled || !IS_MOBILE) return false;
-        const now = Date.now();
-        const last = lastTapRef.current;
-        const dt = now - last.time;
-        const dist = Math.hypot(clientX - last.x, clientY - last.y);
-        if (dt > 0 && dt < 320 && dist < 48) {
-            lastTapRef.current = { time: 0, x: 0, y: 0 };
-            onEject?.();
-            return true;
-        }
-        lastTapRef.current = { time: now, x: clientX, y: clientY };
-        return false;
-    }, [enabled, onEject]);
-}

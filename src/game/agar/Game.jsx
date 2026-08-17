@@ -17,7 +17,7 @@ import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
 import GameBRHud from '../../components/GameBRHud';
 import MobileGameSession from '../../components/MobileGameSession';
-import { AgarMobileControls, useMobileDoubleTapEject } from '../../components/MobileGameControls';
+import { AgarMobileControls } from '../../components/MobileGameControls';
 import { isTouchDevice, getMobileCanvasDpr } from '../../utils/mobile';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
 import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
@@ -1042,11 +1042,6 @@ export default function Game() {
         return () => cancelAnimationFrame(animationFrameId.current);
     }, [isConnected, isDead, brZone, cashedAmount, isSpectating, baseViewZoom, getSpectatorCamera, specCamRef]);
 
-    const tryDoubleTapEject = useMobileDoubleTapEject(
-        IS_MOBILE && isConnected && !isDead && !isSpectating && cashedAmount === null,
-        () => { if (!cashoutActiveRef.current) socketRef.current?.emit('1'); },
-    );
-
     const handleMouseMove = (e) => {
         if (isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
@@ -1072,7 +1067,6 @@ export default function Game() {
         if (!canvas) return;
         const t = e.touches?.[0];
         if (!t) return;
-        tryDoubleTapEject(t.clientX, t.clientY);
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(t.clientX, t.clientY, canvas);
         socketRef.current?.emit('0', {
             x: x / cameraZoomRef.current,
