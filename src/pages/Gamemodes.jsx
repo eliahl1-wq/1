@@ -40,7 +40,6 @@ export default function Gamemodes() {
         competitiveSlither: 0,
         surviv: 0,
     });
-    const [playingOffsets, setPlayingOffsets] = useState({});
 
     const catalog = useMemo(() => getVisibleGamemodes(brAvailable), [brAvailable]);
     const agarModes = catalog.filter((m) => m.tab === 'agar');
@@ -59,21 +58,12 @@ export default function Gamemodes() {
         let alive = true;
         const fetchStats = async () => {
             try {
-                const timestamp = Date.now();
-                const headers = { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' };
-                const [statsResponse, displaySettingsResponse] = await Promise.all([
-                    fetch(`${API_URL}/api/stats?t=${timestamp}`, { headers }),
-                    fetch(`${API_URL}/api/pregame/display-settings?t=${timestamp}`, { headers }),
-                ]);
+                const statsResponse = await fetch(`${API_URL}/api/stats?t=${Date.now()}`, {
+                    headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' },
+                });
                 if (statsResponse.ok && alive) {
                     const d = await statsResponse.json();
-                    setPlayersByGamemode(d.playersByGamemode || {});
-                }
-                if (displaySettingsResponse.ok && alive) {
-                    const settings = await displaySettingsResponse.json();
-                    setPlayingOffsets(settings.playingOffsets && typeof settings.playingOffsets === 'object'
-                        ? settings.playingOffsets
-                        : {});
+                    setPlayersByGamemode(d.displayPlayersByGamemode || d.playersByGamemode || {});
                 }
             } catch { /* ignore */ }
         };
@@ -159,8 +149,7 @@ export default function Gamemodes() {
                             title={mode.title}
                             desc={mode.longDesc}
                             badge={mode.badge}
-                            playing={Math.max(0, Number(playersByGamemode[PLAYING_KEY[mode.id]]) || 0)
-                                + Math.max(0, Number(playingOffsets[PLAYING_KEY[mode.id]]) || 0)}
+                            playing={playersByGamemode[PLAYING_KEY[mode.id]]}
                             onPlay={() => handleSelectMode(mode.id)}
                         />
                     ))}

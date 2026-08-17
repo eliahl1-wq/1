@@ -940,7 +940,7 @@ export default function AdminDashboard() {
                 body: JSON.stringify({ playingOffsets: nextValues }),
             });
             setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(result.playingOffsets || {}) });
-            setActionMsg('✅ Pregame Playing base values saved for every gamemode.');
+            setActionMsg('✅ Playing base values saved for Pregame and Gamemodes.');
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
         } finally {
@@ -1210,9 +1210,9 @@ export default function AdminDashboard() {
                             background: 'rgba(139,92,246,0.08)',
                         }}>
                             <div>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-h)' }}>Pregame “Playing” base values</div>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-h)' }}>Displayed “Playing” base values</div>
                                 <div style={{ marginTop: '4px', color: 'var(--text-3)', fontSize: '0.72rem' }}>
-                                    Each value is added to that gamemode’s live players. Set 10 and the display becomes 11 when one real player joins.
+                                    Used on both Pregame and Gamemodes. Each value is added to that gamemode’s live players, so 10 becomes 11 when one real player joins.
                                 </div>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>

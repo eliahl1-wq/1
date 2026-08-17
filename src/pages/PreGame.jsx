@@ -253,7 +253,6 @@ export default function PreGame() {
         playersByGamemode: { agar: 0, slither: 0, brAgar: 0, brSlither: 0, competitiveSlither: 0, surviv: 0 },
         siteUsersOnline: 0,
     });
-    const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({});
     const solPrice = liveStats?.solPrice || user?.solPrice || 64;
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('alltime');
@@ -551,12 +550,7 @@ export default function PreGame() {
     }, [user?.isAdmin, brAvailable, isAlreadyInGame]);
 
 
-    const displayedPlayersByGamemode = Object.fromEntries(
-        Object.entries(liveStats.playersByGamemode || {}).map(([key, value]) => [
-            key,
-            Math.max(0, Number(value) || 0) + Math.max(0, Number(pregamePlayingOffsets[key]) || 0),
-        ]),
-    );
+    const displayedPlayersByGamemode = liveStats.displayPlayersByGamemode || liveStats.playersByGamemode || {};
     const pregamePlayingCount = getGamemodePlayingCount(displayedPlayersByGamemode, selectedMode);
     const globalCashoutTotalUsd =
         liveStats.globalPlayerEarningsUsd
@@ -675,28 +669,17 @@ export default function PreGame() {
         let alive = true;
         const fetchStats = async () => {
             try {
-                const [r, displaySettingsResponse] = await Promise.all([
-                    fetch(API_URL + '/api/stats?t=' + Date.now(), {
-                        headers: {
-                            'bypass-tunnel-reminders': 'true',
-                            'Cache-Control': 'no-cache',
-                            ...buildPresenceHeaders({
-                                page: location.pathname,
-                                gamemode: selectedMode,
-                            }),
-                        },
-                    }),
-                    fetch(API_URL + '/api/pregame/display-settings?t=' + Date.now(), {
-                        headers: { 'bypass-tunnel-reminders': 'true', 'Cache-Control': 'no-cache' },
-                    }),
-                ]);
+                const r = await fetch(API_URL + '/api/stats?t=' + Date.now(), {
+                    headers: {
+                        'bypass-tunnel-reminders': 'true',
+                        'Cache-Control': 'no-cache',
+                        ...buildPresenceHeaders({
+                            page: location.pathname,
+                            gamemode: selectedMode,
+                        }),
+                    },
+                });
                 if (r.ok && alive) setLiveStats(await r.json());
-                if (displaySettingsResponse.ok && alive) {
-                    const settings = await displaySettingsResponse.json();
-                    setPregamePlayingOffsets(settings.playingOffsets && typeof settings.playingOffsets === 'object'
-                        ? settings.playingOffsets
-                        : {});
-                }
             } catch { }
         };
         fetchStats();
