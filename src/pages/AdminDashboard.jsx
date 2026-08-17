@@ -162,6 +162,7 @@ function OutcomeBadge({ outcome }) {
         Blocked: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
         'No reward': { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
         'In progress': { bg: 'rgba(59,130,246,0.12)', color: 'var(--blue)' },
+        'Free play': { bg: 'rgba(139,92,246,0.14)', color: '#c4b5fd' },
         excluded: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
     };
     const style = colors[outcome] || { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-2)' };
@@ -1867,8 +1868,9 @@ export default function AdminDashboard() {
                                         {transactions.map(tx => {
                                             const id = String(tx.id);
                                             const isExcluded = tx.excludedFromReports;
+                                            const isFreePlay = tx.meta?.simulated === true;
                                             return (
-                                                <tr key={id} style={{ borderBottom: '1px solid var(--border)', opacity: isExcluded ? 0.55 : 1 }}>
+                                                <tr key={id} style={{ borderBottom: '1px solid var(--border)', opacity: isExcluded && !isFreePlay ? 0.55 : 1 }}>
                                                     <td style={{ padding: '12px 16px' }}>
                                                         <input type="checkbox" checked={selectedTxIds.has(id)} onChange={() => toggleTxSelection(id)} />
                                                     </td>
@@ -1882,7 +1884,7 @@ export default function AdminDashboard() {
                                                     <td style={{ padding: '12px 16px', color: 'var(--text-h)' }}>{tx.label}</td>
                                                     <td style={{ padding: '12px 16px', fontWeight: 600 }}>{formatUsd(tx.amountUsd)}</td>
                                                     <td style={{ padding: '12px 16px' }}>
-                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : tx.status}
+                                                        {isFreePlay ? <OutcomeBadge outcome="Free play" /> : isExcluded ? <OutcomeBadge outcome="excluded" /> : tx.status}
                                                     </td>
                                                 </tr>
                                             );

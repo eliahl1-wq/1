@@ -1956,6 +1956,7 @@ export default function PreGame() {
                                                     <div className="live-feed-body">
                                                         <span className="live-feed-name">{event.username}</span>
                                                         <span className="live-feed-action">
+                                                            {event.freePlay && <span className="live-feed-free-badge">Free play</span>}
                                                             {event.type === 'cashout' ? 'Cashed out' : 'Died with'}
                                                         </span>
                                                     </div>

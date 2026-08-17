@@ -1241,6 +1241,22 @@
   color: var(--text-3);
   font-weight: 500;
   line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.live-feed-free-badge {
+  padding: 1px 4px;
+  border: 1px solid rgba(139, 92, 246, 0.32);
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+  font-size: 0.5rem;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  line-height: 1.25;
+  text-transform: uppercase;
 }
 
 .live-feed-right {
