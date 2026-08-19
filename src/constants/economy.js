@@ -36,7 +36,7 @@ export function tierEconomy(entryFeeUsd) {
     const cashoutFeePct = 0.05;
     return {
         entryFee: entry,
-        startBalance: 1.0 * s,
+        startBalance: 2.0 * s,
         snakeStartMass: 1.0,
         goldenBlobValue: entry * 0.10,
         joinFoodBonus: 1.0 * s,

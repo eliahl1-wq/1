@@ -15,7 +15,7 @@ export const NORMAL_CASHOUT_FEE_PCT = PLATFORM_CASHOUT_FEE_BPS / 10_000;
 
 /** Baseline economy at $10 entry — all values scale linearly with entry fee. */
 const BASE = {
-    playerStart: 1.0,
+    playerStart: 2.0,
     /** Extra food-pool dollars per join (formerly owner cut). */
     joinFoodBonus: 1.0,
     foodLow: 12.0,   // 1–2 humans
@@ -28,9 +28,9 @@ const BASE = {
     botMax: 500.0,
     foodDensityPerHuman: 500.0,
     /** Snake mass gained per normal pellet at $10 entry ($5→0.01, $10→0.02, $20→0.04). Decoupled from dollar value. */
-    massPerPellet: 0.02,
+    massPerPellet: 0.04,
     /** Pellet dollar value at $10 entry ($5→$0.02, $10→$0.04, $20→$0.08). Half the blob count, same total food pool $. */
-    foodBlobValue: 0.02,
+    foodBlobValue: 0.04,
 };
 
 export function normalizeEntryFee(fee) {
@@ -51,7 +51,7 @@ export function getEconomy(entryFeeUsd) {
         /** In-game dollars (HUD, cashout, wealth tax). Scales with entry tier. */
         playerStartBalance: BASE.playerStart * s,
         /** Snake mass / visual size — fixed baseline, not tied to entry tier. */
-        massStartBalance: BASE.playerStart,
+        massStartBalance: 1.0,
         massPerPellet: BASE.massPerPellet,
         goldenBlobMass: getGoldenBlobValue(DEFAULT_ENTRY_FEE),
         joinFoodBonus: BASE.joinFoodBonus * s,
@@ -109,8 +109,8 @@ export function getJoinPoolSplit(entryFeeUsd, activeHumansAfterJoin) {
  */
 export function getRewardPoolSplit(entryFeeUsd) {
     const entry = normalizeEntryFee(entryFeeUsd);
-    const playerStart = entry * 0.10; // already deducted as playerStartBalance
-    const food = entry * 0.50;        // includes golden blob (10%)
+    const playerStart = entry * 0.20; // already deducted as playerStartBalance
+    const food = entry * 0.40;        // includes golden blob (10%)
     const ai   = entry * 0.20;
     const contribution = entry - playerStart - food - ai; // 20 %
 
@@ -178,8 +178,8 @@ export function getCompetitiveEconomy(entryFeeUsd) {
         entryFeeUsd: entry,
         dollarStart: entry,
         // Snake mass uses the same baseline as $10 normal slither — size is not tied to entry tier or dollars.
-        playerStartBalance: BASE.playerStart,
-        massPerPellet: BASE.massPerPellet,
+        playerStartBalance: 1.0,
+        massPerPellet: 0.02,
         cashoutFeePct,
         cashoutPlayerPct: 1 - cashoutFeePct,
     };

@@ -14,6 +14,7 @@ import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.j
 import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_VALUE, createAgarStakeCharmState, drawAgarStakeCharm, getAgarStakeCharmImage, getAgarStakePatternIndex } from '../../constants/agarStakeSkin.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
 import { drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
+import { slitherCanvasDpr, slitherQualityForFrameTime } from './slitherPerformance.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
 
@@ -129,7 +130,7 @@ export class SlitherRenderer {
         this._mouthY = 0;
         this._mouthR = 6;
         this._holdStartAt = 0;
-        this._mouseRafQueued = false;
+        this._mouseInputTimer = null;
         this._lastMouseX = 0;
         this._lastMouseY = 0;
         this.isMobile = typeof options.forceMobile === 'boolean'
@@ -188,6 +189,7 @@ export class SlitherRenderer {
         this._balanceBadgeScale = Math.max(0.4, Math.min(1.5, Number(options.balanceBadgeScale) || 1));
         this.hideNames = localStorage.getItem('hide_player_names') === 'true';
         this._inputEmitQueued = false;
+        this._inputEmitTimer = null;
         this._lastTapAt = 0;
         this.running = false;
         this._raf = null;
@@ -201,6 +203,8 @@ export class SlitherRenderer {
         this._smoothSeen = new Set();
         this._screenScratch = { x: 0, y: 0 };
         this._quality = 1;
+        this._frameMsEwma = 16.67;
+        this._qualityEvalFrame = 0;
         this._rainbowStampPack = null;
         this._agarStakeStampPack = null;
         this._agarStakeCharmImage = getAgarStakeCharmImage();
@@ -305,12 +309,15 @@ export class SlitherRenderer {
 
     _pickDpr() {
         if (this._fixedDpr > 0) return this._fixedDpr;
-        const rawDpr = window.devicePixelRatio || 1;
-        const pixelBudgetDpr = Math.sqrt(3_200_000 / Math.max(1, (this.W || window.innerWidth) * (this.H || window.innerHeight)));
-        // Keep phones crisp while preventing tablets and desktop canvases from exceeding the GPU budget.
-        return this.isMobile
-            ? Math.max(1, Math.min(2, rawDpr, pixelBudgetDpr))
-            : Math.min(1.5, rawDpr);
+        // Fullscreen and screen capture make fill-rate the bottleneck. Cap total
+        // backing pixels and temporarily lower them only after sustained slow frames.
+        return slitherCanvasDpr({
+            width: this.W || window.innerWidth,
+            height: this.H || window.innerHeight,
+            rawDpr: window.devicePixelRatio || 1,
+            isMobile: this.isMobile,
+            quality: this._quality,
+        });
     }
 
     _applyCanvasDpr(width, height) {
@@ -347,10 +354,11 @@ export class SlitherRenderer {
     _scheduleInputEmit() {
         if (this._inputEmitQueued) return;
         this._inputEmitQueued = true;
-        requestAnimationFrame(() => {
+        this._inputEmitTimer = setTimeout(() => {
+            this._inputEmitTimer = null;
             this._inputEmitQueued = false;
             this._emitInput?.();
-        });
+        }, 0);
     }
 
     _setInputFromScreen(sx, sy) {
@@ -384,12 +392,11 @@ export class SlitherRenderer {
         if (!this._inputEnabled || this.spectatorMode) return;
         this._lastMouseX = e.clientX;
         this._lastMouseY = e.clientY;
-        if (this._mouseRafQueued) return;
-        this._mouseRafQueued = true;
-        requestAnimationFrame(() => {
-            this._mouseRafQueued = false;
+        if (this._mouseInputTimer != null) return;
+        this._mouseInputTimer = setTimeout(() => {
+            this._mouseInputTimer = null;
             this._setInputFromScreen(this._lastMouseX, this._lastMouseY);
-        });
+        }, 0);
     }
 
     getInput() {
@@ -567,10 +574,13 @@ export class SlitherRenderer {
             }
         }
 
-        if (dest.length > this._maxFoodDraw) {
-            this._capVisibleFoodBuf(dest, cx, cy, this._maxFoodDraw);
-        } else if (this._quality < 0.55 && dest.length > 420) {
-            this._capVisibleFoodBuf(dest, cx, cy, 420);
+        const qualityFoodCap = this._quality <= 0.64
+            ? (this.isMobile ? 360 : 480)
+            : this._quality <= 0.8
+                ? (this.isMobile ? 480 : 620)
+                : this._maxFoodDraw;
+        if (dest.length > qualityFoodCap) {
+            this._capVisibleFoodBuf(dest, cx, cy, qualityFoodCap);
         }
     }
 
@@ -792,6 +802,7 @@ export class SlitherRenderer {
     start() {
         if (this.running) return;
         this.running = true;
+        this._lastFrameTime = 0;
         const loop = () => {
             if (!this.running) return;
             if (this.spectatorMode && this._externalCameraGetter) {
@@ -813,6 +824,24 @@ export class SlitherRenderer {
         this.running = false;
         if (this._raf) cancelAnimationFrame(this._raf);
         this._raf = null;
+        this._lastFrameTime = 0;
+    }
+
+    _updateAdaptiveQuality(frameMs) {
+        // Ignore tab switches/debugger stalls; they do not represent sustained GPU load.
+        if (!Number.isFinite(frameMs) || frameMs <= 0 || frameMs > 100) return;
+        this._frameMsEwma += (frameMs - this._frameMsEwma) * 0.08;
+        if (++this._qualityEvalFrame < 30) return;
+        this._qualityEvalFrame = 0;
+
+        const avg = this._frameMsEwma;
+        const target = slitherQualityForFrameTime(this._quality, avg);
+
+        // Drop promptly under capture/fullscreen load, recover only after the
+        // frame time is safely back at a normal 60 Hz budget.
+        if (target < this._quality || (target > this._quality && avg <= 17.1)) {
+            this._quality = target;
+        }
     }
 
     /** Get (or build once) a cached sprite canvas. Cheap FIFO eviction — no full-cache sort. */
@@ -2026,7 +2055,7 @@ export class SlitherRenderer {
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.globalAlpha = 0.28 * pulse;
-            const glowStride = 1;
+            const glowStride = this._quality < 0.8 ? 2 : 1;
             for (let i = bumpCount - 1; i >= 0; i -= glowStride) {
                 const p = bumps[i];
                 if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
@@ -2231,9 +2260,10 @@ export class SlitherRenderer {
         const H = this.H;
 
         const now = performance.now();
+        const rawFrameMs = this._lastFrameTime ? now - this._lastFrameTime : 16.67;
         let dt = Number.isFinite(forcedDt) && forcedDt > 0
             ? forcedDt
-            : (this._lastFrameTime ? (now - this._lastFrameTime) / 1000 : 1 / 60);
+            : rawFrameMs / 1000;
         this._lastFrameTime = now;
         if (dt > 0.1) dt = 0.1;
 
@@ -2241,7 +2271,7 @@ export class SlitherRenderer {
         this._holdActive = this._isHoldActive(nowMs);
         this._cashoutActive = this._isCashoutActive(nowMs);
 
-        this._quality = 1;
+        if (!Number.isFinite(forcedDt)) this._updateAdaptiveQuality(rawFrameMs);
 
         this._applyCanvasDpr(this.W, this.H);
 
@@ -2475,6 +2505,11 @@ export class SlitherRenderer {
 
     destroy() {
         this.pause();
+        if (this._mouseInputTimer != null) clearTimeout(this._mouseInputTimer);
+        if (this._inputEmitTimer != null) clearTimeout(this._inputEmitTimer);
+        this._mouseInputTimer = null;
+        this._inputEmitTimer = null;
+        this._inputEmitQueued = false;
         this._boostTrailPool.clear();
         this._sprites.clear();
         this._prImgs.clear();
