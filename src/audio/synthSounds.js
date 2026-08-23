@@ -1,16 +1,64 @@
 let audioCtx = null;
 let unlocked = false;
 const noiseBuffers = new Map();
-const footstepNoiseBuffers = new Map();
+const footstepSampleData = new Map();
+const footstepSampleBuffers = new Map();
 let footstepMaster = null;
+let foodPickupMaster = null;
+let footstepFetchPromise = null;
+let footstepDecodePromise = null;
+let footstepDecodeContext = null;
+let gunshotMaster = null;
+let gunshotFetchPromise = null;
+let gunshotDecodePromise = null;
+let gunshotDecodeContext = null;
+const gunshotSampleData = new Map();
+const gunshotBuffers = new Map();
+const lastGunshotVariant = new Map();
+const activeGunshotVoices = [];
 
-const THROTTLE_MS = 38;
+const SURVIV_GUNSHOT_FILES = Object.freeze({
+    pistol: ['pistol-1.wav', 'pistol-2.wav', 'pistol-3.wav'],
+    revolver: ['revolver-1.wav', 'revolver-2.wav', 'revolver-3.wav'],
+    smg: ['smg-1.wav', 'smg-2.wav', 'smg-3.wav'],
+    assault: ['assault-1.wav', 'assault-2.wav', 'assault-3.wav'],
+    shotgun: ['shotgun-1.wav', 'shotgun-2.wav', 'shotgun-3.wav'],
+    dmr: ['dmr-1.wav', 'dmr-2.wav', 'dmr-3.wav'],
+    sniper: ['sniper-1.wav', 'sniper-2.wav', 'sniper-3.wav'],
+    lmg: ['lmg-1.wav', 'lmg-2.wav', 'lmg-3.wav'],
+});
+
+const SURVIV_GUNSHOT_MIX = Object.freeze({
+    pistol: 0.86,
+    revolver: 0.82,
+    smg: 0.90,
+    assault: 0.82,
+    shotgun: 0.76,
+    dmr: 0.78,
+    sniper: 0.72,
+    lmg: 0.84,
+});
+
+const MAX_GUNSHOT_VOICES = 28;
+
+const THROTTLE_MS = 30;
 const STREAK_WINDOW_MS = 220;
-const MAX_STREAK = 12;
+const MAX_STREAK = 10;
 
 let lastFoodEatAt = 0;
 let foodStreak = 0;
 let foodStreakAt = 0;
+
+const FOOTSTEP_SAMPLE_PATHS = Object.freeze({
+    grass: [1, 2, 3, 4].map(index => `/audio/surviv/footsteps/grass/grass-${index}.ogg`),
+    dirt: [1, 2, 3, 4].map(index => `/audio/surviv/footsteps/dirt/dirt-${index}.ogg`),
+    gravel: [1, 2, 3, 4, 5].map(index => `/audio/surviv/footsteps/gravel/gravel-${index}.ogg`),
+    asphalt: [1, 2, 3, 4].map(index => `/audio/surviv/footsteps/asphalt/asphalt-${index}.ogg`),
+    indoor: [1, 2, 3, 4].map(index => `/audio/surviv/footsteps/indoor/indoor-${index}.ogg`),
+    wood: [1, 2, 3, 4].map(index => `/audio/surviv/footsteps/wood/wood-${index}.ogg`),
+    water: [1, 2, 3, 4, 5].map(index => `/audio/surviv/footsteps/water/water-${index}.ogg`),
+    metal: [1, 2, 3, 4].map(index => `/audio/surviv/footsteps/metal/metal-${index}.ogg`),
+});
 
 function getCtx() {
     return audioCtx;
@@ -43,35 +91,61 @@ function getNoiseBuffer(ctx, durationSec = 0.03, variation = 0) {
     return buffer;
 }
 
-function getFootstepNoiseBuffer(ctx, durationSec, variation, roughness = 0.55) {
-    const durationKey = Math.ceil(durationSec * 1000);
-    const roughnessKey = Math.round(roughness * 10);
-    const key = `${ctx.sampleRate}:${durationKey}:${variation & 31}:${roughnessKey}`;
-    const cached = footstepNoiseBuffers.get(key);
-    if (cached) return cached;
+export function preloadSurvivFootsteps() {
+    if (footstepFetchPromise) return footstepFetchPromise;
+    if (typeof fetch !== 'function') return Promise.resolve(false);
 
-    const len = Math.ceil(ctx.sampleRate * durationSec);
-    const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    let state = (0x6d2b79f5 ^ Math.imul((variation | 0) + 7, 0x27d4eb2d) ^ len) >>> 0;
-    let softNoise = 0;
-    const dryAmount = Math.max(0.12, Math.min(0.88, roughness));
-    for (let i = 0; i < len; i++) {
-        state ^= state << 13;
-        state ^= state >>> 17;
-        state ^= state << 5;
-        const whiteNoise = ((state >>> 0) / 0x80000000) - 1;
-        softNoise += (whiteNoise - softNoise) * 0.16;
-        data[i] = whiteNoise * dryAmount + softNoise * (1 - dryAmount);
-    }
-    footstepNoiseBuffers.set(key, buffer);
-    return buffer;
+    footstepFetchPromise = Promise.all(
+        Object.entries(FOOTSTEP_SAMPLE_PATHS).map(async ([material, paths]) => {
+            const samples = await Promise.all(paths.map(async path => {
+                const response = await fetch(path, { cache: 'force-cache' });
+                if (!response.ok) throw new Error(`Unable to load footstep sample: ${path}`);
+                return response.arrayBuffer();
+            }));
+            footstepSampleData.set(material, samples);
+        }),
+    ).then(() => true).catch(() => {
+        footstepSampleData.clear();
+        footstepFetchPromise = null;
+        return false;
+    });
+    return footstepFetchPromise;
+}
+
+function decodeSurvivFootsteps(ctx) {
+    if (footstepDecodeContext === ctx && footstepSampleBuffers.size > 0) return Promise.resolve(true);
+    if (footstepDecodeContext === ctx && footstepDecodePromise) return footstepDecodePromise;
+
+    footstepDecodeContext = ctx;
+    footstepDecodePromise = (async () => {
+        if (!await preloadSurvivFootsteps()) return false;
+        const decodedMaterials = await Promise.all(
+            [...footstepSampleData.entries()].map(async ([material, samples]) => [
+                material,
+                await Promise.all(samples.map(sample => ctx.decodeAudioData(sample.slice(0)))),
+            ]),
+        );
+        footstepSampleBuffers.clear();
+        decodedMaterials.forEach(([material, samples]) => footstepSampleBuffers.set(material, samples));
+        return true;
+    })().catch(() => {
+        footstepSampleBuffers.clear();
+        footstepDecodePromise = null;
+        return false;
+    });
+    return footstepDecodePromise;
 }
 
 /** Unlock audio after a user gesture (required by browsers). */
 export function unlockGameAudio() {
     const ctx = createCtx();
-    if (!ctx || unlocked) return;
+    if (!ctx) return;
+    void decodeSurvivFootsteps(ctx);
+    void decodeSurvivGunshots(ctx);
+    if (unlocked) {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        return;
+    }
 
     const prime = () => {
         const buffer = ctx.createBuffer(1, 1, 22050);
@@ -89,6 +163,151 @@ export function unlockGameAudio() {
     }
 }
 
+function getGunshotMaster(ctx) {
+    if (gunshotMaster?.ctx === ctx) return gunshotMaster.input;
+
+    // Preserve single-shot dynamics and catch only dense overlapping fire.
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -4;
+    compressor.knee.value = 5;
+    compressor.ratio.value = 7;
+    compressor.attack.value = 0.0015;
+    compressor.release.value = 0.085;
+    const output = ctx.createGain();
+    output.gain.value = 0.78;
+    compressor.connect(output);
+    output.connect(ctx.destination);
+    gunshotMaster = { ctx, input: compressor };
+    return compressor;
+}
+
+/** Begin fetching the compact original firearm library before the first shot. */
+export function preloadSurvivGunshots() {
+    if (gunshotFetchPromise) return gunshotFetchPromise;
+    if (typeof fetch !== 'function') return Promise.resolve(false);
+
+    const entries = Object.entries(SURVIV_GUNSHOT_FILES)
+        .flatMap(([weapon, files]) => files.map((file, variant) => ({ weapon, file, variant })));
+    gunshotFetchPromise = Promise.all(entries.map(async ({ weapon, file, variant }) => {
+        const response = await fetch(`/audio/surviv/gunshots/${weapon}/${file}`, { cache: 'force-cache' });
+        if (!response.ok) throw new Error(`Unable to load Surviv gunshot ${weapon}/${file}`);
+        gunshotSampleData.set(`${weapon}:${variant}`, await response.arrayBuffer());
+    })).then(() => true).catch((error) => {
+        console.warn('Surviv gunshot preload failed:', error);
+        gunshotSampleData.clear();
+        gunshotFetchPromise = null;
+        return false;
+    });
+    return gunshotFetchPromise;
+}
+
+function decodeSurvivGunshots(ctx) {
+    if (gunshotDecodeContext === ctx && gunshotBuffers.size > 0) return Promise.resolve(true);
+    if (gunshotDecodeContext === ctx && gunshotDecodePromise) return gunshotDecodePromise;
+
+    gunshotDecodeContext = ctx;
+    gunshotDecodePromise = (async () => {
+        if (!await preloadSurvivGunshots()) return false;
+        const decoded = await Promise.all([...gunshotSampleData.entries()].map(async ([key, encoded]) => [
+            key,
+            await ctx.decodeAudioData(encoded.slice(0)),
+        ]));
+        gunshotBuffers.clear();
+        decoded.forEach(([key, buffer]) => gunshotBuffers.set(key, buffer));
+        return true;
+    })().catch((error) => {
+        console.warn('Surviv gunshot decode failed:', error);
+        gunshotBuffers.clear();
+        gunshotDecodePromise = null;
+        return false;
+    });
+    return gunshotDecodePromise;
+}
+
+function selectGunshotVariant(weapon, count) {
+    const previous = lastGunshotVariant.get(weapon);
+    let next = Math.floor(Math.random() * count);
+    if (count > 1 && next === previous) {
+        next = (next + 1 + Math.floor(Math.random() * (count - 1))) % count;
+    }
+    lastGunshotVariant.set(weapon, next);
+    return next;
+}
+
+function retireGunshotVoice(voice) {
+    const index = activeGunshotVoices.indexOf(voice);
+    if (index >= 0) activeGunshotVoices.splice(index, 1);
+}
+
+/**
+ * Play one firearm report. Distance changes spectral content as well as level:
+ * far reports lose sub pressure and muzzle edge instead of merely becoming a
+ * quieter copy of the close recording.
+ */
+export function playSurvivGunshot(weaponType, options = {}) {
+    const ctx = getCtx();
+    const files = SURVIV_GUNSHOT_FILES[weaponType];
+    if (!ctx || !unlocked || ctx.state !== 'running' || !files) return false;
+    if (!gunshotDecodePromise) void decodeSurvivGunshots(ctx);
+
+    const variant = selectGunshotVariant(weaponType, files.length);
+    const buffer = gunshotBuffers.get(`${weaponType}:${variant}`);
+    if (!buffer) return false;
+
+    const distance = Math.max(0, Number(options.distance) || 0);
+    const distanceMix = Math.min(1, distance / 1450);
+    const attenuation = 1 / (1 + 2.65 * Math.pow(distanceMix, 1.22));
+    const levelJitter = 0.965 + Math.random() * 0.07;
+    const pitchCents = (Math.random() - 0.5) * 20;
+    const t = ctx.currentTime;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.detune.value = pitchCents;
+    const removeSub = ctx.createBiquadFilter();
+    removeSub.type = 'highpass';
+    removeSub.frequency.value = 27 + Math.pow(distanceMix, 1.25) * 155;
+    removeSub.Q.value = 0.35;
+    const softenCrack = ctx.createBiquadFilter();
+    softenCrack.type = 'lowpass';
+    softenCrack.frequency.value = 18_500 - Math.pow(distanceMix, 0.72) * 15_300;
+    softenCrack.Q.value = 0.32;
+    const voiceGain = ctx.createGain();
+    voiceGain.gain.value = (SURVIV_GUNSHOT_MIX[weaponType] || 0.8) * attenuation * levelJitter;
+
+    source.connect(removeSub);
+    removeSub.connect(softenCrack);
+    softenCrack.connect(voiceGain);
+    let finalNode = voiceGain;
+    if (typeof ctx.createStereoPanner === 'function') {
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = Math.max(-0.82, Math.min(0.82, Number(options.pan) || 0));
+        voiceGain.connect(panner);
+        finalNode = panner;
+    }
+    finalNode.connect(getGunshotMaster(ctx));
+
+    const voice = { source, distance, startedAt: t };
+    activeGunshotVoices.push(voice);
+    source.onended = () => retireGunshotVoice(voice);
+    source.start(t);
+
+    if (activeGunshotVoices.length > MAX_GUNSHOT_VOICES) {
+        let victim = activeGunshotVoices[0];
+        for (const candidate of activeGunshotVoices) {
+            if (candidate.distance > victim.distance + 40
+                || (candidate.distance >= victim.distance - 40 && candidate.startedAt < victim.startedAt)) {
+                victim = candidate;
+            }
+        }
+        if (victim !== voice || distance > 700) {
+            try { victim.source.stop(); } catch { /* already ended */ }
+            retireGunshotVoice(victim);
+        }
+    }
+    return true;
+}
+
 function nextStreak() {
     const now = performance.now();
     if (now - foodStreakAt <= STREAK_WINDOW_MS) {
@@ -100,9 +319,30 @@ function nextStreak() {
     return foodStreak;
 }
 
+function getFoodPickupMaster(ctx) {
+    if (foodPickupMaster) return foodPickupMaster;
+
+    // A gentle shared compressor catches overlapping pickup tails without
+    // flattening single pickups or making rapid food chains louder and harsher.
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.knee.value = 16;
+    compressor.ratio.value = 3;
+    compressor.attack.value = 0.002;
+    compressor.release.value = 0.055;
+
+    const output = ctx.createGain();
+    output.gain.value = 0.72;
+    compressor.connect(output);
+    output.connect(ctx.destination);
+    foodPickupMaster = compressor;
+    return foodPickupMaster;
+}
+
 /**
- * Minecraft-style item pickup pop — short, sharp, bubbly, organic plop.
- * Quick downward pitch swoop + soft body + tiny wet attack.
+ * Short tactile food pickup: a soft upward pluck, muted organic body and a
+ * tiny filtered contact texture. Inspired by physical item feedback rather
+ * than an arcade beep; pitch/level vary subtly between repeated pickups.
  */
 export function playFoodEatSound() {
     const now = performance.now();
@@ -114,118 +354,83 @@ export function playFoodEatSound() {
 
     const t = ctx.currentTime;
     const streak = nextStreak();
-    const lift = streak * 18;
-    const jitter = (Math.random() - 0.5) * 70;
-    const startHz = 780 + lift + jitter;
-    const endHz = 310 + lift * 0.35 + jitter * 0.2;
-    const duration = 0.048;
-    const gain = 0.036;
+    const randomPitch = Math.pow(2, ((Math.random() - 0.5) * 0.9) / 12);
+    const streakPitch = Math.pow(2, Math.min(streak, 7) * 0.16 / 12);
+    const pitch = randomPitch * streakPitch;
+    const levelVariation = 0.92 + Math.random() * 0.12;
+    const chainDuck = 1 - Math.min(streak, 8) * 0.022;
+    const duration = 0.058;
 
     const bus = ctx.createGain();
     bus.gain.setValueAtTime(0.0001, t);
-    bus.gain.linearRampToValueAtTime(gain, t + 0.0006);
+    bus.gain.linearRampToValueAtTime(0.031 * levelVariation * chainDuck, t + 0.0012);
     bus.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    bus.connect(ctx.destination);
+    bus.connect(getFoodPickupMaster(ctx));
 
-    // Main pop — fast downward glide (the iconic "boop").
+    // Main tactile pluck: rounded sine with a small upward motion.
     const pop = ctx.createOscillator();
     const popG = ctx.createGain();
     pop.type = 'sine';
-    pop.frequency.setValueAtTime(startHz, t);
-    pop.frequency.exponentialRampToValueAtTime(Math.max(endHz, 40), t + duration * 0.52);
-    popG.gain.value = 0.72;
-    pop.connect(popG);
+    pop.frequency.setValueAtTime(330 * pitch, t);
+    pop.frequency.exponentialRampToValueAtTime(475 * pitch, t + 0.031);
+    popG.gain.setValueAtTime(0.0001, t);
+    popG.gain.linearRampToValueAtTime(0.68, t + 0.0015);
+    popG.gain.exponentialRampToValueAtTime(0.0001, t + 0.052);
+    const popTone = ctx.createBiquadFilter();
+    popTone.type = 'lowpass';
+    popTone.frequency.value = 1450;
+    popTone.Q.value = 0.45;
+    pop.connect(popTone);
+    popTone.connect(popG);
     popG.connect(bus);
     pop.start(t);
-    pop.stop(t + duration + 0.015);
+    pop.stop(t + 0.06);
 
-    // Warm organic body underneath.
+    // Muted low body gives a soft wooden/rubbery sense of contact.
     const body = ctx.createOscillator();
     const bodyG = ctx.createGain();
     body.type = 'triangle';
-    body.frequency.setValueAtTime(startHz * 0.52, t);
-    body.frequency.exponentialRampToValueAtTime(Math.max(endHz * 0.75, 40), t + duration * 0.58);
+    body.frequency.setValueAtTime(155 * pitch, t);
+    body.frequency.exponentialRampToValueAtTime(205 * pitch, t + 0.028);
     bodyG.gain.setValueAtTime(0.0001, t);
-    bodyG.gain.linearRampToValueAtTime(0.28, t + 0.002);
-    bodyG.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.7);
-    body.connect(bodyG);
+    bodyG.gain.linearRampToValueAtTime(0.22, t + 0.0025);
+    bodyG.gain.exponentialRampToValueAtTime(0.0001, t + 0.043);
+    const bodyTone = ctx.createBiquadFilter();
+    bodyTone.type = 'lowpass';
+    bodyTone.frequency.value = 760;
+    bodyTone.Q.value = 0.35;
+    body.connect(bodyTone);
+    bodyTone.connect(bodyG);
     bodyG.connect(bus);
     body.start(t);
-    body.stop(t + duration + 0.015);
+    body.stop(t + 0.05);
 
-    // Bubbly wet attack — short bandpassed noise blip.
-    const blip = ctx.createBufferSource();
-    blip.buffer = getNoiseBuffer(ctx, 0.012);
+    // Very short filtered contact texture prevents the tone feeling synthetic.
+    const contact = ctx.createBufferSource();
+    contact.buffer = getNoiseBuffer(ctx, 0.009, streak + Math.floor(Math.random() * 8));
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = startHz * 1.15;
-    bp.Q.value = 1.1;
-    const blipG = ctx.createGain();
-    blipG.gain.setValueAtTime(0.22, t);
-    blipG.gain.exponentialRampToValueAtTime(0.0001, t + 0.014);
-    blip.connect(bp);
-    bp.connect(blipG);
-    blipG.connect(bus);
-    blip.start(t);
-    blip.stop(t + 0.016);
-
-    // Tiny high sparkle at the very start — the sharp "pickup" edge.
-    const spark = ctx.createOscillator();
-    const sparkG = ctx.createGain();
-    spark.type = 'sine';
-    spark.frequency.setValueAtTime(startHz * 1.45, t);
-    spark.frequency.exponentialRampToValueAtTime(Math.max(startHz * 0.95, 40), t + 0.022);
-    sparkG.gain.setValueAtTime(0.14, t);
-    sparkG.gain.exponentialRampToValueAtTime(0.0001, t + 0.024);
-    spark.connect(sparkG);
-    sparkG.connect(bus);
-    spark.start(t);
-    spark.stop(t + 0.028);
+    bp.frequency.value = 980 * pitch;
+    bp.Q.value = 0.75;
+    const contactG = ctx.createGain();
+    contactG.gain.setValueAtTime(0.13, t);
+    contactG.gain.exponentialRampToValueAtTime(0.0001, t + 0.01);
+    contact.connect(bp);
+    bp.connect(contactG);
+    contactG.connect(bus);
+    contact.start(t);
+    contact.stop(t + 0.011);
 }
 
 const FOOTSTEP_PROFILES = Object.freeze({
-    grass: {
-        duration: 0.18, volume: 0.09, bodyLowpass: 230, bodyGain: 0.72,
-        contactHighpass: 90, contactLowpass: 1250, contactGain: 0.66,
-        toeHighpass: 340, toeLowpass: 2050, toeGain: 0.22,
-        grainHighpass: 620, grainLowpass: 2900, textureGain: 0.075, grains: 4, roughness: 0.34,
-    },
-    dirt: {
-        duration: 0.16, volume: 0.088, bodyLowpass: 280, bodyGain: 0.78,
-        contactHighpass: 80, contactLowpass: 1420, contactGain: 0.7,
-        toeHighpass: 260, toeLowpass: 1800, toeGain: 0.18,
-        grainHighpass: 480, grainLowpass: 2650, textureGain: 0.082, grains: 4, roughness: 0.42,
-    },
-    gravel: {
-        duration: 0.19, volume: 0.082, bodyLowpass: 340, bodyGain: 0.7,
-        contactHighpass: 140, contactLowpass: 2300, contactGain: 0.62,
-        toeHighpass: 480, toeLowpass: 2950, toeGain: 0.2,
-        grainHighpass: 680, grainLowpass: 4100, textureGain: 0.095, grains: 8, roughness: 0.72,
-    },
-    asphalt: {
-        duration: 0.125, volume: 0.083, bodyLowpass: 310, bodyGain: 0.82,
-        contactHighpass: 145, contactLowpass: 1650, contactGain: 0.72,
-        toeHighpass: 410, toeLowpass: 2150, toeGain: 0.13,
-        grainHighpass: 700, grainLowpass: 3100, textureGain: 0.055, grains: 2, roughness: 0.56,
-    },
-    indoor: {
-        duration: 0.13, volume: 0.078, bodyLowpass: 295, bodyGain: 0.76,
-        contactHighpass: 165, contactLowpass: 1750, contactGain: 0.7,
-        toeHighpass: 330, toeLowpass: 2050, toeGain: 0.13,
-        grainHighpass: 720, grainLowpass: 2900, textureGain: 0.045, grains: 1, roughness: 0.46,
-    },
-    wood: {
-        duration: 0.16, volume: 0.081, bodyLowpass: 265, bodyGain: 0.84,
-        contactHighpass: 110, contactLowpass: 1380, contactGain: 0.7,
-        toeHighpass: 280, toeLowpass: 1900, toeGain: 0.16,
-        grainHighpass: 600, grainLowpass: 2600, textureGain: 0.052, grains: 2, roughness: 0.36,
-    },
-    water: {
-        duration: 0.28, volume: 0.098, bodyLowpass: 205, bodyGain: 0.48,
-        contactHighpass: 65, contactLowpass: 1850, contactGain: 0.72,
-        toeHighpass: 320, toeLowpass: 2750, toeGain: 0.34,
-        grainHighpass: 760, grainLowpass: 3900, textureGain: 0.075, grains: 5, roughness: 0.66,
-    },
+    grass: { volume: 0.32, highpass: 55, lowpass: 4700, bodyGain: 0.055, bodyLowpass: 235, duration: 0.29, rate: 0.98 },
+    dirt: { volume: 0.34, highpass: 48, lowpass: 2850, bodyGain: 0.072, bodyLowpass: 255, duration: 0.27, rate: 0.95 },
+    gravel: { volume: 0.29, highpass: 70, lowpass: 6100, bodyGain: 0.045, bodyLowpass: 285, duration: 0.34, rate: 0.99 },
+    asphalt: { volume: 0.30, highpass: 60, lowpass: 5100, bodyGain: 0.065, bodyLowpass: 295, duration: 0.24, rate: 1, presence: 2800, presenceGain: -2 },
+    indoor: { volume: 0.27, highpass: 72, lowpass: 6300, bodyGain: 0.052, bodyLowpass: 300, duration: 0.22, rate: 1.01, presence: 3200, presenceGain: -2.5 },
+    wood: { volume: 0.31, highpass: 48, lowpass: 4250, bodyGain: 0.08, bodyLowpass: 315, duration: 0.30, rate: 0.98, presence: 1900, presenceGain: -2 },
+    water: { volume: 0.33, highpass: 35, lowpass: 4750, bodyGain: 0.05, bodyLowpass: 210, duration: 0.42, rate: 0.97 },
+    metal: { volume: 0.22, highpass: 68, lowpass: 4500, bodyGain: 0.045, bodyLowpass: 270, duration: 0.25, rate: 1, presence: 2400, presenceGain: -5 },
 });
 
 function footstepVariation(stepIndex, salt = 0) {
@@ -235,7 +440,7 @@ function footstepVariation(stepIndex, salt = 0) {
 
 function normalizeFootstepSurface(surface) {
     if (FOOTSTEP_PROFILES[surface]) return surface;
-    if (surface === 'road' || surface === 'service') return 'asphalt';
+    if (surface === 'road' || surface === 'service' || surface === 'concrete' || surface === 'stone') return 'asphalt';
     if (surface === 'trail' || surface === 'ground') return 'grass';
     return 'grass';
 }
@@ -243,51 +448,48 @@ function normalizeFootstepSurface(surface) {
 function getFootstepMaster(ctx) {
     if (footstepMaster?.ctx === ctx) return footstepMaster.input;
     const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.value = -24;
-    compressor.knee.value = 18;
-    compressor.ratio.value = 3;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.16;
+    compressor.threshold.value = -14;
+    compressor.knee.value = 12;
+    compressor.ratio.value = 2;
+    compressor.attack.value = 0.004;
+    compressor.release.value = 0.09;
     const output = ctx.createGain();
-    output.gain.value = 0.82;
+    output.gain.value = 0.42;
     compressor.connect(output);
     output.connect(ctx.destination);
     footstepMaster = { ctx, input: compressor };
     return compressor;
 }
 
-function addFootstepNoise(ctx, destination, options) {
-    const {
-        at, duration, attack = 0.003, gain, highpass = 45, lowpass = 2000,
-        q = 0.36, variation = 0, playbackRate = 1, roughness = 0.55,
-    } = options;
-    const source = ctx.createBufferSource();
-    source.buffer = getFootstepNoiseBuffer(ctx, duration + 0.035, variation, roughness);
-    source.playbackRate.value = playbackRate;
+function connectFootstepTone(ctx, source, destination, profile, at) {
     const highFilter = ctx.createBiquadFilter();
     highFilter.type = 'highpass';
-    highFilter.frequency.setValueAtTime(Math.max(30, highpass), at);
-    highFilter.Q.value = q;
+    highFilter.frequency.setValueAtTime(profile.highpass, at);
+    highFilter.Q.value = 0.55;
     const lowFilter = ctx.createBiquadFilter();
     lowFilter.type = 'lowpass';
-    lowFilter.frequency.setValueAtTime(Math.max(highpass + 80, lowpass), at);
-    lowFilter.Q.value = q;
-    const envelope = ctx.createGain();
-    envelope.gain.setValueAtTime(0.0001, at);
-    envelope.gain.linearRampToValueAtTime(Math.max(0.0001, gain), at + attack);
-    envelope.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    lowFilter.frequency.setValueAtTime(profile.lowpass, at);
+    lowFilter.Q.value = 0.6;
     source.connect(highFilter);
     highFilter.connect(lowFilter);
-    lowFilter.connect(envelope);
-    envelope.connect(destination);
-    source.start(at);
-    source.stop(at + duration + 0.025);
+    if (profile.presence) {
+        const presence = ctx.createBiquadFilter();
+        presence.type = 'peaking';
+        presence.frequency.value = profile.presence;
+        presence.Q.value = 0.75;
+        presence.gain.value = profile.presenceGain;
+        lowFilter.connect(presence);
+        presence.connect(destination);
+    } else {
+        lowFilter.connect(destination);
+    }
 }
 
 /**
- * Layered Surviv footsteps made entirely from softly coloured noise. Broad,
- * low-resonance filters avoid a metallic ring while separate body, sole,
- * toe-off and loose-surface layers keep each material recognisable.
+ * Dry recorded shoe contacts, selected per material. Each step picks a nearby
+ * take and receives tiny pitch, level and stereo changes so a running loop does
+ * not repeat mechanically. The parallel low-passed path adds weight using the
+ * recording itself rather than an oscillator or synthetic noise layer.
  */
 export function playSurvivFootstep(surface = 'ground', stepIndex = 0, intensity = 1) {
     const ctx = getCtx();
@@ -295,102 +497,62 @@ export function playSurvivFootstep(surface = 'ground', stepIndex = 0, intensity 
 
     const material = normalizeFootstepSurface(surface);
     const profile = FOOTSTEP_PROFILES[material];
+    const samples = footstepSampleBuffers.get(material);
+    if (!samples?.length) {
+        void decodeSurvivFootsteps(ctx);
+        return false;
+    }
+
     const t = ctx.currentTime;
     const strength = Math.max(0.64, Math.min(1.06, Number(intensity) || 1));
-    const pitchJitter = 0.965 + footstepVariation(stepIndex, 1) * 0.07;
-    const alternatingPitch = stepIndex % 2 === 0 ? 1.008 : 0.992;
-    const pitch = pitchJitter * alternatingPitch;
+    const selectionVariation = footstepVariation(stepIndex, material.length);
+    const sampleIndex = (stepIndex + Math.floor(selectionVariation * samples.length)) % samples.length;
+    const pitchCents = (footstepVariation(stepIndex, 1) - 0.5) * 36 + (stepIndex % 2 === 0 ? -5 : 5);
+    const playbackRate = profile.rate * Math.pow(2, pitchCents / 1200);
+    const levelVariation = 0.94 + footstepVariation(stepIndex, 2) * 0.1;
+    const duration = Math.min(profile.duration, samples[sampleIndex].duration / playbackRate);
 
     const bus = ctx.createGain();
-    bus.gain.value = profile.volume * strength;
+    bus.gain.value = 1;
     const master = getFootstepMaster(ctx);
     if (typeof ctx.createStereoPanner === 'function') {
         const panner = ctx.createStereoPanner();
         const side = stepIndex % 2 === 0 ? -1 : 1;
-        panner.pan.value = side * (0.018 + footstepVariation(stepIndex, 3) * 0.014);
+        panner.pan.value = side * (0.012 + footstepVariation(stepIndex, 3) * 0.01);
         bus.connect(panner);
         panner.connect(master);
     } else {
         bus.connect(master);
     }
 
-    // Heel/body: coloured low noise feels like weight hitting a surface. A
-    // tonal oscillator is deliberately avoided because it sounds synthetic.
-    addFootstepNoise(ctx, bus, {
-        at: t,
-        duration: material === 'water' ? 0.09 : 0.058,
-        attack: 0.0025,
-        gain: profile.bodyGain,
-        highpass: 38,
-        lowpass: profile.bodyLowpass * pitch,
-        q: 0.32,
-        variation: stepIndex * 3,
-        playbackRate: pitch,
-        roughness: 0.22,
-    });
+    const source = ctx.createBufferSource();
+    source.buffer = samples[sampleIndex];
+    source.playbackRate.value = playbackRate;
+    const mainEnvelope = ctx.createGain();
+    const mainLevel = profile.volume * strength * levelVariation;
+    mainEnvelope.gain.setValueAtTime(0.0001, t);
+    mainEnvelope.gain.linearRampToValueAtTime(mainLevel, t + 0.0015);
+    mainEnvelope.gain.setValueAtTime(mainLevel, t + Math.max(0.008, duration - 0.035));
+    mainEnvelope.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    connectFootstepTone(ctx, source, mainEnvelope, profile, t);
+    mainEnvelope.connect(bus);
 
-    // The broad sole layer provides contact and friction without a narrow,
-    // resonant band that can ring like metal.
-    addFootstepNoise(ctx, bus, {
-        at: t + (material === 'water' ? 0.009 : 0.007),
-        duration: profile.duration,
-        attack: material === 'water' ? 0.014 : 0.006,
-        gain: profile.contactGain,
-        highpass: profile.contactHighpass * pitch,
-        lowpass: profile.contactLowpass * pitch,
-        q: 0.36,
-        variation: stepIndex * 3 + 1,
-        playbackRate: 0.975 + footstepVariation(stepIndex, 5) * 0.05,
-        roughness: profile.roughness,
-    });
+    const bodyHighpass = ctx.createBiquadFilter();
+    bodyHighpass.type = 'highpass';
+    bodyHighpass.frequency.value = 34;
+    const bodyLowpass = ctx.createBiquadFilter();
+    bodyLowpass.type = 'lowpass';
+    bodyLowpass.frequency.value = profile.bodyLowpass;
+    bodyLowpass.Q.value = 0.4;
+    const bodyEnvelope = ctx.createGain();
+    bodyEnvelope.gain.setValueAtTime(profile.bodyGain * strength, t);
+    bodyEnvelope.gain.exponentialRampToValueAtTime(0.0001, t + Math.min(duration, 0.11));
+    source.connect(bodyHighpass);
+    bodyHighpass.connect(bodyLowpass);
+    bodyLowpass.connect(bodyEnvelope);
+    bodyEnvelope.connect(bus);
 
-    // A softer scrape at toe-off makes the foot roll over the ground.
-    addFootstepNoise(ctx, bus, {
-        at: t + (material === 'water' ? 0.07 : 0.045),
-        duration: material === 'water' ? 0.17 : 0.085,
-        attack: material === 'water' ? 0.018 : 0.009,
-        gain: profile.toeGain,
-        highpass: profile.toeHighpass * pitch,
-        lowpass: profile.toeLowpass * pitch,
-        q: 0.34,
-        variation: stepIndex * 3 + 2,
-        playbackRate: 0.96 + footstepVariation(stepIndex, 7) * 0.08,
-        roughness: Math.min(0.78, profile.roughness + 0.08),
-    });
-
-    // A plank gives slightly under the heel, but stays muted instead of ringing.
-    if (material === 'wood') {
-        addFootstepNoise(ctx, bus, {
-            at: t + 0.018,
-            duration: 0.065,
-            attack: 0.004,
-            gain: 0.19,
-            highpass: 55,
-            lowpass: 520 * pitch,
-            q: 0.3,
-            variation: stepIndex * 5 + 4,
-            playbackRate: pitch,
-            roughness: 0.2,
-        });
-    }
-
-    // Small independently timed grains sell gravel, dirt, grass and droplets.
-    for (let grain = 0; grain < profile.grains; grain++) {
-        const grainNoise = footstepVariation(stepIndex * 11 + grain, 9);
-        const grainAt = t + 0.02 + grain * (material === 'water' ? 0.026 : 0.013) + grainNoise * 0.012;
-        const grainDuration = (material === 'water' ? 0.032 : 0.014) + grainNoise * 0.014;
-        addFootstepNoise(ctx, bus, {
-            at: grainAt,
-            duration: grainDuration,
-            attack: 0.002,
-            gain: profile.textureGain * (0.7 + grainNoise * 0.42),
-            highpass: profile.grainHighpass * (0.82 + grainNoise * 0.18),
-            lowpass: profile.grainLowpass * (0.88 + grainNoise * 0.16),
-            q: 0.3,
-            variation: stepIndex + grain + 6,
-            playbackRate: 0.94 + grainNoise * 0.12,
-            roughness: Math.min(0.86, profile.roughness + 0.12),
-        });
-    }
+    source.start(t);
+    source.stop(t + duration + 0.015);
     return true;
 }

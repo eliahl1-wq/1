@@ -6,7 +6,13 @@ import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
-import { playSurvivFootstep, unlockGameAudio } from '../../audio/synthSounds.js';
+import {
+    playSurvivFootstep,
+    playSurvivGunshot,
+    preloadSurvivGunshots,
+    preloadSurvivFootsteps,
+    unlockGameAudio,
+} from '../../audio/synthSounds.js';
 
 const WEAPON_LABELS = {
     fists: 'Fists',
@@ -947,6 +953,8 @@ function biomeAt() {
 
 export class SurvivRenderer {
     constructor(canvas, balanceCanvas = null) {
+        void preloadSurvivFootsteps();
+        void preloadSurvivGunshots();
         this.canvas = canvas;
         // The game paints every pixel each frame, so an opaque low-latency
         // context avoids unnecessary alpha compositing with the DOM.
@@ -1153,6 +1161,7 @@ export class SurvivRenderer {
         // Previous ammo for detecting shots fired
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
+        this._gunAudioPrimed = false;
         // Weapon switch animation
         this._weaponSwitchT = 0;
         this._weaponSwitchFrom = 'fists';
@@ -1399,6 +1408,7 @@ export class SurvivRenderer {
         this._prevHp = 100;
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
+        this._gunAudioPrimed = false;
         this._weaponSwitchT = 0;
         this._weaponSwitchFrom = 'fists';
         this._muzzleFlash = 0;
@@ -1767,10 +1777,29 @@ export class SurvivRenderer {
 
     _ingestBulletSnapshots(bullets, receivedAt) {
         const activeIds = new Set();
+        const heardReports = new Set();
         for (const bullet of bullets) {
             activeIds.add(bullet.id);
             const previous = this._interpBullets.get(bullet.id);
             if (!previous) {
+                const reportKey = `${bullet.ownerId || 'unknown'}:${bullet.weaponType || 'unknown'}`;
+                if (this._gunAudioPrimed
+                    && bullet.ownerId !== this.myId
+                    && !bullet.isGrenade
+                    && bullet.weaponType !== 'grenade'
+                    && !heardReports.has(reportKey)) {
+                    heardReports.add(reportKey);
+                    const shooter = this._playersById.get(bullet.ownerId);
+                    const shotX = Number.isFinite(shooter?.x) ? shooter.x : bullet.x;
+                    const shotY = Number.isFinite(shooter?.y) ? shooter.y : bullet.y;
+                    const listener = this._playersById.get(this.myId) || this.me || this.camera;
+                    const dx = shotX - (Number(listener?.x) || 0);
+                    const dy = shotY - (Number(listener?.y) || 0);
+                    playSurvivGunshot(bullet.weaponType, {
+                        distance: Math.hypot(dx, dy),
+                        pan: clamp(dx / 720, -0.78, 0.78),
+                    });
+                }
                 this._interpBullets.set(bullet.id, {
                     x: bullet.x,
                     y: bullet.y,
@@ -1795,6 +1824,7 @@ export class SurvivRenderer {
         for (const id of this._interpBullets.keys()) {
             if (!activeIds.has(id)) this._interpBullets.delete(id);
         }
+        this._gunAudioPrimed = true;
     }
 
     _advanceBulletInterpolation(dt, now) {
@@ -2120,6 +2150,7 @@ export class SurvivRenderer {
 
             // Detect shots fired → muzzle flash + camera recoil
             if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && me.weapon === this._prevWeapon && me.weapon !== 'fists' && !me.reloading) {
+                playSurvivGunshot(me.weapon, { distance: 0, pan: 0 });
                 this._muzzleFlash = 1.0;
                 const shakeAmt = WEAPON_SHAKE[me.weapon] || 1;
                 this.cameraShake.intensity += shakeAmt;

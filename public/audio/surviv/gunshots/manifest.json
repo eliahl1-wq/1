@@ -1,0 +1,190 @@
+{
+  "sampleRate": 48000,
+  "variantsPerWeapon": 3,
+  "weapons": {
+    "pistol": [
+      {
+        "file": "public/audio/surviv/gunshots/pistol/pistol-1.wav",
+        "frames": 12240,
+        "durationSeconds": 0.255,
+        "peakDbfs": -2.85,
+        "rmsDbfs": -15.31
+      },
+      {
+        "file": "public/audio/surviv/gunshots/pistol/pistol-2.wav",
+        "frames": 12240,
+        "durationSeconds": 0.255,
+        "peakDbfs": -2.78,
+        "rmsDbfs": -14.77
+      },
+      {
+        "file": "public/audio/surviv/gunshots/pistol/pistol-3.wav",
+        "frames": 12240,
+        "durationSeconds": 0.255,
+        "peakDbfs": -2.71,
+        "rmsDbfs": -15.14
+      }
+    ],
+    "revolver": [
+      {
+        "file": "public/audio/surviv/gunshots/revolver/revolver-1.wav",
+        "frames": 16320,
+        "durationSeconds": 0.34,
+        "peakDbfs": -1.94,
+        "rmsDbfs": -13.22
+      },
+      {
+        "file": "public/audio/surviv/gunshots/revolver/revolver-2.wav",
+        "frames": 16320,
+        "durationSeconds": 0.34,
+        "peakDbfs": -1.87,
+        "rmsDbfs": -13.21
+      },
+      {
+        "file": "public/audio/surviv/gunshots/revolver/revolver-3.wav",
+        "frames": 16320,
+        "durationSeconds": 0.34,
+        "peakDbfs": -1.81,
+        "rmsDbfs": -13.08
+      }
+    ],
+    "smg": [
+      {
+        "file": "public/audio/surviv/gunshots/smg/smg-1.wav",
+        "frames": 8640,
+        "durationSeconds": 0.18,
+        "peakDbfs": -3.48,
+        "rmsDbfs": -17.3
+      },
+      {
+        "file": "public/audio/surviv/gunshots/smg/smg-2.wav",
+        "frames": 8640,
+        "durationSeconds": 0.18,
+        "peakDbfs": -3.4,
+        "rmsDbfs": -17.33
+      },
+      {
+        "file": "public/audio/surviv/gunshots/smg/smg-3.wav",
+        "frames": 8640,
+        "durationSeconds": 0.18,
+        "peakDbfs": -3.32,
+        "rmsDbfs": -16.99
+      }
+    ],
+    "assault": [
+      {
+        "file": "public/audio/surviv/gunshots/assault/assault-1.wav",
+        "frames": 12960,
+        "durationSeconds": 0.27,
+        "peakDbfs": -2.16,
+        "rmsDbfs": -13.8
+      },
+      {
+        "file": "public/audio/surviv/gunshots/assault/assault-2.wav",
+        "frames": 12960,
+        "durationSeconds": 0.27,
+        "peakDbfs": -2.09,
+        "rmsDbfs": -13.82
+      },
+      {
+        "file": "public/audio/surviv/gunshots/assault/assault-3.wav",
+        "frames": 12960,
+        "durationSeconds": 0.27,
+        "peakDbfs": -2.03,
+        "rmsDbfs": -13.91
+      }
+    ],
+    "shotgun": [
+      {
+        "file": "public/audio/surviv/gunshots/shotgun/shotgun-1.wav",
+        "frames": 20640,
+        "durationSeconds": 0.43,
+        "peakDbfs": -1.11,
+        "rmsDbfs": -11.72
+      },
+      {
+        "file": "public/audio/surviv/gunshots/shotgun/shotgun-2.wav",
+        "frames": 20640,
+        "durationSeconds": 0.43,
+        "peakDbfs": -1.05,
+        "rmsDbfs": -11.21
+      },
+      {
+        "file": "public/audio/surviv/gunshots/shotgun/shotgun-3.wav",
+        "frames": 20640,
+        "durationSeconds": 0.43,
+        "peakDbfs": -0.99,
+        "rmsDbfs": -11.02
+      }
+    ],
+    "dmr": [
+      {
+        "file": "public/audio/surviv/gunshots/dmr/dmr-1.wav",
+        "frames": 18720,
+        "durationSeconds": 0.39,
+        "peakDbfs": -1.51,
+        "rmsDbfs": -12.54
+      },
+      {
+        "file": "public/audio/surviv/gunshots/dmr/dmr-2.wav",
+        "frames": 18720,
+        "durationSeconds": 0.39,
+        "peakDbfs": -1.45,
+        "rmsDbfs": -12.26
+      },
+      {
+        "file": "public/audio/surviv/gunshots/dmr/dmr-3.wav",
+        "frames": 18720,
+        "durationSeconds": 0.39,
+        "peakDbfs": -1.39,
+        "rmsDbfs": -12.31
+      }
+    ],
+    "sniper": [
+      {
+        "file": "public/audio/surviv/gunshots/sniper/sniper-1.wav",
+        "frames": 29760,
+        "durationSeconds": 0.62,
+        "peakDbfs": -0.72,
+        "rmsDbfs": -11.18
+      },
+      {
+        "file": "public/audio/surviv/gunshots/sniper/sniper-2.wav",
+        "frames": 29760,
+        "durationSeconds": 0.62,
+        "peakDbfs": -0.67,
+        "rmsDbfs": -11.79
+      },
+      {
+        "file": "public/audio/surviv/gunshots/sniper/sniper-3.wav",
+        "frames": 29760,
+        "durationSeconds": 0.62,
+        "peakDbfs": -0.61,
+        "rmsDbfs": -11.27
+      }
+    ],
+    "lmg": [
+      {
+        "file": "public/audio/surviv/gunshots/lmg/lmg-1.wav",
+        "frames": 11760,
+        "durationSeconds": 0.245,
+        "peakDbfs": -2.38,
+        "rmsDbfs": -13.64
+      },
+      {
+        "file": "public/audio/surviv/gunshots/lmg/lmg-2.wav",
+        "frames": 11760,
+        "durationSeconds": 0.245,
+        "peakDbfs": -2.32,
+        "rmsDbfs": -13.65
+      },
+      {
+        "file": "public/audio/surviv/gunshots/lmg/lmg-3.wav",
+        "frames": 11760,
+        "durationSeconds": 0.245,
+        "peakDbfs": -2.25,
+        "rmsDbfs": -13.68
+      }
+    ]
+  }
+}
