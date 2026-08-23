@@ -369,16 +369,19 @@ export function playFoodEatSound() {
 
     const t = ctx.currentTime;
     const streak = nextStreak();
-    const randomPitch = Math.pow(2, ((Math.random() - 0.5) * 0.9) / 12);
-    const streakPitch = Math.pow(2, Math.min(streak, 7) * 0.16 / 12);
+    // Item-pickup feedback works best notably above its source pitch. Keep our
+    // waveform original, but use a wider, higher variation range for that
+    // familiar light inventory-pickup energy.
+    const randomPitch = Math.pow(2, ((Math.random() - 0.5) * 2.2) / 12);
+    const streakPitch = Math.pow(2, Math.min(streak, 7) * 0.28 / 12);
     const pitch = randomPitch * streakPitch;
     const levelVariation = 0.92 + Math.random() * 0.12;
     const chainDuck = 1 - Math.min(streak, 8) * 0.022;
-    const duration = 0.058;
+    const duration = 0.048;
 
     const bus = ctx.createGain();
     bus.gain.setValueAtTime(0.0001, t);
-    bus.gain.linearRampToValueAtTime(0.031 * levelVariation * chainDuck, t + 0.0012);
+    bus.gain.linearRampToValueAtTime(0.033 * levelVariation * chainDuck, t + 0.0008);
     bus.gain.exponentialRampToValueAtTime(0.0001, t + duration);
     bus.connect(getFoodPickupMaster(ctx));
 
@@ -386,49 +389,49 @@ export function playFoodEatSound() {
     const pop = ctx.createOscillator();
     const popG = ctx.createGain();
     pop.type = 'sine';
-    pop.frequency.setValueAtTime(330 * pitch, t);
-    pop.frequency.exponentialRampToValueAtTime(475 * pitch, t + 0.031);
+    pop.frequency.setValueAtTime(610 * pitch, t);
+    pop.frequency.exponentialRampToValueAtTime(905 * pitch, t + 0.022);
     popG.gain.setValueAtTime(0.0001, t);
-    popG.gain.linearRampToValueAtTime(0.68, t + 0.0015);
-    popG.gain.exponentialRampToValueAtTime(0.0001, t + 0.052);
+    popG.gain.linearRampToValueAtTime(0.7, t + 0.0009);
+    popG.gain.exponentialRampToValueAtTime(0.0001, t + 0.043);
     const popTone = ctx.createBiquadFilter();
     popTone.type = 'lowpass';
-    popTone.frequency.value = 1450;
+    popTone.frequency.value = 2200;
     popTone.Q.value = 0.45;
     pop.connect(popTone);
     popTone.connect(popG);
     popG.connect(bus);
     pop.start(t);
-    pop.stop(t + 0.06);
+    pop.stop(t + 0.05);
 
     // Muted low body gives a soft wooden/rubbery sense of contact.
     const body = ctx.createOscillator();
     const bodyG = ctx.createGain();
     body.type = 'triangle';
-    body.frequency.setValueAtTime(155 * pitch, t);
-    body.frequency.exponentialRampToValueAtTime(205 * pitch, t + 0.028);
+    body.frequency.setValueAtTime(285 * pitch, t);
+    body.frequency.exponentialRampToValueAtTime(405 * pitch, t + 0.021);
     bodyG.gain.setValueAtTime(0.0001, t);
-    bodyG.gain.linearRampToValueAtTime(0.22, t + 0.0025);
-    bodyG.gain.exponentialRampToValueAtTime(0.0001, t + 0.043);
+    bodyG.gain.linearRampToValueAtTime(0.2, t + 0.0018);
+    bodyG.gain.exponentialRampToValueAtTime(0.0001, t + 0.036);
     const bodyTone = ctx.createBiquadFilter();
     bodyTone.type = 'lowpass';
-    bodyTone.frequency.value = 760;
+    bodyTone.frequency.value = 1180;
     bodyTone.Q.value = 0.35;
     body.connect(bodyTone);
     bodyTone.connect(bodyG);
     bodyG.connect(bus);
     body.start(t);
-    body.stop(t + 0.05);
+    body.stop(t + 0.042);
 
     // Very short filtered contact texture prevents the tone feeling synthetic.
     const contact = ctx.createBufferSource();
     contact.buffer = getNoiseBuffer(ctx, 0.009, streak + Math.floor(Math.random() * 8));
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = 980 * pitch;
-    bp.Q.value = 0.75;
+    bp.frequency.value = 1680 * pitch;
+    bp.Q.value = 0.82;
     const contactG = ctx.createGain();
-    contactG.gain.setValueAtTime(0.13, t);
+    contactG.gain.setValueAtTime(0.16, t);
     contactG.gain.exponentialRampToValueAtTime(0.0001, t + 0.01);
     contact.connect(bp);
     bp.connect(contactG);
