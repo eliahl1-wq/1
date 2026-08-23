@@ -71,7 +71,7 @@ function meleePunchPose(progress) {
     const t = clamp(progress, 0, 1);
     if (t < 0.16) {
         const windup = smoothstep01(t / 0.16);
-        return { reach: -0.12 * windup, lateral: 0.16 * windup, force: 0 };
+        return { reach: -0.12 * windup, lateral: 0.16 * windup, force: 0, alpha: 1 };
     }
     if (t < 0.4) {
         const strike = easeOutCubic((t - 0.16) / 0.24);
@@ -79,20 +79,26 @@ function meleePunchPose(progress) {
             reach: lerp(-0.12, 1, strike),
             lateral: lerp(0.16, -0.42, strike),
             force: strike,
+            alpha: 1,
         };
     }
     if (t < 0.5) {
         const contact = smoothstep01((t - 0.4) / 0.1);
-        return { reach: 1 - contact * 0.04, lateral: -0.42 + contact * 0.05, force: 1 };
+        return { reach: 1 - contact * 0.04, lateral: -0.42 + contact * 0.05, force: 1, alpha: 1 };
     }
-    const releaseLinear = clamp((t - 0.5) / 0.5, 0, 1);
-    const release = smoothstep01(releaseLinear);
+    if (t < 0.68) {
+        // Keep the fist at the contact point while it disappears. A visible
+        // backward path reads as a second strike in a top-down view.
+        const settle = smoothstep01((t - 0.5) / 0.18);
+        return { reach: 0.96, lateral: -0.37, force: 1 - settle, alpha: 1 - settle };
+    }
+    // Reset invisibly at the neutral pose, then restore opacity. There is only
+    // one directional movement on screen for every accepted melee attack.
     return {
-        reach: lerp(0.96, 0, release),
-        // Retract around the side instead of travelling straight backwards
-        // through the target, which can read as a second punch from above.
-        lateral: lerp(-0.37, 0, release) + Math.sin(releaseLinear * Math.PI) * 0.34,
-        force: 1 - release,
+        reach: 0,
+        lateral: 0,
+        force: 0,
+        alpha: smoothstep01((t - 0.72) / 0.2),
     };
 }
 
@@ -667,26 +673,59 @@ function drawFurnitureTopDown(ctx, o, variant) {
     const h = o.h;
     const hw = w / 2;
     const hh = h / 2;
-    const drawBox = (fill, stroke = '#252725', radius = 4, inset = 0) => {
+    const objectDepth = clamp(Math.min(w, h) * 0.12, 3, 7);
+    const drawRaisedRect = (x, y, width, height, fill, stroke = '#252725', radius = 4, depth = objectDepth) => {
+        const safeDepth = Math.min(depth, width * 0.16, height * 0.16);
+
+        // A cheap painted shadow and an exposed lower face make props read as
+        // raised objects without expensive canvas shadow filters or gradients.
+        ctx.fillStyle = 'rgba(10, 15, 14, 0.30)';
+        roundRect(ctx, x + safeDepth * 0.72, y + safeDepth * 0.90, width, height, radius + 1);
+        ctx.fill();
+        ctx.fillStyle = stroke;
+        roundRect(ctx, x, y + safeDepth, width, height - safeDepth, radius);
+        ctx.fill();
         ctx.fillStyle = fill;
         ctx.strokeStyle = stroke;
         ctx.lineWidth = 2;
-        roundRect(ctx, -hw + inset, -hh + inset, w - inset * 2, h - inset * 2, radius);
+        roundRect(ctx, x, y, width, height - safeDepth * 0.55, radius);
         ctx.fill();
         ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.17)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + radius + 2, y + 2);
+        ctx.lineTo(x + width - radius - 2, y + 2);
+        ctx.moveTo(x + 2, y + radius + 2);
+        ctx.lineTo(x + 2, y + height * 0.58);
+        ctx.stroke();
+    };
+    const drawBox = (fill, stroke = '#252725', radius = 4, inset = 0) => {
+        drawRaisedRect(
+            -hw + inset,
+            -hh + inset,
+            w - inset * 2,
+            h - inset * 2,
+            fill,
+            stroke,
+            radius,
+            objectDepth,
+        );
     };
     const drawChair = (x, y, width, height, rotation = 0, color = '#6d543d') => {
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(rotation);
-        ctx.fillStyle = '#3b2c20';
-        roundRect(ctx, -width / 2, -height / 2, width, height, 3);
-        ctx.fill();
+        drawRaisedRect(-width / 2, -height / 2, width, height, '#3b2c20', '#201812', 3, Math.min(3.5, height * 0.15));
         ctx.fillStyle = color;
-        roundRect(ctx, -width / 2 + 2, -height / 2 + 3, width - 4, height - 7, 2);
+        roundRect(ctx, -width / 2 + 3, -height / 2 + 3, width - 6, height - 8, 2);
         ctx.fill();
         ctx.fillStyle = '#2b2119';
         ctx.fillRect(-width / 2, -height / 2, width, Math.max(3, height * 0.18));
+        ctx.strokeStyle = 'rgba(255, 240, 210, 0.18)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-width / 2 + 3, -height / 2 + 3, width - 6, Math.max(3, height * 0.18));
         ctx.restore();
     };
     const drawWoodGrain = (alpha = 0.18) => {
@@ -774,11 +813,7 @@ function drawFurnitureTopDown(ctx, o, variant) {
             drawChair(-hw + chairH / 2, 0, chairW, chairH, Math.PI / 2, '#816548');
             drawChair(hw - chairH / 2, 0, chairW, chairH, -Math.PI / 2, '#816548');
         }
-        ctx.fillStyle = '#755235';
-        ctx.strokeStyle = '#39291e';
-        ctx.lineWidth = 2;
-        roundRect(ctx, -tableW / 2, -tableH / 2, tableW, tableH, 5);
-        ctx.fill(); ctx.stroke();
+        drawRaisedRect(-tableW / 2, -tableH / 2, tableW, tableH, '#755235', '#39291e', 5, Math.min(5, tableH * 0.16));
         ctx.strokeStyle = 'rgba(244, 216, 165, 0.18)';
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(-tableW / 2 + 7, 0); ctx.lineTo(tableW / 2 - 7, 0); ctx.stroke();
@@ -1534,9 +1569,14 @@ export class SurvivRenderer {
         );
         const surfaceMultiplier = this.me.surface === 'water' ? WATER_MOVE_MULTIPLIER : 1;
         const predictedMoveSpeed = 208 * surfaceMultiplier * (firingFullAuto ? fullAutoMultiplier : 1);
-        const predictedTarget = this._resolvePredictedLootContainerCollision(
+        const predictedObstacleTarget = this._resolvePredictedObstacleCollision(
             state.targetX + moveInput.dx * predictedMoveSpeed * leadSeconds,
             state.targetY + moveInput.dy * predictedMoveSpeed * leadSeconds,
+            Number(this.me.radius) || 14,
+        );
+        const predictedTarget = this._resolvePredictedLootContainerCollision(
+            predictedObstacleTarget.x,
+            predictedObstacleTarget.y,
             Number(this.me.radius) || 14,
             moveInput.dx,
             moveInput.dy,
@@ -1556,6 +1596,75 @@ export class SurvivRenderer {
             this.camera.x = state.x;
             this.camera.y = state.y;
         }
+    }
+
+    _resolvePredictedObstacleCollision(x, y, playerRadius) {
+        let resolvedX = x;
+        let resolvedY = y;
+        const collisionCell = 400;
+
+        // Two short passes are enough to settle corners where two solid props
+        // meet, while keeping the per-frame prediction work tightly bounded.
+        for (let pass = 0; pass < 2; pass++) {
+            const minCellX = Math.floor((resolvedX - playerRadius) / collisionCell);
+            const maxCellX = Math.floor((resolvedX + playerRadius) / collisionCell);
+            const minCellY = Math.floor((resolvedY - playerRadius) / collisionCell);
+            const maxCellY = Math.floor((resolvedY + playerRadius) / collisionCell);
+            const queryToken = this._collisionPredictionToken = (this._collisionPredictionToken || 0) + 1;
+            let changed = false;
+            for (let gx = minCellX; gx <= maxCellX; gx++) {
+                for (let gy = minCellY; gy <= maxCellY; gy++) {
+                    const bucket = this._collisionBuckets.get(gx + ',' + gy);
+                    if (!bucket) continue;
+                    for (const obstacle of bucket) {
+                        if (obstacle._predictionQueryToken === queryToken) continue;
+                        obstacle._predictionQueryToken = queryToken;
+                        const rect = obstacle.kind === 'door' ? getDoorCollisionRect(obstacle) : obstacle;
+                        const halfW = rect.w / 2;
+                        const halfH = rect.h / 2;
+                        const rotation = -(Number(rect.rotation) || 0);
+                        const cos = Math.cos(rotation);
+                        const sin = Math.sin(rotation);
+                        const worldDx = resolvedX - rect.x;
+                        const worldDy = resolvedY - rect.y;
+                        let localX = worldDx * cos - worldDy * sin;
+                        let localY = worldDx * sin + worldDy * cos;
+                        const closestX = clamp(localX, -halfW, halfW);
+                        const closestY = clamp(localY, -halfH, halfH);
+                        const dx = localX - closestX;
+                        const dy = localY - closestY;
+                        const distance = Math.hypot(dx, dy);
+                        if (distance >= playerRadius) continue;
+
+                        if (distance < 0.000001) {
+                            const left = Math.abs(localX + halfW);
+                            const right = Math.abs(halfW - localX);
+                            const top = Math.abs(localY + halfH);
+                            const bottom = Math.abs(halfH - localY);
+                            const nearestEdge = Math.min(left, right, top, bottom);
+                            if (nearestEdge === left) localX = -halfW - playerRadius;
+                            else if (nearestEdge === right) localX = halfW + playerRadius;
+                            else if (nearestEdge === top) localY = -halfH - playerRadius;
+                            else localY = halfH + playerRadius;
+                        } else {
+                            const overlap = playerRadius - distance;
+                            localX += (dx / distance) * overlap;
+                            localY += (dy / distance) * overlap;
+                        }
+
+                        const worldRotation = Number(rect.rotation) || 0;
+                        const worldCos = Math.cos(worldRotation);
+                        const worldSin = Math.sin(worldRotation);
+                        resolvedX = rect.x + localX * worldCos - localY * worldSin;
+                        resolvedY = rect.y + localX * worldSin + localY * worldCos;
+                        changed = true;
+                    }
+                }
+            }
+            if (!changed) break;
+        }
+
+        return { x: resolvedX, y: resolvedY };
     }
 
     _resolvePredictedLootContainerCollision(x, y, playerRadius, moveX = 1, moveY = 0) {
@@ -7184,7 +7293,7 @@ export class SurvivRenderer {
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const pose = punching
                 ? meleePunchPose(progress)
-                : { reach: 0, lateral: 0, force: 0 };
+                : { reach: 0, lateral: 0, force: 0, alpha: 1 };
 
             // One hand attacks per accepted attack id. The server alternates
             // which hand is selected for the next distinct click.
@@ -7200,10 +7309,13 @@ export class SurvivRenderer {
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
 
-            // Both hands stay solid and retain the same white outline. The lead
-            // fist follows one continuous path; there is no fade or respawn.
+            // The guard remains stable. The lead fist has exactly one visible
+            // directional movement, then resets without a backward "hit".
             drawPlayerHand(ctx, leadSide < 0 ? bottomHand : topHand, playerColor);
+            ctx.save();
+            ctx.globalAlpha *= pose.alpha;
             drawPlayerHand(ctx, leadSide < 0 ? topHand : bottomHand, playerColor);
+            ctx.restore();
             return;
         }
 
