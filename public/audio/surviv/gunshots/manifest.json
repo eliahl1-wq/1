@@ -186,5 +186,30 @@
         "rmsDbfs": -13.68
       }
     ]
+  },
+  "explosions": {
+    "grenade": [
+      {
+        "file": "public/audio/surviv/explosions/grenade/grenade-1.wav",
+        "frames": 39360,
+        "durationSeconds": 0.82,
+        "peakDbfs": -0.92,
+        "rmsDbfs": -12.42
+      },
+      {
+        "file": "public/audio/surviv/explosions/grenade/grenade-2.wav",
+        "frames": 39360,
+        "durationSeconds": 0.82,
+        "peakDbfs": -0.86,
+        "rmsDbfs": -12.95
+      },
+      {
+        "file": "public/audio/surviv/explosions/grenade/grenade-3.wav",
+        "frames": 39360,
+        "durationSeconds": 0.82,
+        "peakDbfs": -0.8,
+        "rmsDbfs": -11.98
+      }
+    ]
   }
 }

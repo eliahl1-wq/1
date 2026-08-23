@@ -9,6 +9,7 @@ import { drawGameMinimap } from '../minimap.js';
 import {
     playSurvivBreakSound,
     playSurvivFootstep,
+    playSurvivGrenadeExplosion,
     playSurvivGunshot,
     playSurvivMeleeSwing,
     preloadSurvivGunshots,
@@ -375,15 +376,15 @@ const makeBulletSpec = (trailLen, tipLen, thickness, rgb = '255, 251, 232') => (
 
 // One clean Surviv-style tracer per projectile: no stacked glow/core strokes.
 const WEAPON_BULLET_SPECS = {
-    shotgun: makeBulletSpec(38, 3.5, 0.85),
-    sniper: makeBulletSpec(100, 6, 1.3, '245, 251, 255'),
-    revolver: makeBulletSpec(70, 5, 1.1),
-    pistol: makeBulletSpec(55, 4, 0.95),
-    assault: makeBulletSpec(65, 4.5, 1),
-    dmr: makeBulletSpec(82, 5.5, 1.15),
-    smg: makeBulletSpec(48, 3.5, 0.9),
-    lmg: makeBulletSpec(58, 4, 0.95),
-    default: makeBulletSpec(55, 4, 0.95),
+    shotgun: makeBulletSpec(38, 3.5, 1.12),
+    sniper: makeBulletSpec(100, 6, 1.62, '245, 251, 255'),
+    revolver: makeBulletSpec(70, 5, 1.4),
+    pistol: makeBulletSpec(55, 4, 1.22),
+    assault: makeBulletSpec(65, 4.5, 1.28),
+    dmr: makeBulletSpec(82, 5.5, 1.46),
+    smg: makeBulletSpec(48, 3.5, 1.16),
+    lmg: makeBulletSpec(58, 4, 1.24),
+    default: makeBulletSpec(55, 4, 1.22),
 };
 
 const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
@@ -7090,9 +7091,11 @@ export class SurvivRenderer {
         for (const [wt, spec] of Object.entries(WEAPON_BULLET_SPECS)) {
             const tracer = ctx.createLinearGradient(-spec.trailLen, 0, spec.tipLen, 0);
             tracer.addColorStop(0, `rgba(${spec.rgb}, 0)`);
-            tracer.addColorStop(0.48, `rgba(${spec.rgb}, 0.18)`);
-            tracer.addColorStop(0.84, `rgba(${spec.rgb}, 0.76)`);
-            tracer.addColorStop(1, '#ffffff');
+            tracer.addColorStop(0.3, `rgba(${spec.rgb}, 0.045)`);
+            tracer.addColorStop(0.58, `rgba(${spec.rgb}, 0.2)`);
+            tracer.addColorStop(0.82, `rgba(${spec.rgb}, 0.62)`);
+            tracer.addColorStop(0.95, `rgba(${spec.rgb}, 0.94)`);
+            tracer.addColorStop(1, '#fffdf4');
             this.bulletGradients[wt] = tracer;
         }
     }
@@ -8573,6 +8576,13 @@ export class SurvivRenderer {
 
     spawnGrenadeExplosion(x, y) {
         const spawnedAt = Date.now();
+        const listener = this.me || this.camera;
+        const dx = x - (Number(listener?.x) || 0);
+        const dy = y - (Number(listener?.y) || 0);
+        playSurvivGrenadeExplosion({
+            distance: Math.hypot(dx, dy),
+            pan: clamp(dx / 760, -0.8, 0.8),
+        });
         this.grenadeExplosions.push({ x, y, spawnedAt, duration: 760, radius: 145 });
         if (this.grenadeExplosions.length > 8) this.grenadeExplosions.shift();
 

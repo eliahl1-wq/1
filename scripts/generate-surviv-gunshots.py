@@ -19,6 +19,7 @@ from scipy.signal import butter, sosfilt
 SAMPLE_RATE = 48_000
 VARIANTS = 3
 OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "public" / "audio" / "surviv" / "gunshots"
+EXPLOSION_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "public" / "audio" / "surviv" / "explosions" / "grenade"
 
 
 PROFILES = {
@@ -210,6 +211,85 @@ def render_shot(weapon: str, variant: int) -> np.ndarray:
     return stereo
 
 
+def render_grenade_explosion(variant: int) -> np.ndarray:
+    """Close, dry fragmentation-grenade report with pressure and debris."""
+    rng = np.random.default_rng(0xE719 + variant * 15401)
+    duration = 0.82
+    length = int(duration * SAMPLE_RATE)
+    t = np.arange(length) / SAMPLE_RATE
+    variance = 1.0 + rng.uniform(-0.04, 0.04)
+
+    detonation = np.zeros(length)
+    add_microburst(
+        detonation,
+        filtered_noise(rng, length, 1450 * variance, 16_500, 2),
+        t, 0.00008, 0.000045, 0.010, 1.18,
+    )
+    add_microburst(
+        detonation,
+        filtered_noise(rng, length, 320, 7_200, 2),
+        t, 0.00075, 0.00018, 0.042, 0.68,
+    )
+
+    blast = np.zeros(length)
+    add_microburst(
+        blast,
+        filtered_noise(rng, length, 68, 1950 * variance, 2),
+        t, 0.0007, 0.00065, 0.125, 1.02,
+    )
+    add_microburst(
+        blast,
+        filtered_noise(rng, length, 105, 3350, 2),
+        t, 0.0042 + rng.uniform(0, 0.0015), 0.0012, 0.090, 0.47,
+    )
+
+    pressure = np.zeros(length)
+    add_microburst(
+        pressure,
+        filtered_noise(rng, length, 27, 225 * variance, 2),
+        t, 0.0011, 0.0020, 0.190, 0.92,
+    )
+    add_microburst(
+        pressure,
+        filtered_noise(rng, length, 31, 310, 2),
+        t, 0.0085 + rng.uniform(-0.001, 0.002), 0.0030, 0.135, 0.36,
+    )
+
+    debris = np.zeros(length)
+    for index in range(13):
+        delay = rng.uniform(0.018, 0.235)
+        low = rng.uniform(650, 1900)
+        high = rng.uniform(4800, 10_500)
+        source = filtered_noise(rng, length, low, high, 2)
+        add_microburst(
+            debris, source, t, delay, 0.00008,
+            rng.uniform(0.0025, 0.010), rng.uniform(0.025, 0.075) * (0.96 ** index),
+        )
+
+    air = normalized(filtered_noise(rng, length, 95, 3900, 2))
+    tail = air * envelope(t, 0.006, 0.285, 0.012) * 0.32
+    reflection = normalized(filtered_noise(rng, length, 145, 3100, 2))
+    for index, delay in enumerate((0.021, 0.047, 0.083)):
+        tail += reflection * envelope(t, 0.001, 0.19, delay) * (0.085 / (index + 1))
+
+    mono = detonation + blast + pressure + debris + tail
+    side = normalized(filtered_noise(rng, length, 170, 5700, 2))
+    side *= envelope(t, 0.009, 0.31, 0.012) * 0.14
+    stereo = np.column_stack((mono + side, mono - side * 0.9))
+
+    dc_filter = butter(2, 22 / (SAMPLE_RATE / 2), btype="highpass", output="sos")
+    stereo[:, 0] = sosfilt(dc_filter, stereo[:, 0])
+    stereo[:, 1] = sosfilt(dc_filter, stereo[:, 1])
+    stereo = np.tanh(stereo * 1.34) / math.tanh(1.34)
+    stereo[:, 0] = sosfilt(dc_filter, stereo[:, 0])
+    stereo[:, 1] = sosfilt(dc_filter, stereo[:, 1])
+    fade_samples = int(0.045 * SAMPLE_RATE)
+    stereo[-fade_samples:] *= np.linspace(1.0, 0.0, fade_samples)[:, None]
+    peak = float(np.max(np.abs(stereo))) or 1.0
+    stereo *= (0.90 + (variant - 1) * 0.006) / peak
+    return stereo
+
+
 def write_wav(path: Path, stereo: np.ndarray) -> dict[str, float | int | str]:
     path.parent.mkdir(parents=True, exist_ok=True)
     pcm = np.clip(stereo, -1.0, 1.0)
@@ -230,7 +310,12 @@ def write_wav(path: Path, stereo: np.ndarray) -> dict[str, float | int | str]:
 
 
 def main() -> None:
-    manifest = {"sampleRate": SAMPLE_RATE, "variantsPerWeapon": VARIANTS, "weapons": {}}
+    manifest = {
+        "sampleRate": SAMPLE_RATE,
+        "variantsPerWeapon": VARIANTS,
+        "weapons": {},
+        "explosions": {"grenade": []},
+    }
     for weapon in PROFILES:
         rendered = []
         for variant in range(1, VARIANTS + 1):
@@ -238,9 +323,13 @@ def main() -> None:
             path = OUTPUT_ROOT / weapon / f"{weapon}-{variant}.wav"
             rendered.append(write_wav(path, audio))
         manifest["weapons"][weapon] = rendered
+    for variant in range(1, VARIANTS + 1):
+        audio = render_grenade_explosion(variant)
+        path = EXPLOSION_OUTPUT_ROOT / f"grenade-{variant}.wav"
+        manifest["explosions"]["grenade"].append(write_wav(path, audio))
     manifest_path = OUTPUT_ROOT / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(f"Rendered {len(PROFILES) * VARIANTS} original gunshots to {OUTPUT_ROOT}")
+    print(f"Rendered {len(PROFILES) * VARIANTS} gunshots and {VARIANTS} grenade explosions")
 
 
 if __name__ == "__main__":

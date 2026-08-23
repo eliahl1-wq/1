@@ -33,9 +33,12 @@ const TABS = [
 ];
 
 const USER_SORT_OPTIONS = [
+    { value: 'activity_desc', label: 'Active first' },
+    { value: 'last_active_desc', label: 'Recently active' },
     { value: 'balance_desc', label: 'Highest balance' },
     { value: 'balance_asc', label: 'Lowest balance' },
     { value: 'deposits_desc', label: 'Most deposited' },
+    { value: 'game_spend_desc', label: 'Most played for' },
     { value: 'newest', label: 'Newest first' },
     { value: 'oldest', label: 'Oldest first' },
     { value: 'username_asc', label: 'Username A–Z' },
@@ -177,6 +180,21 @@ function OutcomeBadge({ outcome }) {
             color: style.color,
         }}>
             {outcome}
+        </span>
+    );
+}
+
+function UserActivityBadge({ status }) {
+    const config = {
+        playing: { label: 'Playing', color: '#4ade80', bg: 'rgba(34,197,94,0.13)', dot: '#22c55e' },
+        active: { label: 'Active', color: '#93c5fd', bg: 'rgba(59,130,246,0.13)', dot: '#60a5fa' },
+        offline: { label: 'Offline', color: 'var(--text-3)', bg: 'rgba(148,163,184,0.1)', dot: '#64748b' },
+    };
+    const item = config[status] || config.offline;
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 9px', borderRadius: 'var(--r-full)', background: item.bg, color: item.color, fontSize: '0.7rem', fontWeight: 750 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.dot, boxShadow: status === 'offline' ? 'none' : `0 0 8px ${item.dot}` }} />
+            {item.label}
         </span>
     );
 }
@@ -912,6 +930,23 @@ export default function AdminDashboard() {
         }, 5000);
         return () => clearInterval(id);
     }, [tab, txFilter, showExcluded, fetchTransactions]);
+
+    useEffect(() => {
+        if (tab !== 'users') return undefined;
+        let alive = true;
+        const refreshUsers = async () => {
+            const params = new URLSearchParams();
+            if (showExcludedUsers) params.set('showExcluded', 'true');
+            if (userSort) params.set('sort', userSort);
+            try {
+                const data = await fetchAdmin(`/api/admin/dashboard/users${params.size ? `?${params}` : ''}`);
+                if (alive) setUsers(data.users ?? []);
+            } catch { /* keep the latest list */ }
+        };
+        refreshUsers();
+        const id = setInterval(refreshUsers, 5000);
+        return () => { alive = false; clearInterval(id); };
+    }, [tab, fetchAdmin, showExcludedUsers, userSort]);
 
     const togglePersonalFreePlay = async (enabled) => {
         setActionLoading(true);
@@ -1758,12 +1793,16 @@ export default function AdminDashboard() {
                                                 />
                                             </th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Username</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Activity</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Last active</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Current location</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Joined</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Balance</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Rewards</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Playtime</th>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Game totals</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposited</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Status</th>                                        </tr>
+                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Account</th>                                        </tr>
                                     </thead>
                                     <tbody>
                                         {filteredUsers.map(u => {
@@ -1792,10 +1831,29 @@ export default function AdminDashboard() {
                                                         {u.username}
                                                         {u.email && <div style={{ marginTop: '3px', color: 'var(--text-3)', fontSize: '0.68rem', fontWeight: 400 }}>{u.email}</div>}
                                                     </td>
+                                                    <td style={{ padding: '12px 16px' }}><UserActivityBadge status={u.activityStatus} /></td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text-2)', whiteSpace: 'nowrap' }} title={formatDate(u.lastActiveAt)}>
+                                                        {formatRelativeTime(u.lastActiveAt)}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.76rem' }}>
+                                                        {u.activityStatus === 'playing' ? (
+                                                            <>
+                                                                <strong style={{ color: 'var(--text-h)', textTransform: 'capitalize' }}>{u.currentGamemode || 'Game'}</strong>
+                                                                {u.currentEntryFeeUsd != null && <div style={{ marginTop: 2, color: 'var(--text-3)', fontSize: '0.66rem' }}>{formatUsd(u.currentEntryFeeUsd)} room</div>}
+                                                            </>
+                                                        ) : u.activityStatus === 'active' ? (
+                                                            <span className="mono" style={{ fontSize: '0.68rem' }}>{u.currentPage || 'Website'}</span>
+                                                        ) : '—'}
+                                                    </td>
                                                     <td style={{ padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.78rem' }}>{u.createdAt ? formatDate(u.createdAt) : '—'}</td>
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.balanceUsd)}<div style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{formatSol(u.balanceSol)}</div></td>
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalRewardsBalance)}{u.rewardsDisabled && <div style={{ color: '#ef4444', fontSize: '0.68rem' }}>Blocked</div>}</td>
                                                     <td style={{ padding: '12px 16px' }}>{formatDuration(u.playtime)}</td>
+                                                    <td style={{ padding: '12px 16px', minWidth: 130 }}>
+                                                        <div style={{ color: 'var(--text-h)', fontWeight: 650 }}>{formatUsd(u.gameSpentUsd)} <span style={{ color: 'var(--text-3)', fontSize: '0.64rem', fontWeight: 500 }}>played</span></div>
+                                                        <div style={{ marginTop: 3, color: '#4ade80', fontSize: '0.7rem' }}>{formatUsd(u.gameWonUsd)} won</div>
+                                                        <div style={{ marginTop: 2, color: '#c4b5fd', fontSize: '0.68rem' }}>{formatUsd(u.ownerEarningsUsd)} your fees</div>
+                                                    </td>
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalDepositedUsd)}<div style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{u.depositCount} deposits</div></td>
                                                     <td style={{ padding: '12px 16px' }}>                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : u.isOwnerAccount ? (
                                                             <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 'var(--r-full)', background: 'rgba(139,92,246,0.16)', color: '#a78bfa', fontSize: '0.72rem', fontWeight: 700 }}>Your account</span>

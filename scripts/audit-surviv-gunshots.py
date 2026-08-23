@@ -35,6 +35,7 @@ def main() -> None:
     manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
     assert set(manifest["weapons"]) == EXPECTED_WEAPONS
     assert manifest["variantsPerWeapon"] >= 3
+    assert len(manifest.get("explosions", {}).get("grenade", [])) >= 3
     reports = {}
 
     for weapon, entries in manifest["weapons"].items():
@@ -79,7 +80,45 @@ def main() -> None:
             "texturePercent": round(band_share(first, 48_000, 2500, 16_000) * 100, 1),
         }
 
-    print(json.dumps({"files": sum(len(value) for value in manifest["weapons"].values()), "weapons": reports}, indent=2))
+    explosion_variants = []
+    for entry in manifest["explosions"]["grenade"]:
+        path = ROOT.parent.parent.parent.parent / entry["file"]
+        rate, stereo = read_wav(path)
+        assert rate == 48_000, f"{path}: unexpected sample rate"
+        peak = float(np.abs(stereo).max())
+        assert 0.75 < peak < 0.96, f"{path}: unsafe or weak peak {peak:.3f}"
+        assert not np.any(np.abs(stereo) >= 0.999), f"{path}: clipped samples"
+        assert abs(float(stereo.mean())) < 0.002, f"{path}: DC offset"
+        mono = stereo.mean(axis=1)
+        onset = mono[: int(rate * 0.022)]
+        late = mono[int(len(mono) * 0.72):]
+        onset_rms = math.sqrt(float(np.mean(onset * onset)) + 1e-12)
+        late_rms = math.sqrt(float(np.mean(late * late)) + 1e-12)
+        assert 20 * math.log10(onset_rms / late_rms) > 7.5, f"{path}: blast transient is masked"
+        assert band_share(mono, rate, 30, 250) > 0.18, f"{path}: insufficient pressure"
+        assert band_share(mono, rate, 250, 2500) > 0.12, f"{path}: insufficient blast body"
+        assert band_share(mono, rate, 2500, 16_000) > 0.004, f"{path}: insufficient debris texture"
+        explosion_variants.append(mono)
+
+    explosion_correlations = [
+        float(np.corrcoef(explosion_variants[index], explosion_variants[index + 1])[0, 1])
+        for index in range(len(explosion_variants) - 1)
+    ]
+    assert max(abs(value) for value in explosion_correlations) < 0.35, "grenade variants are too similar"
+    grenade = explosion_variants[0]
+    explosion_report = {
+        "duration": round(len(grenade) / 48_000, 3),
+        "crestDb": round(20 * math.log10(np.abs(grenade).max() / math.sqrt(np.mean(grenade * grenade))), 2),
+        "pressurePercent": round(band_share(grenade, 48_000, 30, 250) * 100, 1),
+        "bodyPercent": round(band_share(grenade, 48_000, 250, 2500) * 100, 1),
+        "debrisPercent": round(band_share(grenade, 48_000, 2500, 16_000) * 100, 1),
+    }
+    total_files = sum(len(value) for value in manifest["weapons"].values()) + len(explosion_variants)
+    print(json.dumps({
+        "files": total_files,
+        "weapons": reports,
+        "explosions": {"grenade": explosion_report},
+    }, indent=2))
 
 
 if __name__ == "__main__":

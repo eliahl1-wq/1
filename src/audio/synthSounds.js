@@ -11,6 +11,7 @@ let footstepFetchPromise = null;
 let footstepDecodePromise = null;
 let footstepDecodeContext = null;
 let gunshotMaster = null;
+let explosionMaster = null;
 let gunshotFetchPromise = null;
 let gunshotDecodePromise = null;
 let gunshotDecodeContext = null;
@@ -29,6 +30,12 @@ const SURVIV_GUNSHOT_FILES = Object.freeze({
     sniper: ['sniper-1.wav', 'sniper-2.wav', 'sniper-3.wav'],
     lmg: ['lmg-1.wav', 'lmg-2.wav', 'lmg-3.wav'],
 });
+
+const SURVIV_GRENADE_EXPLOSION_FILES = Object.freeze([
+    'grenade-1.wav',
+    'grenade-2.wav',
+    'grenade-3.wav',
+]);
 
 const SURVIV_GUNSHOT_MIX = Object.freeze({
     pistol: 0.86,
@@ -189,7 +196,7 @@ function getGunshotMaster(ctx) {
     const output = ctx.createGain();
     // Keep reports clearly above footsteps, but leave more headroom for long
     // sessions and overlapping automatic fire.
-    output.gain.value = 0.55;
+    output.gain.value = 0.45;
     compressor.connect(output);
     output.connect(getSurvivSfxOutput(ctx));
     gunshotMaster = { ctx, input: compressor };
@@ -201,12 +208,22 @@ export function preloadSurvivGunshots() {
     if (gunshotFetchPromise) return gunshotFetchPromise;
     if (typeof fetch !== 'function') return Promise.resolve(false);
 
-    const entries = Object.entries(SURVIV_GUNSHOT_FILES)
+    const gunshotEntries = Object.entries(SURVIV_GUNSHOT_FILES)
         .flatMap(([weapon, files]) => files.map((file, variant) => ({ weapon, file, variant })));
-    gunshotFetchPromise = Promise.all(entries.map(async ({ weapon, file, variant }) => {
-        const response = await fetch(`/audio/surviv/gunshots/${weapon}/${file}`, { cache: 'force-cache' });
-        if (!response.ok) throw new Error(`Unable to load Surviv gunshot ${weapon}/${file}`);
-        gunshotSampleData.set(`${weapon}:${variant}`, await response.arrayBuffer());
+    const entries = [
+        ...gunshotEntries.map(entry => ({
+            key: `${entry.weapon}:${entry.variant}`,
+            path: `/audio/surviv/gunshots/${entry.weapon}/${entry.file}`,
+        })),
+        ...SURVIV_GRENADE_EXPLOSION_FILES.map((file, variant) => ({
+            key: `explosion:grenade:${variant}`,
+            path: `/audio/surviv/explosions/grenade/${file}`,
+        })),
+    ];
+    gunshotFetchPromise = Promise.all(entries.map(async ({ key, path }) => {
+        const response = await fetch(path, { cache: 'force-cache' });
+        if (!response.ok) throw new Error(`Unable to load Surviv combat sound ${path}`);
+        gunshotSampleData.set(key, await response.arrayBuffer());
     })).then(() => true).catch((error) => {
         console.warn('Surviv gunshot preload failed:', error);
         gunshotSampleData.clear();
@@ -320,6 +337,69 @@ export function playSurvivGunshot(weaponType, options = {}) {
             retireGunshotVoice(victim);
         }
     }
+    return true;
+}
+
+function getExplosionMaster(ctx) {
+    if (explosionMaster?.ctx === ctx) return explosionMaster.input;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -3;
+    compressor.knee.value = 5;
+    compressor.ratio.value = 8;
+    compressor.attack.value = 0.001;
+    compressor.release.value = 0.13;
+    const output = ctx.createGain();
+    output.gain.value = 0.62;
+    compressor.connect(output);
+    output.connect(getSurvivSfxOutput(ctx));
+    explosionMaster = { ctx, input: compressor };
+    return compressor;
+}
+
+export function playSurvivGrenadeExplosion(options = {}) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    if (!gunshotDecodePromise) void decodeSurvivGunshots(ctx);
+
+    const variant = selectGunshotVariant('explosion:grenade', SURVIV_GRENADE_EXPLOSION_FILES.length);
+    const buffer = gunshotBuffers.get(`explosion:grenade:${variant}`);
+    if (!buffer) return false;
+
+    const distance = Math.max(0, Number(options.distance) || 0);
+    const distanceMix = Math.min(1, distance / 1650);
+    const attenuation = 1 / (1 + 2.35 * Math.pow(distanceMix, 1.16));
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.detune.value = (Math.random() - 0.5) * 14;
+
+    const removeSub = ctx.createBiquadFilter();
+    removeSub.type = 'highpass';
+    removeSub.frequency.value = 24 + Math.pow(distanceMix, 1.2) * 138;
+    removeSub.Q.value = 0.32;
+    const softenBlast = ctx.createBiquadFilter();
+    softenBlast.type = 'lowpass';
+    softenBlast.frequency.value = 17_500 - Math.pow(distanceMix, 0.72) * 14_200;
+    softenBlast.Q.value = 0.3;
+    const voiceGain = ctx.createGain();
+    voiceGain.gain.value = attenuation * (0.96 + Math.random() * 0.08);
+
+    source.connect(removeSub);
+    removeSub.connect(softenBlast);
+    softenBlast.connect(voiceGain);
+    let finalNode = voiceGain;
+    if (typeof ctx.createStereoPanner === 'function') {
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = Math.max(-0.82, Math.min(0.82, Number(options.pan) || 0));
+        voiceGain.connect(panner);
+        finalNode = panner;
+    }
+    finalNode.connect(getExplosionMaster(ctx));
+
+    const voice = { source, distance, startedAt: t };
+    activeGunshotVoices.push(voice);
+    source.onended = () => retireGunshotVoice(voice);
+    source.start(t);
     return true;
 }
 
