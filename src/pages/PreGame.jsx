@@ -228,6 +228,7 @@ export default function PreGame() {
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
     const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [withdrawAll, setWithdrawAll] = useState(false);
     const [withdrawAddress, setWithdrawAddress] = useState('');
     const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
@@ -964,20 +965,22 @@ export default function PreGame() {
         if (!token) return;
         if (!withdrawAddress || !isValidWithdrawAddress) { setStatusMsg('❌ Invalid Solana address.'); return; }
         const parsed = parseFloat(withdrawAmount);
-        if (isNaN(parsed) || parsed < 1) { setStatusMsg('❌ Minimum withdrawal is $1.00'); return; }
+        if ((!withdrawAll && (!Number.isFinite(parsed) || parsed <= 0)) || (withdrawAll && balanceSol <= 0)) { setStatusMsg('❌ Enter a valid withdrawal amount.'); return; }
+        const usdAmt = Number.isFinite(parsed) ? (isCurSOL ? parsed * solPrice : parsed) : 0;
+        if (!withdrawAll && usdAmt < 1) { setStatusMsg('❌ Minimum withdrawal is $1.00'); return; }
         setStatusMsg('⏳ Processing withdrawal…');
         try {
-            const usdAmt = isCurSOL ? parsed * solPrice : parsed;
             const r = await fetch(`${API_URL}/api/withdraw`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ amountUSD: usdAmt, destinationAddress: withdrawAddress })
+                body: JSON.stringify({ amountUSD: usdAmt, destinationAddress: withdrawAddress, withdrawAll })
             });
             const d = await r.json();
             if (!r.ok) throw new Error(d.message || 'Withdrawal failed');
             await refreshUser();
             setStatusMsg('✅ Funds sent to your wallet!');
             setWithdrawAmount('');
+            setWithdrawAll(false);
         } catch (e) { setStatusMsg(`❌ ${e.message}`); }
     };
 
@@ -1312,7 +1315,10 @@ export default function PreGame() {
                                 <CustomDropdown
                                     options={CUR_OPTIONS}
                                     value={isCurSOL ? 'SOL' : 'USD'}
-                                    onChange={v => setIsCurSOL(v === 'SOL')}
+                                    onChange={v => {
+                                        setIsCurSOL(v === 'SOL');
+                                        setWithdrawAll(false);
+                                    }}
                                     renderValue={v => (
                                         <span className="currency-option currency-option--compact">
                                             {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
@@ -1333,13 +1339,19 @@ export default function PreGame() {
                                     type="number"
                                     placeholder="0.00"
                                     value={withdrawAmount}
-                                    onChange={e => setWithdrawAmount(e.target.value)}
+                                    onChange={e => {
+                                        setWithdrawAmount(e.target.value);
+                                        setWithdrawAll(false);
+                                    }}
                                     className="amount-input withdraw-amount-input"
                                 />
                                 <button
                                     type="button"
                                     className="amount-max-btn"
-                                    onClick={() => setWithdrawAmount(isCurSOL ? balanceSol.toFixed(4) : balanceUsd.toFixed(2))}
+                                    onClick={() => {
+                                        setWithdrawAmount(isCurSOL ? balanceSol.toFixed(9) : balanceUsd.toFixed(6));
+                                        setWithdrawAll(true);
+                                    }}
                                 >
                                     MAX
                                 </button>

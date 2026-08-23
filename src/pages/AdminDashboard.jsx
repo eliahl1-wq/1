@@ -362,6 +362,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [withdrawAmountUsd, setWithdrawAmountUsd] = useState('');
+    const [withdrawAll, setWithdrawAll] = useState(false);
     const [withdrawDestination, setWithdrawDestination] = useState('');
     const [accountActionLoading, setAccountActionLoading] = useState(false);
     const [accountActionMessage, setAccountActionMessage] = useState('');
@@ -452,7 +453,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
 
     const withdrawOwnerBalance = async () => {
         const amount = Number(String(withdrawAmountUsd).replace(',', '.'));
-        if (!Number.isFinite(amount) || amount <= 0) {
+        if (!withdrawAll && (!Number.isFinite(amount) || amount <= 0)) {
             setAccountActionError(true);
             setAccountActionMessage('Enter a valid withdrawal amount.');
             return;
@@ -462,13 +463,13 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
             setAccountActionMessage('Enter a destination wallet.');
             return;
         }
-        if (!window.confirm(`Withdraw ${formatUsd(amount)} from ${detail?.user?.username} to ${withdrawDestination.trim()}? This sends a real on-chain transaction.`)) return;
+        if (!window.confirm(`${withdrawAll ? 'Withdraw the full balance' : `Withdraw ${formatUsd(amount)}`} from ${detail?.user?.username} to ${withdrawDestination.trim()}? This sends a real on-chain transaction.`)) return;
         setAccountActionLoading(true);
         setAccountActionMessage('');
         try {
             const result = await fetchAdmin(`/api/admin/users/${userId}/withdraw`, {
                 method: 'POST',
-                body: JSON.stringify({ amountUSD: amount, destinationAddress: withdrawDestination.trim() }),
+                body: JSON.stringify({ amountUSD: amount, destinationAddress: withdrawDestination.trim(), withdrawAll }),
             });
             setDetail(current => {
                 const realBalanceUsd = Math.max(0, Number(current.user.balanceUsd || 0) - Number(result.amountUsd || 0));
@@ -483,6 +484,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                 };
             });
             setWithdrawAmountUsd('');
+            setWithdrawAll(false);
             setAccountActionError(false);
             setAccountActionMessage(`${result.message} Signature: ${result.signature}`);
             await onRefresh?.();
@@ -673,7 +675,10 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'end' }}>
                                                 <label style={{ display: 'grid', gap: '5px', flex: '0 1 180px' }}>
                                                     <span style={{ color: 'var(--text-2)', fontSize: '0.72rem' }}>Amount (USD)</span>
-                                                    <input type="number" min="0" step="0.01" max={u.balanceUsd} value={withdrawAmountUsd} onChange={event => setWithdrawAmountUsd(event.target.value)} placeholder={String(u.balanceUsd ?? 0)} style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(0,0,0,.25)', color: 'var(--text-h)' }} />
+                                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                                        <input type="number" min="0" step="0.01" max={u.balanceUsd} value={withdrawAmountUsd} onChange={event => { setWithdrawAmountUsd(event.target.value); setWithdrawAll(false); }} placeholder={String(u.balanceUsd ?? 0)} style={{ minWidth: 0, flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'rgba(0,0,0,.25)', color: 'var(--text-h)' }} />
+                                                        <button type="button" className="btn btn-ghost" disabled={accountActionLoading || !(Number(u.balanceSol) > 0)} onClick={() => { setWithdrawAmountUsd(Number(u.balanceUsd || 0).toFixed(6)); setWithdrawAll(true); }}>MAX</button>
+                                                    </div>
                                                 </label>
                                                 <label style={{ display: 'grid', gap: '5px', flex: '1 1 320px' }}>
                                                     <span style={{ color: 'var(--text-2)', fontSize: '0.72rem' }}>Destination Solana wallet</span>
