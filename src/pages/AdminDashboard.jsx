@@ -555,6 +555,9 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                             <StatCard label="Available rewards" value={formatUsd(rewards?.totalAvailableUsd)} sub={u.rewardsDisabled ? 'Rewards blocked' : 'Sponsored + retained + tournament'} />
                             <StatCard label="Playtime" value={formatDuration(u.playtime ?? 0)} sub={`Last active ${formatRelativeTime(u.latestActivityAt)}`} />
                             <StatCard label="Games played" value={stats.gamesPlayed} sub={`${stats.wins}W · ${stats.losses}L · ${stats.deaths} deaths`} />
+                            <StatCard label="Played for" value={formatUsd(stats.gameSpentUsd)} sub="Paid games only" />
+                            <StatCard label="Won from games" value={formatUsd(stats.gameWonUsd)} sub="Real cashouts only" />
+                            <StatCard label="Your fees" value={formatUsd(stats.ownerEarningsUsd)} sub="Earned from this player's cashouts" />
                             <StatCard label="Deposited" value={formatUsd(stats.totalDepositedUsd)} sub={`${stats.depositCount} deposits`} />
                             <StatCard label="Withdrawn" value={formatUsd(stats.totalWithdrawnUsd)} sub={`${stats.withdrawalCount} withdrawals`} />
                         </div>
@@ -1800,7 +1803,6 @@ export default function AdminDashboard() {
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Balance</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Rewards</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Playtime</th>
-                                            <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Game totals</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Deposited</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Account</th>                                        </tr>
                                     </thead>
@@ -1849,11 +1851,6 @@ export default function AdminDashboard() {
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.balanceUsd)}<div style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{formatSol(u.balanceSol)}</div></td>
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalRewardsBalance)}{u.rewardsDisabled && <div style={{ color: '#ef4444', fontSize: '0.68rem' }}>Blocked</div>}</td>
                                                     <td style={{ padding: '12px 16px' }}>{formatDuration(u.playtime)}</td>
-                                                    <td style={{ padding: '12px 16px', minWidth: 130 }}>
-                                                        <div style={{ color: 'var(--text-h)', fontWeight: 650 }}>{formatUsd(u.gameSpentUsd)} <span style={{ color: 'var(--text-3)', fontSize: '0.64rem', fontWeight: 500 }}>played</span></div>
-                                                        <div style={{ marginTop: 3, color: '#4ade80', fontSize: '0.7rem' }}>{formatUsd(u.gameWonUsd)} won</div>
-                                                        <div style={{ marginTop: 2, color: '#c4b5fd', fontSize: '0.68rem' }}>{formatUsd(u.ownerEarningsUsd)} your fees</div>
-                                                    </td>
                                                     <td style={{ padding: '12px 16px' }}>{formatUsd(u.totalDepositedUsd)}<div style={{ color: 'var(--text-3)', fontSize: '0.68rem' }}>{u.depositCount} deposits</div></td>
                                                     <td style={{ padding: '12px 16px' }}>                                                        {isExcluded ? <OutcomeBadge outcome="excluded" /> : u.isOwnerAccount ? (
                                                             <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 'var(--r-full)', background: 'rgba(139,92,246,0.16)', color: '#a78bfa', fontSize: '0.72rem', fontWeight: 700 }}>Your account</span>
