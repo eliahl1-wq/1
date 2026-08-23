@@ -7,8 +7,10 @@ import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
 import {
+    playSurvivBreakSound,
     playSurvivFootstep,
     playSurvivGunshot,
+    playSurvivMeleeSwing,
     preloadSurvivGunshots,
     preloadSurvivFootsteps,
     unlockGameAudio,
@@ -77,7 +79,7 @@ function meleePunchPose(progress) {
     const t = clamp(progress, 0, 1);
     if (t < 0.16) {
         const windup = smoothstep01(t / 0.16);
-        return { reach: -0.12 * windup, lateral: 0.16 * windup, force: 0, alpha: 1 };
+        return { reach: -0.12 * windup, lateral: 0.16 * windup, force: 0 };
     }
     if (t < 0.4) {
         const strike = easeOutCubic((t - 0.16) / 0.24);
@@ -85,26 +87,18 @@ function meleePunchPose(progress) {
             reach: lerp(-0.12, 1, strike),
             lateral: lerp(0.16, -0.42, strike),
             force: strike,
-            alpha: 1,
         };
     }
     if (t < 0.5) {
         const contact = smoothstep01((t - 0.4) / 0.1);
-        return { reach: 1 - contact * 0.04, lateral: -0.42 + contact * 0.05, force: 1, alpha: 1 };
+        return { reach: 1 - contact * 0.04, lateral: -0.42 + contact * 0.05, force: 1 };
     }
-    if (t < 0.68) {
-        // Keep the fist at the contact point while it disappears. A visible
-        // backward path reads as a second strike in a top-down view.
-        const settle = smoothstep01((t - 0.5) / 0.18);
-        return { reach: 0.96, lateral: -0.37, force: 1 - settle, alpha: 1 - settle };
-    }
-    // Reset invisibly at the neutral pose, then restore opacity. There is only
-    // one directional movement on screen for every accepted melee attack.
+    const releaseLinear = clamp((t - 0.5) / 0.5, 0, 1);
+    const release = smoothstep01(releaseLinear);
     return {
-        reach: 0,
-        lateral: 0,
-        force: 0,
-        alpha: smoothstep01((t - 0.72) / 0.2),
+        reach: lerp(0.96, 0, release),
+        lateral: lerp(-0.37, 0, release) + Math.sin(releaseLinear * Math.PI) * 0.34,
+        force: 1 - release,
     };
 }
 
@@ -1012,6 +1006,7 @@ export class SurvivRenderer {
         this._houseBucketSize = 800;
         this._playersById = new Map();
         this._meleeAnimations = new Map();
+        this._lastPlayedMeleeAttackIds = new Map();
         this._visibleFields = [];
         this._visibleWater = [];
         this._visibleRoads = [];
@@ -1367,6 +1362,7 @@ export class SurvivRenderer {
         this._houseBuckets.clear();
         this._playersById.clear();
         this._meleeAnimations.clear();
+        this._lastPlayedMeleeAttackIds.clear();
         this._visibleFields.length = 0;
         this._visibleWater.length = 0;
         this._visibleRoads.length = 0;
@@ -1748,6 +1744,13 @@ export class SurvivRenderer {
                 startedAt: state.startedAt,
                 endAt: state.endAt,
             });
+            const listener = this._playersById.get(this.myId) || this.me || this.camera;
+            const breakDx = item.spawnX - (Number(listener?.x) || 0);
+            const breakDy = item.spawnY - (Number(listener?.y) || 0);
+            playSurvivBreakSound('wood', {
+                distance: Math.hypot(breakDx, breakDy),
+                pan: clamp(breakDx / 720, -0.78, 0.78),
+            });
 
             const burstColor = RARITY_COLORS[item.tier] || '#f5bd63';
             for (let i = 0; i < 16; i++) {
@@ -1855,7 +1858,9 @@ export class SurvivRenderer {
             const estimatedMeleeStartedAt = receivedAt
                 - Math.max(0, MELEE_ANIMATION_MS - meleeRemainingMs);
             let meleeAnimation = this._meleeAnimations.get(player.id);
-            if (meleeRemainingMs > 0 && (!meleeAnimation || meleeAnimation.attackId !== meleeAttackId)) {
+            const lastPlayedAttackId = this._lastPlayedMeleeAttackIds.get(player.id) || 0;
+            const unseenAttack = meleeAttackId > lastPlayedAttackId;
+            if (meleeRemainingMs > 0 && unseenAttack) {
                 meleeAnimation = {
                     attackId: meleeAttackId,
                     startedAt: estimatedMeleeStartedAt,
@@ -1864,6 +1869,15 @@ export class SurvivRenderer {
                     weapon: player.weapon,
                 };
                 this._meleeAnimations.set(player.id, meleeAnimation);
+                this._lastPlayedMeleeAttackIds.set(player.id, meleeAttackId);
+                const listener = this._playersById.get(this.myId) || this.me || this.camera;
+                const isLocal = player.isYou || player.id === this.myId;
+                const dx = isLocal ? 0 : (Number(player.x) || 0) - (Number(listener?.x) || 0);
+                const dy = isLocal ? 0 : (Number(player.y) || 0) - (Number(listener?.y) || 0);
+                playSurvivMeleeSwing(player.weapon || 'fists', {
+                    distance: Math.hypot(dx, dy),
+                    pan: clamp(dx / 620, -0.76, 0.76),
+                });
             } else if (meleeRemainingMs <= 0 && meleeAnimation?.until <= receivedAt) {
                 this._meleeAnimations.delete(player.id);
                 meleeAnimation = null;
@@ -1876,12 +1890,10 @@ export class SurvivRenderer {
                 reloadEndAtLocal: player.reloading
                     ? receivedAt + Math.max(0, Number(player.reloadRemainingMs) || 0)
                     : 0,
-                meleeStartedAt: meleeRemainingMs > 0
-                    ? continuingMelee ? meleeAnimation.startedAt : estimatedMeleeStartedAt
-                    : player.meleeStartedAt || 0,
-                meleeUntil: meleeRemainingMs > 0
-                    ? continuingMelee ? meleeAnimation.until : estimatedMeleeStartedAt + MELEE_ANIMATION_MS
-                    : player.meleeUntil || 0,
+                // Never fall back to stale server timestamps. Only the locally
+                // registered, previously unseen attack id may drive visuals.
+                meleeStartedAt: continuingMelee ? meleeAnimation.startedAt : 0,
+                meleeUntil: continuingMelee ? meleeAnimation.until : 0,
                 meleeHand: continuingMelee ? meleeAnimation.hand : meleeHand,
                 meleeAttackId,
             };
@@ -1954,6 +1966,9 @@ export class SurvivRenderer {
         }
         for (const playerId of this._meleeAnimations.keys()) {
             if (!activePlayerIds.has(playerId)) this._meleeAnimations.delete(playerId);
+        }
+        for (const playerId of this._lastPlayedMeleeAttackIds.keys()) {
+            if (!activePlayerIds.has(playerId)) this._lastPlayedMeleeAttackIds.delete(playerId);
         }
         while (this._seenDeathMarkerIds.size > 200) {
             this._seenDeathMarkerIds.delete(this._seenDeathMarkerIds.values().next().value);
@@ -2028,6 +2043,30 @@ export class SurvivRenderer {
         if (Array.isArray(tick.obstacles)) {
             const nextObstacles = this.mergeObstaclePatch(tick.obstacles, tick.obstaclePatch);
             const previousObstacles = new Map(this.obstacles.map(obstacle => [obstacle.id, obstacle]));
+            const nextObstacleIds = new Set(nextObstacles.map(obstacle => obstacle.id));
+            const listener = me || this.camera;
+            const nearbyDestroyed = [...previousObstacles.values()]
+                .filter(obstacle => obstacle.destructible
+                    && Number(obstacle.hp) > 0
+                    // Map crates also emit a chest burst in the loot snapshot;
+                    // let that path own the sound so one break is never doubled.
+                    && obstacle.kind !== 'crate'
+                    && !nextObstacleIds.has(obstacle.id))
+                .map(obstacle => ({
+                    obstacle,
+                    dx: (Number(obstacle.x) || 0) - (Number(listener?.x) || 0),
+                    dy: (Number(obstacle.y) || 0) - (Number(listener?.y) || 0),
+                }))
+                .filter(entry => Math.hypot(entry.dx, entry.dy) <= 1050)
+                .sort((a, b) => Math.hypot(a.dx, a.dy) - Math.hypot(b.dx, b.dy))
+                .slice(0, 3);
+            for (const { obstacle, dx, dy } of nearbyDestroyed) {
+                const material = obstacle.variant === 'metal' ? 'metal' : obstacle.kind;
+                playSurvivBreakSound(material, {
+                    distance: Math.hypot(dx, dy),
+                    pan: clamp(dx / 720, -0.78, 0.78),
+                });
+            }
             for (const obstacle of nextObstacles) {
                 const previous = previousObstacles.get(obstacle.id);
                 if (previous?._hitAt) obstacle._hitAt = previous._hitAt;
@@ -7324,7 +7363,7 @@ export class SurvivRenderer {
             const progress = punching ? clamp((now - meleeStartedAt) / duration, 0, 1) : 0;
             const pose = punching
                 ? meleePunchPose(progress)
-                : { reach: 0, lateral: 0, force: 0, alpha: 1 };
+                : { reach: 0, lateral: 0, force: 0 };
 
             // One hand attacks per accepted attack id. The server alternates
             // which hand is selected for the next distinct click.
@@ -7340,13 +7379,10 @@ export class SurvivRenderer {
                 ? { x: leadReach, y: leadY, lead: true }
                 : { x: guardReach, y: guardY, lead: false };
 
-            // The guard remains stable. The lead fist has exactly one visible
-            // directional movement, then resets without a backward "hit".
+            // Both hands stay solid and retain the same white outline while the
+            // lead fist follows the smoother original strike/recovery curve.
             drawPlayerHand(ctx, leadSide < 0 ? bottomHand : topHand, playerColor);
-            ctx.save();
-            ctx.globalAlpha *= pose.alpha;
             drawPlayerHand(ctx, leadSide < 0 ? topHand : bottomHand, playerColor);
-            ctx.restore();
             return;
         }
 

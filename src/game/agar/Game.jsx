@@ -482,7 +482,7 @@ export default function Game() {
             setShowResultModal(false);
             setIsConnected(true);
             refreshUser?.();
-            const startBal = playerSettings.balance ?? 1.0;
+            const startBal = playerSettings.dollarBalance ?? playerSettings.balance ?? 1.0;
             prevBalanceRef.current = startBal;
             prevKillsRef.current = playerSettings.kills ?? 0;
             setCurrentBalance(startBal);
@@ -565,7 +565,7 @@ export default function Game() {
             if (!rewardInfo?.battleRoyale) {
                 const me = userData.find(p => p.id === myIdRef.current);
                 if (me) {
-                    const newBal = me.balance ?? 0;
+                    const newBal = me.dollarBalance ?? me.balance ?? 0;
                     prevBalanceRef.current = newBal;
                     setCurrentBalance(newBal);
                     if (me.kills != null) prevKillsRef.current = me.kills;
@@ -937,7 +937,7 @@ export default function Game() {
                 // Rita celler
                 const cellsToDraw = users.flatMap(u => {
                     const totalCellMass = (u.cells || []).reduce((sum, cell) => sum + (Number(cell.balance) || 0), 0);
-                    const totalDollarBalance = Number(u.balance ?? u.dollarBalance ?? 0) || 0;
+                    const totalDollarBalance = Number(u.dollarBalance ?? u.balance ?? 0) || 0;
                     return (u.cells || []).map(c => {
                         const massShare = totalCellMass > 0 ? (Number(c.balance) || 0) / totalCellMass : 0;
                         return {

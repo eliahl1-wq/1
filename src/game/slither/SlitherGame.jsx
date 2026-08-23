@@ -648,7 +648,7 @@ export default function SlitherGame() {
 
             // Competitive arena food only changes mass. Dollar balance increases
             // exclusively when eating paid death drops, so normal food stays silent.
-            const hudBalance = tick.competitiveSlither ? tick.dollarBalance : tick.balance;
+            const hudBalance = tick.dollarBalance ?? tick.balance;
             if (!tick.battleRoyale && hudBalance != null) {
                 const prev = prevBalanceRef.current;
                 if (prev != null && hudBalance > prev + 0.001) {

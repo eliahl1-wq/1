@@ -21,10 +21,10 @@ const BASE = {
     foodLow: 12.0,   // 1–2 humans
     foodMid: 16.0,   // 3–7 humans
     foodHigh: 20.0,  // 8+ humans
-    aiLow: 2.0,   // per join: fund 2 bots; 2 joins → 4 bots max at botStart stake
+    aiLow: 2.0,
     aiMid: 1.0,
     aiHigh: 0.0,
-    botStart: 1.0,
+    botStart: 2.0,
     botMax: 500.0,
     foodDensityPerHuman: 500.0,
     /** Snake mass gained per normal pellet at $10 entry ($5→0.01, $10→0.02, $20→0.04). Decoupled from dollar value. */

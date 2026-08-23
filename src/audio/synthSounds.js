@@ -1,10 +1,12 @@
 let audioCtx = null;
 let unlocked = false;
+let survivSfxOutput = null;
 const noiseBuffers = new Map();
 const footstepSampleData = new Map();
 const footstepSampleBuffers = new Map();
 let footstepMaster = null;
 let foodPickupMaster = null;
+let actionSoundMaster = null;
 let footstepFetchPromise = null;
 let footstepDecodePromise = null;
 let footstepDecodeContext = null;
@@ -70,6 +72,17 @@ function createCtx() {
     if (!Ctx) return null;
     audioCtx = new Ctx();
     return audioCtx;
+}
+
+function getSurvivSfxOutput(ctx) {
+    if (survivSfxOutput?.ctx === ctx) return survivSfxOutput.input;
+    const input = ctx.createGain();
+    // A small global trim keeps every Surviv effect below its previous level
+    // while preserving the carefully balanced differences between effects.
+    input.gain.value = 0.82;
+    input.connect(ctx.destination);
+    survivSfxOutput = { ctx, input };
+    return input;
 }
 
 function getNoiseBuffer(ctx, durationSec = 0.03, variation = 0) {
@@ -176,7 +189,7 @@ function getGunshotMaster(ctx) {
     const output = ctx.createGain();
     output.gain.value = 0.78;
     compressor.connect(output);
-    output.connect(ctx.destination);
+    output.connect(getSurvivSfxOutput(ctx));
     gunshotMaster = { ctx, input: compressor };
     return compressor;
 }
@@ -334,7 +347,7 @@ function getFoodPickupMaster(ctx) {
     const output = ctx.createGain();
     output.gain.value = 0.72;
     compressor.connect(output);
-    output.connect(ctx.destination);
+    output.connect(getSurvivSfxOutput(ctx));
     foodPickupMaster = compressor;
     return foodPickupMaster;
 }
@@ -422,6 +435,181 @@ export function playFoodEatSound() {
     contact.stop(t + 0.011);
 }
 
+function getActionSoundMaster(ctx) {
+    if (actionSoundMaster?.ctx === ctx) return actionSoundMaster.input;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -16;
+    compressor.knee.value = 10;
+    compressor.ratio.value = 2.5;
+    compressor.attack.value = 0.002;
+    compressor.release.value = 0.075;
+    const output = ctx.createGain();
+    output.gain.value = 0.7;
+    compressor.connect(output);
+    output.connect(getSurvivSfxOutput(ctx));
+    actionSoundMaster = { ctx, input: compressor };
+    return compressor;
+}
+
+function connectSpatialActionBus(ctx, bus, pan = 0) {
+    const master = getActionSoundMaster(ctx);
+    if (typeof ctx.createStereoPanner !== 'function') {
+        bus.connect(master);
+        return;
+    }
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = Math.max(-0.78, Math.min(0.78, Number(pan) || 0));
+    bus.connect(panner);
+    panner.connect(master);
+}
+
+function actionDistanceGain(distance, range = 900) {
+    const normalized = Math.max(0, Number(distance) || 0) / range;
+    return 1 / (1 + 2.4 * Math.pow(normalized, 1.3));
+}
+
+/** A dry air/cloth movement for fists and a sharper air cut for knives. */
+export function playSurvivMeleeSwing(weaponType = 'fists', options = {}) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const isKnife = weaponType === 'knife';
+    const attenuation = actionDistanceGain(options.distance, 760);
+    if (attenuation < 0.035) return false;
+    const t = ctx.currentTime;
+    const duration = isKnife ? 0.17 : 0.145;
+    const pitch = 0.96 + Math.random() * 0.08;
+    const bus = ctx.createGain();
+    bus.gain.value = attenuation * (0.91 + Math.random() * 0.12);
+    connectSpatialActionBus(ctx, bus, options.pan);
+
+    const air = ctx.createBufferSource();
+    air.buffer = getNoiseBuffer(ctx, duration + 0.02, Math.floor(Math.random() * 16));
+    air.playbackRate.value = pitch;
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.setValueAtTime(isKnife ? 620 : 230, t);
+    highpass.frequency.exponentialRampToValueAtTime(isKnife ? 1250 : 410, t + duration);
+    highpass.Q.value = 0.35;
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.setValueAtTime(isKnife ? 7200 : 2850, t);
+    lowpass.frequency.exponentialRampToValueAtTime(isKnife ? 4100 : 1750, t + duration);
+    lowpass.Q.value = 0.42;
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0.0001, t);
+    envelope.gain.exponentialRampToValueAtTime(isKnife ? 0.22 : 0.19, t + duration * 0.36);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    air.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(envelope);
+    envelope.connect(bus);
+    air.start(t);
+    air.stop(t + duration + 0.02);
+
+    // A quiet second pass gives the swing natural clothing/hand movement and
+    // prevents consecutive attacks from feeling like a single repeated hiss.
+    const cloth = ctx.createBufferSource();
+    cloth.buffer = getNoiseBuffer(ctx, 0.075, Math.floor(Math.random() * 16));
+    const clothBand = ctx.createBiquadFilter();
+    clothBand.type = 'bandpass';
+    clothBand.frequency.value = isKnife ? 2500 : 920;
+    clothBand.Q.value = 0.58;
+    const clothGain = ctx.createGain();
+    clothGain.gain.setValueAtTime(0.0001, t + 0.035);
+    clothGain.gain.linearRampToValueAtTime(isKnife ? 0.045 : 0.075, t + 0.047);
+    clothGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.105);
+    cloth.connect(clothBand);
+    clothBand.connect(clothGain);
+    clothGain.connect(bus);
+    cloth.start(t + 0.035);
+    cloth.stop(t + 0.115);
+    return true;
+}
+
+const BREAK_SOUND_PROFILES = Object.freeze({
+    wood: { lowpass: 4300, body: 270, crack: 1850, level: 0.3, fragments: 5, duration: 0.25 },
+    stone: { lowpass: 6500, body: 210, crack: 3150, level: 0.28, fragments: 7, duration: 0.29 },
+    metal: { lowpass: 4700, body: 245, crack: 2350, level: 0.22, fragments: 4, duration: 0.23 },
+    foliage: { lowpass: 3600, body: 190, crack: 1250, level: 0.25, fragments: 6, duration: 0.31 },
+});
+
+function normalizeBreakMaterial(material) {
+    if (BREAK_SOUND_PROFILES[material]) return material;
+    if (['crate', 'tree', 'furniture', 'door', 'container'].includes(material)) return 'wood';
+    if (['rock', 'wall', 'concrete', 'stone'].includes(material)) return 'stone';
+    if (['barrel', 'machine'].includes(material)) return 'metal';
+    if (['bush', 'plant'].includes(material)) return 'foliage';
+    return 'wood';
+}
+
+/** Layered debris, impact body and irregular fragments for destroyed props. */
+export function playSurvivBreakSound(material = 'wood', options = {}) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const profile = BREAK_SOUND_PROFILES[normalizeBreakMaterial(material)];
+    const attenuation = actionDistanceGain(options.distance, 980);
+    if (attenuation < 0.03) return false;
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = attenuation * (0.92 + Math.random() * 0.12);
+    connectSpatialActionBus(ctx, bus, options.pan);
+
+    const debris = ctx.createBufferSource();
+    debris.buffer = getNoiseBuffer(ctx, profile.duration + 0.025, Math.floor(Math.random() * 16));
+    debris.playbackRate.value = 0.96 + Math.random() * 0.08;
+    const debrisHigh = ctx.createBiquadFilter();
+    debrisHigh.type = 'highpass';
+    debrisHigh.frequency.value = 55;
+    debrisHigh.Q.value = 0.35;
+    const debrisLow = ctx.createBiquadFilter();
+    debrisLow.type = 'lowpass';
+    debrisLow.frequency.value = profile.lowpass;
+    debrisLow.Q.value = 0.45;
+    const debrisGain = ctx.createGain();
+    debrisGain.gain.setValueAtTime(0.0001, t);
+    debrisGain.gain.linearRampToValueAtTime(profile.level, t + 0.002);
+    debrisGain.gain.exponentialRampToValueAtTime(0.0001, t + profile.duration);
+    debris.connect(debrisHigh);
+    debrisHigh.connect(debrisLow);
+    debrisLow.connect(debrisGain);
+    debrisGain.connect(bus);
+
+    const bodyLow = ctx.createBiquadFilter();
+    bodyLow.type = 'lowpass';
+    bodyLow.frequency.value = profile.body;
+    bodyLow.Q.value = 0.45;
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0.16, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.095);
+    debris.connect(bodyLow);
+    bodyLow.connect(bodyGain);
+    bodyGain.connect(bus);
+    debris.start(t);
+    debris.stop(t + profile.duration + 0.03);
+
+    for (let index = 0; index < profile.fragments; index++) {
+        const variation = Math.random();
+        const offset = 0.012 + index * 0.018 + variation * 0.019;
+        const fragment = ctx.createBufferSource();
+        fragment.buffer = getNoiseBuffer(ctx, 0.032, index + Math.floor(Math.random() * 12));
+        fragment.playbackRate.value = 0.9 + variation * 0.22;
+        const fragmentBand = ctx.createBiquadFilter();
+        fragmentBand.type = 'bandpass';
+        fragmentBand.frequency.value = profile.crack * (0.72 + variation * 0.62);
+        fragmentBand.Q.value = 0.7;
+        const fragmentGain = ctx.createGain();
+        fragmentGain.gain.setValueAtTime(0.0001, t + offset);
+        fragmentGain.gain.linearRampToValueAtTime(0.085 + variation * 0.055, t + offset + 0.0015);
+        fragmentGain.gain.exponentialRampToValueAtTime(0.0001, t + offset + 0.028);
+        fragment.connect(fragmentBand);
+        fragmentBand.connect(fragmentGain);
+        fragmentGain.connect(bus);
+        fragment.start(t + offset);
+        fragment.stop(t + offset + 0.035);
+    }
+    return true;
+}
+
 const FOOTSTEP_PROFILES = Object.freeze({
     grass: { volume: 0.32, highpass: 55, lowpass: 4700, bodyGain: 0.055, bodyLowpass: 235, duration: 0.29, rate: 0.98 },
     dirt: { volume: 0.34, highpass: 48, lowpass: 2850, bodyGain: 0.072, bodyLowpass: 255, duration: 0.27, rate: 0.95 },
@@ -456,7 +644,7 @@ function getFootstepMaster(ctx) {
     const output = ctx.createGain();
     output.gain.value = 0.42;
     compressor.connect(output);
-    output.connect(ctx.destination);
+    output.connect(getSurvivSfxOutput(ctx));
     footstepMaster = { ctx, input: compressor };
     return compressor;
 }
