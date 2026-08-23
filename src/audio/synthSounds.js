@@ -187,7 +187,9 @@ function getGunshotMaster(ctx) {
     compressor.attack.value = 0.0015;
     compressor.release.value = 0.085;
     const output = ctx.createGain();
-    output.gain.value = 0.78;
+    // Keep reports clearly above footsteps, but leave more headroom for long
+    // sessions and overlapping automatic fire.
+    output.gain.value = 0.55;
     compressor.connect(output);
     output.connect(getSurvivSfxOutput(ctx));
     gunshotMaster = { ctx, input: compressor };
