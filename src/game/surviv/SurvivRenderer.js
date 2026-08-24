@@ -386,129 +386,174 @@ function drawLegacyHeldWeaponTopDown(ctx, weapon) {
 }
 
 function drawSimpleWeaponShape(ctx, profile) {
-    const metal = profile.metal;
-    const dark = profile.dark;
-    const furniture = profile.accent || profile.furniture;
-    const width = profile.width;
+    // Classic Surviv weapons are tiny gameplay silhouettes, not inventory art.
+    // A receiver, stock, magazine and barrel are enough to identify almost
+    // every gun; keeping those shapes flat also makes this hot draw path cheap.
+    const metal = '#343f42';
+    const dark = '#171e20';
+    const furniture = profile.accent || profile.furniture || '#36403d';
+    const width = clamp(profile.width * 0.86, 5, 8.8);
     const total = profile.length;
-    const outline = '#111718';
-    const bodyStart = ['none', 'grip'].includes(profile.stock) ? 3 : Math.max(6, total * 0.24);
+    const outline = '#101617';
+    const noStock = ['none', 'grip'].includes(profile.stock);
+    const bodyStart = noStock ? 3 : clamp(total * 0.23, 6.5, 10);
     const bodyEnd = Math.max(bodyStart + 8, total - profile.barrel);
+    const fillShape = (fill = metal) => {
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 1.25;
+        ctx.fill();
+        ctx.stroke();
+    };
 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
     if (profile.style === 'bugle') {
         ctx.strokeStyle = furniture;
-        ctx.lineWidth = 3.4;
+        ctx.lineWidth = 3.2;
         ctx.beginPath();
         ctx.moveTo(3, 0);
-        ctx.bezierCurveTo(10, -5, 17, -5, 21, 0);
+        ctx.bezierCurveTo(9, -4.4, 16, -4.4, 20, 0);
         ctx.stroke();
-        ctx.fillStyle = furniture;
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = 1.1;
         ctx.beginPath();
-        ctx.moveTo(20, -5.2);
-        ctx.lineTo(total, -8);
-        ctx.lineTo(total, 8);
-        ctx.lineTo(20, 5.2);
+        ctx.moveTo(19, -4.6);
+        ctx.lineTo(total, -7.2);
+        ctx.lineTo(total, 7.2);
+        ctx.lineTo(19, 4.6);
         ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        fillShape(furniture);
         return;
     }
 
     if (profile.style === 'pistol' || profile.style === 'revolver') {
-        const cylinder = profile.style === 'revolver';
-        drawGunPart(ctx, 3, -width / 2, bodyEnd - 3, width, metal, 1.25, outline, 1.1);
-        if (cylinder) drawGunPart(ctx, bodyEnd * 0.48, -width * 0.64, width * 0.8, width * 1.28, furniture, width * 0.3, outline, 1.05);
-        drawGunPart(ctx, bodyEnd - 1, -Math.max(1.5, width * 0.27), total - bodyEnd, Math.max(3, width * 0.54), metal, 0.8, outline, 1.05);
-        if (profile.suppressor) drawGunPart(ctx, total - 5, -width * 0.39, 7, width * 0.78, dark, 1.4, outline, 1.05);
+        const revolver = profile.style === 'revolver';
+        // The rear grip, centered slide/cylinder and narrow muzzle form one
+        // compact silhouette instead of several highlighted mechanical parts.
+        ctx.beginPath();
+        ctx.moveTo(2.5, -width * 0.58);
+        ctx.lineTo(9.5, -width * 0.48);
+        ctx.lineTo(10.5, width * 0.48);
+        ctx.lineTo(2.5, width * 0.58);
+        ctx.closePath();
+        fillShape(furniture);
+        drawGunPart(ctx, 7, -width / 2, bodyEnd - 7, width, metal, 1.2, outline, 1.25);
+        if (revolver) {
+            ctx.beginPath();
+            ctx.ellipse(bodyEnd - 4.5, 0, 3.7, width * 0.67, 0, 0, Math.PI * 2);
+            fillShape('#4a5659');
+        }
+        drawGunPart(
+            ctx,
+            bodyEnd - 0.5,
+            -Math.max(1.35, width * 0.24),
+            total - bodyEnd + 1,
+            Math.max(2.7, width * 0.48),
+            revolver ? metal : dark,
+            0.7,
+            outline,
+            1.1,
+        );
+        if (profile.suppressor) drawGunPart(ctx, total - 5, -2, 7, 4, dark, 1.3, outline, 1.1);
         return;
     }
 
+    // Stocks use one unmistakable shape. Skeleton and wire variants remain
+    // open, while full/fixed/bullpup stocks use a single tapered plate.
     if (profile.stock === 'wire' || profile.stock === 'skeleton') {
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = 2.1;
+        ctx.strokeStyle = dark;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(1, -width * 0.32);
-        ctx.lineTo(bodyStart + 1, -width * 0.5);
-        ctx.moveTo(1, width * 0.32);
-        ctx.lineTo(bodyStart + 1, width * 0.5);
+        ctx.moveTo(1, -width * 0.3);
+        ctx.lineTo(bodyStart + 1, -width * 0.48);
+        ctx.moveTo(1, width * 0.3);
+        ctx.lineTo(bodyStart + 1, width * 0.48);
         ctx.stroke();
     } else if (!['none', 'grip', 'tank'].includes(profile.stock)) {
-        ctx.fillStyle = furniture;
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = 1.1;
         ctx.beginPath();
-        ctx.moveTo(1, -width * 0.32);
-        ctx.lineTo(bodyStart + 1, -width * 0.55);
-        ctx.lineTo(bodyStart + 2, width * 0.55);
-        ctx.lineTo(1, width * 0.32);
+        ctx.moveTo(1, -width * 0.31);
+        ctx.lineTo(bodyStart + 1.5, -width * 0.54);
+        ctx.lineTo(bodyStart + 1.5, width * 0.54);
+        ctx.lineTo(1, width * 0.31);
         ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        fillShape(furniture);
     }
 
-    drawGunPart(ctx, bodyStart, -width / 2, bodyEnd - bodyStart, width, metal, 1.25, outline, 1.1);
+    // Receiver and handguard deliberately form one flat body.
+    ctx.beginPath();
+    ctx.moveTo(bodyStart, -width / 2);
+    ctx.lineTo(bodyEnd, -width * 0.4);
+    ctx.lineTo(bodyEnd, width * 0.4);
+    ctx.lineTo(bodyStart, width / 2);
+    ctx.closePath();
+    fillShape(metal);
 
+    const magX = profile.bullpup ? bodyStart + 1.8 : bodyStart + Math.min(6.2, (bodyEnd - bodyStart) * 0.46);
     if (profile.magazine === 'pan') {
-        ctx.fillStyle = dark;
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = 1.1;
         ctx.beginPath();
-        ctx.ellipse(bodyStart + 6, 0, 5.7, width * 0.78, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        ctx.ellipse(magX, 0, 5.6, width * 0.74, 0, 0, Math.PI * 2);
+        fillShape(dark);
     } else if (profile.magazine === 'drum' || profile.magazine === 'tank') {
-        const magX = profile.bullpup ? bodyStart + 2 : bodyStart + 6;
-        ctx.fillStyle = dark;
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = 1.1;
         ctx.beginPath();
-        ctx.arc(magX, 0, width * 0.66, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-    } else if (['box', 'curved', 'stick'].includes(profile.magazine)) {
-        const magX = profile.bullpup ? bodyStart + 1.5 : bodyStart + 5;
-        drawGunPart(ctx, magX, -width * 0.67, profile.magazine === 'stick' ? 3.2 : 5, width * 1.34, dark, 1.2, outline, 1.05);
+        ctx.arc(magX, 0, width * 0.61, 0, Math.PI * 2);
+        fillShape(dark);
+    } else if (profile.magazine === 'curved') {
+        ctx.beginPath();
+        ctx.moveTo(magX - 1.8, -width * 0.53);
+        ctx.lineTo(magX + 2.5, -width * 0.6);
+        ctx.quadraticCurveTo(magX + 5.4, 0, magX + 2.5, width * 0.6);
+        ctx.lineTo(magX - 1.8, width * 0.53);
+        ctx.closePath();
+        fillShape(dark);
+    } else if (['box', 'stick', 'small'].includes(profile.magazine)) {
+        const magWidth = profile.magazine === 'stick' ? 3 : profile.magazine === 'small' ? 3.6 : 4.8;
+        drawGunPart(ctx, magX - magWidth / 2, -width * 0.62, magWidth, width * 1.24, dark, 1, outline, 1.1);
     }
 
     if (profile.style === 'shotgun') {
-        drawGunPart(ctx, bodyEnd - 5, -width * 0.44, Math.min(10, profile.barrel), width * 0.88, furniture, 1.3, outline, 1.05);
-    }
-    if (profile.style === 'special') {
-        ctx.fillStyle = furniture;
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = 1.1;
+        const pumpLength = Math.min(9, Math.max(6, profile.barrel * 0.58));
+        drawGunPart(ctx, bodyEnd - pumpLength * 0.72, -width * 0.39, pumpLength, width * 0.78, furniture, 1.2, outline, 1.1);
+    } else if (profile.style === 'special') {
         ctx.beginPath();
-        ctx.ellipse(bodyStart + 5, 0, 6, width * 0.68, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        ctx.ellipse(bodyStart + 4.6, 0, 5.2, width * 0.63, 0, 0, Math.PI * 2);
+        fillShape(furniture);
     }
 
-    const barrelWidth = profile.style === 'shotgun' || profile.style === 'special' ? 3.4 : 2.5;
-    drawGunPart(ctx, bodyEnd - 0.5, -barrelWidth / 2, total - bodyEnd + 1, barrelWidth, dark, 0.7, outline, 1);
+    const barrelWidth = ['shotgun', 'special'].includes(profile.style) ? 3.2 : 2.25;
+    drawGunPart(ctx, bodyEnd - 0.4, -barrelWidth / 2, total - bodyEnd + 0.9, barrelWidth, dark, 0.55, outline, 1.05);
     if (profile.barrelCount > 1) {
-        ctx.strokeStyle = '#738083';
-        ctx.lineWidth = 1.05;
+        ctx.strokeStyle = '#697578';
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(bodyEnd, 0);
         ctx.lineTo(total, 0);
         ctx.stroke();
     }
-    if (profile.suppressor) drawGunPart(ctx, total - 6, -2.6, 8, 5.2, dark, 1.5, outline, 1.05);
-    if (profile.scope) drawGunPart(ctx, bodyStart + 4, -2, profile.scope === 'long' ? 13 : 9, 4, dark, 1.8, outline, 1);
-    if (profile.stock === 'tank') {
-        ctx.fillStyle = furniture;
-        ctx.strokeStyle = outline;
-        ctx.lineWidth = 1.1;
-        ctx.beginPath();
-        ctx.ellipse(bodyStart - 2, 0, 5, width * 0.72, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+    if (profile.suppressor) drawGunPart(ctx, total - 6, -2.35, 8, 4.7, dark, 1.35, outline, 1.1);
+    if (profile.scope) {
+        const scopeLength = profile.scope === 'long' ? 12 : 8.5;
+        drawGunPart(ctx, bodyStart + 3.5, -1.75, scopeLength, 3.5, dark, 1.7, outline, 1.05);
     }
+    if (profile.stock === 'tank') {
+        ctx.beginPath();
+        ctx.ellipse(bodyStart - 1.5, 0, 4.5, width * 0.68, 0, 0, Math.PI * 2);
+        fillShape(furniture);
+    }
+}
+
+function getHeldWeaponHandAnchors(weapon) {
+    const profile = getSurvivWeaponVisualProfile(weapon);
+    if (profile.dual) {
+        return [{ x: 5.6, y: -6.6 }, { x: 5.6, y: 6.6 }];
+    }
+    const rearX = profile.style === 'pistol' || profile.style === 'revolver'
+        ? 5.2
+        : clamp(profile.length * 0.29, 7, 11.5);
+    const frontX = profile.style === 'pistol' || profile.style === 'revolver'
+        ? rearX
+        : clamp(profile.length - profile.barrel - 1.5, rearX + 5.5, profile.length - 3);
+    const gripSpread = clamp(profile.width * 0.58, 3.5, 5.4);
+    return [{ x: rearX, y: -gripSpread }, { x: frontX, y: gripSpread }];
 }
 
 function drawHeldWeaponTopDown(ctx, weapon) {
@@ -516,21 +561,14 @@ function drawHeldWeaponTopDown(ctx, weapon) {
     if (profile.dual) {
         for (const side of [-1, 1]) {
             ctx.save();
-            ctx.translate(0, side * 5.2);
-            ctx.scale(0.88, 0.88);
+            ctx.translate(0, side * 4.8);
+            ctx.scale(0.86, 0.86);
             drawSimpleWeaponShape(ctx, profile);
             ctx.restore();
         }
-        return [{ x: 6.2, y: -7.1 }, { x: 6.2, y: 7.1 }];
+        return;
     }
     drawSimpleWeaponShape(ctx, profile);
-    const rearX = profile.style === 'pistol' || profile.style === 'revolver'
-        ? 5.4
-        : Math.max(7, profile.length * 0.3);
-    const frontX = profile.style === 'pistol' || profile.style === 'revolver'
-        ? rearX
-        : Math.max(rearX + 6, profile.length - profile.barrel - 1);
-    return [{ x: rearX, y: -profile.width * 0.72 }, { x: frontX, y: profile.width * 0.66 }];
 }
 
 const makeBulletSpec = (trailLen, tipLen, thickness) => ({
@@ -543,15 +581,15 @@ const makeBulletSpec = (trailLen, tipLen, thickness) => ({
 // Families keep slightly different lengths, but colour no longer competes
 // with hit effects or the environment.
 const WEAPON_BULLET_SPECS = {
-    shotgun: makeBulletSpec(22, 3.6, 1.35),
-    sniper: makeBulletSpec(54, 6.5, 1.9),
-    revolver: makeBulletSpec(39, 5.2, 1.65),
-    pistol: makeBulletSpec(31, 4.4, 1.48),
-    assault: makeBulletSpec(37, 4.8, 1.55),
-    dmr: makeBulletSpec(47, 5.8, 1.72),
-    smg: makeBulletSpec(27, 4, 1.4),
-    lmg: makeBulletSpec(35, 4.7, 1.58),
-    default: makeBulletSpec(31, 4.4, 1.48),
+    shotgun: makeBulletSpec(22, 3.6, 1.15),
+    sniper: makeBulletSpec(54, 6.5, 1.55),
+    revolver: makeBulletSpec(39, 5.2, 1.38),
+    pistol: makeBulletSpec(31, 4.4, 1.24),
+    assault: makeBulletSpec(37, 4.8, 1.3),
+    dmr: makeBulletSpec(47, 5.8, 1.44),
+    smg: makeBulletSpec(27, 4, 1.18),
+    lmg: makeBulletSpec(35, 4.7, 1.32),
+    default: makeBulletSpec(31, 4.4, 1.24),
 };
 
 const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
@@ -7601,11 +7639,11 @@ export class SurvivRenderer {
 
         // Soft tapered pass: elongated enough to communicate speed, but still
         // narrow enough that automatic fire never becomes a neon beam.
-        ctx.lineCap = 'round';
+        ctx.lineCap = 'butt';
         ctx.strokeStyle = motionBlur;
-        ctx.lineWidth = spec.thickness * 2.75;
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.46)';
-        ctx.shadowBlur = 3.4;
+        ctx.lineWidth = spec.thickness * 1.7;
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.28)';
+        ctx.shadowBlur = 1.5;
         ctx.beginPath();
         ctx.moveTo(-spec.trailLen, 0);
         ctx.lineTo(spec.tipLen, 0);
@@ -7621,18 +7659,10 @@ export class SurvivRenderer {
         ctx.lineTo(spec.tipLen, 0);
         ctx.stroke();
 
+        // A short squared leading cap avoids the soft pill-shaped projectile.
+        const capHeight = Math.max(0.8, spec.thickness * 0.72);
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.ellipse(
-            spec.tipLen - 0.4,
-            0,
-            Math.max(1.15, spec.thickness * 0.9),
-            Math.max(0.72, spec.thickness * 0.54),
-            0,
-            0,
-            Math.PI * 2,
-        );
-        ctx.fill();
+        ctx.fillRect(spec.tipLen - 1.15, -capHeight / 2, 1.35, capHeight);
 
         ctx.restore();
     }
@@ -8027,8 +8057,8 @@ export class SurvivRenderer {
         }
 
         // Apply a gentle walk-bob sway to gun weapons & hands
-        const bobAngle = walkBob * 0.055;
-        const bobX = Math.abs(walkBob) * 0.7;
+        const bobAngle = walkBob * 0.026;
+        const bobX = Math.abs(walkBob) * 0.32;
         ctx.save();
         ctx.translate(bobX, 0);
         ctx.rotate(bobAngle);
@@ -8036,11 +8066,14 @@ export class SurvivRenderer {
         // Firearms are drawn in the same local direction as the crosshair.
         // Keeping their important parts around y=0 makes them read as genuine
         // overhead silhouettes while the two hands remain visible at the sides.
-        hands = drawHeldWeaponTopDown(ctx, weapon);
-        // Draw hands gripping the gun (two-handed/one-handed)
+        hands = getHeldWeaponHandAnchors(weapon);
+        // Hands sit behind the silhouette and remain visible around its grips.
+        // Drawing the firearm last prevents the circular hands from hiding the
+        // receiver, magazine and other recognition-critical proportions.
         if (weapon !== 'fists' && hands) {
             for (const hand of hands) drawPlayerHand(ctx, hand, playerColor);
         }
+        drawHeldWeaponTopDown(ctx, weapon);
 
         ctx.restore();
     }

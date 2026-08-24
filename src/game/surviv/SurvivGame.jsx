@@ -116,8 +116,8 @@ function survivUiSnapshotsEqual(previous, next) {
     return true;
 }
 
-function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
-    return <SurvivWeaponIcon weaponId={weaponId} color={strokeColor} width={size} />;
+function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24, options = {}) {
+    return <SurvivWeaponIcon weaponId={weaponId} color={strokeColor} width={size} monochrome={!!options.monochrome} />;
 }
 
 // Retained as a self-contained fallback reference for older panel variants;
@@ -1515,7 +1515,55 @@ export default function SurvivGame() {
             {/* Weapons Vertical Hotbar */}
             {gameReady && me && !showResultModal && (
                 <div className="surviv-weapons-hotbar">
-                    {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
+                    <div className="surviv-utility-stack">
+                        <button
+                            type="button"
+                            className={`hotbar-slot grenade-hotbar-slot ${(me.inventory?.grenades || 0) > 0 ? 'has-item' : 'empty-slot'}`}
+                            disabled={(me.inventory?.grenades || 0) <= 0}
+                            aria-label={`Throw grenade, ${me.inventory?.grenades || 0} remaining`}
+                            title={(me.inventory?.grenades || 0) > 0 ? 'Throw grenade (4)' : 'No grenades'}
+                            onClick={() => {
+                                if ((me.inventory?.grenades || 0) > 0) throwGrenadePendingRef.current = true;
+                            }}
+                        >
+                            <span className="hotbar-slot-key">4</span>
+                            <div className="hotbar-weapon-icon-wrap grenade-hotbar-icon" aria-hidden="true">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                    <path d="M9 7.2h6l1.6 3.1a7 7 0 1 1-9.2 0L9 7.2Z" />
+                                    <path d="M10 7V4h4v3M14 4h3.4M17.4 4c0 1.5 1.1 2.1 2.1 2.6" />
+                                </svg>
+                            </div>
+                            <span className="hotbar-slot-name-compact">GRENADE</span>
+                            <span className="hotbar-slot-ammo">{me.inventory?.grenades || 0}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className={'hotbar-slot medkit-hotbar-slot ' + ((me.inventory?.medkits || 0) > 0 ? 'has-item' : 'empty-slot') + (medkitRemainingMs > 0 ? ' is-using' : '')}
+                            disabled={!canMobileHeal}
+                            aria-label={'Use medkit, ' + (me.inventory?.medkits || 0) + ' remaining'}
+                            title={(me.inventory?.medkits || 0) > 0
+                                ? (canMobileHeal ? 'Use medkit (H)' : (medkitRemainingMs > 0 ? 'Using medkit' : 'Health is already full'))
+                                : 'No medkits'}
+                            onClick={() => {
+                                if (canMobileHeal) useMedkitPendingRef.current = true;
+                            }}
+                        >
+                            <span className="hotbar-slot-key">H</span>
+                            <div className="hotbar-weapon-icon-wrap medkit-hotbar-icon" aria-hidden="true">
+                                <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="4" y="4" width="16" height="16" rx="4" />
+                                    <path d="M12 8v8M8 12h8" />
+                                </svg>
+                            </div>
+                            <span className="hotbar-slot-name-compact">MEDKIT</span>
+                            <span className="hotbar-slot-ammo">{me.inventory?.medkits || 0}</span>
+                            {medkitRemainingMs > 0 && (
+                                <span className="medkit-hotbar-progress" style={{ '--medkit-progress': (medkitProgress * 100) + '%' }} />
+                            )}
+                        </button>
+                    </div>
+                    <div className="surviv-weapon-stack">
+                        {SURVIV_WEAPON_SLOTS.map((slotIdx) => {
                         const weaponId = slotIdx === 2 ? (me.inventory?.meleeWeapon || 'fists') : (me.inventory?.weapons?.[slotIdx] || null);
                         const weaponLabel = weaponId ? (WEAPON_LABELS[weaponId] || weaponId) : null;
                         const activeSlot = Number.isInteger(me.activeWeaponSlot)
@@ -1552,7 +1600,7 @@ export default function SurvivGame() {
                                 {weaponId ? (
                                     <>
                                         <div className="hotbar-weapon-icon-wrap">
-                                            {renderWeaponIcon(weaponId, isActive ? '#fff4cf' : 'rgba(239,235,216,0.7)', 54)}
+                                            {renderWeaponIcon(weaponId, isActive ? '#f4f7f6' : '#aeb6b5', 68, { monochrome: true })}
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         {weaponId === 'fists' || weaponId === 'knife' ? (
@@ -1574,53 +1622,9 @@ export default function SurvivGame() {
                                     <span className="hotbar-slot-empty-label">-</span>
                                 )}
                             </button>
-                        );
-                    })}
-                    <button
-                        type="button"
-                        className={`hotbar-slot grenade-hotbar-slot ${(me.inventory?.grenades || 0) > 0 ? 'has-item' : 'empty-slot'}`}
-                        disabled={(me.inventory?.grenades || 0) <= 0}
-                        aria-label={`Throw grenade, ${me.inventory?.grenades || 0} remaining`}
-                        title={(me.inventory?.grenades || 0) > 0 ? 'Throw grenade (4)' : 'No grenades'}
-                        onClick={() => {
-                            if ((me.inventory?.grenades || 0) > 0) throwGrenadePendingRef.current = true;
-                        }}
-                    >
-                        <span className="hotbar-slot-key">4</span>
-                        <div className="hotbar-weapon-icon-wrap grenade-hotbar-icon" aria-hidden="true">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                                <path d="M9 7.2h6l1.6 3.1a7 7 0 1 1-9.2 0L9 7.2Z" />
-                                <path d="M10 7V4h4v3M14 4h3.4M17.4 4c0 1.5 1.1 2.1 2.1 2.6" />
-                            </svg>
-                        </div>
-                        <span className="hotbar-slot-name-compact">GRENADE</span>
-                        <span className="hotbar-slot-ammo">{me.inventory?.grenades || 0}</span>
-                    </button>
-                    <button
-                        type="button"
-                        className={'hotbar-slot medkit-hotbar-slot ' + ((me.inventory?.medkits || 0) > 0 ? 'has-item' : 'empty-slot') + (medkitRemainingMs > 0 ? ' is-using' : '')}
-                        disabled={!canMobileHeal}
-                        aria-label={'Use medkit, ' + (me.inventory?.medkits || 0) + ' remaining'}
-                        title={(me.inventory?.medkits || 0) > 0
-                            ? (canMobileHeal ? 'Use medkit (H)' : (medkitRemainingMs > 0 ? 'Using medkit' : 'Health is already full'))
-                            : 'No medkits'}
-                        onClick={() => {
-                            if (canMobileHeal) useMedkitPendingRef.current = true;
-                        }}
-                    >
-                        <span className="hotbar-slot-key">H</span>
-                        <div className="hotbar-weapon-icon-wrap medkit-hotbar-icon" aria-hidden="true">
-                            <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="4" y="4" width="16" height="16" rx="4" />
-                                <path d="M12 8v8M8 12h8" />
-                            </svg>
-                        </div>
-                        <span className="hotbar-slot-name-compact">MEDKIT</span>
-                        <span className="hotbar-slot-ammo">{me.inventory?.medkits || 0}</span>
-                        {medkitRemainingMs > 0 && (
-                            <span className="medkit-hotbar-progress" style={{ '--medkit-progress': (medkitProgress * 100) + '%' }} />
-                        )}
-                    </button>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
