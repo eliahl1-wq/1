@@ -63,7 +63,7 @@ const RARITY_COLORS = {
 const LOOT_COLORS = {
     money: '#ffd45a',
     medkit: '#5fe08a',
-    armor: '#5d9cff',
+    vest: '#9ca3af',
     ammo: '#d7d1bb',
     grenade: '#f59e0b',
     weapon: '#f2774f',
@@ -1449,7 +1449,7 @@ export class SurvivRenderer {
             balance: 0,
             hp: 100,
             maxHp: 100,
-            armor: 0,
+            vestLevel: 0,
             weapon: 'fists',
             ammo: 15,
             clipSize: 15,
@@ -1858,7 +1858,7 @@ export class SurvivRenderer {
             balance: 0,
             hp: 100,
             maxHp: 100,
-            armor: 0,
+            vestLevel: 0,
             weapon: 'fists',
             ammo: 0,
             clipSize: 0,
@@ -2766,7 +2766,7 @@ export class SurvivRenderer {
 
             this.hud.hp = me.hp;
             this.hud.maxHp = me.maxHp;
-            this.hud.armor = me.armor;
+            this.hud.vestLevel = Number(me.vestLevel) || 0;
             this.hud.weapon = me.weapon;
             this.hud.ammo = me.ammo;
             this.hud.clipSize = me.clipSize;
@@ -7576,7 +7576,7 @@ export class SurvivRenderer {
                 ctx.fill();
                 roundRect(ctx, -7, -2, 14, 4, 1);
                 ctx.fill();
-            } else if (l.type === 'armor') {
+            } else if (l.type === 'vest') {
                 ctx.beginPath();
                 ctx.moveTo(0, -12);
                 ctx.lineTo(11, -7);
@@ -7592,6 +7592,11 @@ export class SurvivRenderer {
                 ctx.moveTo(0, -8);
                 ctx.lineTo(0, 9);
                 ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '900 8px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`L${Math.max(1, Math.min(3, Number(l.vestLevel) || 1))}`, 0, 1);
             } else if (l.type === 'ammo') {
                 roundRect(ctx, -12, -9, 24, 18, 4);
                 ctx.fill();
@@ -7619,7 +7624,7 @@ export class SurvivRenderer {
             }
             ctx.restore();
 
-            const amount = l.type === 'armor' ? l.armorValue : l.amount;
+            const amount = l.amount;
             if ((Number(amount) || 0) > 1) {
                 ctx.fillStyle = 'rgba(8, 10, 9, 0.9)';
                 ctx.strokeStyle = 'rgba(255,255,255,0.2)';
@@ -7825,6 +7830,19 @@ export class SurvivRenderer {
         ctx.fill();
         ctx.stroke();
 
+        const vestLevel = Math.max(0, Math.min(3, Number(p.vestLevel) || 0));
+        if (vestLevel > 0) {
+            const vestColors = ['transparent', '#d6d6ce', '#737b7d', '#171b1c'];
+            ctx.strokeStyle = vestColors[vestLevel];
+            ctx.lineWidth = vestLevel === 3 ? 3.2 : 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, r - 2.2, 0.18 * Math.PI, 0.82 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, r - 2.2, 1.18 * Math.PI, 1.82 * Math.PI);
+            ctx.stroke();
+        }
+
         // Body highlight
         ctx.fillStyle = 'rgba(255,255,255,0.22)';
         ctx.beginPath();
@@ -7920,35 +7938,27 @@ export class SurvivRenderer {
         // renderer without also painting gameplay-only names and status bars.
         if (!showHud) return;
 
-        // The local player already has a precise fixed HUD and balance badge.
-        // Avoid stacking a large duplicate name/health block over the aiming
-        // area; remote status remains visible for the existing game rules.
-        if (!isMe) {
-            const hpPct = clamp((p.hp || 0) / (p.maxHp || 100), 0, 1);
-            const barW = 34;
-            const barY = p.y - r - 14;
-            ctx.fillStyle = 'rgba(10,14,12,0.58)';
-            roundRect(ctx, p.x - barW / 2, barY, barW, 4.5, 2);
-            ctx.fill();
-            ctx.fillStyle = hpPct > 0.35 ? '#55d875' : '#ef544f';
-            roundRect(ctx, p.x - barW / 2, barY, barW * hpPct, 4.5, 2);
-            ctx.fill();
-            if (p.armor > 0) {
-                ctx.fillStyle = '#65a4ff';
-                roundRect(ctx, p.x - barW / 2, barY + 6.5, barW * clamp(p.armor / 100, 0, 1), 2.5, 1.25);
-                ctx.fill();
-            }
+        // Health belongs close to every character, including the local player.
+        // Vest tier is visible on the body itself instead of acting as a second HP bar.
+        const hpPct = clamp((p.hp || 0) / (p.maxHp || 100), 0, 1);
+        const barW = 34;
+        const barY = p.y - r - 14;
+        ctx.fillStyle = 'rgba(10,14,12,0.58)';
+        roundRect(ctx, p.x - barW / 2, barY, barW, 4.5, 2);
+        ctx.fill();
+        ctx.fillStyle = hpPct > 0.35 ? '#55d875' : '#ef544f';
+        roundRect(ctx, p.x - barW / 2, barY, barW * hpPct, 4.5, 2);
+        ctx.fill();
 
-            if (!this.hideNames) {
-                ctx.fillStyle = 'rgba(255,255,255,0.84)';
-                ctx.font = '700 9px system-ui, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.lineWidth = 2.5;
-                ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-                ctx.strokeText(p.username || 'Player', p.x, p.y - r - 19);
-                ctx.fillText(p.username || 'Player', p.x, p.y - r - 19);
-            }
+        if (!isMe && !this.hideNames) {
+            ctx.fillStyle = 'rgba(255,255,255,0.84)';
+            ctx.font = '700 9px system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+            ctx.strokeText(p.username || 'Player', p.x, p.y - r - 19);
+            ctx.fillText(p.username || 'Player', p.x, p.y - r - 19);
         }
 
         if (p.cashoutHoldActive || (isMe && this.hud.cashoutHoldStart)) {
@@ -9202,7 +9212,7 @@ export class SurvivRenderer {
         if (items.money) lines.push(`+$${Number(items.money).toFixed(2)}`);
         if (items.medkits) lines.push(`+${items.medkits} medkit${items.medkits === 1 ? '' : 's'}`);
         if (items.ammoAmount) lines.push(`+${items.ammoAmount} ${items.ammoType || ''} ammo`.replace('  ', ' '));
-        if (items.armor) lines.push(`+${Math.round(items.armor)} armor`);
+        if (items.vestLabel) lines.push(items.vestLabel);
         const text = lines.length ? lines.join('   ') : 'Empty';
         const w = Math.min(W - 28, Math.max(220, Math.min(390, text.length * 7 + 72)));
         const x = W / 2 - w / 2;
@@ -9246,21 +9256,20 @@ export class SurvivRenderer {
         const pad = this.isMobileLayout ? 10 : 16;
         const panelW = this.isMobileLayout ? 164 : 190;
         const hpPct = clamp(this.hud.hp / (this.hud.maxHp || 100), 0, 1);
-        const armorPct = clamp((this.hud.armor || 0) / 100, 0, 1);
+        const vestLevel = Math.max(0, Math.min(3, Number(this.hud.vestLevel) || 0));
 
         ctx.save();
-        this.drawPanel(ctx, pad, pad, panelW, armorPct > 0 ? 76 : 58);
+        this.drawPanel(ctx, pad, pad, panelW, vestLevel > 0 ? 76 : 58);
         ctx.fillStyle = '#785eff';
         ctx.font = '800 11px "Space Mono", monospace';
         ctx.textAlign = 'left';
         ctx.fillText('HEALTH', pad + 12, pad + 17);
 
         this.drawBar(ctx, pad + 12, pad + 26, panelW - 24, 12, hpPct, '#5fe08a', '#ef544f');
-        if (armorPct > 0) {
-            ctx.fillStyle = '#5c9cff';
+        if (vestLevel > 0) {
+            ctx.fillStyle = '#c8cbc7';
             ctx.font = '700 9px "Space Mono", monospace';
-            ctx.fillText('ARMOR', pad + 12, pad + 52);
-            this.drawBar(ctx, pad + 12, pad + 58, panelW - 24, 7, armorPct, '#5c9cff', '#5c9cff');
+            ctx.fillText(`LEVEL ${vestLevel} VEST  ·  -${[0, 25, 38, 45][vestLevel]}% DMG`, pad + 12, pad + 58);
         }
 
         const weaponLabel = WEAPON_LABELS[this.hud.weapon] || 'Fists';

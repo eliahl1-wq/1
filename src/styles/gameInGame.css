@@ -1625,9 +1625,9 @@ body.game-session-active #root {
     text-shadow: 0 0 4px rgba(20, 241, 149, 0.25);
 }
 
-.armor .hud-bar-title-row, .armor .hud-bar-value {
-    color: #00c2ff;
-    text-shadow: 0 0 4px rgba(0, 194, 255, 0.25);
+.vest .hud-bar-title-row, .vest .hud-bar-value {
+    color: #c8cbc7;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .hud-bar-track {
@@ -1648,11 +1648,6 @@ body.game-session-active #root {
 .hud-bar-fill.health-fill {
     background: linear-gradient(90deg, #10b981, #14F195);
     box-shadow: 0 0 8px rgba(20, 241, 149, 0.45);
-}
-
-.hud-bar-fill.armor-fill {
-    background: linear-gradient(90deg, #0088ff, #00c2ff);
-    box-shadow: 0 0 8px rgba(0, 194, 255, 0.45);
 }
 
 .surviv-medkit-timer {
@@ -3235,7 +3230,9 @@ body.game-session-active #root {
 }
 
 .surviv-context-prompt--confirmation {
-    animation: survivPickupConfirmation 120ms ease-out both;
+    top: max(72px, 11vh);
+    bottom: auto;
+    animation: survivPickupConfirmation 2200ms ease-in-out both;
 }
 
 .surviv-context-prompt--confirmation .surviv-context-key {
@@ -3392,8 +3389,10 @@ body.game-session-active #root {
 }
 
 @keyframes survivPickupConfirmation {
-    from { opacity: 0; transform: translate(-50%, 5px) scale(0.97); }
-    to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    0% { opacity: 0; transform: translate(-50%, -14px); }
+    8% { opacity: 1; transform: translate(-50%, 0); }
+    83% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, 0); }
 }
 
 .surviv-game-page .slot-store-btn,

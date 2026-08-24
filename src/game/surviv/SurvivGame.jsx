@@ -60,7 +60,7 @@ function createSurvivUiSnapshot(player) {
     return {
         hp: player?.hp,
         maxHp: player?.maxHp,
-        armor: player?.armor,
+        vestLevel: Number(player?.vestLevel) || 0,
         weapon: player?.weapon,
         ammo: player?.ammo,
         clipSize: player?.clipSize,
@@ -87,7 +87,7 @@ function createSurvivUiSnapshot(player) {
 function survivUiSnapshotsEqual(previous, next) {
     if (!previous || !next) return previous === next;
     const scalarKeys = [
-        'hp', 'maxHp', 'armor', 'weapon', 'ammo', 'clipSize', 'reloading',
+        'hp', 'maxHp', 'vestLevel', 'weapon', 'ammo', 'clipSize', 'reloading',
         'reloadRemainingMs', 'reloadMs', 'medkitRemainingMs', 'medkitUseMs',
         'dollarBalance', 'kills', 'activeWeaponSlot', 'outsideZone',
     ];
@@ -121,7 +121,7 @@ function formatPickupConfirmation(lastLoot) {
     if (items.weaponLabel) return items.weaponLabel;
     if (items.ammoAmount) return `${items.ammoAmount} ${String(items.ammoType || '').toUpperCase()} AMMO`.replace('  ', ' ');
     if (items.medkits) return `${items.medkits} MEDKIT${items.medkits === 1 ? '' : 'S'}`;
-    if (items.armor) return `${Math.round(items.armor)} ARMOR`;
+    if (items.vestLabel) return items.vestLabel.toUpperCase();
     if (items.money) return `$${Number(items.money).toFixed(2)}`;
     return lastLoot?.source === 'ground' ? 'ITEM' : 'LOOT';
 }
@@ -915,7 +915,7 @@ export default function SurvivGame() {
                 pickupConfirmationTimerRef.current = setTimeout(() => {
                     setPickupConfirmation(null);
                     pickupConfirmationTimerRef.current = null;
-                }, 1450);
+                }, 2200);
             }
             if (tick.fullMap) setFullMapData(tick.fullMap);
             if (Array.isArray(tick.activityZones)) {
@@ -1307,7 +1307,8 @@ export default function SurvivGame() {
 
     const cashoutReady = gameReady && isConnected && !cashoutPending && localTimer <= 0 && cashedAmount === null && !isDead;
     const healthRatio = me ? Math.max(0, Math.min(1, (Number(me.hp) || 0) / (Number(me.maxHp) || 100))) : 0;
-    const armorRatio = me ? Math.max(0, Math.min(1, (Number(me.armor) || 0) / 100)) : 0;
+    const vestLevel = Math.max(0, Math.min(3, Number(me?.vestLevel) || 0));
+    const vestReduction = [0, 25, 38, 45][vestLevel];
     const medkitRemainingMs = Math.max(0, Number(me?.medkitRemainingMs) || 0);
     const medkitUseMs = Math.max(1, Number(me?.medkitUseMs) || 2500);
     const medkitProgress = medkitRemainingMs > 0 ? Math.max(0, Math.min(1, 1 - medkitRemainingMs / medkitUseMs)) : 0;
@@ -1431,13 +1432,14 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {!IS_MOBILE && gameReady && me && !showResultModal && !isDead && !isSpectating && !isFullMapOpen && (
-                pickupConfirmation ? (
-                    <div className="surviv-context-prompt surviv-context-prompt--confirmation" role="status" aria-live="polite">
-                        <span className="surviv-context-key" aria-hidden="true">✓</span>
-                        <span>{pickupConfirmation.action} <strong>{pickupConfirmation.label}</strong></span>
-                    </div>
-                ) : nearbyPickup ? (
+            {gameReady && me && pickupConfirmation && !showResultModal && !isDead && !isSpectating && !isFullMapOpen && (
+                <div className="surviv-context-prompt surviv-context-prompt--confirmation" role="status" aria-live="polite">
+                    <span className="surviv-context-key" aria-hidden="true">✓</span>
+                    <span>{pickupConfirmation.action} <strong>{pickupConfirmation.label}</strong></span>
+                </div>
+            )}
+
+            {!IS_MOBILE && gameReady && me && nearbyPickup && !showResultModal && !isDead && !isSpectating && !isFullMapOpen && (
                     <div className="surviv-context-prompt" role="status" aria-live="polite">
                         <kbd>F</kbd>
                         {nearbyPickup.kind === 'door' ? (
@@ -1446,7 +1448,6 @@ export default function SurvivGame() {
                             <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
                         )}
                     </div>
-                ) : null
             )}
 
             {user?.isAdmin && gameReady && !showResultModal && (
@@ -1511,7 +1512,7 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {/* HP and Armor Progress Bars */}
+            {/* HP and equipped vest */}
             {gameReady && me && !showResultModal && (
                 <div className="surviv-hud-status-bars">
                     <div className={`hud-bar-wrapper health${healthRatio <= 0.25 ? ' is-critical' : ''}`}>
@@ -1527,16 +1528,13 @@ export default function SurvivGame() {
                         </div>
                     </div>
 
-                    <div className="hud-bar-wrapper armor">
+                    <div className={`hud-bar-wrapper vest vest-level-${vestLevel}`}>
                         <div className="hud-bar-header">
                             <span className="hud-bar-title-row">
                                 <svg className="hud-bar-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                ARMOR
+                                VEST
                             </span>
-                            <span className="hud-bar-value">{Math.round(me.armor || 0)}%</span>
-                        </div>
-                        <div className="hud-bar-track" role="progressbar" aria-label="Armor" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(me.armor || 0)}>
-                            <div className="hud-bar-fill armor-fill" style={{ width: `${armorRatio * 100}%` }} />
+                            <span className="hud-bar-value">{vestLevel > 0 ? `LVL ${vestLevel} · -${vestReduction}% DMG` : 'NONE'}</span>
                         </div>
                     </div>
                     {medkitRemainingMs > 0 && (
@@ -2016,33 +2014,33 @@ export default function SurvivGame() {
 
                                         {/* Armor Slot */}
                                         <div 
-                                            className={`item-slot-card armor-slot ${(me.armor || 0) > 0 ? 'has-qty' : 'empty-qty'}`}
-                                            draggable={(me.armor || 0) > 0}
+                                            className={`item-slot-card armor-slot ${vestLevel > 0 ? 'has-qty' : 'empty-qty'}`}
+                                            draggable={vestLevel > 0}
                                             onDragStart={(e) => {
-                                                if ((me.armor || 0) > 0) {
-                                                    beginInventoryDrag(e, { source: 'backpack', key: 'armor' });
+                                                if (vestLevel > 0) {
+                                                    beginInventoryDrag(e, { source: 'backpack', key: 'vest' });
                                                 }
                                             }}
                                             onDragEnd={finishInventoryDrag}
                                             onClick={() => {
                                                 const isChestOpen = !!me.openedContainer;
-                                                if ((me.armor || 0) > 0 && isChestOpen) {
+                                                if (vestLevel > 0 && isChestOpen) {
                                                     putChestItemPendingRef.current = {
                                                         chestId: me.openedContainer.id,
-                                                        itemKey: 'armor'
+                                                        itemKey: 'vest'
                                                     };
                                                 }
                                             }}
-                                            style={{ cursor: (!!me.openedContainer) && (me.armor || 0) > 0 ? 'pointer' : 'default' }}
+                                            style={{ cursor: (!!me.openedContainer) && vestLevel > 0 ? 'pointer' : 'default' }}
                                         >
                                             <div className="item-slot-icon-container">
                                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5d9cff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                                             </div>
                                             <div className="item-slot-details">
-                                                <span className="item-slot-name">ARMOR LEVEL</span>
-                                                <span className="item-slot-value">{Math.round(me.armor || 0)}%</span>
+                                                <span className="item-slot-name">VEST</span>
+                                                <span className="item-slot-value">{vestLevel > 0 ? `LEVEL ${vestLevel}` : 'NONE'}</span>
                                             </div>
-                                            {(me.armor || 0) > 0 && (
+                                            {vestLevel > 0 && (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'absolute', top: '4px', right: '6px', gap: '2px' }}>
                                                     {(!!me.openedContainer) && (
                                                         <span className="item-action-badge" style={{ position: 'static', color: '#a855f7' }}>DEPOSIT</span>
@@ -2061,7 +2059,7 @@ export default function SurvivGame() {
                                                         }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            dropItemPendingRef.current = { itemKey: 'armor' };
+                                                            dropItemPendingRef.current = { itemKey: 'vest' };
                                                         }}
                                                     >
                                                         DROP
@@ -2136,7 +2134,7 @@ export default function SurvivGame() {
                                                 } else if (item.kind === 'grenade') {
                                                     strokeColor = '#f59e0b';
                                                     itemIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2"><path d="M9 4h6v4H9zM7 8h10v3a6 6 0 0 1-10 0V8Z"/><path d="M12 4V2M15 5l2-1"/><path d="M8 14h8M9.5 17h5"/></svg>;
-                                                } else if (item.kind === 'armor') {
+                                                } else if (item.kind === 'vest') {
                                                     strokeColor = '#5d9cff';
                                                     itemIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
                                                 }
