@@ -9,16 +9,22 @@ import { drawGameMinimap } from '../minimap.js';
 import {
     playSurvivBreakSound,
     playSurvivDoorOpenSound,
+    playSurvivDryFireSound,
+    playSurvivEquipSound,
     playSurvivFootstep,
     playSurvivGrenadeExplosion,
     playSurvivGunshot,
+    playSurvivHealSound,
     playSurvivImpactSound,
     playSurvivMeleeSwing,
+    playSurvivPickupSound,
+    playSurvivReloadSound,
     preloadSurvivGunshots,
     preloadSurvivFootsteps,
     unlockGameAudio,
 } from '../../audio/synthSounds.js';
 import {
+    getSurvivWeaponAmmoType,
     getSurvivWeaponFamily,
     SURVIV_AMMO_CATALOG,
     SURVIV_WEAPON_CATALOG,
@@ -141,8 +147,8 @@ function meleeKnifePose(progress) {
 }
 
 const WEAPON_SHAKE = {
-    fists: 0, knife: 0.25, pistol: 0.3, revolver: 0.8, smg: 0.15, shotgun: 1.0,
-    assault: 0.3, dmr: 0.6, sniper: 1.4, lmg: 0.25,
+    fists: 0, knife: 0.12, pistol: 0.12, revolver: 0.28, smg: 0.06, shotgun: 0.38,
+    assault: 0.12, dmr: 0.22, sniper: 0.48, lmg: 0.1,
 };
 
 const WEAPON_BULLET_SPEED = {
@@ -380,25 +386,40 @@ function drawHeldWeaponTopDown(ctx, weapon) {
     return [{ x: 6.5, y: -4.6 }, { x: 10.5, y: 4.6 }];
 }
 
-const makeBulletSpec = (trailLen, tipLen, thickness, rgb = '255, 251, 232') => ({
+const makeBulletSpec = (trailLen, tipLen, thickness) => ({
     trailLen,
     tipLen,
     thickness,
-    rgb,
 });
 
-// One clean Surviv-style tracer per projectile: no stacked glow/core strokes.
+// Compact ammo-coloured tracers match classic Surviv readability without
+// turning every projectile into a long modern light streak.
 const WEAPON_BULLET_SPECS = {
-    shotgun: makeBulletSpec(38, 3.5, 1.12),
-    sniper: makeBulletSpec(100, 6, 1.62, '245, 251, 255'),
-    revolver: makeBulletSpec(70, 5, 1.4),
-    pistol: makeBulletSpec(55, 4, 1.22),
-    assault: makeBulletSpec(65, 4.5, 1.28),
-    dmr: makeBulletSpec(82, 5.5, 1.46),
-    smg: makeBulletSpec(48, 3.5, 1.16),
-    lmg: makeBulletSpec(58, 4, 1.24),
-    default: makeBulletSpec(55, 4, 1.22),
+    shotgun: makeBulletSpec(10, 2.8, 1.42),
+    sniper: makeBulletSpec(27, 4.8, 1.82),
+    revolver: makeBulletSpec(18, 4, 1.62),
+    pistol: makeBulletSpec(14, 3.4, 1.48),
+    assault: makeBulletSpec(17, 3.8, 1.54),
+    dmr: makeBulletSpec(22, 4.3, 1.7),
+    smg: makeBulletSpec(12, 3, 1.42),
+    lmg: makeBulletSpec(16, 3.5, 1.52),
+    default: makeBulletSpec(14, 3.4, 1.48),
 };
+
+const BULLET_TRACER_COLORS = Object.freeze({
+    '9mm': '#f5d547',
+    '12g': '#ef6660',
+    '556': '#67d77a',
+    '762': '#64adf4',
+    '45acp': '#b9ec75',
+    '50ae': '#79dde7',
+    '308': '#c7d3d8',
+    '40mm': '#d9a957',
+    flare: '#ff7b53',
+    potato: '#c79a5f',
+    heart: '#ed8ae4',
+    bugle: '#f1c766',
+});
 
 const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
 // These details sit directly on the ground and deliberately stay shadow-free.
@@ -1209,6 +1230,9 @@ export class SurvivRenderer {
         this._lootBurstStates = new Map();
         // Hit marker (center-screen X when you deal damage)
         this.hitMarkers = [];
+        // Short world-space confirmation on the player that was actually hit.
+        this.hitPulses = [];
+        this._playerHitAt = new Map();
         // Damage direction indicators (red arcs at screen edge)
         this.damageIndicators = [];
         // Floating damage numbers
@@ -1273,6 +1297,11 @@ export class SurvivRenderer {
         // Previous ammo for detecting shots fired
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
+        this._prevReloading = false;
+        this._reloadAudioPrimed = false;
+        this._prevMedkitRemainingMs = 0;
+        this._healAudioPrimed = false;
+        this._lastDryFireAt = 0;
         this._gunAudioPrimed = false;
         this._lastObjectImpactId = null;
         // Weapon switch animation
@@ -1511,6 +1540,8 @@ export class SurvivRenderer {
         this.chestBursts = [];
         this._lootBurstStates = new Map();
         this.hitMarkers = [];
+        this.hitPulses = [];
+        this._playerHitAt.clear();
         this.damageIndicators = [];
         this.damageNumbers = [];
         this.killFeed = [];
@@ -1522,6 +1553,11 @@ export class SurvivRenderer {
         this._prevHp = 100;
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
+        this._prevReloading = false;
+        this._reloadAudioPrimed = false;
+        this._prevMedkitRemainingMs = 0;
+        this._healAudioPrimed = false;
+        this._lastDryFireAt = 0;
         this._gunAudioPrimed = false;
         this._lastObjectImpactId = null;
         this._weaponSwitchT = 0;
@@ -1911,10 +1947,14 @@ export class SurvivRenderer {
     _ingestBulletSnapshots(bullets, receivedAt) {
         const activeIds = new Set();
         const heardReports = new Set();
+        const confirmedLocalShotWeaponTypes = new Set();
         for (const bullet of bullets) {
             activeIds.add(bullet.id);
             const previous = this._interpBullets.get(bullet.id);
             if (!previous) {
+                if (bullet.ownerId === this.myId && !bullet.isGrenade && bullet.weaponType !== 'grenade') {
+                    confirmedLocalShotWeaponTypes.add(bullet.weaponType);
+                }
                 const reportKey = `${bullet.ownerId || 'unknown'}:${bullet.weaponType || 'unknown'}`;
                 if (this._gunAudioPrimed
                     && bullet.ownerId !== this.myId
@@ -1954,6 +1994,7 @@ export class SurvivRenderer {
             previous.vy = Number(bullet.vy) || 0;
             previous.receivedAt = receivedAt;
         }
+        this._confirmedLocalShotWeaponTypes = confirmedLocalShotWeaponTypes;
         for (const id of this._interpBullets.keys()) {
             if (!activeIds.has(id)) this._interpBullets.delete(id);
         }
@@ -2126,10 +2167,12 @@ export class SurvivRenderer {
                     this.spawnGrenadeExplosion(b.x, b.y);
                     continue;
                 }
-                // Bullet disappeared! Spawn impact particles at b.x, b.y
+                // A projectile can disappear because it reached max range. Only
+                // create an impact when geometry or a player is actually nearby;
+                // false mid-air sparks make misses look laggy and imprecise.
                 const angle = Math.atan2(b.vy || 0, b.vx || 1);
-                let hitType = 'spark'; // Default spark
-                let hitColor = '#ffd45a';
+                let hitType = null;
+                let hitColor = null;
 
                 // Check if near any player (excluding owner, though target confirms are handled specifically, general debris is nice)
                 const hitPlayer = this.players.find(p => (p.hp || 0) > 0 && Math.hypot(p.x - b.x, p.y - b.y) < 22);
@@ -2154,8 +2197,10 @@ export class SurvivRenderer {
                     }
                 }
 
-                // Spawn 3-6 particles spraying in opposite direction of bullet
-                const count = hitType === 'blood' ? 6 : hitType === 'spark' ? 3 : 4;
+                if (!hitType) continue;
+                // Compact material flecks stay readable without obscuring the
+                // target or turning classic combat into a particle shower.
+                const count = hitType === 'blood' ? 4 : hitType === 'spark' ? 2 : 3;
                 for (let i = 0; i < count; i++) {
                     const spread = (Math.random() - 0.5) * 1.2;
                     const pAngle = angle + Math.PI + spread; // Spray backwards
@@ -2167,7 +2212,7 @@ export class SurvivRenderer {
                         vy: Math.sin(pAngle) * speed,
                         life: 0.2 + Math.random() * 0.15,
                         maxLife: 0.35,
-                        size: hitType === 'blood' ? 2.5 + Math.random() * 2 : 1.5 + Math.random() * 2,
+                        size: hitType === 'blood' ? 1.8 + Math.random() * 1.5 : 1.1 + Math.random() * 1.3,
                         color: hitColor,
                         type: hitType,
                     });
@@ -2214,7 +2259,7 @@ export class SurvivRenderer {
             for (const obstacle of nextObstacles) {
                 const previous = previousObstacles.get(obstacle.id);
                 if (previous?._hitAt) obstacle._hitAt = previous._hitAt;
-                if (previous?.kind === 'door' && !previous.isOpen && obstacle.isOpen && doorSoundsPlayed < 2) {
+                if (previous?.kind === 'door' && previous.isOpen !== obstacle.isOpen && doorSoundsPlayed < 2) {
                     const dx = (Number(obstacle.x) || 0) - (Number(listener?.x) || 0);
                     const dy = (Number(obstacle.y) || 0) - (Number(listener?.y) || 0);
                     const distance = Math.hypot(dx, dy);
@@ -2222,6 +2267,7 @@ export class SurvivRenderer {
                         playSurvivDoorOpenSound(obstacle.variant, {
                             distance,
                             pan: clamp(dx / 720, -0.78, 0.78),
+                            closing: !obstacle.isOpen,
                         });
                         doorSoundsPlayed += 1;
                     }
@@ -2305,7 +2351,13 @@ export class SurvivRenderer {
         if (me?.lastLoot && me.lastLoot.id !== this.lastLootId) {
             this.lastLootId = me.lastLoot.id;
             this.lootToast = { ...me.lastLoot, shownAt: Date.now(), expiresAt: Date.now() + 2200 };
-            this.inventoryOpen = true;
+            const pickedItems = me.lastLoot.items || {};
+            const pickupKind = pickedItems.weaponLabel
+                ? 'weapon'
+                : pickedItems.ammoAmount ? 'ammo'
+                    : pickedItems.medkits ? 'medical'
+                        : pickedItems.money ? 'money' : 'item';
+            playSurvivPickupSound(pickupKind);
         }
         if (me) {
             // Detect damage taken → spawn damage indicator + screen shake
@@ -2317,7 +2369,7 @@ export class SurvivRenderer {
                 const isZoneDamage = !hasServerSource && me.outsideZone;
                 if (!isZoneDamage) {
                     // Camera shake proportional to direct combat damage.
-                    this.cameraShake.intensity += clamp(dmgAmt * 0.3, 1, 8);
+                    this.cameraShake.intensity += clamp(dmgAmt * 0.1, 0.5, 2.8);
                     let damageAngle = null;
                     if (hasServerSource) {
                         damageAngle = Math.atan2(tick.damageTaken.sourceY - me.y, tick.damageTaken.sourceX - me.x);
@@ -2341,17 +2393,32 @@ export class SurvivRenderer {
                             intensity: clamp(dmgAmt / 30, 0.4, 1),
                         });
                     }
-                    this.damageNumbers.push({
-                        x: me.x + (Math.random() - 0.5) * 16,
-                        y: me.y - 20,
-                        amount: Math.round(dmgAmt),
-                        spawnedAt: Date.now(),
-                        duration: 900,
-                        color: '#ff4444',
-                    });
                 }
             }
             this._prevHp = me.hp || 0;
+
+            const isReloading = !!me.reloading;
+            if (this._reloadAudioPrimed && isReloading !== this._prevReloading) {
+                if (isReloading) {
+                    playSurvivReloadSound('start', getSurvivWeaponFamily(me.weapon));
+                } else if (Number(me.ammo) > this._prevAmmo) {
+                    // A canceled reload should not falsely play the magazine-lock cue.
+                    playSurvivReloadSound('complete', getSurvivWeaponFamily(me.weapon));
+                }
+            }
+            this._prevReloading = isReloading;
+            this._reloadAudioPrimed = true;
+
+            const medkitRemainingMs = Math.max(0, Number(me.medkitRemainingMs) || 0);
+            if (this._healAudioPrimed) {
+                if (medkitRemainingMs > 0 && this._prevMedkitRemainingMs <= 0) {
+                    playSurvivHealSound('start');
+                } else if (medkitRemainingMs <= 0 && this._prevMedkitRemainingMs > 0 && hpDelta > 0) {
+                    playSurvivHealSound('complete');
+                }
+            }
+            this._prevMedkitRemainingMs = medkitRemainingMs;
+            this._healAudioPrimed = true;
 
             // Detect shots fired → muzzle flash + camera recoil
             if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && me.weapon === this._prevWeapon && me.weapon !== 'fists' && !me.reloading) {
@@ -2367,19 +2434,24 @@ export class SurvivRenderer {
                 const by = me.y + Math.sin(angle) * barrelDist;
                 // Predict a short local tracer immediately. A close-range shot can
                 // hit between server snapshots and otherwise never be rendered.
-                const pelletCount = weaponFamily === 'shotgun' ? 3 : 1;
-                const speed = (WEAPON_BULLET_SPEED[weaponFamily] || 38) * 40;
-                for (let i = 0; i < pelletCount; i++) {
-                    const spread = pelletCount > 1 ? (i - (pelletCount - 1) / 2) * 0.1 : 0;
-                    this.localShotTracers.push({
-                        id: `local:${receivedAt}:${i}`,
-                        x: bx,
-                        y: by,
-                        vx: Math.cos(angle + spread) * speed,
-                        vy: Math.sin(angle + spread) * speed,
-                        weaponType: me.weapon,
-                        life: 0.11,
-                    });
+                // Only draw a fallback tracer when the authoritative projectile
+                // already hit and disappeared before this snapshot. Previously
+                // this always ran after ingestion and doubled every visible shot.
+                if (!this._confirmedLocalShotWeaponTypes?.has(me.weapon)) {
+                    const pelletCount = weaponFamily === 'shotgun' ? 3 : 1;
+                    const speed = (WEAPON_BULLET_SPEED[weaponFamily] || 38) * 40;
+                    for (let i = 0; i < pelletCount; i++) {
+                        const spread = pelletCount > 1 ? (i - (pelletCount - 1) / 2) * 0.1 : 0;
+                        this.localShotTracers.push({
+                            id: `local:${receivedAt}:${i}`,
+                            x: bx,
+                            y: by,
+                            vx: Math.cos(angle + spread) * speed,
+                            vy: Math.sin(angle + spread) * speed,
+                            weaponType: me.weapon,
+                            life: 0.075,
+                        });
+                    }
                 }
                 for (let i = 0; i < 2; i++) {
                     const spread = (Math.random() - 0.5) * 0.6;
@@ -2402,6 +2474,7 @@ export class SurvivRenderer {
             if (me.weapon !== this._prevWeapon) {
                 this._weaponSwitchT = 1.0;
                 this._weaponSwitchFrom = this._prevWeapon;
+                if (this._gunAudioPrimed) playSurvivEquipSound(getSurvivWeaponFamily(me.weapon));
                 this._prevWeapon = me.weapon;
             }
 
@@ -2438,27 +2511,20 @@ export class SurvivRenderer {
                 weapon: tick.killNotify.weapon || me?.weapon || 'fists',
                 shownAt: Date.now(),
             });
-            // Hit marker for kill
-            this.hitMarkers.push({ spawnedAt: Date.now(), duration: 600, kill: true });
         }
         // Detect hit events
         if (tick.hitConfirm) {
-            this.hitMarkers.push({
-                spawnedAt: Date.now(),
-                duration: tick.hitConfirm.kill ? 560 : 350,
-                kill: !!tick.hitConfirm.kill,
-            });
-            // Spawn damage number on target
             if (tick.hitConfirm.targetX != null) {
-                this.damageNumbers.push({
+                const now = Date.now();
+                this.hitPulses.push({
                     x: tick.hitConfirm.targetX + (Math.random() - 0.5) * 10,
-
-                    y: tick.hitConfirm.targetY - 18,
-                    amount: Math.round(tick.hitConfirm.damage || 0),
-                    spawnedAt: Date.now(),
-                    duration: 800,
-                    color: '#ffffff',
+                    y: tick.hitConfirm.targetY,
+                    spawnedAt: now,
+                    duration: tick.hitConfirm.kill ? 260 : 180,
+                    kill: !!tick.hitConfirm.kill,
                 });
+                if (this.hitPulses.length > 24) this.hitPulses.splice(0, this.hitPulses.length - 24);
+                if (tick.hitConfirm.targetId) this._playerHitAt.set(tick.hitConfirm.targetId, now);
             }
         }
         // Keep kill feed trimmed
@@ -2617,6 +2683,14 @@ export class SurvivRenderer {
     handlePointerDown() {
         if (!this.inputEnabled || this.spectatorMode) return null;
         unlockGameAudio();
+        const weapon = this.me?.weapon;
+        const family = getSurvivWeaponFamily(weapon);
+        const isFirearm = weapon && weapon !== 'fists' && family !== 'melee';
+        const now = performance.now();
+        if (isFirearm && Number(this.me?.ammo) <= 0 && !this.me?.reloading && now - this._lastDryFireAt > 180) {
+            playSurvivDryFireSound();
+            this._lastDryFireAt = now;
+        }
         if (!this.mouse.down) this._firePressId += 1;
         this.mouse.down = true;
         return null;
@@ -3862,9 +3936,7 @@ export class SurvivRenderer {
         // Draw grenade blast waves and particles (world space)
         this.drawGrenadeExplosions(ctx, currentHouse, currentRoom);
         this.drawParticles(ctx, currentHouse, currentRoom);
-
-        // Draw floating damage numbers (world space)
-        this.drawDamageNumbers(ctx, currentHouse, currentRoom);
+        this.drawHitPulses(ctx, currentHouse, currentRoom);
 
         // Softly shade the exterior while all moving entities stay hidden.
         this.drawExteriorHouseShadow(ctx, camX, camY, W, H, z, currentHouse);
@@ -3891,10 +3963,8 @@ export class SurvivRenderer {
             this.balanceCanvas.style.visibility = 'hidden';
         }
         this.drawMobileAimGuide(ctx);
-        this.drawCrosshair(ctx);
         this.drawVignette(ctx, W, H);
         this.drawDamageIndicators(ctx, W, H);
-        this.drawHitMarkers(ctx, W, H);
         this.drawKillAnimation(ctx, W, H);
         this.drawKillFeed(ctx, W, H);
         this.drawLowAmmoWarning(ctx, W, H);
@@ -4968,11 +5038,9 @@ export class SurvivRenderer {
         if (interaction?.kind !== 'door') return;
         const door = interaction.target;
         const label = door.isOpen ? 'F TO CLOSE' : 'F TO OPEN';
-        const target = door.isOpen ? 1 : 0;
-        const progress = this._doorOpenProgress.get(door.id) ?? target;
-        const renderRect = getDoorRenderRect(door, progress);
+        const anchor = this.me || door;
         ctx.save();
-        ctx.translate(renderRect.x, renderRect.y);
+        ctx.translate(anchor.x, anchor.y - 34);
         ctx.font = '800 8px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -5292,7 +5360,7 @@ export class SurvivRenderer {
             const horizontal = o.w >= o.h;
             const longSize = horizontal ? o.w : o.h;
             const panelLength = Math.max(24, longSize + 2);
-            const panelThickness = Math.max(6, (horizontal ? o.h : o.w));
+            const panelThickness = Math.max(4, (horizontal ? o.h : o.w));
             const panelColor = '#f5f7f3';
             const panelDark = '#c9d0c9';
             const target = o.isOpen ? 1 : 0;
@@ -7295,34 +7363,10 @@ export class SurvivRenderer {
                     ctx.arc(0, 0, 22, 0, Math.PI * 2);
                     ctx.stroke();
                     ctx.setLineDash([]);
-                    if (l.type === 'weapon') {
-                        ctx.fillStyle = 'rgba(8, 10, 9, 0.92)';
-                        roundRect(ctx, -34, 35, 68, 16, 4);
-                        ctx.fill();
-                        ctx.fillStyle = '#ffffff';
-                        ctx.font = '900 9px system-ui, sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(this.me.weapon === 'fists' ? 'F  PICK UP' : 'F  SWAP', 0, 43);
-                    }
                 }
             }
         }
         ctx.restore();
-    }
-
-    initBulletGradients(ctx) {
-        this.bulletGradients = {};
-        for (const [wt, spec] of Object.entries(WEAPON_BULLET_SPECS)) {
-            const tracer = ctx.createLinearGradient(-spec.trailLen, 0, spec.tipLen, 0);
-            tracer.addColorStop(0, `rgba(${spec.rgb}, 0)`);
-            tracer.addColorStop(0.3, `rgba(${spec.rgb}, 0.045)`);
-            tracer.addColorStop(0.58, `rgba(${spec.rgb}, 0.2)`);
-            tracer.addColorStop(0.82, `rgba(${spec.rgb}, 0.62)`);
-            tracer.addColorStop(0.95, `rgba(${spec.rgb}, 0.94)`);
-            tracer.addColorStop(1, '#fffdf4');
-            this.bulletGradients[wt] = tracer;
-        }
     }
 
     drawBullet(ctx, b) {
@@ -7347,22 +7391,30 @@ export class SurvivRenderer {
         ctx.translate(b.x, b.y);
         ctx.rotate(angle);
 
-        // Initialize bullet gradients lazily
-        if (!this.bulletGradients) {
-            this.initBulletGradients(ctx);
-        }
-
         const wt = getSurvivWeaponFamily(b.weaponType);
         const spec = WEAPON_BULLET_SPECS[wt] || WEAPON_BULLET_SPECS.default;
-        const tracerGradient = this.bulletGradients[wt] || this.bulletGradients.default;
+        const ammoType = getSurvivWeaponAmmoType(b.weaponType);
+        const tracerColor = BULLET_TRACER_COLORS[ammoType] || '#fff0a8';
 
         ctx.lineCap = 'round';
-        ctx.strokeStyle = tracerGradient;
+        ctx.strokeStyle = 'rgba(7, 10, 8, 0.58)';
+        ctx.lineWidth = spec.thickness + 1.3;
+        ctx.beginPath();
+        ctx.moveTo(-spec.trailLen, 0);
+        ctx.lineTo(spec.tipLen, 0);
+        ctx.stroke();
+
+        ctx.strokeStyle = tracerColor;
         ctx.lineWidth = spec.thickness;
         ctx.beginPath();
         ctx.moveTo(-spec.trailLen, 0);
         ctx.lineTo(spec.tipLen, 0);
         ctx.stroke();
+
+        ctx.fillStyle = '#fff9e8';
+        ctx.beginPath();
+        ctx.arc(spec.tipLen, 0, Math.max(0.85, spec.thickness * 0.62), 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.restore();
     }
@@ -7474,7 +7526,32 @@ export class SurvivRenderer {
         ctx.arc(0, 3, r * 0.7, 0.3, Math.PI - 0.3);
         ctx.fill();
 
+        const reloadProgress = p.reloading && p.reloadEndAtLocal && p.reloadMs
+            ? clamp(1 - (p.reloadEndAtLocal - this._frameNow) / p.reloadMs, 0, 1)
+            : 0;
+        ctx.save();
+        if (reloadProgress > 0 && reloadProgress < 1) {
+            const handling = Math.sin(reloadProgress * Math.PI);
+            ctx.translate(-handling * 2.2, handling * 0.7);
+            ctx.rotate(handling * 0.035);
+        }
         this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color, p.walkBob || 0, p.meleeHand);
+        ctx.restore();
+
+        const hitAt = this._playerHitAt.get(p.id);
+        if (hitAt) {
+            const hitAge = this._frameNow - hitAt;
+            if (hitAge < 150) {
+                ctx.globalAlpha = Math.max(0, 1 - hitAge / 150) * 0.32;
+                ctx.fillStyle = '#fff2bf';
+                ctx.beginPath();
+                ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = knocked ? 0.45 : 1;
+            } else {
+                this._playerHitAt.delete(p.id);
+            }
+        }
 
         // Muzzle flash on self
         if (isMe && this._muzzleFlash > 0.1) {
@@ -7496,7 +7573,7 @@ export class SurvivRenderer {
 
         // Reload progress ring near weapon
         if (p.reloading && p.reloadEndAtLocal && p.reloadMs && p.reloadEndAtLocal > this._frameNow) {
-            const progress = clamp(1 - (p.reloadEndAtLocal - this._frameNow) / p.reloadMs, 0, 1);
+            const progress = reloadProgress;
             if (progress > 0 && progress < 1) {
                 const ringX = r + 12;
                 const ringY = -12;
@@ -7532,30 +7609,35 @@ export class SurvivRenderer {
         // renderer without also painting gameplay-only names and status bars.
         if (!showHud) return;
 
-        const hpPct = clamp((p.hp || 0) / (p.maxHp || 100), 0, 1);
-        const barW = 36;
-        const barY = p.y - r - 15;
-        ctx.fillStyle = 'rgba(10,14,12,0.62)';
-        roundRect(ctx, p.x - barW / 2, barY, barW, 5, 2);
-        ctx.fill();
-        ctx.fillStyle = hpPct > 0.35 ? '#55d875' : '#ef544f';
-        roundRect(ctx, p.x - barW / 2, barY, barW * hpPct, 5, 2);
-        ctx.fill();
-        if (p.armor > 0) {
-            ctx.fillStyle = '#65a4ff';
-            roundRect(ctx, p.x - barW / 2, barY + 7, barW * clamp(p.armor / 100, 0, 1), 3, 1.5);
+        // The local player already has a precise fixed HUD and balance badge.
+        // Avoid stacking a large duplicate name/health block over the aiming
+        // area; remote status remains visible for the existing game rules.
+        if (!isMe) {
+            const hpPct = clamp((p.hp || 0) / (p.maxHp || 100), 0, 1);
+            const barW = 34;
+            const barY = p.y - r - 14;
+            ctx.fillStyle = 'rgba(10,14,12,0.58)';
+            roundRect(ctx, p.x - barW / 2, barY, barW, 4.5, 2);
             ctx.fill();
-        }
+            ctx.fillStyle = hpPct > 0.35 ? '#55d875' : '#ef544f';
+            roundRect(ctx, p.x - barW / 2, barY, barW * hpPct, 4.5, 2);
+            ctx.fill();
+            if (p.armor > 0) {
+                ctx.fillStyle = '#65a4ff';
+                roundRect(ctx, p.x - barW / 2, barY + 6.5, barW * clamp(p.armor / 100, 0, 1), 2.5, 1.25);
+                ctx.fill();
+            }
 
-        if (!this.hideNames || isMe) {
-            ctx.fillStyle = isMe ? '#ffffff' : 'rgba(255,255,255,0.86)';
-            ctx.font = '700 11px system-ui, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-            ctx.strokeText(p.username || 'Player', p.x, p.y - r - 20);
-            ctx.fillText(p.username || 'Player', p.x, p.y - r - 20);
+            if (!this.hideNames) {
+                ctx.fillStyle = 'rgba(255,255,255,0.84)';
+                ctx.font = '700 9px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+                ctx.strokeText(p.username || 'Player', p.x, p.y - r - 19);
+                ctx.fillText(p.username || 'Player', p.x, p.y - r - 19);
+            }
         }
 
         if (p.cashoutHoldActive || (isMe && this.hud.cashoutHoldStart)) {
@@ -7748,27 +7830,6 @@ export class SurvivRenderer {
         ctx.fill();
         ctx.restore();
     }
-    drawCrosshair(ctx) {
-        if (!this.inputEnabled || this.spectatorMode || this.mobileAim.active) return;
-        const x = this.mouse.x || this.viewW / 2;
-        const y = this.mouse.y || this.viewH / 2;
-        ctx.save();
-        ctx.strokeStyle = this.mouse.down ? 'rgba(255, 226, 122, 0.9)' : 'rgba(255,255,255,0.72)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(x, y, 9, 0, Math.PI * 2);
-        ctx.moveTo(x - 16, y);
-        ctx.lineTo(x - 7, y);
-        ctx.moveTo(x + 7, y);
-        ctx.lineTo(x + 16, y);
-        ctx.moveTo(x, y - 16);
-        ctx.lineTo(x, y - 7);
-        ctx.moveTo(x, y + 7);
-        ctx.lineTo(x, y + 16);
-        ctx.stroke();
-        ctx.restore();
-    }
-
     drawPitchedRoofStructure(ctx, house, variant, halfW, halfH) {
         if (variant === 'ironworks') return;
 
@@ -8776,8 +8837,8 @@ export class SurvivRenderer {
         if (vigKey !== this._cachedVignetteKey) {
             this._cachedVignetteGrad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.25, W / 2, H / 2, radius);
             this._cachedVignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            this._cachedVignetteGrad.addColorStop(0.64, 'rgba(0, 0, 0, 0.08)');
-            this._cachedVignetteGrad.addColorStop(1, 'rgba(0, 0, 0, 0.34)');
+            this._cachedVignetteGrad.addColorStop(0.64, 'rgba(0, 0, 0, 0.045)');
+            this._cachedVignetteGrad.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
             this._cachedDangerGrad = ctx.createRadialGradient(W / 2, H / 2, radius * 0.38, W / 2, H / 2, radius * 0.96);
             this._cachedDangerGrad.addColorStop(0, 'rgba(120, 0, 0, 0)');
             this._cachedDangerGrad.addColorStop(1, 'rgba(220, 32, 32, 0.72)');
@@ -8999,7 +9060,7 @@ export class SurvivRenderer {
                 type: smoke ? 'grenadeSmoke' : 'grenadeFire',
             });
         }
-        this.cameraShake.intensity = Math.max(this.cameraShake.intensity || 0, 8);
+        this.cameraShake.intensity = Math.max(this.cameraShake.intensity || 0, 4.2);
     }
 
     drawGrenadeExplosions(ctx, currentHouse = null, currentRoom = null) {
@@ -9107,6 +9168,26 @@ export class SurvivRenderer {
         ctx.restore();
     }
 
+    drawHitPulses(ctx, currentHouse = null, currentRoom = null) {
+        const now = this._frameNow;
+        compactTimedItems(this.hitPulses, now);
+        if (this.hitPulses.length === 0) return;
+        ctx.save();
+        for (const pulse of this.hitPulses) {
+            if (!this.isPointInView(pulse.x, pulse.y, 36)) continue;
+            if (this.isPointHiddenByRooms(pulse.x, pulse.y, currentHouse, currentRoom)) continue;
+            const t = clamp((now - pulse.spawnedAt) / pulse.duration, 0, 1);
+            const eased = 1 - Math.pow(1 - t, 2);
+            ctx.globalAlpha = Math.max(0, 1 - t) * (pulse.kill ? 0.9 : 0.68);
+            ctx.strokeStyle = pulse.kill ? '#ef6660' : '#fff0a8';
+            ctx.lineWidth = Math.max(0.8, 1.9 - t);
+            ctx.beginPath();
+            ctx.arc(pulse.x, pulse.y, 5 + eased * 9, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
     drawDamageNumbers(ctx, currentHouse = null, currentRoom = null) {
         const now = this._frameNow;
         compactTimedItems(this.damageNumbers, now);
@@ -9144,12 +9225,12 @@ export class SurvivRenderer {
         if (this.damageIndicators.length === 0) return;
         const cx = W / 2;
         const cy = H / 2;
-        const indicatorDist = Math.min(W, H) * 0.35;
+        const indicatorDist = Math.min(W, H) * 0.33;
 
         ctx.save();
         for (const d of this.damageIndicators) {
             const age = now - d.spawnedAt;
-            const alpha = Math.max(0, 1 - age / d.duration) * d.intensity;
+            const alpha = Math.max(0, 1 - age / d.duration) * d.intensity * 0.58;
             const x = cx + Math.cos(d.angle) * indicatorDist;
             const y = cy + Math.sin(d.angle) * indicatorDist;
 
@@ -9165,12 +9246,12 @@ export class SurvivRenderer {
             grad.addColorStop(1, 'rgba(255, 40, 30, 0)');
             ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.moveTo(4, -18);
+            ctx.moveTo(4, -13);
             ctx.lineTo(12, 0);
-            ctx.lineTo(4, 18);
-            ctx.lineTo(0, 12);
+            ctx.lineTo(4, 13);
+            ctx.lineTo(1, 9);
             ctx.lineTo(6, 0);
-            ctx.lineTo(0, -12);
+            ctx.lineTo(1, -9);
             ctx.closePath();
             ctx.fill();
             ctx.restore();
@@ -9321,12 +9402,12 @@ export class SurvivRenderer {
         if (this._lowAmmoPulse <= 0) return;
         ctx.save();
         const pulse = 0.5 + Math.sin(this._frameNow / 200) * 0.5;
-        ctx.globalAlpha = this._lowAmmoPulse * pulse * 0.25;
+        ctx.globalAlpha = this._lowAmmoPulse * pulse * 0.14;
         const lowAmmoKey = `${W}:${H}`;
         if (lowAmmoKey !== this._cachedLowAmmoKey) {
             this._cachedLowAmmoGrad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
             this._cachedLowAmmoGrad.addColorStop(0, 'rgba(255, 160, 0, 0)');
-            this._cachedLowAmmoGrad.addColorStop(1, 'rgba(255, 160, 0, 0.5)');
+            this._cachedLowAmmoGrad.addColorStop(1, 'rgba(255, 160, 0, 0.35)');
             this._cachedLowAmmoKey = lowAmmoKey;
         }
         ctx.fillStyle = this._cachedLowAmmoGrad;

@@ -37,6 +37,11 @@ const SURVIV_GRENADE_EXPLOSION_FILES = Object.freeze([
     'grenade-3.wav',
 ]);
 
+const SURVIV_DOOR_FILES = Object.freeze({
+    wood: ['wood-1.wav', 'wood-2.wav', 'wood-3.wav'],
+    metal: ['metal-1.wav', 'metal-2.wav', 'metal-3.wav'],
+});
+
 const SURVIV_GUNSHOT_MIX = Object.freeze({
     pistol: 0.86,
     revolver: 0.82,
@@ -219,6 +224,10 @@ export function preloadSurvivGunshots() {
             key: `explosion:grenade:${variant}`,
             path: `/audio/surviv/explosions/grenade/${file}`,
         })),
+        ...Object.entries(SURVIV_DOOR_FILES).flatMap(([material, files]) => files.map((file, variant) => ({
+            key: `door:${material}:${variant}`,
+            path: `/audio/surviv/doors/${material}/${file}`,
+        }))),
     ];
     gunshotFetchPromise = Promise.all(entries.map(async ({ key, path }) => {
         const response = await fetch(path, { cache: 'force-cache' });
@@ -555,6 +564,173 @@ function actionDistanceGain(distance, range = 900) {
     return 1 / (1 + 2.4 * Math.pow(normalized, 1.3));
 }
 
+function playMechanismClick(ctx, destination, at, options = {}) {
+    const duration = Math.max(0.012, Number(options.duration) || 0.038);
+    const source = ctx.createBufferSource();
+    source.buffer = getNoiseBuffer(ctx, duration + 0.008, Number(options.variation) || 0);
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = Math.max(240, Number(options.frequency) || 2450);
+    band.Q.value = Math.max(0.35, Number(options.q) || 0.9);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(Math.max(0.0001, Number(options.level) || 0.11), at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    source.connect(band);
+    band.connect(gain);
+    gain.connect(destination);
+    source.start(at);
+    source.stop(at + duration + 0.009);
+}
+
+/** Dry, non-tonal empty-magazine click. */
+export function playSurvivDryFireSound() {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = 0.72;
+    connectSpatialActionBus(ctx, bus, 0);
+    playMechanismClick(ctx, bus, t, {
+        frequency: 2950,
+        q: 1.15,
+        level: 0.12,
+        duration: 0.027,
+        variation: Math.floor(Math.random() * 16),
+    });
+    playMechanismClick(ctx, bus, t + 0.018, {
+        frequency: 1180,
+        q: 0.72,
+        level: 0.055,
+        duration: 0.035,
+        variation: 4 + Math.floor(Math.random() * 12),
+    });
+    return true;
+}
+
+/** Magazine handling with a precise start/lock distinction. */
+export function playSurvivReloadSound(phase = 'start', weaponFamily = 'pistol') {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const heavy = ['shotgun', 'dmr', 'sniper', 'lmg'].includes(weaponFamily);
+    const complete = phase === 'complete';
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = complete ? 0.68 : 0.58;
+    connectSpatialActionBus(ctx, bus, 0);
+
+    playMechanismClick(ctx, bus, t, {
+        frequency: complete ? (heavy ? 1620 : 2240) : (heavy ? 1180 : 1780),
+        q: complete ? 0.95 : 0.72,
+        level: complete ? 0.145 : 0.105,
+        duration: heavy ? 0.052 : 0.038,
+        variation: Math.floor(Math.random() * 16),
+    });
+    playMechanismClick(ctx, bus, t + (complete ? 0.055 : 0.075), {
+        frequency: complete ? (heavy ? 2750 : 3450) : (heavy ? 720 : 960),
+        q: complete ? 1.12 : 0.55,
+        level: complete ? 0.105 : 0.065,
+        duration: complete ? 0.034 : 0.058,
+        variation: 3 + Math.floor(Math.random() * 13),
+    });
+    return true;
+}
+
+/** Quiet cloth/mechanism cue for a successful weapon swap. */
+export function playSurvivEquipSound(weaponFamily = 'pistol') {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const heavy = ['shotgun', 'dmr', 'sniper', 'lmg'].includes(weaponFamily);
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = 0.46;
+    connectSpatialActionBus(ctx, bus, 0);
+
+    const cloth = ctx.createBufferSource();
+    cloth.buffer = getNoiseBuffer(ctx, 0.095, Math.floor(Math.random() * 16));
+    const clothBand = ctx.createBiquadFilter();
+    clothBand.type = 'bandpass';
+    clothBand.frequency.value = heavy ? 620 : 880;
+    clothBand.Q.value = 0.48;
+    const clothGain = ctx.createGain();
+    clothGain.gain.setValueAtTime(0.075, t);
+    clothGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    cloth.connect(clothBand);
+    clothBand.connect(clothGain);
+    clothGain.connect(bus);
+    cloth.start(t);
+    cloth.stop(t + 0.1);
+    playMechanismClick(ctx, bus, t + 0.035, {
+        frequency: heavy ? 1450 : 2250,
+        level: heavy ? 0.09 : 0.075,
+        duration: 0.033,
+        variation: 5 + Math.floor(Math.random() * 11),
+    });
+    return true;
+}
+
+/** Compact pickup confirmation; useful without turning looting into a UI jingle. */
+export function playSurvivPickupSound(kind = 'item') {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const isWeapon = kind === 'weapon';
+    const isAmmo = kind === 'ammo';
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = 0.54;
+    connectSpatialActionBus(ctx, bus, 0);
+    playMechanismClick(ctx, bus, t, {
+        frequency: isWeapon ? 1320 : isAmmo ? 2050 : 1680,
+        q: 0.72,
+        level: isWeapon ? 0.115 : 0.085,
+        duration: isWeapon ? 0.052 : 0.038,
+        variation: Math.floor(Math.random() * 16),
+    });
+    playMechanismClick(ctx, bus, t + 0.035, {
+        frequency: isWeapon ? 2380 : isAmmo ? 3180 : 2550,
+        q: 1.05,
+        level: isWeapon ? 0.075 : 0.06,
+        duration: 0.028,
+        variation: 4 + Math.floor(Math.random() * 12),
+    });
+    return true;
+}
+
+/** Soft medical-pack handling at the beginning and end of a heal. */
+export function playSurvivHealSound(phase = 'start') {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const t = ctx.currentTime;
+    const complete = phase === 'complete';
+    const bus = ctx.createGain();
+    bus.gain.value = complete ? 0.48 : 0.42;
+    connectSpatialActionBus(ctx, bus, 0);
+
+    const rustle = ctx.createBufferSource();
+    rustle.buffer = getNoiseBuffer(ctx, complete ? 0.13 : 0.18, Math.floor(Math.random() * 16));
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = complete ? 1850 : 1280;
+    band.Q.value = 0.46;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(complete ? 0.075 : 0.09, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + (complete ? 0.12 : 0.17));
+    rustle.connect(band);
+    band.connect(gain);
+    gain.connect(bus);
+    rustle.start(t);
+    rustle.stop(t + (complete ? 0.14 : 0.19));
+    if (complete) {
+        playMechanismClick(ctx, bus, t + 0.035, {
+            frequency: 2450,
+            level: 0.055,
+            duration: 0.03,
+            variation: 7 + Math.floor(Math.random() * 9),
+        });
+    }
+    return true;
+}
+
 /** A dry air/cloth movement for fists and a sharper air cut for knives. */
 export function playSurvivMeleeSwing(weaponType = 'fists', options = {}) {
     const ctx = getCtx();
@@ -622,10 +798,46 @@ export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
     if (attenuation < 0.035) return false;
     const t = ctx.currentTime;
     const bus = ctx.createGain();
-    bus.gain.value = attenuation * (0.88 + Math.random() * 0.1);
+    const closing = options.closing === true;
+    bus.gain.value = attenuation * (closing ? 0.78 : 0.88) * (0.96 + Math.random() * 0.1);
     connectSpatialActionBus(ctx, bus, options.pan);
 
-    // A filtered, moving hinge texture keeps the sound organic without a long tail.
+    const doorMaterial = metal ? 'metal' : 'wood';
+    const samples = SURVIV_DOOR_FILES[doorMaterial];
+    const variant = selectGunshotVariant(`door:${doorMaterial}`, samples.length);
+    const recordedDoor = gunshotBuffers.get(`door:${doorMaterial}:${variant}`);
+    if (recordedDoor) {
+        const source = ctx.createBufferSource();
+        source.buffer = recordedDoor;
+        source.playbackRate.value = (closing ? 0.89 : 0.975) + Math.random() * 0.05;
+        const highpass = ctx.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 38;
+        highpass.Q.value = 0.32;
+        const lowpass = ctx.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = metal ? 7800 : 6200;
+        lowpass.Q.value = 0.38;
+        const sampleGain = ctx.createGain();
+        sampleGain.gain.value = metal ? 0.76 : 0.82;
+        source.connect(highpass);
+        highpass.connect(lowpass);
+        lowpass.connect(sampleGain);
+        sampleGain.connect(bus);
+        source.start(t);
+        if (closing) {
+            playMechanismClick(ctx, bus, t + 0.31, {
+                frequency: metal ? 1180 : 720,
+                q: 0.55,
+                level: metal ? 0.12 : 0.15,
+                duration: metal ? 0.045 : 0.058,
+                variation: 8 + Math.floor(Math.random() * 8),
+            });
+        }
+        return true;
+    }
+
+    // Lightweight fallback while the recorded layers are still decoding.
     const hinge = ctx.createBufferSource();
     hinge.buffer = getNoiseBuffer(ctx, 0.19, Math.floor(Math.random() * 16));
     hinge.playbackRate.value = 0.93 + Math.random() * 0.1;

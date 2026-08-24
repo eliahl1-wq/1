@@ -114,130 +114,99 @@ function survivUiSnapshotsEqual(previous, next) {
     return true;
 }
 
-function renderWeaponIcon(weaponId, accentColor = 'currentColor', size = 24) {
-    const family = getSurvivWeaponFamily(weaponId);
-    const isDual = weaponId.startsWith('dual');
-    const outline = '#080d0b';
-    const steel = '#c7cfcc';
-    const darkSteel = '#65716d';
-    const furniture = '#8b6849';
-    const outlined = {
-        stroke: outline,
-        strokeWidth: 2.4,
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round',
-        vectorEffect: 'non-scaling-stroke',
-    };
-    const icon = (content, viewBox = '0 0 64 32') => (
-        <svg
-            width={size}
-            height={Math.round(size * 0.62)}
-            viewBox={viewBox}
-            role="presentation"
-            aria-hidden="true"
-            className="weapon-svg-icon surviv-weapon-silhouette"
-        >
-            {content}
-        </svg>
-    );
-
-    if (weaponId === 'fists') {
-        return icon(
-            <g {...outlined}>
-                <path fill="#79ef83" d="M18 24c-4.5 0-8-3.2-8-7.4V11c0-2.6 3.5-3.1 4.4-.9V7.8c0-2.7 4-2.7 4 0V6.4c0-2.7 4-2.7 4 0v1.2c.5-2.2 4-1.8 4 .8v7.8c0 4.6-3.3 7.8-8.4 7.8Z" />
-                <path fill="#79ef83" d="M45.5 24c-4.6 0-8-3.2-8-7.4V9c0-2.6 3.6-3 4.4-.8V6.9c0-2.7 4-2.7 4 0v1c.7-2 3.9-1.5 3.9 1v1.2c.9-2 4-1.3 4 1.1v5c0 4.6-3.3 7.8-8.3 7.8Z" />
-                <path fill="none" stroke="#d7ffdc" strokeWidth="1.2" d="M14.4 10v4.3m4-6.5v6m4-6.2v6.2m19.5-5.6v6m4-6.3v6" />
-            </g>,
-        );
+function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
+    switch (weaponId === 'fists' || weaponId === 'knife' ? weaponId : getSurvivWeaponFamily(weaponId)) {
+        case 'fists':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M5.5 11.5V8.8a1.3 1.3 0 0 1 2.6 0v1.7-3a1.3 1.3 0 0 1 2.6 0v3-2.2a1.3 1.3 0 0 1 2.6 0v2.9-1.5a1.3 1.3 0 0 1 2.6 0v4.1c0 3.8-2.6 6.2-6.1 6.2-3 0-5.3-2.2-5.3-5.1v-2.2c0-.7.4-1.2 1-1.2Z" />
+                    <path d="M15.5 8.5V7.2a1.2 1.2 0 0 1 2.4 0v4.1M18 9.2a1.2 1.2 0 0 1 2.4 0v4.4c0 2.4-1.2 4.4-3.2 5.5" />
+                </svg>
+            );
+        case 'knife':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="m5 19 5.1-5.1 7.9-7.9c1.1-1.1 2.7-1.4 3.9-.7l-1.1 1.1.8.8-1.2 1.2.8.8-1.5 1.5.8.8-2.2 2.2c-1.3 1.3-3.4 1.3-4.7 0L11 18.1 5.9 23H3v-2.9L5 18.1Z" />
+                    <path d="m9.2 14.8 2 2" />
+                </svg>
+            );
+        case 'pistol':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M17 8H6c-.6 0-1 .4-1 1v2c0 .6.4 1 1 1h4l1 1.5v.5l2.5 5.5c.2.4.6.5 1 .5h1.5c.5 0 .8-.4.7-.9l-2.2-5.1H17c.6 0 1-.4 1-1V9c0-.6-.4-1-1-1Z" />
+                    <path d="M11 12c0 .8.7 1.5 1.5 1.5" />
+                </svg>
+            );
+        case 'revolver':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M19 8H13V7.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5V8H5c-.6 0-1 .4-1 1v1.5c0 .6.4 1 1 1h8v1h-3l2 6.5c.1.4.5.5.9.5h1.7c.5 0 .8-.4.7-.9l-1.8-5.1H19c.6 0 1-.4 1-1V9c0-.6-.4-1-1-1Z" />
+                    <rect x="13" y="8" width="4.5" height="3" rx="0.5" fill="none" />
+                    <circle cx="15.25" cy="9.5" r="0.75" fill={strokeColor} />
+                </svg>
+            );
+        case 'smg':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M21 8h-4.5L15 7.5c-.3-.3-.8-.5-1.2-.5H5c-.6 0-1 .4-1 1v2.5c0 .6.4 1 1 1h8.5l.5.5v3.5c0 .6.4 1 1 1h1.5c.6 0 1-.4 1-1v-4H21c.6 0 1-.4 1-1V9c0-.6-.4-1-1-1Z" />
+                    <path d="M9.5 11l-.5 4.5c0 .3-.3.5-.6.5H7.2c-.3 0-.5-.2-.5-.5l-.7-4.5" />
+                    <path d="M17.5 11l1.5 5.5c.1.4.5.5.9.5h1.1c.5 0 .8-.4.7-.9l-2.2-5.1" />
+                    <path d="M22 9h-2v2h2V9Z" />
+                </svg>
+            );
+        case 'shotgun':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M2 9.5h15c.3 0 .5-.2.5-.5v-1c0-.3-.2-.5-.5-.5H2v2Z" />
+                    <path d="M17 8h3.5a1.5 1.5 0 0 1 1.5 1.5v2c0 .6-.4 1-1 1h-2l-3 4.5c-.2.3-.5.5-.9.5h-1.6c-.5 0-.8-.4-.7-.9l1.2-4.1h-4v-1" />
+                    <rect x="7" y="10" width="4.5" height="1.5" rx="0.3" fill="none" />
+                </svg>
+            );
+        case 'assault':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M2 9h16V8c0-.6-.4-1-1-1H3c-.6 0-1 .4-1 1v1Z" />
+                    <path d="M18 9h3a1.5 1.5 0 0 1 1.5 1.5v2c0 .6-.4 1-1 1h-1.5L18 17c-.2.3-.5.5-.9.5h-1.7c-.5 0-.8-.4-.7-.9l1.3-4.1h-5l-.5 4.5c0 .3-.3.5-.6.5H9.2c-.3 0-.5-.2-.5-.5l-.7-4.5H4v-1.5h14V9Z" />
+                    <rect x="9" y="5.5" width="5.5" height="1.5" rx="0.3" />
+                    <path d="M10.5 7v1M13 7v1" />
+                </svg>
+            );
+        case 'dmr':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M1 9h18V8c0-.6-.4-1-1-1H2c-.6 0-1 .4-1 1v1Z" />
+                    <path d="M19 9h2.5a1.5 1.5 0 0 1 1.5 1.5v2.5c0 .6-.4 1-1 1h-2l-2.2 4c-.2.3-.5.5-.9.5h-1.4c-.5 0-.8-.4-.7-.9l1.2-3.6h-5.5l-.8 4.5c0 .3-.3.5-.6.5H11c-.4 0-.6-.3-.5-.7l.8-4.3H4v-1.5h15V9Z" />
+                    <rect x="8.5" y="4.5" width="7" height="2" rx="0.4" />
+                    <path d="M10 6.5v1.5M14 6.5v1.5M1.5 9v1" />
+                </svg>
+            );
+        case 'sniper':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M1 9.5h20V9c0-.6-.4-1-1-1H2c-.6 0-1 .4-1 1v.5Z" />
+                    <path d="M21 9h1.5v2H21V9Z" />
+                    <path d="M21 10.5h.5a1 1 0 0 1 1 1v2c0 .6-.4 1-1 1h-1.5L18 18.5c-.2.3-.6.5-1 .5h-1.5c-.5 0-.8-.4-.7-.9l1.2-4.1H10.5l-1.5 4.5c0 .3-.3.5-.6.5H7.2c-.4 0-.6-.3-.5-.7l1.3-4.3H3.5v-1h17.5v.5Z" />
+                    <rect x="8" y="4.5" width="8.5" height="2.2" rx="0.4" />
+                    <path d="M9.5 6.7v1.8M15 6.7v1.8" />
+                    <path d="M4 11.5L2 16M5 11.5l2 16" />
+                </svg>
+            );
+        case 'lmg':
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M1 9.5h18V8c0-.6-.4-1-1-1H2c-.6 0-1 .4-1 1v1.5Z" />
+                    <path d="M19 9.5h2.5a1.5 1.5 0 0 1 1.5 1.5v2.5c0 .6-.4 1-1 1h-1.5l-2.5 4.5c-.2.3-.5.5-.9.5h-2c-.5 0-.8-.4-.7-.9l1.3-4.1H13v3.5c0 .6-.4 1-1 1h-2c-.6 0-1-.4-1-1V12.5H4v-1.5h15v-1.5Z" />
+                    <path d="M5.5 8V6.5h7V8" />
+                    <path d="M3.5 11L2 16.5M4.5 11l1.5 5.5" />
+                </svg>
+            );
+        default:
+            return (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="weapon-svg-icon">
+                    <path d="M20 4L4 20M14 4h6v6M8 20H4v-4" />
+                </svg>
+            );
     }
-
-    if (weaponId === 'knife') {
-        return icon(
-            <g {...outlined} transform="rotate(-8 32 16)">
-                <path fill={steel} d="M7 19 39 8h17l-8 7-31 8Z" />
-                <path fill="#edf4f1" stroke="none" d="m17 18 31-7-5 3-27 6Z" />
-                <path fill={accentColor} d="m8 17 12 5-3 6-12-5Z" />
-                <path fill={darkSteel} d="m18 15 6 6-3 3-7-7Z" />
-            </g>,
-        );
-    }
-
-    const gun = (
-        <g {...outlined}>
-            {family === 'pistol' && <>
-                <path fill={darkSteel} d="M19 10h28l5 3v7H19Z" />
-                <path fill={steel} d="M21 8h29l4 3-3 5H21Z" />
-                <path fill={accentColor} d="M27 16h13l-2 5-3 8H25l4-9Z" />
-                <path fill="#29312f" d="M22 17h10v4H20Z" />
-                <path fill={outline} stroke="none" d="M49 11h11v3H49Z" />
-                <path fill="none" stroke="#eef4f2" strokeWidth="1" d="M26 11h20" />
-            </>}
-            {family === 'revolver' && <>
-                <path fill={steel} d="M17 11h34l7 3-7 5H17Z" />
-                <circle fill={darkSteel} cx="38" cy="16" r="7" />
-                <circle fill={accentColor} cx="38" cy="16" r="3.1" />
-                <path fill={accentColor} d="M24 19h13l-4 10H22Z" />
-                <path fill={outline} stroke="none" d="M49 14h12v3H49Z" />
-            </>}
-            {family === 'smg' && <>
-                <path fill={darkSteel} d="M11 11h35l8 4-7 7H11Z" />
-                <path fill={steel} d="M17 9h31l5 4-6 5H17Z" />
-                <path fill={accentColor} d="M28 18h11l2 11H30Z" />
-                <path fill="#303936" d="M17 20h10l-3 7h-8Z" />
-                <path fill={outline} stroke="none" d="M49 13h13v3H49Z" />
-                <path fill="none" stroke="#eef4f2" strokeWidth="1" d="M22 12h20" />
-            </>}
-            {family === 'shotgun' && <>
-                <path fill={furniture} d="M3 14 18 8l11 5v7l-12 5-14-4Z" />
-                <path fill={darkSteel} d="M22 11h21v10H22Z" />
-                <path fill={steel} d="M39 12h22v4H39Zm0 6h22v3H39Z" />
-                <path fill={accentColor} d="M34 11h10v11H34Z" />
-                <path fill="#303936" d="M25 20h11l-3 9h-9Z" />
-            </>}
-            {family === 'assault' && <>
-                <path fill={furniture} d="M3 13 17 7l9 7-5 8-18 1Z" />
-                <path fill={darkSteel} d="M19 10h29l7 5-8 7H19Z" />
-                <path fill={steel} d="M25 9h24l5 4-7 5H25Z" />
-                <path fill={accentColor} d="M31 19h12l-2 10H31Z" />
-                <path fill={outline} stroke="none" d="M48 13h14v3H48Z" />
-                <path fill="none" stroke="#eef4f2" strokeWidth="1" d="M29 12h15" />
-            </>}
-            {family === 'dmr' && <>
-                <path fill={furniture} d="M2 14 17 8l12 6-5 8-22 1Z" />
-                <path fill={darkSteel} d="M20 11h31l6 4-7 6H20Z" />
-                <path fill={steel} d="M48 13h14v3H48Z" />
-                <path fill={accentColor} d="M30 19h12l-1 10H31Z" />
-                <rect fill="#27302d" x="27" y="5" width="21" height="6" rx="2" />
-                <path fill="none" stroke="#dce5e1" strokeWidth="1" d="M31 8h13" />
-            </>}
-            {family === 'sniper' && <>
-                <path fill={furniture} d="M1 15 18 8l13 6-6 8-24 2Z" />
-                <path fill={darkSteel} d="M19 12h29l7 4-8 5H19Z" />
-                <path fill={steel} d="M45 14h18v3H45Z" />
-                <path fill={accentColor} d="M26 20h12l-5 9H24Z" />
-                <rect fill="#252d2b" x="24" y="5" width="25" height="6" rx="3" />
-                <circle fill={accentColor} cx="45" cy="8" r="2" />
-            </>}
-            {family === 'lmg' && <>
-                <path fill={furniture} d="M2 13 16 7l12 7-6 9H2Z" />
-                <path fill={darkSteel} d="M18 9h34l6 6-7 8H18Z" />
-                <path fill={steel} d="M47 12h16v4H47Z" />
-                <path fill={accentColor} d="M29 19h17v10H28Z" />
-                <circle fill="#2d3533" cx="37" cy="13" r="7" />
-                <circle fill={accentColor} cx="37" cy="13" r="3" />
-                <path fill="none" d="m50 21 6 8m-1-8-5 8" />
-            </>}
-        </g>
-    );
-
-    if (isDual && (family === 'pistol' || family === 'revolver')) {
-        return icon(<>
-            <g transform="translate(-1 -5) rotate(-7 32 16) scale(.88)">{gun}</g>
-            <g transform="translate(8 8) rotate(7 32 16) scale(.88)">{gun}</g>
-        </>);
-    }
-
-    return icon(gun);
 }
 
 export default function SurvivGame() {
@@ -1511,7 +1480,7 @@ export default function SurvivGame() {
                                 {weaponId ? (
                                     <>
                                         <div className="hotbar-weapon-icon-wrap">
-                                            {renderWeaponIcon(weaponId, isActive ? '#14F195' : '#aab5b1', 42)}
+                                            {renderWeaponIcon(weaponId, isActive ? '#14F195' : 'rgba(255,255,255,0.72)', 32)}
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         {weaponId === 'fists' || weaponId === 'knife' ? (
@@ -1745,8 +1714,8 @@ export default function SurvivGame() {
                                                     <div className="slot-number">{SURVIV_SLOT_KEYS[slotIdx]}</div>
                                                     {weaponId ? (
                                                         <div className="weapon-card-content-flex" style={{ display: 'flex', alignItems: 'center', gap: '7px', height: '100%', minWidth: 0, overflow: 'hidden' }}>
-                                                            <div className="weapon-card-icon-wrap">
-                                                                {renderWeaponIcon(weaponId, isActive ? '#14F195' : '#aab5b1', 42)}
+                                                            <div className="weapon-card-icon-wrap" style={{ flexShrink: 0, width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+                                                                {renderWeaponIcon(weaponId, isActive ? '#14F195' : 'rgba(255,255,255,0.7)', 24)}
                                                             </div>
                                                             <div className="weapon-card-details" style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, overflow: 'hidden' }}>
                                                                 <span className="weapon-name" style={{ fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{weaponLabel}</span>
