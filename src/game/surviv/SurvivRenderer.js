@@ -4973,18 +4973,18 @@ export class SurvivRenderer {
         const renderRect = getDoorRenderRect(door, progress);
         ctx.save();
         ctx.translate(renderRect.x, renderRect.y);
-        ctx.font = '800 10px system-ui, sans-serif';
+        ctx.font = '800 8px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const width = Math.ceil(ctx.measureText(label).width) + 18;
+        const width = Math.ceil(ctx.measureText(label).width) + 12;
         ctx.fillStyle = 'rgba(9, 13, 15, 0.88)';
-        roundRect(ctx, -width / 2, -10, width, 20, 5);
+        roundRect(ctx, -width / 2, -8, width, 16, 4);
         ctx.fill();
         ctx.strokeStyle = 'rgba(232, 239, 235, 0.62)';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1;
         ctx.stroke();
         ctx.fillStyle = '#f4f7f4';
-        ctx.fillText(label, 0, 0.5);
+        ctx.fillText(label, 0, 0.25);
         ctx.restore();
     }
 
@@ -4997,7 +4997,9 @@ export class SurvivRenderer {
         const masonry = ['brick', 'mansion', 'town'].includes(house.variant);
         const depth = industrial ? 54 : wooden ? 68 : 58;
         const axisSize = horizontal ? house.w : house.h;
-        const doorSpan = clamp(axisSize * 0.32, 74, house.variant === 'mansion' || house.variant === 'warehouse' ? 132 : 104);
+        const exteriorDoor = (this._doorwaysByHouseId.get(house.id) || [])
+            .find(door => door.entranceRole !== 'interiorDoor' && (door.orientation || door.role) === side);
+        const doorSpan = exteriorDoor ? Math.max(exteriorDoor.w, exteriorDoor.h) : clamp(axisSize * 0.18, 42, 54);
         const span = Math.min(axisSize - 42, doorSpan + (wooden ? 54 : 42));
         const x = side === 'west'
             ? house.x - house.w / 2 - depth / 2 + 3
