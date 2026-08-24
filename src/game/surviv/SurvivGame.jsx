@@ -257,6 +257,7 @@ export default function SurvivGame() {
     const reloadPendingRef = useRef(false);
     const useMedkitPendingRef = useRef(false);
     const pickupWeaponPendingRef = useRef(false);
+    const pickupVestPendingRef = useRef(null);
     const toggleDoorPendingRef = useRef(null);
     const equipSlotPendingRef = useRef(null);
     const openChestPendingRef = useRef(null);
@@ -645,6 +646,7 @@ export default function SurvivGame() {
             throwGrenadePendingRef.current = false;
             swapWeaponSlotsPendingRef.current = null;
             pickupWeaponPendingRef.current = false;
+            pickupVestPendingRef.current = null;
             toggleDoorPendingRef.current = null;
             equipSlotPendingRef.current = null;
             openChestPendingRef.current = null;
@@ -707,6 +709,9 @@ export default function SurvivGame() {
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
             if (action === 'pickupWeapon') pickupWeaponPendingRef.current = true;
+            if (typeof action === 'string' && action.startsWith('pickupVest:')) {
+                pickupVestPendingRef.current = action.slice('pickupVest:'.length);
+            }
             if (typeof action === 'string' && action.startsWith('toggleDoor:')) {
                 toggleDoorPendingRef.current = action.slice('toggleDoor:'.length);
             }
@@ -944,11 +949,14 @@ export default function SurvivGame() {
                 ? { id: nearbyTarget.id, kind: 'door', isOpen: !!nearbyTarget.isOpen }
                 : nearbyInteraction?.kind === 'weapon'
                     ? { id: nearbyTarget.id, kind: 'weapon', weaponType: nearbyTarget.weaponType }
+                    : nearbyInteraction?.kind === 'vest'
+                        ? { id: nearbyTarget.id, kind: 'vest', vestLevel: Number(nearbyTarget.vestLevel) || 1 }
                     : null;
             const previousNearbyPickup = nearbyPickupValueRef.current;
             if (previousNearbyPickup?.id !== nextNearbyPickup?.id
                 || previousNearbyPickup?.kind !== nextNearbyPickup?.kind
                 || previousNearbyPickup?.weaponType !== nextNearbyPickup?.weaponType
+                || previousNearbyPickup?.vestLevel !== nextNearbyPickup?.vestLevel
                 || previousNearbyPickup?.isOpen !== nextNearbyPickup?.isOpen) {
                 nearbyPickupValueRef.current = nextNearbyPickup;
                 setNearbyPickup(nextNearbyPickup);
@@ -1157,6 +1165,11 @@ export default function SurvivGame() {
                 pickupWeaponPendingRef.current = false;
                 hasAction = true;
             }
+            if (pickupVestPendingRef.current) {
+                payload.pickupVestId = pickupVestPendingRef.current;
+                pickupVestPendingRef.current = null;
+                hasAction = true;
+            }
             if (toggleDoorPendingRef.current) {
                 payload.toggleDoorId = toggleDoorPendingRef.current;
                 toggleDoorPendingRef.current = null;
@@ -1246,6 +1259,7 @@ export default function SurvivGame() {
         reloadPendingRef.current = false;
         useMedkitPendingRef.current = false;
         pickupWeaponPendingRef.current = false;
+        pickupVestPendingRef.current = null;
         toggleDoorPendingRef.current = null;
         equipSlotPendingRef.current = null;
         throwGrenadePendingRef.current = false;
@@ -1288,6 +1302,10 @@ export default function SurvivGame() {
         const interaction = rendererRef.current?.getNearbyInteraction();
         if (interaction?.kind === 'door' && interaction.target?.id) {
             toggleDoorPendingRef.current = interaction.target.id;
+            return;
+        }
+        if (interaction?.kind === 'vest' && interaction.target?.id) {
+            pickupVestPendingRef.current = interaction.target.id;
             return;
         }
         if (interaction?.kind === 'weapon' && interaction.target?.id) pickupWeaponPendingRef.current = true;
@@ -1444,6 +1462,8 @@ export default function SurvivGame() {
                         <kbd>F</kbd>
                         {nearbyPickup.kind === 'door' ? (
                             <span>{nearbyPickup.isOpen ? 'CLOSE' : 'OPEN'} <strong>DOOR</strong></span>
+                        ) : nearbyPickup.kind === 'vest' ? (
+                            <span>SWAP TO <strong>LEVEL {nearbyPickup.vestLevel} VEST</strong></span>
                         ) : (
                             <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
                         )}

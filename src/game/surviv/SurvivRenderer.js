@@ -848,6 +848,104 @@ function seededNoise(x, y) {
     return n - Math.floor(n);
 }
 
+function traceOrganicTreeShape(ctx, radius, seedX, seedY, offsetX = 0, offsetY = 0, pointCount = 20, irregularity = 0.13) {
+    const points = [];
+    for (let index = 0; index < pointCount; index++) {
+        const angle = (index / pointCount) * Math.PI * 2;
+        const noise = seededNoise(seedX + index * 3.17, seedY - index * 2.43);
+        const lobe = Math.sin(angle * 5 + seedX * 0.013) * 0.045;
+        const pointRadius = radius * (1 - irregularity / 2 + noise * irregularity + lobe);
+        points.push({
+            x: offsetX + Math.cos(angle) * pointRadius,
+            y: offsetY + Math.sin(angle) * pointRadius * 0.96,
+        });
+    }
+    const first = points[0];
+    const last = points[points.length - 1];
+    ctx.beginPath();
+    ctx.moveTo((last.x + first.x) / 2, (last.y + first.y) / 2);
+    for (let index = 0; index < points.length; index++) {
+        const point = points[index];
+        const next = points[(index + 1) % points.length];
+        ctx.quadraticCurveTo(point.x, point.y, (point.x + next.x) / 2, (point.y + next.y) / 2);
+    }
+    ctx.closePath();
+}
+
+function drawSurvivTreeTrunk(ctx, tree, radius, variant) {
+    const seedX = Number(tree.x) || 0;
+    const seedY = Number(tree.y) || 0;
+    const birch = variant === 'birch';
+    const trunkRadius = radius * (variant === 'ancientOak' ? 0.32 : 0.255);
+
+    // Short branch shoulders remain under the canopy and make the visible
+    // brown area read as a real trunk instead of a flat brown bullseye.
+    ctx.strokeStyle = birch ? 'rgba(119, 108, 84, 0.88)' : 'rgba(68, 38, 20, 0.92)';
+    ctx.lineWidth = Math.max(3, radius * 0.15);
+    ctx.lineCap = 'round';
+    for (let branch = 0; branch < 3; branch++) {
+        const angle = -2.45 + branch * 1.85 + seededNoise(seedX + branch, seedY) * 0.32;
+        ctx.beginPath();
+        ctx.moveTo(0, radius * 0.02);
+        ctx.lineTo(Math.cos(angle) * radius * 0.49, Math.sin(angle) * radius * 0.43 - radius * 0.03);
+        ctx.stroke();
+    }
+
+    traceOrganicTreeShape(ctx, trunkRadius, seedX * 0.73, seedY * 0.73, 0, radius * 0.025, 13, 0.16);
+    ctx.fillStyle = birch ? '#b8ad91' : '#5b351c';
+    ctx.fill();
+    ctx.strokeStyle = birch ? '#5d5749' : '#25170f';
+    ctx.lineWidth = Math.max(2.4, radius * 0.09);
+    ctx.stroke();
+
+    ctx.strokeStyle = birch ? 'rgba(62, 57, 48, 0.48)' : 'rgba(154, 101, 51, 0.38)';
+    ctx.lineWidth = Math.max(1.1, radius * 0.035);
+    ctx.beginPath();
+    ctx.arc(-radius * 0.03, radius * 0.01, trunkRadius * 0.48, -1.25, 1.45);
+    ctx.stroke();
+}
+
+function drawSurvivBroadleafCanopy(ctx, tree, radius, hue, variant) {
+    const seedX = Number(tree.x) || 0;
+    const seedY = Number(tree.y) || 0;
+    const ancient = variant === 'ancientOak';
+    const birch = variant === 'birch';
+    const scrub = variant === 'scrub';
+    const crownRadius = radius * (ancient ? 1.38 : scrub ? 1.24 : 1.30);
+    const crownX = -radius * 0.025;
+    const crownY = -radius * 0.10;
+    const lightness = ancient ? 23 : birch ? 32 : scrub ? 29 : 26;
+
+    traceOrganicTreeShape(ctx, crownRadius, seedX, seedY, crownX, crownY, ancient ? 24 : 20, ancient ? 0.12 : 0.16);
+    ctx.fillStyle = `hsla(${hue}, ${ancient ? 40 : 43}%, ${lightness}%, 0.72)`;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(14, 29, 14, 0.58)';
+    ctx.lineWidth = Math.max(2.5, radius * 0.085);
+    ctx.stroke();
+
+    // Offset leaf masses avoid the old target-like stack of concentric circles.
+    // Their translucent overlap naturally hides most of the trunk while still
+    // allowing a muted piece of bark to show through the middle.
+    const leafMasses = ancient ? 7 : 5;
+    for (let index = 0; index < leafMasses; index++) {
+        const angle = (index / leafMasses) * Math.PI * 2 - 0.7;
+        const noise = seededNoise(seedX + index * 8.2, seedY - index * 5.7);
+        const distance = crownRadius * (index === 0 ? 0.08 : 0.34 + noise * 0.10);
+        const massRadius = crownRadius * (index === 0 ? 0.43 : 0.29 + noise * 0.07);
+        const x = crownX + Math.cos(angle) * distance - crownRadius * 0.07;
+        const y = crownY + Math.sin(angle) * distance - crownRadius * 0.08;
+        traceOrganicTreeShape(ctx, massRadius, seedX + index * 17, seedY + index * 11, x, y, 13, 0.14);
+        ctx.fillStyle = `hsla(${hue + 5 + (index % 3) * 3}, 46%, ${lightness + 8 + (index % 2) * 3}%, ${index === 0 ? 0.34 : 0.22})`;
+        ctx.fill();
+    }
+
+    // One quiet highlight gives the crown volume without making it glossy.
+    traceOrganicTreeShape(ctx, crownRadius * 0.22, seedX + 91, seedY - 47,
+        crownX - crownRadius * 0.30, crownY - crownRadius * 0.32, 12, 0.13);
+    ctx.fillStyle = `hsla(${hue + 12}, 50%, ${lightness + 18}%, 0.28)`;
+    ctx.fill();
+}
+
 function traceSmoothPath(ctx, points, originX = 0, originY = 0, closed = false) {
     if (!points?.length) return false;
     const local = points.map(point => ({ x: point.x - originX, y: point.y - originY }));
@@ -1096,6 +1194,36 @@ function drawFurnitureTopDown(ctx, o, variant) {
         ctx.strokeStyle = '#687579'; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = '#778f96';
         ctx.beginPath(); ctx.ellipse(0, radius * 0.20, radius * 0.37, radius * 0.29, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (variant === 'bathtub') {
+        drawBox('#c8d2cf', '#4a585b', Math.min(12, Math.min(w, h) * 0.24));
+        ctx.fillStyle = '#edf1ec';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, Math.min(10, Math.min(w, h) * 0.22));
+        ctx.fill();
+        ctx.fillStyle = '#789ca3';
+        roundRect(ctx, -hw + 10, -hh + 9, w - 20, h - 18, Math.min(8, Math.min(w, h) * 0.2));
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(225,246,242,0.50)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        const horizontal = w >= h;
+        ctx.fillStyle = '#aeb9b6';
+        ctx.beginPath();
+        ctx.arc(horizontal ? hw - 11 : 0, horizontal ? 0 : hh - 11, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (variant === 'vanity') {
+        drawBox('#7d715f', '#3b342b', 4);
+        ctx.fillStyle = '#d6d9d1';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, 3);
+        ctx.fill();
+        ctx.fillStyle = '#698891';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, Math.max(5, hw * 0.40), Math.max(4, hh * 0.34), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#4d6268';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#b8c1be';
+        ctx.fillRect(-2, -hh + 5, 4, Math.max(6, hh * 0.42));
     } else if (variant === 'prisonBench') {
         drawBox('#536166', '#20292c', 3);
         ctx.fillStyle = '#7e8c8c';
@@ -1305,6 +1433,50 @@ function drawFurnitureTopDown(ctx, o, variant) {
         ctx.fill();
         ctx.fillStyle = '#d7c274';
         ctx.fillRect(horizontal ? w * 0.23 : -2, horizontal ? -2 : h * 0.23, 4, 4);
+    } else if (variant === 'wardrobe') {
+        drawBox('#6b4b34', '#33241b', 4);
+        drawWoodGrain(0.15);
+        ctx.strokeStyle = 'rgba(37,25,18,0.60)';
+        ctx.lineWidth = 1.5;
+        const horizontal = w >= h;
+        ctx.beginPath();
+        if (horizontal) { ctx.moveTo(0, -hh + 4); ctx.lineTo(0, hh - 4); }
+        else { ctx.moveTo(-hw + 4, 0); ctx.lineTo(hw - 4, 0); }
+        ctx.stroke();
+        ctx.fillStyle = '#c6a470';
+        for (const sign of [-1, 1]) {
+            ctx.beginPath();
+            ctx.arc(horizontal ? sign * w * 0.08 : 0, horizontal ? 0 : sign * h * 0.08, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else if (variant === 'sideboard') {
+        drawBox('#76543a', '#38281e', 4);
+        drawWoodGrain(0.14);
+        const horizontal = w >= h;
+        ctx.strokeStyle = 'rgba(49,31,20,0.55)';
+        ctx.lineWidth = 1.2;
+        for (const offset of [-0.24, 0.24]) {
+            ctx.beginPath();
+            if (horizontal) { ctx.moveTo(offset * w, -hh + 4); ctx.lineTo(offset * w, hh - 4); }
+            else { ctx.moveTo(-hw + 4, offset * h); ctx.lineTo(hw - 4, offset * h); }
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#d0aa6b';
+        ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.fill();
+    } else if (variant === 'entryBench') {
+        drawBox('#59412f', '#2e2118', 4);
+        ctx.fillStyle = '#886545';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, 3);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(239,211,164,0.22)';
+        ctx.lineWidth = 1.2;
+        const horizontal = w >= h;
+        for (let offset = -0.25; offset <= 0.25; offset += 0.25) {
+            ctx.beginPath();
+            if (horizontal) { ctx.moveTo(offset * w, -hh + 6); ctx.lineTo(offset * w, hh - 7); }
+            else { ctx.moveTo(-hw + 6, offset * h); ctx.lineTo(hw - 7, offset * h); }
+            ctx.stroke();
+        }
     } else if (['dresser', 'locker', 'toolCabinet', 'medicalCabinet', 'ammoLocker', 'cabinet'].includes(variant)) {
         const metal = ['locker', 'toolCabinet', 'medicalCabinet', 'ammoLocker'].includes(variant);
         const fill = variant === 'medicalCabinet' ? '#d9e1dd' : variant === 'ammoLocker' ? '#4e5d43' : metal ? '#526167' : '#735139';
@@ -1393,6 +1565,7 @@ export class SurvivRenderer {
         this.loot = [];
         this._solidLootContainers = [];
         this._groundWeapons = [];
+        this._groundVests = [];
         this.bullets = [];
         this.localShotTracers = [];
         this.obstacles = [];
@@ -1748,6 +1921,7 @@ export class SurvivRenderer {
         this.loot = [];
         this._solidLootContainers = [];
         this._groundWeapons = [];
+        this._groundVests = [];
         this.bullets = [];
         this.localShotTracers = [];
         this.deathMarkers = [];
@@ -2222,6 +2396,7 @@ export class SurvivRenderer {
         }
         this._solidLootContainers = nextLoot.filter(item => item.type === 'chest' || item.type === 'deathCrate');
         this._groundWeapons = nextLoot.filter(item => item.type === 'weapon' && item.weaponType);
+        this._groundVests = nextLoot.filter(item => item.type === 'vest' && Number(item.vestLevel) > 0);
         return nextLoot;
     }
 
@@ -2931,6 +3106,7 @@ export class SurvivRenderer {
         if (k === 'f') {
             const interaction = this.getNearbyInteraction();
             if (interaction?.kind === 'door') return `toggleDoor:${interaction.target.id}`;
+            if (interaction?.kind === 'vest') return `pickupVest:${interaction.target.id}`;
             return interaction?.kind === 'weapon' ? 'pickupWeapon' : null;
         }
         if (k === 'g') return 'dropHeld';
@@ -3886,6 +4062,28 @@ export class SurvivRenderer {
         return nearest;
     }
 
+    getNearbyGroundVest() {
+        if (!this.me) return null;
+        const equippedLevel = Math.max(0, Math.min(3, Number(this.me.vestLevel) || 0));
+        if (equippedLevel <= 0) return null;
+        let nearest = null;
+        let nearestDistanceSq = 58 * 58;
+        for (const item of this._groundVests) {
+            const itemLevel = Math.max(1, Math.min(3, Number(item.vestLevel) || 1));
+            // Better vests retain the existing automatic pickup path. A worse
+            // vest requires F so the freshly dropped vest cannot loop-swap.
+            if (itemLevel >= equippedLevel) continue;
+            const dx = this.me.x - item.x;
+            const dy = this.me.y - item.y;
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq < nearestDistanceSq) {
+                nearest = item;
+                nearestDistanceSq = distanceSq;
+            }
+        }
+        return nearest;
+    }
+
     getNearbyDoor() {
         if (!this.me) return null;
         let nearest = null;
@@ -3910,11 +4108,16 @@ export class SurvivRenderer {
         if (!this.me) return null;
         const door = this.getNearbyDoor();
         const weapon = this.getNearbyGroundWeapon();
+        const vest = this.getNearbyGroundVest();
         const doorShape = door?.isOpen ? getDoorCollisionRect(door) : door;
         // Compare object centres when both interactions are valid. Comparing a
         // weapon centre with a door edge unfairly makes every broad doorway win.
         const doorDistance = doorShape ? Math.hypot(this.me.x - doorShape.x, this.me.y - doorShape.y) : Infinity;
         const weaponDistance = weapon ? Math.hypot(this.me.x - weapon.x, this.me.y - weapon.y) : Infinity;
+        const vestDistance = vest ? Math.hypot(this.me.x - vest.x, this.me.y - vest.y) : Infinity;
+        if (vest && vestDistance < doorDistance && vestDistance < weaponDistance) {
+            return { kind: 'vest', target: vest, distance: vestDistance };
+        }
         if (weapon && weaponDistance < doorDistance) {
             return { kind: 'weapon', target: weapon, distance: weaponDistance };
         }
@@ -5238,12 +5441,16 @@ export class SurvivRenderer {
 
         const traceShadowShape = (padding) => {
             if (ROUND_CAST_SHADOW_KINDS.has(kind)) {
-                const radiusX = width / 2 + padding;
+                // Tree foliage deliberately overhangs its solid trunk hitbox.
+                // Match that visual footprint here without changing collision.
+                const radiusX = kind === 'tree'
+                    ? width * 0.64 + padding
+                    : width / 2 + padding;
                 const radiusY = kind === 'tree'
-                    ? height * 0.36 + padding
+                    ? height * 0.50 + padding
                     : height * 0.42 + padding;
                 ctx.beginPath();
-                ctx.ellipse(0, kind === 'tree' ? height * -0.05 : 0, radiusX, radiusY, 0.16, 0, Math.PI * 2);
+                ctx.ellipse(0, kind === 'tree' ? height * -0.08 : 0, radiusX, radiusY, 0.16, 0, Math.PI * 2);
                 return;
             }
             if (kind === 'tent') {
@@ -5436,7 +5643,7 @@ export class SurvivRenderer {
             ctx.shadowOffsetY = 0;
             // Floor with gradient for depth
             const floorColors = {
-                mansion: { main: '#596168', dark: '#474f55', line: 'rgba(215,228,232,0.07)' },
+                mansion: { main: '#756f63', dark: '#5a554c', line: 'rgba(240,226,196,0.10)' },
                 warehouse: { main: '#515e64', dark: '#414c52', line: 'rgba(200,220,228,0.07)' },
                 prisonBlock: { main: '#515b5e', dark: '#3f484b', line: 'rgba(205,219,219,0.09)' },
                 ironworks: { main: '#3f4a4f', dark: '#293237', line: 'rgba(190,218,226,0.11)' },
@@ -5446,6 +5653,16 @@ export class SurvivRenderer {
                 barn: { main: '#75665a', dark: '#5c5048', line: 'rgba(235,216,196,0.09)' },
                 town: { main: '#69766c', dark: '#566259', line: 'rgba(220,234,222,0.09)' },
                 house: { main: '#6d766e', dark: '#59635b', line: 'rgba(224,236,226,0.08)' },
+                'residence-sage': { main: '#788174', dark: '#5b6459', line: 'rgba(232,239,218,0.11)' },
+                'residence-blue': { main: '#71808a', dark: '#53616b', line: 'rgba(220,235,240,0.11)' },
+                'residence-cream': { main: '#837d6c', dark: '#655f52', line: 'rgba(246,232,198,0.11)' },
+                'residence-brick': { main: '#826e63', dark: '#624f47', line: 'rgba(244,216,198,0.10)' },
+                'residence-slate': { main: '#6e737d', dark: '#515660', line: 'rgba(226,230,241,0.10)' },
+                'residence-rose': { main: '#827173', dark: '#625356', line: 'rgba(244,220,220,0.10)' },
+                'residence-sand': { main: '#857763', dark: '#675947', line: 'rgba(247,228,190,0.11)' },
+                'residence-pine': { main: '#68786b', dark: '#4d5e51', line: 'rgba(219,238,220,0.10)' },
+                'residence-teal': { main: '#687e7d', dark: '#4b6161', line: 'rgba(214,239,237,0.10)' },
+                'residence-clay': { main: '#866f61', dark: '#675246', line: 'rgba(247,220,199,0.10)' },
             };
             const labInterior = o.landmarkType === 'lab' || o.role === 'laboratory';
             const prisonInterior = o.landmarkType === 'prison' && o.role === 'cellBlock';
@@ -5472,7 +5689,7 @@ export class SurvivRenderer {
             // homes use staggered boards so every building is not the same grid.
             ctx.strokeStyle = fc.line;
             ctx.lineWidth = 1;
-            const tiled = industrialInterior || ['mansion', 'brick'].includes(o.variant);
+            const tiled = industrialInterior || o.variant === 'brick';
             const tileStep = o.variant === 'ironworks' ? 72 : o.variant === 'warehouse' ? 62 : 54;
             if (tiled) {
                 let row = 0;
@@ -5526,10 +5743,31 @@ export class SurvivRenderer {
                 const roomY = room.y - o.y;
                 const insetW = Math.max(20, room.w - 18);
                 const insetH = Math.max(20, room.h - 18);
-                if (room.variant === 'hallway' || room.variant === 'cell-corridor') {
+                if (room.variant === 'courtyard') {
+                    ctx.fillStyle = '#344f3d';
+                    roundRect(ctx, roomX - insetW / 2, roomY - insetH / 2, insetW, insetH, 4);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(219, 204, 170, 0.38)';
+                    ctx.lineWidth = 7;
+                    roundRect(ctx, roomX - insetW / 2 + 4, roomY - insetH / 2 + 4, insetW - 8, insetH - 8, 3);
+                    ctx.stroke();
+                    ctx.strokeStyle = 'rgba(180, 208, 174, 0.16)';
+                    ctx.lineWidth = 1;
+                    for (let ring = 18; ring < Math.min(insetW, insetH) * 0.43; ring += 18) {
+                        ctx.beginPath();
+                        ctx.arc(roomX, roomY, ring, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    ctx.fillStyle = 'rgba(139, 179, 121, 0.42)';
+                    for (const [dx, dy] of [[-0.31, -0.3], [0.31, -0.3], [-0.31, 0.3], [0.31, 0.3]]) {
+                        ctx.beginPath();
+                        ctx.arc(roomX + dx * insetW, roomY + dy * insetH, 8, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else if (['hallway', 'entry', 'mudroom', 'cell-corridor'].includes(room.variant)) {
                     ctx.fillStyle = industrialInterior
                         ? 'rgba(25,34,38,0.22)'
-                        : 'rgba(92,50,39,0.34)';
+                        : o.variant === 'mansion' ? 'rgba(88,38,35,0.52)' : 'rgba(92,50,39,0.34)';
                     roundRect(ctx, roomX - insetW * 0.32, roomY - insetH * 0.32, insetW * 0.64, insetH * 0.64, 6);
                     ctx.fill();
                     ctx.strokeStyle = 'rgba(230,210,177,0.12)';
@@ -5572,13 +5810,17 @@ export class SurvivRenderer {
                         const stripe = Math.min(5, Math.min(insetW, insetH) * 0.035);
                         ctx.fillRect(roomX - insetW / 2 + 8, roomY - stripe / 2, insetW - 16, stripe);
                     }
-                } else if (['bedroom', 'living-room', 'study', 'studio', 'north-room', 'south-room', 'mid-room'].includes(room.variant)) {
+                } else if (['bedroom', 'living-room', 'family-room', 'playroom', 'sunroom', 'study', 'library', 'dining-room', 'breakfast-room', 'studio', 'north-room', 'south-room', 'mid-room'].includes(room.variant)) {
                     const rugColors = farmInterior
                         ? ['rgba(120,80,43,0.48)', 'rgba(225,191,125,0.25)']
                         : room.variant === 'bedroom'
                         ? ['rgba(55,88,102,0.48)', 'rgba(145,185,194,0.24)']
-                        : room.variant === 'living-room'
+                        : ['living-room', 'family-room', 'playroom'].includes(room.variant)
                             ? ['rgba(114,64,46,0.46)', 'rgba(222,174,116,0.22)']
+                            : room.variant === 'sunroom'
+                                ? ['rgba(54,99,70,0.40)', 'rgba(176,211,160,0.22)']
+                                : ['dining-room', 'breakfast-room'].includes(room.variant)
+                                    ? ['rgba(104,74,45,0.42)', 'rgba(227,195,145,0.21)']
                             : ['rgba(58,75,61,0.42)', 'rgba(160,186,153,0.20)'];
                     const rugW = insetW * 0.62;
                     const rugH = insetH * 0.56;
@@ -5597,7 +5839,7 @@ export class SurvivRenderer {
                         ctx.lineTo(roomX + rugW * 0.38, roomY + stripe * rugH);
                         ctx.stroke();
                     }
-                } else if (['kitchen', 'storage', 'stockroom', 'shop-front', 'workshop', 'control-room', 'loading-bay', 'factory-floor'].includes(room.variant)) {
+                } else if (['kitchen', 'bathroom', 'pantry', 'laundry', 'storage', 'stockroom', 'shop-front', 'workshop', 'control-room', 'loading-bay', 'factory-floor'].includes(room.variant)) {
                     ctx.fillStyle = 'rgba(24,30,31,0.10)';
                     roundRect(ctx, roomX - insetW / 2, roomY - insetH / 2, insetW, insetH, 3);
                     ctx.fill();
@@ -5702,11 +5944,22 @@ export class SurvivRenderer {
             // Wall with gradient and brick/stone texture
             const wallColors = {
                 stone: { main: '#807a6c', dark: '#6a6558', highlight: 'rgba(200,195,180,0.12)' },
+                mansion: { main: '#777168', dark: '#55514b', highlight: 'rgba(238,225,202,0.18)' },
                 warehouse: { main: '#48565e', dark: '#374249', highlight: 'rgba(160,185,200,0.10)' },
                 metal: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
                 ironworks: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
                 brick: { main: '#835447', dark: '#5d3931', highlight: 'rgba(235,194,169,0.13)' },
                 lodge: { main: '#53614b', dark: '#354137', highlight: 'rgba(203,220,177,0.12)' },
+                'residence-sage': { main: '#71806b', dark: '#4f5e4d', highlight: 'rgba(224,239,210,0.16)' },
+                'residence-blue': { main: '#637987', dark: '#465b67', highlight: 'rgba(216,238,246,0.16)' },
+                'residence-cream': { main: '#93866d', dark: '#6b604d', highlight: 'rgba(252,235,196,0.17)' },
+                'residence-brick': { main: '#8a5d50', dark: '#623f36', highlight: 'rgba(247,205,181,0.16)' },
+                'residence-slate': { main: '#687080', dark: '#4b5260', highlight: 'rgba(226,232,249,0.15)' },
+                'residence-rose': { main: '#89686f', dark: '#654a50', highlight: 'rgba(249,218,224,0.16)' },
+                'residence-sand': { main: '#947957', dark: '#6c563d', highlight: 'rgba(250,226,183,0.17)' },
+                'residence-pine': { main: '#5c7460', dark: '#405344', highlight: 'rgba(211,238,214,0.16)' },
+                'residence-teal': { main: '#587877', dark: '#3d5959', highlight: 'rgba(207,242,239,0.16)' },
+                'residence-clay': { main: '#956b57', dark: '#6d493a', highlight: 'rgba(251,215,190,0.16)' },
             };
             const wc = wallColors[o.variant] || { main: '#596268', dark: '#424b50', highlight: 'rgba(208,224,230,0.11)' };
             const wallGrad = ctx.createLinearGradient(0, -o.h / 2, 0, o.h / 2);
@@ -5799,20 +6052,15 @@ export class SurvivRenderer {
             const r = Math.max(o.w, o.h) / 2;
             const treeVariant = o.variant || 'grove';
             const hue = o.hue ?? 118;
-            // Trunk
-            ctx.fillStyle = treeVariant === 'birch' ? '#c6bfa7' : '#5c3a1e';
-            roundRect(ctx, -r * 0.14, -r * 0.05, r * 0.28, r * 0.52, r * 0.07);
-            ctx.fill();
-            ctx.fillStyle = treeVariant === 'birch' ? 'rgba(66, 60, 52, 0.52)' : 'rgba(90, 65, 35, 0.45)';
-            roundRect(ctx, -r * 0.06, 0, r * 0.12, r * 0.38, r * 0.04);
-            ctx.fill();
+            drawSurvivTreeTrunk(ctx, o, r, treeVariant);
             if (treeVariant === 'pine' || treeVariant === 'giantPine') {
-                // Layered, irregular conifer rings remain readable from above.
+                // Pines keep a distinct pointed silhouette, but their layered
+                // translucent boughs use the same trunk-under-canopy language.
                 const layers = treeVariant === 'giantPine' ? 4 : 3;
                 for (let layer = 0; layer < layers; layer++) {
-                    const layerRadius = r * (0.9 - layer * 0.15);
+                    const layerRadius = r * ((treeVariant === 'giantPine' ? 1.17 : 1.08) - layer * 0.15);
                     const points = 18;
-                    ctx.fillStyle = `hsl(${hue + layer * 3}, ${34 + layer * 3}%, ${22 + layer * 6}%)`;
+                    ctx.fillStyle = `hsla(${hue + layer * 3}, ${36 + layer * 3}%, ${22 + layer * 6}%, ${0.76 + layer * 0.04})`;
                     ctx.beginPath();
                     for (let point = 0; point < points; point++) {
                         const angle = (point / points) * Math.PI * 2 + layer * 0.19;
@@ -5825,37 +6073,34 @@ export class SurvivRenderer {
                     ctx.closePath();
                     ctx.fill();
                 }
-                ctx.fillStyle = `hsl(${hue + 12}, 42%, 42%)`;
+                ctx.strokeStyle = 'rgba(12, 28, 17, 0.54)';
+                ctx.lineWidth = Math.max(2.3, r * 0.075);
+                const outerRadius = r * (treeVariant === 'giantPine' ? 1.18 : 1.09);
+                ctx.beginPath();
+                for (let point = 0; point < 18; point++) {
+                    const angle = (point / 18) * Math.PI * 2;
+                    const pointRadius = outerRadius * (point % 2 === 0 ? 1 : 0.68);
+                    const x = Math.cos(angle) * pointRadius;
+                    const y = Math.sin(angle) * pointRadius * 0.9 - r * 0.1;
+                    if (point === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                ctx.fillStyle = `hsla(${hue + 12}, 44%, 43%, 0.46)`;
                 ctx.beginPath();
                 ctx.arc(-r * 0.2, -r * 0.4, r * 0.13, 0, Math.PI * 2);
                 ctx.fill();
-            } else if (treeVariant === 'ancientOak') {
-                // Several broad lobes make old oaks look massive without a
-                // larger collision box or any animated foliage.
-                ctx.fillStyle = `hsl(${hue}, 40%, 24%)`;
-                for (let lobe = 0; lobe < 8; lobe++) {
-                    const angle = (lobe / 8) * Math.PI * 2 + 0.18;
-                    ctx.beginPath();
-                    ctx.arc(Math.cos(angle) * r * 0.34, Math.sin(angle) * r * 0.29 - r * 0.12, r * 0.51, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                ctx.fillStyle = `hsl(${hue + 7}, 43%, 34%)`;
-                for (let lobe = 0; lobe < 5; lobe++) {
-                    const angle = (lobe / 5) * Math.PI * 2 - 0.42;
-                    ctx.beginPath();
-                    ctx.arc(Math.cos(angle) * r * 0.25 - r * 0.08, Math.sin(angle) * r * 0.22 - r * 0.23, r * 0.34, 0, Math.PI * 2);
-                    ctx.fill();
-                }
             } else if (treeVariant === 'willowTree') {
-                ctx.fillStyle = `hsl(${hue}, 42%, 25%)`;
+                ctx.fillStyle = `hsla(${hue}, 42%, 25%, 0.80)`;
                 for (let lobe = 0; lobe < 10; lobe++) {
                     const angle = (lobe / 10) * Math.PI * 2;
                     ctx.beginPath();
-                    ctx.ellipse(Math.cos(angle) * r * 0.34, Math.sin(angle) * r * 0.3 - r * 0.08,
-                        r * 0.48, r * 0.24, angle, 0, Math.PI * 2);
+                    ctx.ellipse(Math.cos(angle) * r * 0.40, Math.sin(angle) * r * 0.34 - r * 0.09,
+                        r * 0.58, r * 0.28, angle, 0, Math.PI * 2);
                     ctx.fill();
                 }
-                ctx.strokeStyle = `hsl(${hue + 8}, 44%, 37%)`;
+                ctx.strokeStyle = `hsla(${hue + 8}, 44%, 39%, 0.66)`;
                 ctx.lineWidth = Math.max(1.5, r * 0.045);
                 for (let branch = 0; branch < 8; branch++) {
                     const angle = (branch / 8) * Math.PI * 2;
@@ -5866,30 +6111,7 @@ export class SurvivRenderer {
                     ctx.stroke();
                 }
             } else {
-                const birchLight = treeVariant === 'birch' ? 7 : 0;
-                ctx.fillStyle = `hsl(${hue}, 36%, ${26 + birchLight}%)`;
-                ctx.beginPath();
-                ctx.arc(0, -r * 0.12, r * 0.82, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = `hsl(${hue + 4}, 40%, ${32 + birchLight}%)`;
-                ctx.beginPath();
-                ctx.arc(-r * 0.08, -r * 0.18, r * 0.62, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = `hsl(${hue + 10}, 44%, ${38 + birchLight}%)`;
-                ctx.beginPath();
-                ctx.arc(-r * 0.16, -r * 0.28, r * 0.38, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = `hsl(${hue + 14}, 48%, ${44 + birchLight}%)`;
-                ctx.beginPath();
-                ctx.arc(-r * 0.22, -r * 0.34, r * 0.16, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            if (treeVariant !== 'pine' && treeVariant !== 'giantPine' && treeVariant !== 'willowTree') {
-                ctx.strokeStyle = 'rgba(16, 30, 14, 0.32)';
-                ctx.lineWidth = Math.max(2.2, r * 0.045);
-                ctx.beginPath();
-                ctx.arc(0, -r * 0.12, r * 0.84, 0, Math.PI * 2);
-                ctx.stroke();
+                drawSurvivBroadleafCanopy(ctx, o, r, hue, treeVariant);
             }
         } else if (kind === 'bush') {
             const r = Math.max(o.w, o.h) / 2;
@@ -7577,26 +7799,63 @@ export class SurvivRenderer {
                 roundRect(ctx, -7, -2, 14, 4, 1);
                 ctx.fill();
             } else if (l.type === 'vest') {
+                // Compact tactical carrier silhouette: shoulder straps, neck
+                // opening, side cummerbund and front armor/pouches. All levels
+                // share this readable ground design; protection stays in HUD.
+                ctx.shadowBlur = 4;
+                ctx.fillStyle = '#59616a';
                 ctx.beginPath();
-                ctx.moveTo(0, -12);
-                ctx.lineTo(11, -7);
-                ctx.lineTo(8, 8);
-                ctx.lineTo(0, 14);
-                ctx.lineTo(-8, 8);
-                ctx.lineTo(-11, -7);
+                ctx.moveTo(-8, -13);
+                ctx.lineTo(-3, -15);
+                ctx.quadraticCurveTo(0, -10, 3, -15);
+                ctx.lineTo(8, -13);
+                ctx.lineTo(13, -6);
+                ctx.lineTo(11, 12);
+                ctx.lineTo(5, 16);
+                ctx.lineTo(-5, 16);
+                ctx.lineTo(-11, 12);
+                ctx.lineTo(-13, -6);
                 ctx.closePath();
                 ctx.fill();
                 ctx.stroke();
-                ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+
+                // Shoulder straps and reinforced outer piping.
+                ctx.fillStyle = '#303840';
+                roundRect(ctx, -10, -13, 5, 12, 2);
+                ctx.fill();
+                roundRect(ctx, 5, -13, 5, 12, 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(230,237,232,0.32)';
+                ctx.lineWidth = 1.2;
                 ctx.beginPath();
-                ctx.moveTo(0, -8);
-                ctx.lineTo(0, 9);
+                ctx.moveTo(-10, -5); ctx.lineTo(-8, 12); ctx.lineTo(-4, 14);
+                ctx.moveTo(10, -5); ctx.lineTo(8, 12); ctx.lineTo(4, 14);
                 ctx.stroke();
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '900 8px system-ui, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`L${Math.max(1, Math.min(3, Number(l.vestLevel) || 1))}`, 0, 1);
+
+                // Neck opening, central plate and MOLLE utility pouches.
+                ctx.fillStyle = '#171d22';
+                ctx.beginPath();
+                ctx.ellipse(0, -12, 3.7, 2.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#424b53';
+                ctx.strokeStyle = '#20272d';
+                ctx.lineWidth = 1.1;
+                roundRect(ctx, -7, -5, 14, 13, 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(232,238,231,0.24)';
+                ctx.beginPath();
+                ctx.moveTo(0, -4); ctx.lineTo(0, 7);
+                ctx.moveTo(-5, -1); ctx.lineTo(5, -1);
+                ctx.stroke();
+                ctx.fillStyle = '#2b3339';
+                for (const x of [-5, 0, 5]) {
+                    roundRect(ctx, x - 2, 9, 4, 5, 1);
+                    ctx.fill();
+                }
+                ctx.fillStyle = '#707a82';
+                ctx.fillRect(-15, -2, 3, 8);
+                ctx.fillRect(12, -2, 3, 8);
             } else if (l.type === 'ammo') {
                 roundRect(ctx, -12, -9, 24, 18, 4);
                 ctx.fill();
@@ -8334,7 +8593,8 @@ export class SurvivRenderer {
         // Selected residential roofs gain compact dormers. Their placement is
         // deterministic, so cached sprites and map readability remain stable.
         const residential = !['warehouse', 'barn'].includes(variant);
-        if (residential && roofW >= 210 && roofH >= 135 && variation > 0.28) {
+        const detailedResidence = variant.startsWith('residence-');
+        if (residential && roofW >= 210 && roofH >= 135 && (detailedResidence || variation > 0.28)) {
             const dormerCount = roofW > 430 ? 2 : 1;
             for (let index = 0; index < dormerCount; index++) {
                 const x = dormerCount === 1 ? 0 : (index === 0 ? -roofW * 0.22 : roofW * 0.22);
@@ -9042,7 +9302,20 @@ export class SurvivRenderer {
                 ['#536b5c', '#34493e'],
                 ['#62647a', '#414455'],
             ];
-            const palette = roofPalettes[Math.floor(seededNoise(o.x * 0.013, o.y * 0.017) * roofPalettes.length)];
+            const residenceRoofPalettes = {
+                'residence-sage': ['#65705c', '#3e4a3a'],
+                'residence-blue': ['#526b78', '#304650'],
+                'residence-cream': ['#806c52', '#574735'],
+                'residence-brick': ['#84483b', '#582d26'],
+                'residence-slate': ['#565d6d', '#343b49'],
+                'residence-rose': ['#774f59', '#4e3139'],
+                'residence-sand': ['#8a6745', '#5b432d'],
+                'residence-pine': ['#49624f', '#2e4434'],
+                'residence-teal': ['#416768', '#294749'],
+                'residence-clay': ['#8b513c', '#5d3328'],
+            };
+            const palette = residenceRoofPalettes[variant]
+                || roofPalettes[Math.floor(seededNoise(o.x * 0.013, o.y * 0.017) * roofPalettes.length)];
             const [tileColor, tileShadow] = palette;
 
             const grad = ctx.createLinearGradient(-hw, -hh, hw, hh);
