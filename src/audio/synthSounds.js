@@ -38,8 +38,14 @@ const SURVIV_GRENADE_EXPLOSION_FILES = Object.freeze([
 ]);
 
 const SURVIV_DOOR_FILES = Object.freeze({
-    wood: ['wood-1.wav', 'wood-2.wav', 'wood-3.wav'],
-    metal: ['metal-1.wav', 'metal-2.wav', 'metal-3.wav'],
+    wood: Object.freeze({
+        open: ['open-1.wav', 'open-2.wav'],
+        close: ['close-1.wav', 'close-2.wav'],
+    }),
+    metal: Object.freeze({
+        open: ['open-1.wav', 'open-2.wav'],
+        close: ['close-1.wav', 'close-2.wav'],
+    }),
 });
 
 const SURVIV_GUNSHOT_MIX = Object.freeze({
@@ -224,10 +230,12 @@ export function preloadSurvivGunshots() {
             key: `explosion:grenade:${variant}`,
             path: `/audio/surviv/explosions/grenade/${file}`,
         })),
-        ...Object.entries(SURVIV_DOOR_FILES).flatMap(([material, files]) => files.map((file, variant) => ({
-            key: `door:${material}:${variant}`,
-            path: `/audio/surviv/doors/${material}/${file}`,
-        }))),
+        ...Object.entries(SURVIV_DOOR_FILES).flatMap(([material, actions]) => (
+            Object.entries(actions).flatMap(([action, files]) => files.map((file, variant) => ({
+                key: `door:${material}:${action}:${variant}`,
+                path: `/audio/surviv/doors/${material}/${file}`,
+            })))
+        )),
     ];
     gunshotFetchPromise = Promise.all(entries.map(async ({ key, path }) => {
         const response = await fetch(path, { cache: 'force-cache' });
@@ -789,7 +797,7 @@ export function playSurvivMeleeSwing(weaponType = 'fists', options = {}) {
     return true;
 }
 
-/** Short spatial hinge movement and latch release for an opening door. */
+/** Spatial real-foley movement and latch cue for an opening or closing door. */
 export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
     const ctx = getCtx();
     if (!ctx || !unlocked || ctx.state !== 'running') return false;
@@ -803,37 +811,30 @@ export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
     connectSpatialActionBus(ctx, bus, options.pan);
 
     const doorMaterial = metal ? 'metal' : 'wood';
-    const samples = SURVIV_DOOR_FILES[doorMaterial];
-    const variant = selectGunshotVariant(`door:${doorMaterial}`, samples.length);
-    const recordedDoor = gunshotBuffers.get(`door:${doorMaterial}:${variant}`);
+    const action = closing ? 'close' : 'open';
+    const samples = SURVIV_DOOR_FILES[doorMaterial][action];
+    const sampleKey = `door:${doorMaterial}:${action}`;
+    const variant = selectGunshotVariant(sampleKey, samples.length);
+    const recordedDoor = gunshotBuffers.get(`${sampleKey}:${variant}`);
     if (recordedDoor) {
         const source = ctx.createBufferSource();
         source.buffer = recordedDoor;
-        source.playbackRate.value = (closing ? 0.89 : 0.975) + Math.random() * 0.05;
+        source.playbackRate.value = 0.97 + Math.random() * 0.055;
         const highpass = ctx.createBiquadFilter();
         highpass.type = 'highpass';
         highpass.frequency.value = 38;
         highpass.Q.value = 0.32;
         const lowpass = ctx.createBiquadFilter();
         lowpass.type = 'lowpass';
-        lowpass.frequency.value = metal ? 7800 : 6200;
+        lowpass.frequency.value = metal ? 9200 : 7600;
         lowpass.Q.value = 0.38;
         const sampleGain = ctx.createGain();
-        sampleGain.gain.value = metal ? 0.76 : 0.82;
+        sampleGain.gain.value = metal ? 0.74 : 0.86;
         source.connect(highpass);
         highpass.connect(lowpass);
         lowpass.connect(sampleGain);
         sampleGain.connect(bus);
         source.start(t);
-        if (closing) {
-            playMechanismClick(ctx, bus, t + 0.31, {
-                frequency: metal ? 1180 : 720,
-                q: 0.55,
-                level: metal ? 0.12 : 0.15,
-                duration: metal ? 0.045 : 0.058,
-                variation: 8 + Math.floor(Math.random() * 8),
-            });
-        }
         return true;
     }
 

@@ -24,7 +24,6 @@ import {
     unlockGameAudio,
 } from '../../audio/synthSounds.js';
 import {
-    getSurvivWeaponAmmoType,
     getSurvivWeaponFamily,
     SURVIV_AMMO_CATALOG,
     SURVIV_WEAPON_CATALOG,
@@ -392,34 +391,20 @@ const makeBulletSpec = (trailLen, tipLen, thickness) => ({
     thickness,
 });
 
-// Compact ammo-coloured tracers match classic Surviv readability without
-// turning every projectile into a long modern light streak.
+// Classic Surviv projectiles read as bright white rounds stretched by speed.
+// Families keep slightly different lengths, but colour no longer competes
+// with hit effects or the environment.
 const WEAPON_BULLET_SPECS = {
-    shotgun: makeBulletSpec(10, 2.8, 1.42),
-    sniper: makeBulletSpec(27, 4.8, 1.82),
-    revolver: makeBulletSpec(18, 4, 1.62),
-    pistol: makeBulletSpec(14, 3.4, 1.48),
-    assault: makeBulletSpec(17, 3.8, 1.54),
-    dmr: makeBulletSpec(22, 4.3, 1.7),
-    smg: makeBulletSpec(12, 3, 1.42),
-    lmg: makeBulletSpec(16, 3.5, 1.52),
-    default: makeBulletSpec(14, 3.4, 1.48),
+    shotgun: makeBulletSpec(22, 3.6, 1.35),
+    sniper: makeBulletSpec(54, 6.5, 1.9),
+    revolver: makeBulletSpec(39, 5.2, 1.65),
+    pistol: makeBulletSpec(31, 4.4, 1.48),
+    assault: makeBulletSpec(37, 4.8, 1.55),
+    dmr: makeBulletSpec(47, 5.8, 1.72),
+    smg: makeBulletSpec(27, 4, 1.4),
+    lmg: makeBulletSpec(35, 4.7, 1.58),
+    default: makeBulletSpec(31, 4.4, 1.48),
 };
-
-const BULLET_TRACER_COLORS = Object.freeze({
-    '9mm': '#f5d547',
-    '12g': '#ef6660',
-    '556': '#67d77a',
-    '762': '#64adf4',
-    '45acp': '#b9ec75',
-    '50ae': '#79dde7',
-    '308': '#c7d3d8',
-    '40mm': '#d9a957',
-    flare: '#ff7b53',
-    potato: '#c79a5f',
-    heart: '#ed8ae4',
-    bugle: '#f1c766',
-});
 
 const SURFACE_KINDS = new Set(['road', 'roadJunction', 'trail_path', 'houseFloor', 'field', 'water', 'river', 'river_path', 'bridge']);
 // These details sit directly on the ground and deliberately stay shadow-free.
@@ -824,6 +809,53 @@ function drawFurnitureTopDown(ctx, o, variant) {
         } else {
             roundRect(ctx, -hw + 3, -hh + 2, w - 6, 7, 3); ctx.fill();
             roundRect(ctx, -hw + 3, hh - 9, w - 6, 7, 3); ctx.fill();
+        }
+    } else if (variant === 'bunkBed') {
+        const horizontal = w >= h;
+        drawBox('#56646a', '#20292c', 3);
+        ctx.fillStyle = '#6f7d80';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, 3);
+        ctx.fill();
+        ctx.strokeStyle = '#b4c0c0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-hw + 4, -hh + 4, w - 8, h - 8);
+        ctx.fillStyle = '#d6d9d0';
+        if (horizontal) {
+            roundRect(ctx, -hw + 8, -hh + 8, Math.max(12, w * 0.22), h - 16, 3);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(27,35,37,0.42)';
+            ctx.beginPath(); ctx.moveTo(0, -hh + 6); ctx.lineTo(0, hh - 6); ctx.stroke();
+        } else {
+            roundRect(ctx, -hw + 8, -hh + 8, w - 16, Math.max(12, h * 0.22), 3);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(27,35,37,0.42)';
+            ctx.beginPath(); ctx.moveTo(-hw + 6, 0); ctx.lineTo(hw - 6, 0); ctx.stroke();
+        }
+        ctx.fillStyle = '#a89063';
+        ctx.fillRect(horizontal ? -2 : -hw + 8, horizontal ? -hh + 8 : -2, horizontal ? 4 : w - 16, horizontal ? h - 16 : 4);
+    } else if (variant === 'toilet') {
+        const radius = Math.min(hw, hh);
+        ctx.fillStyle = 'rgba(7, 11, 12, 0.30)';
+        ctx.beginPath(); ctx.ellipse(3, 5, radius * 0.9, radius * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#cbd3d1';
+        roundRect(ctx, -radius * 0.62, -radius * 0.86, radius * 1.24, radius * 0.58, 4); ctx.fill();
+        ctx.strokeStyle = '#596568'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#e9eeeb';
+        ctx.beginPath(); ctx.ellipse(0, radius * 0.18, radius * 0.72, radius * 0.60, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#687579'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#778f96';
+        ctx.beginPath(); ctx.ellipse(0, radius * 0.20, radius * 0.37, radius * 0.29, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (variant === 'prisonBench') {
+        drawBox('#536166', '#20292c', 3);
+        ctx.fillStyle = '#7e8c8c';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(220,230,228,0.30)'; ctx.lineWidth = 1.5;
+        const horizontal = w >= h;
+        for (const offset of [-0.22, 0.22]) {
+            ctx.beginPath();
+            if (horizontal) { ctx.moveTo(offset * w, -hh + 5); ctx.lineTo(offset * w, hh - 5); }
+            else { ctx.moveTo(-hw + 5, offset * h); ctx.lineTo(hw - 5, offset * h); }
+            ctx.stroke();
         }
     } else if (variant === 'bed' || variant === 'hospitalBed') {
         drawBox(variant === 'hospitalBed' ? '#c8d3cf' : '#5b402b', '#2b2c29', 5);
@@ -5163,6 +5195,7 @@ export class SurvivRenderer {
             const floorColors = {
                 mansion: { main: '#596168', dark: '#474f55', line: 'rgba(215,228,232,0.07)' },
                 warehouse: { main: '#515e64', dark: '#414c52', line: 'rgba(200,220,228,0.07)' },
+                prisonBlock: { main: '#515b5e', dark: '#3f484b', line: 'rgba(205,219,219,0.09)' },
                 ironworks: { main: '#3f4a4f', dark: '#293237', line: 'rgba(190,218,226,0.11)' },
                 brick: { main: '#6c625b', dark: '#514943', line: 'rgba(235,213,190,0.08)' },
                 lodge: { main: '#625c4d', dark: '#48443a', line: 'rgba(227,218,180,0.08)' },
@@ -5172,13 +5205,16 @@ export class SurvivRenderer {
                 house: { main: '#6d766e', dark: '#59635b', line: 'rgba(224,236,226,0.08)' },
             };
             const labInterior = o.landmarkType === 'lab' || o.role === 'laboratory';
+            const prisonInterior = o.landmarkType === 'prison' && o.role === 'cellBlock';
             const militaryInterior = ['military', 'bunker', 'prison'].includes(o.landmarkType)
                 || ['armory', 'barracks'].includes(o.role);
             const industrialInterior = labInterior || militaryInterior
                 || ['warehouse', 'ironworks'].includes(o.variant)
                 || ['garage', 'utility', 'workshop', 'sawmill', 'engineShop'].includes(o.role);
             const farmInterior = ['farm', 'orchard'].includes(o.landmarkType);
-            const fc = labInterior
+            const fc = prisonInterior
+                ? { main: '#596568', dark: '#424c4f', line: 'rgba(209,224,222,0.10)' }
+                : labInterior
                 ? { main: '#65777a', dark: '#4e6064', line: 'rgba(210,242,240,0.11)' }
                 : militaryInterior
                     ? { main: '#596158', dark: '#444d45', line: 'rgba(217,224,188,0.09)' }
@@ -5247,7 +5283,7 @@ export class SurvivRenderer {
                 const roomY = room.y - o.y;
                 const insetW = Math.max(20, room.w - 18);
                 const insetH = Math.max(20, room.h - 18);
-                if (room.variant === 'hallway') {
+                if (room.variant === 'hallway' || room.variant === 'cell-corridor') {
                     ctx.fillStyle = industrialInterior
                         ? 'rgba(25,34,38,0.22)'
                         : 'rgba(92,50,39,0.34)';
@@ -5255,6 +5291,28 @@ export class SurvivRenderer {
                     ctx.fill();
                     ctx.strokeStyle = 'rgba(230,210,177,0.12)';
                     ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else if (prisonInterior && room.variant === 'cell') {
+                    ctx.fillStyle = 'rgba(18,25,27,0.16)';
+                    roundRect(ctx, roomX - insetW / 2, roomY - insetH / 2, insetW, insetH, 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(203,218,215,0.10)';
+                    ctx.lineWidth = 1;
+                    for (let iy = roomY - insetH / 2 + 28; iy < roomY + insetH / 2; iy += 28) {
+                        ctx.beginPath();
+                        ctx.moveTo(roomX - insetW / 2 + 3, iy);
+                        ctx.lineTo(roomX + insetW / 2 - 3, iy);
+                        ctx.stroke();
+                    }
+                } else if (prisonInterior && room.variant === 'intake') {
+                    ctx.fillStyle = 'rgba(96,111,112,0.16)';
+                    roundRect(ctx, roomX - insetW / 2, roomY - insetH / 2, insetW, insetH, 3);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(226,188,72,0.20)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(roomX - insetW * 0.42, roomY);
+                    ctx.lineTo(roomX + insetW * 0.42, roomY);
                     ctx.stroke();
                 } else if (industrialInterior && ['bedroom', 'living-room', 'study', 'studio', 'north-room', 'south-room', 'mid-room'].includes(room.variant)) {
                     ctx.fillStyle = labInterior ? 'rgba(125, 193, 190, 0.08)'
@@ -7393,27 +7451,45 @@ export class SurvivRenderer {
 
         const wt = getSurvivWeaponFamily(b.weaponType);
         const spec = WEAPON_BULLET_SPECS[wt] || WEAPON_BULLET_SPECS.default;
-        const ammoType = getSurvivWeaponAmmoType(b.weaponType);
-        const tracerColor = BULLET_TRACER_COLORS[ammoType] || '#fff0a8';
+        const motionBlur = ctx.createLinearGradient(-spec.trailLen, 0, spec.tipLen, 0);
+        motionBlur.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        motionBlur.addColorStop(0.3, 'rgba(255, 255, 255, 0.08)');
+        motionBlur.addColorStop(0.7, 'rgba(255, 255, 255, 0.5)');
+        motionBlur.addColorStop(1, 'rgba(255, 255, 255, 0.98)');
 
+        // Soft tapered pass: elongated enough to communicate speed, but still
+        // narrow enough that automatic fire never becomes a neon beam.
         ctx.lineCap = 'round';
-        ctx.strokeStyle = 'rgba(7, 10, 8, 0.58)';
-        ctx.lineWidth = spec.thickness + 1.3;
+        ctx.strokeStyle = motionBlur;
+        ctx.lineWidth = spec.thickness * 2.75;
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.46)';
+        ctx.shadowBlur = 3.4;
         ctx.beginPath();
         ctx.moveTo(-spec.trailLen, 0);
         ctx.lineTo(spec.tipLen, 0);
         ctx.stroke();
 
-        ctx.strokeStyle = tracerColor;
+        // A short opaque core keeps the projectile crisp at low zoom while the
+        // translucent rear half supplies the motion blur.
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.96)';
         ctx.lineWidth = spec.thickness;
         ctx.beginPath();
-        ctx.moveTo(-spec.trailLen, 0);
+        ctx.moveTo(-spec.trailLen * 0.42, 0);
         ctx.lineTo(spec.tipLen, 0);
         ctx.stroke();
 
-        ctx.fillStyle = '#fff9e8';
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(spec.tipLen, 0, Math.max(0.85, spec.thickness * 0.62), 0, Math.PI * 2);
+        ctx.ellipse(
+            spec.tipLen - 0.4,
+            0,
+            Math.max(1.15, spec.thickness * 0.9),
+            Math.max(0.72, spec.thickness * 0.54),
+            0,
+            0,
+            Math.PI * 2,
+        );
         ctx.fill();
 
         ctx.restore();
