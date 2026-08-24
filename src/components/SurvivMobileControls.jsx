@@ -114,8 +114,8 @@ function VirtualJoystick({ label, variant, onChange }) {
 }
 
 function ActionIcon({ type }) {
-    if (type === 'inventory') {
-        return <><path d="M5 8h14l-1 12H6L5 8Z" /><path d="M8 8V5a4 4 0 0 1 8 0v3" /></>;
+    if (type === 'map') {
+        return <><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z" /><path d="M9 3v15M15 6v15" /></>;
     }
     if (type === 'reload') {
         return <><path d="M20 6v5h-5" /><path d="M18.5 15a7 7 0 1 1-.5-8.5L20 8" /></>;
@@ -179,7 +179,7 @@ function ActionButton({ label, shortLabel, badge, type, onPress, onRelease, acce
 function SurvivMobileControls({
     onMove,
     onAim,
-    onInventory,
+    onMap,
     onReload,
     onHeal,
     onInteract,
@@ -196,7 +196,7 @@ function SurvivMobileControls({
         <div className="surviv-mobile-controls" aria-label="Surviv mobile controls">
             <VirtualJoystick label="Move" variant="move" onChange={onMove} />
             <div className="surviv-mobile-actions">
-                <ActionButton label="Inventory" shortLabel="BAG" type="inventory" onPress={onInventory} />
+                <ActionButton label="Map" shortLabel="MAP" type="map" onPress={onMap} />
                 <ActionButton label={isReloading ? 'Reloading' : 'Reload weapon'} shortLabel={isReloading ? '...' : 'RLD'} type="reload" onPress={onReload} active={isReloading} disabled={!canReload} />
                 <ActionButton label="Use medkit" shortLabel="MED" badge={medkitCount} type="heal" onPress={onHeal} disabled={!canHeal} />
                 <ActionButton label={canInteract ? 'Pick up nearby item' : 'Nothing nearby'} shortLabel="TAKE" type="interact" onPress={onInteract} onRelease={onInteractEnd} accent={canInteract} disabled={!canInteract} />

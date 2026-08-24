@@ -47,6 +47,7 @@ const SURVIV_DOOR_FILES = Object.freeze({
         close: ['close-1.wav', 'close-2.wav'],
     }),
 });
+const SURVIV_DOOR_CACHE_VERSION = 'fast-clean-v2';
 
 const SURVIV_GUNSHOT_MIX = Object.freeze({
     pistol: 0.86,
@@ -233,7 +234,7 @@ export function preloadSurvivGunshots() {
         ...Object.entries(SURVIV_DOOR_FILES).flatMap(([material, actions]) => (
             Object.entries(actions).flatMap(([action, files]) => files.map((file, variant) => ({
                 key: `door:${material}:${action}:${variant}`,
-                path: `/audio/surviv/doors/${material}/${file}`,
+                path: `/audio/surviv/doors/${material}/${file}?v=${SURVIV_DOOR_CACHE_VERSION}`,
             })))
         )),
     ];
@@ -744,7 +745,7 @@ export function playSurvivMeleeSwing(weaponType = 'fists', options = {}) {
     const ctx = getCtx();
     if (!ctx || !unlocked || ctx.state !== 'running') return false;
     const isKnife = weaponType === 'knife';
-    const attenuation = actionDistanceGain(options.distance, 760);
+    const attenuation = actionDistanceGain(options.distance, 620);
     if (attenuation < 0.035) return false;
     const t = ctx.currentTime;
     const duration = isKnife ? 0.17 : 0.145;
@@ -807,7 +808,7 @@ export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
     const t = ctx.currentTime;
     const bus = ctx.createGain();
     const closing = options.closing === true;
-    bus.gain.value = attenuation * (closing ? 0.78 : 0.88) * (0.96 + Math.random() * 0.1);
+    bus.gain.value = attenuation * (closing ? 0.42 : 0.46) * (0.96 + Math.random() * 0.08);
     connectSpatialActionBus(ctx, bus, options.pan);
 
     const doorMaterial = metal ? 'metal' : 'wood';
@@ -819,17 +820,17 @@ export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
     if (recordedDoor) {
         const source = ctx.createBufferSource();
         source.buffer = recordedDoor;
-        source.playbackRate.value = 0.97 + Math.random() * 0.055;
+        source.playbackRate.value = 1.01 + Math.random() * 0.035;
         const highpass = ctx.createBiquadFilter();
         highpass.type = 'highpass';
-        highpass.frequency.value = 38;
+        highpass.frequency.value = 82;
         highpass.Q.value = 0.32;
         const lowpass = ctx.createBiquadFilter();
         lowpass.type = 'lowpass';
-        lowpass.frequency.value = metal ? 9200 : 7600;
+        lowpass.frequency.value = metal ? 6100 : 5200;
         lowpass.Q.value = 0.38;
         const sampleGain = ctx.createGain();
-        sampleGain.gain.value = metal ? 0.74 : 0.86;
+        sampleGain.gain.value = metal ? 0.58 : 0.62;
         source.connect(highpass);
         highpass.connect(lowpass);
         lowpass.connect(sampleGain);
@@ -840,22 +841,22 @@ export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
 
     // Lightweight fallback while the recorded layers are still decoding.
     const hinge = ctx.createBufferSource();
-    hinge.buffer = getNoiseBuffer(ctx, 0.19, Math.floor(Math.random() * 16));
-    hinge.playbackRate.value = 0.93 + Math.random() * 0.1;
+    hinge.buffer = getNoiseBuffer(ctx, 0.115, Math.floor(Math.random() * 16));
+    hinge.playbackRate.value = 1.02 + Math.random() * 0.08;
     const hingeBand = ctx.createBiquadFilter();
     hingeBand.type = 'bandpass';
-    hingeBand.frequency.setValueAtTime(metal ? 1380 : 820, t);
-    hingeBand.frequency.exponentialRampToValueAtTime(metal ? 720 : 430, t + 0.17);
+    hingeBand.frequency.setValueAtTime(metal ? 1480 : 980, t);
+    hingeBand.frequency.exponentialRampToValueAtTime(metal ? 860 : 590, t + 0.105);
     hingeBand.Q.value = metal ? 1.05 : 0.72;
     const hingeGain = ctx.createGain();
     hingeGain.gain.setValueAtTime(0.0001, t);
-    hingeGain.gain.linearRampToValueAtTime(metal ? 0.11 : 0.135, t + 0.018);
-    hingeGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.185);
+    hingeGain.gain.linearRampToValueAtTime(metal ? 0.058 : 0.064, t + 0.010);
+    hingeGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.108);
     hinge.connect(hingeBand);
     hingeBand.connect(hingeGain);
     hingeGain.connect(bus);
     hinge.start(t);
-    hinge.stop(t + 0.195);
+    hinge.stop(t + 0.115);
 
     // The initial latch release gives the interaction a precise, responsive start.
     const latch = ctx.createBufferSource();
@@ -865,29 +866,13 @@ export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
     latchBand.frequency.value = metal ? 3300 : 2050;
     latchBand.Q.value = 0.85;
     const latchGain = ctx.createGain();
-    latchGain.gain.setValueAtTime(metal ? 0.11 : 0.085, t);
-    latchGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.031);
+    latchGain.gain.setValueAtTime(metal ? 0.052 : 0.046, t);
+    latchGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.022);
     latch.connect(latchBand);
     latchBand.connect(latchGain);
     latchGain.connect(bus);
     latch.start(t);
-    latch.stop(t + 0.038);
-
-    // A quiet low wooden/steel body prevents the door from sounding paper-thin.
-    const body = ctx.createBufferSource();
-    body.buffer = getNoiseBuffer(ctx, 0.09, 2 + Math.floor(Math.random() * 12));
-    const bodyLow = ctx.createBiquadFilter();
-    bodyLow.type = 'lowpass';
-    bodyLow.frequency.value = metal ? 390 : 275;
-    bodyLow.Q.value = 0.38;
-    const bodyGain = ctx.createGain();
-    bodyGain.gain.setValueAtTime(metal ? 0.075 : 0.09, t + 0.025);
-    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.105);
-    body.connect(bodyLow);
-    bodyLow.connect(bodyGain);
-    bodyGain.connect(bus);
-    body.start(t + 0.025);
-    body.stop(t + 0.115);
+    latch.stop(t + 0.026);
     return true;
 }
 

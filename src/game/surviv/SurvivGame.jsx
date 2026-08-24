@@ -13,6 +13,8 @@ import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
 import MobileGameSession from '../../components/MobileGameSession';
 import SurvivMobileControls from '../../components/SurvivMobileControls';
+import SurvivFullMap from '../../components/SurvivFullMap';
+import SurvivWeaponIcon from './SurvivWeaponIcon.jsx';
 import { isTouchDevice } from '../../utils/mobile';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
 import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
@@ -115,6 +117,12 @@ function survivUiSnapshotsEqual(previous, next) {
 }
 
 function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
+    return <SurvivWeaponIcon weaponId={weaponId} color={strokeColor} width={size} />;
+}
+
+// Retained as a self-contained fallback reference for older panel variants;
+// the active loadout and loot UI use the weapon-specific renderer above.
+function renderLegacyWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24) {
     switch (weaponId === 'fists' || weaponId === 'knife' ? weaponId : getSurvivWeaponFamily(weaponId)) {
         case 'fists':
             return (
@@ -332,6 +340,33 @@ export default function SurvivGame() {
     const [cashoutPending, setCashoutPending] = useState(false);
     const [cashOutEndAt, setCashOutEndAt] = useState(0);
     const [resetCountdown, setResetCountdown] = useState(null);
+    const [isFullMapOpen, setIsFullMapOpen] = useState(false);
+    const [fullMapData, setFullMapData] = useState(null);
+    const [mapActivityZones, setMapActivityZones] = useState([]);
+    const [mapZone, setMapZone] = useState(null);
+    const [mapPlayer, setMapPlayer] = useState(null);
+    const lastMapPlayerUpdateRef = useRef(0);
+    const mapActivitySignatureRef = useRef('');
+    const mapZoneSignatureRef = useRef('');
+    const mapHeldRef = useRef(false);
+    const mapToggledRef = useRef(false);
+    const mapOpenRef = useRef(false);
+    const syncFullMapVisibility = useCallback(() => {
+        const visible = mapHeldRef.current || mapToggledRef.current;
+        mapOpenRef.current = visible;
+        setIsFullMapOpen(visible);
+        if (visible) {
+            rendererRef.current?.clearInput();
+            const currentPlayer = rendererRef.current?.me;
+            if (currentPlayer) setMapPlayer({ x: currentPlayer.x, y: currentPlayer.y });
+            if (rendererRef.current?.zone) setMapZone(rendererRef.current.zone);
+        }
+    }, []);
+    const closeFullMap = useCallback(() => {
+        mapHeldRef.current = false;
+        mapToggledRef.current = false;
+        syncFullMapVisibility();
+    }, [syncFullMapVisibility]);
     const [isInventoryOpen, setIsInventoryOpen] = useState(false);
     const inventoryOpenRef = useRef(false);
     inventoryOpenRef.current = isInventoryOpen;
@@ -605,6 +640,10 @@ export default function SurvivGame() {
             setIsInventoryOpen(false);
             setInventoryDrag(null);
             prevOpenedContainerIdRef.current = null;
+            mapHeldRef.current = false;
+            mapToggledRef.current = false;
+            mapOpenRef.current = false;
+            setIsFullMapOpen(false);
         };
         const emitSurvivJoin = () => {
             if (!socket.connected || blockAutoJoinRef.current) return;
@@ -628,20 +667,23 @@ export default function SurvivGame() {
             if (blockInputRef.current || cashoutActiveRef.current) return;
             if (isTextEntryTarget(e.target)) return;
             const k = e.key.toLowerCase();
-            if (k === 'tab' || k === 'i') {
+            if (k === 'tab') {
                 e.preventDefault();
                 if (e.repeat) return;
-                setIsInventoryOpen(prev => {
-                    const next = !prev;
-                    inventoryOpenRef.current = next;
-                    if (!next) closeChestPendingRef.current = true;
-                    return next;
-                });
+                mapHeldRef.current = true;
+                syncFullMapVisibility();
+                return;
+            }
+            if (k === 'm') {
+                e.preventDefault();
+                if (e.repeat) return;
+                mapToggledRef.current = !mapToggledRef.current;
+                syncFullMapVisibility();
                 return;
             }
 
             if (k === 'escape') {
-                if (inventoryOpenRef.current) handleCloseInventory();
+                if (mapOpenRef.current) closeFullMap();
                 return;
             }
             const action = renderer.handleKeyDown(e);
@@ -652,19 +694,30 @@ export default function SurvivGame() {
                 toggleDoorPendingRef.current = action.slice('toggleDoor:'.length);
             }
             if (action === 'throwGrenade') throwGrenadePendingRef.current = true;
+            if (action === 'dropHeld') {
+                const activeSlot = Number.isInteger(renderer.me?.activeWeaponSlot)
+                    ? renderer.me.activeWeaponSlot
+                    : 2;
+                dropItemPendingRef.current = { itemKey: 'weapon', slotIdx: activeSlot };
+            }
             if (typeof action === 'string' && action.startsWith('equipSlot:')) {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
             }
         };
         const onKeyUp = (e) => {
+            if (e.key.toLowerCase() === 'tab') {
+                e.preventDefault();
+                mapHeldRef.current = false;
+                syncFullMapVisibility();
+            }
             renderer.handleKeyUp(e);
         };
         const onPointerMove = (e) => {
-            if (cashoutActiveRef.current || inventoryOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
+            if (cashoutActiveRef.current || mapOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            if (cashoutActiveRef.current || inventoryOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
+            if (cashoutActiveRef.current || mapOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
             renderer.handlePointerDown();
@@ -686,7 +739,7 @@ export default function SurvivGame() {
         let lastWeaponWheelAt = 0;
         let wheelWeaponSlot = null;
         const onWheel = (e) => {
-            if (IS_MOBILE || blockInputRef.current || inventoryOpenRef.current) return;
+            if (IS_MOBILE || blockInputRef.current || mapOpenRef.current) return;
             if (!hasJoinedRef.current || awaitingWelcomeRef.current || !e.deltaY) return;
             e.preventDefault();
             const now = performance.now();
@@ -712,7 +765,11 @@ export default function SurvivGame() {
                 socket.volatile.emit('survivInput', neutral);
             }
         };
-        const onWindowBlur = () => neutralizeInput();
+        const onWindowBlur = () => {
+            mapHeldRef.current = false;
+            syncFullMapVisibility();
+            neutralizeInput();
+        };
         const onFocusIn = (event) => {
             if (isTextEntryTarget(event.target)) neutralizeInput();
         };
@@ -784,6 +841,13 @@ export default function SurvivGame() {
                 setIsInventoryOpen(false);
                 inventoryOpenRef.current = false;
                 setInventoryDrag(null);
+                setMapActivityZones([]);
+                setMapZone(null);
+                setMapPlayer(null);
+                mapHeldRef.current = false;
+                mapToggledRef.current = false;
+                mapOpenRef.current = false;
+                setIsFullMapOpen(false);
                 nearbyPickupValueRef.current = null;
                 setNearbyPickup(null);
                 prevOpenedContainerIdRef.current = null;
@@ -823,6 +887,27 @@ export default function SurvivGame() {
                 spectateTargetsRef.current = tick.spectateTargets;
             }
             renderer.updateState(tick);
+            if (tick.fullMap) setFullMapData(tick.fullMap);
+            if (Array.isArray(tick.activityZones)) {
+                const activitySignature = tick.activityZones
+                    .map(activity => `${activity.x}:${activity.y}:${activity.radius}:${activity.strength}`)
+                    .join('|');
+                if (activitySignature !== mapActivitySignatureRef.current) {
+                    mapActivitySignatureRef.current = activitySignature;
+                    setMapActivityZones(tick.activityZones);
+                }
+            }
+            if (tick.zone) {
+                const zoneSignature = `${Math.round((tick.zone.x || 0) / 10)}:${Math.round((tick.zone.y || 0) / 10)}:${Math.round((tick.zone.radius || 0) / 25)}`;
+                if (zoneSignature !== mapZoneSignatureRef.current) {
+                    mapZoneSignatureRef.current = zoneSignature;
+                    setMapZone(tick.zone);
+                }
+            }
+            if (mapOpenRef.current && tick.you && performance.now() - lastMapPlayerUpdateRef.current >= 140) {
+                lastMapPlayerUpdateRef.current = performance.now();
+                setMapPlayer({ x: tick.you.x, y: tick.you.y });
+            }
             const nearbyInteraction = renderer.getNearbyInteraction();
             const nearbyTarget = nearbyInteraction?.target;
             const nextNearbyPickup = nearbyInteraction?.kind === 'door'
@@ -1122,7 +1207,7 @@ export default function SurvivGame() {
             socket.off();
             socket.disconnect();
         };
-    }, [liveSession, authToken, matchNickname, entryFeeUsd, adminFreeSurvivEntry, navigate, startCashoutCountdown, refreshUser, handleCloseInventory]);
+    }, [liveSession, authToken, matchNickname, entryFeeUsd, adminFreeSurvivEntry, navigate, startCashoutCountdown, refreshUser, closeFullMap, syncFullMapVisibility]);
 
     const handleHoldStart = useCallback(() => {
         const renderer = rendererRef.current;
@@ -1156,23 +1241,10 @@ export default function SurvivGame() {
         rendererRef.current?.setMobileAim(dx, dy, magnitude);
     }, []);
 
-    const handleMobileInventory = useCallback(() => {
-        setIsInventoryOpen(previous => {
-            if (previous) closeChestPendingRef.current = true;
-            const next = !previous;
-            inventoryOpenRef.current = next;
-            if (next) {
-                rendererRef.current?.clearInput();
-                reloadPendingRef.current = false;
-                useMedkitPendingRef.current = false;
-                pickupWeaponPendingRef.current = false;
-                toggleDoorPendingRef.current = null;
-                throwGrenadePendingRef.current = false;
-                equipSlotPendingRef.current = null;
-            }
-            return next;
-        });
-    }, []);
+    const handleMobileMap = useCallback(() => {
+        mapToggledRef.current = !mapToggledRef.current;
+        syncFullMapVisibility();
+    }, [syncFullMapVisibility]);
 
     const handleMobileReload = useCallback(() => {
         reloadPendingRef.current = true;
@@ -1222,7 +1294,7 @@ export default function SurvivGame() {
     const canMobileInteract = !!nearbyPickup;
 
     return (
-        <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}`} style={{
+        <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}${isFullMapOpen ? ' surviv-map-open' : ''}`} style={{
             width: 'var(--game-viewport-width, 100dvw)',
             height: 'var(--game-viewport-height, 100dvh)',
             background: '#0a0a0c',
@@ -1247,11 +1319,11 @@ export default function SurvivGame() {
 
             <MobileGameSession containerRef={viewportRef} orientation="landscape" />
 
-            {IS_MOBILE && gameReady && me && !showResultModal && !isDead && !isSpectating && !isInventoryOpen && (
+            {IS_MOBILE && gameReady && me && !showResultModal && !isDead && !isSpectating && !isFullMapOpen && (
                 <SurvivMobileControls
                     onMove={handleMobileMove}
                     onAim={handleMobileAim}
-                    onInventory={handleMobileInventory}
+                    onMap={handleMobileMap}
                     onReload={handleMobileReload}
                     onHeal={handleMobileHeal}
                     onInteract={handleMobileInteract}
@@ -1325,11 +1397,11 @@ export default function SurvivGame() {
                     <span><kbd>F</kbd> INTERACT</span>
                     <span><kbd>R</kbd> RELOAD</span>
                     <span><kbd>H</kbd> HEAL</span>
-                    <span><kbd>TAB</kbd> INVENTORY</span>
+                    <span><kbd>TAB</kbd> MAP</span>
                 </div>
             )}
 
-            {!IS_MOBILE && gameReady && me && nearbyPickup && nearbyPickup.kind !== 'door' && !showResultModal && !isDead && !isSpectating && !isInventoryOpen && (
+            {!IS_MOBILE && gameReady && me && nearbyPickup && nearbyPickup.kind !== 'door' && !showResultModal && !isDead && !isSpectating && !isFullMapOpen && (
                 <div className="surviv-context-prompt" role="status" aria-live="polite">
                     <kbd>F</kbd>
                     <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
@@ -1480,7 +1552,7 @@ export default function SurvivGame() {
                                 {weaponId ? (
                                     <>
                                         <div className="hotbar-weapon-icon-wrap">
-                                            {renderWeaponIcon(weaponId, isActive ? '#14F195' : 'rgba(255,255,255,0.72)', 32)}
+                                            {renderWeaponIcon(weaponId, isActive ? '#fff4cf' : 'rgba(239,235,216,0.7)', 54)}
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         {weaponId === 'fists' || weaponId === 'knife' ? (
@@ -1509,12 +1581,12 @@ export default function SurvivGame() {
                         className={`hotbar-slot grenade-hotbar-slot ${(me.inventory?.grenades || 0) > 0 ? 'has-item' : 'empty-slot'}`}
                         disabled={(me.inventory?.grenades || 0) <= 0}
                         aria-label={`Throw grenade, ${me.inventory?.grenades || 0} remaining`}
-                        title={(me.inventory?.grenades || 0) > 0 ? 'Throw grenade (G)' : 'No grenades'}
+                        title={(me.inventory?.grenades || 0) > 0 ? 'Throw grenade (4)' : 'No grenades'}
                         onClick={() => {
                             if ((me.inventory?.grenades || 0) > 0) throwGrenadePendingRef.current = true;
                         }}
                     >
-                        <span className="hotbar-slot-key">G</span>
+                        <span className="hotbar-slot-key">4</span>
                         <div className="hotbar-weapon-icon-wrap grenade-hotbar-icon" aria-hidden="true">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                                 <path d="M9 7.2h6l1.6 3.1a7 7 0 1 1-9.2 0L9 7.2Z" />
@@ -1597,8 +1669,18 @@ export default function SurvivGame() {
 
             <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} onChat={handleGameChat} />
 
+            {isFullMapOpen && (
+                <SurvivFullMap
+                    map={fullMapData}
+                    activityZones={mapActivityZones}
+                    player={mapPlayer}
+                    zone={mapZone}
+                    onClose={closeFullMap}
+                />
+            )}
+
             {/* Side-by-Side React Inventory Overlay */}
-            {isInventoryOpen && me && (
+            {false && isInventoryOpen && me && (
                 <div 
                     className={`surviv-inventory-modal ${inventoryDrag?.source === 'backpack' ? 'is-ground-drop-active' : ''}`}
                     role="dialog"

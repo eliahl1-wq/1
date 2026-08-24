@@ -28,6 +28,7 @@ import {
     SURVIV_AMMO_CATALOG,
     SURVIV_WEAPON_CATALOG,
 } from './weaponCatalog.js';
+import { getSurvivWeaponMuzzleScale, getSurvivWeaponVisualProfile } from './weaponVisuals.js';
 
 const WEAPON_LABELS = Object.fromEntries(
     Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.label]),
@@ -167,8 +168,7 @@ const WEAPON_MUZZLE_SCALE = Object.freeze({
 });
 
 function weaponMuzzleDistance(weapon, playerRadius = 14) {
-    const family = getSurvivWeaponFamily(weapon);
-    return playerRadius * (WEAPON_MUZZLE_SCALE[family] || 1.3);
+    return playerRadius * getSurvivWeaponMuzzleScale(weapon);
 }
 
 function drawGunPart(ctx, x, y, w, h, fill, radius = 1.6, stroke = '#11181b', lineWidth = 1.15) {
@@ -189,7 +189,7 @@ function drawGunHighlight(ctx, x1, y1, x2, y2, alpha = 0.32) {
     ctx.stroke();
 }
 
-function drawHeldWeaponTopDown(ctx, weapon) {
+function drawLegacyHeldWeaponTopDown(ctx, weapon) {
     weapon = getSurvivWeaponFamily(weapon);
     const metal = '#354247';
     const darkMetal = '#182124';
@@ -383,6 +383,154 @@ function drawHeldWeaponTopDown(ctx, weapon) {
 
     drawGunPart(ctx, 4, -3.2, 12, 6.4, metal, 1.6);
     return [{ x: 6.5, y: -4.6 }, { x: 10.5, y: 4.6 }];
+}
+
+function drawSimpleWeaponShape(ctx, profile) {
+    const metal = profile.metal;
+    const dark = profile.dark;
+    const furniture = profile.accent || profile.furniture;
+    const width = profile.width;
+    const total = profile.length;
+    const outline = '#111718';
+    const bodyStart = ['none', 'grip'].includes(profile.stock) ? 3 : Math.max(6, total * 0.24);
+    const bodyEnd = Math.max(bodyStart + 8, total - profile.barrel);
+
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    if (profile.style === 'bugle') {
+        ctx.strokeStyle = furniture;
+        ctx.lineWidth = 3.4;
+        ctx.beginPath();
+        ctx.moveTo(3, 0);
+        ctx.bezierCurveTo(10, -5, 17, -5, 21, 0);
+        ctx.stroke();
+        ctx.fillStyle = furniture;
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(20, -5.2);
+        ctx.lineTo(total, -8);
+        ctx.lineTo(total, 8);
+        ctx.lineTo(20, 5.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        return;
+    }
+
+    if (profile.style === 'pistol' || profile.style === 'revolver') {
+        const cylinder = profile.style === 'revolver';
+        drawGunPart(ctx, 3, -width / 2, bodyEnd - 3, width, metal, 1.25, outline, 1.1);
+        if (cylinder) drawGunPart(ctx, bodyEnd * 0.48, -width * 0.64, width * 0.8, width * 1.28, furniture, width * 0.3, outline, 1.05);
+        drawGunPart(ctx, bodyEnd - 1, -Math.max(1.5, width * 0.27), total - bodyEnd, Math.max(3, width * 0.54), metal, 0.8, outline, 1.05);
+        if (profile.suppressor) drawGunPart(ctx, total - 5, -width * 0.39, 7, width * 0.78, dark, 1.4, outline, 1.05);
+        return;
+    }
+
+    if (profile.stock === 'wire' || profile.stock === 'skeleton') {
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 2.1;
+        ctx.beginPath();
+        ctx.moveTo(1, -width * 0.32);
+        ctx.lineTo(bodyStart + 1, -width * 0.5);
+        ctx.moveTo(1, width * 0.32);
+        ctx.lineTo(bodyStart + 1, width * 0.5);
+        ctx.stroke();
+    } else if (!['none', 'grip', 'tank'].includes(profile.stock)) {
+        ctx.fillStyle = furniture;
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(1, -width * 0.32);
+        ctx.lineTo(bodyStart + 1, -width * 0.55);
+        ctx.lineTo(bodyStart + 2, width * 0.55);
+        ctx.lineTo(1, width * 0.32);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    drawGunPart(ctx, bodyStart, -width / 2, bodyEnd - bodyStart, width, metal, 1.25, outline, 1.1);
+
+    if (profile.magazine === 'pan') {
+        ctx.fillStyle = dark;
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.ellipse(bodyStart + 6, 0, 5.7, width * 0.78, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    } else if (profile.magazine === 'drum' || profile.magazine === 'tank') {
+        const magX = profile.bullpup ? bodyStart + 2 : bodyStart + 6;
+        ctx.fillStyle = dark;
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.arc(magX, 0, width * 0.66, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    } else if (['box', 'curved', 'stick'].includes(profile.magazine)) {
+        const magX = profile.bullpup ? bodyStart + 1.5 : bodyStart + 5;
+        drawGunPart(ctx, magX, -width * 0.67, profile.magazine === 'stick' ? 3.2 : 5, width * 1.34, dark, 1.2, outline, 1.05);
+    }
+
+    if (profile.style === 'shotgun') {
+        drawGunPart(ctx, bodyEnd - 5, -width * 0.44, Math.min(10, profile.barrel), width * 0.88, furniture, 1.3, outline, 1.05);
+    }
+    if (profile.style === 'special') {
+        ctx.fillStyle = furniture;
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.ellipse(bodyStart + 5, 0, 6, width * 0.68, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    const barrelWidth = profile.style === 'shotgun' || profile.style === 'special' ? 3.4 : 2.5;
+    drawGunPart(ctx, bodyEnd - 0.5, -barrelWidth / 2, total - bodyEnd + 1, barrelWidth, dark, 0.7, outline, 1);
+    if (profile.barrelCount > 1) {
+        ctx.strokeStyle = '#738083';
+        ctx.lineWidth = 1.05;
+        ctx.beginPath();
+        ctx.moveTo(bodyEnd, 0);
+        ctx.lineTo(total, 0);
+        ctx.stroke();
+    }
+    if (profile.suppressor) drawGunPart(ctx, total - 6, -2.6, 8, 5.2, dark, 1.5, outline, 1.05);
+    if (profile.scope) drawGunPart(ctx, bodyStart + 4, -2, profile.scope === 'long' ? 13 : 9, 4, dark, 1.8, outline, 1);
+    if (profile.stock === 'tank') {
+        ctx.fillStyle = furniture;
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.ellipse(bodyStart - 2, 0, 5, width * 0.72, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+}
+
+function drawHeldWeaponTopDown(ctx, weapon) {
+    const profile = getSurvivWeaponVisualProfile(weapon);
+    if (profile.dual) {
+        for (const side of [-1, 1]) {
+            ctx.save();
+            ctx.translate(0, side * 5.2);
+            ctx.scale(0.88, 0.88);
+            drawSimpleWeaponShape(ctx, profile);
+            ctx.restore();
+        }
+        return [{ x: 6.2, y: -7.1 }, { x: 6.2, y: 7.1 }];
+    }
+    drawSimpleWeaponShape(ctx, profile);
+    const rearX = profile.style === 'pistol' || profile.style === 'revolver'
+        ? 5.4
+        : Math.max(7, profile.length * 0.3);
+    const frontX = profile.style === 'pistol' || profile.style === 'revolver'
+        ? rearX
+        : Math.max(rearX + 6, profile.length - profile.barrel - 1);
+    return [{ x: rearX, y: -profile.width * 0.72 }, { x: frontX, y: profile.width * 0.66 }];
 }
 
 const makeBulletSpec = (trailLen, tipLen, thickness) => ({
@@ -1220,7 +1368,6 @@ export class SurvivRenderer {
         this.inputEnabled = true;
         this.spectatorMode = false;
         this.externalCameraGetter = null;
-        this.inventoryOpen = false;
         this.hideNames = localStorage.getItem('hide_player_names') === 'true';
         this.running = false;
         this._raf = null;
@@ -1600,7 +1747,6 @@ export class SurvivRenderer {
         this.cameraShake.y = 0;
         this.cameraShake.intensity = 0;
         this.cameraShake.phase = 0;
-        this.inventoryOpen = false;
         this.aliveCount = 0;
         this.camera.x = 0;
         this.camera.y = 0;
@@ -2668,12 +2814,7 @@ export class SurvivRenderer {
 
     handleKeyDown(e) {
         const k = e.key.toLowerCase();
-        if (e.repeat && ['r', 'h', 'f', 'g', '1', '2', '3'].includes(k)) return null;
-        if (k === 'tab') {
-            if (!e.repeat) this.inventoryOpen = !this.inventoryOpen;
-            e.preventDefault();
-            return null;
-        }
+        if (e.repeat && ['r', 'h', 'f', 'g', '4', '1', '2', '3'].includes(k)) return null;
         if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(k)) unlockGameAudio();
         if (k === 'w' || k === 'arrowup') this.keys.w = true;
         if (k === 'a' || k === 'arrowleft') this.keys.a = true;
@@ -2689,7 +2830,8 @@ export class SurvivRenderer {
             if (interaction?.kind === 'door') return `toggleDoor:${interaction.target.id}`;
             return interaction?.kind === 'weapon' ? 'pickupWeapon' : null;
         }
-        if (k === 'g') return 'throwGrenade';
+        if (k === 'g') return 'dropHeld';
+        if (k === '4') return 'throwGrenade';
         if (k === '1') return 'equipSlot:2';
         if (k === '2') return 'equipSlot:0';
         if (k === '3') return 'equipSlot:1';
@@ -7795,6 +7937,29 @@ export class SurvivRenderer {
             ctx.save();
             ctx.translate(weaponOffsetX, weaponOffsetY);
             ctx.rotate(knifeAngle);
+
+            // Classic Surviv readability comes from a broad, flat blade and a
+            // dark grip. Avoid bevels, texture strokes and decorative hardware
+            // that disappear at gameplay scale anyway.
+            ctx.fillStyle = '#303936';
+            ctx.strokeStyle = '#111718';
+            ctx.lineWidth = 1.25;
+            roundRect(ctx, r * 0.03, -2.7, r * 0.5, 5.4, 1.4);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#c2cbcc';
+            ctx.beginPath();
+            ctx.moveTo(r * 0.5, -2.8);
+            ctx.lineTo(r * 1.55, -1.8);
+            ctx.lineTo(r * 1.72, 0);
+            ctx.lineTo(r * 0.5, 2.8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            for (const hand of [guardHand, knifeHand]) drawPlayerHand(ctx, hand, playerColor);
+            return;
 
             // Compact textured handle, steel guard and pommel.
             ctx.strokeStyle = '#171d1b';
