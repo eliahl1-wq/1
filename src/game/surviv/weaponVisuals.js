@@ -101,6 +101,135 @@ const ellipsePath = (cx, cy, rx, ry) => [
     `a${number(rx)} ${number(ry)} 0 1 0 -${number(rx * 2)} 0Z`,
 ].join('');
 
+const fixedPart = (d, role = 'metal', strokeWidth = 0) => Object.freeze({ d, role, strokeWidth });
+const fixedSideArt = (parts, cuts = []) => Object.freeze({
+    parts: Object.freeze(parts),
+    cuts: Object.freeze(cuts),
+});
+
+// Purpose-built silhouettes for the standard 16-gun roster. These use the
+// same direction, proportions and defining negative spaces as the approved
+// loadout reference instead of falling back to a generic family template.
+const STANDARD_SIDE_ART = Object.freeze({
+    m9: fixedSideArt([
+        fixedPart('M20 11L27 8H76L82 12V21H29L21 18Z'),
+        fixedPart('M26 19H47L42 41H24L18 34Z', 'furniture'),
+        fixedPart('M47 21C46 31 59 32 60 21', 'metal', 2.7),
+        fixedPart('M25 7H29V11H25ZM70 7H74V11H70Z', 'dark'),
+    ]),
+    ot38: fixedSideArt([
+        fixedPart('M20 13L27 9H76L82 13V21H30L22 19Z'),
+        fixedPart('M27 20H46L42 41H24L18 34Z', 'furniture'),
+        fixedPart(ellipsePath(47, 20, 7, 6), 'metal'),
+        fixedPart('M47 21C46 31 59 31 60 21', 'metal', 2.6),
+        fixedPart('M18 12L22 8L27 13Z', 'dark'),
+    ]),
+    mac10: fixedSideArt([
+        fixedPart('M25 10H67L72 14V24H25Z'),
+        fixedPart('M12 14H27V20H12Z', 'dark'),
+        fixedPart('M39 22H52L51 42H40Z', 'dark'),
+        fixedPart('M55 22H64L61 34H55Z', 'furniture'),
+        fixedPart('M67 12L88 8V30H84V13L68 17', 'dark', 2.7),
+        fixedPart('M51 23C51 31 62 31 63 22', 'metal', 2.5),
+    ]),
+    mp5: fixedSideArt([
+        fixedPart('M24 13H64L70 17V25H24Z'),
+        fixedPart('M7 16H26V21H7Z', 'dark'),
+        fixedPart('M42 23H53C55 31 51 38 44 41C47 34 47 29 42 23Z', 'dark'),
+        fixedPart('M56 23H65L62 35H56Z', 'dark'),
+        fixedPart('M67 15L91 12V31H87V17L68 20', 'furniture', 3),
+        fixedPart('M53 23C52 31 64 31 66 23', 'metal', 2.5),
+        fixedPart('M15 11V16M20 10V16', 'dark', 2),
+    ]),
+    m870: fixedSideArt([
+        fixedPart('M4 17L12 13L31 12L39 17L35 25L18 27L7 25Z', 'furniture'),
+        fixedPart('M31 13H52L58 17V24H33Z'),
+        fixedPart('M52 15H96V19H52ZM52 21H90V24H52Z', 'dark'),
+        fixedPart('M58 20H76V27H57Z', 'furniture'),
+        fixedPart('M39 23C39 30 49 30 51 23', 'metal', 2.2),
+    ]),
+    mp220: fixedSideArt([
+        fixedPart('M5 17L15 12L34 13L43 18L38 25L18 28L7 25Z', 'furniture'),
+        fixedPart('M34 14H51L56 18V24H36Z'),
+        fixedPart('M50 15H96V19H50ZM50 21H96V25H50Z', 'dark'),
+        fixedPart('M40 23C40 30 50 30 52 23', 'metal', 2.1),
+    ]),
+    ak47: fixedSideArt([
+        fixedPart('M6 17H24V22H6ZM12 12V17M17 13V17', 'dark', 2.2),
+        fixedPart('M23 13H62L68 17V25H23Z'),
+        fixedPart('M42 23H54C57 31 53 39 44 42C49 35 48 29 42 23Z', 'dark'),
+        fixedPart('M58 23H66L63 35H57Z', 'dark'),
+        fixedPart('M65 15L78 12L94 16V27L78 25L66 21Z', 'furniture'),
+        fixedPart('M54 23C53 30 63 31 65 23', 'metal', 2.4),
+    ]),
+    m416: fixedSideArt([
+        fixedPart('M5 16H24V21H5ZM10 12V16', 'dark', 2.2),
+        fixedPart('M23 12H67L72 17V25H23Z'),
+        fixedPart('M30 9H51V12H30Z', 'dark'),
+        fixedPart('M48 23H59L57 39H49Z', 'dark'),
+        fixedPart('M61 23H69L66 35H60Z', 'dark'),
+        fixedPart('M69 15L91 13V30H87V18L70 20', 'furniture', 3),
+        fixedPart('M58 23C57 31 68 31 70 23', 'metal', 2.4),
+    ]),
+    famas: fixedSideArt([
+        fixedPart('M4 18H25V22H4ZM12 13V18', 'dark', 2.2),
+        fixedPart('M24 14H80L91 18V29L75 27L68 24H24Z'),
+        fixedPart('M31 13V7H60V14M35 11H56', 'metal', 4),
+        fixedPart('M38 23H49L46 38H37Z', 'dark'),
+        fixedPart('M67 24H75L74 37H68Z', 'dark'),
+        fixedPart('M46 23C45 31 57 31 59 23', 'metal', 2.4),
+    ], [ellipsePath(42, 11, 5, 2.3)]),
+    vss: fixedSideArt([
+        fixedPart('M5 16L28 13L36 18L31 26L5 26Z', 'furniture'),
+        fixedPart('M30 13H64L70 17V25H30Z'),
+        fixedPart('M60 16H96V23H60Z', 'dark'),
+        fixedPart('M40 8H63V13H40ZM37 7H42V14H37ZM61 7H66V14H61Z', 'dark'),
+        fixedPart('M46 23H56L55 35H47Z', 'dark'),
+        fixedPart('M56 23C55 30 65 31 67 23', 'metal', 2.3),
+    ], [ellipsePath(14, 21, 5, 3), ellipsePath(25, 20, 4, 3)]),
+    mosin: fixedSideArt([
+        fixedPart('M4 18H47V21H4ZM12 14V18', 'dark', 2),
+        fixedPart('M45 15H66L72 19V24H45Z'),
+        fixedPart('M64 16L75 13L95 16V27L83 26L73 23L65 22Z', 'furniture'),
+        fixedPart('M58 23C58 29 68 29 70 23', 'metal', 2.1),
+        fixedPart('M54 12L57 8L60 13', 'dark', 2),
+    ]),
+    awms: fixedSideArt([
+        fixedPart('M3 17H43V22H3Z', 'dark'),
+        fixedPart('M41 13H68L73 18V25H41Z'),
+        fixedPart('M48 7H69V12H48ZM45 6H50V13H45ZM67 6H72V13H67Z', 'dark'),
+        fixedPart('M54 24H63L62 35H55Z', 'dark'),
+        fixedPart('M67 15L79 12L96 16V29L83 27L77 24L68 23Z', 'furniture'),
+        fixedPart('M63 23C62 30 72 31 74 23', 'metal', 2.3),
+    ], [ellipsePath(84, 21, 5, 3.5)]),
+    dp28: fixedSideArt([
+        fixedPart('M4 17H43V22H4ZM12 13V17', 'dark', 2.2),
+        fixedPart('M41 14H67L72 18V25H41Z'),
+        fixedPart(ellipsePath(55, 12, 17, 7), 'dark'),
+        fixedPart('M65 16L78 14L95 18V28L83 27L72 23L66 22Z', 'furniture'),
+        fixedPart('M48 23C48 30 59 30 61 23', 'metal', 2.2),
+        fixedPart('M34 22L29 42M38 22L43 41', 'dark', 2),
+    ]),
+    m249: fixedSideArt([
+        fixedPart('M4 16H34V22H4ZM13 11V16M20 13V16', 'dark', 2.2),
+        fixedPart('M32 12H69L74 17V26H32Z'),
+        fixedPart('M43 11C44 4 60 4 62 11', 'dark', 2.5),
+        fixedPart('M41 24H54V42H41Z', 'dark'),
+        fixedPart('M62 24H70L68 36H61Z', 'dark'),
+        fixedPart('M69 15L82 12L96 16V29L82 27L72 23Z', 'furniture'),
+        fixedPart('M26 22L22 41M30 22L36 40', 'dark', 2),
+    ]),
+    m4a1s: fixedSideArt([
+        fixedPart('M3 15H23V23H3Z', 'dark'),
+        fixedPart('M22 17H39V21H22Z', 'dark'),
+        fixedPart('M37 12H70L75 17V25H37Z'),
+        fixedPart('M45 8H61V12H45Z', 'dark'),
+        fixedPart('M50 23H60L58 39H50Z', 'dark'),
+        fixedPart('M64 23H72L69 35H63Z', 'dark'),
+        fixedPart('M72 15L93 13V30H89V18L73 20', 'furniture', 3),
+    ]),
+});
+
 function buildFirearmSideArt(profile) {
     const parts = [];
     const cuts = [];
@@ -232,6 +361,7 @@ export function getSurvivWeaponSideArt(id) {
     const weaponId = String(id || 'fists').toLowerCase();
     if (SIDE_ART_CACHE.has(weaponId)) return SIDE_ART_CACHE.get(weaponId);
     const profile = getSurvivWeaponVisualProfile(weaponId);
+    const fixedGeometry = STANDARD_SIDE_ART[profile.baseId];
     const art = Object.freeze({
         id: weaponId,
         profile,
@@ -242,7 +372,7 @@ export function getSurvivWeaponSideArt(id) {
                 Object.freeze({ x: 47, y: 2, scaleX: 0.52, scaleY: 0.9 }),
             ]
             : [Object.freeze({ x: 0, y: 0, scaleX: 1, scaleY: 1 })]),
-        ...buildFirearmSideArt(profile),
+        ...(fixedGeometry || buildFirearmSideArt(profile)),
     });
     SIDE_ART_CACHE.set(weaponId, art);
     return art;

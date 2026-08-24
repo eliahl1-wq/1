@@ -1641,7 +1641,7 @@ export default function SurvivGame() {
                                 {weaponId ? (
                                     <>
                                         <div className="hotbar-weapon-icon-wrap">
-                                            {renderWeaponIcon(weaponId, isActive ? '#f4f7f6' : '#aeb6b5', 68, { monochrome: true })}
+                                            {renderWeaponIcon(weaponId, isActive ? '#f4f7f6' : '#aeb6b5', 90, { monochrome: true })}
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
                                         {weaponId === 'fists' || weaponId === 'knife' ? (

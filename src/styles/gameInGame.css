@@ -3645,7 +3645,7 @@ body.game-session-active #root {
 }
 
 .surviv-game-page .surviv-weapon-stack {
-    width: 132px;
+    width: 148px;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -3661,9 +3661,9 @@ body.game-session-active #root {
 
 .surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .hotbar-slot {
     position: relative;
-    width: 132px;
-    height: 42px;
-    padding: 3px 31px 3px 18px;
+    width: 148px;
+    height: 56px;
+    padding: 3px 34px 14px 18px;
     border: 1px solid transparent !important;
     border-radius: 4px;
     background: transparent !important;
@@ -3700,12 +3700,35 @@ body.game-session-active #root {
 
 .surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .hotbar-weapon-icon-wrap,
 .surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .active-slot .hotbar-weapon-icon-wrap {
-    width: 72px;
+    width: 94px;
     flex: none;
     justify-content: flex-start;
     opacity: 1;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.72));
     transform: none;
+}
+
+.surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .hotbar-slot-name-compact {
+    display: block;
+    position: absolute;
+    left: 18px;
+    bottom: 3px;
+    width: 94px;
+    overflow: hidden;
+    color: rgba(226, 232, 230, 0.74);
+    font-family: "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+    font-size: 0.6rem;
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .active-slot .hotbar-slot-name-compact {
+    color: rgba(250, 252, 251, 0.96);
 }
 
 .surviv-game-page .surviv-weapons-hotbar .weapon-svg-icon {
@@ -3820,18 +3843,25 @@ body.game-session-active #root {
     }
 
     .game-viewport--mobile.surviv-game-page .surviv-weapon-stack {
-        width: 112px;
+        width: 120px;
     }
 
     .game-viewport--mobile.surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .hotbar-slot {
-        width: 112px;
-        min-width: 112px;
-        height: 38px;
-        padding-right: 27px;
+        width: 120px;
+        min-width: 120px;
+        height: 49px;
+        padding: 2px 27px 12px 14px;
     }
 
     .game-viewport--mobile.surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .hotbar-weapon-icon-wrap {
-        width: 62px;
+        width: 74px;
+    }
+
+    .game-viewport--mobile.surviv-game-page .surviv-weapons-hotbar .surviv-weapon-stack .hotbar-slot-name-compact {
+        left: 14px;
+        bottom: 2px;
+        width: 74px;
+        font-size: 0.42rem;
     }
 
     .game-viewport--mobile.surviv-game-page .surviv-weapons-hotbar .surviv-utility-stack .hotbar-slot {
