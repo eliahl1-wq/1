@@ -92,14 +92,16 @@ export default function RewardsWidget() {
     if (!allowedPaths.includes(location.pathname)) return null;
 
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
+    const permanentRewards = user.permanentRewards || {};
+    const permanentBalance = Number(permanentRewards.balanceUsd) || 0;
+    const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
+    const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
+    const starterFundingRemaining = Number(permanentRewards.starterFundingRemainingUsd) || 0;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
-    const totalBalance = promoBalance + rentFallbackBalance;
+    const totalBalance = promoBalance + permanentBalance + rentFallbackBalance;
     const hasBalance = totalBalance > 0;
     const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
-    const canClaim = rentFallbackBalance > 0 || (!user.rewardsDisabled && isCompleted && promoBalance > 0);
-
-    const shouldShowWidget = hasUnusedTicket || totalBalance > 0 || (user.freeTicketUsed && !isCompleted);
-    // if (!shouldShowWidget) return null; // Always show widget button if on allowed path
+    const canClaim = rentFallbackBalance > 0 || (!user.rewardsDisabled && (permanentBalance > 0 || (isCompleted && promoBalance > 0)));
 
     const requiredContribution = Math.max(5, promoBalance);
     const multiplier = Math.ceil(requiredContribution / 5);
@@ -109,7 +111,6 @@ export default function RewardsWidget() {
     const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
     const hasActiveChallenge = user.freeTicketUsed && !isCompleted && !user.rewardsDisabled;
     const showReward = user.freeTicketUsed && (totalBalance > 0 || !isCompleted);
-    const hasAnyContent = hasTicketChallenge || hasUnusedTicket || showReward || hasActiveChallenge || canClaim || user.rewardClaimInProgress;
 
     const challengeKey = `${user.freeTicketChallengeCompleted}_${normal5Progress}_${req5}_${normal10Progress}_${req10}_${user.freeTicketUsed}`;
     const hasUnhoveredChallenge = hasActiveChallenge && (hoveredKey !== challengeKey);
@@ -207,7 +208,7 @@ export default function RewardsWidget() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>
-                            Challenges
+                            Rewards
                         </span>
                         {(hasUnhoveredChallenge || canClaim) && (
                             <div style={{
@@ -221,7 +222,7 @@ export default function RewardsWidget() {
                     </div>
                     <button
                         onClick={toggleExpand}
-                        aria-label="Close challenges"
+                        aria-label="Close rewards"
                         className="float-panel-close"
                         style={{ fontSize: '1rem', fontWeight: 'bold' }}
                     >
@@ -232,7 +233,7 @@ export default function RewardsWidget() {
                 {hasTicketChallenge && (
                     <div className="challenge-pulse-animation" style={{ marginBottom: '16px', padding: '14px', background: 'rgba(139, 92, 246, 0.12)', borderRadius: 'var(--r-md)', border: '1px solid rgba(139, 92, 246, 0.45)' }}>
                         <div style={{ color: '#a78bfa', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', marginBottom: '5px' }}>
-                            NEW CHALLENGE
+                            NEW REWARD
                         </div>
                         <div style={{ color: 'var(--text-h)', fontSize: '0.94rem', fontWeight: 800 }}>
                             Unlock a Free Ticket
@@ -258,6 +259,27 @@ export default function RewardsWidget() {
                     </div>
                 )}
 
+                <div style={{ marginBottom: '16px', padding: '13px', border: '1px solid rgba(139,92,246,.26)', borderRadius: 'var(--r-md)', background: 'linear-gradient(135deg,rgba(139,92,246,.10),rgba(59,130,246,.035))' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        <div>
+                            <div style={{ color: '#a78bfa', fontSize: '.64rem', fontWeight: 900, letterSpacing: '.08em' }}>PERMANENT REWARDS</div>
+                            <div style={{ marginTop: '3px', color: 'var(--text-h)', fontSize: '.84rem', fontWeight: 800 }}>$20 played → $4 reward</div>
+                        </div>
+                        <strong className="mono" style={{ color: permanentBalance > 0 ? 'var(--green)' : 'var(--text-h)', fontSize: '.9rem' }}>${permanentBalance.toFixed(2)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)', fontSize: '.72rem', marginBottom: '6px' }}>
+                        <span>Current cycle</span><span className="mono">${permanentProgress.toFixed(2)} / $20.00</span>
+                    </div>
+                    <div style={{ height: '7px', overflow: 'hidden', borderRadius: '999px', background: 'rgba(255,255,255,.08)' }}>
+                        <div style={{ width: `${Math.min(100, permanentProgressPct)}%`, height: '100%', borderRadius: 'inherit', background: 'linear-gradient(90deg,#7c3aed,#a855f7,#5b8cff)', boxShadow: '0 0 10px rgba(139,92,246,.45)' }} />
+                    </div>
+                    {starterFundingRemaining > 0 && (
+                        <div style={{ marginTop: '8px', color: 'var(--yellow)', fontSize: '.69rem', lineHeight: 1.4 }}>
+                            ${starterFundingRemaining.toFixed(2)} of reward funding finishes your starter reward first.
+                        </div>
+                    )}
+                </div>
+
                 {showReward && (
                 <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ color: 'var(--text-h)', fontSize: '0.9rem', fontWeight: 700 }}>
@@ -277,7 +299,7 @@ export default function RewardsWidget() {
                     className={hasUnhoveredChallenge ? 'challenge-pulse-animation' : ''}
                     style={{ marginBottom: '20px' }}
                 >
-                    {/* $5 Challenge Bar */}
+                    {/* $5 reward progress */}
                     <div style={{ marginBottom: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
                             <span style={{ color: normal5Progress >= req5 ? 'var(--green)' : 'var(--text-2)' }}>
@@ -296,7 +318,7 @@ export default function RewardsWidget() {
                         </div>
                     </div>
 
-                    {/* $10 Challenge Bar */}
+                    {/* $10 reward progress */}
                     <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
                             <span style={{ color: normal10Progress >= req10 ? 'var(--green)' : 'var(--text-2)' }}>
@@ -315,12 +337,6 @@ export default function RewardsWidget() {
                         </div>
                     </div>
                 </div>
-                )}
-
-                {!hasAnyContent && (
-                    <div style={{ marginBottom: '16px', color: 'var(--text-3)', fontSize: '0.8rem', textAlign: 'center' }}>
-                        No active challenges right now.
-                    </div>
                 )}
 
                 {(canClaim || user.rewardClaimInProgress) && (
@@ -415,7 +431,7 @@ export default function RewardsWidget() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>
                         <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
                     </svg>
-                    Challenges
+                    Rewards
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)', transition: 'transform 0.2s ease', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>

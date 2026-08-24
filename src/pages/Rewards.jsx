@@ -44,6 +44,7 @@ export default function Rewards() {
                         tx.meta?.event === 'sponsored_rewards_claim' ||
                         tx.meta?.isRentExemptFallback === true ||
                         tx.meta?.event === 'free_ticket_join' ||
+                        (tx.meta?.event === 'reward_pool_contribution' && Number(tx.meta?.permanentVolumeUsd) > 0) ||
                         tx.meta?.event === 'tournament_reward' ||
                         tx.meta?.event === 'tournament_reward_claim'
                     );
@@ -136,9 +137,18 @@ export default function Rewards() {
     const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
 
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
+    const permanentRewards = user.permanentRewards || {};
+    const permanentBalance = Number(permanentRewards.balanceUsd) || 0;
+    const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
+    const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
+    const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 20;
+    const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 4;
+    const starterFundingRemaining = Number(permanentRewards.starterFundingRemainingUsd) || 0;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
-    const currentBalance = promoBalance + rentFallbackBalance;
-    const claimableBalance = rentFallbackBalance + (isCompleted && !user.rewardsDisabled ? promoBalance : 0);
+    const currentBalance = promoBalance + permanentBalance + rentFallbackBalance;
+    const claimableBalance = rentFallbackBalance + (!user.rewardsDisabled
+        ? permanentBalance + (isCompleted ? promoBalance : 0)
+        : 0);
     const canClaim = claimableBalance > 0;
     const latestClaim = history.find(tx => tx.meta?.event === 'sponsored_rewards_claim');
     const claimedRewardAmount = Number(latestClaim?.meta?.amountUsd) || 0;
@@ -258,7 +268,7 @@ export default function Rewards() {
             <div className="page-content product-page--rewards">
                 <ProductPageHeader
                     title="Rewards"
-                    description="Complete challenges to unlock earned rewards and claim free tickets."
+                    description="Earn recurring game rewards, unlock your free ticket and claim everything from one place."
                 />
 
                 {/* Unified Rewards Summary */}
@@ -285,6 +295,57 @@ export default function Rewards() {
                         Promotional rewards are disabled while an admin reviews accounts funded by the same external wallet. Retained game winnings can still be claimed.
                     </div>
                 )}
+                <section className="rewards-section rewards-program-section">
+                    <div className="rewards-program-card">
+                        <div className="rewards-program-topline">
+                            <div>
+                                <span className="rewards-program-kicker">PERMANENT REWARDS</span>
+                                <h2>Play Normal. Earn 20% back.</h2>
+                                <p>{starterFundingRemaining > 0
+                                    ? `Your next $${starterFundingRemaining.toFixed(2)} reward share finishes the one-time starter reward first. The remainder then advances this cycle.`
+                                    : `Every paid Agar or Slither Normal game advances the cycle. Each $${permanentCycleVolume.toFixed(0)} played unlocks $${permanentCycleReward.toFixed(0)}.`}</p>
+                            </div>
+                            <div className="rewards-program-balance">
+                                <span>Available</span>
+                                <strong className="mono">${permanentBalance.toFixed(2)}</strong>
+                            </div>
+                        </div>
+
+                        <div className="rewards-cycle-head">
+                            <div>
+                                <span>Current cycle</span>
+                                <strong className="mono">${permanentProgress.toFixed(2)} / ${permanentCycleVolume.toFixed(2)}</strong>
+                            </div>
+                            <span className="rewards-rate-badge">20% REWARD</span>
+                        </div>
+                        <div className="rewards-cycle-track" role="progressbar" aria-label="Permanent reward progress" aria-valuemin="0" aria-valuemax={permanentCycleVolume} aria-valuenow={permanentProgress}>
+                            <div style={{ width: `${Math.min(100, permanentProgressPct)}%` }} />
+                        </div>
+                        <div className="rewards-cycle-foot">
+                            <span>${Number(permanentRewards.volumeRemainingUsd ?? permanentCycleVolume).toFixed(2)} until the next ${permanentCycleReward.toFixed(2)}</span>
+                            <span>{Number(permanentRewards.cyclesCompleted) || 0} cycles completed</span>
+                        </div>
+
+                        <div className="rewards-program-metrics">
+                            <div><span>Lifetime volume</span><strong className="mono">${Number(permanentRewards.lifetimeVolumeUsd || 0).toFixed(2)}</strong></div>
+                            <div><span>Lifetime earned</span><strong className="mono">${Number(permanentRewards.lifetimeEarnedUsd || 0).toFixed(2)}</strong></div>
+                            <div><span>Eligible modes</span><strong>Agar + Slither Normal</strong></div>
+                        </div>
+
+                        <button
+                            type="button"
+                            className="btn btn-green rewards-program-claim"
+                            onClick={handleClaim}
+                            disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}
+                        >
+                            {user.rewardClaimInProgress || claimStatus?.type === 'loading'
+                                ? 'CLAIMING...'
+                                : canClaim
+                                    ? `CLAIM $${claimableBalance.toFixed(2)}`
+                                    : 'KEEP PLAYING TO EARN'}
+                        </button>
+                    </div>
+                </section>
                 {/* Section 1: Free Game Ticket */}
                 <section className="rewards-section">
                     <h2 className="rewards-section-title">
@@ -342,7 +403,7 @@ export default function Rewards() {
                         <div className="panel" style={{ padding: '24px', border: '1px solid rgba(139, 92, 246, 0.32)', background: 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.04))' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
                                 <div>
-                                    <p className="label" style={{ margin: '0 0 6px', color: '#a78bfa' }}>FREE TICKET CHALLENGE</p>
+                                    <p className="label" style={{ margin: '0 0 6px', color: '#a78bfa' }}>FREE TICKET REWARD</p>
                                     <h3 style={{ margin: '0 0 8px', color: 'var(--text-h)' }}>Complete 1 Normal game</h3>
                                     <p style={{ margin: 0, color: 'var(--text-2)', lineHeight: 1.55 }}>
                                         Finish any Agar, Slither or Surviv Normal match. Slither Arena, Battle Royale, tournaments and free-ticket games do not count.
@@ -380,16 +441,16 @@ export default function Rewards() {
                     <div className="panel" style={{ padding: '24px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
                             <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-h)', fontWeight: '600' }}>
-                                Unlock Challenges
+                                Starter Reward Progress
                             </h4>
                             <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-h)' }}>
                                 Reward: <span style={{ color: 'var(--green)' }}>{challengeRewardLabel}</span>
                             </div>
                         </div>
 
-                        {/* Challenges */}
+                        {/* Starter reward tasks */}
                         <div>
-                            {/* $5 Challenge */}
+                            {/* $5 reward task */}
                             <div style={{ marginBottom: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
                                     <span style={{ color: normal5Progress >= req5 ? '#4ade80' : 'var(--text-2)' }}>
@@ -407,7 +468,7 @@ export default function Rewards() {
                                 </div>
                             </div>
 
-                            {/* $10 Challenge */}
+                            {/* $10 reward task */}
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
                                     <span style={{ color: normal10Progress >= req10 ? '#4ade80' : 'var(--text-2)' }}>
@@ -436,7 +497,7 @@ export default function Rewards() {
                                 ...(!canClaim && !user.rewardClaimInProgress ? { background: '#374151', color: '#9ca3af', boxShadow: 'none', opacity: 0.7 } : {})
                             }}
                         >
-                            {user.rewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING...' : canClaim ? (user.rewardsDisabled ? 'CLAIM RETAINED WINNINGS' : 'CLAIM REWARD') : isCompleted && currentBalance === 0 ? 'CLAIMED' : user.rewardsDisabled ? 'REWARDS UNDER REVIEW' : 'COMPLETE CHALLENGES'}
+                            {user.rewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING...' : canClaim ? (user.rewardsDisabled ? 'CLAIM RETAINED WINNINGS' : 'CLAIM REWARD') : isCompleted && currentBalance === 0 ? 'CLAIMED' : user.rewardsDisabled ? 'REWARDS UNDER REVIEW' : 'COMPLETE REWARD TASKS'}
                         </button>
                     </div>
                 </section>
@@ -502,10 +563,10 @@ export default function Rewards() {
                             How Rewards Work
                         </h3>
                         <p style={{ margin: '0 0 8px', color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                            Complete challenges to earn and unlock rewards. By participating in games and fulfilling challenge requirements, you build up your Rewards balance.
+                            Paid Agar and Slither Normal games continuously build permanent rewards after the one-time starter reward is funded. Every $20 in eligible volume unlocks $4, and progress carries into the next cycle.
                         </p>
                         <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                            Once a challenge is fully completed, your locked rewards become available to claim. When you claim your rewards, the SOL is securely deposited into your wallet!
+                            Free-ticket and starter rewards appear alongside permanent, tournament and affiliate rewards. Claims are paid securely to your account wallet in SOL.
                         </p>
                     </div>
                 </section>
@@ -551,6 +612,12 @@ export default function Rewards() {
                                     desc = `Joined $${tx.meta.entryFeeUsd || 10} match using free ticket`;
                                     val = 'FREE';
                                     color = 'var(--blue)';
+                                } else if (tx.meta?.event === 'reward_pool_contribution') {
+                                    const unlocked = Number(tx.meta.permanentRewardUnlockedUsd) || 0;
+                                    title = unlocked > 0 ? 'Permanent Reward Unlocked' : 'Permanent Reward Progress';
+                                    desc = `$${Number(tx.meta.permanentVolumeUsd || 0).toFixed(2)} eligible Normal volume added`;
+                                    val = unlocked > 0 ? `+$${unlocked.toFixed(2)}` : `+$${Number(tx.meta.permanentVolumeUsd || 0).toFixed(2)} VOL`;
+                                    color = unlocked > 0 ? 'var(--green)' : 'var(--accent)';
                                 } else if (tx.meta?.event === 'tournament_reward') {
                                     title = 'Tournament Prize';
                                     desc = `Placed #${tx.meta.placement} in ${tx.meta.tournamentName || 'Tournament'}`;

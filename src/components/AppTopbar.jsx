@@ -50,6 +50,13 @@ export default function AppTopbar({ children }) {
         `gm-nav-link${isPathActive(path) ? ' gm-nav-link--active' : ''}`
     );
     const currentPage = (path) => (isPathActive(path) ? 'page' : undefined);
+    const hasRewardNotification = !!user && (
+        user.affiliateRewardsAvailable
+        || Number(user.permanentRewards?.balanceUsd) > 0
+        || Number(user.tournamentRewardsBalance) > 0
+        || (user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked && Number(user.sponsoredRewardsBalance) > 0)
+        || (user.hasFreeTicket && !user.freeTicketUsed)
+    );
 
     const navItems = (
         <>
@@ -71,7 +78,7 @@ export default function AppTopbar({ children }) {
             {user && (
                 <button type="button" className={linkClass('/rewards') + ' gm-nav-link--notification'} aria-current={currentPage('/rewards')} onClick={() => navigate('/rewards')}>
                     <span>Rewards</span>
-                    {user.affiliateRewardsAvailable && <span className="gm-nav-notification-dot" aria-label="Affiliate rewards available" />}
+                    {hasRewardNotification && <span className="gm-nav-notification-dot" aria-label="Rewards available" />}
                 </button>
             )}
 

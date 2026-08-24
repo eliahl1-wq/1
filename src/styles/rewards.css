@@ -62,6 +62,149 @@
     margin:-18px 0 28px;
 }
 
+.rewards-program-section{margin-top:4px}
+.rewards-program-card{
+    position:relative;
+    overflow:hidden;
+    padding:26px;
+    border:1px solid rgba(139,92,246,.38);
+    border-radius:20px;
+    background:
+        radial-gradient(circle at 88% 0%,rgba(92,65,255,.22),transparent 36%),
+        linear-gradient(145deg,rgba(24,21,39,.98),rgba(12,12,18,.98));
+    box-shadow:0 22px 70px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.04);
+}
+.rewards-program-card:after{
+    content:"";
+    position:absolute;
+    top:-70px;
+    right:-35px;
+    width:180px;
+    height:180px;
+    border:1px solid rgba(167,139,250,.13);
+    border-radius:50%;
+    pointer-events:none;
+}
+.rewards-program-topline{
+    position:relative;
+    z-index:1;
+    display:flex;
+    justify-content:space-between;
+    gap:28px;
+    align-items:flex-start;
+}
+.rewards-program-kicker{
+    display:block;
+    margin-bottom:8px;
+    color:#a78bfa;
+    font-size:.66rem;
+    font-weight:850;
+    letter-spacing:.13em;
+}
+.rewards-program-topline h2{
+    margin:0 0 8px;
+    color:var(--text-h);
+    font-size:1.42rem;
+    letter-spacing:-.035em;
+}
+.rewards-program-topline p{
+    max-width:540px;
+    margin:0;
+    color:var(--text-2);
+    font-size:.86rem;
+    line-height:1.55;
+}
+.rewards-program-balance{
+    min-width:138px;
+    padding:13px 15px;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;
+    background:rgba(0,0,0,.22);
+    text-align:right;
+}
+.rewards-program-balance span,.rewards-cycle-head span,.rewards-program-metrics span{
+    display:block;
+    color:var(--text-subtle);
+    font-size:.65rem;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+}
+.rewards-program-balance strong{
+    display:block;
+    margin-top:5px;
+    color:var(--green);
+    font-size:1.45rem;
+}
+.rewards-cycle-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:end;
+    gap:16px;
+    margin-top:28px;
+}
+.rewards-cycle-head strong{
+    display:block;
+    margin-top:5px;
+    color:var(--text-h);
+    font-size:.9rem;
+}
+.rewards-rate-badge{
+    padding:6px 9px;
+    border:1px solid rgba(74,222,128,.22);
+    border-radius:999px;
+    background:rgba(34,197,94,.08);
+    color:var(--green)!important;
+    font-size:.61rem!important;
+}
+.rewards-cycle-track{
+    height:10px;
+    margin-top:10px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.05);
+    border-radius:999px;
+    background:rgba(255,255,255,.055);
+}
+.rewards-cycle-track>div{
+    height:100%;
+    min-width:0;
+    border-radius:inherit;
+    background:linear-gradient(90deg,#7c3aed,#a855f7 55%,#5b8cff);
+    box-shadow:0 0 18px rgba(139,92,246,.55);
+    transition:width .45s ease;
+}
+.rewards-cycle-foot{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    margin-top:8px;
+    color:var(--text-subtle);
+    font-size:.69rem;
+}
+.rewards-program-metrics{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px;
+    margin-top:22px;
+}
+.rewards-program-metrics>div{
+    min-width:0;
+    padding:13px 14px;
+    border:1px solid rgba(255,255,255,.065);
+    border-radius:12px;
+    background:rgba(0,0,0,.16);
+}
+.rewards-program-metrics strong{
+    display:block;
+    overflow:hidden;
+    margin-top:6px;
+    color:var(--text-h);
+    font-size:.82rem;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.rewards-program-claim{width:100%;margin-top:16px;padding:13px 18px!important}
+
 .rewards-section{
     width:100%;
     margin:0 0 34px;
@@ -132,4 +275,9 @@
     .rewards-section>.panel,.rewards-ticket-card,.rewards-info-card{padding:18px!important}
     .rewards-ticket-card button{min-width:100%}
     .product-page--rewards>.affiliate-rewards-embedded{margin-bottom:40px}
+    .rewards-program-card{padding:20px}
+    .rewards-program-topline{display:block}
+    .rewards-program-balance{width:100%;margin-top:18px;text-align:left}
+    .rewards-program-metrics{grid-template-columns:1fr}
+    .rewards-cycle-foot{display:block;line-height:1.7}
 }

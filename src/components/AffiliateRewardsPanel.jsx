@@ -171,7 +171,7 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
                     <div className="affiliate-payout-card affiliate-payout-challenge">
                         <div className="affiliate-payout-header">
                             <div>
-                                <span className="label">Payout challenge</span>
+                                <span className="label">Payout progress</span>
                                 <h4>Unlock affiliate payout</h4>
                             </div>
                             <div className="affiliate-payout-amount">

@@ -554,7 +554,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                 value={formatUsd(u.displayBalanceUsd ?? u.balanceUsd)}
                                 sub={u.visualBalanceOverrideUsd != null ? `Real: ${formatUsd(u.balanceUsd)} · UI only` : formatSol(u.balanceSol)}
                             />
-                            <StatCard label="Available rewards" value={formatUsd(rewards?.totalAvailableUsd)} sub={u.rewardsDisabled ? 'Rewards blocked' : 'Sponsored + retained + tournament'} />
+                            <StatCard label="Available rewards" value={formatUsd(rewards?.totalAvailableUsd)} sub={u.rewardsDisabled ? 'Rewards blocked' : 'Permanent + starter + retained + tournament'} />
                             <StatCard label="Playtime" value={formatDuration(u.playtime ?? 0)} sub={`Last active ${formatRelativeTime(u.latestActivityAt)}`} />
                             <StatCard label="Games played" value={stats.gamesPlayed} sub={`${stats.wins}W · ${stats.losses}L · ${stats.deaths} deaths`} />
                             <StatCard label="Played for" value={formatUsd(stats.gameSpentUsd)} sub="Paid games only" />
@@ -706,20 +706,23 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                         <p className="label" style={{ marginBottom: '12px' }}>Rewards & tickets</p>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
                                             <div><span style={{ color: 'var(--text-2)' }}>Sponsored balance</span><br /><strong>{formatUsd(rewards?.sponsoredBalanceUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Permanent balance</span><br /><strong>{formatUsd(rewards?.permanentRewards?.balanceUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Permanent cycle</span><br /><strong>{formatUsd(rewards?.permanentRewards?.progressVolumeUsd)} / {formatUsd(rewards?.permanentRewards?.cycleVolumeUsd)}</strong></div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Permanent lifetime</span><br /><strong>{formatUsd(rewards?.permanentRewards?.lifetimeEarnedUsd)}</strong><small style={{ display: 'block', color: 'var(--text-3)', marginTop: '3px' }}>{formatUsd(rewards?.permanentRewards?.lifetimeVolumeUsd)} volume</small></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Retained winnings</span><br /><strong>{formatUsd(rewards?.retainedWinningsUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Tournament balance</span><br /><strong>{formatUsd(rewards?.tournamentBalanceUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Sponsored claimed</span><br /><strong>{formatUsd(rewards?.sponsoredClaimedUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Tournament earned</span><br /><strong>{formatUsd(rewards?.tournamentEarnedUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Tournament claimed</span><br /><strong>{formatUsd(rewards?.tournamentClaimedUsd)}</strong></div>
-                                            <div><span style={{ color: 'var(--text-2)' }}>Free ticket</span><br />{rewards?.hasFreeTicket && rewards?.freeTicketChallengeCompleted && !rewards?.freeTicketUsed ? 'Available' : rewards?.freeTicketUsed ? 'Used' : !rewards?.freeTicketChallengeCompleted ? 'Challenge 0/1' : 'None'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Free ticket</span><br />{rewards?.hasFreeTicket && rewards?.freeTicketChallengeCompleted && !rewards?.freeTicketUsed ? 'Available' : rewards?.freeTicketUsed ? 'Used' : !rewards?.freeTicketChallengeCompleted ? 'Reward task 0/1' : 'None'}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Free games played</span><br /><strong>{rewards?.freeTicketGamesPlayed ?? 0}</strong>{rewards?.freeTicketLastPlayedAt ? <small style={{ display: 'block', color: 'var(--text-3)', marginTop: '3px' }}>Last {formatRelativeTime(rewards.freeTicketLastPlayedAt)}</small> : null}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Free-game outcomes</span><br /><strong>{rewards?.freeTicketCashouts ?? 0} cashouts · {rewards?.freeTicketDeaths ?? 0} deaths</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Free reward earned</span><br /><strong>{formatUsd(rewards?.freeTicketRewardEligibleUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Free reward credited</span><br /><strong>{formatUsd(rewards?.freeTicketRewardCreditedUsd)}</strong></div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Free reward blocked</span><br /><strong>{formatUsd(rewards?.freeTicketRewardBlockedUsd)}</strong></div>
-                                            <div><span style={{ color: 'var(--text-2)' }}>$5 challenge games</span><br />{rewards?.completedFiveDollarGames ?? 0}</div>
-                                            <div><span style={{ color: 'var(--text-2)' }}>$10 challenge games</span><br />{rewards?.completedTenDollarGames ?? 0}</div>
-                                            <div><span style={{ color: 'var(--text-2)' }}>Challenge</span><br />{rewards?.challengeCompleted ? 'Completed' : rewards?.challengeUnlocked ? 'Unlocked' : 'In progress'}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>$5 reward games</span><br />{rewards?.completedFiveDollarGames ?? 0}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>$10 reward games</span><br />{rewards?.completedTenDollarGames ?? 0}</div>
+                                            <div><span style={{ color: 'var(--text-2)' }}>Starter reward</span><br />{rewards?.challengeCompleted ? 'Completed' : rewards?.challengeUnlocked ? 'Unlocked' : 'In progress'}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Claim status</span><br />{rewards?.claimInProgress || rewards?.tournamentClaimInProgress ? 'Processing' : 'Idle'}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Reward access</span><br />{u.rewardsDisabled ? `Blocked${u.rewardsDisabledReason ? ` · ${u.rewardsDisabledReason}` : ''}` : 'Enabled'}</div>
                                         </div>
@@ -1338,7 +1341,7 @@ export default function AdminDashboard() {
                                 <StatCard label="Registered users" value={overview?.totalAccounts ?? '—'} sub={`${formatUsd(overview?.totalUserBalanceUsd)} held in balances`} />
                                 <StatCard label="Total deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={`${overview?.depositCount ?? 0} deposits`} />
                                 <StatCard label="Platform earnings" value={formatUsd(overview?.ownerEarningsUsd)} sub={`${overview?.ownerSweepCount ?? 0} completed sweeps`} />
-                                <StatCard label="Rewards owed" value={formatUsd((overview?.totalSponsoredRewards ?? 0) + (overview?.totalRetainedWinnings ?? 0))} sub={`${overview?.activeSponsoredPlayers ?? 0} sponsored users`} />
+                                <StatCard label="Rewards owed" value={formatUsd((overview?.totalSponsoredRewards ?? 0) + (overview?.totalPermanentRewards ?? 0) + (overview?.totalPermanentProgressReserve ?? 0) + (overview?.totalRetainedWinnings ?? 0))} sub={`${overview?.activeSponsoredPlayers ?? 0} active reward users`} />
                                 <StatCard label="Needs attention" value={rewardAlerts.filter(alert => alert.status === 'pending').length + pendingRewardClaims.length} sub="Reward alerts and unsettled claims" />
                                 <StatCard
                                     label="Your accounts"

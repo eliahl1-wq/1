@@ -704,6 +704,7 @@ function obstacleRenderSignature(obstacles) {
         mixString(o.id);
         mixString(o.kind);
         mixString(o.variant);
+        mixString(o.canopyStyle);
         mixString(o.houseId);
         mixString(o.role);
         mixString(o.orientation);
@@ -872,7 +873,7 @@ function traceOrganicTreeShape(ctx, radius, seedX, seedY, offsetX = 0, offsetY =
     ctx.closePath();
 }
 
-function drawSurvivTreeTrunk(ctx, tree, radius, variant) {
+function drawSurvivTreeTrunk(ctx, tree, radius, variant, drawBranches = true) {
     const seedX = Number(tree.x) || 0;
     const seedY = Number(tree.y) || 0;
     const birch = variant === 'birch';
@@ -880,15 +881,17 @@ function drawSurvivTreeTrunk(ctx, tree, radius, variant) {
 
     // Short branch shoulders remain under the canopy and make the visible
     // brown area read as a real trunk instead of a flat brown bullseye.
-    ctx.strokeStyle = birch ? 'rgba(119, 108, 84, 0.88)' : 'rgba(68, 38, 20, 0.92)';
-    ctx.lineWidth = Math.max(3, radius * 0.15);
-    ctx.lineCap = 'round';
-    for (let branch = 0; branch < 3; branch++) {
-        const angle = -2.45 + branch * 1.85 + seededNoise(seedX + branch, seedY) * 0.32;
-        ctx.beginPath();
-        ctx.moveTo(0, radius * 0.02);
-        ctx.lineTo(Math.cos(angle) * radius * 0.49, Math.sin(angle) * radius * 0.43 - radius * 0.03);
-        ctx.stroke();
+    if (drawBranches) {
+        ctx.strokeStyle = birch ? 'rgba(119, 108, 84, 0.88)' : 'rgba(68, 38, 20, 0.92)';
+        ctx.lineWidth = Math.max(3, radius * 0.15);
+        ctx.lineCap = 'round';
+        for (let branch = 0; branch < 3; branch++) {
+            const angle = -2.45 + branch * 1.85 + seededNoise(seedX + branch, seedY) * 0.32;
+            ctx.beginPath();
+            ctx.moveTo(0, radius * 0.02);
+            ctx.lineTo(Math.cos(angle) * radius * 0.49, Math.sin(angle) * radius * 0.43 - radius * 0.03);
+            ctx.stroke();
+        }
     }
 
     traceOrganicTreeShape(ctx, trunkRadius, seedX * 0.73, seedY * 0.73, 0, radius * 0.025, 13, 0.16);
@@ -911,7 +914,7 @@ function drawSurvivBroadleafCanopy(ctx, tree, radius, hue, variant) {
     const ancient = variant === 'ancientOak';
     const birch = variant === 'birch';
     const scrub = variant === 'scrub';
-    const crownRadius = radius * (ancient ? 1.38 : scrub ? 1.24 : 1.30);
+    const crownRadius = radius * (ancient ? 1.48 : scrub ? 1.32 : 1.40);
     const crownX = -radius * 0.025;
     const crownY = -radius * 0.10;
     const lightness = ancient ? 23 : birch ? 32 : scrub ? 29 : 26;
@@ -944,6 +947,91 @@ function drawSurvivBroadleafCanopy(ctx, tree, radius, hue, variant) {
         crownX - crownRadius * 0.30, crownY - crownRadius * 0.32, 12, 0.13);
     ctx.fillStyle = `hsla(${hue + 12}, 50%, ${lightness + 18}%, 0.28)`;
     ctx.fill();
+
+    // Bring the solid centre back above the translucent base, then cover its
+    // edges with a few leaf clusters. This makes the new tree unmistakably a
+    // trunk under foliage instead of another opaque green disc.
+    ctx.save();
+    ctx.globalAlpha = 0.78;
+    drawSurvivTreeTrunk(ctx, tree, radius, variant, false);
+    ctx.restore();
+    for (let index = 0; index < 3; index++) {
+        const angle = -0.9 + index * 2.1;
+        const veilRadius = radius * (0.16 + index * 0.015);
+        traceOrganicTreeShape(
+            ctx,
+            veilRadius,
+            seedX + 143 + index * 19,
+            seedY - 83 + index * 13,
+            Math.cos(angle) * radius * 0.21,
+            Math.sin(angle) * radius * 0.18 - radius * 0.02,
+            11,
+            0.16,
+        );
+        ctx.fillStyle = `hsla(${hue + 7 + index * 3}, 45%, ${lightness + 9 + index * 2}%, 0.42)`;
+        ctx.fill();
+    }
+}
+
+function drawLegacyTree(ctx, tree, radius, hue, variant) {
+    ctx.fillStyle = variant === 'birch' ? '#c6bfa7' : '#5c3a1e';
+    roundRect(ctx, -radius * 0.14, -radius * 0.05, radius * 0.28, radius * 0.52, radius * 0.07);
+    ctx.fill();
+    if (variant === 'pine' || variant === 'giantPine') {
+        const layers = variant === 'giantPine' ? 4 : 3;
+        for (let layer = 0; layer < layers; layer++) {
+            const layerRadius = radius * (0.9 - layer * 0.15);
+            ctx.fillStyle = `hsl(${hue + layer * 3}, ${34 + layer * 3}%, ${22 + layer * 6}%)`;
+            ctx.beginPath();
+            for (let point = 0; point < 18; point++) {
+                const angle = (point / 18) * Math.PI * 2 + layer * 0.19;
+                const pointRadius = layerRadius * (point % 2 === 0 ? 1 : 0.68);
+                const x = Math.cos(angle) * pointRadius - layer * radius * 0.035;
+                const y = Math.sin(angle) * pointRadius * 0.9 - radius * (0.1 + layer * 0.05);
+                if (point === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+        return;
+    }
+    if (variant === 'willowTree') {
+        ctx.fillStyle = `hsl(${hue}, 42%, 25%)`;
+        for (let lobe = 0; lobe < 10; lobe++) {
+            const angle = (lobe / 10) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.ellipse(
+                Math.cos(angle) * radius * 0.34,
+                Math.sin(angle) * radius * 0.3 - radius * 0.08,
+                radius * 0.48,
+                radius * 0.24,
+                angle,
+                0,
+                Math.PI * 2,
+            );
+            ctx.fill();
+        }
+        return;
+    }
+    const birchLight = variant === 'birch' ? 7 : 0;
+    const layers = [
+        [0, -0.12, 0.82, 0],
+        [-0.08, -0.18, 0.62, 6],
+        [-0.16, -0.28, 0.38, 12],
+        [-0.22, -0.34, 0.16, 18],
+    ];
+    for (const [x, y, size, light] of layers) {
+        ctx.fillStyle = `hsl(${hue + light * 0.7}, ${36 + light * 0.65}%, ${26 + birchLight + light * 0.68}%)`;
+        ctx.beginPath();
+        ctx.arc(x * radius, y * radius, size * radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(16, 30, 14, 0.32)';
+    ctx.lineWidth = Math.max(2.2, radius * 0.045);
+    ctx.beginPath();
+    ctx.arc(0, -radius * 0.12, radius * 0.84, 0, Math.PI * 2);
+    ctx.stroke();
 }
 
 function traceSmoothPath(ctx, points, originX = 0, originY = 0, closed = false) {
@@ -6052,65 +6140,13 @@ export class SurvivRenderer {
             const r = Math.max(o.w, o.h) / 2;
             const treeVariant = o.variant || 'grove';
             const hue = o.hue ?? 118;
-            drawSurvivTreeTrunk(ctx, o, r, treeVariant);
-            if (treeVariant === 'pine' || treeVariant === 'giantPine') {
-                // Pines keep a distinct pointed silhouette, but their layered
-                // translucent boughs use the same trunk-under-canopy language.
-                const layers = treeVariant === 'giantPine' ? 4 : 3;
-                for (let layer = 0; layer < layers; layer++) {
-                    const layerRadius = r * ((treeVariant === 'giantPine' ? 1.17 : 1.08) - layer * 0.15);
-                    const points = 18;
-                    ctx.fillStyle = `hsla(${hue + layer * 3}, ${36 + layer * 3}%, ${22 + layer * 6}%, ${0.76 + layer * 0.04})`;
-                    ctx.beginPath();
-                    for (let point = 0; point < points; point++) {
-                        const angle = (point / points) * Math.PI * 2 + layer * 0.19;
-                        const radius = layerRadius * (point % 2 === 0 ? 1 : 0.68);
-                        const px = Math.cos(angle) * radius - layer * r * 0.035;
-                        const py = Math.sin(angle) * radius * 0.9 - r * (0.1 + layer * 0.05);
-                        if (point === 0) ctx.moveTo(px, py);
-                        else ctx.lineTo(px, py);
-                    }
-                    ctx.closePath();
-                    ctx.fill();
-                }
-                ctx.strokeStyle = 'rgba(12, 28, 17, 0.54)';
-                ctx.lineWidth = Math.max(2.3, r * 0.075);
-                const outerRadius = r * (treeVariant === 'giantPine' ? 1.18 : 1.09);
-                ctx.beginPath();
-                for (let point = 0; point < 18; point++) {
-                    const angle = (point / 18) * Math.PI * 2;
-                    const pointRadius = outerRadius * (point % 2 === 0 ? 1 : 0.68);
-                    const x = Math.cos(angle) * pointRadius;
-                    const y = Math.sin(angle) * pointRadius * 0.9 - r * 0.1;
-                    if (point === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.closePath();
-                ctx.stroke();
-                ctx.fillStyle = `hsla(${hue + 12}, 44%, 43%, 0.46)`;
-                ctx.beginPath();
-                ctx.arc(-r * 0.2, -r * 0.4, r * 0.13, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (treeVariant === 'willowTree') {
-                ctx.fillStyle = `hsla(${hue}, 42%, 25%, 0.80)`;
-                for (let lobe = 0; lobe < 10; lobe++) {
-                    const angle = (lobe / 10) * Math.PI * 2;
-                    ctx.beginPath();
-                    ctx.ellipse(Math.cos(angle) * r * 0.40, Math.sin(angle) * r * 0.34 - r * 0.09,
-                        r * 0.58, r * 0.28, angle, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                ctx.strokeStyle = `hsla(${hue + 8}, 44%, 39%, 0.66)`;
-                ctx.lineWidth = Math.max(1.5, r * 0.045);
-                for (let branch = 0; branch < 8; branch++) {
-                    const angle = (branch / 8) * Math.PI * 2;
-                    ctx.beginPath();
-                    ctx.moveTo(0, -r * 0.12);
-                    ctx.quadraticCurveTo(Math.cos(angle) * r * 0.42, Math.sin(angle) * r * 0.3,
-                        Math.cos(angle) * r * 0.72, Math.sin(angle) * r * 0.62);
-                    ctx.stroke();
-                }
+            if (o.canopyStyle === 'legacy') {
+                drawLegacyTree(ctx, o, r, hue, treeVariant);
             } else {
+                // Missing style data from an older static snapshot intentionally
+                // defaults to the new design, so stale matches never regress to
+                // showing no replacement trees at all.
+                drawSurvivTreeTrunk(ctx, o, r, treeVariant);
                 drawSurvivBroadleafCanopy(ctx, o, r, hue, treeVariant);
             }
         } else if (kind === 'bush') {
@@ -7149,7 +7185,7 @@ export class SurvivRenderer {
         // Cache at the same physical density the world is displayed at. The old
         // 1x sprites were enlarged by camera zoom, making props and floors soft.
         const scale = Math.min(1.6, Math.max(1, (this.targetZoom || 1) * (this.renderDpr || 1)));
-        const key = [o.id, kind, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || '', scale.toFixed(2)].join(':');
+        const key = [o.id, kind, o.variant || '', o.canopyStyle || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || '', scale.toFixed(2)].join(':');
         let sprite = this._obstacleSpriteCache.get(key);
         if (sprite) {
             this._obstacleSpriteCache.delete(key);

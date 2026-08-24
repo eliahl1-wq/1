@@ -4798,3 +4798,59 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   .profile-tabs,.gm-tabs,.product-page--admin .admin-tabs{gap:20px}
   .profile-tab-btn,.gm-tab,.product-page--admin .admin-tabs .tab-btn{min-height:42px;font-size:.81rem!important}
 }
+
+/* Desktop top navigation: Axiom-style text tabs. Keep the compact mobile
+   header unchanged. */
+@media (min-width: 769px) {
+  .topbar {
+    height: 60px;
+    padding-inline: 24px;
+  }
+
+  .page-shell--pregame {
+    padding-top: 60px;
+  }
+
+  .topbar-left {
+    gap: 32px;
+  }
+
+  .topbar-nav {
+    gap: 5px;
+  }
+
+  .logo {
+    font-size: 1.38rem;
+  }
+
+  .topbar-nav--desktop .gm-nav-link {
+    min-height: 38px;
+    padding: 0 13px;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: #fff;
+    box-shadow: none;
+    font-size: 0.91rem;
+    font-weight: 650;
+  }
+
+  .topbar-nav--desktop .gm-nav-link:not(.gm-nav-link--active):hover {
+    border-color: rgba(145, 112, 255, 0.72);
+    background: rgba(124, 58, 255, 0.14);
+    color: var(--accent);
+    box-shadow: none;
+  }
+
+  .topbar-nav--desktop .gm-nav-link--active,
+  .topbar-nav--desktop .gm-nav-link--active:hover {
+    border-color: transparent;
+    background: transparent;
+    color: var(--accent);
+    box-shadow: none;
+  }
+
+  .topbar-nav--desktop .gm-nav-link--active::after {
+    content: none;
+  }
+}
