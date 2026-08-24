@@ -13,7 +13,7 @@ export const STUDIO_SCENARIOS = Object.freeze([
             {
                 id: 'player',
                 name: 'AGARSTAKE',
-                color: 'agarstake',
+                color: '#7c3aff',
                 balance: 8.5,
                 start: { x: -300, y: 180, angle: -0.18 },
                 path: [

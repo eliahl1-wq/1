@@ -11,7 +11,6 @@ import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverla
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
-import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_VALUE, createAgarStakeCharmState, drawAgarStakeCharm, getAgarStakeCharmImage, getAgarStakePatternIndex } from '../../constants/agarStakeSkin.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
 import { drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
 import { slitherCanvasDpr, slitherQualityForFrameTime } from './slitherPerformance.js';
@@ -93,7 +92,6 @@ function normalizeSnakeColor(color) {
 function bucketSnakeColor(color) {
     const specialSkin = getSlitherSpecialSkin(color);
     if (specialSkin) return specialSkin.baseColor;
-    if (color === AGARSTAKE_SKIN_VALUE) return AGARSTAKE_SKIN_COLORS[0];
     if (color === 'random') return 'random';
     if (parseFlagSkin(color)) return '#808080';
     const cs = normalizeSnakeColor(color);
@@ -206,9 +204,6 @@ export class SlitherRenderer {
         this._frameMsEwma = 16.67;
         this._qualityEvalFrame = 0;
         this._rainbowStampPack = null;
-        this._agarStakeStampPack = null;
-        this._agarStakeCharmImage = getAgarStakeCharmImage();
-        this._agarStakeCharmStates = new Map();
         this._flagStampPacks = new Map();
         this._deathClusterBuf = [];
         this._deathClusterIds = new Set();
@@ -793,9 +788,6 @@ export class SlitherRenderer {
         }
         for (const id of this._boostTrailPool.keys()) {
             if (!seen.has(id)) this._boostTrailPool.delete(id);
-        }
-        for (const id of this._agarStakeCharmStates.keys()) {
-            if (!seen.has(id)) this._agarStakeCharmStates.delete(id);
         }
     }
 
@@ -1823,17 +1815,6 @@ export class SlitherRenderer {
         return pack;
     }
 
-    _getAgarStakeStamps(cacheR, prNeeds) {
-        const prKey = `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`;
-        let pack = this._agarStakeStampPack;
-        if (!pack || pack.cacheR !== cacheR || pack.prKey !== prKey) {
-            const colors = AGARSTAKE_SKIN_COLORS;
-            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds, true));
-            pack = { cacheR, prKey, colors, stamps };
-            this._agarStakeStampPack = pack;
-        }
-        return pack;
-    }
     _getSpecialSkinStamps(skin, cacheR, prNeeds) {
         if (!this._specialSkinStampPacks) this._specialSkinStampPacks = new Map();
         const prKey = `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`;
@@ -1987,24 +1968,19 @@ export class SlitherRenderer {
         };
 
         const isRainbow = snake.color === 'random';
-        const isAgarStake = snake.color === AGARSTAKE_SKIN_VALUE;
         const specialSkin = getSlitherSpecialSkin(snake.color);
         const flagCode = parseFlagSkin(snake.color);
-        const isPatternSkin = isRainbow || isAgarStake || !!specialSkin || !!flagCode;
+        const isPatternSkin = isRainbow || !!specialSkin || !!flagCode;
         const patternPack = isRainbow
             ? this._getRainbowStamps(cacheR, prNeeds, bodyRadius)
-            : isAgarStake
-                ? this._getAgarStakeStamps(cacheR, prNeeds)
-                : specialSkin
+            : specialSkin
                     ? this._getSpecialSkinStamps(specialSkin, cacheR, prNeeds)
                     : flagCode
                         ? this._getFlagStamps(flagCode, cacheR, prNeeds)
                         : null;
         const getPatternIndex = (index) => isRainbow
             ? Math.floor((this._frame * 0.048 + index * 0.35) % patternPack.colors.length)
-            : isAgarStake
-                ? getAgarStakePatternIndex(index)
-                : specialSkin
+            : specialSkin
                     ? 0
                     : Math.floor(index * 0.28) % patternPack.colors.length;
         let normal, boostBody, glow, trailGlow, bodySS, stampScale;
@@ -2123,27 +2099,6 @@ export class SlitherRenderer {
             this._drawBoostWaves(ctx, bumps, bumpCount, bodyRadius, pulse);
         }
 
-        if (isAgarStake) {
-            if (snake._agarStakeCharmSeed === undefined) {
-                snake._agarStakeCharmSeed = String(snake.id || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) * 0.17;
-            }
-            let charmState = this._agarStakeCharmStates.get(snake.id);
-            if (!charmState) {
-                charmState = createAgarStakeCharmState();
-                this._agarStakeCharmStates.set(snake.id, charmState);
-            }
-            drawAgarStakeCharm(
-                ctx,
-                this._agarStakeCharmImage,
-                hx,
-                hy,
-                headRadius,
-                angle,
-                this._frame * 0.055 + snake._agarStakeCharmSeed,
-                charmState,
-                performance.now(),
-            );
-        }
         // Head and Eyes
         const perpX = Math.sin(angle);
         const perpY = -Math.cos(angle);

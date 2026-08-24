@@ -7,6 +7,7 @@ import { normalizeSurvivEntryFee, formatUsd } from '../../constants/economy';
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
+import GamePlusCursor from '../../components/GamePlusCursor';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
@@ -21,6 +22,7 @@ import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
 import { nextWeaponSlot } from '../../utils/gameWheel.js';
 import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
+import { getSurvivWeaponRarity, SURVIV_AMMO_CATALOG, SURVIV_WEAPON_CATALOG } from './weaponCatalog.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -28,46 +30,21 @@ const WORLD_HALF = 10000;
 
 const SPEC_ZOOM = IS_MOBILE ? 1.6 : 2.2;
 
-const WEAPON_LABELS = {
-    fists: 'Fists',
-    knife: 'Combat Knife',
-    pistol: 'M9',
-    revolver: 'OT-38',
-    smg: 'MP5',
-    shotgun: 'M870',
-    assault: 'M416',
-    dmr: 'M39 EMR',
-    sniper: 'Mosin-Nagant',
-    lmg: 'M249',
-};
+const WEAPON_LABELS = Object.fromEntries(
+    Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.label]),
+);
 
 // Server slots stay 0/1 for firearms and 2 for melee. The HUD/key order is melee first.
 const SURVIV_WEAPON_SLOTS = [2, 0, 1];
 const SURVIV_SLOT_KEYS = { 2: 1, 0: 2, 1: 3 };
 
-const WEAPON_CLIP_SIZES = {
-    fists: 0,
-    pistol: 15,
-    revolver: 6,
-    smg: 30,
-    shotgun: 6,
-    assault: 30,
-    dmr: 10,
-    sniper: 5,
-    lmg: 100,
-};
-
-const AMMO_TYPES = {
-    '9mm': { label: '9mm', color: '#f5d547', max: 180 },
-    '12g': { label: '12 Gauge', color: '#f05a5a', max: 48 },
-    '556': { label: '5.56mm', color: '#63d471', max: 180 },
-    '762': { label: '7.62mm', color: '#5aa9f8', max: 90 },
-};
-
-const WEAPON_AMMO_TYPES = {
-    pistol: '9mm', smg: '9mm', shotgun: '12g', assault: '556', lmg: '556',
-    revolver: '762', dmr: '762', sniper: '762',
-};
+const WEAPON_CLIP_SIZES = Object.fromEntries(
+    Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.clipSize]),
+);
+const AMMO_TYPES = SURVIV_AMMO_CATALOG;
+const WEAPON_AMMO_TYPES = Object.fromEntries(
+    Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.ammoType]),
+);
 
 const SURVIV_RELOAD_UI_STEP_MS = 100;
 
@@ -1255,7 +1232,8 @@ export default function SurvivGame() {
             left: 0,
             fontFamily: 'system-ui',
         }}>
-            <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
+            <canvas ref={canvasRef} className="gameplay-cursor-surface" style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }} />
+            <GamePlusCursor />
             <canvas ref={balanceCanvasRef} aria-hidden="true" style={{
                 display: 'block',
                 position: 'absolute',
@@ -1478,7 +1456,7 @@ export default function SurvivGame() {
                         const reloadProgress = isReloading
                             ? Math.max(0, Math.min(1, 1 - reloadRemaining / reloadDuration))
                             : 0;
-                        const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
+                        const weaponRarity = weaponId ? getSurvivWeaponRarity(weaponId) : 'common';
                         const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
                         const ammoType = WEAPON_AMMO_TYPES[weaponId];
                         const reserveAmmo = ammoType ? (me.inventory?.ammoReserves?.[ammoType] || 0) : 0;
@@ -1699,7 +1677,7 @@ export default function SurvivGame() {
                                                 : (me.inventory?.weapons?.indexOf(me.weapon) ?? 0);
                                             const isActive = activeSlot === slotIdx;
                                             
-                                            const weaponRarity = weaponId ? (weaponId === 'sniper' || weaponId === 'lmg' ? 'military' : (weaponId === 'shotgun' || weaponId === 'assault' || weaponId === 'dmr' ? 'rare' : 'common')) : 'common';
+                                            const weaponRarity = weaponId ? getSurvivWeaponRarity(weaponId) : 'common';
                                             const borderRarityClass = weaponId ? `rarity-border-${weaponRarity}` : '';
                                             return (
                                                 <div 

@@ -1050,20 +1050,12 @@
     aspect-ratio: 2.5;
 }
 
-/* Branded and special Slither previews */
-.shop-agarstake-preview {
-    background:
-        radial-gradient(circle at 58% 48%, rgba(124, 58, 255, 0.27), transparent 42%),
-        linear-gradient(155deg, #08070c, #100b18 58%, #09080d);
-}
-
-.shop-agarstake-preview .snake-preview-wrapper,
+/* Special Slither previews */
 .shop-special-preview .snake-preview-wrapper {
     position: relative;
     z-index: 2;
 }
 
-.shop-agarstake-preview-glow,
 .shop-special-preview-glow {
     position: absolute;
     z-index: 1;

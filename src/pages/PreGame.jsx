@@ -24,7 +24,6 @@ import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRende
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
 import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
-import { AGARSTAKE_SKIN_COLORS, AGARSTAKE_SKIN_PRODUCT_ID, AGARSTAKE_SKIN_VALUE, createAgarStakeCharmState, drawAgarStakeCharm, getAgarStakeCharmImage, getAgarStakePatternIndex } from '../constants/agarStakeSkin';
 import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
 import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
@@ -131,7 +130,6 @@ const getChromaName = (color) => {
         const flag = getFlagSkin(flagCode);
         return `${flag.emoji} ${flag.name}`;
     }
-    if (color === AGARSTAKE_SKIN_VALUE) return 'AGAR';
     if (color === 'random') return 'Rainbow';
     switch (color) {
         case '#c080ff': return 'Lavender Purple';
@@ -329,9 +327,6 @@ export default function PreGame() {
             setSelectedSkinAgar('#c080ff');
         }
         if (parseFlagSkin(selectedSkin) && !user?.isAdmin && !ownedSkinProducts.has('flags:bundle')) {
-            setSelectedSkin('#c080ff');
-        }
-        if (selectedSkin === AGARSTAKE_SKIN_VALUE && !user?.isAdmin && !ownedSkinProducts.has(AGARSTAKE_SKIN_PRODUCT_ID)) {
             setSelectedSkin('#c080ff');
         }
         const selectedSpecialSkin = getSlitherSpecialSkin(selectedSkin);
@@ -2039,7 +2034,6 @@ export default function PreGame() {
                         const flag = getFlagSkin(flagCode);
                         return `${flag.emoji} ${flag.name}`;
                     }
-                    if (color === AGARSTAKE_SKIN_VALUE) return 'AGAR';
                     const specialNameSkin = getSlitherSpecialSkin(color);
                     if (specialNameSkin) return specialNameSkin.name;
                     if (color === 'random_color') return 'Random';
@@ -2067,15 +2061,13 @@ export default function PreGame() {
                 const isRainbow = currentChroma === 'random' && customizerTab !== 'surviv';
                 const activeFlagCode = parseFlagSkin(currentChroma);
                 const isFlag = !!activeFlagCode && customizerTab !== 'surviv';
-                const isAgarStake = currentChroma === AGARSTAKE_SKIN_VALUE && customizerTab === 'slither';
                 const specialSkin = customizerTab === 'slither' ? getSlitherSpecialSkin(currentChroma) : null;
                 const isSpecialSkin = !!specialSkin;
                 const isRandomSelection = currentChroma === 'random' || currentChroma === 'random_color';
-                const displayChroma = specialSkin ? specialSkin.colors[4] : isAgarStake ? '#7c3aff' : (isRandomSelection || isFlag) ? '#80d0d0' : currentChroma;
+                const displayChroma = specialSkin ? specialSkin.colors[4] : (isRandomSelection || isFlag) ? '#80d0d0' : currentChroma;
                 const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
                 const ownsRainbow = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has(rainbowProductId));
                 const ownsFlagPack = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has('flags:bundle'));
-                const ownsAgarStake = customizerTab === 'slither' && (user?.isAdmin || ownedSkinProducts.has(AGARSTAKE_SKIN_PRODUCT_ID));
                 const ownedSpecialSkinIds = new Set(SLITHER_SPECIAL_SKINS.filter((skin) => user?.isAdmin || ownedSkinProducts.has(skin.productId)).map((skin) => skin.id));
 
                 const cycleChroma = (direction) => {
@@ -2109,7 +2101,7 @@ export default function PreGame() {
 
                 const setSkinStyle = (style) => {
                     const requestedSpecialSkin = getSlitherSpecialSkin(style);
-                    if ((style === 'rainbow' && !ownsRainbow) || (style === 'flags' && !ownsFlagPack) || (style === 'agarstake' && !ownsAgarStake) || (requestedSpecialSkin && !ownedSpecialSkinIds.has(requestedSpecialSkin.id))) {
+                    if ((style === 'rainbow' && !ownsRainbow) || (style === 'flags' && !ownsFlagPack) || (requestedSpecialSkin && !ownedSpecialSkinIds.has(requestedSpecialSkin.id))) {
                         setShowCustomizer(false);
                         navigate('/shop');
                         return;
@@ -2117,7 +2109,6 @@ export default function PreGame() {
                     let newSkin = style;
                     if (style === 'rainbow') newSkin = 'random';
                     else if (style === 'flags') newSkin = flagSkinValue(activeFlagCode || DEFAULT_FLAG_CODE);
-                    else if (style === 'agarstake') newSkin = AGARSTAKE_SKIN_VALUE;
                     else if (requestedSpecialSkin) newSkin = requestedSpecialSkin.value;
                     else if (style === 'classic') newSkin = '#c080ff';
                     
@@ -2201,8 +2192,6 @@ export default function PreGame() {
                                             ? { backgroundImage: 'linear-gradient(90deg, #ff4040, #ffa060, #eeee70, #80ff80, #80d0d0, #9099ff, #c080ff)' }
                                             : specialSkin
                                                 ? { backgroundImage: specialSkin.badgeGradient }
-                                            : isAgarStake
-                                                ? { backgroundImage: 'linear-gradient(135deg, #09070f 10%, #7c3aff 62%, #b13cff)' }
                                             : isRandomSelection
                                                 ? { backgroundImage: 'linear-gradient(135deg, #80d0d0, #c080ff, #ffa060)' }
                                                 : { backgroundColor: currentChroma }
@@ -2217,7 +2206,7 @@ export default function PreGame() {
                                     <div className="skin-cards-grid">
                                         <button
                                             type="button"
-                                            className={`skin-card ${(!isRainbow && !isRandomColor && !isFlag && !isAgarStake && !isSpecialSkin) ? 'active' : ''}`}
+                                            className={`skin-card ${(!isRainbow && !isRandomColor && !isFlag && !isSpecialSkin) ? 'active' : ''}`}
                                             onClick={() => setSkinStyle('classic')}
                                         >
                                             <div className="skin-card-icon grid-icon">
@@ -2254,18 +2243,6 @@ export default function PreGame() {
                                             </button>
                                         )}
 
-                                        {customizerTab === 'slither' && ownsAgarStake && (
-                                            <button
-                                                type="button"
-                                                className={`skin-card ${isAgarStake ? 'active' : ''}`}
-                                                onClick={() => setSkinStyle('agarstake')}
-                                            >
-                                                <div className="skin-card-icon agarstake-charm-icon">
-                                                    <img src="/agarstake-charm.png" alt="" />
-                                                </div>
-                                                <span>AGAR</span>
-                                            </button>
-                                        )}
                                         {customizerTab === 'slither' && SLITHER_SPECIAL_SKINS.filter((skin) => ownedSpecialSkinIds.has(skin.id)).map((skin) => (
                                             <button
                                                 key={skin.id}
@@ -2417,14 +2394,11 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const pointY = new Float64Array(segmentsCount);
         const shadowCanvas = getSnakeShadowCanvas(radius);
         const rainbowCanvases = rainbowColors.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
-        const agarStakeCanvases = AGARSTAKE_SKIN_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor, true));
         const specialSkinCanvases = new Map(SLITHER_SPECIAL_SKINS.map((skin) => [
             skin.id,
             getSnakeSegmentCanvas(radius, skin.baseColor),
         ]));
         const detailPoints = Array.from({ length: segmentsCount }, () => ({ x: 0, y: 0 }));
-        const agarStakeCharmImage = getAgarStakeCharmImage();
-        const agarStakeCharmState = createAgarStakeCharmState();
         const randomColorCanvases = RANDOM_PREVIEW_SNAKE_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
         const shadowHalf = shadowCanvas.width / 2;
         let fixedColor = null;
@@ -2465,7 +2439,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                 fixedFlagCode = flagCode;
                 flagCanvases = getFlagSegmentColors(flagCode).map((flagColor) => getSnakeSegmentCanvas(radius, flagColor));
             }
-            if (currentColor !== 'random' && currentColor !== 'random_color' && currentColor !== AGARSTAKE_SKIN_VALUE && !currentSpecialSkin && !flagCode && currentColor !== fixedColor) {
+            if (currentColor !== 'random' && currentColor !== 'random_color' && !currentSpecialSkin && !flagCode && currentColor !== fixedColor) {
                 fixedColor = currentColor;
                 fixedSegmentCanvas = getSnakeSegmentCanvas(radius, currentColor);
             }
@@ -2483,8 +2457,6 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                     ? rainbowCanvases[Math.floor((now * 0.0012 + i * 0.15) % rainbowCanvases.length)]
                     : currentColor === 'random_color'
                         ? randomColorCanvases[Math.floor((now % RANDOM_PREVIEW_DURATION_MS) / RANDOM_PREVIEW_DURATION_MS * randomColorCanvases.length)]
-                        : currentColor === AGARSTAKE_SKIN_VALUE
-                            ? agarStakeCanvases[getAgarStakePatternIndex(i)]
                         : currentSpecialSkin
                             ? specialSkinCanvases.get(currentSpecialSkin.id)
                         : flagCode
@@ -2513,19 +2485,6 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
             const eyeR = Math.max(2.5, radius * 0.43);
             const pupilR = eyeR * 0.48;
 
-            if (currentColor === AGARSTAKE_SKIN_VALUE) {
-                drawAgarStakeCharm(
-                    ctx,
-                    agarStakeCharmImage,
-                    pointX[0],
-                    pointY[0],
-                    radius,
-                    headAngle,
-                    now * 0.0042,
-                    agarStakeCharmState,
-                    now,
-                );
-            }
             for (const side of [-1, 1]) {
                 const ex = pointX[0] + fwdX * eyeFwd + perpX * eyeSide * side;
                 const ey = pointY[0] + fwdY * eyeFwd + perpY * eyeSide * side;

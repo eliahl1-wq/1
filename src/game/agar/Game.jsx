@@ -12,6 +12,7 @@ import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlay
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
+import GamePlusCursor from '../../components/GamePlusCursor';
 import GameSocialOverlay, { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
@@ -1108,12 +1109,14 @@ export default function Game() {
         }}>
             <canvas
                 ref={canvasRef}
+                className="gameplay-cursor-surface"
                 onMouseMove={handleMouseMove}
                 onWheel={handleWheel}
                 onTouchStart={handleTouch}
                 onTouchMove={handleTouch}
                 style={{ display: 'block', touchAction: 'none' }}
             />
+            <GamePlusCursor />
 
             <MobileGameSession containerRef={viewportRef} />
 

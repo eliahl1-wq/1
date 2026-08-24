@@ -14,6 +14,7 @@ import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlay
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
+import GamePlusCursor from '../../components/GamePlusCursor';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
@@ -1020,7 +1021,8 @@ export default function SlitherGame() {
 
         }}>
 
-            <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none', contain: 'strict' }} />
+            <canvas ref={canvasRef} className="gameplay-cursor-surface" style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none', contain: 'strict' }} />
+            <GamePlusCursor />
 
             <MobileGameSession containerRef={viewportRef} />
 

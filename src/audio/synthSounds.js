@@ -86,7 +86,7 @@ function getSurvivSfxOutput(ctx) {
     const input = ctx.createGain();
     // A small global trim keeps every Surviv effect below its previous level
     // while preserving the carefully balanced differences between effects.
-    input.gain.value = 0.82;
+    input.gain.value = 0.64;
     input.connect(ctx.destination);
     survivSfxOutput = { ctx, input };
     return input;
@@ -427,9 +427,11 @@ function getFoodPickupMaster(ctx) {
     compressor.release.value = 0.055;
 
     const output = ctx.createGain();
-    output.gain.value = 0.72;
+    // This sound is shared by Agar and Slither. Preserve its previous effective
+    // level while the Surviv-only output is reduced independently.
+    output.gain.value = 0.59;
     compressor.connect(output);
-    output.connect(getSurvivSfxOutput(ctx));
+    output.connect(ctx.destination);
     foodPickupMaster = compressor;
     return foodPickupMaster;
 }
@@ -611,11 +613,160 @@ export function playSurvivMeleeSwing(weaponType = 'fists', options = {}) {
     return true;
 }
 
+/** Short spatial hinge movement and latch release for an opening door. */
+export function playSurvivDoorOpenSound(material = 'wood', options = {}) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const metal = material === 'metal' || material === 'warehouse' || material === 'ironworks';
+    const attenuation = actionDistanceGain(options.distance, 760);
+    if (attenuation < 0.035) return false;
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = attenuation * (0.88 + Math.random() * 0.1);
+    connectSpatialActionBus(ctx, bus, options.pan);
+
+    // A filtered, moving hinge texture keeps the sound organic without a long tail.
+    const hinge = ctx.createBufferSource();
+    hinge.buffer = getNoiseBuffer(ctx, 0.19, Math.floor(Math.random() * 16));
+    hinge.playbackRate.value = 0.93 + Math.random() * 0.1;
+    const hingeBand = ctx.createBiquadFilter();
+    hingeBand.type = 'bandpass';
+    hingeBand.frequency.setValueAtTime(metal ? 1380 : 820, t);
+    hingeBand.frequency.exponentialRampToValueAtTime(metal ? 720 : 430, t + 0.17);
+    hingeBand.Q.value = metal ? 1.05 : 0.72;
+    const hingeGain = ctx.createGain();
+    hingeGain.gain.setValueAtTime(0.0001, t);
+    hingeGain.gain.linearRampToValueAtTime(metal ? 0.11 : 0.135, t + 0.018);
+    hingeGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.185);
+    hinge.connect(hingeBand);
+    hingeBand.connect(hingeGain);
+    hingeGain.connect(bus);
+    hinge.start(t);
+    hinge.stop(t + 0.195);
+
+    // The initial latch release gives the interaction a precise, responsive start.
+    const latch = ctx.createBufferSource();
+    latch.buffer = getNoiseBuffer(ctx, 0.035, 5 + Math.floor(Math.random() * 10));
+    const latchBand = ctx.createBiquadFilter();
+    latchBand.type = 'bandpass';
+    latchBand.frequency.value = metal ? 3300 : 2050;
+    latchBand.Q.value = 0.85;
+    const latchGain = ctx.createGain();
+    latchGain.gain.setValueAtTime(metal ? 0.11 : 0.085, t);
+    latchGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.031);
+    latch.connect(latchBand);
+    latchBand.connect(latchGain);
+    latchGain.connect(bus);
+    latch.start(t);
+    latch.stop(t + 0.038);
+
+    // A quiet low wooden/steel body prevents the door from sounding paper-thin.
+    const body = ctx.createBufferSource();
+    body.buffer = getNoiseBuffer(ctx, 0.09, 2 + Math.floor(Math.random() * 12));
+    const bodyLow = ctx.createBiquadFilter();
+    bodyLow.type = 'lowpass';
+    bodyLow.frequency.value = metal ? 390 : 275;
+    bodyLow.Q.value = 0.38;
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(metal ? 0.075 : 0.09, t + 0.025);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.105);
+    body.connect(bodyLow);
+    bodyLow.connect(bodyGain);
+    bodyGain.connect(bus);
+    body.start(t + 0.025);
+    body.stop(t + 0.115);
+    return true;
+}
+
+const IMPACT_SOUND_PROFILES = Object.freeze({
+    wood: { body: 245, contact: 1450, highpass: 62, lowpass: 3900, level: 0.17, duration: 0.105, flecks: 2 },
+    stone: { body: 175, contact: 3250, highpass: 48, lowpass: 7200, level: 0.15, duration: 0.115, flecks: 3 },
+    metal: { body: 310, contact: 4100, highpass: 85, lowpass: 7600, level: 0.135, duration: 0.085, flecks: 2 },
+    foliage: { body: 155, contact: 980, highpass: 45, lowpass: 2700, level: 0.16, duration: 0.14, flecks: 3 },
+    soft: { body: 120, contact: 650, highpass: 38, lowpass: 1750, level: 0.17, duration: 0.12, flecks: 1 },
+});
+
+function normalizeImpactMaterial(material) {
+    if (IMPACT_SOUND_PROFILES[material]) return material;
+    if (['crate', 'tree', 'stump', 'fallenLog', 'furniture', 'door', 'bench', 'signpost', 'container'].includes(material)) return 'wood';
+    if (['rock', 'wall', 'interiorWall', 'concrete', 'stone'].includes(material)) return 'stone';
+    if (['barrel', 'machine', 'locker', 'metal'].includes(material)) return 'metal';
+    if (['bush', 'plant', 'foliage'].includes(material)) return 'foliage';
+    if (['sandbag', 'tent', 'hayBale', 'soft'].includes(material)) return 'soft';
+    return 'wood';
+}
+
+/** Short material-specific contact played for damage before an object breaks. */
+export function playSurvivImpactSound(material = 'wood', options = {}) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const profile = IMPACT_SOUND_PROFILES[normalizeImpactMaterial(material)];
+    const attenuation = actionDistanceGain(options.distance, 920);
+    if (attenuation < 0.03) return false;
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = attenuation * (0.92 + Math.random() * 0.12);
+    connectSpatialActionBus(ctx, bus, options.pan);
+
+    const contact = ctx.createBufferSource();
+    contact.buffer = getNoiseBuffer(ctx, profile.duration + 0.025, Math.floor(Math.random() * 16));
+    contact.playbackRate.value = 0.95 + Math.random() * 0.1;
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = profile.highpass;
+    highpass.Q.value = 0.35;
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = profile.lowpass;
+    lowpass.Q.value = 0.42;
+    const contactGain = ctx.createGain();
+    contactGain.gain.setValueAtTime(0.0001, t);
+    contactGain.gain.linearRampToValueAtTime(profile.level, t + 0.0012);
+    contactGain.gain.exponentialRampToValueAtTime(0.0001, t + profile.duration);
+    contact.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(contactGain);
+    contactGain.connect(bus);
+
+    const bodyFilter = ctx.createBiquadFilter();
+    bodyFilter.type = 'lowpass';
+    bodyFilter.frequency.value = profile.body;
+    bodyFilter.Q.value = 0.38;
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(profile.level * 0.72, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + profile.duration * 0.72);
+    contact.connect(bodyFilter);
+    bodyFilter.connect(bodyGain);
+    bodyGain.connect(bus);
+    contact.start(t);
+    contact.stop(t + profile.duration + 0.025);
+
+    for (let index = 0; index < profile.flecks; index++) {
+        const offset = 0.008 + index * 0.011 + Math.random() * 0.007;
+        const fleck = ctx.createBufferSource();
+        fleck.buffer = getNoiseBuffer(ctx, 0.026, index + Math.floor(Math.random() * 12));
+        const fleckBand = ctx.createBiquadFilter();
+        fleckBand.type = 'bandpass';
+        fleckBand.frequency.value = profile.contact * (0.82 + Math.random() * 0.36);
+        fleckBand.Q.value = 0.62;
+        const fleckGain = ctx.createGain();
+        fleckGain.gain.setValueAtTime(profile.level * 0.32, t + offset);
+        fleckGain.gain.exponentialRampToValueAtTime(0.0001, t + offset + 0.021);
+        fleck.connect(fleckBand);
+        fleckBand.connect(fleckGain);
+        fleckGain.connect(bus);
+        fleck.start(t + offset);
+        fleck.stop(t + offset + 0.026);
+    }
+    return true;
+}
+
 const BREAK_SOUND_PROFILES = Object.freeze({
     wood: { lowpass: 4300, body: 270, crack: 1850, level: 0.3, fragments: 5, duration: 0.25 },
     stone: { lowpass: 6500, body: 210, crack: 3150, level: 0.28, fragments: 7, duration: 0.29 },
     metal: { lowpass: 4700, body: 245, crack: 2350, level: 0.22, fragments: 4, duration: 0.23 },
     foliage: { lowpass: 3600, body: 190, crack: 1250, level: 0.25, fragments: 6, duration: 0.31 },
+    soft: { lowpass: 2200, body: 135, crack: 780, level: 0.24, fragments: 3, duration: 0.27 },
 });
 
 function normalizeBreakMaterial(material) {
@@ -624,6 +775,7 @@ function normalizeBreakMaterial(material) {
     if (['rock', 'wall', 'concrete', 'stone'].includes(material)) return 'stone';
     if (['barrel', 'machine'].includes(material)) return 'metal';
     if (['bush', 'plant'].includes(material)) return 'foliage';
+    if (['sandbag', 'tent', 'hayBale', 'soft'].includes(material)) return 'soft';
     return 'wood';
 }
 

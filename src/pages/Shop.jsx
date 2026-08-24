@@ -8,7 +8,6 @@ import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 import { flagSkinValue, DEFAULT_FLAG_CODE } from '../constants/flagSkins';
-import { AGARSTAKE_SKIN_PRODUCT_ID, AGARSTAKE_SKIN_VALUE } from '../constants/agarStakeSkin';
 import { SLITHER_SPECIAL_SKINS, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
 import { AgarBlobPreview, SnakeSkinPreview } from './PreGame';
 import '../styles/shop.css';
@@ -22,7 +21,6 @@ function authHeaders(token, json = false) {
 }
 
 function getProductDisplayName(product) {
-    if (product?.skinId === 'agarstake' || product?.id === AGARSTAKE_SKIN_PRODUCT_ID) return 'AGAR';
     return product?.name || 'Skin';
 }
 
@@ -65,14 +63,6 @@ function FlagPackPreview() {
                     <SnakeSkinPreview color="flag:gb" isLarge={false} />
                 </div>
             </div>
-        </div>
-    );
-}
-function AgarStakePreview() {
-    return (
-        <div className="shop-rainbow-preview shop-agarstake-preview" aria-hidden="true">
-            <div className="shop-agarstake-preview-glow" />
-            <SnakeSkinPreview color={AGARSTAKE_SKIN_VALUE} isLarge />
         </div>
     );
 }
@@ -204,7 +194,7 @@ export default function Shop() {
                 type: response.status === 202 ? 'pending' : 'success',
                 message: response.status === 202
                     ? 'Payment was broadcast and is being confirmed. Do not retry.'
-                    : `${getSlitherSpecialSkin(quote?.skinId)?.name || (quote?.skinId === 'flags' ? 'Flag Pack' : quote?.skinId === 'agarstake' ? 'AGAR' : 'Rainbow')} unlocked successfully.`,
+                    : `${getSlitherSpecialSkin(quote?.skinId)?.name || (quote?.skinId === 'flags' ? 'Flag Pack' : 'Rainbow')} unlocked successfully.`,
             });
         } catch (error) {
             setNotice({ type: 'error', message: error.message });
@@ -217,11 +207,6 @@ export default function Shop() {
         const specialSkin = getSlitherSpecialSkin(product.skinId);
         if (specialSkin) {
             localStorage.setItem('selected_skin', specialSkin.value);
-            navigate('/pre-game', { state: { mode: 'slither' } });
-            return;
-        }
-        if (product.skinId === 'agarstake') {
-            localStorage.setItem('selected_skin', AGARSTAKE_SKIN_VALUE);
             navigate('/pre-game', { state: { mode: 'slither' } });
             return;
         }
@@ -304,7 +289,6 @@ export default function Shop() {
                         { id: 'flags:bundle', gameMode: 'all', skinId: 'flags', name: 'Flag Pack', usdPrice: 1 },
                         { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
                         { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
-                        { id: AGARSTAKE_SKIN_PRODUCT_ID, gameMode: 'slither', skinId: 'agarstake', name: 'AGAR', usdPrice: 1 },
                         ...SLITHER_SPECIAL_SKINS.map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
                     ]).map((product) => {
                         const owned = ownedProducts.has(product.id);
@@ -330,11 +314,9 @@ export default function Shop() {
                                 </div>
                                 {product.skinId === 'flags'
                                     ? <FlagPackPreview nickname={user?.username} />
-                                    : product.skinId === 'agarstake'
-                                        ? <AgarStakePreview />
-                                        : specialSkin
-                                            ? <SpecialSlitherPreview skin={specialSkin} />
-                                            : <RainbowPreview mode={product.gameMode} nickname={user?.username} />}
+                                    : specialSkin
+                                        ? <SpecialSlitherPreview skin={specialSkin} />
+                                        : <RainbowPreview mode={product.gameMode} nickname={user?.username} />}
                                 <div className="shop-product-copy">
                                     <div className="shop-product-heading">
                                         <h2>{getProductDisplayName(product)}</h2>
@@ -342,11 +324,9 @@ export default function Shop() {
                                     </div>
                                     <p>{product.skinId === 'flags'
                                         ? 'One pack with popular country flags for both Agar and Slither.'
-                                        : product.skinId === 'agarstake'
-                                            ? 'A black and purple AGAR snake with a hanging crypto-logo charm.'
-                                            : specialSkin
-                                                ? specialSkin.description
-                                                : 'A luminous animated spectrum made for ' + (product.gameMode === 'agar' ? 'Agar' : 'Slither') + '.'}</p>
+                                        : specialSkin
+                                            ? specialSkin.description
+                                            : 'A luminous animated spectrum made for ' + (product.gameMode === 'agar' ? 'Agar' : 'Slither') + '.'}</p>
                                 </div>
                                 <div className="shop-product-price">
                                     <div>
@@ -445,9 +425,7 @@ export default function Shop() {
                             {getSlitherSpecialSkin(quote.skinId)?.name || (
                                 quote.skinId === 'flags'
                                     ? 'Agar + Slither Flag Pack'
-                                    : quote.skinId === 'agarstake'
-                                        ? 'AGAR'
-                                        : (quote.gameMode === 'agar' ? 'Agar' : 'Slither') + ' Rainbow'
+                                    : (quote.gameMode === 'agar' ? 'Agar' : 'Slither') + ' Rainbow'
                             )}
                         </h2>
                         <p className="shop-confirm-subtitle">Review the purchase details before confirming.</p>

@@ -3544,3 +3544,52 @@ body.game-session-active #root {
     .game-viewport--mobile .game-result-btn{min-height:42px;font-size:.8rem}
     .game-viewport--mobile .game-result-btn--play{font-size:.82rem!important}
 }
+.gameplay-cursor-surface {
+    cursor: none !important;
+}
+
+.game-plus-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 20000;
+    width: 20px;
+    height: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(-100px, -100px, 0);
+    transition: opacity 60ms linear;
+    will-change: transform;
+}
+
+.game-plus-cursor[data-visible="true"] {
+    opacity: 1;
+}
+
+.game-plus-cursor::before,
+.game-plus-cursor::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 2px;
+    background: #fff;
+    box-shadow: 0 0 1px 1px rgba(0, 0, 0, 0.72), 0 0 5px rgba(255, 255, 255, 0.32);
+    transform: translate(-50%, -50%);
+}
+
+.game-plus-cursor::before {
+    width: 16px;
+    height: 2px;
+}
+
+.game-plus-cursor::after {
+    width: 2px;
+    height: 16px;
+}
+
+@media (pointer: coarse) {
+    .game-plus-cursor {
+        display: none;
+    }
+}
