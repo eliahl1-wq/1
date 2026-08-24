@@ -116,6 +116,16 @@ function survivUiSnapshotsEqual(previous, next) {
     return true;
 }
 
+function formatPickupConfirmation(lastLoot) {
+    const items = lastLoot?.items || {};
+    if (items.weaponLabel) return items.weaponLabel;
+    if (items.ammoAmount) return `${items.ammoAmount} ${String(items.ammoType || '').toUpperCase()} AMMO`.replace('  ', ' ');
+    if (items.medkits) return `${items.medkits} MEDKIT${items.medkits === 1 ? '' : 'S'}`;
+    if (items.armor) return `${Math.round(items.armor)} ARMOR`;
+    if (items.money) return `$${Number(items.money).toFixed(2)}`;
+    return lastLoot?.source === 'ground' ? 'ITEM' : 'LOOT';
+}
+
 function renderWeaponIcon(weaponId, strokeColor = 'currentColor', size = 24, options = {}) {
     return <SurvivWeaponIcon weaponId={weaponId} color={strokeColor} width={size} monochrome={!!options.monochrome} />;
 }
@@ -259,6 +269,8 @@ export default function SurvivGame() {
     const swapWeaponSlotsPendingRef = useRef(null);
     const meUiSnapshotRef = useRef(null);
     const nearbyPickupValueRef = useRef(null);
+    const lastPickupConfirmationIdRef = useRef(null);
+    const pickupConfirmationTimerRef = useRef(null);
     const leaderboardSignatureRef = useRef('');
     const resetCountdownValueRef = useRef(null);
     const aliveCountValueRef = useRef(0);
@@ -377,12 +389,17 @@ export default function SurvivGame() {
     }, []);
     const [me, setMe] = useState(null);
     const [nearbyPickup, setNearbyPickup] = useState(null);
+    const [pickupConfirmation, setPickupConfirmation] = useState(null);
     const [aliveCount, setAliveCount] = useState(0);
     const spectateTargetsRef = useRef([]);
     const hideNames = localStorage.getItem('hide_player_names') === 'true';
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
     const entryFeeUsd = normalizeSurvivEntryFee(localStorage.getItem('selected_entry_fee'));
+
+    useEffect(() => () => {
+        if (pickupConfirmationTimerRef.current) clearTimeout(pickupConfirmationTimerRef.current);
+    }, []);
     // Preserve the requested join type across a direct refresh. The server
     // remains authoritative and ignores this flag for every non-admin account.
     const adminFreeSurvivEntry = (
@@ -887,6 +904,19 @@ export default function SurvivGame() {
                 spectateTargetsRef.current = tick.spectateTargets;
             }
             renderer.updateState(tick);
+            if (tick.you?.lastLoot?.id && tick.you.lastLoot.id !== lastPickupConfirmationIdRef.current) {
+                lastPickupConfirmationIdRef.current = tick.you.lastLoot.id;
+                setPickupConfirmation({
+                    id: tick.you.lastLoot.id,
+                    label: formatPickupConfirmation(tick.you.lastLoot),
+                    action: tick.you.lastLoot.source === 'ground' ? 'PICKED UP' : 'LOOTED',
+                });
+                if (pickupConfirmationTimerRef.current) clearTimeout(pickupConfirmationTimerRef.current);
+                pickupConfirmationTimerRef.current = setTimeout(() => {
+                    setPickupConfirmation(null);
+                    pickupConfirmationTimerRef.current = null;
+                }, 1450);
+            }
             if (tick.fullMap) setFullMapData(tick.fullMap);
             if (Array.isArray(tick.activityZones)) {
                 const activitySignature = tick.activityZones
@@ -1401,11 +1431,22 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {!IS_MOBILE && gameReady && me && nearbyPickup && nearbyPickup.kind !== 'door' && !showResultModal && !isDead && !isSpectating && !isFullMapOpen && (
-                <div className="surviv-context-prompt" role="status" aria-live="polite">
-                    <kbd>F</kbd>
-                    <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
-                </div>
+            {!IS_MOBILE && gameReady && me && !showResultModal && !isDead && !isSpectating && !isFullMapOpen && (
+                pickupConfirmation ? (
+                    <div className="surviv-context-prompt surviv-context-prompt--confirmation" role="status" aria-live="polite">
+                        <span className="surviv-context-key" aria-hidden="true">✓</span>
+                        <span>{pickupConfirmation.action} <strong>{pickupConfirmation.label}</strong></span>
+                    </div>
+                ) : nearbyPickup ? (
+                    <div className="surviv-context-prompt" role="status" aria-live="polite">
+                        <kbd>F</kbd>
+                        {nearbyPickup.kind === 'door' ? (
+                            <span>{nearbyPickup.isOpen ? 'CLOSE' : 'OPEN'} <strong>DOOR</strong></span>
+                        ) : (
+                            <span>PICK UP <strong>{WEAPON_LABELS[nearbyPickup.weaponType] || nearbyPickup.weaponType || 'WEAPON'}</strong></span>
+                        )}
+                    </div>
+                ) : null
             )}
 
             {user?.isAdmin && gameReady && !showResultModal && (

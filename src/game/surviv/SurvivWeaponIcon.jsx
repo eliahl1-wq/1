@@ -1,81 +1,63 @@
-import React from 'react';
-import { getSurvivWeaponVisualProfile } from './weaponVisuals.js';
+import React, { useId } from 'react';
+import { getSurvivWeaponSideArt, getSurvivWeaponVisualProfile } from './weaponVisuals.js';
 
-const defaultOutline = '#101617';
+const roleColor = (profile, role, primary) => {
+    if (role === 'dark') return profile.dark || '#151d1f';
+    if (role === 'furniture') return profile.furniture || '#48504c';
+    if (role === 'accent') return profile.accent || profile.furniture || primary;
+    return primary;
+};
 
-function Stock({ type, color, outline = defaultOutline }) {
-    if (type === 'none' || type === 'grip' || type === 'tank') return null;
-    if (type === 'wire' || type === 'skeleton') {
-        return <path d="M14 10 4 7v8l10-3" fill="none" stroke={outline} strokeWidth="2.7" strokeLinejoin="round" />;
-    }
-    if (type === 'bullpup') return <path d="M5 7h15v8H5l-3-3V9Z" fill={color} stroke={outline} strokeWidth="1.35" />;
-    return <path d="M4 7h13l5 3v4H8l-6-3Z" fill={color} stroke={outline} strokeWidth="1.35" strokeLinejoin="round" />;
-}
-
-function Magazine({ type, x = 27, color, outline = defaultOutline }) {
-    if (type === 'none' || type === 'tube' || type === 'grip') return null;
-    if (type === 'pan') return <ellipse cx={x} cy="8" rx="7" ry="3.7" fill={color} stroke={outline} strokeWidth="1.35" />;
-    if (type === 'drum' || type === 'tank') return <circle cx={x} cy="16" r="4.2" fill={color} stroke={outline} strokeWidth="1.35" />;
-    if (type === 'curved') return <path d={`M${x - 2} 13h6c.4 4 2.2 6.4 4.2 8-3.4-.3-7-2.4-8.2-8Z`} fill={color} stroke={outline} strokeWidth="1.35" />;
-    return <path d={`M${x - 2} 13h6l1 7h-6Z`} fill={color} stroke={outline} strokeWidth="1.35" />;
-}
-
-function Firearm({ profile, color, monochrome = false }) {
-    const metal = color;
-    const furniture = monochrome ? '#aeb7b5' : (profile.accent || profile.furniture || color);
-    const dark = monochrome ? '#7f8a88' : profile.dark;
-    const outline = monochrome ? '#222a2b' : defaultOutline;
-    const bodyStart = profile.stock === 'none' ? 9 : 14;
-    const bodyEnd = profile.style === 'pistol' || profile.style === 'revolver'
-        ? Math.min(42, 31 + profile.length * 0.42)
-        : Math.min(42, 29 + profile.length * 0.3);
-    const barrelEnd = Math.min(62, bodyEnd + 5 + profile.barrel * 0.72);
-    const magX = profile.bullpup ? 18 : 29;
-
-    if (profile.style === 'bugle') {
-        return <><path d="M7 12c9-8 22-7 33-2" fill="none" stroke={color} strokeWidth="3.8" strokeLinecap="round" /><path d="m39 6 20 6-20 6Z" fill={color} stroke={outline} strokeWidth="1.35" /></>;
-    }
-
-    if (profile.style === 'pistol' || profile.style === 'revolver') {
-        const cylinder = profile.style === 'revolver';
-        return <>
-            <path d={`M9 8h${Math.max(22, bodyEnd - 9)}l2 2v5H9Z`} fill={metal} stroke={outline} strokeWidth="1.35" strokeLinejoin="round" />
-            {cylinder && <circle cx="27" cy="12" r="5" fill={furniture} stroke={outline} strokeWidth="1.35" />}
-            <path d="M14 14h10l-2.5 8h-6.5Z" fill={furniture} stroke={outline} strokeWidth="1.35" strokeLinejoin="round" />
-            <path d="M24 15c0 3 2 4 4 4" fill="none" stroke={outline} strokeWidth="1.25" strokeLinecap="round" />
-            <rect x={bodyEnd - 1} y="9.5" width={Math.max(7, barrelEnd - bodyEnd + 1)} height={cylinder ? 4 : 3} rx="1" fill={metal} stroke={outline} strokeWidth="1.2" />
-            {profile.suppressor && <rect x={barrelEnd - 5} y="8.5" width="12" height="5" rx="1.5" fill={dark} stroke={outline} strokeWidth="1.2" />}
-            <path d={`M12 7h${Math.max(8, bodyEnd - 18)}`} stroke={monochrome ? '#eef2f1' : outline} strokeWidth="1" strokeLinecap="round" opacity=".72" />
-        </>;
-    }
-
+function FirearmSilhouette({ weaponId, color, monochrome, maskId }) {
+    const art = getSurvivWeaponSideArt(weaponId);
+    const profile = art.profile;
     return <>
-        <Stock type={profile.stock} color={furniture} outline={outline} />
-        <path d={`M${bodyStart} 8h${bodyEnd - bodyStart}l4 3v4H${bodyStart}Z`} fill={metal} stroke={outline} strokeWidth="1.35" strokeLinejoin="round" />
-        {profile.style === 'shotgun' && <rect x="29" y="13.5" width="15" height="3.5" rx="1.5" fill={furniture} stroke={outline} strokeWidth="1.2" />}
-        {profile.style === 'special' && <ellipse cx="27" cy="12" rx="7" ry="5.5" fill={furniture} stroke={outline} strokeWidth="1.35" />}
-        <Magazine type={profile.magazine} x={magX} color={dark} outline={outline} />
-        <path d={`M${bodyEnd} 10h${Math.max(4, barrelEnd - bodyEnd)}v4H${bodyEnd}Z`} fill={metal} stroke={outline} strokeWidth="1.25" />
-        {profile.barrelCount > 1 && <path d={`M${bodyEnd + 2} 15h${Math.max(3, barrelEnd - bodyEnd - 2)}`} stroke={outline} strokeWidth="2" strokeLinecap="round" />}
-        {profile.suppressor && <rect x={barrelEnd - 8} y="9" width="11" height="6" rx="2" fill={dark} stroke={outline} strokeWidth="1.2" />}
-        {profile.scope && <><rect x="22" y="4" width={profile.scope === 'long' ? 18 : 13} height="4" rx="2" fill={dark} stroke={outline} strokeWidth="1.1" /><path d="M25 8v2m11-2v2" stroke={outline} strokeWidth="1.2" /></>}
-        {profile.stock === 'tank' && <circle cx="12" cy="12" r="6" fill={furniture} stroke={outline} strokeWidth="1.35" />}
-        <path d={`M${bodyStart + 3} 8h${Math.max(6, bodyEnd - bodyStart - 6)}`} stroke={monochrome ? '#eef2f1' : 'rgba(255,255,255,.26)'} strokeWidth="1" strokeLinecap="round" opacity=".72" />
-        {profile.style !== 'shotgun' && profile.magazine !== 'pan' && <path d={`M${Math.min(bodyEnd - 6, magX + 5)} 14c0 3 2 4 4 4`} fill="none" stroke={outline} strokeWidth="1.15" strokeLinecap="round" />}
+        {art.cuts.length > 0 && <defs>
+            <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="44">
+                <rect x="0" y="0" width="100" height="44" fill="#fff" />
+                {art.instances.flatMap((instance, instanceIndex) => art.cuts.map((d, cutIndex) => (
+                    <path
+                        key={`${instanceIndex}-${cutIndex}`}
+                        d={d}
+                        fill="#000"
+                        transform={`translate(${instance.x} ${instance.y}) scale(${instance.scaleX} ${instance.scaleY})`}
+                    />
+                )))}
+            </mask>
+        </defs>}
+        <g mask={art.cuts.length > 0 ? `url(#${maskId})` : undefined}>
+            {art.instances.flatMap((instance, instanceIndex) => art.parts.map((part, partIndex) => {
+                const fill = monochrome ? color : roleColor(profile, part.role, color);
+                return <path
+                    key={`${instanceIndex}-${partIndex}`}
+                    d={part.d}
+                    fill={part.strokeWidth ? 'none' : fill}
+                    stroke={part.strokeWidth ? fill : 'none'}
+                    strokeWidth={part.strokeWidth || undefined}
+                    strokeLinecap="square"
+                    strokeLinejoin="miter"
+                    transform={`translate(${instance.x} ${instance.y}) scale(${instance.scaleX} ${instance.scaleY})`}
+                />;
+            }))}
+        </g>
     </>;
 }
 
 export default function SurvivWeaponIcon({ weaponId, color = 'currentColor', width = 46, className = '', monochrome = false }) {
     const profile = getSurvivWeaponVisualProfile(weaponId);
-    const height = Math.round(width * 0.42);
+    const height = Math.round(width * 0.44);
+    const rawId = useId();
+    const maskId = `surviv-weapon-mask-${rawId.replace(/:/g, '')}`;
+
     if (profile.style === 'fists') {
         return <svg width={height} height={height} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" className={`weapon-svg-icon ${className}`}><path d="M5 12V8a1.4 1.4 0 0 1 2.8 0v3-5a1.4 1.4 0 0 1 2.8 0v5-4a1.4 1.4 0 0 1 2.8 0v4-2a1.4 1.4 0 0 1 2.8 0v5c0 4-2.7 6-6 6S5 18 5 14Z" /></svg>;
     }
     if (profile.style === 'knife') {
-        return <svg width={width} height={height} viewBox="0 0 64 24" fill="none" className={`weapon-svg-icon ${className}`}><path d="M5 14h20L51 5c3-1 6 .5 7 3L27 17H5Z" fill={color} stroke={monochrome ? '#222a2b' : defaultOutline} strokeWidth="1.5" /><rect x="4" y="11" width="19" height="8" rx="2" fill={monochrome ? '#8d9896' : '#313936'} stroke={monochrome ? '#222a2b' : defaultOutline} strokeWidth="1.5" /></svg>;
+        return <svg width={width} height={height} viewBox="0 0 100 44" className={`weapon-svg-icon ${className}`} aria-hidden="true">
+            <FirearmSilhouette weaponId={weaponId} color={color} monochrome={monochrome} maskId={maskId} />
+        </svg>;
     }
-    return <svg width={width} height={height} viewBox="0 0 64 24" fill="none" className={`weapon-svg-icon ${className}`} aria-hidden="true">
-        <g opacity={profile.dual ? 0.64 : 1} transform={profile.dual ? 'translate(0 -3) scale(.92)' : undefined}><Firearm profile={profile} color={color} monochrome={monochrome} /></g>
-        {profile.dual && <g transform="translate(0 4) scale(.92)"><Firearm profile={profile} color={color} monochrome={monochrome} /></g>}
+    return <svg width={width} height={height} viewBox="0 0 100 44" className={`weapon-svg-icon ${className}`} aria-hidden="true">
+        <FirearmSilhouette weaponId={weaponId} color={color} monochrome={monochrome} maskId={maskId} />
     </svg>;
 }

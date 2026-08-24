@@ -46,7 +46,8 @@ const GROUP_OVERRIDES = [
     [['vss'], { style: 'rifle', length: 34, width: 6.7, stock: 'skeleton', magazine: 'box', barrel: 11, scope: 'short', suppressor: true, furniture: '#745033' }],
     [['m1garand', 'svd63', 'l86a2'], { style: 'rifle', length: 36, width: 6.5, stock: 'full', magazine: 'small', barrel: 13, furniture: '#765136' }],
     [['heartcannon'], { style: 'rifle', length: 35, width: 8, stock: 'full', magazine: 'box', barrel: 12, scope: 'short', accent: '#a95780' }],
-    [['mosin', 'blr81', 'model94', 'sniper'], { style: 'rifle', length: 40, width: 5.8, stock: 'full', magazine: 'small', barrel: 17, scope: 'long', furniture: '#79502e' }],
+    [['mosin'], { style: 'rifle', length: 40, width: 5.8, stock: 'full', magazine: 'small', barrel: 17, scope: null, furniture: '#79502e' }],
+    [['blr81', 'model94', 'sniper'], { style: 'rifle', length: 40, width: 5.8, stock: 'full', magazine: 'small', barrel: 17, scope: 'long', furniture: '#79502e' }],
     [['sv98', 'scoutelite'], { style: 'rifle', length: 40, width: 6.2, stock: 'skeleton', magazine: 'small', barrel: 17, scope: 'long' }],
     [['awms'], { style: 'rifle', length: 41, width: 6.8, stock: 'skeleton', magazine: 'small', barrel: 18, scope: 'long', suppressor: true }],
 
@@ -87,6 +88,164 @@ export function getSurvivWeaponVisualProfile(id) {
         dark: '#151d1f',
         furniture: OVERRIDES[baseId]?.furniture || '#303936',
     });
+}
+
+const SIDE_ART_CACHE = new Map();
+
+const number = value => Math.round(value * 10) / 10;
+const rectPath = (x, y, width, height) => `M${number(x)} ${number(y)}h${number(width)}v${number(height)}h-${number(width)}Z`;
+const polygonPath = points => `M${points.map(([x, y]) => `${number(x)} ${number(y)}`).join('L')}Z`;
+const ellipsePath = (cx, cy, rx, ry) => [
+    `M${number(cx - rx)} ${number(cy)}`,
+    `a${number(rx)} ${number(ry)} 0 1 0 ${number(rx * 2)} 0`,
+    `a${number(rx)} ${number(ry)} 0 1 0 -${number(rx * 2)} 0Z`,
+].join('');
+
+function buildFirearmSideArt(profile) {
+    const parts = [];
+    const cuts = [];
+    const add = (d, role = 'metal', strokeWidth = 0) => parts.push(Object.freeze({ d, role, strokeWidth }));
+    const cut = d => cuts.push(d);
+    const line = (d, role = 'metal', strokeWidth = 2.1) => add(d, role, strokeWidth);
+
+    if (profile.style === 'fists') return { parts, cuts };
+    if (profile.style === 'knife') {
+        add(polygonPath([[6, 18], [39, 18], [92, 7], [96, 11], [41, 27], [6, 27]]), 'metal');
+        add(rectPath(5, 15, 37, 16), 'furniture');
+        add(rectPath(39, 13, 4, 20), 'dark');
+        return { parts, cuts };
+    }
+
+    if (profile.style === 'bugle') {
+        line('M9 23C18 8 36 8 47 20C54 28 45 34 35 28C27 23 32 16 43 17', 'accent', 4.2);
+        add(polygonPath([[43, 15], [91, 7], [91, 33], [43, 25]]), 'accent');
+        return { parts, cuts };
+    }
+
+    if (profile.style === 'pistol' || profile.style === 'revolver') {
+        const revolver = profile.style === 'revolver';
+        const longBarrel = revolver ? 89 : (profile.heavy ? 84 : 78);
+        if (revolver) {
+            add(polygonPath([[23, 15], [36, 12], [55, 13], [60, 18], [55, 24], [31, 24], [23, 21]]));
+            add(ellipsePath(48, 19, 8.5, 8), 'metal');
+            add(rectPath(55, 15, longBarrel - 55, 6), 'metal');
+            add(rectPath(62, 21, longBarrel - 67, 2.2), 'dark');
+            add(polygonPath([[29, 22], [45, 23], [40, 40], [24, 39], [19, 34]]), 'furniture');
+            add(polygonPath([[22, 14], [26, 9], [29, 15]]), 'dark');
+        } else {
+            add(polygonPath([[20, 11], [longBarrel, 11], [82, 14], [82, 22], [24, 22], [18, 18]]));
+            add(rectPath(25, 21, Math.max(35, longBarrel - 31), 5), 'dark');
+            add(polygonPath([[25, 23], [46, 23], [42, 40], [24, 40], [18, 34]]), 'furniture');
+            add(rectPath(longBarrel - 2, 13, Math.max(5, 85 - longBarrel), 5), 'dark');
+            add(rectPath(26, 8, 3, 3), 'dark');
+            add(rectPath(longBarrel - 8, 8, 3, 3), 'dark');
+        }
+        line('M44 23C44 31 55 32 57 23', 'metal', 2.5);
+        if (profile.suppressor) add(rectPath(80, 13, 17, 7), 'dark');
+        return { parts, cuts };
+    }
+
+    const receiverStart = profile.bullpup ? 22 : (profile.stock === 'none' ? 18 : 31);
+    const receiverEnd = profile.style === 'shotgun' ? 58 : 62;
+    const barrelEnd = profile.suppressor ? 83 : 94;
+    const bodyTop = profile.style === 'lmg' ? 12 : 14;
+    const bodyBottom = profile.style === 'lmg' ? 27 : 25;
+
+    if (profile.baseId === 'awms') {
+        add(polygonPath([[4, 14], [16, 11], [35, 14], [39, 21], [34, 29], [19, 28], [13, 24], [4, 24]]), 'furniture');
+        cut(ellipsePath(22, 21, 6.5, 4.5));
+    } else if (profile.stock === 'wire' || profile.stock === 'skeleton') {
+        line(`M31 16L8 12L5 18L31 22`, 'furniture', 3.2);
+        line('M7 12L5 27', 'furniture', 3.2);
+    } else if (profile.stock === 'bullpup') {
+        add(polygonPath([[5, 15], [31, 13], [39, 18], [35, 29], [20, 30], [16, 24], [5, 24]]), 'furniture');
+        cut(ellipsePath(22, 23, 5.2, 4));
+    } else if (!['none', 'grip', 'tank'].includes(profile.stock)) {
+        add(polygonPath([[4, 15], [12, 11], [33, 14], [36, 22], [24, 27], [10, 26], [4, 23]]), 'furniture');
+    }
+
+    if (profile.stock === 'tank') add(ellipsePath(17, 22, 11, 12), 'accent');
+
+    if (profile.style === 'shotgun') {
+        add(polygonPath([[receiverStart, 14], [57, 14], [61, 18], [58, 24], [receiverStart, 24]]));
+        const pumpX = profile.barrelCount > 1 ? 59 : 62;
+        add(rectPath(56, 16, 37, profile.barrelCount > 1 ? 7 : 4), 'dark');
+        if (profile.barrelCount > 1) line('M58 23H94', 'dark', 2.5);
+        if (profile.barrelCount <= 1) add(polygonPath([[pumpX, 20], [78, 20], [75, 28], [59, 27]]), 'furniture');
+    } else if (profile.style === 'special') {
+        add(polygonPath([[receiverStart, 12], [62, 12], [68, 18], [62, 27], [receiverStart, 27]]));
+        add(ellipsePath(49, 20, 10, 9), 'accent');
+        add(rectPath(62, 16, 28, 7), 'dark');
+    } else {
+        add(polygonPath([[receiverStart, bodyTop], [receiverEnd, bodyTop], [67, 18], [64, bodyBottom], [receiverStart, bodyBottom]]));
+        add(rectPath(61, 15.5, 19, 8.5), profile.style === 'lmg' ? 'furniture' : 'metal');
+        add(rectPath(79, 18, barrelEnd - 79, profile.style === 'lmg' ? 4 : 3), 'dark');
+    }
+
+    // The grip, magazine and trigger guard carry most of the named-gun identity
+    // at slot size. They intentionally stay chunky enough to survive scaling.
+    const gripX = profile.bullpup ? 50 : 45;
+    add(polygonPath([[gripX, 24], [gripX + 8, 24], [gripX + 5, 37], [gripX - 1, 37]]), 'dark');
+    line(`M${gripX + 7} 24C${gripX + 7} 31 ${gripX + 17} 31 ${gripX + 18} 23`, 'metal', 2.3);
+
+    const magX = profile.bullpup ? 28 : 57;
+    if (profile.magazine === 'pan') {
+        add(ellipsePath(49, 12.5, 15, 6.5), 'dark');
+    } else if (profile.magazine === 'drum') {
+        add(ellipsePath(magX + 2, 29, 7.5, 8), 'dark');
+    } else if (profile.magazine === 'tank') {
+        add(ellipsePath(magX, 29, 8.5, 9), 'accent');
+    } else if (profile.magazine === 'curved') {
+        add(`M${magX - 4} 24H${magX + 5}C${magX + 7} 31 ${magX + 3} 37 ${magX - 3} 40C${magX} 34 ${magX} 29 ${magX - 4} 24Z`, 'dark');
+    } else if (['box', 'stick', 'small'].includes(profile.magazine)) {
+        const width = profile.magazine === 'stick' ? 6 : profile.magazine === 'small' ? 7 : 10;
+        const height = profile.magazine === 'stick' ? 16 : profile.magazine === 'small' ? 10 : 14;
+        add(polygonPath([[magX - width / 2, 24], [magX + width / 2, 24], [magX + width / 2 - 1, 24 + height], [magX - width / 2 + 1, 24 + height]]), 'dark');
+    }
+
+    if (profile.scope) {
+        const scopeStart = profile.scope === 'long' ? 37 : 42;
+        const scopeLength = profile.scope === 'long' ? 28 : 20;
+        add(rectPath(scopeStart, 8, scopeLength, 5), 'dark');
+        add(rectPath(scopeStart - 3, 6.5, 4, 8), 'dark');
+        add(rectPath(scopeStart + scopeLength - 1, 6.5, 4, 8), 'dark');
+    }
+
+    if (profile.suppressor) add(rectPath(81, 16, 16, 7), 'dark');
+    if (profile.style === 'lmg') {
+        line('M73 24L69 40M75 24L82 39', 'dark', 1.8);
+        if (profile.magazine === 'box') add(rectPath(53, 25, 13, 13), 'furniture');
+    }
+    if (profile.barrelCount >= 3) {
+        line('M76 15H96M76 20H98M76 25H96', 'dark', 2.2);
+    }
+
+    return { parts, cuts };
+}
+
+/**
+ * Shared side-view art for the HUD and weapon loot. Keeping the path list in
+ * one place guarantees that the coloured ground item has the exact same
+ * exterior silhouette as its monochrome loadout icon.
+ */
+export function getSurvivWeaponSideArt(id) {
+    const weaponId = String(id || 'fists').toLowerCase();
+    if (SIDE_ART_CACHE.has(weaponId)) return SIDE_ART_CACHE.get(weaponId);
+    const profile = getSurvivWeaponVisualProfile(weaponId);
+    const art = Object.freeze({
+        id: weaponId,
+        profile,
+        viewBox: Object.freeze([0, 0, 100, 44]),
+        instances: Object.freeze(profile.dual
+            ? [
+                Object.freeze({ x: 0, y: 2, scaleX: 0.52, scaleY: 0.9 }),
+                Object.freeze({ x: 47, y: 2, scaleX: 0.52, scaleY: 0.9 }),
+            ]
+            : [Object.freeze({ x: 0, y: 0, scaleX: 1, scaleY: 1 })]),
+        ...buildFirearmSideArt(profile),
+    });
+    SIDE_ART_CACHE.set(weaponId, art);
+    return art;
 }
 
 export function getSurvivWeaponMuzzleScale(id) {

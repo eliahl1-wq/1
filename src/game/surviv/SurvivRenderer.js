@@ -28,7 +28,11 @@ import {
     SURVIV_AMMO_CATALOG,
     SURVIV_WEAPON_CATALOG,
 } from './weaponCatalog.js';
-import { getSurvivWeaponMuzzleScale, getSurvivWeaponVisualProfile } from './weaponVisuals.js';
+import {
+    getSurvivWeaponMuzzleScale,
+    getSurvivWeaponSideArt,
+    getSurvivWeaponVisualProfile,
+} from './weaponVisuals.js';
 
 const WEAPON_LABELS = Object.fromEntries(
     Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.label]),
@@ -569,6 +573,67 @@ function drawHeldWeaponTopDown(ctx, weapon) {
         return;
     }
     drawSimpleWeaponShape(ctx, profile);
+}
+
+const SIDE_ART_PATH_CACHE = new Map();
+
+function getSideArtPath(pathData) {
+    let path = SIDE_ART_PATH_CACHE.get(pathData);
+    if (!path) {
+        path = new Path2D(pathData);
+        SIDE_ART_PATH_CACHE.set(pathData, path);
+    }
+    return path;
+}
+
+function groundWeaponPartColor(profile, role) {
+    if (role === 'dark') return profile.dark || '#151d1f';
+    if (role === 'furniture') return profile.furniture || '#48504c';
+    if (role === 'accent') return profile.accent || profile.furniture || '#56615e';
+    return profile.metal || '#586568';
+}
+
+function drawGroundWeaponSideArt(ctx, weaponId) {
+    const art = getSurvivWeaponSideArt(weaponId);
+    const profile = art.profile;
+    ctx.save();
+    ctx.rotate(-0.14);
+    ctx.scale(0.61, 0.61);
+    ctx.translate(-50, -22);
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+    ctx.shadowBlur = 0;
+
+    for (const instance of art.instances) {
+        ctx.save();
+        ctx.translate(instance.x, instance.y);
+        ctx.scale(instance.scaleX, instance.scaleY);
+        for (const part of art.parts) {
+            const path = getSideArtPath(part.d);
+            const partColor = groundWeaponPartColor(profile, part.role);
+            if (part.strokeWidth) {
+                ctx.strokeStyle = '#0b1011';
+                ctx.lineWidth = part.strokeWidth + 2;
+                ctx.stroke(path);
+                ctx.strokeStyle = partColor;
+                ctx.lineWidth = part.strokeWidth;
+                ctx.stroke(path);
+            } else {
+                ctx.fillStyle = partColor;
+                ctx.strokeStyle = '#0b1011';
+                ctx.lineWidth = 1.8;
+                ctx.fill(path);
+                ctx.stroke(path);
+            }
+        }
+        // Ground loot is painted directly onto the world canvas, so cutouts
+        // use the same near-black interior as the weapon outline. The HUD uses
+        // these exact paths as true transparent mask holes.
+        ctx.fillStyle = '#0b1011';
+        for (const d of art.cuts) ctx.fill(getSideArtPath(d));
+        ctx.restore();
+    }
+    ctx.restore();
 }
 
 const makeBulletSpec = (trailLen, tipLen, thickness) => ({
@@ -4154,7 +4219,6 @@ export class SurvivRenderer {
         this.drawExteriorHouseShadow(ctx, camX, camY, W, H, z, currentHouse);
         // Keep the contextual label attached to the doorway and above players,
         // loot, particles and house shading.
-        this.drawNearbyDoorPrompt(ctx);
 
         ctx.restore();
 
@@ -4181,7 +4245,6 @@ export class SurvivRenderer {
         this.drawKillFeed(ctx, W, H);
         this.drawLowAmmoWarning(ctx, W, H);
         this.drawMinimapPanel(ctx, W, H);
-        this.drawLootToast(ctx, W, H);
         if (import.meta.env.DEV) this.drawFpsCounter(ctx, W, H);
     }
 
@@ -7119,7 +7182,11 @@ export class SurvivRenderer {
             ctx.shadowBlur = 6;
 
             if (l.type === 'weapon') {
-                const weaponFamily = getSurvivWeaponFamily(l.weaponType);
+                // Weapon loot uses the same named-gun geometry as the loadout.
+                // The legacy family branches below are bypassed by this
+                // dedicated sentinel and retained only as a safe fallback
+                // during live-session compatibility.
+                const weaponFamily = '__shared_side_art__';
                 if (weaponFamily === 'pistol') {
                     // M9
                     ctx.rotate(-0.22);
@@ -7484,11 +7551,7 @@ export class SurvivRenderer {
                     ctx.fillRect(-2, 2.5, 2, 4);
                     ctx.fillRect(0, 1.5, 2, 4);
                 } else {
-                    // Fallback
-                    ctx.rotate(-0.22);
-                    roundRect(ctx, -15, -5, 22, 9, 2);
-                    ctx.fill();
-                    ctx.stroke();
+                    drawGroundWeaponSideArt(ctx, l.weaponType);
                 }
             } else if (l.type === 'grenade') {
                 ctx.fillStyle = '#334155';
