@@ -1,5 +1,5 @@
 import global from './global.js';
-import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
+import { drawCashoutProgressRing, CASHOUT_HOLD_MS, getRemoteCashoutRingProgress } from '../cashoutRing.js';
 import { drawBalanceBadge as drawBalanceBadgePill } from '../balanceBadge.js';
 import { drawFlag, getFlagBorderColor, parseFlagSkin } from '../../constants/flagSkins.js';
 
@@ -213,13 +213,10 @@ function drawBalanceBadge(graph, cell, nameY, fontSize) {
 }
 
 function drawPlayerCashoutRing(graph, cell) {
-    const startedAt = cell.isMe && global.holdStartAt
-        ? global.holdStartAt
-        : cell.cashoutHoldStartedAt;
-    const now = cell.isMe && global.holdStartAt ? performance.now() : Date.now();
-    const progress = startedAt
-        ? Math.min(1, Math.max(0, (now - startedAt) / CASHOUT_HOLD_MS))
-        : 0;
+    const progress = cell.isMe && global.holdStartAt
+        ? Math.min(1, Math.max(0, (performance.now() - global.holdStartAt) / CASHOUT_HOLD_MS))
+        : getRemoteCashoutRingProgress(cell);
+    if (progress === null) return;
     const ringR = cell.radius + 10;
     drawCashoutProgressRing(graph, cell.x, cell.y, ringR, progress, { counterClockwise: true });
 }
@@ -277,7 +274,7 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
             drawBalanceBadge(graph, cell, nameY, fontSize);
         }
 
-        if (cell.cashoutHoldActive || (cell.isMe && global.holdStartAt)) {
+        if (cell.cashoutHoldActive || cell.isCashingOut || (cell.isMe && global.holdStartAt)) {
             graph.shadowBlur = 0;
             drawPlayerCashoutRing(graph, cell);
         }

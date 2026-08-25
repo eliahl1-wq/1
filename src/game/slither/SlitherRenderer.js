@@ -2,7 +2,7 @@
  * Server-authoritative slither renderer — slither.io-inspired visuals.
  */
 
-import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
+import { drawCashoutProgressRing, CASHOUT_HOLD_MS, getRemoteCashoutRingProgress } from '../cashoutRing.js';
 import { drawBalanceBadge } from '../balanceBadge.js';
 import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
@@ -2163,12 +2163,14 @@ export class SlitherRenderer {
                 }
             }
 
-            if (snake.cashoutHoldActive || (isYou && this._holdStartAt)) {
-                const progress = isYou
+            if (snake.cashoutHoldActive || snake.isCashingOut || (isYou && this._holdStartAt)) {
+                const progress = isYou && this._holdStartAt
                     ? this._getHoldProgress(performance.now())
-                    : Math.min(1, Math.max(0, (Date.now() - (snake.cashoutHoldStartedAt || Date.now())) / CASHOUT_HOLD_MS));
-                const ringR = headRadius + 10;
-                drawCashoutProgressRing(ctx, hx, hy, ringR, progress, { counterClockwise: true });
+                    : getRemoteCashoutRingProgress(snake);
+                if (progress !== null) {
+                    const ringR = headRadius + 10;
+                    drawCashoutProgressRing(ctx, hx, hy, ringR, progress, { counterClockwise: true });
+                }
             }
         }
 
@@ -2265,6 +2267,10 @@ export class SlitherRenderer {
             rs.name = snake.name;
             rs.balance = snake.balance;
             rs.dollarBalance = snake.dollarBalance;
+            rs.cashoutHoldActive = snake.cashoutHoldActive;
+            rs.cashoutHoldStartedAt = snake.cashoutHoldStartedAt;
+            rs.isCashingOut = snake.isCashingOut;
+            rs.cashOutEndTime = snake.cashOutEndTime;
             rs.segments = s ? s.segments : snake.segments;
             rs.angle = s ? s.angle : snake.angle;
             renderSnakes.push(rs);

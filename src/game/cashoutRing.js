@@ -3,6 +3,9 @@ const FULL_ANGLE = Math.PI * 2;
 /** Hold Q / cashout button duration before cashout is submitted. */
 export const CASHOUT_HOLD_MS = 3000;
 
+/** Server-side bot exit countdown. */
+export const BOT_CASHOUT_MS = 3000;
+
 /** Brand purple — matches --accent / cashout button styling. */
 export const CASHOUT_RING_COLOR = '#785eff';
 
@@ -11,6 +14,22 @@ export function getCashoutRingProgress(endAtMs, totalSeconds) {
     if (!endAtMs || !totalSeconds) return 0;
     const remainingSec = Math.max(0, endAtMs - Date.now()) / 1000;
     return remainingSec / totalSeconds;
+}
+
+/**
+ * Progress visible to other clients. Players broadcast the start of their
+ * Q-hold, while bots broadcast the end of their server-side exit countdown.
+ */
+export function getRemoteCashoutRingProgress(entity, nowMs = Date.now()) {
+    if (entity?.cashoutHoldActive && Number.isFinite(entity.cashoutHoldStartedAt)) {
+        return Math.min(1, Math.max(0, (nowMs - entity.cashoutHoldStartedAt) / CASHOUT_HOLD_MS));
+    }
+
+    if (entity?.isCashingOut && Number.isFinite(entity.cashOutEndTime) && entity.cashOutEndTime > nowMs) {
+        return Math.min(1, Math.max(0, 1 - ((entity.cashOutEndTime - nowMs) / BOT_CASHOUT_MS)));
+    }
+
+    return null;
 }
 
 /**

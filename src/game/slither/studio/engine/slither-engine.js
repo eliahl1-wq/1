@@ -442,9 +442,8 @@ export function trimSlitherBots(room, targetCount) {
 export function getSlitherTargetBots(humanCount) {
     if (humanCount <= 0) return 0;
     
-    // Target a lively arena with a mix of players and bots.
-    // The fewer humans, the more bots we spawn to fill the room up to a target size.
-    // Max 5 bots per normal game (reduced from 8).
+    // Desired population target for studio simulations; production additionally
+    // caps spawns against the room's funded AI budget.
     const targetEntities = 8;
     if (humanCount >= targetEntities) return 0;
     

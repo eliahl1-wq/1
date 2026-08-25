@@ -946,6 +946,7 @@ export default function Game() {
                             name: u.username,
                             isMe: u.id === myIdRef.current,
                             isCashingOut: u.isCashingOut,
+                            cashOutEndTime: u.cashOutEndTime,
                             cashoutHoldActive: u.cashoutHoldActive,
                             cashoutHoldStartedAt: u.cashoutHoldStartedAt,
                             dollarBalance: totalDollarBalance * massShare,
