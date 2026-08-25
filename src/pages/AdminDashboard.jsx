@@ -496,6 +496,40 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
         }
     };
 
+    const updateRewardAccess = async (enabled) => {
+        let reason = '';
+        if (!enabled) {
+            reason = window.prompt(`Reason for disabling rewards for ${detail?.user?.username}:`) || '';
+            if (!reason.trim()) return;
+        } else if (!window.confirm(`Enable rewards for ${detail?.user?.username}?`)) {
+            return;
+        }
+        setAccountActionLoading(true);
+        setAccountActionMessage('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${userId}/reward-access`, {
+                method: 'PUT',
+                body: JSON.stringify({ enabled, reason: reason.trim() }),
+            });
+            setDetail(current => ({
+                ...current,
+                user: {
+                    ...current.user,
+                    rewardsDisabled: result.rewardsDisabled,
+                    rewardsDisabledReason: result.rewardsDisabledReason,
+                },
+            }));
+            setAccountActionError(false);
+            setAccountActionMessage(result.message);
+            await onRefresh?.();
+        } catch (err) {
+            setAccountActionError(true);
+            setAccountActionMessage(err.message || 'Could not update reward access.');
+        } finally {
+            setAccountActionLoading(false);
+        }
+    };
+
     const deleteAccount = async () => {
         const username = detail?.user?.username;
         const confirmation = window.prompt(`Permanently delete ${username}? Balances, rewards, active games, and claims must be empty. Transaction history is preserved.\n\nType ${username} to confirm.`);
@@ -725,6 +759,17 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                             <div><span style={{ color: 'var(--text-2)' }}>Starter reward</span><br />{rewards?.challengeCompleted ? 'Completed' : rewards?.challengeUnlocked ? 'Unlocked' : 'In progress'}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Claim status</span><br />{rewards?.claimInProgress || rewards?.tournamentClaimInProgress ? 'Processing' : 'Idle'}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Reward access</span><br />{u.rewardsDisabled ? `Blocked${u.rewardsDisabledReason ? ` · ${u.rewardsDisabledReason}` : ''}` : 'Enabled'}</div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' }}>
+                                            <button
+                                                type="button"
+                                                className={u.rewardsDisabled ? 'btn btn-primary' : 'btn btn-danger'}
+                                                disabled={accountActionLoading}
+                                                onClick={() => updateRewardAccess(!!u.rewardsDisabled)}
+                                            >
+                                                {u.rewardsDisabled ? 'Enable rewards' : 'Disable rewards'}
+                                            </button>
+                                            <small style={{ alignSelf: 'center', color: 'var(--text-3)' }}>Manual access control; existing reward balances are preserved.</small>
                                         </div>
                                     </section>
 
@@ -996,7 +1041,7 @@ export default function AdminDashboard() {
     };
 
     const resolveRewardAlert = async (alert, action) => {
-        const verb = action === 'approve' ? 'allow rewards for' : 'keep rewards blocked for';
+        const verb = action === 'approve' ? 'dismiss this alert for' : 'manually disable rewards for';
         if (!window.confirm(`${verb} all accounts linked to ${alert.sourceWallet}?`)) return;
         setActionLoading(true);
         setActionMsg('');
@@ -1008,7 +1053,7 @@ export default function AdminDashboard() {
             const data = await fetchAdmin('/api/admin/reward-security-alerts');
             setRewardAlerts(data.alerts ?? []);
             setPendingRewardClaims(data.pendingClaims ?? []);
-            setActionMsg(action === 'approve' ? '✅ Linked accounts approved and rewards restored.' : '✅ Reward block confirmed.');
+            setActionMsg(action === 'approve' ? '✅ Alert dismissed. Account access was not changed.' : '✅ Rewards manually disabled; existing balances were preserved.');
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
         } finally {
@@ -1497,7 +1542,7 @@ export default function AdminDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <Panel
                             title={`Shared deposit-wallet alerts (${rewardAlerts.filter(alert => alert.status === 'pending').length} pending)`}
-                            sub="Rewards are removed automatically until you allow the linked accounts or confirm the block."
+                            sub="Alerts are informational only. They never change reward or affiliate access automatically."
                         >
                             {rewardAlerts.length === 0 ? (
                                 <div style={{ padding: '24px', color: 'var(--text-2)', fontSize: '0.82rem' }}>No linked-wallet alerts.</div>
@@ -1517,10 +1562,10 @@ export default function AdminDashboard() {
                                     {alert.status === 'pending' && (
                                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                             <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'approve')}>
-                                                Allow linked accounts
+                                                Dismiss alert
                                             </button>
                                             <button type="button" className="btn btn-danger" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'deny')}>
-                                                Keep rewards blocked
+                                                Disable rewards
                                             </button>
                                         </div>
                                     )}
