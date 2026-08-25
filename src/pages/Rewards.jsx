@@ -139,7 +139,7 @@ export default function Rewards() {
     const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
     const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
-    const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 1.4;
+    const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 2;
     const solPrice = Number(user.solPrice) || 0;
     const isSolView = localStorage.getItem('balance_currency') === 'SOL' && solPrice > 0;
     const nextRewardLabel = isSolView
@@ -182,10 +182,9 @@ export default function Rewards() {
             ...payout,
         })),
     ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    const requiredContribution = Math.max(5, promoBalance);
-    const multiplier = Math.ceil(requiredContribution / 5);
-    const req5 = multiplier * 3;
-    const req10 = multiplier * 1;
+    const fallbackMultiplier = Math.ceil(Math.max(5, promoBalance) / 5);
+    const req5 = Number(user.starterRewardRequirements?.req5) || fallbackMultiplier * 3;
+    const req10 = Number(user.starterRewardRequirements?.req10) || fallbackMultiplier;
 
     const normal5Progress = Math.min(req5, user.completedFiveDollarNormalGames ?? 0);
     const normal10Progress = Math.min(req10, user.completedTenDollarNormalGames ?? 0);
