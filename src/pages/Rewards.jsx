@@ -41,7 +41,7 @@ export default function Rewards() {
                         tx.meta?.event === 'free_ticket_join' ||
                         tx.meta?.freeTicketChallengeApplied === true ||
                         tx.meta?.starterRewardCompleted === true ||
-                        (tx.meta?.event === 'reward_pool_contribution' && Number(tx.meta?.permanentVolumeUsd) > 0) ||
+                        tx.meta?.permanentRewardApplied === true ||
                         tx.meta?.event === 'tournament_reward' ||
                         tx.meta?.event === 'tournament_reward_claim'
                     );
@@ -138,8 +138,13 @@ export default function Rewards() {
     const permanentBalance = Number(permanentRewards.balanceUsd) || 0;
     const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
-    const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 20;
-    const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 4;
+    const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
+    const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 1.4;
+    const solPrice = Number(user.solPrice) || 0;
+    const isSolView = localStorage.getItem('balance_currency') === 'SOL' && solPrice > 0;
+    const nextRewardLabel = isSolView
+        ? `${(permanentCycleReward / solPrice).toFixed(6)} SOL`
+        : `$${permanentCycleReward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
     const currentBalance = promoBalance + permanentBalance + rentFallbackBalance;
     const claimableBalance = rentFallbackBalance + (!user.rewardsDisabled
@@ -279,11 +284,11 @@ export default function Rewards() {
         if (tx.meta?.event === 'free_ticket_join') {
             return { title: 'Free ticket used', type: tx.meta.mode || 'Normal', value: 'Free game', tone: 'purple' };
         }
-        if (tx.meta?.event === 'reward_pool_contribution') {
+        if (tx.meta?.permanentRewardApplied) {
             const unlocked = Number(tx.meta.permanentRewardUnlockedUsd) || 0;
             return unlocked > 0
                 ? { title: 'Game reward unlocked', type: 'Completed', value: `+$${unlocked.toFixed(2)}`, tone: 'green' }
-                : { title: 'Reward progress', type: 'Normal game', value: `+$${Number(tx.meta.permanentVolumeUsd || 0).toFixed(2)} played`, tone: 'default' };
+                : { title: 'Reward progress', type: 'Cashout', value: `+$${Number(tx.meta.permanentCashoutVolumeUsd || 0).toFixed(2)}`, tone: 'default' };
         }
         if (tx.meta?.event === 'tournament_reward') {
             return { title: 'Tournament prize', type: `#${tx.meta.placement || '—'}`, value: `+$${Number(tx.meta.amountUsd || 0).toFixed(2)}`, tone: 'yellow' };
@@ -320,8 +325,7 @@ export default function Rewards() {
                             <div><span>Earned</span><strong className="mono">${totalClaimedAllTime.toFixed(2)}</strong></div>
                         </div>
                         <div className="rewards-overview-progress-head">
-                            <span>Play for ${permanentCycleVolume.toFixed(0)}</span>
-                            <strong>Next reward ${permanentCycleReward.toFixed(0)}</strong>
+                            <strong>Next reward {nextRewardLabel}</strong>
                         </div>
                         <div className="rewards-overview-track" role="progressbar" aria-label="Next game reward" aria-valuemin="0" aria-valuemax={permanentCycleVolume} aria-valuenow={permanentProgress}>
                             <div style={{ width: `${Math.min(100, permanentProgressPct)}%` }} />

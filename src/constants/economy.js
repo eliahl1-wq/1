@@ -33,7 +33,7 @@ export function normalizeBREntryFee(fee) {
 export function tierEconomy(entryFeeUsd) {
     const entry = normalizeEntryFee(entryFeeUsd);
     const s = entry / DEFAULT_ENTRY_FEE;
-    const cashoutFeePct = 0.05;
+    const cashoutFeePct = 0.08;
     return {
         entryFee: entry,
         startBalance: 2.0 * s,
@@ -48,7 +48,7 @@ export function tierEconomy(entryFeeUsd) {
 /** Slither Arena economy for $1 / $2 / $5 tiers (separate pools). */
 export function competitiveTierEconomy(entryFeeUsd) {
     const entry = normalizeCompetitiveEntryFee(entryFeeUsd);
-    const cashoutFeePct = 0.05;
+    const cashoutFeePct = 0.08;
     return {
         entryFee: entry,
         dollarStart: entry,
@@ -61,7 +61,7 @@ export function competitiveTierEconomy(entryFeeUsd) {
 /** Surviv economy - full entry becomes synchronized map loot; players start at $0. */
 export function survivTierEconomy(entryFeeUsd) {
     const entry = normalizeSurvivEntryFee(entryFeeUsd);
-    const cashoutFeePct = 0.05;
+    const cashoutFeePct = 0.08;
     return {
         entryFee: entry,
         dollarStart: 0,

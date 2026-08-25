@@ -1058,6 +1058,11 @@ export default function AdminDashboard() {
         }
     };
 
+    const sweepRewardSurplus = () => runAdminAction(
+        '/api/admin/reward-pool/sweep-surplus',
+        'Withdraw only the currently safe reward-pool surplus to the owner vault? Player liabilities and active claims remain reserved.',
+    );
+
     const toggleTxSelection = (id) => {
         setSelectedTxIds(prev => {
             const next = new Set(prev);
@@ -1685,12 +1690,26 @@ export default function AdminDashboard() {
                                 value={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'}
                                 sub={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : 'Not configured'}
                             />
+                            <StatCard
+                                label="Reward safety surplus"
+                                value={formatUsd(overview?.rewardOwnerSurplusUsd)}
+                                sub="Tracked separately from player rewards"
+                            />
                         </div>
                         <Panel
                             title="Reward Pool Management"
                             sub="Factory reset clears all player reward balances and sweeps available funds."
                         >
-                            <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-start' }}>
+                            <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'flex-start' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    disabled={actionLoading || !(Number(overview?.rewardOwnerSurplusUsd) > 0)}
+                                    onClick={sweepRewardSurplus}
+                                    style={{ padding: '11px 18px', fontSize: '0.8rem' }}
+                                >
+                                    WITHDRAW SAFE SURPLUS
+                                </button>
                                 <button
                                     type="button"
                                     className="btn btn-ghost"
@@ -1709,7 +1728,7 @@ export default function AdminDashboard() {
                                     { key: 'address', label: 'Address', render: r => <span className="mono" style={{ fontSize: '0.72rem' }} title={r.address}>{truncateAddr(r.address)}</span> },
                                     { key: 'balanceSol', label: 'Balance', render: r => formatSol(r.balanceSol) },
                                     { key: 'balanceUsd', label: 'USD', render: r => formatUsd(r.balanceUsd) },
-                                    { key: 'sweptOnReset', label: 'Sweep rule', render: r => typeof r.sweptOnReset === 'string' ? r.sweptOnReset : r.sweptOnReset === false ? '2.5% after BR match' : r.sweptOnReset ? 'On arena reset' : '—' },
+                                    { key: 'sweptOnReset', label: 'Sweep rule', render: r => typeof r.sweptOnReset === 'string' ? r.sweptOnReset : r.sweptOnReset === false ? '8% after BR match' : r.sweptOnReset ? 'On arena reset' : '—' },
                                 ]}
                                 rows={[
                                     ...(wallets?.mainHouse ? [wallets.mainHouse] : []),

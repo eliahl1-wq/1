@@ -96,6 +96,13 @@ export default function RewardsWidget() {
     const permanentBalance = Number(permanentRewards.balanceUsd) || 0;
     const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
+    const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
+    const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 1.4;
+    const solPrice = Number(user.solPrice) || 0;
+    const isSolView = localStorage.getItem('balance_currency') === 'SOL' && solPrice > 0;
+    const nextRewardLabel = isSolView
+        ? `${(permanentCycleReward / solPrice).toFixed(6)} SOL`
+        : `$${permanentCycleReward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
     const totalBalance = promoBalance + permanentBalance + rentFallbackBalance;
     const hasBalance = totalBalance > 0;
@@ -262,12 +269,12 @@ export default function RewardsWidget() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                         <div>
                             <div style={{ color: 'var(--text-subtle)', fontSize: '.64rem', fontWeight: 900, letterSpacing: '.08em' }}>NEXT REWARD</div>
-                            <div style={{ marginTop: '3px', color: 'var(--text-h)', fontSize: '.84rem', fontWeight: 800 }}>Play for $20 · Get $4</div>
+                            <div style={{ marginTop: '3px', color: 'var(--text-h)', fontSize: '.84rem', fontWeight: 800 }}>{nextRewardLabel}</div>
                         </div>
                         <strong className="mono" style={{ color: permanentBalance > 0 ? 'var(--green)' : 'var(--text-h)', fontSize: '.9rem' }}>${permanentBalance.toFixed(2)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)', fontSize: '.72rem', marginBottom: '6px' }}>
-                        <span>Current cycle</span><span className="mono">${permanentProgress.toFixed(2)} / $20.00</span>
+                        <span>Cashout progress</span><span className="mono">${permanentProgress.toFixed(2)} / ${permanentCycleVolume.toFixed(2)}</span>
                     </div>
                     <div style={{ height: '7px', overflow: 'hidden', borderRadius: '999px', background: 'rgba(255,255,255,.08)' }}>
                         <div style={{ width: `${Math.min(100, permanentProgressPct)}%`, height: '100%', borderRadius: 'inherit', background: 'linear-gradient(90deg,#16a34a,#22c55e,#4ade80)', boxShadow: '0 0 10px rgba(34,197,94,.3)' }} />

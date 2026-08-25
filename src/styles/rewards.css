@@ -131,6 +131,7 @@
 }
 
 .rewards-overview-progress-head{
+    justify-content:center;
     margin-top:26px;
     color:#a98bff;
     font-size:.7rem;
