@@ -199,10 +199,10 @@ export default function RewardsWidget() {
             {/* Expanded Content */}
             <div style={{
                 width: '320px',
-                background: isPregame ? 'transparent' : 'var(--bg-2)',
-                border: isPregame ? 'none' : '1px solid var(--border)',
-                borderRadius: isPregame ? 0 : 'var(--r-xl)',
-                padding: isPregame ? 0 : '16px',
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-xl)',
+                padding: '16px',
                 boxShadow: isPregame ? 'none' : 'var(--shadow-xl)',
                 marginBottom: '10px',
                 transform: expanded ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
@@ -271,7 +271,7 @@ export default function RewardsWidget() {
                             <div style={{ color: 'var(--text-subtle)', fontSize: '.64rem', fontWeight: 900, letterSpacing: '.08em' }}>NEXT REWARD</div>
                             <div style={{ marginTop: '3px', color: 'var(--text-h)', fontSize: '.84rem', fontWeight: 800 }}>{nextRewardLabel}</div>
                         </div>
-                        <strong className="mono" style={{ color: permanentBalance > 0 ? 'var(--green)' : 'var(--text-h)', fontSize: '.9rem' }}>${permanentBalance.toFixed(2)}</strong>
+                        {!isPregame && <strong className="mono" style={{ color: permanentBalance > 0 ? 'var(--green)' : 'var(--text-h)', fontSize: '.9rem' }}>${permanentBalance.toFixed(2)}</strong>}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)', fontSize: '.72rem', marginBottom: '6px' }}>
                         <span>Cashout progress</span><span className="mono">${permanentProgress.toFixed(2)} / ${permanentCycleVolume.toFixed(2)}</span>
