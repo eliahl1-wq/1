@@ -295,7 +295,7 @@ export default function Rewards() {
     };
 
     return (
-        <div className="page-shell page-shell--with-topbar page-shell--scroll">
+        <div className="page-shell page-shell--with-topbar page-shell--scroll rewards-page-shell">
             <Background />
             <AppTopbar />
             <div className="page-content product-page--rewards">

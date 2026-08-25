@@ -49,11 +49,6 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
 
     useEffect(() => { load(); }, [load]);
 
-    useEffect(() => {
-        if (window.location.hash !== '#affiliate-rewards' || !data) return;
-        document.getElementById('affiliate-rewards')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, [data]);
-
     if (!eligible) {
         return (
             <section id="affiliate-rewards" className="affiliate-rewards-embedded">

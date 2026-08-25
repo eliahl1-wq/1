@@ -1,8 +1,17 @@
+.rewards-page-shell{
+    height:100dvh;
+    min-height:0;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior-y:contain;
+    scrollbar-gutter:stable;
+}
+
 .product-page--rewards{
     width:100%;
     max-width:1160px;
-    padding-top:30px;
-    padding-bottom:78px;
+    padding-top:88px;
+    padding-bottom:96px;
 }
 
 .rewards-page-head{
@@ -378,7 +387,7 @@
 .rewards-type-pill.is-yellow{border-color:rgba(234,179,8,.2);background:rgba(234,179,8,.07);color:var(--yellow)}
 .rewards-type-pill.is-purple{border-color:rgba(139,92,246,.22);background:rgba(139,92,246,.08);color:#a98bff}
 .rewards-activity-empty{display:grid;place-items:center;min-height:110px;color:var(--text-3);font-size:.72rem}
-.product-page--rewards>.rewards-view>.affiliate-rewards-embedded{margin:0;padding-top:0;border-top:0}
+.product-page--rewards>.rewards-view>.affiliate-rewards-embedded{margin:8px 0 48px;padding-top:10px;border-top:0}
 .product-page--rewards>.rewards-view>.affiliate-rewards-embedded>.affiliate-section-heading{margin-bottom:12px}
 
 @media(max-width:900px){
@@ -387,7 +396,7 @@
 }
 
 @media(max-width:680px){
-    .product-page--rewards{padding-top:22px;padding-bottom:54px}
+    .product-page--rewards{padding-top:76px;padding-bottom:80px}
     .rewards-page-head{align-items:flex-start;flex-direction:column;margin-bottom:20px}
     .rewards-view-tabs{width:100%}
     .rewards-view-tabs button{flex:1;min-width:0}
