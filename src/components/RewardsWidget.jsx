@@ -96,7 +96,6 @@ export default function RewardsWidget() {
     const permanentBalance = Number(permanentRewards.balanceUsd) || 0;
     const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
-    const starterFundingRemaining = Number(permanentRewards.starterFundingRemainingUsd) || 0;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
     const totalBalance = promoBalance + permanentBalance + rentFallbackBalance;
     const hasBalance = totalBalance > 0;
@@ -231,8 +230,8 @@ export default function RewardsWidget() {
                 </div>
 
                 {hasTicketChallenge && (
-                    <div className="challenge-pulse-animation" style={{ marginBottom: '16px', padding: '14px', background: 'rgba(139, 92, 246, 0.12)', borderRadius: 'var(--r-md)', border: '1px solid rgba(139, 92, 246, 0.45)' }}>
-                        <div style={{ color: '#a78bfa', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', marginBottom: '5px' }}>
+                    <div className="challenge-pulse-animation" style={{ marginBottom: '16px', padding: '14px', background: 'var(--bg-1)', borderRadius: 'var(--r-md)', border: '1px solid var(--border-2)' }}>
+                        <div style={{ color: 'var(--text-subtle)', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', marginBottom: '5px' }}>
                             NEW REWARD
                         </div>
                         <div style={{ color: 'var(--text-h)', fontSize: '0.94rem', fontWeight: 800 }}>
@@ -245,7 +244,7 @@ export default function RewardsWidget() {
                             <span>Normal games played</span><span>0 / 1</span>
                         </div>
                         <div style={{ height: '6px', background: 'rgba(255,255,255,0.10)', borderRadius: '999px', overflow: 'hidden', marginBottom: '10px' }}>
-                            <div style={{ width: '0%', height: '100%', background: '#a78bfa' }} />
+                            <div style={{ width: '0%', height: '100%', background: 'var(--green)' }} />
                         </div>
                         <div style={{ color: 'var(--green)', fontSize: '0.76rem', fontWeight: 800 }}>
                             REWARD: 1 FREE TICKET
@@ -259,11 +258,11 @@ export default function RewardsWidget() {
                     </div>
                 )}
 
-                <div style={{ marginBottom: '16px', padding: '13px', border: '1px solid rgba(139,92,246,.26)', borderRadius: 'var(--r-md)', background: 'linear-gradient(135deg,rgba(139,92,246,.10),rgba(59,130,246,.035))' }}>
+                <div style={{ marginBottom: '16px', padding: '13px', border: '1px solid var(--border-2)', borderRadius: 'var(--r-md)', background: 'var(--bg-1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                         <div>
-                            <div style={{ color: '#a78bfa', fontSize: '.64rem', fontWeight: 900, letterSpacing: '.08em' }}>PERMANENT REWARDS</div>
-                            <div style={{ marginTop: '3px', color: 'var(--text-h)', fontSize: '.84rem', fontWeight: 800 }}>$20 played → $4 reward</div>
+                            <div style={{ color: 'var(--text-subtle)', fontSize: '.64rem', fontWeight: 900, letterSpacing: '.08em' }}>NEXT REWARD</div>
+                            <div style={{ marginTop: '3px', color: 'var(--text-h)', fontSize: '.84rem', fontWeight: 800 }}>Play for $20 · Get $4</div>
                         </div>
                         <strong className="mono" style={{ color: permanentBalance > 0 ? 'var(--green)' : 'var(--text-h)', fontSize: '.9rem' }}>${permanentBalance.toFixed(2)}</strong>
                     </div>
@@ -271,13 +270,8 @@ export default function RewardsWidget() {
                         <span>Current cycle</span><span className="mono">${permanentProgress.toFixed(2)} / $20.00</span>
                     </div>
                     <div style={{ height: '7px', overflow: 'hidden', borderRadius: '999px', background: 'rgba(255,255,255,.08)' }}>
-                        <div style={{ width: `${Math.min(100, permanentProgressPct)}%`, height: '100%', borderRadius: 'inherit', background: 'linear-gradient(90deg,#7c3aed,#a855f7,#5b8cff)', boxShadow: '0 0 10px rgba(139,92,246,.45)' }} />
+                        <div style={{ width: `${Math.min(100, permanentProgressPct)}%`, height: '100%', borderRadius: 'inherit', background: 'linear-gradient(90deg,#16a34a,#22c55e,#4ade80)', boxShadow: '0 0 10px rgba(34,197,94,.3)' }} />
                     </div>
-                    {starterFundingRemaining > 0 && (
-                        <div style={{ marginTop: '8px', color: 'var(--yellow)', fontSize: '.69rem', lineHeight: 1.4 }}>
-                            ${starterFundingRemaining.toFixed(2)} of reward funding finishes your starter reward first.
-                        </div>
-                    )}
                 </div>
 
                 {showReward && (

@@ -1,32 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppTopbar from '../components/AppTopbar';
-import ProductPageHeader from '../components/ProductPageHeader';
 import Background from '../components/Background';
 import AffiliateRewardsPanel from '../components/AffiliateRewardsPanel';
 import { API_URL } from '../utils/apiBase';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import '../styles/rewards.css';
 
-function RewardStatCard({ label, value, detail, tone = 'default' }) {
-    return (
-        <div className={`rewards-stat-card rewards-stat-card--${tone}`}>
-            <div className="rewards-stat-label">{label}</div>
-            <div className="rewards-stat-value mono">{value}</div>
-            <div className="rewards-stat-detail">{detail}</div>
-        </div>
-    );
-}
-
 export default function Rewards() {
     const { user, loading, refreshUser } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [history, setHistory] = useState([]);
     const [historyLoaded, setHistoryLoaded] = useState(false);
     const [claimStatus, setClaimStatus] = useState(null); // { type: 'success'|'error'|'loading', message: string }
     const [affiliateData, setAffiliateData] = useState(null);
+    const [activeView, setActiveView] = useState(() => window.location.hash === '#affiliate-rewards' ? 'affiliate' : 'game');
     const claimLockRef = useRef(false);
+
+    useEffect(() => {
+        setActiveView(location.hash === '#affiliate-rewards' ? 'affiliate' : 'game');
+    }, [location.hash]);
 
     useEffect(() => {
         document.title = 'AgarStake | Rewards';
@@ -44,6 +39,8 @@ export default function Rewards() {
                         tx.meta?.event === 'sponsored_rewards_claim' ||
                         tx.meta?.isRentExemptFallback === true ||
                         tx.meta?.event === 'free_ticket_join' ||
+                        tx.meta?.freeTicketChallengeApplied === true ||
+                        tx.meta?.starterRewardCompleted === true ||
                         (tx.meta?.event === 'reward_pool_contribution' && Number(tx.meta?.permanentVolumeUsd) > 0) ||
                         tx.meta?.event === 'tournament_reward' ||
                         tx.meta?.event === 'tournament_reward_claim'
@@ -143,16 +140,12 @@ export default function Rewards() {
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
     const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 20;
     const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 4;
-    const starterFundingRemaining = Number(permanentRewards.starterFundingRemainingUsd) || 0;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
     const currentBalance = promoBalance + permanentBalance + rentFallbackBalance;
     const claimableBalance = rentFallbackBalance + (!user.rewardsDisabled
         ? permanentBalance + (isCompleted ? promoBalance : 0)
         : 0);
     const canClaim = claimableBalance > 0;
-    const latestClaim = history.find(tx => tx.meta?.event === 'sponsored_rewards_claim');
-    const claimedRewardAmount = Number(latestClaim?.meta?.amountUsd) || 0;
-    const challengeRewardAmount = promoBalance > 0 ? promoBalance : (isCompleted ? claimedRewardAmount : 0);
     const tournamentBalance = Number(user.tournamentRewardsBalance) || 0;
     const affiliateMetrics = affiliateData?.metrics || {};
     const affiliatePending = Number(affiliateMetrics.pendingCommissionUsd) || 0;
@@ -184,10 +177,7 @@ export default function Rewards() {
             ...payout,
         })),
     ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    const challengeRewardLabel = isCompleted && promoBalance <= 0 && !historyLoaded
-        ? '--'
-        : `$${challengeRewardAmount.toFixed(2)}`;
-    const requiredContribution = Math.max(5, challengeRewardAmount);
+    const requiredContribution = Math.max(5, promoBalance);
     const multiplier = Math.ceil(requiredContribution / 5);
     const req5 = multiplier * 3;
     const req10 = multiplier * 1;
@@ -261,393 +251,188 @@ export default function Rewards() {
             claimLockRef.current = false;
         }
     };
+
+    const selectView = (view) => {
+        setActiveView(view);
+        navigate(view === 'affiliate' ? '/rewards#affiliate-rewards' : '/rewards', { replace: true });
+    };
+
+    const activityDisplay = (tx) => {
+        if (tx.affiliatePayout) {
+            const status = String(tx.status || 'requested').replace('_', ' ');
+            const isPaid = ['completed', 'paid'].includes(String(tx.status));
+            return { title: 'Affiliate payout', type: status, value: `${isPaid ? '-' : ''}$${Number(tx.amountUsd || 0).toFixed(2)}`, tone: isPaid ? 'green' : 'yellow' };
+        }
+        if (tx.meta?.starterRewardCompleted) {
+            return { title: 'Starter reward completed', type: 'Completed', value: `$${Number(tx.meta.starterRewardAmountUsd || 0).toFixed(2)}`, tone: 'green' };
+        }
+        if (tx.meta?.freeTicketChallengeApplied) {
+            return { title: 'Free ticket unlocked', type: 'Completed', value: '1 ticket', tone: 'purple' };
+        }
+        if (tx.meta?.event === 'sponsored_rewards_claim') {
+            return { title: 'Game rewards claimed', type: 'Claim', value: `-$${Number(tx.meta.amountUsd || 0).toFixed(2)}`, tone: 'green' };
+        }
+        if (tx.meta?.isRentExemptFallback) {
+            const amount = (Number(tx.amount) || 0) * Number(tx.meta.solPrice || 64);
+            return { title: 'Reward retained', type: 'Wallet credit', value: `+$${amount.toFixed(2)}`, tone: 'purple' };
+        }
+        if (tx.meta?.event === 'free_ticket_join') {
+            return { title: 'Free ticket used', type: tx.meta.mode || 'Normal', value: 'Free game', tone: 'purple' };
+        }
+        if (tx.meta?.event === 'reward_pool_contribution') {
+            const unlocked = Number(tx.meta.permanentRewardUnlockedUsd) || 0;
+            return unlocked > 0
+                ? { title: 'Game reward unlocked', type: 'Completed', value: `+$${unlocked.toFixed(2)}`, tone: 'green' }
+                : { title: 'Reward progress', type: 'Normal game', value: `+$${Number(tx.meta.permanentVolumeUsd || 0).toFixed(2)} played`, tone: 'default' };
+        }
+        if (tx.meta?.event === 'tournament_reward') {
+            return { title: 'Tournament prize', type: `#${tx.meta.placement || '—'}`, value: `+$${Number(tx.meta.amountUsd || 0).toFixed(2)}`, tone: 'yellow' };
+        }
+        if (tx.meta?.event === 'tournament_reward_claim') {
+            return { title: 'Tournament claimed', type: 'Claim', value: `-$${Number(tx.meta.amountUsd || 0).toFixed(2)}`, tone: 'green' };
+        }
+        return { title: 'Reward activity', type: 'Reward', value: '—', tone: 'default' };
+    };
+
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
             <AppTopbar />
             <div className="page-content product-page--rewards">
-                <ProductPageHeader
-                    title="Rewards"
-                    description="Earn recurring game rewards, unlock your free ticket and claim everything from one place."
-                />
-
-                {/* Unified Rewards Summary */}
-                <div className="rewards-summary-grid">
-                    <RewardStatCard
-                        label="Total Reward Balance"
-                        value={`$${totalRewardBalance.toFixed(2)}`}
-                        detail="All unclaimed rewards combined"
-                    />
-                    <RewardStatCard
-                        label="Ready To Claim"
-                        value={`$${totalReadyToClaim.toFixed(2)}`}
-                        detail={totalReadyToClaim > 0 ? 'Available through the claim options below' : 'No rewards are currently claimable'}
-                        tone="claimable"
-                    />
-                    <RewardStatCard
-                        label="Total Paid (All-Time)"
-                        value={`$${totalClaimedAllTime.toFixed(2)}`}
-                        detail="Game, tournament and affiliate payouts"
-                    />
-                </div>
-                {user.rewardsDisabled && (
-                    <div className="product-alert product-alert--error">
-                        Promotional rewards are disabled while an admin reviews accounts funded by the same external wallet. Retained game winnings can still be claimed.
+                <header className="rewards-page-head">
+                    <h1>Rewards</h1>
+                    <div className="rewards-view-tabs" role="tablist" aria-label="Reward views">
+                        <button type="button" className={activeView === 'game' ? 'is-active' : ''} onClick={() => selectView('game')}>Game Rewards</button>
+                        <button type="button" className={activeView === 'affiliate' ? 'is-active' : ''} onClick={() => selectView('affiliate')}>Affiliate</button>
                     </div>
-                )}
-                <section className="rewards-section rewards-program-section">
-                    <div className="rewards-program-card">
-                        <div className="rewards-program-topline">
-                            <div>
-                                <span className="rewards-program-kicker">PERMANENT REWARDS</span>
-                                <h2>Play Normal. Earn 20% back.</h2>
-                                <p>{starterFundingRemaining > 0
-                                    ? `Your next $${starterFundingRemaining.toFixed(2)} reward share finishes the one-time starter reward first. The remainder then advances this cycle.`
-                                    : `Every paid Agar or Slither Normal game advances the cycle. Each $${permanentCycleVolume.toFixed(0)} played unlocks $${permanentCycleReward.toFixed(0)}.`}</p>
-                            </div>
-                            <div className="rewards-program-balance">
-                                <span>Available</span>
-                                <strong className="mono">${permanentBalance.toFixed(2)}</strong>
-                            </div>
-                        </div>
+                </header>
 
-                        <div className="rewards-cycle-head">
-                            <div>
-                                <span>Current cycle</span>
-                                <strong className="mono">${permanentProgress.toFixed(2)} / ${permanentCycleVolume.toFixed(2)}</strong>
-                            </div>
-                            <span className="rewards-rate-badge">20% REWARD</span>
+                <div className={activeView === 'game' ? 'rewards-view is-active' : 'rewards-view'}>
+                    {user.rewardsDisabled && <div className="product-alert product-alert--error">Rewards are under review.</div>}
+
+                    <section className="rewards-overview" aria-labelledby="game-rewards-heading">
+                        <div className="rewards-overview-mark" aria-hidden="true">R</div>
+                        <span className="rewards-overview-kicker">GAME REWARDS</span>
+                        <h2 id="game-rewards-heading">${totalRewardBalance.toFixed(2)}</h2>
+                        <p>Total balance</p>
+                        <div className="rewards-overview-stats">
+                            <div><span>Available</span><strong className="mono">${totalReadyToClaim.toFixed(2)}</strong></div>
+                            <div><span>Earned</span><strong className="mono">${totalClaimedAllTime.toFixed(2)}</strong></div>
                         </div>
-                        <div className="rewards-cycle-track" role="progressbar" aria-label="Permanent reward progress" aria-valuemin="0" aria-valuemax={permanentCycleVolume} aria-valuenow={permanentProgress}>
+                        <div className="rewards-overview-progress-head">
+                            <span>Play for ${permanentCycleVolume.toFixed(0)}</span>
+                            <strong>Next reward ${permanentCycleReward.toFixed(0)}</strong>
+                        </div>
+                        <div className="rewards-overview-track" role="progressbar" aria-label="Next game reward" aria-valuemin="0" aria-valuemax={permanentCycleVolume} aria-valuenow={permanentProgress}>
                             <div style={{ width: `${Math.min(100, permanentProgressPct)}%` }} />
                         </div>
-                        <div className="rewards-cycle-foot">
-                            <span>${Number(permanentRewards.volumeRemainingUsd ?? permanentCycleVolume).toFixed(2)} until the next ${permanentCycleReward.toFixed(2)}</span>
-                            <span>{Number(permanentRewards.cyclesCompleted) || 0} cycles completed</span>
-                        </div>
-
-                        <div className="rewards-program-metrics">
-                            <div><span>Lifetime volume</span><strong className="mono">${Number(permanentRewards.lifetimeVolumeUsd || 0).toFixed(2)}</strong></div>
-                            <div><span>Lifetime earned</span><strong className="mono">${Number(permanentRewards.lifetimeEarnedUsd || 0).toFixed(2)}</strong></div>
-                            <div><span>Eligible modes</span><strong>Agar + Slither Normal</strong></div>
-                        </div>
-
-                        <button
-                            type="button"
-                            className="btn btn-green rewards-program-claim"
-                            onClick={handleClaim}
-                            disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}
-                        >
-                            {user.rewardClaimInProgress || claimStatus?.type === 'loading'
-                                ? 'CLAIMING...'
-                                : canClaim
-                                    ? `CLAIM $${claimableBalance.toFixed(2)}`
-                                    : 'KEEP PLAYING TO EARN'}
-                        </button>
-                    </div>
-                </section>
-                {/* Section 1: Free Game Ticket */}
-                <section className="rewards-section">
-                    <h2 className="rewards-section-title">
-                        Free Game Ticket
-                    </h2>
-
-                    {hasUnusedTicket ? (
-                        <div className="rewards-ticket-card rewards-ticket-card--active" style={{
-                            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
-                            border: '1px solid rgba(34, 197, 94, 0.2)',
-                            borderRadius: '16px',
-                            padding: '24px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }}>
-                                <div style={{
-                                    width: '48px', height: '48px', borderRadius: '12px',
-                                    background: 'rgba(34, 197, 94, 0.15)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: '#4ade80'
-                                }}>
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
-                                        <path d="M12 9v6" strokeDasharray="2 2" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 style={{ margin: '0 0 4px', fontSize: '1.25rem', color: '#4ade80', fontWeight: '700' }}>
-                                        Free $5 Normal Game
-                                    </h3>
-                                    <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.95rem', lineHeight: '1.5' }}>
-                                        You have 1 sponsored ticket available! Use it to play a Normal match on either Agar or Slither for free.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                <button
-                                    className="btn btn-green"
-                                    onClick={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}
-                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
-                                >
-                                    Use on Agar
-                                </button>
-                                <button
-                                    className="btn btn-green"
-                                    onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}
-                                    style={{ flex: 1, padding: '12px 20px', fontSize: '1rem', display: 'flex', justifyContent: 'center' }}
-                                >
-                                    Use on Slither
-                                </button>
-                            </div>
-                        </div>
-                    ) : hasTicketChallenge ? (
-                        <div className="panel" style={{ padding: '24px', border: '1px solid rgba(139, 92, 246, 0.32)', background: 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.04))' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                <div>
-                                    <p className="label" style={{ margin: '0 0 6px', color: '#a78bfa' }}>FREE TICKET REWARD</p>
-                                    <h3 style={{ margin: '0 0 8px', color: 'var(--text-h)' }}>Complete 1 Normal game</h3>
-                                    <p style={{ margin: 0, color: 'var(--text-2)', lineHeight: 1.55 }}>
-                                        Finish any Agar, Slither or Surviv Normal match. Slither Arena, Battle Royale, tournaments and free-ticket games do not count.
-                                    </p>
-                                </div>
-                                <strong className="mono" style={{ color: '#a78bfa', whiteSpace: 'nowrap' }}>0 / 1</strong>
-                            </div>
-                            <button className="btn btn-primary" type="button" onClick={() => navigate('/gamemodes')}>
-                                Choose Normal Game
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="panel rewards-ticket-card rewards-ticket-card--used">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                    <polyline points="22 4 12 14.01 9 11.01" />
-                                </svg>
-                                <span style={{ color: 'var(--text-h)', fontWeight: '600' }}>Free Ticket Used</span>
-                            </div>
-                            <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.9rem' }}>
-                                You have already used your free sponsored ticket. Any winnings are stored in your Rewards balance.
-                            </p>
-                        </div>
-                    )}
-                </section>
-
-                {/* Section 2: Rewards (Only visible if ticket has been used) */}
-                {(user.freeTicketUsed || rentFallbackBalance > 0 || user.rewardClaimInProgress) && (
-                    <section className="rewards-section">
-                        <h2 className="rewards-section-title">
-                            Rewards
-                        </h2>
-
-                    <div className="panel" style={{ padding: '24px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                            <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-h)', fontWeight: '600' }}>
-                                Starter Reward Progress
-                            </h4>
-                            <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-h)' }}>
-                                Reward: <span style={{ color: 'var(--green)' }}>{challengeRewardLabel}</span>
-                            </div>
-                        </div>
-
-                        {/* Starter reward tasks */}
-                        <div>
-                            {/* $5 reward task */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
-                                    <span style={{ color: normal5Progress >= req5 ? '#4ade80' : 'var(--text-2)' }}>
-                                        {normal5Progress >= req5 ? '✓ ' : ''}Complete {req5} × $5 Normal Games
-                                    </span>
-                                    <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal5Progress} / {req5}</span>
-                                </div>
-                                <div style={{ height: '8px', background: 'var(--bg-3)', borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{
-                                        height: '100%',
-                                        width: `${(normal5Progress / req5) * 100}%`,
-                                        background: normal5Progress >= req5 ? '#4ade80' : '#ffffff',
-                                        transition: 'width 0.5s ease-out'
-                                    }} />
-                                </div>
-                            </div>
-
-                            {/* $10 reward task */}
-                            <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '8px' }}>
-                                    <span style={{ color: normal10Progress >= req10 ? '#4ade80' : 'var(--text-2)' }}>
-                                        {normal10Progress >= req10 ? '✓ ' : ''}Complete {req10} × $10 Normal Game
-                                    </span>
-                                    <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>{normal10Progress} / {req10}</span>
-                                </div>
-                                <div style={{ height: '8px', background: 'var(--bg-3)', borderRadius: '4px', overflow: 'hidden' }}>
-                                    <div style={{
-                                        height: '100%',
-                                        width: `${(normal10Progress / req10) * 100}%`,
-                                        background: normal10Progress >= req10 ? '#4ade80' : '#ffffff',
-                                        transition: 'width 0.5s ease-out'
-                                    }} />
-                                </div>
-                            </div>
-                        </div>
-
-                        <button
-                            type="button"
-                            className="btn btn-green"
-                            onClick={handleClaim}
-                            disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}
-                            style={{
-                                width: '100%', marginTop: '24px', padding: '13px 20px', fontSize: '0.95rem',
-                                ...(!canClaim && !user.rewardClaimInProgress ? { background: '#374151', color: '#9ca3af', boxShadow: 'none', opacity: 0.7 } : {})
-                            }}
-                        >
-                            {user.rewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING...' : canClaim ? (user.rewardsDisabled ? 'CLAIM RETAINED WINNINGS' : 'CLAIM REWARD') : isCompleted && currentBalance === 0 ? 'CLAIMED' : user.rewardsDisabled ? 'REWARDS UNDER REVIEW' : 'COMPLETE REWARD TASKS'}
-                        </button>
-                    </div>
-                </section>
-                )}
-
-                {/* Section 2.5: Tournament Winnings */}
-                {(user.tournamentRewardsBalance > 0 || user.tournamentRewardClaimInProgress) && (
-                    <section className="rewards-section">
-                        <h2 className="rewards-section-title">
-                            Tournament Winnings
-                        </h2>
-
-                        <div className="panel" style={{ padding: '24px', background: 'var(--bg-1)', border: '1px solid var(--border)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                                <div>
-                                    <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-h)', fontWeight: '600' }}>
-                                        Unclaimed Tournament Prize
-                                    </h4>
-                                    <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: '0.85rem' }}>
-                                        Winnings from finishing in the top 3 of a tournament match.
-                                    </p>
-                                </div>
-                                <div className="mono" style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--yellow)' }}>
-                                    ${Number(user.tournamentRewardsBalance || 0).toFixed(2)}
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                className="btn btn-yellow"
-                                onClick={handleTournamentClaim}
-                                disabled={!(user.tournamentRewardsBalance > 0) || claimStatus?.type === 'loading' || user.tournamentRewardClaimInProgress}
-                                style={{
-                                    width: '100%',
-                                    padding: '13px 20px',
-                                    fontSize: '0.95rem',
-                                    background: 'var(--yellow)',
-                                    color: '#000',
-                                    border: 'none',
-                                    fontWeight: '700',
-                                    boxShadow: '0 4px 14px rgba(234, 179, 8, 0.2)',
-                                    cursor: 'pointer',
-                                    borderRadius: 'var(--r-md)',
-                                    transition: 'all 0.15s ease',
-                                    ...(!(user.tournamentRewardsBalance > 0) && !user.tournamentRewardClaimInProgress ? { background: '#374151', color: '#9ca3af', boxShadow: 'none', opacity: 0.7, cursor: 'default' } : {})
-                                }}
-                            >
-                                {user.tournamentRewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING WINNINGS...' : 'CLAIM TOURNAMENT WINNINGS'}
-                            </button>
+                        <div className="rewards-overview-progress-foot">
+                            <span className="mono">${permanentProgress.toFixed(2)} / ${permanentCycleVolume.toFixed(2)}</span>
+                            <span>{Number(permanentRewards.cyclesCompleted) || 0} completed</span>
                         </div>
                     </section>
-                )}
 
-                {/* Section 3: Information */}
-                <section className="rewards-section">
-                    <div className="panel rewards-info-card">
-                        <h3 style={{ margin: '0 0 12px', fontSize: '1rem', color: 'var(--text-h)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 16v-4"/>
-                                <path d="M12 8h.01"/>
-                            </svg>
-                            How Rewards Work
-                        </h3>
-                        <p style={{ margin: '0 0 8px', color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                            Paid Agar and Slither Normal games continuously build permanent rewards after the one-time starter reward is funded. Every $20 in eligible volume unlocks $4, and progress carries into the next cycle.
-                        </p>
-                        <p style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                            Free-ticket and starter rewards appear alongside permanent, tournament and affiliate rewards. Claims are paid securely to your account wallet in SOL.
-                        </p>
-                    </div>
-                </section>
+                    <section className="rewards-block">
+                        <h2>Claim</h2>
+                        <div className="rewards-claim-grid">
+                            <article className="rewards-dashboard-card rewards-claim-card">
+                                <div className="rewards-card-head"><span>Game rewards</span><span className="rewards-status-dot" /></div>
+                                <div className="rewards-claim-amount mono">${claimableBalance.toFixed(2)}</div>
+                                <span className="rewards-claim-caption">Available</span>
+                                <div className="rewards-claim-chips">
+                                    <span>Game <b className="mono">${(promoBalance + permanentBalance).toFixed(2)}</b></span>
+                                    <span>Retained <b className="mono">${rentFallbackBalance.toFixed(2)}</b></span>
+                                </div>
+                                <button type="button" className="btn btn-primary rewards-full-button" onClick={handleClaim} disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}>
+                                    {user.rewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING…' : canClaim ? `CLAIM $${claimableBalance.toFixed(2)}` : 'NOTHING TO CLAIM'}
+                                </button>
+                            </article>
 
-                {/* Section 4: History */}
-                <section className="rewards-section">
-                    <h2 className="rewards-section-title">
-                        Rewards History
-                    </h2>
-                    {rewardHistory.length === 0 ? (
-                        <div className="panel" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-2)', fontSize: '0.9rem' }}>
-                            No rewards activity found.
+                            <article className="rewards-dashboard-card rewards-active-card">
+                                <div className="rewards-card-head"><span>Active reward</span><span>{hasUnusedTicket || hasTicketChallenge || (user.freeTicketUsed && !isCompleted) ? '1' : '0'}</span></div>
+                                {hasUnusedTicket ? (
+                                    <div className="rewards-active-content">
+                                        <div className="rewards-active-icon is-ready">✓</div>
+                                        <strong>Free $5 game ready</strong>
+                                        <span>Agar or Slither Normal</span>
+                                        <div className="rewards-ticket-actions">
+                                            <button type="button" onClick={() => navigate('/pre-game', { state: { selectedMode: 'agar' } })}>Agar</button>
+                                            <button type="button" onClick={() => navigate('/pre-game', { state: { selectedMode: 'slither' } })}>Slither</button>
+                                        </div>
+                                    </div>
+                                ) : hasTicketChallenge ? (
+                                    <div className="rewards-active-content">
+                                        <div className="rewards-ring" style={{ '--progress': '0deg' }}><span>0/1</span></div>
+                                        <strong>Play 1 Normal game</strong>
+                                        <span>Reward: Free $5 game</span>
+                                        <button type="button" className="rewards-card-link" onClick={() => navigate('/gamemodes')}>Play now →</button>
+                                    </div>
+                                ) : user.freeTicketUsed && !isCompleted && !user.rewardsDisabled ? (
+                                    <div className="rewards-active-content rewards-starter-content">
+                                        <strong>Starter reward</strong>
+                                        <span>Reward: ${promoBalance.toFixed(2)}</span>
+                                        <div className="rewards-mini-task">
+                                            <div><span>{req5} × $5 games</span><b>{normal5Progress}/{req5}</b></div>
+                                            <i><em style={{ width: `${(normal5Progress / req5) * 100}%` }} /></i>
+                                        </div>
+                                        <div className="rewards-mini-task">
+                                            <div><span>{req10} × $10 games</span><b>{normal10Progress}/{req10}</b></div>
+                                            <i><em style={{ width: `${(normal10Progress / req10) * 100}%` }} /></i>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rewards-active-content rewards-empty-active">
+                                        <div className="rewards-active-icon">✓</div>
+                                        <strong>All caught up</strong>
+                                        <span>New rewards will appear here.</span>
+                                    </div>
+                                )}
+                            </article>
+
+                            <article className="rewards-dashboard-card rewards-breakdown-card">
+                                <div className="rewards-card-head"><span>Breakdown</span><span>USD</span></div>
+                                <div className="rewards-breakdown-list">
+                                    <div><span><i className="is-purple" />Game rewards</span><strong className="mono">${currentBalance.toFixed(2)}</strong></div>
+                                    <div><span><i className="is-yellow" />Tournament</span><strong className="mono">${tournamentBalance.toFixed(2)}</strong></div>
+                                    <div><span><i className="is-green" />Affiliate</span><strong className="mono">${affiliateBalance.toFixed(2)}</strong></div>
+                                </div>
+                                {tournamentBalance > 0 ? (
+                                    <button type="button" className="btn rewards-tournament-button rewards-full-button" onClick={handleTournamentClaim} disabled={claimStatus?.type === 'loading' || user.tournamentRewardClaimInProgress}>
+                                        {user.tournamentRewardClaimInProgress ? 'CLAIMING…' : `CLAIM TOURNAMENT $${tournamentBalance.toFixed(2)}`}
+                                    </button>
+                                ) : (
+                                    <button type="button" className="rewards-card-link rewards-breakdown-link" onClick={() => selectView('affiliate')}>View affiliate rewards →</button>
+                                )}
+                            </article>
                         </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {rewardHistory.map((tx) => {
-                                let title = 'Reward Activity';
-                                let desc = '';
-                                let val = '';
-                                let color = 'var(--text-h)';
+                    </section>
 
-                                if (tx.affiliatePayout) {
-                                    const payoutStatus = String(tx.status || 'requested');
-                                    const isPaid = ['completed', 'paid'].includes(payoutStatus);
-                                    title = 'Affiliate Payout';
-                                    desc = isPaid
-                                        ? `Paid to ${tx.destinationWallet ? tx.destinationWallet.slice(0, 6) + '...' + tx.destinationWallet.slice(-5) : 'your wallet'}`
-                                        : `Payout ${payoutStatus.replace('_', ' ')}`;
-                                    val = `${isPaid ? '-' : ''}$${Number(tx.amountUsd || 0).toFixed(2)}`;
-                                    color = isPaid ? 'var(--green)' : 'var(--yellow)';
-                                } else if (tx.meta?.event === 'sponsored_rewards_claim') {
-                                    title = 'Claim Payout';
-                                    desc = `Claimed via Solana: ${tx.meta.signature ? tx.meta.signature.slice(0, 8) + '...' : 'Pending'}`;
-                                    val = `-$${(tx.meta.amountUsd || 0).toFixed(2)}`;
-                                    color = 'var(--green)';
-                                } else if (tx.meta?.isRentExemptFallback) {
-                                    title = 'Rent Fallback Credit';
-                                    desc = 'Game payout auto-credited due to wallet rent limits';
-                                    val = `+$${((tx.amount || 0) * (tx.meta.solPrice || 64)).toFixed(2)}`;
-                                    color = 'var(--accent)';
-                                } else if (tx.meta?.event === 'free_ticket_join') {
-                                    title = 'Free Ticket Used';
-                                    desc = `Joined $${tx.meta.entryFeeUsd || 10} match using free ticket`;
-                                    val = 'FREE';
-                                    color = 'var(--blue)';
-                                } else if (tx.meta?.event === 'reward_pool_contribution') {
-                                    const unlocked = Number(tx.meta.permanentRewardUnlockedUsd) || 0;
-                                    title = unlocked > 0 ? 'Permanent Reward Unlocked' : 'Permanent Reward Progress';
-                                    desc = `$${Number(tx.meta.permanentVolumeUsd || 0).toFixed(2)} eligible Normal volume added`;
-                                    val = unlocked > 0 ? `+$${unlocked.toFixed(2)}` : `+$${Number(tx.meta.permanentVolumeUsd || 0).toFixed(2)} VOL`;
-                                    color = unlocked > 0 ? 'var(--green)' : 'var(--accent)';
-                                } else if (tx.meta?.event === 'tournament_reward') {
-                                    title = 'Tournament Prize';
-                                    desc = `Placed #${tx.meta.placement} in ${tx.meta.tournamentName || 'Tournament'}`;
-                                    val = `+$${(tx.meta.amountUsd || 0).toFixed(2)}`;
-                                    color = 'var(--yellow)';
-                                } else if (tx.meta?.event === 'tournament_reward_claim') {
-                                    title = 'Tournament Claim Payout';
-                                    desc = `Claimed via Solana: ${tx.meta.signature ? tx.meta.signature.slice(0, 8) + '...' : 'Pending'}`;
-                                    val = `-$${(tx.meta.amountUsd || 0).toFixed(2)}`;
-                                    color = 'var(--green)';
-                                }
-
+                    <section className="rewards-block rewards-activity-block">
+                        <div className="rewards-block-head"><h2>Activity</h2><span>{rewardHistory.length}</span></div>
+                        <div className="rewards-activity-panel">
+                            <div className="rewards-activity-header"><span>Reward</span><span>Type</span><span>Date</span><span>Amount</span></div>
+                            {!historyLoaded ? (
+                                <div className="rewards-activity-empty"><span className="spinner" /></div>
+                            ) : rewardHistory.length === 0 ? (
+                                <div className="rewards-activity-empty">No reward activity yet.</div>
+                            ) : rewardHistory.map(tx => {
+                                const item = activityDisplay(tx);
                                 return (
-                                    <div key={tx._id} className="panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px' }}>
-                                        <div>
-                                            <h4 style={{ margin: '0 0 4px', fontSize: '0.95rem', color: 'var(--text-h)', fontWeight: '600' }}>{title}</h4>
-                                            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-2)' }}>{desc}</p>
-                                        </div>
-                                        <div style={{ fontSize: '1.05rem', fontWeight: '700', color }}>
-                                            {val}
-                                        </div>
+                                    <div className="rewards-activity-row" key={tx._id}>
+                                        <strong>{item.title}</strong>
+                                        <span><b className={`rewards-type-pill is-${item.tone}`}>{item.type}</b></span>
+                                        <time>{new Date(tx.createdAt || Date.now()).toLocaleDateString()}</time>
+                                        <em className={`is-${item.tone}`}>{item.value}</em>
                                     </div>
                                 );
                             })}
                         </div>
-                    )}
-                </section>
+                    </section>
+                </div>
 
-                {/* Affiliate details stay last so the core reward flow reads top-to-bottom. */}
-                <AffiliateRewardsPanel onDataChange={setAffiliateData} />
+                <div className={activeView === 'affiliate' ? 'rewards-view is-active' : 'rewards-view'}>
+                    <AffiliateRewardsPanel onDataChange={setAffiliateData} />
+                </div>
 
                 {/* Custom Modal/Alert System */}
                 {claimStatus && (

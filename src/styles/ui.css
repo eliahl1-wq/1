@@ -4836,7 +4836,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   }
 
   .topbar-nav--desktop .gm-nav-link:not(.gm-nav-link--active):hover {
-    border-color: rgba(145, 112, 255, 0.72);
+    border-color: transparent;
     background: rgba(124, 58, 255, 0.14);
     color: var(--accent);
     box-shadow: none;
