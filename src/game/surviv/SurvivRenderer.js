@@ -926,9 +926,12 @@ function drawSurvivTreeTrunk(ctx, tree, radius, variant, drawBranches = true) {
     const seedY = Number(tree.y) || 0;
     const birch = variant === 'birch';
     const configuredScale = Number(tree.trunkScale);
-    const trunkRadius = radius * (configuredScale > 0
-        ? configuredScale
-        : variant === 'ancientOak' ? 0.32 : 0.255);
+    const serializedTrunkRadius = Math.max(Number(tree.hitboxW) || 0, Number(tree.hitboxH) || 0) / 2;
+    const trunkRadius = serializedTrunkRadius > 0
+        ? serializedTrunkRadius
+        : radius * (configuredScale > 0
+            ? configuredScale
+            : variant === 'ancientOak' ? 0.32 : 0.255);
 
     // Short branch shoulders remain under the canopy and make the visible
     // brown area read as a real trunk instead of a flat brown bullseye.
@@ -999,13 +1002,9 @@ function drawSurvivBroadleafCanopy(ctx, tree, radius, hue, variant) {
     ctx.fillStyle = `hsla(${hue + 12}, 50%, ${lightness + 18}%, 0.28)`;
     ctx.fill();
 
-    // Bring the solid centre back above the translucent base, then cover its
-    // edges with a few leaf clusters. This makes the new tree unmistakably a
-    // trunk under foliage instead of another opaque green disc.
-    ctx.save();
-    ctx.globalAlpha = 0.78;
-    drawSurvivTreeTrunk(ctx, tree, radius, variant, false);
-    ctx.restore();
+    // These centre clusters veil the trunk without turning the canopy into an
+    // opaque disc. The trunk itself is drawn in the solid world-object pass;
+    // this foliage pass is deliberately composited above moving entities.
     for (let index = 0; index < 3; index++) {
         const angle = -0.9 + index * 2.1;
         const veilRadius = radius * (0.16 + index * 0.015);
@@ -1024,10 +1023,13 @@ function drawSurvivBroadleafCanopy(ctx, tree, radius, hue, variant) {
     }
 }
 
-function drawLegacyTree(ctx, tree, radius, hue, variant) {
+function drawLegacyTreeTrunk(ctx, tree, radius, variant) {
     ctx.fillStyle = variant === 'birch' ? '#c6bfa7' : '#5c3a1e';
     roundRect(ctx, -radius * 0.14, -radius * 0.05, radius * 0.28, radius * 0.52, radius * 0.07);
     ctx.fill();
+}
+
+function drawLegacyTreeCanopy(ctx, tree, radius, hue, variant) {
     if (variant === 'pine' || variant === 'giantPine') {
         const layers = variant === 'giantPine' ? 4 : 3;
         for (let layer = 0; layer < layers; layer++) {
@@ -4546,6 +4548,14 @@ export class SurvivRenderer {
             this.drawPlayer(ctx, p);
         }
 
+        // Tree trunks are solid world objects, but their foliage is a separate
+        // translucent depth layer. Drawing it after players makes movement
+        // beneath the crown visually honest: bodies, weapons and rounds pass
+        // under leaves and remain faintly readable through them.
+        for (const obstacle of visibleWorldObstacles) {
+            if (obstacle.kind === 'tree') this.drawTreeCanopy(ctx, obstacle);
+        }
+
         const emoteNow = performance.now();
         ctx.save();
         ctx.textAlign = 'center';
@@ -6244,15 +6254,13 @@ export class SurvivRenderer {
         } else if (kind === 'tree') {
             const r = Math.max(o.w, o.h) / 2;
             const treeVariant = o.variant || 'grove';
-            const hue = o.hue ?? 118;
             if (o.canopyStyle === 'legacy') {
-                drawLegacyTree(ctx, o, r, hue, treeVariant);
+                drawLegacyTreeTrunk(ctx, o, r, treeVariant);
             } else {
                 // Missing style data from an older static snapshot intentionally
                 // defaults to the new design, so stale matches never regress to
                 // showing no replacement trees at all.
                 drawSurvivTreeTrunk(ctx, o, r, treeVariant);
-                drawSurvivBroadleafCanopy(ctx, o, r, hue, treeVariant);
             }
         } else if (kind === 'bush') {
             const r = Math.max(o.w, o.h) / 2;
@@ -7281,7 +7289,7 @@ export class SurvivRenderer {
         );
         return true;
     }
-    drawCachedObstacle(ctx, o, kind) {
+    drawCachedObstacle(ctx, o, kind, renderPhase = 'base') {
         if (typeof document === 'undefined' || !o?.id || !CACHEABLE_PROP_KINDS.has(kind)) return false;
         const maxCacheW = kind === 'houseFloor' ? 2000 : 320;
         const maxCacheH = kind === 'houseFloor' ? 1400 : 320;
@@ -7290,7 +7298,7 @@ export class SurvivRenderer {
         // Cache at the same physical density the world is displayed at. The old
         // 1x sprites were enlarged by camera zoom, making props and floors soft.
         const scale = Math.min(1.6, Math.max(1, (this.targetZoom || 1) * (this.renderDpr || 1)));
-        const key = [o.id, kind, o.variant || '', o.canopyStyle || '', o.treeSize || '', o.trunkScale || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || '', scale.toFixed(2)].join(':');
+        const key = [renderPhase, o.id, kind, o.variant || '', o.canopyStyle || '', o.treeSize || '', o.trunkScale || '', o.hitboxW || '', o.hitboxH || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || '', scale.toFixed(2)].join(':');
         let sprite = this._obstacleSpriteCache.get(key);
         if (sprite) {
             this._obstacleSpriteCache.delete(key);
@@ -7305,8 +7313,9 @@ export class SurvivRenderer {
 
             const rotated = Math.abs(o.rotation || 0) > 0.001;
             const extent = rotated ? Math.hypot(o.w, o.h) : 0;
-            const worldWidth = Math.ceil((rotated ? extent : o.w) + 60);
-            const worldHeight = Math.ceil((rotated ? extent : o.h) + 66);
+            const treePadding = kind === 'tree' ? Math.max(72, Math.max(o.w, o.h) * 0.58) : 60;
+            const worldWidth = Math.ceil((rotated ? extent : o.w) + treePadding);
+            const worldHeight = Math.ceil((rotated ? extent : o.h) + treePadding + 6);
             const width = Math.ceil(worldWidth * scale);
             const height = Math.ceil(worldHeight * scale);
             const canvas = document.createElement('canvas');
@@ -7319,7 +7328,8 @@ export class SurvivRenderer {
             cacheCtx.translate(width / 2, height / 2);
             cacheCtx.scale(scale, scale);
             cacheCtx.translate(-o.x, -o.y);
-            this.drawObstacle(cacheCtx, o, false);
+            if (renderPhase === 'canopy') this.drawTreeCanopy(cacheCtx, o, false);
+            else this.drawObstacle(cacheCtx, o, false);
             const pixels = width * height;
             sprite = { canvas, width, height, worldWidth, worldHeight, pixels };
 
@@ -7346,6 +7356,29 @@ export class SurvivRenderer {
             sprite.worldHeight,
         );
         return true;
+    }
+
+    drawTreeCanopy(ctx, o, allowCache = true) {
+        if (!o || o.kind !== 'tree') return;
+        if (allowCache && this.drawCachedObstacle(ctx, o, 'tree', 'canopy')) return;
+
+        const shake = allowCache ? this.getObstacleHitShake(o) : { x: 0, y: 0 };
+        const radius = Math.max(o.w, o.h) / 2;
+        const variant = o.variant || 'grove';
+        const hue = o.hue ?? 118;
+        ctx.save();
+        ctx.translate(o.x + shake.x, o.y + shake.y);
+        ctx.rotate(o.rotation || 0);
+        if (o.canopyStyle === 'legacy') {
+            // Retained biome trees still participate in correct world depth.
+            // A little transparency prevents their older opaque crowns from
+            // completely hiding a player walking below them.
+            ctx.globalAlpha = 0.84;
+            drawLegacyTreeCanopy(ctx, o, radius, hue, variant);
+        } else {
+            drawSurvivBroadleafCanopy(ctx, o, radius, hue, variant);
+        }
+        ctx.restore();
     }
     drawChestBursts(ctx, currentHouse = null, currentRoom = null) {
         if (!this.chestBursts.length) return;
