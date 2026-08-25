@@ -90,6 +90,7 @@ export default function RewardsWidget() {
 
     const allowedPaths = ['/pre-game', '/agar', '/slither', '/surviv', '/competitive-slither', '/competitive-agar'];
     if (!allowedPaths.includes(location.pathname)) return null;
+    const isPregame = location.pathname === '/pre-game';
 
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
     const permanentRewards = user.permanentRewards || {};
@@ -198,11 +199,11 @@ export default function RewardsWidget() {
             {/* Expanded Content */}
             <div style={{
                 width: '320px',
-                background: 'var(--bg-2)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--r-xl)',
-                padding: '16px',
-                boxShadow: location.pathname === '/pre-game' ? 'none' : 'var(--shadow-xl)',
+                background: isPregame ? 'transparent' : 'var(--bg-2)',
+                border: isPregame ? 'none' : '1px solid var(--border)',
+                borderRadius: isPregame ? 0 : 'var(--r-xl)',
+                padding: isPregame ? 0 : '16px',
+                boxShadow: isPregame ? 'none' : 'var(--shadow-xl)',
                 marginBottom: '10px',
                 transform: expanded ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
                 opacity: expanded ? 1 : 0,
@@ -210,7 +211,7 @@ export default function RewardsWidget() {
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 transformOrigin: 'bottom right'
             }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                {!isPregame && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-2)' }}>
                             Rewards
@@ -233,10 +234,10 @@ export default function RewardsWidget() {
                     >
                         ✕
                     </button>
-                </div>
+                </div>}
 
                 {hasTicketChallenge && (
-                    <div className="challenge-pulse-animation" style={{ marginBottom: '16px', padding: '14px', background: 'var(--bg-1)', borderRadius: 'var(--r-md)', border: '1px solid var(--border-2)' }}>
+                    <div className="challenge-pulse-animation" style={{ marginBottom: '16px', padding: isPregame ? 0 : '14px', background: isPregame ? 'transparent' : 'var(--bg-1)', borderRadius: isPregame ? 0 : 'var(--r-md)', border: isPregame ? 'none' : '1px solid var(--border-2)' }}>
                         <div style={{ color: 'var(--text-subtle)', fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', marginBottom: '5px' }}>
                             NEW REWARD
                         </div>
@@ -259,12 +260,12 @@ export default function RewardsWidget() {
                 )}
 
                 {hasUnusedTicket && (
-                    <div style={{ marginBottom: '16px', padding: '12px', background: 'rgba(34, 197, 94, 0.08)', borderRadius: 'var(--r-md)', border: '1px solid var(--green-border)' }}>
+                    <div style={{ marginBottom: '16px', padding: isPregame ? 0 : '12px', background: isPregame ? 'transparent' : 'rgba(34, 197, 94, 0.08)', borderRadius: isPregame ? 0 : 'var(--r-md)', border: isPregame ? 'none' : '1px solid var(--green-border)' }}>
                         <p style={{ margin: 0, color: 'var(--green)', fontSize: '0.8rem', fontWeight: '700' }}>✨ 1 Free Ticket Available</p>
                     </div>
                 )}
 
-                <div style={{ marginBottom: '16px', padding: '13px', border: '1px solid var(--border-2)', borderRadius: 'var(--r-md)', background: 'var(--bg-1)' }}>
+                <div style={{ marginBottom: '16px', padding: isPregame ? 0 : '13px', border: isPregame ? 'none' : '1px solid var(--border-2)', borderRadius: isPregame ? 0 : 'var(--r-md)', background: isPregame ? 'transparent' : 'var(--bg-1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                         <div>
                             <div style={{ color: 'var(--text-subtle)', fontSize: '.64rem', fontWeight: 900, letterSpacing: '.08em' }}>NEXT REWARD</div>

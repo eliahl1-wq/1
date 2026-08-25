@@ -705,6 +705,10 @@ function obstacleRenderSignature(obstacles) {
         mixString(o.kind);
         mixString(o.variant);
         mixString(o.canopyStyle);
+        mixString(o.treeSize);
+        mixString(Array.isArray(o.footprint)
+            ? o.footprint.map(point => `${point.x},${point.y}`).join(';')
+            : '');
         mixString(o.houseId);
         mixString(o.role);
         mixString(o.orientation);
@@ -715,6 +719,9 @@ function obstacleRenderSignature(obstacles) {
         mixNumber(o.y);
         mixNumber(o.w);
         mixNumber(o.h);
+        mixNumber(o.hitboxW);
+        mixNumber(o.hitboxH);
+        mixNumber(o.trunkScale);
         mixNumber(o.rotation);
         mixNumber(o.width);
         mixNumber(o.collidable === false ? 0 : 1);
@@ -774,6 +781,47 @@ function getDoorCollisionRect(door) {
         h: thickness,
         rotation,
     };
+}
+
+function getObstacleCollisionRect(obstacle) {
+    if (obstacle?.kind === 'door') return getDoorCollisionRect(obstacle);
+    const visualW = Math.abs(Number(obstacle?.w) || 0);
+    const visualH = Math.abs(Number(obstacle?.h) || 0);
+    let hitboxW = Number(obstacle?.hitboxW) > 0 ? Number(obstacle.hitboxW) : null;
+    let hitboxH = Number(obstacle?.hitboxH) > 0 ? Number(obstacle.hitboxH) : null;
+    if (obstacle?.kind === 'tree') {
+        const fallbackScale = Number(obstacle.trunkScale) > 0
+            ? Number(obstacle.trunkScale)
+            : Math.max(visualW, visualH) >= 64 ? 0.31 : 0.255;
+        hitboxW ??= Math.max(11, visualW * fallbackScale);
+        hitboxH ??= Math.max(11, visualH * fallbackScale);
+    }
+    if (hitboxW == null && hitboxH == null) return obstacle;
+    hitboxW = clamp(hitboxW ?? visualW, 1, Math.max(1, visualW));
+    hitboxH = clamp(hitboxH ?? visualH, 1, Math.max(1, visualH));
+    return {
+        x: obstacle.x,
+        y: obstacle.y,
+        w: hitboxW,
+        h: hitboxH,
+        rotation: Number(obstacle.rotation) || 0,
+    };
+}
+
+function traceObstacleFootprint(ctx, obstacle, offsetX = 0, offsetY = 0) {
+    const points = obstacle?.footprint;
+    if (!Array.isArray(points) || points.length < 3) {
+        roundRect(ctx, -obstacle.w / 2 + offsetX, -obstacle.h / 2 + offsetY,
+            obstacle.w, obstacle.h, 5);
+        return false;
+    }
+    ctx.beginPath();
+    ctx.moveTo(points[0].x + offsetX, points[0].y + offsetY);
+    for (let index = 1; index < points.length; index++) {
+        ctx.lineTo(points[index].x + offsetX, points[index].y + offsetY);
+    }
+    ctx.closePath();
+    return true;
 }
 
 function getDoorRenderRect(door, progress) {
@@ -877,7 +925,10 @@ function drawSurvivTreeTrunk(ctx, tree, radius, variant, drawBranches = true) {
     const seedX = Number(tree.x) || 0;
     const seedY = Number(tree.y) || 0;
     const birch = variant === 'birch';
-    const trunkRadius = radius * (variant === 'ancientOak' ? 0.32 : 0.255);
+    const configuredScale = Number(tree.trunkScale);
+    const trunkRadius = radius * (configuredScale > 0
+        ? configuredScale
+        : variant === 'ancientOak' ? 0.32 : 0.255);
 
     // Short branch shoulders remain under the canopy and make the visible
     // brown area read as a real trunk instead of a flat brown bullseye.
@@ -980,19 +1031,26 @@ function drawLegacyTree(ctx, tree, radius, hue, variant) {
     if (variant === 'pine' || variant === 'giantPine') {
         const layers = variant === 'giantPine' ? 4 : 3;
         for (let layer = 0; layer < layers; layer++) {
-            const layerRadius = radius * (0.9 - layer * 0.15);
-            ctx.fillStyle = `hsl(${hue + layer * 3}, ${34 + layer * 3}%, ${22 + layer * 6}%)`;
-            ctx.beginPath();
-            for (let point = 0; point < 18; point++) {
-                const angle = (point / 18) * Math.PI * 2 + layer * 0.19;
-                const pointRadius = layerRadius * (point % 2 === 0 ? 1 : 0.68);
-                const x = Math.cos(angle) * pointRadius - layer * radius * 0.035;
-                const y = Math.sin(angle) * pointRadius * 0.9 - radius * (0.1 + layer * 0.05);
-                if (point === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
+            const layerRadius = radius * (0.88 - layer * 0.14);
+            const offsetX = -layer * radius * 0.035;
+            const offsetY = -radius * (0.08 + layer * 0.075);
+            traceOrganicTreeShape(
+                ctx,
+                layerRadius,
+                (Number(tree.x) || 0) + layer * 31,
+                (Number(tree.y) || 0) - layer * 19,
+                offsetX,
+                offsetY,
+                18,
+                0.18,
+            );
+            ctx.fillStyle = `hsl(${hue + layer * 4}, ${36 + layer * 3}%, ${24 + layer * 6}%)`;
             ctx.fill();
+            if (layer === 0) {
+                ctx.strokeStyle = 'rgba(15, 32, 18, 0.36)';
+                ctx.lineWidth = Math.max(2, radius * 0.045);
+                ctx.stroke();
+            }
         }
         return;
     }
@@ -2323,7 +2381,7 @@ export class SurvivRenderer {
                     for (const obstacle of bucket) {
                         if (obstacle._predictionQueryToken === queryToken) continue;
                         obstacle._predictionQueryToken = queryToken;
-                        const rect = obstacle.kind === 'door' ? getDoorCollisionRect(obstacle) : obstacle;
+                        const rect = getObstacleCollisionRect(obstacle);
                         const halfW = rect.w / 2;
                         const halfH = rect.h / 2;
                         const rotation = -(Number(rect.rotation) || 0);
@@ -3601,7 +3659,7 @@ export class SurvivRenderer {
                 for (const obstacle of bucket) {
                     if (seen.has(obstacle.id)) continue;
                     seen.add(obstacle.id);
-                    const collisionShape = obstacle.kind === 'door' ? getDoorCollisionRect(obstacle) : obstacle;
+                    const collisionShape = getObstacleCollisionRect(obstacle);
                     if (this.pointInsideRect(collisionShape, x, y, padding)) return obstacle;
                 }
             }
@@ -3643,16 +3701,39 @@ export class SurvivRenderer {
 
     pointInsideRect(o, x, y, pad = 0) {
         const rotation = -(Number(o.rotation) || 0);
-        if (Math.abs(rotation) < 0.00001) {
-            return x >= o.x - o.w / 2 - pad && x <= o.x + o.w / 2 + pad
-                && y >= o.y - o.h / 2 - pad && y <= o.y + o.h / 2 + pad;
-        }
         const dx = x - o.x;
         const dy = y - o.y;
         const cos = Math.cos(rotation);
         const sin = Math.sin(rotation);
         const localX = dx * cos - dy * sin;
         const localY = dx * sin + dy * cos;
+        if (Array.isArray(o.footprint) && o.footprint.length >= 3) {
+            let inside = false;
+            let edgeDistance = Infinity;
+            for (let i = 0, j = o.footprint.length - 1; i < o.footprint.length; j = i++) {
+                const a = o.footprint[i];
+                const b = o.footprint[j];
+                const crosses = (a.y > localY) !== (b.y > localY)
+                    && localX < (b.x - a.x) * (localY - a.y) / ((b.y - a.y) || 1e-9) + a.x;
+                if (crosses) inside = !inside;
+                const segmentX = b.x - a.x;
+                const segmentY = b.y - a.y;
+                const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+                const amount = lengthSquared > 0
+                    ? clamp(((localX - a.x) * segmentX + (localY - a.y) * segmentY) / lengthSquared, 0, 1)
+                    : 0;
+                edgeDistance = Math.min(edgeDistance, Math.hypot(
+                    localX - (a.x + segmentX * amount),
+                    localY - (a.y + segmentY * amount),
+                ));
+            }
+            if (pad >= 0) return inside || edgeDistance <= pad;
+            return inside && edgeDistance >= -pad;
+        }
+        if (Math.abs(rotation) < 0.00001) {
+            return x >= o.x - o.w / 2 - pad && x <= o.x + o.w / 2 + pad
+                && y >= o.y - o.h / 2 - pad && y <= o.y + o.h / 2 + pad;
+        }
         return Math.abs(localX) <= o.w / 2 + pad && Math.abs(localY) <= o.h / 2 + pad;
     }
 
@@ -5509,36 +5590,53 @@ export class SurvivRenderer {
             && Math.max(width, height) >= 20;
         if (!width || !height || (CAST_SHADOW_EXEMPT_KINDS.has(kind) && !indoorRaisedObject)) return;
 
+        // In a nearly vertical top-down view a tree crown should not project a
+        // large side-on oval. Its foliage already contains its own value
+        // layering, so only retain a compact contact shadow at the solid trunk.
+        if (kind === 'tree') {
+            const collision = getObstacleCollisionRect(o);
+            ctx.save();
+            ctx.translate(0, Math.max(1, height * 0.025));
+            ctx.fillStyle = 'rgba(7, 12, 8, 0.11)';
+            ctx.beginPath();
+            ctx.ellipse(
+                0,
+                0,
+                Math.max(4, collision.w * 0.58),
+                Math.max(3, collision.h * 0.42),
+                0,
+                0,
+                Math.PI * 2,
+            );
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
+
         // The light direction is fixed in world space. Convert it to the
         // obstacle's local space so rotating a prop never rotates its shadow.
         const rotation = Number(o.rotation) || 0;
         const minSize = Math.min(width, height);
         const tall = TALL_CAST_SHADOW_KINDS.has(kind);
-        const distance = kind === 'bridge' ? 5
-            : kind === 'wall' || kind === 'interiorWall' || kind === 'door' ? 6
-                : clamp(minSize * (tall ? 0.21 : 0.15), tall ? 8 : 5, tall ? 18 : 13);
+        const distance = kind === 'bridge' ? 3
+            : kind === 'wall' || kind === 'interiorWall' || kind === 'door' ? 3.5
+                : clamp(minSize * (tall ? 0.10 : 0.08), tall ? 3 : 2, tall ? 8 : 6);
         const worldOffsetX = distance * 0.62;
         const worldOffsetY = distance;
         const localOffsetX = Math.cos(rotation) * worldOffsetX + Math.sin(rotation) * worldOffsetY;
         const localOffsetY = -Math.sin(rotation) * worldOffsetX + Math.cos(rotation) * worldOffsetY;
-        const softPad = Math.min(7, Math.max(2.5, minSize * 0.12));
-        const coreAlpha = indoorRaisedObject ? 0.29
-            : kind === 'wall' || kind === 'interiorWall' ? 0.17
-            : kind === 'bridge' ? 0.18
-                : tall ? 0.25 : 0.22;
+        const softPad = Math.min(4, Math.max(1.5, minSize * 0.07));
+        const coreAlpha = indoorRaisedObject ? 0.16
+            : kind === 'wall' || kind === 'interiorWall' ? 0.10
+            : kind === 'bridge' ? 0.10
+                : tall ? 0.12 : 0.11;
 
         const traceShadowShape = (padding) => {
             if (ROUND_CAST_SHADOW_KINDS.has(kind)) {
-                // Tree foliage deliberately overhangs its solid trunk hitbox.
-                // Match that visual footprint here without changing collision.
-                const radiusX = kind === 'tree'
-                    ? width * 0.64 + padding
-                    : width / 2 + padding;
-                const radiusY = kind === 'tree'
-                    ? height * 0.50 + padding
-                    : height * 0.42 + padding;
+                const radiusX = width / 2 + padding;
+                const radiusY = height * 0.42 + padding;
                 ctx.beginPath();
-                ctx.ellipse(0, kind === 'tree' ? height * -0.08 : 0, radiusX, radiusY, 0.16, 0, Math.PI * 2);
+                ctx.ellipse(0, 0, radiusX, radiusY, 0.16, 0, Math.PI * 2);
                 return;
             }
             if (kind === 'tent') {
@@ -5560,11 +5658,11 @@ export class SurvivRenderer {
             );
         };
 
-        // A wide low-opacity silhouette plus a tighter contact silhouette
-        // produces a soft readable shadow without an expensive per-frame blur.
+        // Two restrained, nearly aligned shapes keep height readable without
+        // turning the top-down scene into a collection of long dark cut-outs.
         ctx.save();
         ctx.translate(localOffsetX * 1.16, localOffsetY * 1.16);
-        ctx.fillStyle = 'rgba(7, 12, 8, 0.09)';
+        ctx.fillStyle = 'rgba(7, 12, 8, 0.035)';
         traceShadowShape(softPad);
         ctx.fill();
         ctx.restore();
@@ -5729,6 +5827,12 @@ export class SurvivRenderer {
             ctx.shadowColor = 'transparent';
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
+            const clippedFootprint = Array.isArray(o.footprint) && o.footprint.length >= 3;
+            if (clippedFootprint) {
+                ctx.save();
+                traceObstacleFootprint(ctx, o);
+                ctx.clip();
+            }
             // Floor with gradient for depth
             const floorColors = {
                 mansion: { main: '#756f63', dark: '#5a554c', line: 'rgba(240,226,196,0.10)' },
@@ -5987,6 +6091,7 @@ export class SurvivRenderer {
             ctx.lineWidth = 1;
             roundRect(ctx, -o.w / 2 + 3, -o.h / 2 + 3, o.w - 6, o.h - 6, 4);
             ctx.stroke();
+            if (clippedFootprint) ctx.restore();
         } else if (kind === 'door') {
             const horizontal = o.w >= o.h;
             const longSize = horizontal ? o.w : o.h;
@@ -7185,7 +7290,7 @@ export class SurvivRenderer {
         // Cache at the same physical density the world is displayed at. The old
         // 1x sprites were enlarged by camera zoom, making props and floors soft.
         const scale = Math.min(1.6, Math.max(1, (this.targetZoom || 1) * (this.renderDpr || 1)));
-        const key = [o.id, kind, o.variant || '', o.canopyStyle || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || '', scale.toFixed(2)].join(':');
+        const key = [o.id, kind, o.variant || '', o.canopyStyle || '', o.treeSize || '', o.trunkScale || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.orientation || '', o.role || '', scale.toFixed(2)].join(':');
         let sprite = this._obstacleSpriteCache.get(key);
         if (sprite) {
             this._obstacleSpriteCache.delete(key);
@@ -8672,6 +8777,56 @@ export class SurvivRenderer {
         const hw = o.w / 2;
         const hh = o.h / 2;
 
+        if (Array.isArray(o.footprint) && o.footprint.length >= 5) {
+            // Concave residences use one clean continuous roof matching the
+            // actual walkable footprint instead of a rectangular cap over the
+            // missing corner. Restrained seams keep it readable at game scale.
+            ctx.save();
+            ctx.translate(11, 16);
+            traceObstacleFootprint(ctx, o);
+            ctx.fillStyle = 'rgba(7, 10, 8, 0.30)';
+            ctx.fill();
+            ctx.restore();
+
+            const hue = Number(o.hue) || 110;
+            const roofGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            roofGrad.addColorStop(0, `hsl(${hue}, 22%, 43%)`);
+            roofGrad.addColorStop(0.55, `hsl(${hue}, 24%, 27%)`);
+            roofGrad.addColorStop(1, `hsl(${hue + 5}, 21%, 38%)`);
+            traceObstacleFootprint(ctx, o);
+            ctx.fillStyle = roofGrad;
+            ctx.fill();
+
+            ctx.save();
+            traceObstacleFootprint(ctx, o);
+            ctx.clip();
+            ctx.strokeStyle = 'rgba(13, 22, 24, 0.24)';
+            ctx.lineWidth = 1.4;
+            const rowHeight = 24;
+            for (let rowY = -hh + rowHeight; rowY < hh; rowY += rowHeight) {
+                ctx.beginPath();
+                ctx.moveTo(-hw, rowY);
+                ctx.lineTo(hw, rowY);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = 'rgba(224, 235, 226, 0.30)';
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.moveTo(-hw + 24, 0);
+            ctx.lineTo(hw - 24, 0);
+            ctx.moveTo(0, -hh + 24);
+            ctx.lineTo(0, hh - 24);
+            ctx.stroke();
+            ctx.restore();
+
+            traceObstacleFootprint(ctx, o);
+            ctx.strokeStyle = '#263136';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
+
         // Stable two-stage roof shadow. Its direction stays fixed in world
         // space even if a future building is rotated.
         const roofRotation = Number(o.rotation) || 0;
@@ -9428,7 +9583,10 @@ export class SurvivRenderer {
         if (o.w > 2000 || o.h > 1400) return false;
 
         const scale = Math.min(1.6, Math.max(1, (this.targetZoom || 1) * (this.renderDpr || 1)));
-        const key = [o.id, o.variant || '', o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.label || '', o.landmarkType || '', scale.toFixed(2)].join(':');
+        const footprintKey = Array.isArray(o.footprint)
+            ? o.footprint.map(point => `${point.x},${point.y}`).join(';')
+            : '';
+        const key = [o.id, o.variant || '', footprintKey, o.x, o.y, o.w, o.h, Number(o.rotation || 0).toFixed(3), o.label || '', o.landmarkType || '', scale.toFixed(2)].join(':');
         let sprite = this._roofSpriteCache.get(key);
         if (sprite) {
             this._roofSpriteCache.delete(key);
