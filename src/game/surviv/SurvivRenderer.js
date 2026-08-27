@@ -10340,3 +10340,39 @@ export class SurvivRenderer {
         }
     }
 }
+
+// Draws the exact gameplay character silhouette for lightweight non-game
+// surfaces such as the skin customizer, without constructing a live renderer.
+export function drawSurvivPlayerPreview(ctx, {
+    x = 0,
+    y = 0,
+    angle = 0,
+    color = '#77c7c8',
+    weapon = 'm416',
+    scale = 1,
+} = {}) {
+    const renderer = Object.create(SurvivRenderer.prototype);
+    renderer.myId = '__surviv_preview__';
+    renderer._frameNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    renderer._weaponSwitchT = 0;
+    renderer._playerHitAt = new Map();
+    renderer._muzzleFlash = 0;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    renderer.drawPlayer(ctx, {
+        id: '__surviv_preview__',
+        isYou: true,
+        x: 0,
+        y: 0,
+        angle,
+        color,
+        weapon,
+        hp: 100,
+        maxHp: 100,
+        vestLevel: 0,
+        walkBob: 0,
+    }, false);
+    ctx.restore();
+}

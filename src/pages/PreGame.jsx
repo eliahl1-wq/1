@@ -8,6 +8,7 @@ import '../styles/slitherSpecialSkins.css';
 import '../styles/pregameModeSelector.css';
 import CustomDropdown from '../components/CustomDropdown';
 import PregameGameBackground from '../components/PregameGameBackground';
+import { drawSurvivPlayerPreview } from '../game/surviv/SurvivRenderer.js';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
@@ -2331,26 +2332,67 @@ const RANDOM_PREVIEW_SNAKE_COLORS = Object.freeze(Array.from({ length: 48 }, (_,
     randomPreviewColor((index / 48) * RANDOM_PREVIEW_DURATION_MS)
 )));
 function SurvivSkinPreview({ color, isLarge, nickname }) {
+    const canvasRef = useRef(null);
     const isRandom = color === 'random' || color === 'random_color';
     const displayColor = isRandom ? '#80d0d0' : color;
     const displayName = (nickname || 'SURVIV').slice(0, 10).toUpperCase();
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return undefined;
+
+        let cancelled = false;
+        let animationFrameId = 0;
+        let resizeObserver = null;
+
+        const paint = (time = performance.now()) => {
+            if (cancelled) return;
+            const bounds = canvas.getBoundingClientRect();
+            if (bounds.width <= 0 || bounds.height <= 0) return;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const pixelWidth = Math.max(1, Math.round(bounds.width * dpr));
+            const pixelHeight = Math.max(1, Math.round(bounds.height * dpr));
+            if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+                canvas.width = pixelWidth;
+                canvas.height = pixelHeight;
+            }
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, bounds.width, bounds.height);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            drawSurvivPlayerPreview(ctx, {
+                x: bounds.width * 0.43,
+                y: bounds.height * (isLarge ? 0.47 : 0.5),
+                angle: -0.18,
+                color: isRandom ? randomPreviewColor(time) : displayColor,
+                weapon: 'm416',
+                scale: isLarge ? 2.75 : 1.65,
+            });
+
+            if (isRandom) animationFrameId = requestAnimationFrame(paint);
+        };
+
+        paint();
+        resizeObserver = new ResizeObserver(() => paint());
+        resizeObserver.observe(canvas);
+
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(animationFrameId);
+            resizeObserver?.disconnect();
+        };
+    }, [displayColor, isLarge, isRandom]);
 
     return (
         <div
             className={`surviv-skin-preview ${isLarge ? 'large' : 'small'} ${isRandom ? 'is-random' : ''}`}
             style={{ '--surviv-skin-color': displayColor }}
         >
-            <div className="surviv-preview-grid" aria-hidden="true"></div>
-            <div className="surviv-preview-shadow" aria-hidden="true"></div>
-            <div className="surviv-preview-player">
-                <div className="surviv-preview-arm left" aria-hidden="true"></div>
-                <div className="surviv-preview-arm right" aria-hidden="true"></div>
-                <div className="surviv-preview-body">
-                    <div className="surviv-preview-vest" aria-hidden="true"></div>
-                    <div className="surviv-preview-head" aria-hidden="true"></div>
-                </div>
-                <div className="surviv-preview-weapon" aria-hidden="true"></div>
-            </div>
+            <canvas ref={canvasRef} className="surviv-preview-canvas" aria-label="Surviv skin preview" />
             {isLarge && <div className="surviv-preview-name">{displayName}</div>}
         </div>
     );

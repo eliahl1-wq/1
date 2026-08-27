@@ -926,130 +926,14 @@ a:focus-visible {
   height: 200px;
 }
 
-.surviv-preview-grid {
+.surviv-preview-canvas {
   position: absolute;
-  inset: 9% 7%;
-  border-radius: 12px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    radial-gradient(circle at 35% 40%, rgba(128, 208, 208, 0.12), transparent 42%);
-  background-size: 26px 26px, 26px 26px, 100% 100%;
-  opacity: 0.95;
-  z-index: 0;
-}
-
-.surviv-preview-shadow {
-  position: absolute;
-  width: 84px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.36);
-  filter: blur(8px);
-  transform: translateY(34px);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
   z-index: 1;
-}
-
-.surviv-skin-preview.large .surviv-preview-shadow {
-  width: 122px;
-  height: 36px;
-  transform: translateY(47px);
-}
-
-.surviv-preview-player {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  transform: rotate(-16deg);
-  z-index: 2;
-  filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.36));
-}
-
-.surviv-skin-preview.large .surviv-preview-player {
-  width: 92px;
-  height: 92px;
-}
-
-.surviv-preview-body {
-  position: absolute;
-  inset: 13% 15%;
-  border-radius: 42% 42% 38% 38%;
-  background:
-    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.32), transparent 26%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.18), transparent 38%),
-    var(--surviv-skin-color);
-  border: 3px solid rgba(0, 0, 0, 0.46);
-  box-shadow: inset 0 -10px 0 rgba(0, 0, 0, 0.16);
-}
-
-.surviv-preview-vest {
-  position: absolute;
-  left: 19%;
-  right: 19%;
-  bottom: 12%;
-  height: 34%;
-  border-radius: 6px;
-  background: rgba(34, 39, 43, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.surviv-preview-head {
-  position: absolute;
-  left: 50%;
-  top: -15%;
-  width: 42%;
-  height: 42%;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background: var(--surviv-skin-color);
-  border: 3px solid rgba(0, 0, 0, 0.46);
-  box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.22);
-}
-
-.surviv-preview-arm {
-  position: absolute;
-  width: 16%;
-  height: 42%;
-  top: 34%;
-  border-radius: 999px;
-  background: var(--surviv-skin-color);
-  border: 2px solid rgba(0, 0, 0, 0.42);
-  z-index: -1;
-}
-
-.surviv-preview-arm.left {
-  left: 2%;
-  transform: rotate(18deg);
-}
-
-.surviv-preview-arm.right {
-  right: 2%;
-  transform: rotate(-18deg);
-}
-
-.surviv-preview-weapon {
-  position: absolute;
-  width: 70%;
-  height: 12%;
-  right: -38%;
-  top: 40%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #1d2226 0 62%, #343c42 62% 82%, #121619 82%);
-  border: 2px solid rgba(0, 0, 0, 0.55);
-  transform: rotate(4deg);
-  transform-origin: left center;
-}
-
-.surviv-preview-weapon::after {
-  content: "";
-  position: absolute;
-  left: 34%;
-  top: 70%;
-  width: 18%;
-  height: 140%;
-  border-radius: 2px;
-  background: #161a1d;
-  transform: rotate(-12deg);
+  pointer-events: none;
 }
 
 .surviv-preview-name {
@@ -1069,17 +953,6 @@ a:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
-.surviv-skin-preview.is-random .surviv-preview-body,
-.surviv-skin-preview.is-random .surviv-preview-head,
-.surviv-skin-preview.is-random .surviv-preview-arm {
-  animation: surviv-preview-random-color 4.5s ease-in-out infinite;
-}
-
-@keyframes surviv-preview-random-color {
-  0%, 100% { background-color: #80d0d0; }
-  33% { background-color: #c080ff; }
-  66% { background-color: #ffa060; }
-}
 .flag-pack-icon {
   display: grid;
   place-items: center;
