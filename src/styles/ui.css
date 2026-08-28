@@ -2483,9 +2483,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   padding: var(--currency-switch-pad);
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  border: 1px solid rgba(117, 86, 191, 0.38);
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(8, 9, 14, 0.88);
   color: rgba(255, 255, 255, 0.55);
   font-family: var(--ui);
   font-size: 0.69rem;
@@ -2493,14 +2493,14 @@
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 2px 7px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(64, 40, 112, 0.08);
   transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
   isolation: isolate;
 }
 
 .currency-switch-button:hover {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.075);
+  border-color: rgba(139, 101, 222, 0.55);
+  background: rgba(12, 12, 19, 0.94);
 }
 
 .currency-switch-button:active {
@@ -2520,9 +2520,9 @@
   left: var(--currency-switch-pad);
   width: calc((100% - (var(--currency-switch-pad) * 2)) / 2);
   border-radius: var(--r-full);
-  background: linear-gradient(180deg, #3b414d 0%, #2c313b 100%);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #24202e 0%, #191620 100%);
+  border: 1px solid rgba(128, 91, 204, 0.28);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.045);
   transform: translateX(100%);
   transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
 }
@@ -4973,5 +4973,53 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 
   .topbar-nav--desktop .gm-nav-link--active::after {
     content: none;
+  }
+}
+
+/* Mobile: keep the primary header uncluttered and give the currency control
+   its own compact row directly beneath it. */
+@media (max-width: 768px) {
+  .topbar {
+    height: 96px;
+    align-items: flex-start;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    height: 52px;
+    align-items: center;
+  }
+
+  .topbar-currency-switch {
+    position: absolute;
+    top: 57px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .currency-switch-button--topbar {
+    width: 136px;
+    height: 32px;
+    min-height: 32px;
+  }
+
+  .topbar-mobile-menu {
+    top: 96px;
+  }
+
+  .test-mode-banner {
+    top: 104px;
+  }
+
+  .page-shell--pregame {
+    padding-top: 96px;
+  }
+
+  .page-shell--pregame:has(.test-mode-banner) {
+    padding-top: 136px;
+  }
+
+  .page-content {
+    padding-top: 116px;
   }
 }
