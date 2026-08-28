@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createQR } from '@solana/pay';
 import '../styles/ui.css';
-import CustomDropdown from '../components/CustomDropdown';
+import CurrencySwitchButton from '../components/CurrencySwitchButton';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
@@ -11,16 +11,12 @@ import { MIN_ENTRY_FEE } from '../constants/economy';
 import { setPageSeo, SEO } from '../utils/seo';
 import { API_URL } from '../utils/apiBase';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
+import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 const SolLogo = ({ size = 13, style }) => (
     <img src="/solana-sol-logo.png" alt="SOL"
         style={{ height: size, width: 'auto', objectFit: 'contain', display: 'inline-block', verticalAlign: 'middle', flexShrink: 0, ...style }} />
 );
-
-const CUR_OPTIONS = [
-    { label: 'USD', value: 'USD' },
-    { label: 'SOL', value: 'SOL' },
-];
 
 export default function Lobby() {
     const { user, logout, token, refreshUser } = useAuth();
@@ -30,12 +26,10 @@ export default function Lobby() {
     const [statusMsg, setStatusMsg] = useState('');
     const [arenaError, setArenaError] = useState('');
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(false);
-    const [isCurSOL, setIsCurSOL] = useState(() => localStorage.getItem('balance_currency') === 'SOL');
+    const [balanceCurrency, setBalanceCurrency] = useBalanceCurrency();
+    const isCurSOL = balanceCurrency === 'SOL';
+    const setIsCurSOL = useCallback(value => setBalanceCurrency(value ? 'SOL' : 'USD'), [setBalanceCurrency]);
     const solPrice = user?.solPrice || 64;
-
-    useEffect(() => {
-        localStorage.setItem('balance_currency', isCurSOL ? 'SOL' : 'USD');
-    }, [isCurSOL]);
 
     const qrRef = useRef(null);
     const userMenuRef = useRef(null);
@@ -149,20 +143,9 @@ export default function Lobby() {
                                     {/* Currency toggle in menu */}
                                     <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
                                         <span className="label">Currency</span>
-                                        <CustomDropdown
-                                            options={CUR_OPTIONS}
+                                        <CurrencySwitchButton
                                             value={isCurSOL ? 'SOL' : 'USD'}
                                             onChange={v => setIsCurSOL(v === 'SOL')}
-                                            renderValue={v => (
-                                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
-                                                </span>
-                                            )}
-                                            renderOption={opt => (
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
-                                                </span>
-                                            )}
                                         />
                                     </div>
                                     <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transaction History</button>

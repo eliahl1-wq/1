@@ -1186,6 +1186,101 @@ function traceOrganicPond(ctx, obstacle, padding = 0, scale = 1) {
     traceSmoothPath(ctx, points, 0, 0, true);
 }
 
+const WOOD_INTERIOR_PROP_VARIANTS = new Set([
+    'bed', 'coffeeTable', 'nightstand', 'diningTable', 'desk', 'bookshelf',
+    'displayShelf', 'salesCounter', 'wardrobe', 'sideboard', 'entryBench',
+    'dresser', 'workbench', 'palletStack', 'weaponRack', 'mapTable',
+]);
+const METAL_INTERIOR_PROP_VARIANTS = new Set([
+    'bunkBed', 'prisonBench', 'hospitalBed', 'labBench', 'serverRack',
+    'generator', 'storageShelf', 'locker', 'toolCabinet', 'medicalCabinet',
+    'ammoLocker', 'controlConsole', 'machine', 'industrial',
+]);
+const SOFT_INTERIOR_PROP_VARIANTS = new Set(['sofa', 'armchair']);
+const CERAMIC_INTERIOR_PROP_VARIANTS = new Set(['toilet', 'bathtub', 'vanity', 'specimenTank']);
+
+function drawInteriorPropFinish(ctx, o, variant, w, h) {
+    const hw = w / 2;
+    const hh = h / 2;
+    const minSize = Math.min(w, h);
+    const horizontal = w >= h;
+
+    // Tiny material cues are shared by every prop in a family, keeping a
+    // coherent visual language even when homes, shops and laboratories use
+    // completely different silhouettes.
+    if (WOOD_INTERIOR_PROP_VARIANTS.has(variant)) {
+        ctx.strokeStyle = 'rgba(255, 226, 177, 0.18)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (horizontal) {
+            ctx.moveTo(-hw + 8, -hh + 5);
+            ctx.quadraticCurveTo(0, -hh + 2, hw - 8, -hh + 5);
+        } else {
+            ctx.moveTo(-hw + 5, -hh + 8);
+            ctx.quadraticCurveTo(-hw + 2, 0, -hw + 5, hh - 8);
+        }
+        ctx.stroke();
+    } else if (METAL_INTERIOR_PROP_VARIANTS.has(variant)) {
+        ctx.fillStyle = 'rgba(218, 230, 228, 0.42)';
+        const inset = Math.max(4, Math.min(7, minSize * 0.16));
+        const rivet = Math.max(1, Math.min(1.8, minSize * 0.045));
+        for (const [x, y] of [[-hw + inset, -hh + inset], [hw - inset, -hh + inset]]) {
+            ctx.beginPath();
+            ctx.arc(x, y, rivet, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else if (SOFT_INTERIOR_PROP_VARIANTS.has(variant)) {
+        ctx.strokeStyle = 'rgba(224, 237, 229, 0.20)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        roundRect(ctx, -hw + 8, -hh + 8, Math.max(1, w - 16), Math.max(1, h - 16), 3);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    } else if (CERAMIC_INTERIOR_PROP_VARIANTS.has(variant)) {
+        ctx.strokeStyle = 'rgba(255, 255, 249, 0.42)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-hw * 0.44, -hh * 0.46);
+        ctx.lineTo(hw * 0.10, -hh * 0.46);
+        ctx.stroke();
+    }
+
+    const maxHp = Number(o.maxHp);
+    const hp = Number(o.hp);
+    if (!(maxHp > 0) || !Number.isFinite(hp)) return;
+    const damage = clamp(1 - hp / maxHp, 0, 1);
+    if (damage < 0.08) return;
+
+    // Authoritative damage is readable on the object itself. Deterministic
+    // marks avoid animated noise and remain cheap enough for dense interiors.
+    const metal = METAL_INTERIOR_PROP_VARIANTS.has(variant);
+    const ceramic = CERAMIC_INTERIOR_PROP_VARIANTS.has(variant);
+    ctx.strokeStyle = ceramic
+        ? `rgba(57, 74, 77, ${0.30 + damage * 0.36})`
+        : metal
+            ? `rgba(18, 24, 25, ${0.28 + damage * 0.38})`
+            : `rgba(42, 29, 22, ${0.24 + damage * 0.40})`;
+    ctx.lineWidth = damage > 0.62 ? 2 : 1.3;
+    ctx.lineCap = 'round';
+    const markCount = damage > 0.68 ? 3 : damage > 0.34 ? 2 : 1;
+    const seedX = (Number(o.x) || 0) * 0.013;
+    const seedY = (Number(o.y) || 0) * 0.017;
+    for (let index = 0; index < markCount; index++) {
+        const nx = seededNoise(seedX + index * 7.1, seedY + 2.3) - 0.5;
+        const ny = seededNoise(seedY + index * 5.9, seedX + 8.7) - 0.5;
+        const x = nx * w * 0.48;
+        const y = ny * h * 0.48;
+        const length = Math.min(12, minSize * (0.18 + damage * 0.13));
+        ctx.beginPath();
+        ctx.moveTo(x - length * 0.55, y - length * 0.18);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + length * 0.36, y + length * 0.42);
+        if (damage > 0.52) ctx.lineTo(x + length * 0.58, y + length * 0.10);
+        ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+}
+
 function drawFurnitureTopDown(ctx, o, variant) {
     const w = o.w;
     const h = o.h;
@@ -1681,6 +1776,8 @@ function drawFurnitureTopDown(ctx, o, variant) {
         drawBox('#705039', '#36271e', 4);
         drawWoodGrain(0.15);
     }
+
+    drawInteriorPropFinish(ctx, o, variant, w, h);
 }
 
 function biomeAt() {

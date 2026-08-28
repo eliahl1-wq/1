@@ -4,10 +4,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import ProductPageHeader from '../components/ProductPageHeader';
-import CustomDropdown from '../components/CustomDropdown';
+import CurrencySwitchButton from '../components/CurrencySwitchButton';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
 import { API_URL } from '../utils/apiBase';
+import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 const SolLogo = ({ size = 13, style }) => (
     <img
@@ -45,7 +46,7 @@ export default function Profile() {
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs] = useState([]);
-    const [displayCur, setDisplayCur] = useState(() => localStorage.getItem('balance_currency') || 'USD');
+    const [displayCur, setDisplayCur] = useBalanceCurrency();
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
@@ -292,26 +293,9 @@ export default function Profile() {
                                     <div style={{ position: 'relative', zIndex: 1 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                             <span className="label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Available Balance</span>
-                                            <CustomDropdown
-                                                options={[
-                                                    { label: 'SOL', value: 'SOL' },
-                                                    { label: 'USD', value: 'USD' }
-                                                ]}
+                                            <CurrencySwitchButton
                                                 value={displayCur}
-                                                onChange={val => {
-                                                    setDisplayCur(val);
-                                                    localStorage.setItem('balance_currency', val);
-                                                }}
-                                                renderValue={v => (
-                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        {v === 'SOL' ? <><SolLogo size={10} /> SOL</> : '$ USD'}
-                                                    </span>
-                                                )}
-                                                renderOption={opt => (
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        {opt.value === 'SOL' ? <><SolLogo size={11} /> SOL</> : '$ USD'}
-                                                    </span>
-                                                )}
+                                                onChange={setDisplayCur}
                                             />
                                         </div>
 

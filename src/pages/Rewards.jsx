@@ -7,11 +7,13 @@ import AffiliateRewardsPanel from '../components/AffiliateRewardsPanel';
 import { API_URL } from '../utils/apiBase';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import '../styles/rewards.css';
+import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 export default function Rewards() {
     const { user, loading, refreshUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    const [balanceCurrency] = useBalanceCurrency();
     const [history, setHistory] = useState([]);
     const [historyLoaded, setHistoryLoaded] = useState(false);
     const [claimStatus, setClaimStatus] = useState(null); // { type: 'success'|'error'|'loading', message: string }
@@ -141,7 +143,7 @@ export default function Rewards() {
     const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
     const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 2;
     const solPrice = Number(user.solPrice) || 0;
-    const isSolView = localStorage.getItem('balance_currency') === 'SOL' && solPrice > 0;
+    const isSolView = balanceCurrency === 'SOL' && solPrice > 0;
     const nextRewardLabel = isSolView
         ? `${(permanentCycleReward / solPrice).toFixed(6)} SOL`
         : `$${permanentCycleReward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;

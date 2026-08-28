@@ -3,11 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
 import { hasUnseenActiveTournament, TOURNAMENT_SEEN_EVENT } from '../utils/tournamentNotifications';
+import useBalanceCurrency from '../hooks/useBalanceCurrency';
+import CurrencySwitchButton from './CurrencySwitchButton';
 
 export default function AppTopbar({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
+    const [balanceCurrency, setBalanceCurrency] = useBalanceCurrency();
     const [menuOpen, setMenuOpen] = useState(false);
     const [hasTournamentNotification, setHasTournamentNotification] = useState(false);
 
@@ -131,15 +134,20 @@ export default function AppTopbar({ children }) {
                     </div>
                 </div>
 
-                {(children || !user) && (
-                    <div className="topbar-right">
-                        {children || (
+                <div className="topbar-right">
+                    <div className="topbar-currency-switch" aria-label="Balance display currency">
+                        <CurrencySwitchButton
+                            value={balanceCurrency}
+                            onChange={setBalanceCurrency}
+                            className="currency-switch-button--topbar"
+                        />
+                    </div>
+                    {children || (!user && (
                             <button type="button" className="nav-deposit-btn" onClick={() => navigate('/login')}>
                                 Login
                             </button>
-                        )}
-                    </div>
-                )}
+                    ))}
+                </div>
             </nav>
 
             {menuOpen && (

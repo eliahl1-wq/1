@@ -6,7 +6,7 @@ import '../styles/ui.css';
 import '../styles/tournaments.css';
 import '../styles/slitherSpecialSkins.css';
 import '../styles/pregameModeSelector.css';
-import CustomDropdown from '../components/CustomDropdown';
+import CurrencySwitchButton from '../components/CurrencySwitchButton';
 import PregameGameBackground from '../components/PregameGameBackground';
 import { drawSurvivPlayerPreview } from '../game/surviv/SurvivRenderer.js';
 import AppTopbar from '../components/AppTopbar';
@@ -33,6 +33,7 @@ import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import { FREE_MODE_STORAGE_KEY, getFreeModeEntryFee, setPublicFreeModeEnabled } from '../utils/freeMode';
 import { formatGameSolAmount, formatWalletBalanceAmount } from '../utils/displayCurrency';
+import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.gg/m5mWMu8aF';
 
@@ -103,11 +104,6 @@ const WithdrawIcon = ({ size = 14 }) => (
         <path d="M10 16.5v-8M6.75 11.75 10 8.5l3.25 3.25M4 5.5h12" />
     </svg>
 );
-const CUR_OPTIONS = [
-    { label: 'USD', value: 'USD' },
-    { label: 'SOL', value: 'SOL' },
-];
-
 function readStoredGameMode() {
     return localStorage.getItem('selected_gamemode') || localStorage.getItem('current_game_mode') || null;
 }
@@ -232,7 +228,9 @@ export default function PreGame() {
     const [withdrawAddress, setWithdrawAddress] = useState('');
     const [isValidWithdrawAddress, setIsValidWithdrawAddress] = useState(true);
     const [displayFullAddress, setDisplayFullAddress] = useState(false);
-    const [isCurSOL, setIsCurSOL] = useState(() => localStorage.getItem('balance_currency') === 'SOL');
+    const [balanceCurrency, setBalanceCurrency] = useBalanceCurrency();
+    const isCurSOL = balanceCurrency === 'SOL';
+    const setIsCurSOL = useCallback(value => setBalanceCurrency(value ? 'SOL' : 'USD'), [setBalanceCurrency]);
     const [isMatchmaking, setIsMatchmaking] = useState(false);
 
     const [isAlreadyInGame, setIsAlreadyInGame] = useState(
@@ -351,10 +349,6 @@ export default function PreGame() {
     useEffect(() => {
         localStorage.setItem('selected_skin_surviv', selectedSkinSurviv);
     }, [selectedSkinSurviv]);
-
-    useEffect(() => {
-        localStorage.setItem('balance_currency', isCurSOL ? 'SOL' : 'USD');
-    }, [isCurSOL]);
 
     const [selectedMode, setSelectedMode] = useState(
         () => resolvePreGameMode(location.pathname, location.state?.selectedMode)
@@ -1107,20 +1101,9 @@ export default function PreGame() {
                                                 >
                                                     History
                                                 </button>
-                                                <CustomDropdown
-                                                    options={CUR_OPTIONS}
+                                                <CurrencySwitchButton
                                                     value={isCurSOL ? 'SOL' : 'USD'}
                                                     onChange={v => setIsCurSOL(v === 'SOL')}
-                                                    renderValue={v => (
-                                                        <span className="currency-option currency-option--compact">
-                                                            {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
-                                                        </span>
-                                                    )}
-                                                    renderOption={opt => (
-                                                        <span className="currency-option">
-                                                            {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
-                                                        </span>
-                                                    )}
                                                 />
                                             </div>
 
@@ -1309,23 +1292,12 @@ export default function PreGame() {
                         <div>
                             <div className="withdraw-form__row">
                                 <span className="label">Amount</span>
-                                <CustomDropdown
-                                    options={CUR_OPTIONS}
+                                <CurrencySwitchButton
                                     value={isCurSOL ? 'SOL' : 'USD'}
                                     onChange={v => {
                                         setIsCurSOL(v === 'SOL');
                                         setWithdrawAll(false);
                                     }}
-                                    renderValue={v => (
-                                        <span className="currency-option currency-option--compact">
-                                            {v === 'SOL' ? <><SolLogo size={10} /> Solana</> : '$USD'}
-                                        </span>
-                                    )}
-                                    renderOption={opt => (
-                                        <span className="currency-option">
-                                            {opt.value === 'SOL' ? <><SolLogo size={12} /> Solana</> : '$ USD'}
-                                        </span>
-                                    )}
                                 />
                             </div>
                             <div className="amount-field">

@@ -6,6 +6,7 @@ import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
+import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 const SolLogo = ({ size = 13, style }) => (
     <img
@@ -17,6 +18,7 @@ const SolLogo = ({ size = 13, style }) => (
 
 export default function RewardsWidget() {
     const { user, refreshUser } = useAuth();
+    const [balanceCurrency] = useBalanceCurrency();
     const navigate = useNavigate();
     const location = useLocation();
     const { snapshot: agarMarket, launchReady: agarLaunchReady, openAgarModal } = useAgarToken();
@@ -100,7 +102,7 @@ export default function RewardsWidget() {
     const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
     const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 2;
     const solPrice = Number(user.solPrice) || 0;
-    const isSolView = localStorage.getItem('balance_currency') === 'SOL' && solPrice > 0;
+    const isSolView = balanceCurrency === 'SOL' && solPrice > 0;
     const nextRewardLabel = isSolView
         ? `${(permanentCycleReward / solPrice).toFixed(6)} SOL`
         : `$${permanentCycleReward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
