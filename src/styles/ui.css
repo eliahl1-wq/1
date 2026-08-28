@@ -2520,8 +2520,9 @@
   left: var(--currency-switch-pad);
   width: calc((100% - (var(--currency-switch-pad) * 2)) / 2);
   border-radius: var(--r-full);
-  background: #f1f1f3;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: linear-gradient(180deg, #3b414d 0%, #2c313b 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transform: translateX(100%);
   transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
 }
@@ -2544,7 +2545,7 @@
 }
 
 .currency-switch-button__option.is-active {
-  color: #141419;
+  color: #ffffff;
 }
 
 .currency-switch-button__sol-logo {

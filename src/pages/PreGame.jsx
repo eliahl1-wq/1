@@ -26,7 +26,6 @@ import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
 import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
 import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
-import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
@@ -1052,7 +1051,6 @@ export default function PreGame() {
                                 title={agarLaunchReady ? 'Exchange account SOL for AGAR' : 'Coming Soon'}
                             >
                                 <AgarLogo size={22} />
-                                <span className="agar-nav-balance__symbol">{AGAR.symbol}</span>
                                 <strong className="mono">
                                     {!agarLaunchReady
                                         ? 'Coming Soon'
