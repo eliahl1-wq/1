@@ -147,7 +147,9 @@ export default function GameResultModal({
     }, [isWin, amount]);
 
     const amountSol = solPrice > 0 ? displayAmount / solPrice : 0;
-    const formattedAmountSol = formatGameSolAmount(amountSol);
+    const formattedAmountSol = showSol
+        ? formatWalletBalanceAmount(amountSol)
+        : formatGameSolAmount(amountSol);
     const formattedWalletSol = formatWalletBalanceAmount(walletBalanceSol);
 
     return (
