@@ -7,7 +7,7 @@ import Canvas from './canvas.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ChatClient from './chat-client.js';
 import * as renderUtils from './render.js';
-import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee, formatUsd } from '../../constants/economy';
+import { DEFAULT_ENTRY_FEE, normalizeEntryFee, normalizeBREntryFee } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
@@ -30,6 +30,7 @@ import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
 import { adjustPlayerWheelZoom } from '../../utils/gameWheel.js';
 import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
+import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -90,6 +91,10 @@ export default function Game() {
     const canvasRef = useRef(null);
     const viewportRef = useRef(null);
     const { user, token, refreshUser, applyOptimisticBalanceDelta } = useAuth();
+    const balanceCurrency = getStoredBalanceCurrency();
+    const gameSolPrice = Number(user?.solPrice) || 0;
+    global.balanceCurrency = balanceCurrency;
+    global.solPrice = gameSolPrice;
 
     const pendingAtMount = loadPendingResult('agar');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
@@ -1170,7 +1175,7 @@ export default function Game() {
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">
-                            {`${brAliveCount} players remain. Prize pool: $${brPrizePool.toFixed(2)}`}
+                            {`${brAliveCount} players remain. Prize pool: ${formatBalanceAmount(brPrizePool, gameSolPrice, balanceCurrency)}`}
                         </p>
                     </div>
                 </div>
@@ -1275,7 +1280,7 @@ export default function Game() {
                         <p style={{ opacity: 0.5 }}>
                             {isBattleRoyale
                                 ? 'Syncing match — no cash-out in this mode'
-                                : `Make sure you have at least ${formatUsd(entryFeeUsd)} balance.`}
+                                : `Make sure you have at least ${formatBalanceAmount(entryFeeUsd, gameSolPrice, balanceCurrency)} balance.`}
                         </p>
                     </div>
                 </div>
@@ -1286,6 +1291,8 @@ export default function Game() {
                     prizePool={brPrizePool}
                     aliveCount={brAliveCount}
                     playerCount={brPlayerCount}
+                    solPrice={gameSolPrice}
+                    currency={balanceCurrency}
                 />
             )}
 
@@ -1303,7 +1310,7 @@ export default function Game() {
             )}
 
             {brVictoryAmount != null && (
-                <BRVictoryOverlay show amount={brVictoryAmount} />
+                <BRVictoryOverlay show amount={brVictoryAmount} solPrice={gameSolPrice} currency={balanceCurrency} />
             )}
 
             <BRIntroOverlay
@@ -1311,6 +1318,8 @@ export default function Game() {
                 prizePool={brPrizePool}
                 playerCount={brPlayerCount}
                 entryFeeUsd={normalizeBREntryFee(localStorage.getItem('selected_entry_fee'))}
+                solPrice={gameSolPrice}
+                currency={balanceCurrency}
                 onComplete={dismissBrIntro}
             />
 
@@ -1402,7 +1411,7 @@ export default function Game() {
                         }}>
                             <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {(hideNames && p.id !== myIdRef.current) ? '???' : (p.name || 'An unnamed cell')}</span>
                             <span className="mono">
-                                {isBattleRoyale ? `${p.kills ?? 0} kills` : `$${Number(p.balance ?? 0).toFixed(2)}`}
+                                {isBattleRoyale ? `${p.kills ?? 0} kills` : formatBalanceAmount(p.balance ?? 0, gameSolPrice, balanceCurrency)}
                             </span>
                         </div>
                     ))}

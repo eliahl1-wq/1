@@ -209,7 +209,10 @@ function drawOrganicCell(cell, borders, graph, allCells = [], highQuality = fals
 function drawBalanceBadge(graph, cell, nameY, fontSize) {
     const pillY = nameY + fontSize / 1.35;
     const displayBalance = cell.dollarBalance ?? cell.balance;
-    drawBalanceBadgePill(graph, cell.x, pillY, displayBalance, cell.isMe);
+    drawBalanceBadgePill(graph, cell.x, pillY, displayBalance, cell.isMe, {
+        currency: global.balanceCurrency,
+        solPrice: global.solPrice,
+    });
 }
 
 function drawPlayerCashoutRing(graph, cell) {

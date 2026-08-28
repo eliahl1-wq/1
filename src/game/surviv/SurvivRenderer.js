@@ -3,6 +3,7 @@
  */
 
 import { drawBalanceBadge } from '../balanceBadge.js';
+import { formatBalanceAmount } from '../../utils/displayCurrency.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
@@ -1696,7 +1697,7 @@ export class SurvivRenderer {
         this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.balanceCanvas = balanceCanvas;
         this.balanceCtx = balanceCanvas?.getContext('2d', { alpha: true }) || null;
-        this._balanceCanvasCssWidth = 112;
+        this._balanceCanvasCssWidth = 164;
         this._balanceCanvasCssHeight = 31;
         this._balanceCanvasDpr = 0;
         this._renderedBalance = null;
@@ -1768,6 +1769,8 @@ export class SurvivRenderer {
         this.lastLootId = null;
         this.hud = {
             balance: 0,
+            balanceCurrency: 'USD',
+            solPrice: 0,
             hp: 100,
             maxHp: 100,
             vestLevel: 0,
@@ -1948,11 +1951,15 @@ export class SurvivRenderer {
         if (!this.balanceCanvas || !this.balanceCtx) return false;
         this.configureBalanceCanvas();
         const amount = Number(balance) || 0;
-        if (this._renderedBalance !== amount) {
+        const renderKey = `${amount}|${this.hud.balanceCurrency}|${this.hud.solPrice}`;
+        if (this._renderedBalance !== renderKey) {
             const ctx = this.balanceCtx;
             ctx.clearRect(0, 0, this._balanceCanvasCssWidth, this._balanceCanvasCssHeight);
-            drawBalanceBadge(ctx, this._balanceCanvasCssWidth / 2, 2, amount, true);
-            this._renderedBalance = amount;
+            drawBalanceBadge(ctx, this._balanceCanvasCssWidth / 2, 2, amount, true, {
+                currency: this.hud.balanceCurrency,
+                solPrice: this.hud.solPrice,
+            });
+            this._renderedBalance = renderKey;
         }
         const left = Math.round(screenX - this._balanceCanvasCssWidth / 2);
         const top = Math.round(screenY - 2);
@@ -4615,7 +4622,10 @@ export class SurvivRenderer {
             const screenY = Math.round(playerScreenY + (localPlayer.radius || 14) * z + 7);
             const balance = this.hud.balance ?? localPlayer.dollarBalance ?? 0;
             if (!this.drawLocalBalanceBadge(screenX, screenY, balance)) {
-                drawBalanceBadge(ctx, screenX, screenY, balance, true);
+                drawBalanceBadge(ctx, screenX, screenY, balance, true, {
+                    currency: this.hud.balanceCurrency,
+                    solPrice: this.hud.solPrice,
+                });
             }
         } else if (this.balanceCanvas) {
             this.balanceCanvas.style.visibility = 'hidden';
@@ -9709,7 +9719,7 @@ export class SurvivRenderer {
         const items = this.lootToast.items || {};
         const lines = [];
         if (items.weaponLabel) lines.push(`+ ${items.weaponLabel}`);
-        if (items.money) lines.push(`+$${Number(items.money).toFixed(2)}`);
+        if (items.money) lines.push(`+${formatBalanceAmount(items.money, this.hud.solPrice, this.hud.balanceCurrency)}`);
         if (items.medkits) lines.push(`+${items.medkits} medkit${items.medkits === 1 ? '' : 's'}`);
         if (items.ammoAmount) lines.push(`+${items.ammoAmount} ${items.ammoType || ''} ammo`.replace('  ', ' '));
         if (items.vestLabel) lines.push(items.vestLabel);

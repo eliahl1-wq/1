@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { formatBalanceAmount, getBalanceDisplayParts, getStoredBalanceCurrency } from '../utils/displayCurrency.js';
 
-export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, onComplete }) {
+export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, solPrice = 0, currency = getStoredBalanceCurrency(), onComplete }) {
     const [displayPool, setDisplayPool] = useState(0);
     const [phase, setPhase] = useState('pool');
     const [snapshot, setSnapshot] = useState({ pool: 0, players: 0, fee: entryFeeUsd });
@@ -65,6 +66,7 @@ export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, 
 
     if (!show) return null;
 
+    const poolParts = getBalanceDisplayParts(displayPool, solPrice, currency);
     return (
         <div className="br-overlay-backdrop">
             <div className="br-overlay-card">
@@ -72,11 +74,12 @@ export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, 
                     <>
                         <div className="br-overlay-label">PRIZE POOL</div>
                         <div className="br-overlay-amount">
-                            <span className="br-unit">$</span>
-                            {displayPool.toFixed(2)}
+                            {poolParts.unitPosition === 'prefix' && <span className="br-unit">{poolParts.unit}</span>}
+                            {poolParts.amount}
+                            {poolParts.unitPosition === 'suffix' && <span className="br-unit"> {poolParts.unit}</span>}
                         </div>
                         <div className="br-overlay-sub">
-                            {snapshot.players} players · ${snapshot.fee} entry · winner takes all
+                            {snapshot.players} players · {formatBalanceAmount(snapshot.fee, solPrice, currency)} entry · winner takes all
                         </div>
                     </>
                 ) : (
@@ -121,7 +124,7 @@ export function BRIntroOverlay({ show, prizePool, playerCount, entryFeeUsd = 5, 
     );
 }
 
-export function BRVictoryOverlay({ show, amount }) {
+export function BRVictoryOverlay({ show, amount, solPrice = 0, currency = getStoredBalanceCurrency() }) {
     const [display, setDisplay] = useState(0);
     const animatingRef = useRef(false);
 
@@ -157,6 +160,7 @@ export function BRVictoryOverlay({ show, amount }) {
 
     if (!show || amount == null) return null;
 
+    const displayParts = getBalanceDisplayParts(display, solPrice, currency);
     return (
         <div className="br-victory-backdrop">
             <div className="br-victory-rays" />
@@ -164,7 +168,9 @@ export function BRVictoryOverlay({ show, amount }) {
                 <div className="br-victory-badge">VICTORY ROYALE</div>
                 <h2 className="br-victory-title">You Won!</h2>
                 <div className="br-victory-amount">
-                    <span className="br-unit">$</span>{display.toFixed(2)}
+                    {displayParts.unitPosition === 'prefix' && <span className="br-unit">{displayParts.unit}</span>}
+                    {displayParts.amount}
+                    {displayParts.unitPosition === 'suffix' && <span className="br-unit"> {displayParts.unit}</span>}
                 </div>
                 <p className="br-victory-caption">Prize sent to your account</p>
             </div>

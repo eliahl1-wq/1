@@ -156,7 +156,7 @@ export class SlitherRenderer {
         this._slurpSetPool = new Set();
         this._foodNearBuf = [];
         this._FOOD_CELL = 256;
-        this.hud = { balance: 1, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
+        this.hud = { balance: 1, balanceCurrency: 'USD', solPrice: 0, cashoutSeconds: 0, cashoutTotal: 10, cashoutEndAt: 0, holdProgress: 0 };
         this.camera = { x: 0, y: 0 };
         this._cameraInit = false;
         this._holdActive = false;
@@ -2153,12 +2153,18 @@ export class SlitherRenderer {
                     ? (this.hud.balance ?? snake.dollarBalance ?? snake.balance) 
                     : (snake.dollarBalance ?? snake.balance);
                 if (this._balanceBadgeScale === 1) {
-                    drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou);
+                    drawBalanceBadge(ctx, hx, pillY, displayBalance, isYou, {
+                        currency: this.hud.balanceCurrency,
+                        solPrice: this.hud.solPrice,
+                    });
                 } else {
                     ctx.save();
                     ctx.translate(hx, pillY);
                     ctx.scale(this._balanceBadgeScale, this._balanceBadgeScale);
-                    drawBalanceBadge(ctx, 0, 0, displayBalance, isYou);
+                    drawBalanceBadge(ctx, 0, 0, displayBalance, isYou, {
+                        currency: this.hud.balanceCurrency,
+                        solPrice: this.hud.solPrice,
+                    });
                     ctx.restore();
                 }
             }
@@ -2207,7 +2213,10 @@ export class SlitherRenderer {
     }
 
     _drawBalanceBadge(ctx, screenX, screenY, balance, isMe) {
-        drawBalanceBadge(ctx, screenX, screenY, balance, isMe);
+        drawBalanceBadge(ctx, screenX, screenY, balance, isMe, {
+            currency: this.hud.balanceCurrency,
+            solPrice: this.hud.solPrice,
+        });
     }
 
     draw(forcedDt = null) {

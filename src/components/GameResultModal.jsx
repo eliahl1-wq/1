@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getStoredBalanceCurrency } from '../utils/displayCurrency.js';
 
 function formatTimeSurvived(ms) {
     const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -116,6 +117,7 @@ export default function GameResultModal({
     showSpectate = false,
 }) {
     const isWin = type === 'cashout';
+    const showSol = getStoredBalanceCurrency() === 'SOL' && Number(solPrice) > 0;
     const [displayAmount, setDisplayAmount] = useState(0);
 
     useEffect(() => {
@@ -158,11 +160,13 @@ export default function GameResultModal({
 
                         <p className="game-result-label">Amount Received</p>
                         <div className="game-result-amount">
-                            ${displayAmount.toFixed(2)}
+                            {showSol ? `${amountSol.toFixed(6)} SOL` : `$${displayAmount.toFixed(2)}`}
                         </div>
-                        <p className="game-result-sol">
-                            {amountSol.toFixed(6)} SOL
-                        </p>
+                        {!showSol && (
+                            <p className="game-result-sol">
+                                {amountSol.toFixed(6)} SOL
+                            </p>
+                        )}
 
                         <div className="game-result-divider" />
 
@@ -190,7 +194,9 @@ export default function GameResultModal({
                         <div className="game-result-wallet">
                             <WalletIcon />
                             <span>
-                                ${Number(walletBalanceUsd).toFixed(2)} / {Number(walletBalanceSol).toFixed(6)} SOL
+                                {showSol
+                                    ? `${Number(walletBalanceSol).toFixed(6)} SOL`
+                                    : `$${Number(walletBalanceUsd).toFixed(2)} / ${Number(walletBalanceSol).toFixed(6)} SOL`}
                             </span>
                         </div>
                     </>

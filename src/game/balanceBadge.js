@@ -1,3 +1,5 @@
+import { getBalanceDisplayParts } from '../utils/displayCurrency.js';
+
 /**
  * In-world balance pill — crisp purple outline for local player, muted for others.
  */
@@ -29,9 +31,13 @@ const OTHER = {
  * @param {number} balance
  * @param {boolean} isMe
  */
-export function drawBalanceBadge(ctx, centerX, topY, balance, isMe) {
+export function drawBalanceBadge(ctx, centerX, topY, balance, isMe, options = {}) {
     const theme = isMe ? ME : OTHER;
-    const amount = (balance || 0).toFixed(2);
+    const { amount, unit, unitPosition } = getBalanceDisplayParts(
+        balance,
+        options.solPrice,
+        options.currency,
+    );
     const amountFont = 13;
     const unitFont = 10;
     const gap = 3;
@@ -40,7 +46,7 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe) {
     ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
     const amountW = ctx.measureText(amount).width;
     ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    const unitW = ctx.measureText('$').width;
+    const unitW = ctx.measureText(unit).width;
 
     const padX = 10;
     const pillW = Math.ceil(unitW + gap + amountW + padX * 2);
@@ -77,11 +83,13 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe) {
 
     ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
     ctx.fillStyle = theme.unitColor;
-    ctx.fillText('$', pillX + padX, midY);
+    const amountX = unitPosition === 'prefix' ? pillX + padX + unitW + gap : pillX + padX;
+    const unitX = unitPosition === 'prefix' ? pillX + padX : pillX + padX + amountW + gap;
+    ctx.fillText(unit, unitX, midY);
 
     ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
     ctx.fillStyle = theme.amountColor;
-    ctx.fillText(amount, pillX + padX + unitW + gap, midY);
+    ctx.fillText(amount, amountX, midY);
 
     ctx.textAlign = 'center';
     ctx.restore();

@@ -9,7 +9,7 @@ import { io } from 'socket.io-client';
 
 import { SlitherRenderer } from './SlitherRenderer.js';
 
-import { normalizeEntryFee, normalizeBREntryFee, normalizeCompetitiveEntryFee, formatUsd } from '../../constants/economy';
+import { normalizeEntryFee, normalizeBREntryFee, normalizeCompetitiveEntryFee } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
@@ -29,6 +29,7 @@ import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
 import { API_URL } from '../../utils/apiBase';
 import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
+import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
 
 
 const IS_MOBILE = isTouchDevice();
@@ -59,6 +60,8 @@ export default function SlitherGame() {
     const location = useLocation();
 
     const { user, token: authToken, refreshUser, applyOptimisticBalanceDelta } = useAuth();
+    const balanceCurrency = getStoredBalanceCurrency();
+    const gameSolPrice = Number(user?.solPrice) || 0;
 
     const pendingAtMount = loadPendingResult('slither');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
@@ -382,11 +385,13 @@ export default function SlitherGame() {
     useLayoutEffect(() => {
         rendererRef.current?.setHud({
             balance: currentBalance,
+            balanceCurrency,
+            solPrice: gameSolPrice,
             cashoutSeconds: localTimer,
             cashoutTotal: cashOutTotalRef.current || CASHOUT_SECONDS,
             cashoutEndAt: cashOutEndAtRef.current,
         });
-    }, [currentBalance, localTimer]);
+    }, [currentBalance, localTimer, balanceCurrency, gameSolPrice]);
 
     useEffect(() => {
         if (localTimer > 0 || isDead || cashedAmount !== null || isBattleRoyale) {
@@ -464,6 +469,7 @@ export default function SlitherGame() {
 
 
         const renderer = new SlitherRenderer(canvasRef.current);
+        renderer.setHud({ balanceCurrency, solPrice: gameSolPrice });
 
         rendererRef.current = renderer;
 
@@ -1073,14 +1079,14 @@ export default function SlitherGame() {
                         </div>
                         <div className="overlay-divider" />
                         <p className="overlay-caption">
-                            {`${brAliveCount} players remain. Prize pool: $${brPrizePool.toFixed(2)}`}
+                            {`${brAliveCount} players remain. Prize pool: ${formatBalanceAmount(brPrizePool, gameSolPrice, balanceCurrency)}`}
                         </p>
                     </div>
                 </div>
             )}
 
             {brVictoryAmount != null && (
-                <BRVictoryOverlay show amount={brVictoryAmount} />
+                <BRVictoryOverlay show amount={brVictoryAmount} solPrice={gameSolPrice} currency={balanceCurrency} />
             )}
 
             <BRIntroOverlay
@@ -1088,6 +1094,8 @@ export default function SlitherGame() {
                 prizePool={brPrizePool}
                 playerCount={brPlayerCount}
                 entryFeeUsd={entryFeeUsd}
+                solPrice={gameSolPrice}
+                currency={balanceCurrency}
                 onComplete={dismissBrIntro}
             />
 
@@ -1184,7 +1192,7 @@ export default function SlitherGame() {
                         <p style={{ opacity: 0.5 }}>
                             {isBattleRoyale
                                 ? 'Syncing match — no cash-out in this mode'
-                                : `Make sure you have at least ${formatUsd(entryFeeUsd)} balance.`}
+                                : `Make sure you have at least ${formatBalanceAmount(entryFeeUsd, gameSolPrice, balanceCurrency)} balance.`}
                         </p>
 
                     </div>
@@ -1200,6 +1208,8 @@ export default function SlitherGame() {
                     prizePool={brPrizePool}
                     aliveCount={brAliveCount}
                     playerCount={brPlayerCount}
+                    solPrice={gameSolPrice}
+                    currency={balanceCurrency}
                 />
             )}
 
@@ -1340,7 +1350,7 @@ export default function SlitherGame() {
                             <span className="game-leaderboard-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{i + 1}. {(hideNames && p.id !== myIdRef.current) ? '???' : p.name}</span>
 
                             <span style={{ fontFamily: 'ui-monospace, monospace' }}>
-                                {isBattleRoyale ? `${p.kills ?? 0} kills` : `$${(p.balance ?? 0).toFixed(2)}`}
+                                {isBattleRoyale ? `${p.kills ?? 0} kills` : formatBalanceAmount(p.balance ?? 0, gameSolPrice, balanceCurrency)}
                             </span>
 
                         </div>

@@ -36,4 +36,6 @@ export default {
     holdCashoutProgress: 0,
     holdStartAt: 0,
     battleRoyale: false,
+    balanceCurrency: 'USD',
+    solPrice: 0,
 };

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 import { SurvivRenderer } from './SurvivRenderer.js';
-import { normalizeSurvivEntryFee, formatUsd } from '../../constants/economy';
+import { normalizeSurvivEntryFee } from '../../constants/economy';
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
@@ -25,6 +25,7 @@ import { API_URL } from '../../utils/apiBase';
 import { nextWeaponSlot } from '../../utils/gameWheel.js';
 import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 import { getSurvivWeaponFamily, getSurvivWeaponRarity, SURVIV_AMMO_CATALOG, SURVIV_WEAPON_CATALOG } from './weaponCatalog.js';
+import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -116,13 +117,13 @@ function survivUiSnapshotsEqual(previous, next) {
     return true;
 }
 
-function formatPickupConfirmation(lastLoot) {
+function formatPickupConfirmation(lastLoot, solPrice, currency) {
     const items = lastLoot?.items || {};
     if (items.weaponLabel) return items.weaponLabel;
     if (items.ammoAmount) return `${items.ammoAmount} ${String(items.ammoType || '').toUpperCase()} AMMO`.replace('  ', ' ');
     if (items.medkits) return `${items.medkits} MEDKIT${items.medkits === 1 ? '' : 'S'}`;
     if (items.vestLabel) return items.vestLabel.toUpperCase();
-    if (items.money) return `$${Number(items.money).toFixed(2)}`;
+    if (items.money) return formatBalanceAmount(items.money, solPrice, currency);
     return lastLoot?.source === 'ground' ? 'ITEM' : 'LOOT';
 }
 
@@ -231,6 +232,8 @@ export default function SurvivGame() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, token: authToken, refreshUser, applyOptimisticBalanceDelta } = useAuth();
+    const balanceCurrency = getStoredBalanceCurrency();
+    const gameSolPrice = Number(user?.solPrice) || 0;
 
     const pendingAtMount = loadPendingResult('surviv');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
@@ -558,12 +561,14 @@ export default function SurvivGame() {
     useLayoutEffect(() => {
         rendererRef.current?.setHud({
             balance: currentBalance,
+            balanceCurrency,
+            solPrice: gameSolPrice,
             cashoutSeconds: localTimer,
             cashoutTotal: cashOutTotalRef.current || CASHOUT_SECONDS,
             cashoutEndAt: cashOutEndAtRef.current,
 
         });
-    }, [currentBalance, localTimer]);
+    }, [currentBalance, localTimer, balanceCurrency, gameSolPrice]);
 
     useEffect(() => {
         const previousBackground = document.body.style.backgroundColor;
@@ -627,6 +632,7 @@ export default function SurvivGame() {
         }
 
         const renderer = new SurvivRenderer(canvasRef.current, balanceCanvasRef.current);
+        renderer.setHud({ balanceCurrency, solPrice: gameSolPrice });
         renderer.worldHalf = WORLD_HALF;
         renderer.hideNames = hideNames;
         rendererRef.current = renderer;
@@ -913,7 +919,7 @@ export default function SurvivGame() {
                 lastPickupConfirmationIdRef.current = tick.you.lastLoot.id;
                 setPickupConfirmation({
                     id: tick.you.lastLoot.id,
-                    label: formatPickupConfirmation(tick.you.lastLoot),
+                    label: formatPickupConfirmation(tick.you.lastLoot, gameSolPrice, balanceCurrency),
                     action: tick.you.lastLoot.source === 'ground' ? 'PICKED UP' : 'LOOTED',
                 });
                 if (pickupConfirmationTimerRef.current) clearTimeout(pickupConfirmationTimerRef.current);
@@ -1394,7 +1400,7 @@ export default function SurvivGame() {
                         <p style={{ opacity: 0.62, lineHeight: 1.5 }}>
                             {connectionError || (isRejoining
                                 ? 'Your player is protected briefly while the connection recovers.'
-                                : `Entry: ${adminFreeSurvivEntry ? 'FREE ADMIN · PUBLIC MATCH' : formatUsd(entryFeeUsd)}. Waiting for the server to confirm your session.`)}
+                                : `Entry: ${adminFreeSurvivEntry ? 'FREE ADMIN · PUBLIC MATCH' : formatBalanceAmount(entryFeeUsd, gameSolPrice, balanceCurrency)}. Waiting for the server to confirm your session.`)}
                         </p>
                     </div>
                 </div>
@@ -1524,7 +1530,7 @@ export default function SurvivGame() {
                                     {i + 1}. {(hideNames && entry.id !== myIdRef.current) ? '???' : entry.username}
                                 </span>
                                 <span className="game-leaderboard-value">
-                                    {formatUsd(entry.balance)}
+                                    {formatBalanceAmount(entry.balance, gameSolPrice, balanceCurrency)}
                                 </span>
                             </div>
                         ))}
@@ -2095,7 +2101,7 @@ export default function SurvivGame() {
                                             </div>
                                             <div className="item-slot-details">
                                                 <span className="item-slot-name">BALANCE</span>
-                                                <span className="item-slot-value cyan-glow">{formatUsd(me.dollarBalance || 0)}</span>
+                                                <span className="item-slot-value cyan-glow">{formatBalanceAmount(me.dollarBalance || 0, gameSolPrice, balanceCurrency)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -2192,7 +2198,7 @@ export default function SurvivGame() {
 
                         <div className="surviv-inventory-footer">
                             <span>{me.openedContainer ? 'CHEST OPEN' : 'DRAG AN ITEM OUT TO DROP IT'}</span>
-                            <span>{formatUsd(me.dollarBalance || 0)}</span>
+                            <span>{formatBalanceAmount(me.dollarBalance || 0, gameSolPrice, balanceCurrency)}</span>
                         </div>
                     </div>
                 </div>
