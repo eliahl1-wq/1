@@ -7,19 +7,22 @@ export default function CurrencySwitchButton({ value = 'USD', onChange, classNam
         <button
             type="button"
             className={`currency-switch-button${className ? ` ${className}` : ''}`}
+            data-currency={currency}
             onClick={() => onChange?.(nextCurrency)}
             aria-label={`Show balances in ${nextCurrency}`}
+            aria-checked={currency === 'SOL'}
+            role="switch"
             title={`Switch to ${nextCurrency}`}
         >
-            <span className="currency-switch-button__mark" aria-hidden="true">
-                {currency === 'SOL'
-                    ? <img src="/solana-sol-logo.png" alt="" />
-                    : <span>$</span>}
+            <span className="currency-switch-button__thumb" aria-hidden="true" />
+            <span className={`currency-switch-button__option${currency === 'SOL' ? ' is-active' : ''}`} aria-hidden="true">
+                <img className="currency-switch-button__sol-logo" src="/solana-sol-logo.png" alt="" />
+                <span>SOL</span>
             </span>
-            <span className="currency-switch-button__label">{currency}</span>
-            <svg className="currency-switch-button__swap" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M3 5h8.5M9.5 3l2 2-2 2M13 11H4.5M6.5 9l-2 2 2 2" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <span className={`currency-switch-button__option${currency === 'USD' ? ' is-active' : ''}`} aria-hidden="true">
+                <span className="currency-switch-button__dollar">$</span>
+                <span>USD</span>
+            </span>
         </button>
     );
 }

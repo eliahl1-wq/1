@@ -49,17 +49,20 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe, options = {}
     const unitFont = 10;
     const gap = 3;
     const usesSolLogo = unit === 'SOL';
+    const usesDollarText = unit === '$';
+    const displayAmount = usesDollarText ? `$${amount}` : amount;
     const displayUnitPosition = usesSolLogo ? 'prefix' : unitPosition;
     const logoSize = 12;
 
     ctx.save();
     ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    const amountW = ctx.measureText(amount).width;
+    const amountW = ctx.measureText(displayAmount).width;
     ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    const unitW = usesSolLogo ? logoSize : ctx.measureText(unit).width;
+    const unitW = usesSolLogo ? logoSize : (usesDollarText ? 0 : ctx.measureText(unit).width);
+    const contentGap = unitW > 0 ? gap : 0;
 
     const padX = 10;
-    const pillW = Math.ceil(unitW + gap + amountW + padX * 2);
+    const pillW = Math.ceil(unitW + contentGap + amountW + padX * 2);
     const pillH = amountFont + 10;
     const pillX = Math.round(centerX - pillW / 2);
     const pillY = Math.round(topY);
@@ -91,11 +94,11 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe, options = {}
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
-    const amountX = displayUnitPosition === 'prefix' ? pillX + padX + unitW + gap : pillX + padX;
+    const amountX = displayUnitPosition === 'prefix' ? pillX + padX + unitW + contentGap : pillX + padX;
     const unitX = displayUnitPosition === 'prefix' ? pillX + padX : pillX + padX + amountW + gap;
     if (usesSolLogo && isBalanceBadgeSolLogoReady()) {
         ctx.drawImage(solLogo, unitX, midY - logoSize / 2, logoSize, logoSize);
-    } else if (!usesSolLogo) {
+    } else if (!usesSolLogo && !usesDollarText) {
         ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillStyle = theme.unitColor;
         ctx.fillText(unit, unitX, midY);
@@ -103,7 +106,7 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe, options = {}
 
     ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
     ctx.fillStyle = theme.amountColor;
-    ctx.fillText(amount, amountX, midY);
+    ctx.fillText(displayAmount, amountX, midY);
 
     ctx.textAlign = 'center';
     ctx.restore();
