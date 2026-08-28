@@ -544,6 +544,19 @@
   letter-spacing: -0.01em;
 }
 
+.lobby-tier-btn__amount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.lobby-tier-btn__amount img {
+  display: block;
+  flex: 0 0 auto;
+}
+
 .lobby-tier-btn:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);

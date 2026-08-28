@@ -32,7 +32,7 @@ import AgarLogo from '../features/agar/ui/AgarLogo';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import { FREE_MODE_STORAGE_KEY, getFreeModeEntryFee, setPublicFreeModeEnabled } from '../utils/freeMode';
-import { formatWalletBalanceAmount } from '../utils/displayCurrency';
+import { formatGameSolAmount, formatWalletBalanceAmount } from '../utils/displayCurrency';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.gg/m5mWMu8aF';
 
@@ -564,6 +564,14 @@ export default function PreGame() {
 
     // ── Format helpers ─────────────────────────────────
     const fmt = formatWalletBalanceAmount;
+    const renderEntryFee = (feeUsd, logoSize = 11) => (
+        isCurSOL && solPrice > 0 ? (
+            <span className="lobby-tier-btn__amount">
+                <SolLogo size={logoSize} />
+                {formatGameSolAmount(Number(feeUsd) / solPrice)}
+            </span>
+        ) : `$${feeUsd}`
+    );
 
     const shortAddr = (addr, chars = 5) =>
         addr && addr.length > chars * 2 + 3
@@ -1636,10 +1644,10 @@ export default function PreGame() {
                                                 >
                                                     {isFreeCovered ? (
                                                         <>
-                                                            <span className="lobby-tier-btn__free-price">${tier}</span>
+                                                            <span className="lobby-tier-btn__free-price">{renderEntryFee(tier, 10)}</span>
                                                             <span className="lobby-tier-btn__free-label">Free</span>
                                                         </>
-                                                    ) : (isFreeTicketButton && !freePlay ? 'Free Ticket' : `$${tier}`)}
+                                                    ) : (isFreeTicketButton && !freePlay ? 'Free Ticket' : renderEntryFee(tier))}
                                                 </button>
                                             );
                                         })}
