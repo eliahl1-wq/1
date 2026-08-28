@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { getStoredBalanceCurrency } from '../utils/displayCurrency.js';
 
+function SolLogo({ size = 12 }) {
+    return <img className="game-result-sol-logo" src="/solana-sol-logo.png" alt="Solana" style={{ width: size, height: size }} />;
+}
+
 function formatTimeSurvived(ms) {
     const totalSec = Math.max(0, Math.floor(ms / 1000));
     const mins = Math.floor(totalSec / 60);
@@ -143,6 +147,8 @@ export default function GameResultModal({
     }, [isWin, amount]);
 
     const amountSol = solPrice > 0 ? displayAmount / solPrice : 0;
+    const formattedAmountSol = amountSol.toFixed(2);
+    const formattedWalletSol = Number(walletBalanceSol).toFixed(2);
 
     return (
         <div className="game-result-backdrop">
@@ -160,13 +166,13 @@ export default function GameResultModal({
 
                         <p className="game-result-label">Amount Received</p>
                         <div className="game-result-amount">
-                            {showSol ? `${amountSol.toFixed(6)} SOL` : `$${displayAmount.toFixed(2)}`}
+                            {showSol ? <><SolLogo size={28} />{formattedAmountSol}</> : `$${displayAmount.toFixed(2)}`}
                         </div>
-                        {!showSol && (
-                            <p className="game-result-sol">
-                                {amountSol.toFixed(6)} SOL
-                            </p>
-                        )}
+                        <p className="game-result-sol">
+                            {showSol
+                                ? `$${displayAmount.toFixed(2)}`
+                                : <><SolLogo size={12} />{formattedAmountSol}</>}
+                        </p>
 
                         <div className="game-result-divider" />
 
@@ -195,8 +201,8 @@ export default function GameResultModal({
                             <WalletIcon />
                             <span>
                                 {showSol
-                                    ? `${Number(walletBalanceSol).toFixed(6)} SOL`
-                                    : `$${Number(walletBalanceUsd).toFixed(2)} / ${Number(walletBalanceSol).toFixed(6)} SOL`}
+                                    ? <><SolLogo />{formattedWalletSol}<span className="game-result-wallet-separator">/</span>${Number(walletBalanceUsd).toFixed(2)}</>
+                                    : <>${Number(walletBalanceUsd).toFixed(2)}<span className="game-result-wallet-separator">/</span><SolLogo />{formattedWalletSol}</>}
                             </span>
                         </div>
                     </>

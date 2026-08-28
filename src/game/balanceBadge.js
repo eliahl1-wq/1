@@ -1,5 +1,12 @@
 import { getBalanceDisplayParts } from '../utils/displayCurrency.js';
 
+const solLogo = typeof Image !== 'undefined' ? new Image() : null;
+if (solLogo) solLogo.src = '/solana-sol-logo.png';
+
+export function isBalanceBadgeSolLogoReady() {
+    return !!(solLogo?.complete && solLogo.naturalWidth > 0);
+}
+
 /**
  * In-world balance pill — crisp purple outline for local player, muted for others.
  */
@@ -41,12 +48,15 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe, options = {}
     const amountFont = 13;
     const unitFont = 10;
     const gap = 3;
+    const usesSolLogo = unit === 'SOL';
+    const displayUnitPosition = usesSolLogo ? 'prefix' : unitPosition;
+    const logoSize = 12;
 
     ctx.save();
     ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
     const amountW = ctx.measureText(amount).width;
     ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    const unitW = ctx.measureText(unit).width;
+    const unitW = usesSolLogo ? logoSize : ctx.measureText(unit).width;
 
     const padX = 10;
     const pillW = Math.ceil(unitW + gap + amountW + padX * 2);
@@ -81,11 +91,15 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe, options = {}
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
-    ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    ctx.fillStyle = theme.unitColor;
-    const amountX = unitPosition === 'prefix' ? pillX + padX + unitW + gap : pillX + padX;
-    const unitX = unitPosition === 'prefix' ? pillX + padX : pillX + padX + amountW + gap;
-    ctx.fillText(unit, unitX, midY);
+    const amountX = displayUnitPosition === 'prefix' ? pillX + padX + unitW + gap : pillX + padX;
+    const unitX = displayUnitPosition === 'prefix' ? pillX + padX : pillX + padX + amountW + gap;
+    if (usesSolLogo && isBalanceBadgeSolLogoReady()) {
+        ctx.drawImage(solLogo, unitX, midY - logoSize / 2, logoSize, logoSize);
+    } else if (!usesSolLogo) {
+        ctx.font = `600 ${unitFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.fillStyle = theme.unitColor;
+        ctx.fillText(unit, unitX, midY);
+    }
 
     ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
     ctx.fillStyle = theme.amountColor;

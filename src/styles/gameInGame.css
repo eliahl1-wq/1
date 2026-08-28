@@ -640,6 +640,10 @@ body.game-session-active #root {
 }
 
 .game-result-amount {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
     font-size: 2.75rem;
     font-weight: 900;
     color: var(--green);
@@ -651,6 +655,10 @@ body.game-session-active #root {
 }
 
 .game-result-sol {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     margin: 0 0 18px;
     font-size: 0.82rem;
     color: rgba(255, 255, 255, 0.42);
@@ -728,6 +736,24 @@ body.game-session-active #root {
     color: rgba(255, 255, 255, 0.72);
     font-size: 0.78rem;
     font-family: var(--mono);
+}
+
+.game-result-wallet > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.game-result-sol-logo {
+    display: inline-block;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
+.game-result-wallet-separator {
+    color: rgba(255, 255, 255, 0.28);
+    margin: 0 2px;
 }
 
 .game-result-wallet svg {

@@ -2,7 +2,7 @@
  * Surviv client renderer - top-down shooter canvas.
  */
 
-import { drawBalanceBadge } from '../balanceBadge.js';
+import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
@@ -1951,7 +1951,7 @@ export class SurvivRenderer {
         if (!this.balanceCanvas || !this.balanceCtx) return false;
         this.configureBalanceCanvas();
         const amount = Number(balance) || 0;
-        const renderKey = `${amount}|${this.hud.balanceCurrency}|${this.hud.solPrice}`;
+        const renderKey = `${amount}|${this.hud.balanceCurrency}|${this.hud.solPrice}|${isBalanceBadgeSolLogoReady() ? 1 : 0}`;
         if (this._renderedBalance !== renderKey) {
             const ctx = this.balanceCtx;
             ctx.clearRect(0, 0, this._balanceCanvasCssWidth, this._balanceCanvasCssHeight);

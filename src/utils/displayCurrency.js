@@ -11,7 +11,7 @@ export function getBalanceDisplayParts(amountUsd, solPrice, currency = getStored
     const price = Number(solPrice) || 0;
     if (currency === 'SOL' && price > 0) {
         return {
-            amount: (usd / price).toFixed(6),
+            amount: (usd / price).toFixed(2),
             unit: 'SOL',
             unitPosition: 'suffix',
         };
