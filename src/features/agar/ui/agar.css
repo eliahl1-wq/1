@@ -7,7 +7,7 @@
     padding: 0 10px;
     color: var(--text-h);
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(151, 124, 255, 0.22);
+    border: 1px solid rgba(117, 86, 191, 0.38);
     border-radius: var(--r-full);
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
@@ -15,7 +15,7 @@
 
 .agar-nav-balance:hover {
     background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(151, 124, 255, 0.42);
+    border-color: rgba(139, 101, 222, 0.55);
 }
 
 .agar-nav-balance__symbol {

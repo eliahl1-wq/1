@@ -246,7 +246,7 @@
   height: 32px;
   border-radius: var(--r-full);
   background: rgba(255,255,255,0.03);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: var(--ui);
@@ -257,11 +257,11 @@
 }
 .balance-pill:hover {
   background: rgba(255,255,255,0.06);
-  border-color: var(--border-2);
+  border-color: transparent;
 }
 .balance-pill--open {
   background: rgba(173,152,255,.07);
-  border-color: var(--accent-border);
+  border-color: transparent;
 }
 .balance-pill__value { color: var(--text-h); font-size: .82rem; }
 .balance-pill__chevron { margin-left: 2px; opacity: .42; }
@@ -2520,9 +2520,9 @@
   left: var(--currency-switch-pad);
   width: calc((100% - (var(--currency-switch-pad) * 2)) / 2);
   border-radius: var(--r-full);
-  background: linear-gradient(180deg, #24202e 0%, #191620 100%);
-  border: 1px solid rgba(128, 91, 204, 0.28);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  background: linear-gradient(180deg, #202228 0%, #17191e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.035);
   transform: translateX(100%);
   transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
 }

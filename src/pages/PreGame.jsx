@@ -1107,15 +1107,11 @@ export default function PreGame() {
 
                                             {/* Balance */}
                                             <div className="wallet-card-balance">
-                                                {isCurSOL ? (
-                                                    <SolLogo size={28} />
-                                                ) : (
-                                                    <span className="wallet-card-currency-prefix">$</span>
-                                                )}
+                                                {isCurSOL && <SolLogo size={28} />}
                                                 <span className={isCurSOL ? 'wallet-card-balance__with-logo' : undefined}>
                                                     {isCurSOL
                                                         ? fmt(balanceSol)
-                                                        : fmt(balanceUsd)}
+                                                        : `$${fmt(balanceUsd)}`}
                                                 </span>
                                             </div>
                                             <div className="wallet-card-sub">
