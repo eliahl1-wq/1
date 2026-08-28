@@ -32,6 +32,7 @@ import AgarLogo from '../features/agar/ui/AgarLogo';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import { FREE_MODE_STORAGE_KEY, getFreeModeEntryFee, setPublicFreeModeEnabled } from '../utils/freeMode';
+import { formatWalletBalanceAmount } from '../utils/displayCurrency';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.gg/m5mWMu8aF';
 
@@ -562,15 +563,7 @@ export default function PreGame() {
     const canJoin = !!selectedMode && selectedEntryFee !== null && (freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
 
     // ── Format helpers ─────────────────────────────────
-    const fmt = (v) => {
-        const n = Number(v || 0);
-        if (!isFinite(n)) return '0';
-        if (n >= 10000) return Math.round(n).toString();
-        if (n >= 1000) return n.toFixed(1);
-        if (n >= 1) return n.toFixed(2);
-        if (n > 0) return n.toFixed(4);
-        return '0';
-    };
+    const fmt = formatWalletBalanceAmount;
 
     const shortAddr = (addr, chars = 5) =>
         addr && addr.length > chars * 2 + 3

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getStoredBalanceCurrency } from '../utils/displayCurrency.js';
+import { formatGameSolAmount, formatWalletBalanceAmount, getStoredBalanceCurrency } from '../utils/displayCurrency.js';
 
 function SolLogo({ size = 12 }) {
     return <img className="game-result-sol-logo" src="/solana-sol-logo.png" alt="Solana" style={{ width: size, height: size }} />;
@@ -147,8 +147,8 @@ export default function GameResultModal({
     }, [isWin, amount]);
 
     const amountSol = solPrice > 0 ? displayAmount / solPrice : 0;
-    const formattedAmountSol = amountSol.toFixed(2);
-    const formattedWalletSol = Number(walletBalanceSol).toFixed(2);
+    const formattedAmountSol = formatGameSolAmount(amountSol);
+    const formattedWalletSol = formatWalletBalanceAmount(walletBalanceSol);
 
     return (
         <div className="game-result-backdrop">
