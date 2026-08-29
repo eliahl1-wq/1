@@ -5188,6 +5188,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 }
 
 .pregame-bottom-dock .pregame-discord-link--dock,
+.pregame-bottom-dock .pregame-social-link,
 .pregame-bottom-dock .pregame-bug-report-link,
 .pregame-bottom-dock .pregame-affiliate-link,
 .pregame-bottom-dock .rewards-widget-toggle {
@@ -5202,6 +5203,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 }
 
 .pregame-bottom-dock .pregame-discord-link--dock:hover,
+.pregame-bottom-dock .pregame-social-link:hover,
 .pregame-bottom-dock .pregame-bug-report-link:hover,
 .pregame-bottom-dock .pregame-affiliate-link:hover,
 .pregame-bottom-dock .rewards-widget-toggle:hover {
@@ -5213,12 +5215,18 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   transform: none;
 }
 
-.pregame-bottom-dock .pregame-discord-link--dock {
+.pregame-bottom-dock .pregame-discord-link--dock,
+.pregame-bottom-dock .pregame-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   height: 30px;
+  text-decoration: none;
 }
 
-.pregame-bottom-dock .pregame-discord-link--dock svg {
+.pregame-bottom-dock .pregame-discord-link--dock svg,
+.pregame-bottom-dock .pregame-social-link svg {
   width: 17px;
   height: 17px;
 }

@@ -1118,10 +1118,12 @@ export default function PreGame() {
                                     {agarLaunchReady && <span className="agar-nav-balance__add" aria-hidden="true">+</span>}
                                 </button>
                                 {showCoinLaunchHint && (
-                                    <span className="agar-nav-launch-hint" aria-hidden="true">
-                                        <svg viewBox="0 0 20 20"><path d="M3 16c4-1 7-4 9-9M8 7h4V3" /></svg>
-                                        <b>NEW COIN</b>
-                                    </span>
+                                    <aside className="agar-nav-launch-hint" aria-hidden="true">
+                                        <span className="agar-nav-launch-hint__eyebrow"><i /> NOW LIVE</span>
+                                        <strong>{agarConfig.symbol} has launched</strong>
+                                        <p>Buy the new AreniFi coin and use it to unlock exclusive skins.</p>
+                                        <span className="agar-nav-launch-hint__action">Click your balance to explore <b>→</b></span>
+                                    </aside>
                                 )}
                             </div>
 
@@ -2041,6 +2043,21 @@ export default function PreGame() {
                             <path
                                 fill="currentColor"
                                 d="M19.5 5.34A16.3 16.3 0 0 0 15.44 4l-.5 1.02a15.1 15.1 0 0 0-5.87 0L8.56 4A16.5 16.5 0 0 0 4.5 5.35C1.93 9.15 1.23 12.85 1.58 16.5a16.6 16.6 0 0 0 4.98 2.52l1.2-1.65a10.6 10.6 0 0 1-1.89-.91l.46-.36c3.64 1.69 7.6 1.69 11.2 0l.47.36c-.6.36-1.24.67-1.9.91l1.2 1.65a16.5 16.5 0 0 0 4.98-2.52c.42-4.23-.72-7.9-2.78-11.16ZM8.52 14.3c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.88 2.27-2 2.27Zm6.96 0c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.87 2.27-2 2.27Z"
+                            />
+                        </svg>
+                    </a>
+                    <a
+                        className="pregame-social-link pregame-social-link--x"
+                        href="https://x.com/agarstake"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Follow Arenifi on X"
+                        title="Follow Arenifi on X"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                                fill="currentColor"
+                                d="M18.9 2H22l-6.77 7.74L23.2 22h-6.24l-4.89-6.39L6.48 22H3.36l7.26-8.3L2.97 2h6.4l4.42 5.84L18.9 2Zm-1.09 17.84h1.73L8.43 4.05H6.58l11.23 15.79Z"
                             />
                         </svg>
                     </a>
