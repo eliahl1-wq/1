@@ -2491,7 +2491,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   padding: var(--currency-switch-pad);
-  border: 1.5px solid rgba(91, 67, 145, 0.36);
+  border: 2px solid rgba(98, 72, 158, 0.32);
   border-radius: var(--r-full);
   background: transparent;
   color: rgba(255, 255, 255, 0.55);
