@@ -1,8 +1,8 @@
-# AgarStake product design system
+# Arenifi product design system
 
-This document is the visual source of truth for the AgarStake frontend. The
+This document is the visual source of truth for the Arenifi frontend. The
 product should feel like a compact crypto application built for multiplayer
-games: dark, precise, information-dense and recognizably AgarStake.
+games: dark, precise, information-dense and recognizably Arenifi.
 
 ## Audit summary
 
@@ -151,4 +151,3 @@ colors must not be used as decorative card themes.
 The UI is verified at 375, 430, 768, 1024, 1440 and 1920px widths. At each
 checkpoint check horizontal overflow, sticky/fixed controls, popover bounds,
 safe-area padding, readable numerical columns and stable primary-action size.
-

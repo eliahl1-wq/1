@@ -112,7 +112,7 @@ export default function AgarTokenModal({
             return;
         }
         if (!accountAddress || !authToken) {
-            setNotice('Your AgarStake account wallet is not available.');
+            setNotice('Your Arenifi account wallet is not available.');
             setNoticeType('error');
             return;
         }
@@ -202,7 +202,7 @@ export default function AgarTokenModal({
                     <div className="agar-modal__identity">
                         <AgarLogo size={48} config={config} />
                         <div>
-                            <span className="agar-modal__eyebrow">AgarStake ecosystem</span>
+                            <span className="agar-modal__eyebrow">Arenifi ecosystem</span>
                             <h2 id="agar-modal-title">
                                 {config.symbol}
                                 <span>{config.name}</span>
@@ -233,7 +233,7 @@ export default function AgarTokenModal({
                                     {shortAddress(accountAddress)}
                                 </strong>
                             </div>
-                            <span className="agar-modal__account-lock" title="Locked to your AgarStake account">
+                            <span className="agar-modal__account-lock" title="Locked to your Arenifi account">
                                 Account linked
                             </span>
                         </div>

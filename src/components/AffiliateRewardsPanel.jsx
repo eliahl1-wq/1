@@ -144,7 +144,7 @@ export default function AffiliateRewardsPanel({ onDataChange }) {
                 <div className="affiliate-link-card">
                     <div>
                         <span className="label">Become an affiliate</span>
-                        <strong>Earn 30% of AgarArena's eligible 8% cashout fee</strong>
+                        <strong>Earn 30% of Arenifi's eligible 8% cashout fee</strong>
                         <small>Activate once to receive your permanent referral link. No guaranteed earnings; affiliate terms and anti-abuse rules apply.</small>
                     </div>
                     <button className="btn btn-green" onClick={activate} disabled={loading}>

@@ -35,7 +35,7 @@ export default function Rewards() {
     }, [location.hash]);
 
     useEffect(() => {
-        document.title = 'AgarStake | Rewards';
+        document.title = 'Rewards | Arenifi';
 
         // Fetch transaction history for rewards
         const fetchHistory = async () => {

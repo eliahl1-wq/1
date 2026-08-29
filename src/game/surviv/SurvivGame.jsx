@@ -574,7 +574,7 @@ export default function SurvivGame() {
         const previousBackground = document.body.style.backgroundColor;
         const previousTitle = document.title;
         document.body.style.backgroundColor = '#0a0a0c';
-        document.title = 'AgarStake | Surviv';
+        document.title = 'Surviv | Arenifi';
         stopSessionRecording();
         return () => {
             document.body.style.backgroundColor = previousBackground;

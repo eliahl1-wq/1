@@ -7,7 +7,7 @@ import { setPageSeo, SEO } from '../utils/seo';
 
 const FAQ_ITEMS = [
     {
-        q: 'Is AgarStake real money?',
+        q: 'Does Arenifi support real-money matches?',
         a: 'Yes. You deposit real Solana (SOL) and compete against other players for real stakes. Your arena balance reflects actual USD value, and cashouts are sent as SOL to your wallet.',
     },
     {
@@ -16,7 +16,7 @@ const FAQ_ITEMS = [
     },
     {
         q: 'How does cashing out work?',
-        a: 'While in a game, hold the cash-out button for a few seconds. Your current arena balance (minus a small fee) is credited to your AgarStake wallet instantly. You can then withdraw to any Solana address.',
+        a: 'While in a game, hold the cash-out button for a few seconds. Your current arena balance (minus a small fee) is credited to your Arenifi wallet instantly. You can then withdraw to any Solana address.',
     },
     {
         q: 'What happens if I die?',
@@ -28,7 +28,7 @@ const FAQ_ITEMS = [
     },
     {
         q: 'Are there bots?',
-        a: 'No. AgarStake matches you with real players only. Each stake tier runs in its own pool so you compete against players at your level.',
+        a: 'No. Arenifi matches you with real players only. Each stake tier runs in its own pool so you compete against players at your level.',
     },
     {
         q: 'Is my deposit safe?',
@@ -40,11 +40,11 @@ const FAQ_ITEMS = [
     },
     {
         q: 'Can I play on mobile?',
-        a: 'Yes. AgarStake works in mobile browsers with touch controls for movement and actions. For the best experience, use landscape mode on larger phones.',
+        a: 'Yes. Arenifi works in mobile browsers with touch controls for movement and actions. For the best experience, use landscape mode on larger phones.',
     },
     {
         q: 'How do I contact support?',
-        a: 'Email us at support@agararena.space with your username and a description of the issue. We typically respond within 24 hours.',
+        a: 'Email us at support@arenifi.fun with your username and a description of the issue. We typically respond within 24 hours.',
     },
 ];
 
@@ -97,7 +97,7 @@ export default function Faq() {
                 <div className="info-cta-block" style={{ marginTop: '32px' }}>
                     <p className="info-hero-sub">
                         Still have questions?{' '}
-                        <a href="mailto:support@agararena.space" className="text-accent" style={{ textDecoration: 'none', fontWeight: 600 }}>
+                        <a href="mailto:support@arenifi.fun" className="text-accent" style={{ textDecoration: 'none', fontWeight: 600 }}>
                             Contact support
                         </a>
                     </p>

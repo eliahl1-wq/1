@@ -30,7 +30,7 @@ export default function Tournaments() {
     const [selectedRulesTournament, setSelectedRulesTournament] = useState(null);
 
     useEffect(() => {
-        document.title = 'AgarStake | Tournaments';
+        document.title = 'Tournaments | Arenifi';
         const timer = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(timer);
     }, []);

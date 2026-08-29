@@ -1,10 +1,10 @@
-const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://agararena.space').replace(/\/$/, '');
+const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://arenifi.fun').replace(/\/$/, '');
 
 export const BASE_KEYWORDS = [
-    'agarstake', 'agar stake', 'agararena', 'agar arena',
+    'arenifi', 'competitive browser games', 'multiplayer io games',
     'agar with money', 'agar.io with money', 'play agar for money', 'real money agar', 'real money agario',
     'slither with money', 'slither.io with money', 'play slither for money', 'real money slither', 'real money slitherio',
-    'io games with money', 'real money io games', 'crypto io games', 'web3 browser games',
+    'io games with money', 'real money io games', 'free play io games', 'crypto browser games',
     'solana wager game', 'solana io game', 'earn crypto playing games', 'cash out crypto games',
 ].join(', ');
 
@@ -33,13 +33,20 @@ function upsertLink(rel, href) {
  * tabTitle     → browser tab only (short)
  * description  → Google meta description (not Discord/OG)
  * keywords     → meta keywords
- * OG/twitter tags stay static in index.html for clean link previews.
+ * Social tags are updated alongside the visible route metadata.
  */
 export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
     if (tabTitle) document.title = tabTitle;
 
     if (description) {
         upsertMeta('meta[name="description"]', { name: 'description', content: description });
+        upsertMeta('meta[property="og:description"]', { property: 'og:description', content: description });
+        upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: description });
+    }
+
+    if (tabTitle) {
+        upsertMeta('meta[property="og:title"]', { property: 'og:title', content: tabTitle });
+        upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: tabTitle });
     }
 
     if (keywords) {
@@ -48,96 +55,97 @@ export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
 
     const canonical = `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
     upsertLink('canonical', canonical);
+    upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical });
 }
 
 export const SEO = {
     home: {
-        tabTitle: 'Play Agar & Slither with money - PvP Wagering Games | AgarStake',
-        description: 'Welcome to the premier platform for competitive Web3 gaming. Wager Solana (SOL) in skill-based Agar and Slither arenas, outplay opponents, and withdraw your winnings instantly.',
+        tabTitle: 'Arenifi | Competitive Browser Games with SOL Stakes',
+        description: 'Play competitive Agar, Slither and Surviv-style browser games on Arenifi. Choose free play or enter SOL-staked matches and compete live.',
         keywords: BASE_KEYWORDS,
         path: '/',
     },
     agar: {
-        tabTitle: 'AgarStake | Play Agar with Money',
+        tabTitle: 'Play Agar Online | Arenifi',
         description: 'Enter the high-stakes Agar arena. Wager SOL against real players, grow your mass, dominate the map, and cash out your crypto instantly.',
         keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
         path: '/agar',
     },
     slither: {
-        tabTitle: 'AgarStake | Play Slither with Money',
+        tabTitle: 'Play Slither Online | Arenifi',
         description: 'Join the ultimate competitive Slither arena. Stake SOL, outmaneuver opponents, claim the leaderboard, and cash out immediately.',
         keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
         path: '/slither',
     },
     gamemodesAgar: {
-        tabTitle: 'AgarStake | Agar Arenas',
+        tabTitle: 'Agar Game Modes | Arenifi',
         description: 'Choose your Agar mode: high-stakes Normal or winner-takes-all Battle Royale. Secure your entry and compete for the Solana prize pool.',
         keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
         path: '/gamemodes',
     },
     gamemodesSlither: {
-        tabTitle: 'AgarStake | Slither Arenas',
+        tabTitle: 'Slither Game Modes | Arenifi',
         description: 'Choose your Slither mode: high-stakes Normal or winner-takes-all Battle Royale. Secure your entry and compete for the Solana prize pool.',
         keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
         path: '/gamemodes',
     },
     preGameAgar: {
-        tabTitle: 'AgarStake | Join Agar Match',
+        tabTitle: 'Join an Agar Match | Arenifi',
         description: 'Select your entry tier and jump straight into the Agar action. High stakes, real opponents, instant crypto cashouts.',
         keywords: `${BASE_KEYWORDS}, agar.io cash out`,
         path: '/pre-game',
     },
     gamemodesSurviv: {
-        tabTitle: 'AgarStake | Surviv Arena',
+        tabTitle: 'Surviv Arena | Arenifi',
         description: 'Surviv Normal — $5 entry top-down battle royale. Loot, fight, and cash out your balance anytime.',
         keywords: `${BASE_KEYWORDS}, surviv.io real money, battle royale shooter`,
         path: '/gamemodes',
     },
     preGameSlither: {
-        tabTitle: 'AgarStake | Join Slither Match',
+        tabTitle: 'Join a Slither Match | Arenifi',
         description: 'Select your entry tier and jump straight into the Slither action. High stakes, real opponents, instant crypto cashouts.',
         keywords: `${BASE_KEYWORDS}, slither.io cash out`,
         path: '/pre-game',
     },
     lobby: {
-        tabTitle: 'AgarStake | Game Lobby',
+        tabTitle: 'Wallet & Lobby | Arenifi',
         description: 'Manage your funds and deposit Solana (SOL) using your personal address or QR code to enter the arenas.',
         keywords: `${BASE_KEYWORDS}, deposit solana, crypto game lobby`,
         path: '/lobby',
     },
     login: {
-        tabTitle: 'AgarStake | Login',
-        description: 'Securely log in to your AgarStake account to play competitive Web3 games for Solana.',
-        keywords: `${BASE_KEYWORDS}, agarstake login`,
+        tabTitle: 'Log In | Arenifi',
+        description: 'Log in securely to your Arenifi account.',
+        keywords: `${BASE_KEYWORDS}, arenifi login`,
         path: '/login',
     },
     register: {
-        tabTitle: 'AgarStake | Register',
-        description: 'Create your AgarStake account today and start competing in high-stakes PvP arenas.',
-        keywords: `${BASE_KEYWORDS}, agarstake register, sign up`,
+        tabTitle: 'Create an Account | Arenifi',
+        description: 'Create an Arenifi account to join multiplayer arenas, track performance and manage your balance.',
+        keywords: `${BASE_KEYWORDS}, arenifi register, sign up`,
         path: '/register',
     },
     profile: {
-        tabTitle: 'AgarStake | Profile & Performance',
-        description: 'Track your overall performance, win rates, and account balance on AgarStake.',
-        keywords: `${BASE_KEYWORDS}, agarstake profile, stats`,
+        tabTitle: 'Profile & Performance | Arenifi',
+        description: 'Review your Arenifi profile, game performance and account settings.',
+        keywords: `${BASE_KEYWORDS}, arenifi profile, stats`,
         path: '/profile',
     },
     transactions: {
-        tabTitle: 'AgarStake | Transaction History',
-        description: 'View your secure deposit and withdrawal history on the AgarStake platform.',
-        keywords: `${BASE_KEYWORDS}, agarstake transactions, withdrawals`,
+        tabTitle: 'Transaction History | Arenifi',
+        description: 'Review deposits, withdrawals and account transactions on Arenifi.',
+        keywords: `${BASE_KEYWORDS}, arenifi transactions, withdrawals`,
         path: '/transactions',
     },
     howItWorks: {
-        tabTitle: 'AgarStake | How it Works',
+        tabTitle: 'How Arenifi Works',
         description: 'Learn the mechanics of our high-stakes Web3 arenas. Master the economy, understand cashouts, and start winning Solana.',
         keywords: `${BASE_KEYWORDS}, how to play, cash out`,
         path: '/how-it-works',
     },
     faq: {
-        tabTitle: 'AgarStake | Support & FAQ',
-        description: 'Get answers to common questions about deposits, withdrawals, and game rules on AgarStake.',
+        tabTitle: 'Help & FAQ | Arenifi',
+        description: 'Find answers about Arenifi accounts, gameplay, deposits, withdrawals and game rules.',
         keywords: `${BASE_KEYWORDS}, faq, help, support`,
         path: '/faq',
     },

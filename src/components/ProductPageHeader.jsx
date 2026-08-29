@@ -9,7 +9,7 @@ function BackIcon() {
 }
 
 export default function ProductPageHeader({
-    eyebrow = 'AgarStake',
+    eyebrow = 'Arenifi',
     title,
     description,
     onBack,

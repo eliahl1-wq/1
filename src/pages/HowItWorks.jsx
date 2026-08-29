@@ -73,7 +73,7 @@ export default function HowItWorks() {
             <div className="page-content info-page">
                 <div className="info-hero">
                     <p className="label">Guide</p>
-                    <h1 className="info-hero-title">How AgarStake works</h1>
+                    <h1 className="info-hero-title">How Arenifi works</h1>
                     <p className="info-hero-sub">
                         Real-money Agar.io and Slither.io on Solana. Five steps from signup to cashout.
                     </p>

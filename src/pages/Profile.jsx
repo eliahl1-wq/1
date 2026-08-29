@@ -763,7 +763,7 @@ export default function Profile() {
                                         </div>
                                     )}
                                     <p style={{ margin: '8px 0 0', fontSize: '0.67rem', color: 'var(--text-3)', lineHeight: 1.5 }}>
-                                        Used for affiliate payouts. Entering an address does not connect your wallet to AgarStake.
+                                        Used for affiliate payouts. Entering an address does not connect your wallet to Arenifi.
                                     </p>
                                 </div>
 

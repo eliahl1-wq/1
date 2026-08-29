@@ -41,7 +41,7 @@ export default function BRLobby() {
     }, []);
 
     useEffect(() => {
-        document.title = 'AgarStake | Battle Royale Queue';
+        document.title = 'Battle Royale Queue | Arenifi';
         if (!token) {
             navigate('/login');
             return;
@@ -142,10 +142,10 @@ export default function BRLobby() {
             <Background />
             <nav className="topbar" style={{ width: '100%', zIndex: 2 }}>
                 <div className="topbar-left">
-                    <div className="logo" onClick={() => navigate('/pre-game')}>
-                        <div className="logo-dot" />
-                        <span>AGAR<span className="logo-accent">STAKE</span></span>
-                    </div>
+                    <button type="button" className="logo" onClick={() => navigate('/pre-game')} aria-label="Arenifi home">
+                        <img className="logo-full-mark" src="/arenifi-logo.png" alt="Arenifi" />
+                        <img className="logo-compact-mark" src="/arenifi-mark-transparent.png" alt="" aria-hidden="true" />
+                    </button>
                 </div>
             </nav>
 
@@ -276,4 +276,3 @@ export default function BRLobby() {
         </div>
     );
 }
-

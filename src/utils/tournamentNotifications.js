@@ -1,6 +1,7 @@
-const SEEN_TOURNAMENTS_KEY = 'agarstake-seen-tournaments-v1';
+const SEEN_TOURNAMENTS_KEY = 'arenifi-seen-tournaments-v1';
+const LEGACY_SEEN_TOURNAMENTS_KEY = 'agarstake-seen-tournaments-v1';
 
-export const TOURNAMENT_SEEN_EVENT = 'agarstake:tournaments-seen';
+export const TOURNAMENT_SEEN_EVENT = 'arenifi:tournaments-seen';
 
 export function getActiveTournamentIds(tournaments = []) {
     return tournaments.filter(t => t?.id && ['scheduled', 'live'].includes(t.status)).map(t => String(t.id));
@@ -8,7 +9,14 @@ export function getActiveTournamentIds(tournaments = []) {
 
 function readSeenTournamentIds() {
     try {
-        const value = JSON.parse(localStorage.getItem(SEEN_TOURNAMENTS_KEY) || '[]');
+        const storedValue = localStorage.getItem(SEEN_TOURNAMENTS_KEY)
+            || localStorage.getItem(LEGACY_SEEN_TOURNAMENTS_KEY)
+            || '[]';
+        const value = JSON.parse(storedValue);
+        if (!localStorage.getItem(SEEN_TOURNAMENTS_KEY) && storedValue !== '[]') {
+            localStorage.setItem(SEEN_TOURNAMENTS_KEY, storedValue);
+            localStorage.removeItem(LEGACY_SEEN_TOURNAMENTS_KEY);
+        }
         return new Set(Array.isArray(value) ? value.map(String) : []);
     } catch {
         return new Set();

@@ -2,50 +2,53 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#0a0a0f" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="google-site-verification" content="680c9e97322f5664" />
-    <meta name="robots" content="index, follow" />
-    <meta name="author" content="AgarStake" />
-    <meta name="application-name" content="AgarStake" />
-    <title>AgarStake | Competitive PvP Games with Real Cash &amp; Crypto Wagers</title>
-    <meta name="description" content="Welcome to the premier platform for competitive Web3 gaming. Wager Solana (SOL) in skill-based Agar and Slither arenas, climb the leaderboard, and withdraw your winnings instantly." />
-    <meta name="keywords" content="agarstake, agar stake, agararena, agar with money, agar.io with money, slither with money, slither.io with money, io games with money, real money io games, play agar for money, play slither for money, crypto io games, web3 browser games, solana wager game, earn crypto playing games, real money agario, real money slitherio, agar.io real money, slither.io real money" />
-    <meta property="og:title" content="AgarStake | Competitive PvP Games with Real Cash &amp; Crypto Wagers" />
-    <meta property="og:description" content="The premier platform for competitive Web3 gaming. Wager Solana, outplay your opponents in Agar and Slither, and cash out instantly." />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="author" content="Arenifi" />
+    <meta name="application-name" content="Arenifi" />
+    <title>Arenifi | Competitive Browser Games with SOL Stakes</title>
+    <meta name="description" content="Play competitive Agar, Slither and Surviv-style browser games on Arenifi. Choose free play or enter SOL-staked matches, compete live and cash out your balance." />
+    <meta name="keywords" content="arenifi, competitive browser games, multiplayer io games, agar with money, slither with money, surviv browser game, free play io games, real money io games, crypto browser games, solana games, SOL wager games" />
+    <meta property="og:site_name" content="Arenifi" />
+    <meta property="og:title" content="Arenifi | Competitive Browser Games with SOL Stakes" />
+    <meta property="og:description" content="Play Agar, Slither and Surviv-style multiplayer games in free-play or SOL-staked arenas." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://agararena.space/" />
-    <meta property="og:image" content="https://agararena.space/logo-512.png" />
+    <meta property="og:url" content="https://arenifi.fun/" />
+    <meta property="og:image" content="https://arenifi.fun/arenifi-logo.png" />
+    <meta property="og:image:width" content="2172" />
+    <meta property="og:image:height" content="724" />
+    <meta property="og:image:alt" content="Arenifi wordmark" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="AgarStake | Competitive PvP Games with Real Cash &amp; Crypto Wagers" />
-    <meta name="twitter:description" content="The premier platform for competitive Web3 gaming. Wager Solana, outplay your opponents in Agar and Slither, and cash out instantly." />
-    <meta name="twitter:image" content="https://agararena.space/logo-512.png" />
-    <link rel="canonical" href="https://agararena.space/" />
+    <meta name="twitter:title" content="Arenifi | Competitive Browser Games with SOL Stakes" />
+    <meta name="twitter:description" content="Play Agar, Slither and Surviv-style multiplayer games in free-play or SOL-staked arenas." />
+    <meta name="twitter:image" content="https://arenifi.fun/arenifi-logo.png" />
+    <meta name="twitter:image:alt" content="Arenifi wordmark" />
+    <link rel="canonical" href="https://arenifi.fun/" />
     <script>
-      // Redirect before loading modules so stale www caches cannot break startup.
-      if (location.hostname === 'www.agararena.space') {
-        location.replace('https://agararena.space' + location.pathname + location.search + location.hash);
+      // Keep the canonical host consistent before the application loads.
+      if (location.hostname === 'www.arenifi.fun') {
+        location.replace('https://arenifi.fun' + location.pathname + location.search + location.hash);
       }
 
       // Recover once when route HTML outlives its hashed deployment assets.
       window.addEventListener('error', function (event) {
         var target = event.target;
         if (!target || target.tagName !== 'SCRIPT' || !target.src || target.src.indexOf('/assets/') === -1) return;
-        var refreshKey = 'agarstake-asset-refresh';
+        var refreshKey = 'arenifi-asset-refresh';
         if (sessionStorage.getItem(refreshKey)) return;
         sessionStorage.setItem(refreshKey, '1');
         var separator = location.search ? '&' : '?';
         location.replace(location.pathname + location.search + separator + 'asset-refresh=' + Date.now() + location.hash);
       }, true);
       window.addEventListener('load', function () {
-        sessionStorage.removeItem('agarstake-asset-refresh');
+        sessionStorage.removeItem('arenifi-asset-refresh');
       });
     </script>
     <script type="application/ld+json">
@@ -54,49 +57,45 @@
       "@graph": [
         {
           "@type": "WebSite",
-          "name": "AgarStake",
-          "alternateName": ["Agar Stake", "AgarArena", "agarstake", "agararena.space"],
-          "url": "https://agararena.space",
-          "description": "Earn money playing Agar and Slither with crypto. Deposit Solana and cash out instantly.",
-          "publisher": { "@id": "https://agararena.space/#organization" }
+          "@id": "https://arenifi.fun/#website",
+          "name": "Arenifi",
+          "url": "https://arenifi.fun/",
+          "description": "Competitive multiplayer browser games with free-play and SOL-staked arenas.",
+          "publisher": { "@id": "https://arenifi.fun/#organization" }
         },
         {
           "@type": "WebApplication",
-          "name": "AgarStake",
-          "alternateName": ["Agar Stake", "AgarArena"],
-          "url": "https://agararena.space",
-          "description": "Welcome to the premier platform for competitive Web3 gaming. Wager Solana (SOL) in skill-based Agar and Slither arenas, climb the leaderboard, and withdraw your winnings instantly.",
+          "@id": "https://arenifi.fun/#app",
+          "name": "Arenifi",
+          "url": "https://arenifi.fun/",
+          "description": "Play competitive Agar, Slither and Surviv-style browser games in free-play or SOL-staked matches.",
           "applicationCategory": "GameApplication",
-          "operatingSystem": "Web browser",
-          "browserRequirements": "Requires JavaScript",
-          "offers": {
-            "@type": "Offer",
-            "price": "5",
-            "priceCurrency": "USD"
-          }
+          "operatingSystem": "Any",
+          "browserRequirements": "Requires JavaScript and a modern web browser",
+          "isAccessibleForFree": true,
+          "publisher": { "@id": "https://arenifi.fun/#organization" }
         },
         {
           "@type": "Organization",
-          "@id": "https://agararena.space/#organization",
-          "name": "AgarStake",
-          "url": "https://agararena.space",
+          "@id": "https://arenifi.fun/#organization",
+          "name": "Arenifi",
+          "url": "https://arenifi.fun/",
           "logo": {
             "@type": "ImageObject",
-            "url": "https://agararena.space/logo-512.png",
-            "width": 512,
-            "height": 512
+            "url": "https://arenifi.fun/arenifi-mark.png",
+            "width": 1254,
+            "height": 1254
           }
         },
         {
           "@type": "ItemList",
-          "name": "AgarStake Site Navigation",
+          "name": "Arenifi site navigation",
           "itemListElement": [
-            { "@type": "SiteNavigationElement", "position": 1, "name": "Agar", "url": "https://agararena.space/agar" },
-            { "@type": "SiteNavigationElement", "position": 2, "name": "Slither", "url": "https://agararena.space/slither" },
-            { "@type": "SiteNavigationElement", "position": 3, "name": "Gamemodes", "url": "https://agararena.space/gamemodes" },
-            { "@type": "SiteNavigationElement", "position": 4, "name": "Lobby", "url": "https://agararena.space/lobby" },
-            { "@type": "SiteNavigationElement", "position": 5, "name": "Login", "url": "https://agararena.space/login" },
-            { "@type": "SiteNavigationElement", "position": 6, "name": "Register", "url": "https://agararena.space/register" }
+            { "@type": "SiteNavigationElement", "position": 1, "name": "Play", "url": "https://arenifi.fun/pre-game" },
+            { "@type": "SiteNavigationElement", "position": 2, "name": "Game modes", "url": "https://arenifi.fun/gamemodes" },
+            { "@type": "SiteNavigationElement", "position": 3, "name": "Tournaments", "url": "https://arenifi.fun/tournaments" },
+            { "@type": "SiteNavigationElement", "position": 4, "name": "How it works", "url": "https://arenifi.fun/how-it-works" },
+            { "@type": "SiteNavigationElement", "position": 5, "name": "FAQ", "url": "https://arenifi.fun/faq" }
           ]
         }
       ]
@@ -106,17 +105,16 @@
   <body>
     <noscript>
       <header>
-        <h1>AgarStake | Competitive PvP Games with Real Cash &amp; Crypto Wagers</h1>
-        <p>The premier platform for competitive Web3 gaming. Wager Solana (SOL) in skill-based Agar and Slither arenas, climb the leaderboard, and withdraw your winnings instantly at agararena.space.</p>
+        <h1>Arenifi competitive browser games</h1>
+        <p>Play Agar, Slither and Surviv-style multiplayer games in free-play or SOL-staked arenas at arenifi.fun.</p>
       </header>
       <nav aria-label="Site navigation">
         <ul>
-          <li><a href="https://agararena.space/agar">Agar</a></li>
-          <li><a href="https://agararena.space/slither">Slither</a></li>
-          <li><a href="https://agararena.space/gamemodes">Gamemodes</a></li>
-          <li><a href="https://agararena.space/lobby">Lobby</a></li>
-          <li><a href="https://agararena.space/login">Login</a></li>
-          <li><a href="https://agararena.space/register">Register</a></li>
+          <li><a href="https://arenifi.fun/pre-game">Play</a></li>
+          <li><a href="https://arenifi.fun/gamemodes">Game modes</a></li>
+          <li><a href="https://arenifi.fun/tournaments">Tournaments</a></li>
+          <li><a href="https://arenifi.fun/how-it-works">How it works</a></li>
+          <li><a href="https://arenifi.fun/faq">FAQ</a></li>
         </ul>
       </nav>
     </noscript>

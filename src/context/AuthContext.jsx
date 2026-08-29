@@ -4,7 +4,7 @@ import { flagDiscoveryForSession } from '../constants/gamemodes';
 import { API_URL } from '../utils/apiBase';
 
 const AuthContext = createContext();
-const BALANCE_GUARD_KEY = 'agarstake_pending_balance';
+const BALANCE_GUARD_KEY = 'arenifi_pending_balance';
 
 function formatUser(userData) {
     if (!userData) return null;

@@ -8,7 +8,7 @@ export default function AppFooter({ showStatus = true }) {
                 <Link to="/how-it-works">How it Works</Link>
                 <Link to="/faq">FAQ</Link>
                 <Link to="/rewards#affiliate-rewards">Affiliate</Link>
-                <a href="mailto:support@agararena.space">Support</a>
+                <a href="mailto:support@arenifi.fun">Support</a>
                 {showStatus && (
                     <span className="footer-status">
                         <span className="live-dot" aria-hidden="true" />

@@ -4,10 +4,7 @@ export default function AppLoadingScreen() {
     return (
         <div className="app-loading" role="status" aria-label="Loading">
             <div className="app-loading-brand">
-                <div className="logo-dot" />
-                <span className="app-loading-name">
-                    AGAR<span className="logo-accent">STAKE</span>
-                </span>
+                <img src="/arenifi-logo.png" alt="Arenifi" />
             </div>
             <span className="spinner app-loading-spinner" />
         </div>

@@ -1,21 +1,23 @@
 {
-  "name": "AgarStake",
-  "short_name": "AgarStake",
-  "description": "Competitive Agar.io and Slither.io with Solana stakes.",
-  "start_url": "/",
+  "name": "Arenifi",
+  "short_name": "Arenifi",
+  "description": "Competitive multiplayer browser games with free-play and SOL-staked arenas.",
+  "id": "/",
+  "start_url": "/pre-game",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
   "icons": [
     {
       "src": "/favicon.png",
-      "sizes": "192x192",
+      "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/logo-512.png",
-      "sizes": "512x512",
+      "src": "/arenifi-mark.png",
+      "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "any"
     }

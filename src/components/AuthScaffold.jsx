@@ -4,9 +4,8 @@ import { Link } from 'react-router-dom';
 export function AuthBrand({ subtitle }) {
     return (
         <header className="auth-brand">
-            <div className="auth-brand__logo" aria-label="AgarStake">
-                <span className="auth-brand__dot" aria-hidden="true" />
-                <span>AGAR<span>STAKE</span></span>
+            <div className="auth-brand__logo">
+                <img src="/arenifi-logo.png" alt="Arenifi" />
             </div>
             <p>{subtitle}</p>
         </header>

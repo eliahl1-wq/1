@@ -1,5 +1,7 @@
-export const REFERRAL_STORAGE_KEY = 'agararena_referral_first_touch';
-export const REFERRAL_DEVICE_KEY = 'agararena_referral_device_id';
+export const REFERRAL_STORAGE_KEY = 'arenifi_referral_first_touch';
+export const REFERRAL_DEVICE_KEY = 'arenifi_referral_device_id';
+const LEGACY_REFERRAL_STORAGE_KEY = 'agararena_referral_first_touch';
+const LEGACY_REFERRAL_DEVICE_KEY = 'agararena_referral_device_id';
 export const REFERRAL_DURATION_MS = 60 * 24 * 60 * 60 * 1000;
 
 export function normalizeReferralCode(code) {
@@ -20,10 +22,16 @@ export function getStoredReferral({
     now = Date.now(),
 } = {}) {
     if (!storage) return null;
-    const parsed = safeParse(storage.getItem(REFERRAL_STORAGE_KEY));
+    const storedValue = storage.getItem(REFERRAL_STORAGE_KEY) || storage.getItem(LEGACY_REFERRAL_STORAGE_KEY);
+    const parsed = safeParse(storedValue);
     if (!parsed?.code || !Number.isFinite(parsed.expiresAt) || parsed.expiresAt <= now) {
         storage.removeItem(REFERRAL_STORAGE_KEY);
+        storage.removeItem(LEGACY_REFERRAL_STORAGE_KEY);
         return null;
+    }
+    if (!storage.getItem(REFERRAL_STORAGE_KEY)) {
+        storage.setItem(REFERRAL_STORAGE_KEY, storedValue);
+        storage.removeItem(LEGACY_REFERRAL_STORAGE_KEY);
     }
     return parsed;
 }
@@ -66,16 +74,18 @@ export function updateStoredReferralClick(clickId, canonicalCode, {
 
 export function clearStoredReferral(storage = typeof window !== 'undefined' ? window.localStorage : null) {
     storage?.removeItem(REFERRAL_STORAGE_KEY);
+    storage?.removeItem(LEGACY_REFERRAL_STORAGE_KEY);
 }
 
 export function getReferralDeviceId(storage = typeof window !== 'undefined' ? window.localStorage : null) {
     if (!storage) return '';
-    let id = storage.getItem(REFERRAL_DEVICE_KEY);
+    let id = storage.getItem(REFERRAL_DEVICE_KEY) || storage.getItem(LEGACY_REFERRAL_DEVICE_KEY);
     if (!id) {
         id = typeof crypto !== 'undefined' && crypto.randomUUID
             ? crypto.randomUUID()
             : `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        storage.setItem(REFERRAL_DEVICE_KEY, id);
     }
+    storage.setItem(REFERRAL_DEVICE_KEY, id);
+    storage.removeItem(LEGACY_REFERRAL_DEVICE_KEY);
     return id;
 }

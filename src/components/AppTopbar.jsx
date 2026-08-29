@@ -122,12 +122,9 @@ export default function AppTopbar({ children }) {
                         </svg>
                     </button>
 
-                    <button type="button" className="logo" aria-label="AgarStake home" onClick={() => navigate('/pre-game')}>
-                        <img className="logo-compact-mark" src="/favicon.png" alt="" aria-hidden="true" />
-                        <div className="logo-dot" />
-                        <span>
-                            AGAR<span className="logo-accent">STAKE</span>
-                        </span>
+                    <button type="button" className="logo" aria-label="Arenifi home" onClick={() => navigate('/pre-game')}>
+                        <img className="logo-full-mark" src="/arenifi-logo.png" alt="Arenifi" />
+                        <img className="logo-compact-mark" src="/arenifi-mark-transparent.png" alt="" aria-hidden="true" />
                     </button>
 
                     <div className="topbar-nav topbar-nav--desktop">

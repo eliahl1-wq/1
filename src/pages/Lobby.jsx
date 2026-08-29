@@ -87,7 +87,7 @@ export default function Lobby() {
         if (qrRef.current && depositAddress) {
             qrRef.current.innerHTML = '';
             try {
-                const qr = createQR(`solana:${depositAddress}?amount=0&label=AgarStake&message=Deposit`, 190, 'white', 'black');
+                const qr = createQR(`solana:${depositAddress}?amount=0&label=Arenifi&message=Deposit`, 190, 'white', 'black');
                 qr.append(qrRef.current);
             } catch { }
         }

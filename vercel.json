@@ -1,7 +1,31 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "agararena.space" }],
+      "destination": "https://arenifi.fun/:path*",
+      "statusCode": 301,
+      "preserveQueryParams": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.agararena.space" }],
+      "destination": "https://arenifi.fun/:path*",
+      "statusCode": 301,
+      "preserveQueryParams": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.arenifi.fun" }],
+      "destination": "https://arenifi.fun/:path*",
+      "statusCode": 301,
+      "preserveQueryParams": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/",

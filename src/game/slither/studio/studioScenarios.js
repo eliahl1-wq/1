@@ -12,7 +12,7 @@ export const STUDIO_SCENARIOS = Object.freeze([
         actors: [
             {
                 id: 'player',
-                name: 'AGARSTAKE',
+                name: 'ARENIFI',
                 color: '#7c3aff',
                 balance: 8.5,
                 start: { x: -300, y: 180, angle: -0.18 },
@@ -89,7 +89,7 @@ export const STUDIO_SCENARIOS = Object.freeze([
         actors: [
             {
                 id: 'player',
-                name: 'AGARSTAKE',
+                name: 'ARENIFI',
                 color: '#e030e0',
                 balance: 11.5,
                 start: { x: -40, y: 45, angle: 1.35, bend: 0.028 },

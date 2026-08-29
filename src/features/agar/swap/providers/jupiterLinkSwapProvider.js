@@ -3,7 +3,7 @@ function buildSwapUrl(template, mint) {
 }
 
 /**
- * Launch-safe Jupiter handoff. It keeps quote/signing outside AgarStake until
+ * Launch-safe Jupiter handoff. It keeps quote/signing outside Arenifi until
  * the embedded Jupiter adapter is reviewed and enabled.
  */
 export const jupiterLinkSwapProvider = Object.freeze({

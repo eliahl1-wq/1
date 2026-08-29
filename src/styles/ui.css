@@ -197,6 +197,13 @@
   display: none;
 }
 
+.logo-full-mark {
+  display: block;
+  width: 126px;
+  height: 36px;
+  object-fit: contain;
+}
+
 /* ─── User pill in topbar ─── */
 .user-pill {
   display: flex;
@@ -1749,6 +1756,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.app-loading-brand img {
+  display: block;
+  width: 176px;
+  height: auto;
 }
 
 .app-loading-name {
@@ -3350,6 +3363,7 @@
     object-fit: contain;
   }
 
+  .logo-full-mark,
   .logo > .logo-dot,
   .logo > span {
     display: none;
@@ -4514,17 +4528,14 @@
   letter-spacing: -0.045em;
 }
 
-.auth-brand__logo > span:last-child > span { color: #9a86ff; }
-.auth-brand__dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 7px;
-  border-radius: 50%;
-  background: var(--accent);
+.auth-brand__logo img {
+  display: block;
+  width: 154px;
+  height: auto;
 }
 
 .auth-brand p {
-  margin: 5px 0 0 15px;
+  margin: 5px 0 0;
   color: var(--text-subtle);
   font-size: 0.8rem;
   font-weight: 500;
@@ -5076,5 +5087,378 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 
   .page-content {
     padding-top: 116px;
+  }
+}
+
+/* Compact pregame utility navigation */
+.pregame-bottom-dock {
+  min-height: 40px;
+  padding: 3px 18px calc(3px + env(safe-area-inset-bottom, 0px));
+  gap: 12px;
+  background: rgba(13, 13, 17, 0.94);
+  border-top-color: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 -3px 15px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.pregame-bottom-dock .footer-links {
+  min-height: 32px;
+  gap: 5px 15px;
+  font-size: 0.56rem;
+}
+
+.pregame-bottom-dock .pregame-affiliate-link {
+  min-height: 30px;
+  padding-inline: 10px;
+  font-size: 0.64rem;
+  box-shadow: none;
+}
+
+.pregame-discord-link--floating {
+  position: fixed;
+  z-index: 1001;
+  left: 18px;
+  bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+  width: 34px;
+  height: 34px;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(13, 13, 17, 0.94);
+  border-color: rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.pregame-discord-link--floating:hover {
+  color: #a99cff;
+  background: rgba(20, 19, 28, 0.97);
+  border-color: rgba(124, 111, 240, 0.32);
+  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.34);
+}
+
+.pregame-discord-link--floating svg {
+  width: 19px;
+  height: 19px;
+}
+
+@media (max-width: 768px) {
+  .pregame-bottom-dock {
+    min-height: 38px;
+    padding: 3px 9px calc(3px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pregame-bottom-dock .footer-links {
+    min-height: 30px;
+    gap: 4px 9px;
+    font-size: 0.51rem;
+  }
+
+  .pregame-discord-link--floating {
+    left: 10px;
+    bottom: calc(45px + env(safe-area-inset-bottom, 0px));
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Terminal-style navigation skin — compact hierarchy inspired by trading UIs. */
+.topbar {
+  height: 44px;
+  padding: 0 14px;
+  background: rgba(7, 8, 12, 0.97);
+  border-bottom: 1px solid #20232d;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+}
+
+.topbar-left {
+  height: 44px;
+  gap: 14px;
+}
+
+.topbar-nav {
+  gap: 2px;
+  padding-left: 11px;
+  border-left: 1px solid #20232d;
+}
+
+.logo {
+  gap: 7px;
+  font-size: 1.04rem;
+  font-weight: 830;
+  letter-spacing: -0.035em;
+}
+
+.logo-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+}
+
+.topbar-nav--desktop .gm-nav-link,
+.gm-nav-link {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 9px;
+  color: #a5a9b7;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  box-shadow: none;
+  font-family: var(--ui);
+  font-size: 0.69rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.topbar-nav--desktop .gm-nav-link:not(.gm-nav-link--active):hover,
+.gm-nav-link:not(.gm-nav-link--active):hover {
+  color: #e8eaf2;
+  background: #11141b;
+  border-color: #292d38;
+}
+
+.topbar-nav--desktop .gm-nav-link--active,
+.topbar-nav--desktop .gm-nav-link--active:hover,
+.gm-nav-link--active,
+.gm-nav-link--active:hover {
+  color: var(--accent);
+  background: #111d3d;
+  border-color: #253b72;
+  box-shadow: inset 0 0 0 1px rgba(75, 113, 230, 0.08);
+}
+
+.topbar-nav--desktop .gm-nav-link--active::after,
+.gm-nav-link--active::after {
+  content: none;
+}
+
+.gm-nav-notification-dot {
+  width: 5px;
+  height: 5px;
+  flex-basis: 5px;
+  background: #34d399;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.1);
+}
+
+.topbar-right,
+.pregame-topbar-actions {
+  gap: 5px;
+}
+
+.currency-switch-button,
+.currency-switch-button--topbar {
+  width: 96px;
+  height: 28px;
+  min-height: 28px;
+  padding: 2px;
+  border: 1px solid #282c37;
+  border-radius: 6px;
+  background: #0b0d12;
+  font-size: 0.61rem;
+}
+
+.currency-switch-button__option {
+  border-radius: 4px;
+}
+
+.currency-switch-button__option.is-active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+.currency-switch-button__option:hover {
+  background: #141823;
+}
+
+.nav-deposit-btn,
+.nav-deposit-btn--compact {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  font-family: var(--ui);
+  font-size: 0.66rem;
+  font-weight: 720;
+}
+
+.nav-deposit-btn:hover,
+.nav-deposit-btn--compact:hover {
+  background: var(--accent-hover);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  filter: none;
+  transform: none;
+}
+
+.agar-nav-balance,
+.balance-pill {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  gap: 5px;
+  color: #cdd1dc;
+  background: #0b0d12;
+  border: 1px solid #282c37;
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 0.65rem;
+}
+
+.agar-nav-balance:hover,
+.balance-pill:hover,
+.balance-pill--open {
+  color: #fff;
+  background: #12151d;
+  border-color: #343946;
+}
+
+.agar-nav-balance__add {
+  color: #34d399;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid #2d427d;
+  border-radius: 6px;
+  font-size: 0.68rem;
+}
+
+.user-pill:hover .avatar {
+  background: #21305c;
+}
+
+.pregame-bottom-dock {
+  min-height: 36px;
+  padding: 2px 14px calc(2px + env(safe-area-inset-bottom, 0px));
+  background: rgba(7, 8, 12, 0.97);
+  border-top-color: #20232d;
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.pregame-bottom-dock .footer-links {
+  min-height: 28px;
+  gap: 4px 13px;
+  color: #747987;
+  font-size: 0.52rem;
+}
+
+.pregame-bottom-dock .footer-links a:hover {
+  color: #b5bac8;
+}
+
+.pregame-bottom-dock .pregame-affiliate-link {
+  min-height: 27px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 5px;
+  font-size: 0.59rem;
+  font-weight: 680;
+}
+
+.pregame-bottom-dock .pregame-affiliate-link:hover {
+  color: var(--accent-ink);
+  background: var(--accent-hover);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.pregame-discord-link--floating {
+  bottom: calc(43px + env(safe-area-inset-bottom, 0px));
+  width: 30px;
+  height: 30px;
+  color: #8c92a2;
+  background: rgba(7, 8, 12, 0.97);
+  border: 1px solid #262a34;
+  border-radius: 6px;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.32);
+}
+
+.pregame-discord-link--floating:hover {
+  color: var(--accent);
+  background: #11151f;
+  border-color: var(--accent-border);
+}
+
+.pregame-discord-link--floating svg {
+  width: 17px;
+  height: 17px;
+}
+
+.page-shell--pregame {
+  padding-top: 44px;
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    height: 44px;
+    padding-inline: 9px;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    height: 44px;
+  }
+
+  .topbar-menu-btn {
+    width: 32px;
+    height: 32px;
+    margin-right: -4px;
+    border: 1px solid #282c37;
+    border-radius: 6px;
+  }
+
+  .logo {
+    font-size: 0.92rem;
+  }
+
+  .topbar-currency-switch {
+    top: 49px;
+  }
+
+  .currency-switch-button--topbar {
+    width: 104px;
+    height: 28px;
+    min-height: 28px;
+  }
+
+  .topbar-mobile-menu {
+    top: 44px;
+    padding: 6px;
+    background: rgba(7, 8, 12, 0.98);
+    border-bottom-color: #20232d;
+  }
+
+  .topbar-mobile-menu .gm-nav-link {
+    min-height: 32px;
+    height: 32px;
+    border-radius: 5px;
+  }
+
+  .page-shell--pregame {
+    padding-top: 84px;
+  }
+
+  .pregame-bottom-dock {
+    min-height: 34px;
+    padding-inline: 7px;
+  }
+
+  .pregame-discord-link--floating {
+    left: 8px;
+    bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+    width: 29px;
+    height: 29px;
   }
 }

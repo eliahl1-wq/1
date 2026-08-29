@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getStoredBalanceCurrency } from '../utils/displayCurrency.js';
 
-export const BALANCE_CURRENCY_EVENT = 'agarstake:balance-currency-change';
+export const BALANCE_CURRENCY_EVENT = 'arenifi:balance-currency-change';
 
 function normalizeCurrency(value) {
     return value === 'SOL' ? 'SOL' : 'USD';

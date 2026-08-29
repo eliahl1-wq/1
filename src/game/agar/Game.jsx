@@ -84,7 +84,7 @@ function getAgarCameraZoom(cells) {
 /**
  * Version v11 - Full Agar.io Clone Logic Integrated
  * Version v12 - Full Agar.io Clone Logic Integrated (Frontend)
- * AgarStake Core Game Component (Multiplayer Engine)
+ * Arenifi core game component (multiplayer engine)
  */
 
 export default function Game() {
@@ -351,7 +351,7 @@ export default function Game() {
     useEffect(() => {
         stopSessionRecording();
         const itv = setInterval(() => setCurrentTime(Date.now()), 1000);
-        document.title = isBattleRoyale ? 'AgarStake | Battle Royale' : 'AgarStake | In Game';
+        document.title = isBattleRoyale ? 'Battle Royale | Arenifi' : 'In Game | Arenifi';
         global.battleRoyale = isBattleRoyale;
         return () => clearInterval(itv);
     }, [isBattleRoyale]);

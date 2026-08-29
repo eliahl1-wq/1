@@ -49,7 +49,7 @@ export default function AgarTokenCard({
             <span className="agar-token-card__header">
                 <AgarLogo size={40} config={config} />
                 <span className="agar-token-card__identity">
-                    <span className="agar-token-card__eyebrow">AgarStake token</span>
+                    <span className="agar-token-card__eyebrow">Arenifi token</span>
                     <span className="agar-token-card__name">
                         {config.name}
                         <span>{config.symbol}</span>

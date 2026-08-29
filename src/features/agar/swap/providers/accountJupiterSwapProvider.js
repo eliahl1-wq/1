@@ -6,7 +6,7 @@ function resolveEndpoint(path) {
 }
 
 /**
- * Uses the custodial Solana address attached to the AgarStake account.
+ * Uses the custodial Solana address attached to the Arenifi account.
  * The browser never receives or signs with the account deposit secret.
  */
 export const accountJupiterSwapProvider = Object.freeze({

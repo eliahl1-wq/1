@@ -276,7 +276,7 @@ export default function Transactions() {
 
                 {/* Footer */}
                 <div className="product-helper">
-                    Secure Terminal · AgarStake
+                    Secure Terminal · Arenifi
                 </div>
             </div>
 
@@ -284,4 +284,3 @@ export default function Transactions() {
         </div>
     );
 }
-

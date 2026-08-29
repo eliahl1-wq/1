@@ -25,7 +25,7 @@ export function isMixpanelConfigured() {
 export function initMixpanel() {
     if (initialized) return;
     if (!TOKEN) {
-        console.warn('[Mixpanel] VITE_MIXPANEL_TOKEN saknas — events skickas inte. Sätt variabeln i Cloudflare (Production) och redeploya.');
+        console.warn('[Mixpanel] VITE_MIXPANEL_TOKEN is missing — analytics events are disabled. Set it in the production frontend environment and redeploy.');
         return;
     }
 

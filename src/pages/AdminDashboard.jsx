@@ -962,7 +962,7 @@ export default function AdminDashboard() {
     }, [fetchAdmin, filterUserId, showExcluded, showExcludedUsers, userSort, fetchTransactions, fetchLiveFeed]);
 
     useEffect(() => {
-        document.title = 'AgarStake | Admin';
+        document.title = 'Admin | Arenifi';
         loadData();
     }, [loadData]);
 

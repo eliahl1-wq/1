@@ -302,7 +302,7 @@ export default function SlitherGame() {
 
     useEffect(() => {
         document.body.style.backgroundColor = '#0a0a0c';
-        document.title = 'AgarStake | Slither';
+        document.title = 'Slither | Arenifi';
         stopSessionRecording();
     }, []);
 
