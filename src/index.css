@@ -17,12 +17,14 @@
   --space-10: 40px;
   --space-12: 48px;
   /* Core palette — neutral surface hierarchy */
-  --bg: #050506;
-  --bg-1: #121213;
-  --bg-2: #171719;
-  --bg-3: #1c1c1f;
-  --bg-hover: #222225;
-  --bg-elevated: rgba(22, 22, 24, 0.98);
+  --bg: #070708;
+  --bg-1: #131314;
+  --bg-2: #19191b;
+  --bg-3: #1f1f22;
+  --bg-hover: #252528;
+  --bg-elevated: rgba(24, 24, 26, 0.98);
+  --control-bg: rgba(255, 255, 255, 0.075);
+  --control-hover: rgba(255, 255, 255, 0.11);
 
   /* Borders — razor thin with subtle micro-reflect */
   --border: rgba(255, 255, 255, 0.065);
@@ -1065,13 +1067,13 @@ a:focus-visible {
 }
 .btn-ghost{
   padding-inline:14px;
-  background:rgba(255,255,255,.026);
+  background:var(--control-bg);
   border-color:rgba(255,255,255,.09);
   color:var(--text-muted);
   font-size:.8rem;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
 }
-.btn-ghost:hover:not(:disabled){background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.14);color:var(--text-h)}
+.btn-ghost:hover:not(:disabled){background:var(--control-hover);border-color:rgba(255,255,255,.14);color:var(--text-h)}
 .btn-danger{padding-inline:15px;font-size:.8rem;font-weight:690}
 .btn:hover:not(:disabled){transform:translateY(-1px)}
 .btn:active:not(:disabled){transform:translateY(0) scale(.985)}

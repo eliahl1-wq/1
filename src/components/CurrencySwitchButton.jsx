@@ -2,27 +2,32 @@ import React from 'react';
 
 export default function CurrencySwitchButton({ value = 'USD', onChange, className = '' }) {
     const currency = value === 'SOL' ? 'SOL' : 'USD';
-    const nextCurrency = currency === 'SOL' ? 'USD' : 'SOL';
     return (
-        <button
-            type="button"
+        <div
             className={`currency-switch-button${className ? ` ${className}` : ''}`}
-            data-currency={currency}
-            onClick={() => onChange?.(nextCurrency)}
-            aria-label={`Show balances in ${nextCurrency}`}
-            aria-checked={currency === 'SOL'}
-            role="switch"
-            title={`Switch to ${nextCurrency}`}
+            role="group"
+            aria-label="Balance display currency"
         >
-            <span className="currency-switch-button__thumb" aria-hidden="true" />
-            <span className={`currency-switch-button__option${currency === 'SOL' ? ' is-active' : ''}`} aria-hidden="true">
+            <button
+                type="button"
+                className={`currency-switch-button__option${currency === 'SOL' ? ' is-active' : ''}`}
+                onClick={() => onChange?.('SOL')}
+                aria-pressed={currency === 'SOL'}
+                title="Show balances in SOL"
+            >
                 <img className="currency-switch-button__sol-logo" src="/solana-sol-logo.png" alt="" />
                 <span>SOL</span>
-            </span>
-            <span className={`currency-switch-button__option${currency === 'USD' ? ' is-active' : ''}`} aria-hidden="true">
+            </button>
+            <button
+                type="button"
+                className={`currency-switch-button__option${currency === 'USD' ? ' is-active' : ''}`}
+                onClick={() => onChange?.('USD')}
+                aria-pressed={currency === 'USD'}
+                title="Show balances in USD"
+            >
                 <span className="currency-switch-button__dollar">$</span>
                 <span>USD</span>
-            </span>
-        </button>
+            </button>
+        </div>
     );
 }

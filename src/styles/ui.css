@@ -245,7 +245,7 @@
   padding: 0 12px;
   height: 32px;
   border-radius: var(--r-full);
-  background: rgba(255,255,255,0.055);
+  background: var(--control-bg);
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -256,11 +256,11 @@
   white-space: nowrap;
 }
 .balance-pill:hover {
-  background: rgba(255,255,255,0.085);
+  background: var(--control-hover);
   border-color: transparent;
 }
 .balance-pill--open {
-  background: rgba(255,255,255,.075);
+  background: var(--control-bg);
   border-color: transparent;
 }
 .balance-pill__value { color: var(--text-h); font-size: .82rem; }
@@ -678,6 +678,10 @@
   font-weight: 500;
 }
 .wallet-card-balance__with-logo { margin-left: 2px; }
+
+.wallet-card .currency-switch-button {
+  border-color: transparent;
+}
 .currency-option {
   display: inline-flex;
   align-items: center;
@@ -2483,7 +2487,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   padding: var(--currency-switch-pad);
-  border: 1px solid rgba(117, 86, 191, 0.38);
+  border: 2px solid rgba(117, 86, 191, 0.46);
   border-radius: var(--r-full);
   background: transparent;
   color: rgba(255, 255, 255, 0.55);
@@ -2491,61 +2495,43 @@
   font-size: 0.69rem;
   font-weight: 700;
   line-height: 1;
-  cursor: pointer;
+  cursor: default;
   white-space: nowrap;
   box-shadow: none;
-  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
-  isolation: isolate;
-}
-
-.currency-switch-button:hover {
-  border-color: rgba(139, 101, 222, 0.55);
-  background: transparent;
-}
-
-.currency-switch-button:active {
-  transform: scale(.98);
-}
-
-.currency-switch-button:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.currency-switch-button__thumb {
-  position: absolute;
-  z-index: -1;
-  top: var(--currency-switch-pad);
-  bottom: var(--currency-switch-pad);
-  left: var(--currency-switch-pad);
-  width: calc((100% - (var(--currency-switch-pad) * 2)) / 2);
-  border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.055);
-  border: none;
-  box-shadow: none;
-  transform: translateX(100%);
-  transition: transform 180ms cubic-bezier(.2, .8, .2, 1);
-}
-
-.currency-switch-button[data-currency='SOL'] .currency-switch-button__thumb {
-  transform: translateX(0);
+  transition: none;
 }
 
 .currency-switch-button__option {
-  position: relative;
-  z-index: 1;
   min-width: 0;
   height: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
   color: rgba(255, 255, 255, 0.52);
-  transition: color 180ms cubic-bezier(.2, .8, .2, 1);
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
 
 .currency-switch-button__option.is-active {
+  background: var(--control-bg);
   color: #ffffff;
+}
+
+.currency-switch-button__option:hover {
+  background: var(--control-hover);
+  color: #ffffff;
+}
+
+.currency-switch-button__option:focus-visible {
+  outline: none;
+  background: var(--control-hover);
 }
 
 .currency-switch-button__sol-logo {
@@ -2612,7 +2598,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--control-bg);
   border: none;
   border-radius: 20px;
   padding: 5px 12px;
@@ -4979,6 +4965,10 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 /* Mobile: keep the primary header uncluttered and give the currency control
    its own compact row directly beneath it. */
 @media (max-width: 768px) {
+  .nav-deposit-btn--deposit {
+    display: none;
+  }
+
   .topbar {
     height: 52px;
     align-items: center;

@@ -1148,7 +1148,7 @@ export default function PreGame() {
 
                             {/* Deposit button */}
                             <button
-                                className="nav-deposit-btn nav-deposit-btn--compact"
+                                className="nav-deposit-btn nav-deposit-btn--compact nav-deposit-btn--deposit"
                                 onClick={() => {
                                     trackMixpanelEvent('deposit_clicked', { source: 'nav_button', platform: 'web' });
                                     setIsWalletOpen(false);

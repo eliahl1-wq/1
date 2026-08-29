@@ -393,7 +393,7 @@ export default function RewardsWidget() {
                 {location.pathname === '/pre-game' && (
                     <div className="sol-price-pill" style={{ position: 'static', margin: 0, height: '28px', display: 'flex', alignItems: 'center', gap: '6px', boxSizing: 'border-box' }}>
                         <SolLogo size={14} />
-                        <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-h)', fontWeight: 700 }}>
+                        <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>
                             ${(user?.solPrice || 64).toFixed(2)}
                         </span>
                     </div>
@@ -401,7 +401,7 @@ export default function RewardsWidget() {
                 <button
                     onClick={toggleExpand}
                     style={{
-                        background: 'var(--bg-2)',
+                        background: 'var(--control-bg)',
                         border: 'none',
                         borderRadius: '20px',
                         padding: '5px 12px',
@@ -421,11 +421,11 @@ export default function RewardsWidget() {
                         boxSizing: 'border-box'
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--bg-3)';
+                        e.currentTarget.style.background = 'var(--control-hover)';
                         e.currentTarget.style.color = 'var(--text-h)';
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--bg-2)';
+                        e.currentTarget.style.background = 'var(--control-bg)';
                         e.currentTarget.style.color = 'var(--text)';
                     }}
                 >
