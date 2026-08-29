@@ -95,7 +95,7 @@
   right: 0;
   top: calc(100% + 4px);
   min-width: 90px;
-  background: rgba(22, 23, 30, 0.98);
+  background: rgba(21, 21, 23, 0.98);
   border: 1px solid var(--border-2);
   border-radius: var(--r-md);
   padding: 3px;
@@ -117,7 +117,7 @@
   width: 100%;
   display: flex;
   align-items: center;
-  border: 1px solid rgba(117, 86, 191, 0.38);
+  border: 1px solid transparent;
   background: transparent;
   text-align: left;
   padding: 5px 8px;
@@ -149,7 +149,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  background: rgba(12, 13, 18, 0.85);
+  background: rgba(7, 7, 9, 0.88);
   backdrop-filter: blur(24px) saturate(200%);
   -webkit-backdrop-filter: blur(24px) saturate(200%);
   border-bottom: 1px solid var(--border);
@@ -245,7 +245,7 @@
   padding: 0 12px;
   height: 32px;
   border-radius: var(--r-full);
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.055);
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -256,11 +256,11 @@
   white-space: nowrap;
 }
 .balance-pill:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.085);
   border-color: transparent;
 }
 .balance-pill--open {
-  background: rgba(173,152,255,.07);
+  background: rgba(255,255,255,.075);
   border-color: transparent;
 }
 .balance-pill__value { color: var(--text-h); font-size: .82rem; }
@@ -416,7 +416,7 @@
   justify-content: space-between;
   align-items: center;
   text-align: center;
-  background: linear-gradient(180deg, rgba(12, 13, 18, 0.45) 0%, rgba(12, 13, 18, 0.9) 100%);
+  background: linear-gradient(180deg, rgba(8, 8, 10, 0.45) 0%, rgba(8, 8, 10, 0.9) 100%);
   z-index: 2;
 }
 
@@ -2483,7 +2483,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   padding: var(--currency-switch-pad);
-  border: 1px solid transparent;
+  border: 1px solid rgba(117, 86, 191, 0.38);
   border-radius: var(--r-full);
   background: transparent;
   color: rgba(255, 255, 255, 0.55);
@@ -2520,7 +2520,7 @@
   left: var(--currency-switch-pad);
   width: calc((100% - (var(--currency-switch-pad) * 2)) / 2);
   border-radius: var(--r-full);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.055);
   border: none;
   box-shadow: none;
   transform: translateX(100%);
@@ -2612,11 +2612,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #000;
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.055);
+  border: none;
   border-radius: 20px;
   padding: 5px 12px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: none;
   z-index: 1050;
 }
 
@@ -3278,7 +3278,7 @@
     top: 52px;
     left: 0;
     right: 0;
-    background: rgba(12, 13, 18, 0.97);
+    background: rgba(9, 9, 11, 0.97);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 1px solid var(--border);
@@ -4216,7 +4216,7 @@
 .topbar {
   height: 52px;
   padding-inline: 20px;
-  background: rgba(12, 13, 18, 0.94);
+  background: rgba(7, 7, 9, 0.94);
   border-bottom-color: rgba(255, 255, 255, 0.075);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -4363,7 +4363,7 @@
 .info-step-card {
   padding: 18px 20px;
   border-color: var(--border-2);
-  background: rgba(18, 19, 25, 0.84);
+  background: rgba(23, 23, 25, 0.84);
 }
 .info-step-card:hover { border-color: rgba(255, 255, 255, 0.14); }
 .info-step-icon { opacity: 0.72; }
@@ -4371,9 +4371,9 @@
 .info-step-desc,
 .info-mode-card p,
 .faq-answer p { color: var(--text-subtle); }
-.info-mode-card { border-color: var(--border-2); background: rgba(18, 19, 25, 0.72); }
+.info-mode-card { border-color: var(--border-2); background: rgba(23, 23, 25, 0.72); }
 
-.faq-item { border-color: var(--border-2); background: rgba(18, 19, 25, 0.76); }
+.faq-item { border-color: var(--border-2); background: rgba(23, 23, 25, 0.76); }
 .faq-question { min-height: 48px; font-weight: 600; }
 
 .app-footer { margin-top: auto; }
@@ -4483,7 +4483,7 @@
   padding: 24px;
   border: 1px solid var(--border-2);
   border-radius: var(--r-lg);
-  background: rgba(18, 19, 25, 0.94);
+  background: rgba(23, 23, 25, 0.94);
   box-shadow: var(--shadow-surface);
 }
 

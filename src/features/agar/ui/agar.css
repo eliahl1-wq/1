@@ -6,7 +6,7 @@
     height: 32px;
     padding: 0 10px;
     color: var(--text-h);
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.055);
     border: 1px solid rgba(117, 86, 191, 0.38);
     border-radius: var(--r-full);
     cursor: pointer;
@@ -14,7 +14,7 @@
 }
 
 .agar-nav-balance:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.085);
     border-color: rgba(139, 101, 222, 0.55);
 }
 
@@ -48,7 +48,7 @@
     padding: 5px 10px;
     color: var(--text);
     background: var(--bg-1);
-    border: 1px solid var(--border-2);
+    border: none;
     border-radius: var(--r-full);
     box-shadow: none;
     cursor: pointer;
@@ -58,7 +58,6 @@
 .agar-price-pill:hover {
     color: var(--text-h);
     background: var(--bg-2);
-    border-color: rgba(151, 124, 255, 0.42);
 }
 
 .agar-price-pill .mono {
