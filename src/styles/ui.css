@@ -2698,12 +2698,103 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--control-bg);
+  background: transparent;
   border: none;
-  border-radius: 20px;
-  padding: 5px 12px;
+  border-radius: 0;
+  padding: 5px 4px;
   box-shadow: none;
   z-index: 1050;
+}
+
+/* Unified navbar controls: one quiet outlined treatment on the navbar surface. */
+.topbar .currency-switch-button,
+.topbar .agar-nav-balance,
+.topbar .nav-deposit-btn,
+.topbar .avatar {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-h);
+  box-shadow: none;
+  filter: none;
+}
+
+.topbar .currency-switch-button:hover,
+.topbar .agar-nav-balance:hover,
+.topbar .nav-deposit-btn:hover,
+.topbar .user-pill:hover .avatar {
+  background: transparent;
+  border-color: rgba(173, 152, 255, 0.42);
+  color: #fff;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+
+.topbar .currency-switch-button__option,
+.topbar .currency-switch-button__option.is-active {
+  background: transparent;
+  box-shadow: none;
+}
+
+.topbar .currency-switch-button__option.is-active {
+  color: #fff;
+}
+
+.topbar .balance-pill,
+.topbar .balance-pill:hover,
+.topbar .balance-pill--open {
+  padding-inline: 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.gm-nav-link--discord {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  text-decoration: none;
+}
+
+.gm-nav-link--discord svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+@media (min-width: 769px) {
+  .topbar .topbar-nav--desktop .gm-nav-link.gm-nav-link--discord {
+    width: 38px;
+    min-height: 34px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .topbar .topbar-nav--desktop .gm-nav-link.gm-nav-link--discord:hover {
+    border-color: rgba(173, 152, 255, 0.42);
+    background: transparent;
+    color: #fff;
+  }
+
+  .gm-nav-discord-label {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar-mobile-menu .gm-nav-link--discord {
+    justify-content: flex-start;
+  }
+
+  .topbar-mobile-menu.topbar-mobile-menu {
+    top: 96px;
+    z-index: 1200;
+  }
 }
 
 .test-mode-banner {

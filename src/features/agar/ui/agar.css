@@ -45,11 +45,11 @@
     gap: 6px;
     align-items: center;
     height: 28px;
-    padding: 5px 10px;
+    padding: 5px 4px;
     color: var(--text);
-    background: var(--control-bg);
+    background: transparent;
     border: none;
-    border-radius: var(--r-full);
+    border-radius: 0;
     box-shadow: none;
     cursor: pointer;
     box-sizing: border-box;
@@ -57,7 +57,7 @@
 
 .agar-price-pill:hover {
     color: var(--text-h);
-    background: var(--control-hover);
+    background: transparent;
 }
 
 .agar-price-pill .mono {
