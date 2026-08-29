@@ -6,6 +6,7 @@ import AppTopbar from '../components/AppTopbar';
 import ProductPageHeader from '../components/ProductPageHeader';
 import TournamentAdminPanel from '../components/TournamentAdminPanel';
 import AffiliateAdminPanel from '../components/AffiliateAdminPanel';
+import TokenLaunchAdminPanel from '../components/TokenLaunchAdminPanel';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
 
@@ -31,6 +32,7 @@ const TABS = [
     { id: 'affiliates', label: 'Affiliates' },
     { id: 'rewards', label: 'Rewards' },
     { id: 'operations', label: 'Operations' },
+    { id: 'token-launch', label: 'Token launch' },
 ];
 
 const USER_SORT_OPTIONS = [
@@ -1442,6 +1444,8 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 )}
+
+                {tab === 'token-launch' && <TokenLaunchAdminPanel fetchAdmin={fetchAdmin} />}
 
                 {tab === 'reports' && (
                     <section className="admin-bug-reports" aria-labelledby="admin-bug-reports-title">
