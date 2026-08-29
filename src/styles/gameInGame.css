@@ -525,7 +525,7 @@ body.game-session-active #root {
 
     .game-viewport--mobile .brand-lockup--game .brand-lockup__name {
         font-size: 0.68rem;
-        letter-spacing: 0.1em;
+        letter-spacing: -0.02em;
     }
 
     .game-viewport--mobile .game-logo-sub {

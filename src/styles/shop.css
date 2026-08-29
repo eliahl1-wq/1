@@ -1509,3 +1509,36 @@
     background: var(--accent);
     box-shadow: 0 4px 16px rgba(124, 58, 255, 0.35);
 }
+
+/* Cooler shop surfaces — neutral blue-grey instead of the warmer global grey. */
+.shop-page {
+    --bg-1: rgb(38, 40, 50);
+    --bg-2: rgb(43, 45, 56);
+    --bg-3: rgb(47, 50, 61);
+}
+
+.shop-balance-logo,
+.shop-product-price,
+.shop-economy-breakdown,
+.shop-confirm-details,
+.shop-confirm-logo,
+.shop-filters,
+.shop-empty-state {
+    background-color: rgba(44, 47, 58, 0.82);
+}
+
+.shop-economy-note {
+    background: rgb(38, 40, 50);
+}
+
+.shop-confirm {
+    background:
+        radial-gradient(circle at 50% 0, rgba(120, 94, 255, 0.09), transparent 34%),
+        rgb(38, 40, 50);
+}
+
+.shop-hero-stage {
+    background:
+        radial-gradient(circle at 50% 50%, rgba(124, 58, 255, 0.11), transparent 70%),
+        linear-gradient(145deg, rgba(42, 44, 55, 0.94), rgba(34, 36, 45, 0.96));
+}
