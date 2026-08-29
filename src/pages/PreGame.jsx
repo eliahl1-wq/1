@@ -291,6 +291,21 @@ export default function PreGame() {
     const [shopProducts, setShopProducts] = useState([]);
 
     const [showCustomizer, setShowCustomizer] = useState(false);
+    const [showCoinLaunchHint, setShowCoinLaunchHint] = useState(false);
+
+    useEffect(() => {
+        if (!agarLaunchReady || !agarConfig.mint) {
+            setShowCoinLaunchHint(false);
+            return;
+        }
+        setShowCoinLaunchHint(localStorage.getItem(`arenifi_coin_launch_seen:${agarConfig.mint}`) !== 'true');
+    }, [agarConfig.mint, agarLaunchReady]);
+
+    const openCoinAndDismissLaunchHint = () => {
+        if (agarConfig.mint) localStorage.setItem(`arenifi_coin_launch_seen:${agarConfig.mint}`, 'true');
+        setShowCoinLaunchHint(false);
+        openAgarModal({ action: 'BUY' });
+    };
 
     useEffect(() => {
         localStorage.setItem('has_seen_rainbow', hasSeenRainbow);
@@ -1084,23 +1099,31 @@ export default function PreGame() {
                 <div className="pregame-topbar-actions">
                     {isAuthenticated ? (
                         <>
-                            <button
-                                type="button"
-                                className="agar-nav-balance"
-                                onClick={() => openAgarModal({ action: 'BUY' })}
-                                aria-label={agarLaunchReady ? `Buy ${agarConfig.symbol} with account balance` : `${agarConfig.symbol} Coming Soon`}
-                                title={agarLaunchReady ? `Exchange account SOL for ${agarConfig.symbol}` : 'Coming Soon'}
-                            >
-                                <AgarLogo size={22} />
-                                <strong className="mono">
-                                    {!agarLaunchReady
-                                        ? 'Coming Soon'
-                                        : agarBalanceLoading
-                                            ? '…'
-                                            : formatAgarAmount(agarBalance)}
-                                </strong>
-                                {agarLaunchReady && <span className="agar-nav-balance__add" aria-hidden="true">+</span>}
-                            </button>
+                            <div className="agar-nav-balance-anchor">
+                                <button
+                                    type="button"
+                                    className="agar-nav-balance"
+                                    onClick={openCoinAndDismissLaunchHint}
+                                    aria-label={agarLaunchReady ? `Buy ${agarConfig.symbol} with account balance` : `${agarConfig.symbol} Coming Soon`}
+                                    title={agarLaunchReady ? `Exchange account SOL for ${agarConfig.symbol}` : 'Coming Soon'}
+                                >
+                                    <AgarLogo size={22} />
+                                    <strong className="mono">
+                                        {!agarLaunchReady
+                                            ? 'Coming Soon'
+                                            : agarBalanceLoading
+                                                ? '…'
+                                                : formatAgarAmount(agarBalance)}
+                                    </strong>
+                                    {agarLaunchReady && <span className="agar-nav-balance__add" aria-hidden="true">+</span>}
+                                </button>
+                                {showCoinLaunchHint && (
+                                    <span className="agar-nav-launch-hint" aria-hidden="true">
+                                        <svg viewBox="0 0 20 20"><path d="M3 16c4-1 7-4 9-9M8 7h4V3" /></svg>
+                                        <b>NEW COIN</b>
+                                    </span>
+                                )}
+                            </div>
 
                             {/* Balance pill */}
                             {(user?.balance || 0) > 0 && (
