@@ -8,6 +8,7 @@ import { executeAgarSwap } from '../swap/agarSwap';
 import AgarLogo from './AgarLogo';
 import AgarPriceChart from './AgarPriceChart';
 import { formatAgarAmount } from '../formatAgarAmount';
+import { API_URL } from '../../../utils/apiBase';
 
 const DETAIL_METRICS = [
     ['Price', 'price'],
@@ -77,6 +78,7 @@ export default function AgarTokenModal({
     const [submitting, setSubmitting] = useState(false);
     const [tradeSide, setTradeSide] = useState(initialAction === 'SELL' ? 'SELL' : 'BUY');
     const [tradeAmount, setTradeAmount] = useState('');
+    const [treasury, setTreasury] = useState({ balance: 0, address: '', loading: false });
     const launchReady = isAgarLaunchReady(config);
 
     useEffect(() => {
@@ -101,6 +103,23 @@ export default function AgarTokenModal({
         setTransactionSignature('');
         setSubmitting(false);
     }, [config.messages.notLaunched, initialAction, launchReady, open]);
+
+    useEffect(() => {
+        if (!open || !launchReady || !authToken) return undefined;
+        let active = true;
+        setTreasury(current => ({ ...current, loading: true }));
+        fetch(`${API_URL}/api/agar/treasury`, {
+            cache: 'no-store',
+            headers: { Authorization: `Bearer ${authToken}` },
+        }).then(async response => {
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.message || 'Treasury unavailable');
+            if (active) setTreasury({ balance: Number(payload.balance) || 0, address: payload.address || '', loading: false });
+        }).catch(() => {
+            if (active) setTreasury(current => ({ ...current, loading: false }));
+        });
+        return () => { active = false; };
+    }, [authToken, launchReady, open]);
 
     if (!open) return null;
 
@@ -223,6 +242,18 @@ export default function AgarTokenModal({
                             <span>{launchReady && marketLoading ? 'Loading…' : launchReady ? 'Live' : config.messages.comingSoon}</span>
                         </div>
                         <AgarPriceChart launchReady={launchReady} authToken={authToken} symbol={config.symbol} />
+                        <div className="agar-modal__treasury-tracker">
+                            <div className="agar-modal__treasury-icon"><AgarLogo size={23} config={config} /></div>
+                            <div>
+                                <span>TREASURY TRACKER</span>
+                                <strong>{treasury.loading ? '…' : `${formatAgarAmount(treasury.balance)} ${config.symbol}`}</strong>
+                            </div>
+                            {treasury.address ? (
+                                <a href={`https://solscan.io/account/${treasury.address}`} target="_blank" rel="noopener noreferrer" title={treasury.address}>
+                                    {shortAddress(treasury.address)} <b>↗</b>
+                                </a>
+                            ) : <span className="agar-modal__treasury-pending">--</span>}
+                        </div>
                     </div>
 
                     <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}`}>
