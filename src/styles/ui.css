@@ -1579,10 +1579,71 @@
 }
 
 .page-shell--pregame .footer-links {
+  position: static;
+}
+
+/* ─── Pregame Bottom Dock Bar ─── */
+.pregame-bottom-dock {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 1000;
+  min-height: 52px;
+  padding: 6px 20px calc(6px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(13, 15, 22, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.pregame-bottom-dock__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.pregame-bottom-dock__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 2 1 0%;
+  min-width: 0;
+}
+
+.pregame-bottom-dock__right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.pregame-bottom-dock .pregame-discord-link,
+.pregame-bottom-dock .pregame-affiliate-link {
+  position: static;
+  bottom: auto;
+  left: auto;
+  box-shadow: none;
+}
+
+.pregame-bottom-dock .app-footer {
+  width: auto;
+  margin: 0;
+}
+
+.pregame-bottom-dock .footer-links {
+  position: static;
+  padding: 0;
+  gap: 6px 16px;
 }
 
 .footer-links a {
@@ -1597,10 +1658,6 @@
 }
 
 .pregame-discord-link {
-  position: fixed;
-  left: 22px;
-  bottom: 18px;
-  z-index: 40;
   display: grid;
   place-items: center;
   width: 38px;
@@ -1631,10 +1688,6 @@
 }
 
 .pregame-affiliate-link {
-  position: fixed;
-  left: 68px;
-  bottom: 18px;
-  z-index: 40;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3415,19 +3468,20 @@
     font-size: 0.55rem;
   }
 
-  .page-shell--pregame .footer-links {
-    position: static;
+  .pregame-bottom-dock {
+    min-height: 48px;
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+    gap: 6px;
   }
 
-  .pregame-discord-link {
-    left: 14px;
-    bottom: calc(62px + env(safe-area-inset-bottom, 0));
+  .pregame-bottom-dock .footer-links {
+    font-size: 0.55rem;
+    gap: 4px 10px;
   }
 
-  .pregame-affiliate-link {
-    left: 60px;
-    bottom: calc(62px + env(safe-area-inset-bottom, 0));
-    padding: 0 10px;
+  .pregame-bottom-dock .pregame-affiliate-link {
+    padding: 0 8px;
+    font-size: 0.68rem;
   }
 
   .gm-discovery {
@@ -4422,14 +4476,8 @@
   }
   .gm-sub,
   .info-hero-sub { font-size: 0.82rem; }
-  .gm-card { padding: 16px; }
-  .page-shell--pregame { padding-bottom: 0; }
+  .page-shell--pregame { padding-bottom: 56px; }
   .page-shell--pregame .footer-links { position: static; }
-  .pregame-discord-link,
-  .pregame-affiliate-link {
-    position: absolute;
-    bottom: calc(48px + env(safe-area-inset-bottom, 0px));
-  }
 }
 
 @media (max-width: 480px) {

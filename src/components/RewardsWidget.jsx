@@ -187,10 +187,10 @@ export default function RewardsWidget() {
         }
     };
     return (
-        <div style={{
-            position: 'fixed',
-            bottom: '16px',
-            right: '16px',
+        <div className={`rewards-widget-wrapper ${isPregame ? 'rewards-widget-wrapper--pregame' : ''}`} style={{
+            position: isPregame ? 'relative' : 'fixed',
+            bottom: isPregame ? 'auto' : '16px',
+            right: isPregame ? 'auto' : '16px',
             zIndex: 1050,
             display: 'flex',
             flexDirection: 'column',
@@ -199,13 +199,16 @@ export default function RewardsWidget() {
         }}>
             {/* Expanded Content */}
             <div style={{
+                position: isPregame ? 'absolute' : 'relative',
+                bottom: isPregame ? 'calc(100% + 12px)' : 'auto',
+                right: isPregame ? '0' : 'auto',
                 width: '320px',
                 background: 'var(--bg-2)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--r-xl)',
                 padding: '16px',
-                boxShadow: isPregame ? 'none' : 'var(--shadow-xl)',
-                marginBottom: '10px',
+                boxShadow: 'var(--shadow-xl)',
+                marginBottom: isPregame ? '0' : '10px',
                 transform: expanded ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
                 opacity: expanded ? 1 : 0,
                 pointerEvents: expanded ? 'auto' : 'none',
