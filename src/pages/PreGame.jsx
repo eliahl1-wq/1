@@ -220,6 +220,10 @@ export default function PreGame() {
     }, [tournamentId, tournamentLoading]);
 
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [showBugReport, setShowBugReport] = useState(false);
+    const [bugReportMessage, setBugReportMessage] = useState('');
+    const [bugReportStatus, setBugReportStatus] = useState('');
+    const [bugReportSubmitting, setBugReportSubmitting] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isWalletExpanded, setIsWalletExpanded] = useState(false);
     const [isWithdrawExpanded, setIsWithdrawExpanded] = useState(false);
@@ -975,6 +979,42 @@ export default function PreGame() {
         } catch (e) { setStatusMsg(`❌ ${e.message}`); }
     };
 
+    const openBugReport = () => {
+        if (!token) {
+            navigate('/login');
+            return;
+        }
+        setBugReportStatus('');
+        setShowBugReport(true);
+    };
+
+    const submitBugReport = async (event) => {
+        event.preventDefault();
+        const message = bugReportMessage.trim();
+        if (message.length < 3 || bugReportSubmitting) return;
+        setBugReportSubmitting(true);
+        setBugReportStatus('');
+        try {
+            const response = await fetch(`${API_URL}/api/bug-reports`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    message,
+                    page: `${location.pathname}${location.search || ''}`,
+                    gamemode: selectedMode || '',
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Could not submit the report.');
+            setBugReportMessage('');
+            setBugReportStatus('Thanks — your report is now in the admin dashboard.');
+        } catch (error) {
+            setBugReportStatus(error.message || 'Could not submit the report.');
+        } finally {
+            setBugReportSubmitting(false);
+        }
+    };
+
     // ── Panel position ─────────────────────────────────
     const panelStyle = {
         position: 'absolute',
@@ -1183,6 +1223,13 @@ export default function PreGame() {
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile', { state: { tab: 'stats' } }); }}>Stats</button>
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transactions</button>
                                         <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/rewards#affiliate-rewards'); }}>Refer & Earn</button>
+                                        <div className="user-menu-mobile-links">
+                                            <div className="user-menu-divider" />
+                                            <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/how-it-works'); }}>How it Works</button>
+                                            <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/faq'); }}>FAQ</button>
+                                            <a className="user-menu-item" href="mailto:support@arenifi.fun" onClick={() => setShowUserMenu(false)}>Support</a>
+                                            <div className="user-menu-status"><span className="live-dot" />EU-West · Online</div>
+                                        </div>
                                         <button className="user-menu-item danger" onClick={logout}>Log Out</button>
                                     </div>
                                 )}
@@ -1340,12 +1387,6 @@ export default function PreGame() {
             )}
 
             {/* ── Main layout ── */}
-            {freePlay && (
-                <div className="test-mode-banner">
-                    FREE MODE — No real SOL used
-                </div>
-            )}
-
             {!isAuthenticated && <GuestWelcomeBanner />}
 
             {tournamentId && tournamentLoading ? (
@@ -1980,6 +2021,20 @@ export default function PreGame() {
                             />
                         </svg>
                     </a>
+                    <button
+                        type="button"
+                        className="pregame-bug-report-link"
+                        aria-label="Report a bug"
+                        title="Report a bug"
+                        onClick={openBugReport}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M8.5 9.5h7M8 13h8M9.5 16.5h5" />
+                            <path d="M7.5 6.5 6 4.5M16.5 6.5l1.5-2M5 10H2.5M21.5 10H19M5 15H2.5M21.5 15H19" />
+                            <rect x="5" y="6.5" width="14" height="13" rx="6" />
+                        </svg>
+                        <span>Report bug</span>
+                    </button>
                     {!user?.affiliateActive && !user?.isAdmin && !user?.personalFreePlay && (
                         <Link
                             className="pregame-affiliate-link"
@@ -2001,6 +2056,42 @@ export default function PreGame() {
                     <RewardsWidget />
                 </div>
             </div>
+
+            {showBugReport && (
+                <div className="bug-report-backdrop" role="presentation" onMouseDown={() => !bugReportSubmitting && setShowBugReport(false)}>
+                    <form className="bug-report-modal" onSubmit={submitBugReport} onMouseDown={event => event.stopPropagation()}>
+                        <div className="bug-report-modal__header">
+                            <div>
+                                <span>INTERNAL REPORT</span>
+                                <h2>Report a bug</h2>
+                            </div>
+                            <button type="button" aria-label="Close bug report" disabled={bugReportSubmitting} onClick={() => setShowBugReport(false)}>×</button>
+                        </div>
+                        <p>Describe what happened. The message is sent directly to the Arenifi admin dashboard.</p>
+                        <textarea
+                            autoFocus
+                            maxLength={2000}
+                            value={bugReportMessage}
+                            placeholder="What happened, and how can we reproduce it?"
+                            onChange={event => {
+                                setBugReportMessage(event.target.value);
+                                if (bugReportStatus) setBugReportStatus('');
+                            }}
+                        />
+                        <div className="bug-report-modal__meta">
+                            <span>{selectedMode || 'pregame'}</span>
+                            <span>{bugReportMessage.length}/2000</span>
+                        </div>
+                        {bugReportStatus && <div className="bug-report-modal__status" role="status">{bugReportStatus}</div>}
+                        <div className="bug-report-modal__actions">
+                            <button type="button" className="btn btn-ghost" disabled={bugReportSubmitting} onClick={() => setShowBugReport(false)}>Cancel</button>
+                            <button type="submit" className="btn btn-primary" disabled={bugReportMessage.trim().length < 3 || bugReportSubmitting}>
+                                {bugReportSubmitting ? 'Sending…' : 'Send report'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
 
             {/* Customizer Modal Overlay */}
             {showCustomizer && (() => {

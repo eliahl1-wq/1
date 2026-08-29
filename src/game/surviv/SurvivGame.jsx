@@ -259,6 +259,8 @@ export default function SurvivGame() {
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 5, adminFreeSurvivEntry: false });
     const reloadPendingRef = useRef(false);
     const useMedkitPendingRef = useRef(false);
+    // `true` preserves keyboard-nearest pickup; a string targets the exact
+    // ground weapon tapped on touch devices.
     const pickupWeaponPendingRef = useRef(false);
     const pickupVestPendingRef = useRef(null);
     const toggleDoorPendingRef = useRef(null);
@@ -745,7 +747,18 @@ export default function SurvivGame() {
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            if (cashoutActiveRef.current || mapOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
+            if (cashoutActiveRef.current || mapOpenRef.current) return;
+            if (IS_MOBILE && e.pointerType !== 'mouse') {
+                const interaction = renderer.getTappedInteraction(e.clientX, e.clientY);
+                if (interaction?.kind === 'door' && interaction.target?.id) {
+                    toggleDoorPendingRef.current = interaction.target.id;
+                } else if (interaction?.kind === 'vest' && interaction.target?.id) {
+                    pickupVestPendingRef.current = interaction.target.id;
+                } else if (interaction?.kind === 'weapon' && interaction.target?.id) {
+                    pickupWeaponPendingRef.current = interaction.target.id;
+                }
+                return;
+            }
             if (e.button !== 0) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
             renderer.handlePointerDown();
@@ -1167,7 +1180,7 @@ export default function SurvivGame() {
                 hasAction = true;
             }
             if (pickupWeaponPendingRef.current) {
-                payload.pickupWeapon = true;
+                payload.pickupWeapon = pickupWeaponPendingRef.current;
                 pickupWeaponPendingRef.current = false;
                 hasAction = true;
             }
@@ -1304,21 +1317,6 @@ export default function SurvivGame() {
         useMedkitPendingRef.current = true;
     }, []);
 
-    const handleMobileInteract = useCallback(() => {
-        const interaction = rendererRef.current?.getNearbyInteraction();
-        if (interaction?.kind === 'door' && interaction.target?.id) {
-            toggleDoorPendingRef.current = interaction.target.id;
-            return;
-        }
-        if (interaction?.kind === 'vest' && interaction.target?.id) {
-            pickupVestPendingRef.current = interaction.target.id;
-            return;
-        }
-        if (interaction?.kind === 'weapon' && interaction.target?.id) pickupWeaponPendingRef.current = true;
-    }, []);
-
-    const handleMobileInteractEnd = useCallback(() => {}, []);
-
     const handleAdminSpawnBot = useCallback(() => {
         if (!authToken) return;
         socketRef.current?.emit('adminSpawnBotNearMe', { token: authToken, mode: 'surviv' });
@@ -1346,8 +1344,6 @@ export default function SurvivGame() {
         && (Number(me.inventory?.medkits) || 0) > 0
         && (Number(me.hp) || 0) < (Number(me.maxHp) || 100)
         && medkitRemainingMs <= 0;
-    const canMobileInteract = !!nearbyPickup;
-
     return (
         <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}${isFullMapOpen ? ' surviv-map-open' : ''}`} style={{
             width: 'var(--game-viewport-width, 100dvw)',
@@ -1381,9 +1377,6 @@ export default function SurvivGame() {
                     onMap={handleMobileMap}
                     onReload={handleMobileReload}
                     onHeal={handleMobileHeal}
-                    onInteract={handleMobileInteract}
-                    onInteractEnd={handleMobileInteractEnd}
-                    canInteract={canMobileInteract}
                     canReload={canMobileReload}
                     canHeal={canMobileHeal}
                     isReloading={!!me?.reloading}

@@ -26,6 +26,7 @@ const TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: 'Users' },
     { id: 'activity', label: 'Activity' },
+    { id: 'reports', label: 'Bug reports' },
     { id: 'tournaments', label: 'Tournaments' },
     { id: 'affiliates', label: 'Affiliates' },
     { id: 'rewards', label: 'Rewards' },
@@ -865,6 +866,8 @@ export default function AdminDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
     const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
+    const [bugReports, setBugReports] = useState([]);
+    const [bugReportsLoading, setBugReportsLoading] = useState(false);
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
@@ -907,6 +910,16 @@ export default function AdminDashboard() {
             /* keep last feed */
         } finally {
             if (!silent) setLiveRefreshing(false);
+        }
+    }, [fetchAdmin]);
+
+    const fetchBugReports = useCallback(async () => {
+        setBugReportsLoading(true);
+        try {
+            const data = await fetchAdmin('/api/admin/bug-reports');
+            setBugReports(data.reports ?? []);
+        } finally {
+            setBugReportsLoading(false);
         }
     }, [fetchAdmin]);
 
@@ -986,6 +999,11 @@ export default function AdminDashboard() {
         }, 5000);
         return () => clearInterval(id);
     }, [tab, txFilter, showExcluded, fetchTransactions]);
+
+    useEffect(() => {
+        if (tab !== 'reports') return;
+        fetchBugReports().catch(err => setError(err.message));
+    }, [tab, fetchBugReports]);
 
     useEffect(() => {
         if (tab !== 'users') return undefined;
@@ -1243,6 +1261,23 @@ export default function AdminDashboard() {
         if (userId) setSelectedUserId(String(userId));
     };
 
+    const updateBugReportStatus = async (reportId, status) => {
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            const data = await fetchAdmin(`/api/admin/bug-reports/${reportId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status }),
+            });
+            setBugReports(current => current.map(report => String(report._id) === String(reportId) ? data.report : report));
+            setActionMsg(status === 'resolved' ? '✅ Bug report marked as resolved.' : '✅ Bug report reopened.');
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
@@ -1406,6 +1441,56 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     </div>
+                )}
+
+                {tab === 'reports' && (
+                    <section className="admin-bug-reports" aria-labelledby="admin-bug-reports-title">
+                        <div className="admin-bug-reports__header">
+                            <div>
+                                <span>USER FEEDBACK</span>
+                                <h2 id="admin-bug-reports-title">Bug reports</h2>
+                                <p>{bugReports.filter(report => report.status === 'open').length} open · {bugReports.length} total</p>
+                            </div>
+                            <button type="button" className="btn btn-ghost" disabled={bugReportsLoading} onClick={() => fetchBugReports().catch(err => setError(err.message))}>
+                                {bugReportsLoading ? 'Loading…' : 'Refresh'}
+                            </button>
+                        </div>
+
+                        {bugReportsLoading && bugReports.length === 0 ? (
+                            <div className="admin-bug-reports__empty">Loading reports…</div>
+                        ) : bugReports.length === 0 ? (
+                            <div className="admin-bug-reports__empty">No bug reports yet.</div>
+                        ) : (
+                            <div className="admin-bug-reports__list">
+                                {bugReports.map(report => (
+                                    <article key={report._id} className={`admin-bug-report${report.status === 'resolved' ? ' is-resolved' : ''}`}>
+                                        <div className="admin-bug-report__topline">
+                                            <div>
+                                                <strong>{report.username}</strong>
+                                                <span>{formatDate(report.createdAt)}</span>
+                                            </div>
+                                            <span className={`admin-bug-report__status is-${report.status}`}>{report.status}</span>
+                                        </div>
+                                        <p>{report.message}</p>
+                                        <div className="admin-bug-report__footer">
+                                            <div>
+                                                <span>{report.gamemode || 'No gamemode'}</span>
+                                                <span>{report.page || '/pre-game'}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn btn-ghost"
+                                                disabled={actionLoading}
+                                                onClick={() => updateBugReportStatus(report._id, report.status === 'resolved' ? 'open' : 'resolved')}
+                                            >
+                                                {report.status === 'resolved' ? 'Reopen' : 'Mark resolved'}
+                                            </button>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                    </section>
                 )}
 
                 {tab === 'affiliates' && (

@@ -4399,6 +4399,46 @@ export class SurvivRenderer {
         return door ? { kind: 'door', target: door, distance: doorDistance } : null;
     }
 
+    getTappedInteraction(clientX, clientY) {
+        if (!this.me || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.viewW / Math.max(1, rect.width);
+        const scaleY = this.viewH / Math.max(1, rect.height);
+        const screenX = (clientX - rect.left) * scaleX;
+        const screenY = (clientY - rect.top) * scaleY;
+        const world = this.screenToWorld(screenX, screenY);
+        const tapRadius = 34 / Math.max(0.5, this.zoom);
+        const pickupRange = 70;
+        const candidates = [];
+
+        const considerLoot = (kind, item) => {
+            const playerDistance = Math.hypot(this.me.x - item.x, this.me.y - item.y);
+            if (playerDistance > pickupRange) return;
+            const tapDistance = Math.hypot(world.x - item.x, world.y - item.y);
+            if (tapDistance > tapRadius + Math.max(10, Math.min(Number(item.w) || 20, Number(item.h) || 20) * 0.35)) return;
+            candidates.push({ kind, target: item, distance: playerDistance, tapDistance });
+        };
+        for (const item of this._groundWeapons) considerLoot('weapon', item);
+        for (const item of this._groundVests) considerLoot('vest', item);
+
+        for (const door of this.doorways) {
+            const panel = door.isOpen ? getDoorCollisionRect(door) : door;
+            const playerDistance = Math.min(
+                distanceFromPointToRect(this.me.x, this.me.y, door),
+                distanceFromPointToRect(this.me.x, this.me.y, panel),
+            );
+            if (playerDistance > 58) continue;
+            const tapDistance = Math.min(
+                distanceFromPointToRect(world.x, world.y, door),
+                distanceFromPointToRect(world.x, world.y, panel),
+            );
+            if (tapDistance <= tapRadius) candidates.push({ kind: 'door', target: door, distance: playerDistance, tapDistance });
+        }
+
+        candidates.sort((a, b) => a.tapDistance - b.tapDistance || a.distance - b.distance);
+        return candidates[0] || null;
+    }
+
 
     draw(dt = 1 / 60) {
         this._frameDt = dt;
@@ -7675,6 +7715,22 @@ export class SurvivRenderer {
             ctx.beginPath();
             ctx.arc(0, 0, 25, 0, Math.PI * 2);
             ctx.fill();
+
+            const touchPickupReady = this.isMobileLayout
+                && (l.type === 'weapon' || l.type === 'vest')
+                && this.me
+                && Math.hypot(this.me.x - l.x, this.me.y - l.y) <= 70;
+            if (touchPickupReady) {
+                ctx.strokeStyle = 'rgba(126, 244, 181, 0.78)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, 22, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(126, 244, 181, 0.92)';
+                ctx.beginPath();
+                ctx.arc(16, -15, 2.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             ctx.save();
             ctx.translate(0, -2);

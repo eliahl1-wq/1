@@ -26,10 +26,10 @@ function readPositiveInteger(value, fallback) {
 export const AGAR = Object.freeze({
     enabled: readBoolean(env.VITE_AGAR_ENABLED, false),
     mint: env.VITE_AGAR_MINT?.trim() || '',
-    decimals: readPositiveInteger(env.VITE_AGAR_DECIMALS, 9),
-    name: env.VITE_AGAR_NAME?.trim() || 'Stakecoin',
-    symbol: env.VITE_AGAR_SYMBOL?.trim() || 'STAKE',
-    logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/stakecoin-token-logo.png',
+    decimals: readPositiveInteger(env.VITE_AGAR_DECIMALS, 6),
+    name: env.VITE_AGAR_NAME?.trim() || 'AreniFi Coin',
+    symbol: env.VITE_AGAR_SYMBOL?.trim() || 'ARENA',
+    logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/arenifi-coin-logo.png',
     balancePollIntervalMs: readPositiveInteger(env.VITE_AGAR_BALANCE_POLL_MS, 60_000),
     marketData: Object.freeze({
         provider: env.VITE_AGAR_MARKET_PROVIDER?.trim() || 'dexscreener',
@@ -50,7 +50,7 @@ export const AGAR = Object.freeze({
     }),
     messages: Object.freeze({
         comingSoon: 'Coming Soon',
-        notLaunched: 'Stakecoin has not launched yet.',
+        notLaunched: 'AreniFi Coin has not launched yet.',
     }),
 });
 

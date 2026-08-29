@@ -182,9 +182,6 @@ function SurvivMobileControls({
     onMap,
     onReload,
     onHeal,
-    onInteract,
-    onInteractEnd,
-    canInteract,
     canReload,
     canHeal,
     isReloading,
@@ -199,7 +196,6 @@ function SurvivMobileControls({
                 <ActionButton label="Map" shortLabel="MAP" type="map" onPress={onMap} />
                 <ActionButton label={isReloading ? 'Reloading' : 'Reload weapon'} shortLabel={isReloading ? '...' : 'RLD'} type="reload" onPress={onReload} active={isReloading} disabled={!canReload} />
                 <ActionButton label="Use medkit" shortLabel="MED" badge={medkitCount} type="heal" onPress={onHeal} disabled={!canHeal} />
-                <ActionButton label={canInteract ? 'Pick up nearby item' : 'Nothing nearby'} shortLabel="TAKE" type="interact" onPress={onInteract} onRelease={onInteractEnd} accent={canInteract} disabled={!canInteract} />
             </div>
             <VirtualJoystick label="Aim and fire" variant="aim" onChange={onAim} />
         </div>

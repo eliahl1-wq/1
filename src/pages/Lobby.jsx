@@ -151,6 +151,13 @@ export default function Lobby() {
                                     <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/transactions'); }}>Transaction History</button>
                                     <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/profile'); }}>My Profile</button>
                                     <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/rewards#affiliate-rewards'); }}>Refer & Earn</button>
+                                    <div className="user-menu-mobile-links">
+                                        <div className="user-menu-divider" />
+                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/how-it-works'); }}>How it Works</button>
+                                        <button className="user-menu-item" onClick={() => { setShowUserMenu(false); navigate('/faq'); }}>FAQ</button>
+                                        <a className="user-menu-item" href="mailto:support@arenifi.fun" onClick={() => setShowUserMenu(false)}>Support</a>
+                                        <div className="user-menu-status"><span className="live-dot" />EU-West · Online</div>
+                                    </div>
                                     <button className="user-menu-item danger" onClick={logout}>Log Out</button>
                                 </div>
                             )}

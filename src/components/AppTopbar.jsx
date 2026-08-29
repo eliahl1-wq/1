@@ -133,7 +133,7 @@ export default function AppTopbar({ children }) {
                 </div>
 
                 <div className="topbar-right">
-                    <div className="topbar-currency-switch" aria-label="Balance display currency">
+                    <div className="topbar-currency-switch topbar-currency-switch--desktop" aria-label="Balance display currency">
                         <CurrencySwitchButton
                             value={balanceCurrency}
                             onChange={setBalanceCurrency}
@@ -148,9 +148,24 @@ export default function AppTopbar({ children }) {
                 </div>
             </nav>
 
+            <div className="topbar-currency-switch topbar-currency-switch--mobile" aria-label="Balance display currency">
+                <CurrencySwitchButton
+                    value={balanceCurrency}
+                    onChange={setBalanceCurrency}
+                    className="currency-switch-button--topbar"
+                />
+            </div>
+
             {menuOpen && (
                 <div className="topbar-mobile-menu">
                     {navItems}
+                    <div className="topbar-mobile-utility-links">
+                        <button type="button" className="gm-nav-link" onClick={() => navigate('/how-it-works')}>How it Works</button>
+                        <button type="button" className="gm-nav-link" onClick={() => navigate('/faq')}>FAQ</button>
+                        <button type="button" className="gm-nav-link" onClick={() => navigate('/rewards#affiliate-rewards')}>Affiliate</button>
+                        <a className="gm-nav-link" href="mailto:support@arenifi.fun">Support</a>
+                        <div className="topbar-mobile-status"><span className="live-dot" />EU-West · Online</div>
+                    </div>
                 </div>
             )}
         </>
