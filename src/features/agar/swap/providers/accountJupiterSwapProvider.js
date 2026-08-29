@@ -31,7 +31,7 @@ export const accountJupiterSwapProvider = Object.freeze({
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-            throw new Error(payload.message || payload.error || 'AGAR account swap failed.');
+            throw new Error(payload.message || payload.error || `${config.symbol} account swap failed.`);
         }
         return payload;
     },

@@ -14,7 +14,7 @@ const providers = new Map([
  */
 export function registerAgarSwapProvider(name, provider) {
     if (!name || typeof provider?.execute !== 'function') {
-        throw new TypeError('An AGAR swap provider must expose execute().');
+        throw new TypeError('A token swap provider must expose execute().');
     }
     providers.set(name, provider);
 }
@@ -33,7 +33,7 @@ export async function executeAgarSwap({
     const provider = providers.get(config.swap.provider);
     if (!provider) {
         // TODO: Register any custom swap adapter selected in configuration.
-        throw new Error('AGAR swaps are not available yet.');
+        throw new Error(`${config.symbol} swaps are not available yet.`);
     }
 
     return provider.execute({

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { AGAR } from '../config/agarConfig';
+import { AGAR, normalizeArenifiTokenName, normalizeArenifiTokenSymbol } from '../config/agarConfig';
 import { useAgarMarketData } from '../market/useAgarMarketData';
 import { useAgarBalance } from '../wallet/useAgarBalance';
 import AgarTokenModal from './AgarTokenModal';
@@ -51,8 +51,8 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
         enabled: publicConfig?.accessGranted === true && publicConfig?.enabled === true,
         mint: publicConfig?.accessGranted === true ? (publicConfig?.mint || '') : '',
         decimals: publicConfig?.decimals ?? config.decimals,
-        name: publicConfig?.name ?? config.name,
-        symbol: publicConfig?.symbol ?? config.symbol,
+        name: normalizeArenifiTokenName(publicConfig?.name ?? config.name),
+        symbol: normalizeArenifiTokenSymbol(publicConfig?.symbol ?? config.symbol),
     }), [config, publicConfig]);
     const market = useAgarMarketData(runtimeConfig);
     const wallet = useAgarBalance(runtimeConfig, user?.depositAddress || '', token);

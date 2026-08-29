@@ -12,6 +12,18 @@ function readPositiveInteger(value, fallback) {
     return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+export function normalizeArenifiTokenName(value) {
+    const name = String(value || '').trim();
+    if (!name || /^(stake\s*coin|agar\s*(coin|token)?)$/i.test(name)) return 'AreniFi Coin';
+    return name;
+}
+
+export function normalizeArenifiTokenSymbol(value) {
+    const symbol = String(value || '').trim().toUpperCase();
+    if (!symbol || symbol === 'AGAR' || symbol === 'STAKECOIN') return 'ARENA';
+    return symbol;
+}
+
 /**
  * Single source of truth for every AGAR feature.
  *
@@ -27,8 +39,8 @@ export const AGAR = Object.freeze({
     enabled: readBoolean(env.VITE_AGAR_ENABLED, false),
     mint: env.VITE_AGAR_MINT?.trim() || '',
     decimals: readPositiveInteger(env.VITE_AGAR_DECIMALS, 6),
-    name: env.VITE_AGAR_NAME?.trim() || 'AreniFi Coin',
-    symbol: env.VITE_AGAR_SYMBOL?.trim() || 'ARENA',
+    name: normalizeArenifiTokenName(env.VITE_AGAR_NAME),
+    symbol: normalizeArenifiTokenSymbol(env.VITE_AGAR_SYMBOL),
     logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/arenifi-coin-logo.png',
     balancePollIntervalMs: readPositiveInteger(env.VITE_AGAR_BALANCE_POLL_MS, 60_000),
     marketData: Object.freeze({
