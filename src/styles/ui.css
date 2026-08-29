@@ -196,7 +196,7 @@
 .brand-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 16px;
   min-width: 0;
   color: var(--text-h);
   line-height: 1;
@@ -214,10 +214,10 @@
   display: inline-flex;
   align-items: baseline;
   color: #f7f6fb;
-  font-family: var(--display);
-  font-size: 1.18rem;
-  font-weight: 820;
-  letter-spacing: 0.13em;
+  font-family: 'Inter', sans-serif;
+  font-size: 1.42rem;
+  font-weight: 650;
+  letter-spacing: 0.145em;
   line-height: 1;
   white-space: nowrap;
 }
@@ -1781,7 +1781,7 @@
 }
 
 .brand-lockup--loading {
-  gap: 12px;
+  gap: 19px;
 }
 
 .brand-lockup--loading .brand-lockup__mark {
@@ -1791,7 +1791,7 @@
 }
 
 .brand-lockup--loading .brand-lockup__name {
-  font-size: 1.62rem;
+  font-size: 1.9rem;
 }
 
 .app-loading-name {
@@ -4563,7 +4563,7 @@
 }
 
 .brand-lockup--auth {
-  gap: 10px;
+  gap: 16px;
 }
 
 .brand-lockup--auth .brand-lockup__mark {
@@ -4573,7 +4573,7 @@
 }
 
 .brand-lockup--auth .brand-lockup__name {
-  font-size: 1.42rem;
+  font-size: 1.68rem;
 }
 
 .auth-brand p {

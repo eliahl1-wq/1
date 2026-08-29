@@ -440,7 +440,7 @@ body.game-session-active #root {
 }
 
 .brand-lockup--game {
-    gap: 7px;
+    gap: 13px;
 }
 
 .brand-lockup--game .brand-lockup__mark {
@@ -450,7 +450,7 @@ body.game-session-active #root {
 }
 
 .brand-lockup--game .brand-lockup__name {
-    font-size: 1.18rem;
+    font-size: 1.36rem;
 }
 
 .game-viewport--mobile .brand-lockup--game {
