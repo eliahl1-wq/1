@@ -4,7 +4,7 @@ const EMPTY_FORM = {
     name: 'AreniFi Coin', symbol: 'ARENA',
     description: 'The utility token for the AreniFi gaming ecosystem.',
     imageSourceUrl: 'https://arenifi.fun/arenifi-coin-logo.png',
-    website: 'https://arenifi.fun', twitter: '', telegram: '',
+    website: 'https://arenifi.fun', twitter: '', twitterPost: '', telegram: '',
 };
 
 export default function TokenLaunchAdminPanel({ fetchAdmin }) {
@@ -73,7 +73,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
                     {Object.entries(form).map(([key, value]) => (
                         <label key={key} style={{ display: 'grid', gap: 6, gridColumn: key === 'description' ? '1 / -1' : undefined }}>
-                            <span className="admin-filter-label">{key.replace(/([A-Z])/g, ' $1')}</span>
+                            <span className="admin-filter-label">{key === 'twitter' ? 'X account URL' : key === 'twitterPost' ? 'Featured X post URL (Axiom preview)' : key.replace(/([A-Z])/g, ' $1')}</span>
                             {key === 'description' ? <textarea className="admin-input" rows="4" value={value} onChange={e => setForm({ ...form, [key]: e.target.value })} /> : <input className="admin-input" value={value} onChange={e => setForm({ ...form, [key]: e.target.value })} />}
                         </label>
                     ))}
