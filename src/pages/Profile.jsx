@@ -4,7 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import ProductPageHeader from '../components/ProductPageHeader';
-import CurrencySwitchButton from '../components/CurrencySwitchButton';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
 import { API_URL } from '../utils/apiBase';
@@ -46,7 +45,7 @@ export default function Profile() {
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'stats');
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [gameLogs, setGameLogs] = useState([]);
-    const [displayCur, setDisplayCur] = useBalanceCurrency();
+    const [displayCur] = useBalanceCurrency();
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
@@ -293,10 +292,6 @@ export default function Profile() {
                                     <div style={{ position: 'relative', zIndex: 1 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                                             <span className="label" style={{ fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Available Balance</span>
-                                            <CurrencySwitchButton
-                                                value={displayCur}
-                                                onChange={setDisplayCur}
-                                            />
                                         </div>
 
                                         {displayCur === 'SOL' ? (

@@ -2,12 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import useBalanceCurrency from '../hooks/useBalanceCurrency';
+import { formatGameSolAmount } from '../utils/displayCurrency';
 import '../styles/affiliate.css';
 
-const money = value => `$${Number(value || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-})}`;
 const date = value => value ? new Date(value).toLocaleString() : '—';
 const shortWallet = value => value ? `${value.slice(0, 6)}…${value.slice(-5)}` : 'Not connected';
 
@@ -17,11 +15,19 @@ function Status({ value }) {
 
 export default function AffiliateRewardsPanel({ onDataChange }) {
     const { user, token, refreshUser } = useAuth();
+    const [balanceCurrency] = useBalanceCurrency();
     const navigate = useNavigate();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [copyLabel, setCopyLabel] = useState('Copy link');
+    const solPrice = Number(user?.solPrice) || 0;
+    const money = value => {
+        const amount = Number(value) || 0;
+        return balanceCurrency === 'SOL' && solPrice > 0
+            ? `${formatGameSolAmount(amount / solPrice)} SOL`
+            : `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
 
     const eligible = !!user && !user.isAdmin && !user.personalFreePlay && !user.isOwnerAccount;
 

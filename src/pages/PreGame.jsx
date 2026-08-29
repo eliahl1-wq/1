@@ -151,6 +151,7 @@ export default function PreGame() {
         walletBalance: agarBalance,
         balanceLoading: agarBalanceLoading,
         launchReady: agarLaunchReady,
+        config: agarConfig,
     } = useAgarToken();
 
     // ── Tournament States ───────────────────────────────
@@ -1047,8 +1048,8 @@ export default function PreGame() {
                                 type="button"
                                 className="agar-nav-balance"
                                 onClick={() => openAgarModal({ action: 'BUY' })}
-                                aria-label={agarLaunchReady ? 'Buy AGAR with account balance' : 'AGAR Coming Soon'}
-                                title={agarLaunchReady ? 'Exchange account SOL for AGAR' : 'Coming Soon'}
+                                aria-label={agarLaunchReady ? `Buy ${agarConfig.symbol} with account balance` : `${agarConfig.symbol} Coming Soon`}
+                                title={agarLaunchReady ? `Exchange account SOL for ${agarConfig.symbol}` : 'Coming Soon'}
                             >
                                 <AgarLogo size={22} />
                                 <strong className="mono">

@@ -34,7 +34,7 @@ function buildGeometry(points, width, height) {
     return { min, max, coordinates, line, area };
 }
 
-export default function AgarPriceChart({ launchReady, authToken = '' }) {
+export default function AgarPriceChart({ launchReady, authToken = '', symbol = 'STAKE' }) {
     const canvasRef = useRef(null);
     const [size, setSize] = useState({ width: 700, height: 292 });
     const [range, setRange] = useState('24H');
@@ -139,7 +139,7 @@ export default function AgarPriceChart({ launchReady, authToken = '' }) {
 
             <div className="agar-price-chart__canvas" ref={canvasRef}>
                 {!launchReady ? (
-                    <div className="agar-price-chart__state"><strong>Coming Soon</strong><span>AGAR / USD</span></div>
+                    <div className="agar-price-chart__state"><strong>Coming Soon</strong><span>{symbol} / USD</span></div>
                 ) : loading && !geometry ? (
                     <div className="agar-price-chart__state"><strong>Loading chart…</strong></div>
                 ) : error && !geometry ? (
@@ -151,7 +151,7 @@ export default function AgarPriceChart({ launchReady, authToken = '' }) {
                         viewBox={`0 0 ${size.width} ${size.height}`}
 
                         role="img"
-                        aria-label={`AGAR ${range} price chart`}
+                        aria-label={`${symbol} ${range} price chart`}
                         onPointerMove={handlePointer}
                         onPointerLeave={() => setHoveredIndex(null)}
                     >

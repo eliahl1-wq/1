@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
-import { AGAR } from '../features/agar/config/agarConfig';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
@@ -21,7 +20,7 @@ export default function RewardsWidget() {
     const [balanceCurrency] = useBalanceCurrency();
     const navigate = useNavigate();
     const location = useLocation();
-    const { snapshot: agarMarket, launchReady: agarLaunchReady, openAgarModal } = useAgarToken();
+    const { snapshot: agarMarket, launchReady: agarLaunchReady, openAgarModal, config: agarConfig } = useAgarToken();
     const [expanded, setExpanded] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [hasSeen, setHasSeen] = useState(false);
@@ -379,14 +378,14 @@ export default function RewardsWidget() {
                         type="button"
                         className="agar-price-pill"
                         onClick={() => openAgarModal()}
-                        aria-label="Open AGAR price chart"
-                        title="Open AGAR chart"
+                        aria-label={`Open ${agarConfig.symbol} price chart`}
+                        title={`Open ${agarConfig.symbol} chart`}
                     >
                         <AgarLogo size={18} />
                         <span className="mono">
                             {agarLaunchReady && Number.isFinite(agarMarket.price)
                                 ? `${agarMarket.price.toLocaleString('en-US', { maximumSignificantDigits: 5 })}`
-                                : AGAR.messages.comingSoon}
+                                : agarConfig.messages.comingSoon}
                         </span>
                     </button>
                 )}

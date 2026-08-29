@@ -27,9 +27,9 @@ export const AGAR = Object.freeze({
     enabled: readBoolean(env.VITE_AGAR_ENABLED, false),
     mint: env.VITE_AGAR_MINT?.trim() || '',
     decimals: readPositiveInteger(env.VITE_AGAR_DECIMALS, 9),
-    name: env.VITE_AGAR_NAME?.trim() || 'AGARSTAKE',
-    symbol: env.VITE_AGAR_SYMBOL?.trim() || 'AGAR',
-    logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/agarstake-token-logo.png',
+    name: env.VITE_AGAR_NAME?.trim() || 'Stakecoin',
+    symbol: env.VITE_AGAR_SYMBOL?.trim() || 'STAKE',
+    logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/stakecoin-token-logo.png',
     balancePollIntervalMs: readPositiveInteger(env.VITE_AGAR_BALANCE_POLL_MS, 60_000),
     marketData: Object.freeze({
         provider: env.VITE_AGAR_MARKET_PROVIDER?.trim() || 'dexscreener',
@@ -50,7 +50,7 @@ export const AGAR = Object.freeze({
     }),
     messages: Object.freeze({
         comingSoon: 'Coming Soon',
-        notLaunched: 'AGAR has not launched yet.',
+        notLaunched: 'Stakecoin has not launched yet.',
     }),
 });
 

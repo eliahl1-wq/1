@@ -147,7 +147,7 @@ export default function AgarTokenModal({
             ]);
         } catch (error) {
             setTransactionSignature('');
-            setNotice(error.message || 'AGAR swaps are unavailable.');
+            setNotice(error.message || `${config.symbol} swaps are unavailable.`);
             setNoticeType('error');
         } finally {
             setSubmitting(false);
@@ -209,7 +209,7 @@ export default function AgarTokenModal({
                             </h2>
                         </div>
                     </div>
-                    <button type="button" className="agar-modal__close" onClick={onClose} aria-label="Close AGAR details">
+                    <button type="button" className="agar-modal__close" onClick={onClose} aria-label={`Close ${config.symbol} details`}>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M6 6l12 12M18 6 6 18" />
                         </svg>
@@ -222,7 +222,7 @@ export default function AgarTokenModal({
                             <span>Chart</span>
                             <span>{launchReady && marketLoading ? 'Loading…' : launchReady ? 'Live' : config.messages.comingSoon}</span>
                         </div>
-                        <AgarPriceChart launchReady={launchReady} authToken={authToken} />
+                        <AgarPriceChart launchReady={launchReady} authToken={authToken} symbol={config.symbol} />
                     </div>
 
                     <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}`}>
@@ -364,7 +364,7 @@ export default function AgarTokenModal({
                     {!launchReady && (
                         <div className="agar-modal__launch-note">
                             <span className="agar-modal__launch-dot" />
-                            AGAR features are coming soon · Trading remains disabled
+                            {config.name} features are coming soon · Trading remains disabled
                         </div>
                     )}
                 </div>

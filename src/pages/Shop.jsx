@@ -116,6 +116,7 @@ export default function Shop() {
     const [quote, setQuote] = useState(null);
     const [busy, setBusy] = useState('');
     const [notice, setNotice] = useState(null);
+    const [activeFilter, setActiveFilter] = useState('all');
 
     const load = useCallback(async () => {
         const [catalogResponse, inventoryResponse] = await Promise.all([
@@ -186,7 +187,7 @@ export default function Shop() {
             });
             const payload = await response.json();
             if (!response.ok && response.status !== 202) {
-                throw new Error(payload.message || 'AGAR purchase failed.');
+                throw new Error(payload.message || `${config.symbol} purchase failed.`);
             }
             setQuote(null);
             await Promise.all([load(), refreshAgarBalance(), refreshUser({ forceBalance: true })]);
@@ -223,6 +224,19 @@ export default function Shop() {
     };
     const agarAccess = publicConfig?.accessGranted === true;
     const shopReady = agarAccess && catalog?.ready === true && publicConfig?.shopReady === true;
+    const products = useMemo(() => catalog?.products || [
+        { id: 'flags:bundle', gameMode: 'all', skinId: 'flags', name: 'Flag Pack', usdPrice: 1 },
+        { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
+        { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
+        ...SLITHER_SPECIAL_SKINS.map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
+    ], [catalog?.products]);
+    const filteredProducts = useMemo(() => products.filter((product) => {
+        if (activeFilter === 'owned') return ownedProducts.has(product.id);
+        if (activeFilter === 'agar') return product.gameMode === 'agar' || product.gameMode === 'all';
+        if (activeFilter === 'slither') return product.gameMode === 'slither' || product.gameMode === 'all';
+        return true;
+    }), [activeFilter, ownedProducts, products]);
+    const ownedCount = products.filter((product) => ownedProducts.has(product.id)).length;
 
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll shop-page">
@@ -231,35 +245,38 @@ export default function Shop() {
             <main className="shop-shell">
                 <header className="shop-hero">
                     <div className="shop-hero-copy">
-                        <p className="shop-kicker"><span /> AGARSTAKE MARKETPLACE</p>
-                        <h1>Skin Shop</h1>
-                        <p>Stand out in every match with permanent cosmetics, unlocked securely using AGAR from your account wallet.</p>
+                        <p className="shop-kicker"><span /> THE AGARSTAKE LOCKER</p>
+                        <h1>Own the <em>arena.</em></h1>
+                        <p>Discover permanent skins built to stand out at full speed. One secure unlock, yours across every match.</p>
                         <div className="shop-hero-points" aria-label="Shop benefits">
-                            <span><i /> Permanent unlocks</span>
+                            <span><i /> Permanent</span>
                             <span><i /> Account-bound</span>
-                            <span><i /> On-chain checkout</span>
+                            <span><i /> Verified on Solana</span>
                         </div>
                     </div>
-                    <section className="shop-balance-card" aria-label="Your AGAR balance">
-                        <div className="shop-balance-logo">
-                            <AgarLogo size={42} config={config} />
-                        </div>
+                    <div className="shop-hero-stage" aria-hidden="true">
+                        <div className="shop-hero-stage-grid" />
+                        <div className="shop-hero-stage-glow" />
+                        <div className="shop-hero-snake"><SnakeSkinPreview color="special:aurora-veil" isLarge /></div>
+                        <div className="shop-hero-blob"><AgarBlobPreview color="random" isLarge hideName /></div>
+                        <span className="shop-hero-stage-label">COSMETIC DROP / 01</span>
+                    </div>
+                    <section className="shop-balance-card" aria-label={`Your ${config.symbol} balance`}>
+                        <div className="shop-balance-logo"><AgarLogo size={38} config={config} /></div>
                         <div className="shop-balance-copy">
-                            <span>YOUR AGAR BALANCE</span>
-                            <strong className="mono">{!agarAccess ? 'Coming Soon' : balanceLoading ? '...' : formatAgarAmount(walletBalance)}</strong>
-                            <small>{agarAccess ? 'Available to spend' : 'Admin preview only'}</small>
+                            <span>AVAILABLE BALANCE</span>
+                            <strong className="mono">{!agarAccess ? 'Coming Soon' : balanceLoading ? '...' : `${formatAgarAmount(walletBalance)} ${config.symbol}`}</strong>
+                            <small>{agarAccess ? `${ownedCount} of ${products.length} items collected` : 'Admin preview only'}</small>
                         </div>
                         <button
                             type="button"
                             className="shop-balance-add"
-                            aria-label="Buy AGAR"
-                            title={agarAccess ? 'Buy AGAR' : 'Coming Soon'}
+                            aria-label={`Buy ${config.symbol}`}
+                            title={agarAccess ? `Buy ${config.symbol}` : 'Coming Soon'}
                             disabled={!agarAccess}
                             onClick={() => openAgarModal({ action: 'BUY' })}
                         >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M12 5v14M5 12h14" />
-                            </svg>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                         </button>
                     </section>
                 </header>
@@ -270,7 +287,7 @@ export default function Shop() {
                         </div>
                         <div>
                             <span>COMING SOON</span>
-                            <p>{catalog?.reason || publicConfig?.shopReason || 'The AGAR shop activates when the token launches.'}</p>
+                            <p>{catalog?.reason || publicConfig?.shopReason || `The ${config.symbol} shop activates when the token launches.`}</p>
                         </div>
                     </div>
                 )}
@@ -284,59 +301,69 @@ export default function Shop() {
                         <span>{notice.message}</span>
                     </div>
                 )}
-                <section className="shop-products" aria-label="AGAR skins">
-                    {(catalog?.products || [
-                        { id: 'flags:bundle', gameMode: 'all', skinId: 'flags', name: 'Flag Pack', usdPrice: 1 },
-                        { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
-                        { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
-                        ...SLITHER_SPECIAL_SKINS.map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
-                    ]).map((product) => {
+                <section className="shop-catalog" aria-labelledby="shop-catalog-title">
+                    <div className="shop-catalog-heading">
+                        <div>
+                            <p className="shop-kicker"><span /> COLLECTION</p>
+                            <h2 id="shop-catalog-title">Choose your signature</h2>
+                            <p>Original cosmetics for Agar and Slither.</p>
+                        </div>
+                        <div className="shop-filters" role="group" aria-label="Filter shop items">
+                            {[
+                                ['all', 'All'],
+                                ['agar', 'Agar'],
+                                ['slither', 'Slither'],
+                                ['owned', `Owned ${ownedCount}`],
+                            ].map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    className={activeFilter === value ? 'is-active' : ''}
+                                    aria-pressed={activeFilter === value}
+                                    onClick={() => setActiveFilter(value)}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="shop-products" aria-label={`${config.symbol} skins`}>
+                    {filteredProducts.map((product, index) => {
                         const owned = ownedProducts.has(product.id);
                         const specialSkin = getSlitherSpecialSkin(product.skinId);
                         return (
                             <article
-                                className={'shop-product-card' + (owned ? ' shop-product-card--owned' : '')}
+                                className={'shop-product-card' + (owned ? ' shop-product-card--owned' : '') + (index === 0 && activeFilter === 'all' ? ' shop-product-card--featured' : '')}
                                 key={product.id}
                             >
-                                <div className="shop-product-topline">
-                                    <span className="shop-mode-badge">
-                                        <i />
-                                        {product.gameMode === 'all' ? 'AGAR + SLITHER' : product.gameMode.toUpperCase()}
-                                    </span>
-                                    <span className={'shop-availability' + (owned ? ' is-owned' : '')}>
-                                        {owned && (
-                                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="m7 12.5 3 3 7-8" />
-                                            </svg>
-                                        )}
-                                        {!agarAccess ? 'COMING SOON' : owned ? 'OWNED' : 'PREMIUM'}
-                                    </span>
-                                </div>
-                                {product.skinId === 'flags'
-                                    ? <FlagPackPreview nickname={user?.username} />
-                                    : specialSkin
-                                        ? <SpecialSlitherPreview skin={specialSkin} />
-                                        : <RainbowPreview mode={product.gameMode} nickname={user?.username} />}
-                                <div className="shop-product-copy">
-                                    <div className="shop-product-heading">
-                                        <h2>{getProductDisplayName(product)}</h2>
-                                        <span>{product.skinId === 'flags' ? 'BUNDLE' : 'SKIN'}</span>
-                                    </div>
-                                    <p>{product.skinId === 'flags'
-                                        ? 'One pack with popular country flags for both Agar and Slither.'
+                                <div className="shop-product-visual">
+                                    {product.skinId === 'flags'
+                                        ? <FlagPackPreview nickname={user?.username} />
                                         : specialSkin
-                                            ? specialSkin.description
-                                            : 'A luminous animated spectrum made for ' + (product.gameMode === 'agar' ? 'Agar' : 'Slither') + '.'}</p>
-                                </div>
-                                <div className="shop-product-price">
-                                    <div>
-                                        <span>PRICE</span>
-                                        <strong className="mono">
-                                            {product.estimatedAgar ? product.estimatedAgar + ' AGAR' : 'Coming Soon'}
-                                        </strong>
+                                            ? <SpecialSlitherPreview skin={specialSkin} />
+                                            : <RainbowPreview mode={product.gameMode} nickname={user?.username} />}
+                                    <div className="shop-product-topline">
+                                        <span className="shop-mode-badge"><i />{product.gameMode === 'all' ? 'AGAR + SLITHER' : product.gameMode.toUpperCase()}</span>
+                                        <span className={'shop-availability' + (owned ? ' is-owned' : '')}>
+                                            {owned && <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 12.5 3 3 7-8" /></svg>}
+                                            {!agarAccess ? 'COMING SOON' : owned ? 'OWNED' : 'PREMIUM'}
+                                        </span>
                                     </div>
-                                    <small><b>{'$' + Number(product.usdPrice).toFixed(2)}</b> live-price target</small>
                                 </div>
+                                <div className="shop-product-content">
+                                    <div className="shop-product-copy">
+                                        <div className="shop-product-heading">
+                                            <div><span>{product.skinId === 'flags' ? 'BUNDLE' : 'SKIN'}</span><h3>{getProductDisplayName(product)}</h3></div>
+                                            <strong className="shop-usd-price mono">${Number(product.usdPrice).toFixed(2)}</strong>
+                                        </div>
+                                        <p>{product.skinId === 'flags'
+                                            ? 'A complete collection of popular country flags for both Agar and Slither.'
+                                            : specialSkin
+                                                ? specialSkin.description
+                                                : `An animated spectrum crafted exclusively for ${product.gameMode === 'agar' ? 'Agar' : 'Slither'}.`}</p>
+                                    </div>
+                                    <div className="shop-product-purchase">
+                                        <div className="shop-product-price"><span>PAY WITH {config.symbol}</span><strong className="mono">{product.estimatedAgar ? `${product.estimatedAgar} ${config.symbol}` : 'Coming Soon'}</strong></div>
                                 {!agarAccess ? (
                                     <button type="button" className="shop-buy-button" disabled>
                                         <span>Coming Soon</span>
@@ -356,7 +383,7 @@ export default function Shop() {
                                         onClick={() => requestQuote(product.id)}
                                     >
                                         {busy === product.id && <span className="shop-button-spinner" aria-hidden="true" />}
-                                        <span>{!shopReady ? 'Coming Soon' : busy === product.id ? 'Preparing quote...' : 'Buy with AGAR'}</span>
+                                        <span>{!shopReady ? 'Coming Soon' : busy === product.id ? 'Preparing quote...' : `Buy with ${config.symbol}`}</span>
                                         {shopReady && busy !== product.id && (
                                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                                 <path d="M5 12h14M13 6l6 6-6 6" />
@@ -364,9 +391,20 @@ export default function Shop() {
                                         )}
                                     </button>
                                 )}
+                                    </div>
+                                </div>
                             </article>
                         );
                     })}
+                    {filteredProducts.length === 0 && (
+                        <div className="shop-empty-state">
+                            <span>0</span>
+                            <h3>No owned skins yet</h3>
+                            <p>Your unlocked cosmetics will appear here.</p>
+                            <button type="button" onClick={() => setActiveFilter('all')}>Browse collection</button>
+                        </div>
+                    )}
+                    </div>
                 </section>
 
                 <section className="shop-economy-note" aria-labelledby="shop-economy-title">
@@ -379,13 +417,13 @@ export default function Shop() {
                         </div>
                         <div>
                             <p className="shop-kicker"><span /> TRANSPARENT DISTRIBUTION</p>
-                            <h2 id="shop-economy-title">Where your AGAR goes</h2>
+                            <h2 id="shop-economy-title">Where your {config.symbol} goes</h2>
                             <p>Every purchase is split automatically and verified on Solana before your cosmetic unlocks.</p>
                         </div>
                     </div>
                     <div className="shop-economy-breakdown">
                         <div className="shop-economy-stat">
-                            <div><strong>90%</strong><span>AGAR treasury</span></div>
+                            <div><strong>90%</strong><span>{config.symbol} treasury</span></div>
                             <div><strong>10%</strong><span>Owner revenue</span></div>
                         </div>
                         <div className="shop-economy-bar" aria-label="90 percent treasury and 10 percent owner revenue">
@@ -431,7 +469,7 @@ export default function Shop() {
                         <p className="shop-confirm-subtitle">Review the purchase details before confirming.</p>
                         <div className="shop-confirm-amount">
                             <span>TOTAL</span>
-                            <strong className="mono">{quote.tokenAmount} AGAR</strong>
+                            <strong className="mono">{quote.tokenAmount} {config.symbol}</strong>
                             <small>{'≈ $' + Number(quote.usdPrice).toFixed(2) + ' reference value'}</small>
                         </div>
                         <div className="shop-confirm-details">

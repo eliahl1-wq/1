@@ -8,6 +8,7 @@ import { API_URL } from '../utils/apiBase';
 import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import '../styles/rewards.css';
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
+import { formatGameSolAmount } from '../utils/displayCurrency';
 
 export default function Rewards() {
     const { user, loading, refreshUser } = useAuth();
@@ -20,6 +21,14 @@ export default function Rewards() {
     const [affiliateData, setAffiliateData] = useState(null);
     const [activeView, setActiveView] = useState(() => window.location.hash === '#affiliate-rewards' ? 'affiliate' : 'game');
     const claimLockRef = useRef(false);
+    const solPrice = Number(user?.solPrice) || 0;
+    const isSolView = balanceCurrency === 'SOL' && solPrice > 0;
+    const rewardMoney = (value, prefix = '') => {
+        const amount = Math.abs(Number(value) || 0);
+        return isSolView
+            ? `${prefix}${formatGameSolAmount(amount / solPrice)} SOL`
+            : `${prefix}$${amount.toFixed(2)}`;
+    };
 
     useEffect(() => {
         setActiveView(location.hash === '#affiliate-rewards' ? 'affiliate' : 'game');
@@ -74,7 +83,7 @@ export default function Rewards() {
                 if (cancelled) return;
                 if (data.claim?.status === 'confirmed') {
                     await refreshUser();
-                    setClaimStatus({ type: 'success', message: `Successfully claimed $${Number(data.claim.amountUsd).toFixed(2)}!` });
+                    setClaimStatus({ type: 'success', message: `Successfully claimed ${rewardMoney(data.claim.amountUsd)}!` });
                 } else if (data.claim?.status === 'failed') {
                     await refreshUser();
                     setClaimStatus({ type: 'error', message: data.claim.error || 'Reward claim failed.' });
@@ -101,7 +110,7 @@ export default function Rewards() {
                 if (cancelled) return;
                 if (data.claim?.status === 'confirmed') {
                     await refreshUser();
-                    setClaimStatus({ type: 'success', message: `Successfully claimed $${Number(data.claim.amountUsd).toFixed(2)} of tournament winnings!` });
+                    setClaimStatus({ type: 'success', message: `Successfully claimed ${rewardMoney(data.claim.amountUsd)} of tournament winnings!` });
                 } else if (data.claim?.status === 'failed') {
                     await refreshUser();
                     setClaimStatus({ type: 'error', message: data.claim.error || 'Tournament reward claim failed.' });
@@ -142,11 +151,7 @@ export default function Rewards() {
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
     const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
     const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 2;
-    const solPrice = Number(user.solPrice) || 0;
-    const isSolView = balanceCurrency === 'SOL' && solPrice > 0;
-    const nextRewardLabel = isSolView
-        ? `${(permanentCycleReward / solPrice).toFixed(6)} SOL`
-        : `$${permanentCycleReward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+    const nextRewardLabel = rewardMoney(permanentCycleReward);
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
     const currentBalance = promoBalance + permanentBalance + rentFallbackBalance;
     const claimableBalance = rentFallbackBalance + (!user.rewardsDisabled
@@ -200,7 +205,7 @@ export default function Rewards() {
             const data = await res.json();
             if (data.claim?.status === 'confirmed') {
                 await refreshUser();
-                setClaimStatus({ type: 'success', message: `Successfully claimed $${data.claim.amountUsd.toFixed(2)}!` });
+                setClaimStatus({ type: 'success', message: `Successfully claimed ${rewardMoney(data.claim.amountUsd)}!` });
                 return;
             }
             if (data.claim?.status === 'failed') throw new Error(data.claim.error || 'Reward claim failed.');
@@ -225,7 +230,7 @@ export default function Rewards() {
             }
             if (!res.ok || !data.success) throw new Error(data.error || 'Failed to claim rewards.');
             await refreshUser();
-            setClaimStatus({ type: 'success', message: `Successfully claimed $${data.amount.toFixed(2)}!` });
+            setClaimStatus({ type: 'success', message: `Successfully claimed ${rewardMoney(data.amount)}!` });
         } catch (err) {
             setClaimStatus({ type: 'error', message: err.message || 'Error claiming rewards. Try again later.' });
         } finally {
@@ -250,7 +255,7 @@ export default function Rewards() {
             }
             if (!res.ok || !data.success) throw new Error(data.error || 'Failed to claim tournament rewards.');
             await refreshUser();
-            setClaimStatus({ type: 'success', message: `Successfully claimed $${data.amount.toFixed(2)} in tournament rewards!` });
+            setClaimStatus({ type: 'success', message: `Successfully claimed ${rewardMoney(data.amount)} in tournament rewards!` });
         } catch (err) {
             setClaimStatus({ type: 'error', message: err.message || 'Error claiming tournament rewards. Try again later.' });
         } finally {
@@ -267,20 +272,20 @@ export default function Rewards() {
         if (tx.affiliatePayout) {
             const status = String(tx.status || 'requested').replace('_', ' ');
             const isPaid = ['completed', 'paid'].includes(String(tx.status));
-            return { title: 'Affiliate payout', type: status, value: `${isPaid ? '-' : ''}$${Number(tx.amountUsd || 0).toFixed(2)}`, tone: isPaid ? 'green' : 'yellow' };
+            return { title: 'Affiliate payout', type: status, value: rewardMoney(tx.amountUsd, isPaid ? '-' : ''), tone: isPaid ? 'green' : 'yellow' };
         }
         if (tx.meta?.starterRewardCompleted) {
-            return { title: 'Starter reward completed', type: 'Completed', value: `$${Number(tx.meta.starterRewardAmountUsd || 0).toFixed(2)}`, tone: 'green' };
+            return { title: 'Starter reward completed', type: 'Completed', value: rewardMoney(tx.meta.starterRewardAmountUsd), tone: 'green' };
         }
         if (tx.meta?.freeTicketChallengeApplied) {
             return { title: 'Free ticket unlocked', type: 'Completed', value: '1 ticket', tone: 'purple' };
         }
         if (tx.meta?.event === 'sponsored_rewards_claim') {
-            return { title: 'Game rewards claimed', type: 'Claim', value: `-$${Number(tx.meta.amountUsd || 0).toFixed(2)}`, tone: 'green' };
+            return { title: 'Game rewards claimed', type: 'Claim', value: rewardMoney(tx.meta.amountUsd, '-'), tone: 'green' };
         }
         if (tx.meta?.isRentExemptFallback) {
             const amount = (Number(tx.amount) || 0) * Number(tx.meta.solPrice || 64);
-            return { title: 'Reward retained', type: 'Wallet credit', value: `+$${amount.toFixed(2)}`, tone: 'purple' };
+            return { title: 'Reward retained', type: 'Wallet credit', value: rewardMoney(amount, '+'), tone: 'purple' };
         }
         if (tx.meta?.event === 'free_ticket_join') {
             return { title: 'Free ticket used', type: tx.meta.mode || 'Normal', value: 'Free game', tone: 'purple' };
@@ -288,14 +293,14 @@ export default function Rewards() {
         if (tx.meta?.permanentRewardApplied) {
             const unlocked = Number(tx.meta.permanentRewardUnlockedUsd) || 0;
             return unlocked > 0
-                ? { title: 'Game reward unlocked', type: 'Completed', value: `+$${unlocked.toFixed(2)}`, tone: 'green' }
-                : { title: 'Reward progress', type: 'Cashout', value: `+$${Number(tx.meta.permanentCashoutVolumeUsd || 0).toFixed(2)}`, tone: 'default' };
+                ? { title: 'Game reward unlocked', type: 'Completed', value: rewardMoney(unlocked, '+'), tone: 'green' }
+                : { title: 'Reward progress', type: 'Cashout', value: rewardMoney(tx.meta.permanentCashoutVolumeUsd, '+'), tone: 'default' };
         }
         if (tx.meta?.event === 'tournament_reward') {
-            return { title: 'Tournament prize', type: `#${tx.meta.placement || '—'}`, value: `+$${Number(tx.meta.amountUsd || 0).toFixed(2)}`, tone: 'yellow' };
+            return { title: 'Tournament prize', type: `#${tx.meta.placement || '—'}`, value: rewardMoney(tx.meta.amountUsd, '+'), tone: 'yellow' };
         }
         if (tx.meta?.event === 'tournament_reward_claim') {
-            return { title: 'Tournament claimed', type: 'Claim', value: `-$${Number(tx.meta.amountUsd || 0).toFixed(2)}`, tone: 'green' };
+            return { title: 'Tournament claimed', type: 'Claim', value: rewardMoney(tx.meta.amountUsd, '-'), tone: 'green' };
         }
         return { title: 'Reward activity', type: 'Reward', value: '—', tone: 'default' };
     };
@@ -319,11 +324,11 @@ export default function Rewards() {
                     <section className="rewards-overview" aria-labelledby="game-rewards-heading">
                         <div className="rewards-overview-mark" aria-hidden="true">R</div>
                         <span className="rewards-overview-kicker">GAME REWARDS</span>
-                        <h2 id="game-rewards-heading">${totalRewardBalance.toFixed(2)}</h2>
+                        <h2 id="game-rewards-heading">{rewardMoney(totalRewardBalance)}</h2>
                         <p>Total balance</p>
                         <div className="rewards-overview-stats">
-                            <div><span>Available</span><strong className="mono">${totalReadyToClaim.toFixed(2)}</strong></div>
-                            <div><span>Earned</span><strong className="mono">${totalClaimedAllTime.toFixed(2)}</strong></div>
+                            <div><span>Available</span><strong className="mono">{rewardMoney(totalReadyToClaim)}</strong></div>
+                            <div><span>Earned</span><strong className="mono">{rewardMoney(totalClaimedAllTime)}</strong></div>
                         </div>
                         <div className="rewards-overview-progress-head">
                             <strong>Next reward {nextRewardLabel}</strong>
@@ -332,7 +337,7 @@ export default function Rewards() {
                             <div style={{ width: `${Math.min(100, permanentProgressPct)}%` }} />
                         </div>
                         <div className="rewards-overview-progress-foot">
-                            <span className="mono">${permanentProgress.toFixed(2)} / ${permanentCycleVolume.toFixed(2)}</span>
+                            <span className="mono">{rewardMoney(permanentProgress)} / {rewardMoney(permanentCycleVolume)}</span>
                             <span>{Number(permanentRewards.cyclesCompleted) || 0} completed</span>
                         </div>
                     </section>
@@ -342,14 +347,14 @@ export default function Rewards() {
                         <div className="rewards-claim-grid">
                             <article className="rewards-dashboard-card rewards-claim-card">
                                 <div className="rewards-card-head"><span>Game rewards</span><span className="rewards-status-dot" /></div>
-                                <div className="rewards-claim-amount mono">${claimableBalance.toFixed(2)}</div>
+                                <div className="rewards-claim-amount mono">{rewardMoney(claimableBalance)}</div>
                                 <span className="rewards-claim-caption">Available</span>
                                 <div className="rewards-claim-chips">
-                                    <span>Game <b className="mono">${(promoBalance + permanentBalance).toFixed(2)}</b></span>
-                                    <span>Retained <b className="mono">${rentFallbackBalance.toFixed(2)}</b></span>
+                                    <span>Game <b className="mono">{rewardMoney(promoBalance + permanentBalance)}</b></span>
+                                    <span>Retained <b className="mono">{rewardMoney(rentFallbackBalance)}</b></span>
                                 </div>
                                 <button type="button" className="btn btn-primary rewards-full-button" onClick={handleClaim} disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}>
-                                    {user.rewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING…' : canClaim ? `CLAIM $${claimableBalance.toFixed(2)}` : 'NOTHING TO CLAIM'}
+                                    {user.rewardClaimInProgress || claimStatus?.type === 'loading' ? 'CLAIMING…' : canClaim ? `CLAIM ${rewardMoney(claimableBalance)}` : 'NOTHING TO CLAIM'}
                                 </button>
                             </article>
 
@@ -375,7 +380,7 @@ export default function Rewards() {
                                 ) : user.freeTicketUsed && !isCompleted && !user.rewardsDisabled ? (
                                     <div className="rewards-active-content rewards-starter-content">
                                         <strong>Starter reward</strong>
-                                        <span>Reward: ${promoBalance.toFixed(2)}</span>
+                                        <span>Reward: {rewardMoney(promoBalance)}</span>
                                         <div className="rewards-mini-task">
                                             <div><span>{req5} × $5 games</span><b>{normal5Progress}/{req5}</b></div>
                                             <i><em style={{ width: `${(normal5Progress / req5) * 100}%` }} /></i>
@@ -395,15 +400,15 @@ export default function Rewards() {
                             </article>
 
                             <article className="rewards-dashboard-card rewards-breakdown-card">
-                                <div className="rewards-card-head"><span>Breakdown</span><span>USD</span></div>
+                                <div className="rewards-card-head"><span>Breakdown</span><span>{isSolView ? 'SOL' : 'USD'}</span></div>
                                 <div className="rewards-breakdown-list">
-                                    <div><span><i className="is-purple" />Game rewards</span><strong className="mono">${currentBalance.toFixed(2)}</strong></div>
-                                    <div><span><i className="is-yellow" />Tournament</span><strong className="mono">${tournamentBalance.toFixed(2)}</strong></div>
-                                    <div><span><i className="is-green" />Affiliate</span><strong className="mono">${affiliateBalance.toFixed(2)}</strong></div>
+                                    <div><span><i className="is-purple" />Game rewards</span><strong className="mono">{rewardMoney(currentBalance)}</strong></div>
+                                    <div><span><i className="is-yellow" />Tournament</span><strong className="mono">{rewardMoney(tournamentBalance)}</strong></div>
+                                    <div><span><i className="is-green" />Affiliate</span><strong className="mono">{rewardMoney(affiliateBalance)}</strong></div>
                                 </div>
                                 {tournamentBalance > 0 ? (
                                     <button type="button" className="btn rewards-tournament-button rewards-full-button" onClick={handleTournamentClaim} disabled={claimStatus?.type === 'loading' || user.tournamentRewardClaimInProgress}>
-                                        {user.tournamentRewardClaimInProgress ? 'CLAIMING…' : `CLAIM TOURNAMENT $${tournamentBalance.toFixed(2)}`}
+                                        {user.tournamentRewardClaimInProgress ? 'CLAIMING…' : `CLAIM TOURNAMENT ${rewardMoney(tournamentBalance)}`}
                                     </button>
                                 ) : (
                                     <button type="button" className="rewards-card-link rewards-breakdown-link" onClick={() => selectView('affiliate')}>View affiliate rewards →</button>

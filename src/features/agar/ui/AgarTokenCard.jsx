@@ -74,7 +74,7 @@ export default function AgarTokenCard({
             <span className="agar-token-card__footer">
                 {walletConnected && (
                     <span className="agar-token-card__balance">
-                        <span>AGAR Balance</span>
+                        <span>{config.symbol} Balance</span>
                         <strong>
                             {!launchReady
                                 ? config.messages.comingSoon
