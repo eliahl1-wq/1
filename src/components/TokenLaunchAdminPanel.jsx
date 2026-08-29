@@ -14,6 +14,8 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
     const [initialBuySol, setInitialBuySol] = useState('0');
     const [busy, setBusy] = useState('');
     const [notice, setNotice] = useState('');
+    const [position, setPosition] = useState(null);
+    const [sellAmount, setSellAmount] = useState('');
 
     const load = async () => {
         const value = await fetchAdmin('/api/admin/token-launch');
@@ -21,6 +23,14 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
         if (value.prepared) setForm(current => ({ ...current, ...Object.fromEntries(Object.keys(current).map(key => [key, value[key] || current[key]])) }));
     };
     useEffect(() => { load().catch(error => setNotice(error.message)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const loadPosition = async () => {
+        const value = await fetchAdmin('/api/admin/token-launch/position');
+        setPosition(value.position);
+    };
+    useEffect(() => {
+        if (launch?.status === 'launched' && launch?.launchWalletAddress) loadPosition().catch(error => setNotice(error.message));
+    }, [launch?.status, launch?.launchWalletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const run = async (kind, path, body) => {
         setBusy(kind); setNotice('');
@@ -41,6 +51,23 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
             anchor.href = url; anchor.download = `arenifi-mint-${launch.mintAddress}.encrypted.json`; anchor.click();
             URL.revokeObjectURL(url);
             setNotice('Encrypted mint backup downloaded. Store it offline with a separate backup of WALLET_ENCRYPTION_KEY.');
+        } catch (error) { setNotice(error.message); } finally { setBusy(''); }
+    };
+
+    const sell = async (max = false) => {
+        const shownAmount = max ? position?.tokenAmount : sellAmount;
+        if (!shownAmount || Number(shownAmount) <= 0) return setNotice('Enter an amount to sell.');
+        if (!window.confirm(`Sell ${shownAmount} ${launch.symbol} from the creator wallet for SOL? This is an on-chain transaction and cannot be reversed.`)) return;
+        setBusy('sell'); setNotice('');
+        try {
+            const result = await fetchAdmin('/api/admin/token-launch/sell', {
+                method: 'POST',
+                body: JSON.stringify({ amount: shownAmount, max, confirmation: `SELL ${launch.mintAddress}` }),
+            });
+            setPosition(result.position);
+            setSellAmount('');
+            setNotice(`Sold successfully. Transaction: ${result.signature}`);
+            await load();
         } catch (error) { setNotice(error.message); } finally { setBusy(''); }
     };
 
@@ -96,7 +123,31 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
                 <button style={{ marginTop: 14 }} className="btn btn-danger" disabled={!!busy || !launch.launchEnabled || !launch.mintMatchesEnvironment || confirmation !== `LAUNCH ${launch.mintAddress}`} onClick={() => run('launch', '/api/admin/token-launch/launch', { confirmation, initialBuySol })}>{busy === 'launch' ? 'Launching…' : 'Launch exact mint on Pump.fun'}</button>
             </section>}
 
-            {launched && <section className="admin-panel" style={{ padding: 22 }}><h2 className="admin-section-title">Launched</h2><p>{launch.mintAddress}</p><a href={`https://solscan.io/tx/${launch.signature}`} target="_blank" rel="noreferrer">View transaction</a></section>}
+            {launched && <section className="admin-panel" style={{ padding: 22, display: 'grid', gap: 18 }}>
+                <div><h2 className="admin-section-title">Launched</h2><code style={{ overflowWrap: 'anywhere' }}>{launch.mintAddress}</code><div style={{ marginTop: 10 }}><a href={`https://solscan.io/tx/${launch.signature}`} target="_blank" rel="noreferrer">View launch transaction</a></div></div>
+                {launch.launchWalletAddress ? <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, display: 'grid', gap: 14 }}>
+                    <div>
+                        <p className="shop-kicker"><span /> CREATOR POSITION</p>
+                        <h2 className="admin-section-title">Sell {launch.symbol} for SOL</h2>
+                        <p style={{ color: 'var(--text-3)', margin: 0 }}>Sold from the encrypted dedicated launch wallet. SOL from the sale remains in this wallet.</p>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+                        <div className="admin-panel" style={{ padding: 14 }}><span className="admin-filter-label">{launch.symbol} balance</span><strong style={{ display: 'block', fontSize: 22, marginTop: 6 }}>{position ? Number(position.tokenAmount).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}</strong></div>
+                        <div className="admin-panel" style={{ padding: 14 }}><span className="admin-filter-label">Launch-wallet SOL</span><strong style={{ display: 'block', fontSize: 22, marginTop: 6 }}>{position ? Number(position.solAmount).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}</strong></div>
+                    </div>
+                    <div style={{ display: 'grid', gap: 7 }}><span className="admin-filter-label">Launch wallet</span><code style={{ overflowWrap: 'anywhere' }}>{launch.launchWalletAddress}</code></div>
+                    <label style={{ display: 'grid', gap: 6, maxWidth: 520 }}>
+                        <span className="admin-filter-label">Amount to sell</span>
+                        <div style={{ display: 'flex', gap: 8 }}><input className="admin-input" type="number" min="0" step="any" value={sellAmount} onChange={e => setSellAmount(e.target.value)} placeholder={`0 ${launch.symbol}`} style={{ flex: 1 }} /><button type="button" className="btn btn-ghost" disabled={!position || !!busy} onClick={() => setSellAmount(position.tokenAmount)}>Max</button></div>
+                    </label>
+                    <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+                        <button className="btn btn-danger" disabled={!!busy || !position || Number(position.tokenAmount) <= 0 || !sellAmount || Number(sellAmount) <= 0} onClick={() => sell(false)}>{busy === 'sell' ? 'Selling…' : `Sell ${launch.symbol}`}</button>
+                        <button className="btn btn-ghost" disabled={!!busy || !position || Number(position.tokenAmount) <= 0} onClick={() => sell(true)}>Sell max</button>
+                        <button className="btn btn-ghost" disabled={!!busy} onClick={() => loadPosition().catch(error => setNotice(error.message))}>Refresh balances</button>
+                    </div>
+                    {launch.lastSellSignature && <a href={`https://solscan.io/tx/${launch.lastSellSignature}`} target="_blank" rel="noreferrer">View latest sell transaction</a>}
+                </div> : <div className="product-alert">The initial purchase was made by the admin account wallet. Use the normal token Sell flow for that wallet.</div>}
+            </section>}
         </div>
     );
 }
