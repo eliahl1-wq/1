@@ -123,6 +123,7 @@ export default function AppTopbar({ children }) {
                     </button>
 
                     <button type="button" className="logo" aria-label="AgarStake home" onClick={() => navigate('/pre-game')}>
+                        <img className="logo-compact-mark" src="/favicon.png" alt="" aria-hidden="true" />
                         <div className="logo-dot" />
                         <span>
                             AGAR<span className="logo-accent">STAKE</span>

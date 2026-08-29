@@ -149,7 +149,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  background: rgba(7, 7, 9, 0.88);
+  background: rgba(13, 13, 17, 0.9);
   backdrop-filter: blur(24px) saturate(200%);
   -webkit-backdrop-filter: blur(24px) saturate(200%);
   border-bottom: 1px solid var(--border);
@@ -191,6 +191,10 @@
   background: var(--accent);
   border-radius: 50%;
   box-shadow: none;
+}
+
+.logo-compact-mark {
+  display: none;
 }
 
 /* ─── User pill in topbar ─── */
@@ -2487,7 +2491,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   padding: var(--currency-switch-pad);
-  border: 2px solid rgba(117, 86, 191, 0.46);
+  border: 1.5px solid rgba(91, 67, 145, 0.36);
   border-radius: var(--r-full);
   background: transparent;
   color: rgba(255, 255, 255, 0.55);
@@ -3264,7 +3268,7 @@
     top: 52px;
     left: 0;
     right: 0;
-    background: rgba(9, 9, 11, 0.97);
+    background: rgba(15, 15, 19, 0.97);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 1px solid var(--border);
@@ -3283,6 +3287,19 @@
   .logo {
     font-size: 1.15rem;
     min-width: 0;
+  }
+
+  .logo-compact-mark {
+    display: block;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    object-fit: contain;
+  }
+
+  .logo > .logo-dot,
+  .logo > span {
+    display: none;
   }
 
   .logo span {
@@ -4202,7 +4219,7 @@
 .topbar {
   height: 52px;
   padding-inline: 20px;
-  background: rgba(7, 7, 9, 0.94);
+  background: rgba(13, 13, 17, 0.94);
   border-bottom-color: rgba(255, 255, 255, 0.075);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);

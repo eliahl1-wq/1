@@ -17,12 +17,12 @@
   --space-10: 40px;
   --space-12: 48px;
   /* Core palette — neutral surface hierarchy */
-  --bg: #070708;
-  --bg-1: #131314;
-  --bg-2: #19191b;
-  --bg-3: #1f1f22;
-  --bg-hover: #252528;
-  --bg-elevated: rgba(24, 24, 26, 0.98);
+  --bg: #0a0a0d;
+  --bg-1: #161619;
+  --bg-2: #1c1c20;
+  --bg-3: #222227;
+  --bg-hover: #28282d;
+  --bg-elevated: rgba(27, 27, 31, 0.98);
   --control-bg: rgba(255, 255, 255, 0.075);
   --control-hover: rgba(255, 255, 255, 0.11);
 
