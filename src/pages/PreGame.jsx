@@ -1962,25 +1962,24 @@ export default function PreGame() {
                 </div>
             )}
 
-            <a
-                className="pregame-discord-link pregame-discord-link--floating"
-                href={DISCORD_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Join our Discord server"
-                title="Join our Discord"
-            >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                        fill="currentColor"
-                        d="M19.5 5.34A16.3 16.3 0 0 0 15.44 4l-.5 1.02a15.1 15.1 0 0 0-5.87 0L8.56 4A16.5 16.5 0 0 0 4.5 5.35C1.93 9.15 1.23 12.85 1.58 16.5a16.6 16.6 0 0 0 4.98 2.52l1.2-1.65a10.6 10.6 0 0 1-1.89-.91l.46-.36c3.64 1.69 7.6 1.69 11.2 0l.47.36c-.6.36-1.24.67-1.9.91l1.2 1.65a16.5 16.5 0 0 0 4.98-2.52c.42-4.23-.72-7.9-2.78-11.16ZM8.52 14.3c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.88 2.27-2 2.27Zm6.96 0c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.87 2.27-2 2.27Z"
-                    />
-                </svg>
-            </a>
-
             {/* Bottom navigation bar */}
             <div className="pregame-bottom-dock">
                 <div className="pregame-bottom-dock__left">
+                    <a
+                        className="pregame-discord-link pregame-discord-link--dock"
+                        href={DISCORD_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Join our Discord server"
+                        title="Join our Discord"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                                fill="currentColor"
+                                d="M19.5 5.34A16.3 16.3 0 0 0 15.44 4l-.5 1.02a15.1 15.1 0 0 0-5.87 0L8.56 4A16.5 16.5 0 0 0 4.5 5.35C1.93 9.15 1.23 12.85 1.58 16.5a16.6 16.6 0 0 0 4.98 2.52l1.2-1.65a10.6 10.6 0 0 1-1.89-.91l.46-.36c3.64 1.69 7.6 1.69 11.2 0l.47.36c-.6.36-1.24.67-1.9.91l1.2 1.65a16.5 16.5 0 0 0 4.98-2.52c.42-4.23-.72-7.9-2.78-11.16ZM8.52 14.3c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.88 2.27-2 2.27Zm6.96 0c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.87 2.27-2 2.27Z"
+                            />
+                        </svg>
+                    </a>
                     {!user?.affiliateActive && !user?.isAdmin && !user?.personalFreePlay && (
                         <Link
                             className="pregame-affiliate-link"

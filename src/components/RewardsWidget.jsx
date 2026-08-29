@@ -401,17 +401,15 @@ export default function RewardsWidget() {
                     </div>
                 )}
                 <button
+                    type="button"
+                    className="rewards-widget-toggle"
                     onClick={toggleExpand}
                     style={{
-                        background: 'var(--control-bg)',
-                        border: 'none',
-                        borderRadius: '20px',
                         padding: '5px 12px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
                         cursor: 'pointer',
-                        boxShadow: 'var(--shadow-md)',
                         color: 'var(--text)',
                         position: 'relative',
                         fontFamily: 'inherit',
@@ -421,14 +419,6 @@ export default function RewardsWidget() {
                         transition: 'all 0.15s ease',
                         height: '28px',
                         boxSizing: 'border-box'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--control-hover)';
-                        e.currentTarget.style.color = 'var(--text-h)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--control-bg)';
-                        e.currentTarget.style.color = 'var(--text)';
                     }}
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-2)' }}>

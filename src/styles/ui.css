@@ -2706,97 +2706,6 @@
   z-index: 1050;
 }
 
-/* Unified navbar controls: one quiet outlined treatment on the navbar surface. */
-.topbar .currency-switch-button,
-.topbar .agar-nav-balance,
-.topbar .nav-deposit-btn,
-.topbar .avatar {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text-h);
-  box-shadow: none;
-  filter: none;
-}
-
-.topbar .currency-switch-button:hover,
-.topbar .agar-nav-balance:hover,
-.topbar .nav-deposit-btn:hover,
-.topbar .user-pill:hover .avatar {
-  background: transparent;
-  border-color: rgba(173, 152, 255, 0.42);
-  color: #fff;
-  box-shadow: none;
-  filter: none;
-  transform: none;
-}
-
-.topbar .currency-switch-button__option,
-.topbar .currency-switch-button__option.is-active {
-  background: transparent;
-  box-shadow: none;
-}
-
-.topbar .currency-switch-button__option.is-active {
-  color: #fff;
-}
-
-.topbar .balance-pill,
-.topbar .balance-pill:hover,
-.topbar .balance-pill--open {
-  padding-inline: 4px;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.gm-nav-link--discord {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  text-decoration: none;
-}
-
-.gm-nav-link--discord svg {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-}
-
-@media (min-width: 769px) {
-  .topbar .topbar-nav--desktop .gm-nav-link.gm-nav-link--discord {
-    width: 38px;
-    min-height: 34px;
-    padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.11);
-    border-radius: var(--r-sm);
-    background: transparent;
-    color: rgba(255, 255, 255, 0.72);
-  }
-
-  .topbar .topbar-nav--desktop .gm-nav-link.gm-nav-link--discord:hover {
-    border-color: rgba(173, 152, 255, 0.42);
-    background: transparent;
-    color: #fff;
-  }
-
-  .gm-nav-discord-label {
-    display: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .topbar-mobile-menu .gm-nav-link--discord {
-    justify-content: flex-start;
-  }
-
-  .topbar-mobile-menu.topbar-mobile-menu {
-    top: 96px;
-    z-index: 1200;
-  }
-}
-
 .test-mode-banner {
   position: fixed;
   top: 72px;
@@ -5248,32 +5157,54 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   box-shadow: none;
 }
 
-.pregame-discord-link--floating {
-  position: fixed;
-  z-index: 1001;
-  left: 18px;
-  bottom: calc(48px + env(safe-area-inset-bottom, 0px));
-  width: 34px;
-  height: 34px;
-  color: rgba(255, 255, 255, 0.78);
-  background: rgba(13, 13, 17, 0.94);
-  border-color: rgba(255, 255, 255, 0.09);
-  border-radius: 10px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+.pregame-bottom-dock .pregame-discord-link--dock,
+.pregame-bottom-dock .pregame-affiliate-link,
+.pregame-bottom-dock .rewards-widget-toggle {
+  min-height: 30px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 7px;
+  box-shadow: none;
+  filter: none;
+  transform: none;
 }
 
-.pregame-discord-link--floating:hover {
-  color: #a99cff;
-  background: rgba(20, 19, 28, 0.97);
-  border-color: rgba(124, 111, 240, 0.32);
-  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.34);
+.pregame-bottom-dock .pregame-discord-link--dock:hover,
+.pregame-bottom-dock .pregame-affiliate-link:hover,
+.pregame-bottom-dock .rewards-widget-toggle:hover {
+  color: var(--text-h);
+  background: transparent;
+  border-color: rgba(145, 124, 238, 0.48);
+  box-shadow: none;
+  filter: none;
+  transform: none;
 }
 
-.pregame-discord-link--floating svg {
-  width: 19px;
-  height: 19px;
+.pregame-bottom-dock .pregame-discord-link--dock {
+  width: 30px;
+  height: 30px;
+}
+
+.pregame-bottom-dock .pregame-discord-link--dock svg {
+  width: 17px;
+  height: 17px;
+}
+
+.pregame-bottom-dock .pregame-affiliate-link > span:first-child {
+  width: auto;
+  height: auto;
+  background: transparent;
+  border-radius: 0;
+}
+
+.pregame-bottom-dock .sol-price-pill,
+.pregame-bottom-dock .agar-price-pill {
+  padding-inline: 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 @media (max-width: 768px) {
@@ -5288,10 +5219,8 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
     font-size: 0.51rem;
   }
 
-  .pregame-discord-link--floating {
-    left: 10px;
-    bottom: calc(45px + env(safe-area-inset-bottom, 0px));
-    width: 32px;
-    height: 32px;
+  .pregame-bottom-dock .pregame-discord-link--dock {
+    width: 30px;
+    height: 30px;
   }
 }
