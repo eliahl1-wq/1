@@ -439,6 +439,34 @@ body.game-session-active #root {
     font-size: 0.95rem !important;
 }
 
+.brand-lockup--game {
+    gap: 7px;
+}
+
+.brand-lockup--game .brand-lockup__mark {
+    width: 27px;
+    height: 25px;
+    flex-basis: 27px;
+}
+
+.brand-lockup--game .brand-lockup__name {
+    font-size: 1.18rem;
+}
+
+.game-viewport--mobile .brand-lockup--game {
+    gap: 5px;
+}
+
+.game-viewport--mobile .brand-lockup--game .brand-lockup__mark {
+    width: 22px;
+    height: 20px;
+    flex-basis: 22px;
+}
+
+.game-viewport--mobile .brand-lockup--game .brand-lockup__name {
+    font-size: 0.88rem;
+}
+
 .game-viewport--mobile .game-logo-sub {
     font-size: 0.62rem !important;
 }
@@ -483,6 +511,21 @@ body.game-session-active #root {
     .game-viewport--mobile .game-logo-text {
         font-size: 0.72rem !important;
         letter-spacing: -0.5px !important;
+    }
+
+    .game-viewport--mobile .brand-lockup--game {
+        gap: 4px;
+    }
+
+    .game-viewport--mobile .brand-lockup--game .brand-lockup__mark {
+        width: 18px;
+        height: 17px;
+        flex-basis: 18px;
+    }
+
+    .game-viewport--mobile .brand-lockup--game .brand-lockup__name {
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
     }
 
     .game-viewport--mobile .game-logo-sub {

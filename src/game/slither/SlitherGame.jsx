@@ -16,6 +16,7 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import GamePlusCursor from '../../components/GamePlusCursor';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
+import BrandLogo from '../../components/BrandLogo';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
 import GameBRHud from '../../components/GameBRHud';
@@ -1268,17 +1269,7 @@ export default function SlitherGame() {
 
             <div className="game-logo-wrap" style={{ position: 'absolute', top: '30px', right: '30px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', zIndex: 100 }}>
 
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-
-                    <div style={{ width: 7, height: 7, background: 'var(--accent)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent)' }} />
-
-                    <span className="game-logo-text" style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '-1px', color: '#fff' }}>
-
-                        AGAR<span style={{ color: 'var(--accent)' }}>STAKE</span>
-
-                    </span>
-
-                </div>
+                <BrandLogo className="brand-lockup--game" labelled />
 
                 <div className="game-logo-sub" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
                     {isBattleRoyale ? 'Battle Royale' : (isCompetitiveMode ? 'Slither Arena' : 'Slither Mode')}

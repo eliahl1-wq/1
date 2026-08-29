@@ -193,15 +193,37 @@
   box-shadow: none;
 }
 
-.logo-compact-mark {
-  display: none;
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--text-h);
+  line-height: 1;
 }
 
-.logo-full-mark {
+.brand-lockup__mark {
   display: block;
-  width: 126px;
-  height: 36px;
+  width: 32px;
+  height: 29px;
+  flex: 0 0 32px;
   object-fit: contain;
+}
+
+.brand-lockup__name {
+  display: inline-flex;
+  align-items: baseline;
+  color: #f7f6fb;
+  font-family: var(--display);
+  font-size: 1.18rem;
+  font-weight: 820;
+  letter-spacing: 0.13em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brand-lockup__accent {
+  color: #927cf4;
 }
 
 /* ─── User pill in topbar ─── */
@@ -1758,10 +1780,18 @@
   gap: 10px;
 }
 
-.app-loading-brand img {
-  display: block;
-  width: 176px;
-  height: auto;
+.brand-lockup--loading {
+  gap: 12px;
+}
+
+.brand-lockup--loading .brand-lockup__mark {
+  width: 43px;
+  height: 39px;
+  flex-basis: 43px;
+}
+
+.brand-lockup--loading .brand-lockup__name {
+  font-size: 1.62rem;
 }
 
 .app-loading-name {
@@ -3355,17 +3385,21 @@
     min-width: 0;
   }
 
-  .logo-compact-mark {
-    display: block;
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
-    object-fit: contain;
+  .brand-lockup--responsive .brand-lockup__name {
+    display: none;
   }
 
-  .logo-full-mark,
-  .logo > .logo-dot,
-  .logo > span {
+  .brand-lockup--responsive {
+    gap: 0;
+  }
+
+  .brand-lockup--responsive .brand-lockup__mark {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .logo > .logo-dot {
     display: none;
   }
 
@@ -4528,10 +4562,18 @@
   letter-spacing: -0.045em;
 }
 
-.auth-brand__logo img {
-  display: block;
-  width: 154px;
-  height: auto;
+.brand-lockup--auth {
+  gap: 10px;
+}
+
+.brand-lockup--auth .brand-lockup__mark {
+  width: 36px;
+  height: 33px;
+  flex-basis: 36px;
+}
+
+.brand-lockup--auth .brand-lockup__name {
+  font-size: 1.42rem;
 }
 
 .auth-brand p {

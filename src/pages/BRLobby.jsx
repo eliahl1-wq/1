@@ -8,6 +8,7 @@ import { normalizeBREntryFee, formatUsd } from '../constants/economy';
 import { getOrCreatePresenceId } from '../utils/sitePresence';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
+import BrandLogo from '../components/BrandLogo';
 
 const MIN_PLAYERS = 5;
 const MAX_PLAYERS = 10;
@@ -143,8 +144,7 @@ export default function BRLobby() {
             <nav className="topbar" style={{ width: '100%', zIndex: 2 }}>
                 <div className="topbar-left">
                     <button type="button" className="logo" onClick={() => navigate('/pre-game')} aria-label="Arenifi home">
-                        <img className="logo-full-mark" src="/arenifi-logo.png" alt="Arenifi" />
-                        <img className="logo-compact-mark" src="/arenifi-mark-transparent.png" alt="" aria-hidden="true" />
+                        <BrandLogo responsive />
                     </button>
                 </div>
             </nav>

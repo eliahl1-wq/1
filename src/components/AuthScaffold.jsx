@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import BrandLogo from './BrandLogo';
 
 export function AuthBrand({ subtitle }) {
     return (
         <header className="auth-brand">
             <div className="auth-brand__logo">
-                <img src="/arenifi-logo.png" alt="Arenifi" />
+                <BrandLogo className="brand-lockup--auth" labelled />
             </div>
             <p>{subtitle}</p>
         </header>

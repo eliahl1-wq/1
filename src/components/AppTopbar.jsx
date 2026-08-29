@@ -5,6 +5,7 @@ import { API_URL } from '../utils/apiBase';
 import { hasUnseenActiveTournament, TOURNAMENT_SEEN_EVENT } from '../utils/tournamentNotifications';
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
 import CurrencySwitchButton from './CurrencySwitchButton';
+import BrandLogo from './BrandLogo';
 
 export default function AppTopbar({ children }) {
     const navigate = useNavigate();
@@ -123,8 +124,7 @@ export default function AppTopbar({ children }) {
                     </button>
 
                     <button type="button" className="logo" aria-label="Arenifi home" onClick={() => navigate('/pre-game')}>
-                        <img className="logo-full-mark" src="/arenifi-logo.png" alt="Arenifi" />
-                        <img className="logo-compact-mark" src="/arenifi-mark-transparent.png" alt="" aria-hidden="true" />
+                        <BrandLogo responsive />
                     </button>
 
                     <div className="topbar-nav topbar-nav--desktop">
