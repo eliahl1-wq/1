@@ -11,6 +11,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
     const [launch, setLaunch] = useState(null);
     const [form, setForm] = useState(EMPTY_FORM);
     const [confirmation, setConfirmation] = useState('');
+    const [initialBuySol, setInitialBuySol] = useState('0');
     const [busy, setBusy] = useState('');
     const [notice, setNotice] = useState('');
 
@@ -85,11 +86,13 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
 
             {prepared && metadataReady && !launched && <section className="admin-panel" style={{ padding: 22, borderColor: 'rgba(239,68,68,.55)' }}>
                 <h2 className="admin-section-title">Final irreversible launch</h2>
-                <p style={{ color: 'var(--text-3)' }}>Uses your admin account wallet as creator and fee payer. No automatic initial purchase is made.</p>
+                <p style={{ color: 'var(--text-3)' }}>Uses your admin account wallet as creator and fee payer. You may include an optional initial purchase.</p>
                 {!launch.launchEnabled && <div className="product-alert product-alert--error">Railway: set PUMP_LAUNCH_ENABLED=true only when you are ready.</div>}
                 {!launch.mintMatchesEnvironment && <div className="product-alert product-alert--error">AGAR_TOKEN_MINT must match the prepared mint.</div>}
                 <label style={{ display: 'grid', gap: 6, marginTop: 14 }}><span className="admin-filter-label">Type LAUNCH followed by the complete mint address</span><input className="admin-input" value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder={`LAUNCH ${launch.mintAddress}`} /></label>
-                <button style={{ marginTop: 14 }} className="btn btn-danger" disabled={!!busy || !launch.launchEnabled || !launch.mintMatchesEnvironment || confirmation !== `LAUNCH ${launch.mintAddress}`} onClick={() => run('launch', '/api/admin/token-launch/launch', { confirmation })}>{busy === 'launch' ? 'Launching…' : 'Launch exact mint on Pump.fun'}</button>
+                <label style={{ display: 'grid', gap: 6, marginTop: 14 }}><span className="admin-filter-label">Initial creator buy (SOL, 0 = no buy)</span><input className="admin-input" type="number" min="0" max="100" step="0.001" value={initialBuySol} onChange={e => setInitialBuySol(e.target.value)} /></label>
+                <p style={{ color: 'var(--text-3)', fontSize: 12 }}>The initial buy is included atomically in the launch transaction and paid from the admin account wallet.</p>
+                <button style={{ marginTop: 14 }} className="btn btn-danger" disabled={!!busy || !launch.launchEnabled || !launch.mintMatchesEnvironment || confirmation !== `LAUNCH ${launch.mintAddress}`} onClick={() => run('launch', '/api/admin/token-launch/launch', { confirmation, initialBuySol })}>{busy === 'launch' ? 'Launching…' : 'Launch exact mint on Pump.fun'}</button>
             </section>}
 
             {launched && <section className="admin-panel" style={{ padding: 22 }}><h2 className="admin-section-title">Launched</h2><p>{launch.mintAddress}</p><a href={`https://solscan.io/tx/${launch.signature}`} target="_blank" rel="noreferrer">View transaction</a></section>}
