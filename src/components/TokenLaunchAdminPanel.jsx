@@ -18,6 +18,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
     const [ownerRevenueAddress, setOwnerRevenueAddress] = useState('');
     const [sellAmount, setSellAmount] = useState('');
     const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [withdrawAll, setWithdrawAll] = useState(false);
     const [newCoinConfirmation, setNewCoinConfirmation] = useState('');
 
     const load = async () => {
@@ -75,7 +76,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
         } catch (error) { setNotice(error.message); } finally { setBusy(''); }
     };
 
-    const withdrawSol = async (max = false) => {
+    const withdrawSol = async (max = withdrawAll) => {
         const shownAmount = max ? position?.solAmount : withdrawAmount;
         if (!shownAmount || Number(shownAmount) <= 0) return setNotice('Enter a SOL amount to withdraw.');
         if (!window.confirm(`Withdraw ${max ? 'the maximum available' : shownAmount} SOL from the launch wallet to ${ownerRevenueAddress}? This cannot be reversed.`)) return;
@@ -87,6 +88,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
             });
             setPosition(result.position);
             setWithdrawAmount('');
+            setWithdrawAll(false);
             setNotice(`Withdrew ${Number(result.sentSol).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL to ${result.destination}.`);
         } catch (error) { setNotice(error.message); } finally { setBusy(''); }
     };
@@ -186,11 +188,10 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
                         {ownerRevenueAddress ? <code style={{ overflowWrap: 'anywhere' }}>{ownerRevenueAddress}</code> : <div className="product-alert product-alert--error">AGAR_OWNER_REVENUE_ADDRESS is not configured.</div>}
                         <label style={{ display: 'grid', gap: 6, maxWidth: 520 }}>
                             <span className="admin-filter-label">SOL amount</span>
-                            <div style={{ display: 'flex', gap: 8 }}><input className="admin-input" type="number" min="0" step="0.000000001" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="0 SOL" style={{ flex: 1 }} /><button type="button" className="btn btn-ghost" disabled={!position || !!busy} onClick={() => setWithdrawAmount(String(position.solAmount))}>Max</button></div>
+                            <div style={{ display: 'flex', gap: 8 }}><input className="admin-input" type="number" min="0" step="0.000000001" value={withdrawAmount} onChange={e => { setWithdrawAmount(e.target.value); setWithdrawAll(false); }} placeholder="0 SOL" style={{ flex: 1 }} /><button type="button" className="btn btn-ghost" disabled={!position || !!busy} onClick={() => { setWithdrawAmount(String(position.solAmount)); setWithdrawAll(true); }}>Max</button></div>
                         </label>
                         <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-                            <button className="btn btn-primary" disabled={!!busy || !ownerRevenueAddress || !withdrawAmount || Number(withdrawAmount) <= 0} onClick={() => withdrawSol(false)}>{busy === 'withdraw' ? 'Withdrawing…' : 'Withdraw SOL'}</button>
-                            <button className="btn btn-ghost" disabled={!!busy || !ownerRevenueAddress || !position || Number(position.solAmount) <= 0} onClick={() => withdrawSol(true)}>Withdraw max</button>
+                            <button className="btn btn-primary" disabled={!!busy || !ownerRevenueAddress || !withdrawAmount || Number(withdrawAmount) <= 0} onClick={() => withdrawSol()}>{busy === 'withdraw' ? 'Withdrawing…' : withdrawAll ? 'Withdraw all' : 'Withdraw SOL'}</button>
                         </div>
                     </div>
                 </div> : <div className="product-alert">The initial purchase was made by the admin account wallet. Use the normal token Sell flow for that wallet.</div>}
