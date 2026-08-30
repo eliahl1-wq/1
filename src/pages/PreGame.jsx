@@ -1120,8 +1120,8 @@ export default function PreGame() {
                                 {showCoinLaunchHint && (
                                     <aside className="agar-nav-launch-hint" aria-hidden="true">
                                         <span className="agar-nav-launch-hint__eyebrow"><i /> NOW LIVE</span>
-                                        <strong>{agarConfig.symbol} has launched</strong>
-                                        <p>Buy the new AreniFi coin and use it to unlock exclusive skins.</p>
+                                        <strong>${agarConfig.symbol} has launched</strong>
+                                        <p>Buy AreniFi Credits and use them to unlock exclusive skins.</p>
                                         <span className="agar-nav-launch-hint__action">Click your balance to explore <b>→</b></span>
                                     </aside>
                                 )}
@@ -1271,14 +1271,14 @@ export default function PreGame() {
                                     title={`Explore the new ${agarConfig.symbol} coin`}
                                 >
                                     <AgarLogo size={22} />
-                                    <strong className="mono">{agarConfig.symbol}</strong>
+                                    <strong className="mono">${agarConfig.symbol}</strong>
                                     <span className="agar-nav-balance__new">NEW</span>
                                 </button>
                                 {showCoinLaunchHint && (
                                     <aside className="agar-nav-launch-hint" aria-hidden="true">
                                         <span className="agar-nav-launch-hint__eyebrow"><i /> NOW LIVE</span>
-                                        <strong>{agarConfig.symbol} has launched</strong>
-                                        <p>Explore the new AreniFi coin and follow its live market chart.</p>
+                                        <strong>${agarConfig.symbol} has launched</strong>
+                                        <p>Explore AreniFi Credits and follow the live market chart.</p>
                                         <span className="agar-nav-launch-hint__action">Click to explore <b>→</b></span>
                                     </aside>
                                 )}

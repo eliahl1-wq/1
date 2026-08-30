@@ -34,7 +34,7 @@ function buildGeometry(points, width, height) {
     return { min, max, coordinates, line, area };
 }
 
-export default function AgarPriceChart({ launchReady, authToken = '', symbol = 'ARENA' }) {
+export default function AgarPriceChart({ launchReady, authToken = '', symbol = 'ARC' }) {
     const canvasRef = useRef(null);
     const [size, setSize] = useState({ width: 700, height: 292 });
     const [range, setRange] = useState('24H');

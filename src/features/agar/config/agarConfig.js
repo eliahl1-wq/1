@@ -14,13 +14,13 @@ function readPositiveInteger(value, fallback) {
 
 export function normalizeArenifiTokenName(value) {
     const name = String(value || '').trim();
-    if (!name || /^(stake\s*coin|agar\s*(coin|token)?)$/i.test(name)) return 'AreniFi Coin';
+    if (!name || /^(stake\s*coin|agar\s*(coin|token)?|arenifi\s*coin)$/i.test(name)) return 'AreniFi Credits';
     return name;
 }
 
 export function normalizeArenifiTokenSymbol(value) {
     const symbol = String(value || '').trim().toUpperCase();
-    if (!symbol || symbol === 'AGAR' || symbol === 'STAKECOIN') return 'ARENA';
+    if (!symbol || symbol === 'AGAR' || symbol === 'STAKECOIN' || symbol === 'ARENA') return 'ARC';
     return symbol;
 }
 
@@ -62,7 +62,7 @@ export const AGAR = Object.freeze({
     }),
     messages: Object.freeze({
         comingSoon: 'Coming Soon',
-        notLaunched: 'AreniFi Coin has not launched yet.',
+        notLaunched: 'AreniFi Credits has not launched yet.',
     }),
 });
 

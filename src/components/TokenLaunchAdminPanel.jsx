@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 const EMPTY_FORM = {
-    name: 'AreniFi Coin', symbol: 'ARENA',
+    name: 'AreniFi Credits', symbol: 'ARC',
     description: 'The utility token for the AreniFi gaming ecosystem.',
     imageSourceUrl: 'https://arenifi.fun/arenifi-coin-logo.png',
     website: 'https://arenifi.fun', twitter: '', twitterPost: '', telegram: '',
@@ -113,7 +113,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
         <div style={{ display: 'grid', gap: 20 }}>
             <section className="admin-panel" style={{ padding: 22 }}>
                 <p className="shop-kicker"><span /> EXACT MINT LAUNCH</p>
-                <h2 className="admin-section-title">AreniFi Coin · Pump.fun</h2>
+                <h2 className="admin-section-title">AreniFi Credits · Pump.fun</h2>
                 <p style={{ color: 'var(--text-3)', maxWidth: 760 }}>Generate the final address now. Nothing is created on Solana until you explicitly enable and confirm Launch.</p>
                 {notice && <div className="product-alert" style={{ marginTop: 14 }}>{notice}</div>}
                 {!prepared ? (

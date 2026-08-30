@@ -196,7 +196,7 @@
 .brand-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
+  gap: 11px;
   min-width: 0;
   color: var(--text-h);
   line-height: 1;
@@ -213,17 +213,26 @@
 .brand-lockup__name {
   display: inline-flex;
   align-items: baseline;
-  color: #f7f6fb;
-  font-family: 'Inter', sans-serif;
-  font-size: 1.48rem;
-  font-weight: 500;
-  letter-spacing: -0.035em;
-  line-height: 1;
+  color: #f4f2fa;
+  font-family: var(--display);
+  font-size: 1.16rem;
+  font-weight: 800;
+  letter-spacing: 0.095em;
+  line-height: 0.92;
+  text-transform: uppercase;
   white-space: nowrap;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
 }
 
 .brand-lockup__accent {
-  color: #927cf4;
+  margin-left: 0.015em;
+  color: var(--accent);
+  background: linear-gradient(135deg, #c9bdff 0%, #a88fff 48%, #896cf4 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 18px rgba(151, 124, 244, 0.16);
 }
 
 /* ─── User pill in topbar ─── */

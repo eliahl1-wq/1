@@ -225,7 +225,7 @@ export default function AgarTokenModal({
                         <div>
                             <span className="agar-modal__eyebrow">Arenifi ecosystem</span>
                             <h2 id="agar-modal-title">
-                                {config.symbol}
+                                ${config.symbol}
                                 <span>{config.name}</span>
                             </h2>
                         </div>
@@ -261,9 +261,9 @@ export default function AgarTokenModal({
                     <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}${!authToken ? ' is-guest' : ''}`}>
                         {!authToken && (
                             <div className="agar-modal__login-callout">
-                                <span>ARENA ACCOUNT</span>
+                                <span>${config.symbol} ACCOUNT</span>
                                 <strong>Log in to continue</strong>
-                                <p>The live chart is public. Log in to view your ARENA balance or buy and sell.</p>
+                                <p>{`The live chart is public. Log in to view your $${config.symbol} balance or buy and sell.`}</p>
                                 <button type="button" onClick={() => { onClose(); navigate('/login'); }}>Log in</button>
                             </div>
                         )}
