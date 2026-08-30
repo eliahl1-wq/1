@@ -21,16 +21,15 @@ export default function AgarTokenExperience({ children, config = AGAR }) {
     useEffect(() => {
         let active = true;
         setPublicConfig(null);
-        if (!token) {
-            setPublicConfig(null);
-            return () => { active = false; };
-        }
         const load = async () => {
             try {
-                const response = await fetch(`${API_URL}/api/agar/config`, {
+                let response = token ? await fetch(`${API_URL}/api/agar/config`, {
                     cache: 'no-store',
                     headers: { Authorization: `Bearer ${token}` },
-                });
+                }) : null;
+                // Public fallback is authoritative only when AGAR_ADMIN_ONLY is
+                // disabled on the backend. Admin preview still requires auth.
+                if (!response?.ok) response = await fetch(`${API_URL}/api/agar/public-config`, { cache: 'no-store' });
                 if (!response.ok) return;
                 const payload = await response.json();
                 if (active) setPublicConfig(payload);
