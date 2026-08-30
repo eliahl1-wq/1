@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 const EMPTY_FORM = {
     name: 'AreniFi Credits', symbol: 'ARC',
     description: 'The utility token for the AreniFi gaming ecosystem.',
-    imageSourceUrl: 'https://arenifi.fun/arenifi-coin-logo.png',
+    imageSourceUrl: 'https://arenifi.fun/arenifi-credits-logo.png',
     website: 'https://arenifi.fun', twitter: '', twitterPost: '', telegram: '',
 };
 

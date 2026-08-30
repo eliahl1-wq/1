@@ -19,7 +19,7 @@ export function normalizeArenifiTokenName(value) {
 }
 
 export function normalizeArenifiTokenSymbol(value) {
-    const symbol = String(value || '').trim().toUpperCase();
+    const symbol = String(value || '').trim().toUpperCase().replace(/^\$+/, '');
     if (!symbol || symbol === 'AGAR' || symbol === 'STAKECOIN' || symbol === 'ARENA') return 'ARC';
     return symbol;
 }
@@ -41,7 +41,7 @@ export const AGAR = Object.freeze({
     decimals: readPositiveInteger(env.VITE_AGAR_DECIMALS, 6),
     name: normalizeArenifiTokenName(env.VITE_AGAR_NAME),
     symbol: normalizeArenifiTokenSymbol(env.VITE_AGAR_SYMBOL),
-    logoUrl: env.VITE_AGAR_LOGO_URL?.trim() || '/arenifi-coin-logo.png',
+    logoUrl: '/arenifi-credits-logo.png',
     balancePollIntervalMs: readPositiveInteger(env.VITE_AGAR_BALANCE_POLL_MS, 60_000),
     marketData: Object.freeze({
         provider: env.VITE_AGAR_MARKET_PROVIDER?.trim() || 'dexscreener',
