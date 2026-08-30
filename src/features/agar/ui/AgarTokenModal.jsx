@@ -150,7 +150,10 @@ export default function AgarTokenModal({
             setNotice(`Preparing ${side.toLowerCase()}…`);
             const result = await executeAgarSwap({
                 side,
-                amount: parsedAmount,
+                // Preserve the exact decimal text. Converting tiny SOL amounts
+                // to Number first can serialize them as `1e-9`, which the
+                // backend intentionally rejects as an ambiguous money value.
+                amount: tradeAmount.trim(),
                 accountAddress,
                 authToken,
                 config,
@@ -328,7 +331,7 @@ export default function AgarTokenModal({
                                 <input
                                     type="number"
                                     min="0"
-                                    step="any"
+                                    step={tradeSide === 'BUY' ? '0.000000001' : 'any'}
                                     inputMode="decimal"
                                     placeholder="0.00"
                                     value={tradeAmount}
