@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     AGAR,
     buildAgarExternalUrl,
@@ -72,6 +73,7 @@ export default function AgarTokenModal({
     refreshAccountBalance,
     config = AGAR,
 }) {
+    const navigate = useNavigate();
     const [notice, setNotice] = useState('');
     const [noticeType, setNoticeType] = useState('');
     const [transactionSignature, setTransactionSignature] = useState('');
@@ -256,7 +258,15 @@ export default function AgarTokenModal({
                         </div>
                     </div>
 
-                    <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}`}>
+                    <aside className={`agar-modal__trade-panel${initialAction === 'BUY' ? ' is-buy-intent' : ''}${!authToken ? ' is-guest' : ''}`}>
+                        {!authToken && (
+                            <div className="agar-modal__login-callout">
+                                <span>ARENA ACCOUNT</span>
+                                <strong>Log in to continue</strong>
+                                <p>The live chart is public. Log in to view your ARENA balance or buy and sell.</p>
+                                <button type="button" onClick={() => { onClose(); navigate('/login'); }}>Log in</button>
+                            </div>
+                        )}
                         <div className="agar-modal__account-wallet">
                             <div>
                                 <span>Account wallet</span>

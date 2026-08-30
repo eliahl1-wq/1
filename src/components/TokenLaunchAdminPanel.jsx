@@ -18,6 +18,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
     const [ownerRevenueAddress, setOwnerRevenueAddress] = useState('');
     const [sellAmount, setSellAmount] = useState('');
     const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [newCoinConfirmation, setNewCoinConfirmation] = useState('');
 
     const load = async () => {
         const value = await fetchAdmin('/api/admin/token-launch');
@@ -87,6 +88,21 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
             setPosition(result.position);
             setWithdrawAmount('');
             setNotice(`Withdrew ${Number(result.sentSol).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL to ${result.destination}.`);
+        } catch (error) { setNotice(error.message); } finally { setBusy(''); }
+    };
+
+    const prepareNewCoin = async () => {
+        setBusy('prepare-new'); setNotice('');
+        try {
+            const result = await fetchAdmin('/api/admin/token-launch/prepare-new', {
+                method: 'POST',
+                body: JSON.stringify({ confirmation: newCoinConfirmation }),
+            });
+            setLaunch(result.launch);
+            setPosition(null);
+            setNewCoinConfirmation('');
+            setForm(EMPTY_FORM);
+            setNotice('A new future mint address was generated. The previous launch remains archived securely.');
         } catch (error) { setNotice(error.message); } finally { setBusy(''); }
     };
 
@@ -178,6 +194,12 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
                         </div>
                     </div>
                 </div> : <div className="product-alert">The initial purchase was made by the admin account wallet. Use the normal token Sell flow for that wallet.</div>}
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, display: 'grid', gap: 12 }}>
+                    <div><h2 className="admin-section-title">Create another coin</h2><p style={{ color: 'var(--text-3)', margin: 0 }}>The current launch is archived, not deleted. A dedicated launch wallet must first be emptied so no funds become inaccessible from this panel.</p></div>
+                    <label style={{ display: 'grid', gap: 6 }}><span className="admin-filter-label">Type NEW COIN followed by the current mint address</span><input className="admin-input" value={newCoinConfirmation} onChange={e => setNewCoinConfirmation(e.target.value)} placeholder={`NEW COIN ${launch.mintAddress}`} /></label>
+                    <button className="btn btn-danger" style={{ justifySelf: 'start' }} disabled={!!busy || newCoinConfirmation !== `NEW COIN ${launch.mintAddress}`} onClick={prepareNewCoin}>{busy === 'prepare-new' ? 'Preparing…' : 'Archive launch and create new mint'}</button>
+                    {!!launch.archivedLaunches && <small style={{ color: 'var(--text-3)' }}>{launch.archivedLaunches} previous launch{launch.archivedLaunches === 1 ? '' : 'es'} archived.</small>}
+                </div>
             </section>}
         </div>
     );

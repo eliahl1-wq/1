@@ -162,6 +162,70 @@
     background: transparent;
 }
 
+.agar-nav-balance__new {
+    display: inline-flex;
+    align-items: center;
+    height: 17px;
+    padding: 0 5px;
+    color: #d8cbff;
+    background: rgba(137, 99, 255, .14);
+    border: 1px solid rgba(159, 128, 255, .28);
+    border-radius: var(--r-full);
+    font-size: .48rem;
+    font-weight: 850;
+    letter-spacing: .08em;
+}
+
+.agar-modal__trade-panel.is-guest > :not(.agar-modal__login-callout) {
+    display: none;
+}
+
+.agar-modal__login-callout {
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+}
+
+.agar-modal__login-callout > span {
+    color: #aa8cff;
+    font-size: .58rem;
+    font-weight: 850;
+    letter-spacing: .12em;
+}
+
+.agar-modal__login-callout strong {
+    color: var(--text-h);
+    font-size: 1.05rem;
+}
+
+.agar-modal__login-callout p {
+    margin: 0 0 7px;
+    color: var(--text-3);
+    font-size: .72rem;
+    line-height: 1.5;
+}
+
+.agar-modal__login-callout button {
+    min-height: 36px;
+    padding: 0 18px;
+    color: #fff;
+    background: #8065dc;
+    border: 0;
+    border-radius: var(--r-full);
+    font: inherit;
+    font-size: .72rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.agar-modal__login-callout button:hover {
+    background: #9075eb;
+}
+
 .agar-price-pill .mono {
     color: #b9aaff;
     font-size: 0.68rem;

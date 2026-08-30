@@ -1261,9 +1261,32 @@ export default function PreGame() {
                             </div>
                         </>
                     ) : (
-                        <button className="nav-deposit-btn" onClick={() => navigate('/login')}>
-                            Login
-                        </button>
+                        <>
+                            <div className="agar-nav-balance-anchor">
+                                <button
+                                    type="button"
+                                    className="agar-nav-balance agar-nav-balance--guest"
+                                    onClick={openCoinAndDismissLaunchHint}
+                                    aria-label={`Explore ${agarConfig.symbol}`}
+                                    title={`Explore the new ${agarConfig.symbol} coin`}
+                                >
+                                    <AgarLogo size={22} />
+                                    <strong className="mono">{agarConfig.symbol}</strong>
+                                    <span className="agar-nav-balance__new">NEW</span>
+                                </button>
+                                {showCoinLaunchHint && (
+                                    <aside className="agar-nav-launch-hint" aria-hidden="true">
+                                        <span className="agar-nav-launch-hint__eyebrow"><i /> NOW LIVE</span>
+                                        <strong>{agarConfig.symbol} has launched</strong>
+                                        <p>Explore the new AreniFi coin and follow its live market chart.</p>
+                                        <span className="agar-nav-launch-hint__action">Click to explore <b>→</b></span>
+                                    </aside>
+                                )}
+                            </div>
+                            <button className="nav-deposit-btn" onClick={() => navigate('/login')}>
+                                Login
+                            </button>
+                        </>
                     )}
                 </div>
             </AppTopbar>
