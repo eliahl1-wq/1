@@ -3976,7 +3976,9 @@ body.game-session-active #root {
     letter-spacing: 0.08em;
 }
 
-.surviv-full-map-heading > span { margin-left: auto; color: rgba(241, 236, 213, 0.64); font-size: 0.52rem; }
+.surviv-full-map-heading > span { color: rgba(241, 236, 213, 0.64); font-size: 0.52rem; }
+.surviv-full-map-heading > span:first-of-type { margin-left: auto; }
+.surviv-full-map-heading .surviv-full-map-drop-legend { color: rgba(239, 174, 91, 0.82); }
 .surviv-full-map-heading i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 50%; background: rgba(198, 42, 37, 0.7); }
 .surviv-full-map-heading button {
     width: 25px;

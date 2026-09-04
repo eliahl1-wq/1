@@ -54,7 +54,7 @@ function drawObstacle(ctx, obstacle, toMap, scale) {
     ctx.restore();
 }
 
-export default function SurvivFullMap({ map, activityZones = [], player, zone, onClose }) {
+export default function SurvivFullMap({ map, activityZones = [], airdrops = [], player, zone, onClose }) {
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -118,6 +118,26 @@ export default function SurvivFullMap({ map, activityZones = [], player, zone, o
                 ctx.stroke();
             }
 
+            for (const drop of airdrops) {
+                if (drop?.x == null || drop?.y == null) continue;
+                const p = toMap(drop.x, drop.y);
+                ctx.fillStyle = drop.state === 'incoming' ? '#ef7658' : '#d6a13e';
+                ctx.strokeStyle = 'rgba(44, 28, 20, 0.94)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 240, 202, 0.82)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(p.x - 2.5, p.y - 2.5);
+                ctx.lineTo(p.x + 2.5, p.y + 2.5);
+                ctx.moveTo(p.x + 2.5, p.y - 2.5);
+                ctx.lineTo(p.x - 2.5, p.y + 2.5);
+                ctx.stroke();
+            }
+
             const acceptedLabels = [];
             ctx.font = '700 9px "Space Mono", monospace';
             ctx.textAlign = 'center';
@@ -155,7 +175,7 @@ export default function SurvivFullMap({ map, activityZones = [], player, zone, o
         const observer = new ResizeObserver(draw);
         observer.observe(canvas);
         return () => observer.disconnect();
-    }, [map, activityZones, player?.x, player?.y, zone?.x, zone?.y, zone?.cx, zone?.cy, zone?.radius]);
+    }, [map, activityZones, airdrops, player?.x, player?.y, zone?.x, zone?.y, zone?.cx, zone?.cy, zone?.radius]);
 
     return (
         <div className="surviv-full-map-overlay" role="dialog" aria-modal="true" aria-label="Full match map">
@@ -163,6 +183,7 @@ export default function SurvivFullMap({ map, activityZones = [], player, zone, o
                 <div className="surviv-full-map-heading">
                     <strong>ISLAND MAP</strong>
                     <span><i aria-hidden="true" /> ACTIVITY AREA</span>
+                    <span className="surviv-full-map-drop-legend">◆ SUPPLY DROP</span>
                     <button type="button" onClick={onClose} aria-label="Close map">×</button>
                 </div>
                 <canvas ref={canvasRef} className="surviv-full-map-canvas" />

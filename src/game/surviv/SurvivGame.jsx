@@ -361,10 +361,12 @@ export default function SurvivGame() {
     const [isFullMapOpen, setIsFullMapOpen] = useState(false);
     const [fullMapData, setFullMapData] = useState(null);
     const [mapActivityZones, setMapActivityZones] = useState([]);
+    const [mapAirdrops, setMapAirdrops] = useState([]);
     const [mapZone, setMapZone] = useState(null);
     const [mapPlayer, setMapPlayer] = useState(null);
     const lastMapPlayerUpdateRef = useRef(0);
     const mapActivitySignatureRef = useRef('');
+    const mapAirdropSignatureRef = useRef('');
     const mapZoneSignatureRef = useRef('');
     const mapHeldRef = useRef(false);
     const mapToggledRef = useRef(false);
@@ -883,6 +885,7 @@ export default function SurvivGame() {
                 inventoryOpenRef.current = false;
                 setInventoryDrag(null);
                 setMapActivityZones([]);
+                setMapAirdrops([]);
                 setMapZone(null);
                 setMapPlayer(null);
                 mapHeldRef.current = false;
@@ -949,6 +952,15 @@ export default function SurvivGame() {
                 if (activitySignature !== mapActivitySignatureRef.current) {
                     mapActivitySignatureRef.current = activitySignature;
                     setMapActivityZones(tick.activityZones);
+                }
+            }
+            if (Array.isArray(tick.airdrops)) {
+                const airdropSignature = tick.airdrops
+                    .map(drop => `${drop.id}:${drop.state}:${drop.x}:${drop.y}`)
+                    .join('|');
+                if (airdropSignature !== mapAirdropSignatureRef.current) {
+                    mapAirdropSignatureRef.current = airdropSignature;
+                    setMapAirdrops(tick.airdrops);
                 }
             }
             if (tick.zone) {
@@ -1735,6 +1747,7 @@ export default function SurvivGame() {
                 <SurvivFullMap
                     map={fullMapData}
                     activityZones={mapActivityZones}
+                    airdrops={mapAirdrops}
                     player={mapPlayer}
                     zone={mapZone}
                     onClose={closeFullMap}

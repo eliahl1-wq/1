@@ -1189,7 +1189,7 @@ function traceOrganicPond(ctx, obstacle, padding = 0, scale = 1) {
 const WOOD_INTERIOR_PROP_VARIANTS = new Set([
     'bed', 'coffeeTable', 'nightstand', 'diningTable', 'desk', 'bookshelf',
     'displayShelf', 'salesCounter', 'wardrobe', 'sideboard', 'entryBench',
-    'dresser', 'workbench', 'palletStack', 'weaponRack', 'mapTable',
+    'dresser', 'workbench', 'palletStack', 'weaponRack', 'mapTable', 'planterBox',
 ]);
 const METAL_INTERIOR_PROP_VARIANTS = new Set([
     'bunkBed', 'prisonBench', 'hospitalBed', 'labBench', 'serverRack',
@@ -1377,6 +1377,29 @@ function drawFurnitureTopDown(ctx, o, variant) {
             ctx.beginPath();
             ctx.ellipse(Math.cos(angle) * hw * 0.42, Math.sin(angle) * hh * 0.42 - 2, hw * 0.34, hh * 0.16, angle, 0, Math.PI * 2);
             ctx.fill();
+        }
+    } else if (variant === 'planterBox') {
+        drawBox('#72502f', '#34251a', 4);
+        ctx.fillStyle = '#30271c';
+        roundRect(ctx, -hw + 7, -hh + 7, w - 14, h - 14, 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(207, 168, 103, 0.32)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        const horizontal = w >= h;
+        const rows = horizontal ? 2 : 4;
+        const columns = horizontal ? 4 : 2;
+        for (let row = 0; row < rows; row++) {
+            for (let column = 0; column < columns; column++) {
+                const px = lerp(-hw + 15, hw - 15, columns === 1 ? 0.5 : column / (columns - 1));
+                const py = lerp(-hh + 15, hh - 15, rows === 1 ? 0.5 : row / (rows - 1));
+                const seed = row * 11 + column * 7 + (Number(o.x) || 0) * 0.01;
+                ctx.fillStyle = seed % 2 > 1 ? '#4c7d45' : '#649250';
+                ctx.beginPath();
+                ctx.ellipse(px - 3, py, 7, 3.5, -0.45, 0, Math.PI * 2);
+                ctx.ellipse(px + 3, py, 7, 3.5, 0.45, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
     } else if (variant === 'sofa' || variant === 'armchair') {
         const horizontal = w >= h;
@@ -1809,6 +1832,7 @@ export class SurvivRenderer {
         this.worldEmotes = new Map();
         this.worldChats = new Map();
         this.loot = [];
+        this.airdrops = [];
         this._solidLootContainers = [];
         this._groundWeapons = [];
         this._groundVests = [];
@@ -2171,6 +2195,7 @@ export class SurvivRenderer {
         this.worldEmotes.clear();
         this.worldChats.clear();
         this.loot = [];
+        this.airdrops = [];
         this._solidLootContainers = [];
         this._groundWeapons = [];
         this._groundVests = [];
@@ -2802,6 +2827,7 @@ export class SurvivRenderer {
             }
         }
         this.loot = this._ingestLootSnapshots(tick.loot || [], receivedAt);
+        this.airdrops = Array.isArray(tick.airdrops) ? tick.airdrops : [];
         this.deathMarkers = Array.isArray(tick.deathMarkers) ? tick.deathMarkers : [];
         const activeMarkerIds = new Set();
         for (const marker of this.deathMarkers) {
@@ -4660,6 +4686,8 @@ export class SurvivRenderer {
         // Draw zone (gas circle)
         this.drawZone(ctx);
 
+        if (!currentHouse) this.drawAirdropsWorld(ctx);
+
         this.drawChestBursts(ctx, currentHouse, currentRoom);
         for (const l of this.loot) {
             if (this.shouldDrawIndoorContainerUnderShadow(l, currentHouse, currentRoom)) continue;
@@ -4768,6 +4796,7 @@ export class SurvivRenderer {
             this.balanceCanvas.style.visibility = 'hidden';
         }
         this.drawMobileAimGuide(ctx);
+        this.drawAirdropIndicators(ctx, W, H);
         this.drawVignette(ctx, W, H);
         this.drawDamageIndicators(ctx, W, H);
         this.drawKillAnimation(ctx, W, H);
@@ -6296,6 +6325,7 @@ export class SurvivRenderer {
                 stone: { main: '#807a6c', dark: '#6a6558', highlight: 'rgba(200,195,180,0.12)' },
                 mansion: { main: '#777168', dark: '#55514b', highlight: 'rgba(238,225,202,0.18)' },
                 warehouse: { main: '#48565e', dark: '#374249', highlight: 'rgba(160,185,200,0.10)' },
+                greenhouse: { main: '#76a9a0', dark: '#3d6867', highlight: 'rgba(224,255,244,0.32)' },
                 metal: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
                 ironworks: { main: '#38464d', dark: '#222c31', highlight: 'rgba(176,214,225,0.16)' },
                 brick: { main: '#835447', dark: '#5d3931', highlight: 'rgba(235,194,169,0.13)' },
@@ -6365,6 +6395,22 @@ export class SurvivRenderer {
                         ctx.lineTo(o.w / 2 - 2, by);
                         ctx.stroke();
                     }
+                }
+            } else if (o.variant === 'greenhouse') {
+                ctx.strokeStyle = 'rgba(205, 242, 231, 0.50)';
+                ctx.lineWidth = 1.2;
+                const length = Math.max(o.w, o.h);
+                const step = 42;
+                for (let offset = -length / 2 + step; offset < length / 2; offset += step) {
+                    ctx.beginPath();
+                    if (o.w > o.h) {
+                        ctx.moveTo(offset, -o.h / 2 + 2);
+                        ctx.lineTo(offset, o.h / 2 - 2);
+                    } else {
+                        ctx.moveTo(-o.w / 2 + 2, offset);
+                        ctx.lineTo(o.w / 2 - 2, offset);
+                    }
+                    ctx.stroke();
                 }
             } else if (o.variant === 'metal' || o.variant === 'ironworks') {
                 ctx.strokeStyle = 'rgba(8, 13, 16, 0.34)';
@@ -7582,6 +7628,110 @@ export class SurvivRenderer {
         this.chestBursts.length = liveCount;
     }
 
+    drawAirdropsWorld(ctx) {
+        if (!this.airdrops?.length) return;
+        const now = Date.now();
+        const pulse = (Math.sin((this._frameNow || performance.now()) / 240) + 1) * 0.5;
+        for (const drop of this.airdrops) {
+            if (!this.isPointInView(drop.x, drop.y, 260)) continue;
+            ctx.save();
+            ctx.translate(drop.x, drop.y);
+
+            if (drop.state === 'incoming') {
+                const remaining = Math.max(0, Number(drop.landsAt) - now);
+                const descent = clamp(remaining / 8200, 0, 1);
+                const altitude = 28 + descent * 190;
+
+                ctx.strokeStyle = `rgba(236, 88, 58, ${0.54 + pulse * 0.28})`;
+                ctx.lineWidth = 2.2 / this.zoom;
+                ctx.beginPath();
+                ctx.arc(0, 0, 34 + pulse * 7, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = `rgba(25, 28, 25, ${0.18 + (1 - descent) * 0.16})`;
+                ctx.beginPath();
+                ctx.ellipse(8, 9, 25 - descent * 9, 10 - descent * 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.translate(0, -altitude);
+                ctx.fillStyle = '#d95a42';
+                ctx.strokeStyle = '#542c25';
+                ctx.lineWidth = 2.4;
+                ctx.beginPath();
+                ctx.arc(0, 0, 31, Math.PI, Math.PI * 2);
+                ctx.lineTo(0, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 218, 184, 0.76)';
+                ctx.lineWidth = 1.3;
+                for (const x of [-20, 0, 20]) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, -2);
+                    ctx.lineTo(x * 0.38, 31);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#765438';
+                ctx.strokeStyle = '#2d241d';
+                ctx.lineWidth = 2;
+                roundRect(ctx, -13, 27, 26, 19, 2);
+                ctx.fill();
+                ctx.stroke();
+            } else {
+                // Low-cost, deterministic smoke puffs make a landed crate
+                // readable from behind nearby cover without using blur filters.
+                for (let index = 0; index < 4; index++) {
+                    const phase = ((this._frameNow || performance.now()) / 1250 + index * 0.24) % 1;
+                    const side = index % 2 ? 1 : -1;
+                    ctx.fillStyle = `rgba(192, 68, 48, ${(1 - phase) * 0.24})`;
+                    ctx.beginPath();
+                    ctx.arc(side * (8 + phase * 15), -18 - phase * 46, 7 + phase * 14, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+    }
+
+    drawAirdropIndicators(ctx, W, H) {
+        if (!this.airdrops?.length) return;
+        const z = this.zoom || 1;
+        const edge = 42;
+        for (const drop of this.airdrops) {
+            const rawX = (drop.x - this.camera.x) * z + W / 2;
+            const rawY = (drop.y - this.camera.y) * z + H / 2;
+            if (rawX >= 24 && rawX <= W - 24 && rawY >= 24 && rawY <= H - 24) continue;
+            const x = clamp(rawX, edge, W - edge);
+            const y = clamp(rawY, edge, H - edge);
+            const angle = Math.atan2(rawY - H / 2, rawX - W / 2);
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = drop.state === 'incoming' ? '#ef7658' : '#d9a441';
+            ctx.strokeStyle = 'rgba(20, 18, 16, 0.88)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(11, 0);
+            ctx.lineTo(-7, -8);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-7, 8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.font = '800 9px "Space Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(10, 12, 11, 0.88)';
+            ctx.strokeText('DROP', x, y + 17);
+            ctx.fillStyle = '#f5eee0';
+            ctx.fillText('DROP', x, y + 17);
+            ctx.restore();
+        }
+    }
+
     drawLootContainer(ctx, l) {
         const type = l.type === 'deathCrate' ? 'death_crate' : (l.containerType || 'wood_crate');
         const palettes = {
@@ -7590,6 +7740,7 @@ export class SurvivRenderer {
             ammo_crate: { top: '#65734b', body: '#3f4b32', trim: '#20271b', mark: '#e7d76e' },
             medical_crate: { top: '#e6e3d7', body: '#b9b9ae', trim: '#355847', mark: '#e7f5eb' },
             armory_crate: { top: '#4b5657', body: '#283234', trim: '#12191a', mark: '#e0b84d' },
+            airdrop_crate: { top: '#d45b3f', body: '#70402e', trim: '#251b17', mark: '#f1cf77' },
             death_crate: { top: '#56396e', body: '#30203e', trim: '#17101f', mark: '#d8b4fe' },
         };
         const palette = palettes[type] || palettes.wood_crate;
@@ -7646,6 +7797,16 @@ export class SurvivRenderer {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('ARM', 0, 3);
+        } else if (type === 'airdrop_crate') {
+            ctx.fillStyle = palette.mark;
+            ctx.fillRect(-18, -11, 5, 23);
+            ctx.fillRect(13, -11, 5, 23);
+            ctx.strokeStyle = '#f4dfac';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-9, -4); ctx.lineTo(9, 5);
+            ctx.moveTo(9, -4); ctx.lineTo(-9, 5);
+            ctx.stroke();
         } else {
             ctx.strokeStyle = palette.mark;
             ctx.lineWidth = 2;
@@ -9042,6 +9203,56 @@ export class SurvivRenderer {
         roundRect(ctx, -hw - 7, -hh - 7, o.w + 14, o.h + 14, 9);
         ctx.fill();
         ctx.restore();
+
+        if (variant === 'greenhouse') {
+            const glass = ctx.createLinearGradient(-hw, -hh, hw, hh);
+            glass.addColorStop(0, 'rgba(161, 220, 207, 0.92)');
+            glass.addColorStop(0.46, 'rgba(91, 154, 151, 0.88)');
+            glass.addColorStop(1, 'rgba(58, 111, 114, 0.94)');
+            ctx.fillStyle = glass;
+            roundRect(ctx, -hw - 5, -hh - 5, o.w + 10, o.h + 10, 8);
+            ctx.fill();
+
+            ctx.save();
+            roundRect(ctx, -hw - 2, -hh - 2, o.w + 4, o.h + 4, 6);
+            ctx.clip();
+            const bayW = 74;
+            for (let x = -hw; x <= hw; x += bayW) {
+                ctx.fillStyle = Math.round((x + hw) / bayW) % 2
+                    ? 'rgba(234, 255, 246, 0.075)'
+                    : 'rgba(8, 48, 49, 0.065)';
+                ctx.fillRect(x, -hh, bayW, o.h);
+                ctx.strokeStyle = 'rgba(31, 67, 67, 0.74)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(x, -hh);
+                ctx.lineTo(x, hh);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = 'rgba(225, 253, 243, 0.48)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-hw + 8, 0);
+            ctx.lineTo(hw - 8, 0);
+            ctx.stroke();
+
+            // Dark rows visible through the glazing make the building's
+            // greenhouse purpose readable before the player enters.
+            ctx.fillStyle = 'rgba(46, 55, 35, 0.38)';
+            for (const rowY of [-hh * 0.42, hh * 0.40]) {
+                for (const columnX of [-0.28, -0.09, 0.09, 0.28]) {
+                    roundRect(ctx, columnX * o.w - 29, rowY - 24, 58, 48, 4);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+            ctx.strokeStyle = '#263e3f';
+            ctx.lineWidth = 5;
+            roundRect(ctx, -hw - 5, -hh - 5, o.w + 10, o.h + 10, 8);
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
 
         if (variant === 'ironworks') {
             // --- IRONWORKS: giant saw-tooth steel roof for the indoor PvP landmark ---
