@@ -4,6 +4,7 @@
 
 import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
+import { ingestAirdropTimers, ingestExplosionEvents } from './worldEvents.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
@@ -1833,6 +1834,7 @@ export class SurvivRenderer {
         this.worldChats = new Map();
         this.loot = [];
         this.airdrops = [];
+        this._seenExplosions = new Map();
         this._solidLootContainers = [];
         this._groundWeapons = [];
         this._groundVests = [];
@@ -1953,6 +1955,7 @@ export class SurvivRenderer {
         // Particle system (muzzle flash, bullet impacts, debris)
         this.particles = [];
         this.grenadeExplosions = [];
+        this.scorchMarks = [];
         this.chestBursts = [];
         this._lootBurstStates = new Map();
         // Hit marker (center-screen X when you deal damage)
@@ -2196,6 +2199,7 @@ export class SurvivRenderer {
         this.worldChats.clear();
         this.loot = [];
         this.airdrops = [];
+        this._seenExplosions.clear();
         this._solidLootContainers = [];
         this._groundWeapons = [];
         this._groundVests = [];
@@ -2270,6 +2274,7 @@ export class SurvivRenderer {
         this.lastLootId = null;
         this.particles = [];
         this.grenadeExplosions = [];
+        this.scorchMarks = [];
         this.chestBursts = [];
         this._lootBurstStates = new Map();
         this.hitMarkers = [];
@@ -2827,7 +2832,9 @@ export class SurvivRenderer {
             }
         }
         this.loot = this._ingestLootSnapshots(tick.loot || [], receivedAt);
-        this.airdrops = Array.isArray(tick.airdrops) ? tick.airdrops : [];
+        this.airdrops = ingestAirdropTimers(tick.airdrops, this.airdrops, receivedAt);
+        ingestExplosionEvents(tick.explosions, this._seenExplosions, receivedAt,
+            (x, y, options) => this.spawnGrenadeExplosion(x, y, options));
         this.deathMarkers = Array.isArray(tick.deathMarkers) ? tick.deathMarkers : [];
         const activeMarkerIds = new Set();
         for (const marker of this.deathMarkers) {
@@ -2897,8 +2904,11 @@ export class SurvivRenderer {
         const currentBulletIds = new Set((tick.bullets || []).map(b => b.id));
         for (const b of prevBullets) {
             if (!currentBulletIds.has(b.id)) {
-                if ((b.isGrenade || b.weaponType === 'grenade') && (!b.detonateAt || Date.now() + 140 >= b.detonateAt)) {
-                    this.spawnGrenadeExplosion(b.x, b.y);
+                if (b.isGrenade || b.weaponType === 'grenade') {
+                    // Legacy servers only. Disappearing/culling isn't a detonation.
+                    if (!Array.isArray(tick.explosions) && (!b.detonateAt || Date.now() + 140 >= b.detonateAt)) {
+                        this.spawnGrenadeExplosion(b.x, b.y);
+                    }
                     continue;
                 }
                 // A projectile can disappear because it reached max range. Only
@@ -4666,6 +4676,7 @@ export class SurvivRenderer {
             }
         }
         this.drawDoorRevealPreview(ctx, doorRevealPreview);
+        this.drawScorchMarks(ctx, currentHouse, currentRoom);
         for (const o of visibleWorldObstacles) {
             if (!currentHouse && o.kind === 'entrancePad') continue;
             this.drawObstacle(ctx, o);
@@ -6792,11 +6803,14 @@ export class SurvivRenderer {
             }
         } else if (kind === 'barrel') {
             const r = Math.max(o.w, o.h) / 2;
+            const fuel = o.variant === 'fuel';
+            const water = o.variant === 'water';
             // Metallic body gradient
             const barrelGrad = ctx.createRadialGradient(-r * 0.25, -r * 0.2, 0, 0, 0, r);
-            barrelGrad.addColorStop(0, `hsl(${o.hue ?? 22}, 48%, 48%)`);
-            barrelGrad.addColorStop(0.5, `hsl(${o.hue ?? 22}, 44%, 37%)`);
-            barrelGrad.addColorStop(1, `hsl(${o.hue ?? 22}, 40%, 28%)`);
+            const hue = fuel ? 7 : water ? 198 : (o.hue ?? 22);
+            barrelGrad.addColorStop(0, `hsl(${hue}, 48%, 48%)`);
+            barrelGrad.addColorStop(0.5, `hsl(${hue}, 44%, 37%)`);
+            barrelGrad.addColorStop(1, `hsl(${hue}, 40%, 28%)`);
             ctx.fillStyle = barrelGrad;
             ctx.beginPath();
             ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -6811,9 +6825,6 @@ export class SurvivRenderer {
             ctx.beginPath();
             ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
-            ctx.stroke();
             // Rivet highlights
             ctx.fillStyle = 'rgba(255,255,255,0.22)';
             for (let i = 0; i < 6; i++) {
@@ -6826,6 +6837,26 @@ export class SurvivRenderer {
             ctx.fillStyle = 'rgba(255,255,255,0.10)';
             ctx.beginPath();
             ctx.ellipse(-r * 0.15, -r * 0.2, r * 0.35, r * 0.22, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            // Original top-down hazard stamp, not a floating HUD badge.
+            if (fuel) {
+                ctx.fillStyle = '#e9d79c';
+                ctx.strokeStyle = '#422a24';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(0, -r * 0.48);
+                ctx.lineTo(r * 0.46, r * 0.34);
+                ctx.lineTo(-r * 0.46, r * 0.34);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#5a2c24';
+                ctx.fillRect(-1, -r * 0.14, 2, r * 0.24);
+                ctx.fillRect(-1, r * 0.19, 2, 2);
+            }
+            ctx.fillStyle = '#343e3c';
+            ctx.beginPath();
+            ctx.arc(r * 0.35, -r * 0.4, r * 0.12, 0, Math.PI * 2);
             ctx.fill();
         } else if (kind === 'sandbag') {
             // Stacked sandbags look
@@ -7638,9 +7669,9 @@ export class SurvivRenderer {
             ctx.translate(drop.x, drop.y);
 
             if (drop.state === 'incoming') {
-                const remaining = Math.max(0, Number(drop.landsAt) - now);
+                const remaining = Math.max(0, Number(drop.localLandsAt) - now);
                 const descent = clamp(remaining / 8200, 0, 1);
-                const altitude = 28 + descent * 190;
+                const altitude = descent * 190;
 
                 ctx.strokeStyle = `rgba(236, 88, 58, ${0.54 + pulse * 0.28})`;
                 ctx.lineWidth = 2.2 / this.zoom;
@@ -7652,7 +7683,7 @@ export class SurvivRenderer {
                 ctx.ellipse(8, 9, 25 - descent * 9, 10 - descent * 3, 0, 0, Math.PI * 2);
                 ctx.fill();
 
-                ctx.translate(0, -altitude);
+                ctx.translate(0, -altitude - 56);
                 ctx.fillStyle = '#d95a42';
                 ctx.strokeStyle = '#542c25';
                 ctx.lineWidth = 2.4;
@@ -7667,15 +7698,12 @@ export class SurvivRenderer {
                 for (const x of [-20, 0, 20]) {
                     ctx.beginPath();
                     ctx.moveTo(x, -2);
-                    ctx.lineTo(x * 0.38, 31);
+                    ctx.lineTo(x * 0.7, 45);
                     ctx.stroke();
                 }
-                ctx.fillStyle = '#765438';
-                ctx.strokeStyle = '#2d241d';
-                ctx.lineWidth = 2;
-                roundRect(ctx, -13, 27, 26, 19, 2);
-                ctx.fill();
-                ctx.stroke();
+                ctx.translate(0, 56);
+                this.drawLootContainer(ctx, { id: drop.id, type: 'chest',
+                    containerType: 'airdrop_crate', hp: 108, maxHp: 108 });
             } else {
                 // Low-cost, deterministic smoke puffs make a landed crate
                 // readable from behind nearby cover without using blur filters.
@@ -7700,8 +7728,13 @@ export class SurvivRenderer {
             const rawX = (drop.x - this.camera.x) * z + W / 2;
             const rawY = (drop.y - this.camera.y) * z + H / 2;
             if (rawX >= 24 && rawX <= W - 24 && rawY >= 24 && rawY <= H - 24) continue;
-            const x = clamp(rawX, edge, W - edge);
-            const y = clamp(rawY, edge, H - edge);
+            // Intersect the direction ray with the screen edge, preserving bearing.
+            const dx = rawX - W / 2;
+            const dy = rawY - H / 2;
+            const scale = Math.min((W / 2 - edge) / Math.max(0.001, Math.abs(dx)),
+                (H / 2 - edge) / Math.max(0.001, Math.abs(dy)));
+            const x = W / 2 + dx * scale;
+            const y = H / 2 + dy * scale;
             const angle = Math.atan2(rawY - H / 2, rawX - W / 2);
             ctx.save();
             ctx.translate(x, y);
@@ -10251,22 +10284,31 @@ export class SurvivRenderer {
 
     // ========== NEW VISUAL FEEDBACK METHODS ==========
 
-    spawnGrenadeExplosion(x, y) {
-        const spawnedAt = Date.now();
+    spawnGrenadeExplosion(x, y, { radius = 145, kind = 'grenade', ageMs = 0 } = {}) {
+        const spawnedAt = Date.now() - ageMs;
         const listener = this.me || this.camera;
         const dx = x - (Number(listener?.x) || 0);
         const dy = y - (Number(listener?.y) || 0);
-        playSurvivGrenadeExplosion({
-            distance: Math.hypot(dx, dy),
+        const distance = Math.hypot(dx, dy);
+        if (ageMs < 300) playSurvivGrenadeExplosion({
+            distance,
             pan: clamp(dx / 760, -0.8, 0.8),
         });
-        this.grenadeExplosions.push({ x, y, spawnedAt, duration: 760, radius: 145 });
+        if (!this.reducedMotion && ageMs < 300) {
+            this.cameraShake.intensity = Math.max(this.cameraShake.intensity || 0,
+                4.2 * Math.pow(clamp(1 - distance / 600, 0, 1), 2));
+        }
+        if (!this.isPointInView(x, y, radius + 60)) return;
+        this.scorchMarks.push({ x, y, spawnedAt, duration: 18000, size: kind === 'barrel' ? 36 : 43 });
+        if (this.scorchMarks.length > 24) this.scorchMarks.shift();
+        this.grenadeExplosions.push({ x, y, spawnedAt, duration: 760, radius, kind });
         if (this.grenadeExplosions.length > 8) this.grenadeExplosions.shift();
 
-        for (let i = 0; i < 34; i++) {
+        const particleCount = Math.min(ageMs > 300 ? 0 : 28, Math.max(0, 240 - this.particles.length));
+        for (let i = 0; i < particleCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 70 + Math.random() * 190;
-            const smoke = i >= 22;
+            const smoke = i >= 18;
             const life = smoke ? 0.65 + Math.random() * 0.35 : 0.28 + Math.random() * 0.24;
             this.particles.push({
                 x,
@@ -10280,7 +10322,6 @@ export class SurvivRenderer {
                 type: smoke ? 'grenadeSmoke' : 'grenadeFire',
             });
         }
-        this.cameraShake.intensity = Math.max(this.cameraShake.intensity || 0, 4.2);
     }
 
     drawGrenadeExplosions(ctx, currentHouse = null, currentRoom = null) {
@@ -10308,12 +10349,14 @@ export class SurvivRenderer {
                 ctx.fill();
             }
 
-            ctx.globalAlpha = Math.max(0, 1 - t) * 0.95;
-            ctx.strokeStyle = t < 0.3 ? '#ffd166' : '#e26424';
-            ctx.lineWidth = Math.max(2, 11 * (1 - t));
-            ctx.beginPath();
-            ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
-            ctx.stroke();
+            if (t < 0.26) {
+                ctx.globalAlpha = 0.32 * (1 - t / 0.26);
+                ctx.strokeStyle = '#eee1be';
+                ctx.lineWidth = 1.5 + 3 * (1 - t / 0.26);
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
 
             if (t > 0.12) {
                 ctx.globalAlpha = Math.max(0, 0.42 * (1 - t));
@@ -10322,6 +10365,35 @@ export class SurvivRenderer {
                 ctx.arc(explosion.x, explosion.y, 28 + t * 38, 0, Math.PI * 2);
                 ctx.fill();
             }
+        }
+        ctx.restore();
+    }
+
+    drawScorchMarks(ctx, currentHouse, currentRoom) {
+        const now = this._frameNow || Date.now();
+        compactTimedItems(this.scorchMarks, now);
+        if (!this.scorchMarks.length) return;
+        ctx.save();
+        for (const mark of this.scorchMarks) {
+            if (!this.isPointInView(mark.x, mark.y, 60)
+                || this.isPointHiddenByRooms(mark.x, mark.y, currentHouse, currentRoom)) continue;
+            const fade = Math.min(1, (mark.duration - (now - mark.spawnedAt)) / 3000);
+            ctx.fillStyle = '#1d241e';
+            ctx.globalAlpha = 0.2 * fade;
+            ctx.beginPath();
+            for (let i = 0; i < 18; i++) {
+                const a = i / 18 * Math.PI * 2;
+                const r = mark.size * (0.74 + 0.26 * Math.sin(i * 2.4 + mark.x));
+                const x = mark.x + Math.cos(a) * r;
+                const y = mark.y + Math.sin(a) * r * 0.8;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 0.24 * fade;
+            ctx.beginPath();
+            ctx.ellipse(mark.x, mark.y, mark.size * 0.47, mark.size * 0.35, 0.3, 0, Math.PI * 2);
+            ctx.fill();
         }
         ctx.restore();
     }

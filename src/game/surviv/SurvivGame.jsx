@@ -886,6 +886,7 @@ export default function SurvivGame() {
                 setInventoryDrag(null);
                 setMapActivityZones([]);
                 setMapAirdrops([]);
+                mapAirdropSignatureRef.current = '';
                 setMapZone(null);
                 setMapPlayer(null);
                 mapHeldRef.current = false;
