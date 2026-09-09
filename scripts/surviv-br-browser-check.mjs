@@ -29,6 +29,28 @@ try {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`${origin}/surviv-battle-royale`);
     await page.getByText('Battle Royale · 10–25', { exact: true }).first().waitFor();
+    if (process.env.CHECK_FREE_BR === '1') {
+        const preview = page.locator('img[src="/surviv-battle-royale-gameplay.png"]').first();
+        await preview.waitFor();
+        assert.ok(await preview.evaluate(img => img.complete && img.naturalWidth > 0));
+        await page.locator('label.free-mode-option').click();
+        assert.equal(await page.getByRole('checkbox', { name: 'Free play', exact: true }).isChecked(), true);
+        await page.waitForTimeout(300);
+        assert.equal(await page.evaluate(() => localStorage.getItem('public_free_mode')), 'true');
+        await page.screenshot({ path: resolve(output, 'free-pregame.png') });
+        await page.goto(`${origin}/br-lobby`);
+        await page.getByText('Waiting for 9 more players to start', { exact: true }).waitFor();
+        await page.waitForTimeout(2000);
+        assert.ok(page.url().endsWith('/br-lobby'), 'bots do not start immediately');
+        await page.screenshot({ path: resolve(output, 'free-queue.png') });
+        await page.waitForURL('**/surviv-game', { timeout: 30000 });
+        await page.locator('.sbr-countdown').waitFor({ state: 'detached', timeout: 10000 });
+        await page.locator('.sbr-zone-status').waitFor();
+        assert.equal((await page.locator('.sbr-survivors strong').innerText()).trim(), '10');
+        await page.screenshot({ path: resolve(output, 'free-bots-game.png') });
+        assert.deepEqual(errors, []);
+        console.log('Free BR browser flow passed: gameplay image, free toggle, delayed solo bot fill, actual game.');
+    } else {
     await page.screenshot({ path: resolve(output, 'pregame.png') });
     await page.goto(`${origin}/br-lobby`);
     await page.getByText('Waiting for 9 more players to start', { exact: true }).waitFor();
@@ -114,4 +136,5 @@ try {
     await touch.waitForURL('**/pre-game');
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
     console.log(JSON.stringify({ passed: true, scenarios: ['public selection', '10-player queue', 'locked countdown', 'movement', 'pickup', 'firing', 'safe-zone map', 'rejoin', 'victory payout', 'queue again'], screenshots: output }, null, 2));
+    }
 } finally { await browser.close(); }

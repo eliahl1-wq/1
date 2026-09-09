@@ -154,7 +154,7 @@ export default function SlitherGame() {
 
     const dismissBrIntro = useCallback(() => setBrShowIntro(false), []);
 
-    const matchNickname = location.state?.nickname || user?.username || 'Guest';
+    const matchNickname = hideNames ? ' ' : (location.state?.nickname || user?.username || 'Guest');
     const gameModeStored = localStorage.getItem('current_game_mode') || 'slither';
     const tournamentId = location.state?.tournamentId || localStorage.getItem('current_tournament_id');
     const isTournamentMode = gameModeStored === 'tournament-slither'

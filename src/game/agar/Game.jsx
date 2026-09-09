@@ -389,7 +389,7 @@ export default function Game() {
             hasJoinedGameRef.current = false;
         }
 
-        const matchNickname = location.state?.nickname || user?.username || 'Guest';
+        const matchNickname = hideNames ? ' ' : (location.state?.nickname || user?.username || 'Guest');
         const storedMode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || 'agar';
         const wantsBattleRoyale = storedMode === 'br-agar' || !!location.state?.battleRoyale;
         const sessionMode = wantsBattleRoyale ? 'br-agar' : 'agar';

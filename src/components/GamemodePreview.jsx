@@ -6,6 +6,7 @@ const PREVIEW_IMAGES = {
     'competitive-slither': '/arena slither.png',
     'br-slither': '/battle royale slither.png',
     surviv: '/surviv normal.png',
+    'br-surviv': '/surviv-battle-royale-gameplay.png',
 };
 
 const CANVAS_W = 480;

@@ -540,7 +540,7 @@ export default function PreGame() {
 
     useEffect(() => {
         if (isAlreadyInGame) return;
-        if (publicFreeMode && (!selectedMode || isBattleRoyaleMode)) {
+        if (publicFreeMode && (!selectedMode || (isBattleRoyaleMode && selectedMode !== 'br-surviv'))) {
             setPublicFreeMode(false);
             return;
         }
@@ -885,6 +885,7 @@ export default function PreGame() {
 
     const playTournament = () => {
         if (!canPlayTournament) return;
+        const matchNickname = hideNames ? ' ' : (user?.username || nickname);
         clearAllPendingResults();
         localStorage.setItem('current_game_mode', 'tournament-slither');
         localStorage.setItem('selected_gamemode', 'tournament-slither');
@@ -894,7 +895,7 @@ export default function PreGame() {
             state: {
                 selectedMode: 'tournament-slither',
                 tournamentId: tournament.id,
-                nickname: user?.username || nickname,
+                nickname: matchNickname,
             },
         });
     };
@@ -922,7 +923,8 @@ export default function PreGame() {
 
         setIsMatchmaking(true);
         refreshUser();
-        localStorage.setItem('match_nickname', nickname);
+        const matchNickname = hideNames ? ' ' : nickname;
+        if (!hideNames) localStorage.setItem('match_nickname', nickname);
         localStorage.setItem('selected_entry_fee', String(entryFeeForSession));
         setPublicFreeModeEnabled(freePlay);
         localStorage.removeItem('admin_free_surviv_entry');
@@ -948,13 +950,13 @@ export default function PreGame() {
             if (isAlreadyInGame && canRejoinThisMode) {
                 const path = variant === 'surviv' ? '/surviv-game' : variant === 'slither' ? '/slither-game' : '/game';
                 setTimeout(() => navigate(path, {
-                    state: { nickname, battleRoyale: true },
+                    state: { nickname: matchNickname, battleRoyale: true },
                 }), 400);
                 return;
             }
             setTimeout(() => navigate('/br-lobby', {
                 state: {
-                    nickname,
+                    nickname: matchNickname,
                     variant,
                     entryFeeUsd: entryFeeForSession,
                 },
@@ -970,7 +972,7 @@ export default function PreGame() {
         const baseMode = activeMode.replace(/^br-/, '');
         setTimeout(() => navigate(targetPath, {
             state: {
-                nickname,
+                nickname: matchNickname,
                 selectedMode: baseMode,
                 useFreeTicket: !isAlreadyInGame && isNormal5 && hasFreeTicket,
                 publicFreeMode: !isAlreadyInGame && freePlay,
@@ -1552,7 +1554,7 @@ export default function PreGame() {
                             )}
 
                             <div className="game-card main-card" ref={mainCardRef}>
-                                <div className="pregame-nickname-block">
+                                {!hideNames && <div className="pregame-nickname-block">
                                     <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
                                         Nickname
                                     </label>
@@ -1564,7 +1566,7 @@ export default function PreGame() {
                                         placeholder="Enter name…"
                                         className="nickname-input"
                                     />
-                                </div>
+                                </div>}
 
                                 <div className="divider" style={{ marginBottom: '14px' }} />
 
@@ -1638,17 +1640,19 @@ export default function PreGame() {
                             <div className="game-card main-card pregame-play-card">
                                 {/* Nickname field */}
                                 <div style={{ marginBottom: '18px' }}>
-                                    <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
-                                        Nickname
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={nickname}
-                                        onChange={e => setNickname(e.target.value)}
-                                        maxLength={15}
-                                        placeholder="Enter name…"
-                                        className="nickname-input"
-                                    />
+                                    {!hideNames && <>
+                                        <label className="label" style={{ display: 'block', marginBottom: '5px' }}>
+                                            Nickname
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={nickname}
+                                            onChange={e => setNickname(e.target.value)}
+                                            maxLength={15}
+                                            placeholder="Enter name…"
+                                            className="nickname-input"
+                                        />
+                                    </>}
                                     <label
                                         htmlFor="hide-names-toggle"
                                         style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '6px', cursor: 'pointer', userSelect: 'none' }}
@@ -1670,7 +1674,7 @@ export default function PreGame() {
 
                                 {/* Stake selection and simulated free room toggle */}
                                 <div className="lobby-stake-selection">
-                                    {!isBattleRoyaleMode && (
+                                    {(!isBattleRoyaleMode || selectedMode === 'br-surviv') && (
                                         <label className={`free-mode-option${freePlay ? ' free-mode-option--active' : ''}`}>
                                             <input
                                                 type="checkbox"

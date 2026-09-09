@@ -409,7 +409,7 @@ export default function SurvivGame() {
     const spectateTargetsRef = useRef([]);
     const hideNames = localStorage.getItem('hide_player_names') === 'true';
 
-    const matchNickname = location.state?.nickname || user?.username || 'Guest';
+    const matchNickname = hideNames ? ' ' : (location.state?.nickname || user?.username || 'Guest');
     const entryFeeUsd = (isBR ? normalizeBREntryFee : normalizeSurvivEntryFee)(localStorage.getItem('selected_entry_fee'));
 
     useEffect(() => () => {

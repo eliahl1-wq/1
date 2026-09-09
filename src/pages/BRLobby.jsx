@@ -10,6 +10,7 @@ import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
 import BrandLogo from '../components/BrandLogo';
 import '../game/surviv/survivBattleRoyale.css';
+import { isPublicFreeModeEnabled } from '../utils/freeMode';
 
 const MIN_PLAYERS = 5;
 const MAX_PLAYERS = 10;
@@ -18,12 +19,12 @@ export default function BRLobby() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, token } = useAuth();
-    const freePlay = !!user?.freePlay;
     const socketRef = useRef(null);
     const joinedRef = useRef(false);
     const matchStartedRef = useRef(false);
 
     const variant = location.state?.variant || localStorage.getItem('selected_gamemode')?.replace('br-', '') || 'agar';
+    const freePlay = !!user?.freePlay || (variant === 'surviv' && isPublicFreeModeEnabled());
     const entryFeeUsd = normalizeBREntryFee(
         location.state?.entryFeeUsd ?? localStorage.getItem('selected_entry_fee')
     );
@@ -35,7 +36,8 @@ export default function BRLobby() {
     const [joining, setJoining] = useState(false);
     const [tick, setTick] = useState(0);
 
-    const matchNickname = location.state?.nickname || user?.username || 'Guest';
+    const hideNames = localStorage.getItem('hide_player_names') === 'true';
+    const matchNickname = hideNames ? ' ' : (location.state?.nickname || user?.username || 'Guest');
 
     useEffect(() => {
         const id = setInterval(() => setTick(t => t + 1), 1000);
@@ -70,6 +72,7 @@ export default function BRLobby() {
                 token,
                 username: matchNickname,
                 entryFeeUsd,
+                publicFreeMode: variant === 'surviv' && freePlay,
                 skinColor: preferredSkin,
                 skinId: getPremiumSkinId(preferredSkin)
             });
@@ -125,7 +128,7 @@ export default function BRLobby() {
             socket.disconnect();
             joinedRef.current = false;
         };
-    }, [token, variant, entryFeeUsd, navigate, matchNickname, brMode]);
+    }, [token, variant, entryFeeUsd, navigate, matchNickname, brMode, freePlay]);
 
     const leaveQueue = () => {
         if (!matchStartedRef.current) {
@@ -199,6 +202,7 @@ export default function BRLobby() {
                                     borderRadius: '12px', color: '#FFD080', fontSize: '0.78rem', fontWeight: 600,
                                 }}>
                                     TEST MODE — Free play, no real SOL used
+                                    {variant === 'surviv' && <div style={{ marginTop: 6 }}>Empty slots fill with bots after 15 seconds without a new player joining. Solo: you + 9 bots.</div>}
                                 </div>
                             )}
 
