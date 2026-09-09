@@ -1,4 +1,5 @@
 import { getSlitherSpecialSkin } from './slitherSpecialSkins.js';
+import { getSignatureSkin } from './signatureSkins.js';
 export const FLAG_SKINS = Object.freeze([
     { code: 'se', name: 'Sweden', emoji: '🇸🇪', colors: ['#006aa7', '#fecc02'] },
     { code: 'us', name: 'United States', emoji: '🇺🇸', colors: ['#b22234', '#ffffff', '#3c3b6e'] },
@@ -62,6 +63,8 @@ export function getFlagBorderColor(code) {
 }
 
 export function getPremiumSkinId(value) {
+    const signature = getSignatureSkin(value);
+    if (signature) return signature.id;
     const specialSkin = getSlitherSpecialSkin(value);
     if (specialSkin) return specialSkin.id;
     if (value === 'random') return 'rainbow';

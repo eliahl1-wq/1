@@ -40,6 +40,15 @@ export const GAMEMODE_CATALOG = [
         longDesc: '$5 entry — start with $2 in-game. Loot weapons, armor, and cash across the map. Shrinking zone, last one standing wins the tension. Cash out anytime.',
     },
     {
+        id: 'br-surviv',
+        tab: 'surviv',
+        title: 'Surviv Battle Royale',
+        shortTitle: 'Surviv BR',
+        badge: 'new',
+        desc: '10–25 players. One life. Last survivor wins.',
+        longDesc: 'Loot, fight, and outrun the red zone. Starts with 10 players, up to 25. $5 or $10 entry; the last survivor wins 92% of the pot. No respawns or cash-out.',
+    },
+    {
         id: 'br-agar',
         tab: 'agar',
         title: 'Agar Battle Royale',

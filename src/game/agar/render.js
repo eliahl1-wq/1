@@ -2,6 +2,7 @@ import global from './global.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS, getRemoteCashoutRingProgress } from '../cashoutRing.js';
 import { drawBalanceBadge as drawBalanceBadgePill } from '../balanceBadge.js';
 import { drawFlag, getFlagBorderColor, parseFlagSkin } from '../../constants/flagSkins.js';
+import { drawPrismSkin } from '../../constants/signatureSkins.js';
 
 const FULL_ANGLE = 2 * Math.PI;
 
@@ -189,10 +190,11 @@ function drawOrganicCell(cell, borders, graph, allCells = [], highQuality = fals
     }
     graph.closePath();
     const flagCode = parseFlagSkin(cell.color);
-    if (flagCode) {
+    if (flagCode || cell.color === 'prism') {
         graph.save();
         graph.clip();
-        drawFlag(graph, flagCode, cell.x, cell.y, cell.radius * 2.15, cell.radius * 2.15);
+        if (cell.color === 'prism') drawPrismSkin(graph, cell.x, cell.y, cell.radius);
+        else drawFlag(graph, flagCode, cell.x, cell.y, cell.radius * 2.15, cell.radius * 2.15);
         graph.restore();
         graph.beginPath();
         graph.moveTo(points[0].x, points[0].y);
@@ -227,7 +229,10 @@ function drawPlayerCashoutRing(graph, cell) {
 const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQuality = false, hideNames = false) => {
     for (let cell of cells) {
         const flagCode = parseFlagSkin(cell.color);
-        if (flagCode) {
+        if (cell.color === 'prism') {
+            graph.fillStyle = '#252052';
+            graph.strokeStyle = '#7d83c3';
+        } else if (flagCode) {
             graph.fillStyle = '#ffffff';
             graph.strokeStyle = getFlagBorderColor(flagCode);
         } else if (cell.color === 'rainbow') {

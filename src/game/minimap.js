@@ -174,6 +174,16 @@ export function drawGameMinimap(ctx, opts) {
     }
 
     // food pellets
+    if (zone?.targetRadius > 0 && zone.targetRadius < zone.radius) {
+        const target = toMini(zone.targetX, zone.targetY);
+        ctx.beginPath();
+        ctx.arc(target.x, target.y, zone.targetRadius * scale, 0, Math.PI * 2);
+        ctx.strokeStyle = '#fffde8';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+    }
+
+    // food pellets
     const foodR = isMobile ? 0.9 : 1.1;
     let foodDrawn = 0;
     const maxFoodDots = isMobile ? 50 : 80;

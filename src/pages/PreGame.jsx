@@ -24,8 +24,9 @@ import { API_URL } from '../utils/apiBase';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
+import { SIGNATURE_SKINS, getSignatureSkin, drawPrismSkin } from '../constants/signatureSkins';
 import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
-import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
+import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanEyes, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
@@ -35,6 +36,9 @@ import { formatGameSolAmount, formatWalletBalanceAmount } from '../utils/display
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.gg/m5mWMu8aF';
+// Keep the live cashout/death feed implemented, but hidden until it is ready
+// to be exposed again in the pregame leaderboard card.
+const SHOW_LIVE_LEADERBOARD_TAB = false;
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (
@@ -117,11 +121,14 @@ function resolvePreGameMode(pathname, locationStateMode, isAdmin = false) {
         return 'slither';
     }
     if (pathname === '/surviv') return 'surviv';
+    if (pathname === '/surviv-battle-royale') return 'br-surviv';
     const raw = locationStateMode || stored || 'agar';
     return normalizeGamemodeForLobby(raw, isAdmin);
 }
 
 const getChromaName = (color) => {
+    const special = getSignatureSkin(color) || getSlitherSpecialSkin(color);
+    if (special) return special.name;
     const flagCode = parseFlagSkin(color);
     if (flagCode) {
         const flag = getFlagSkin(flagCode);
@@ -339,6 +346,10 @@ export default function PreGame() {
 
     useEffect(() => {
         if (!skinInventoryLoaded) return;
+        for (const [mode, value, setter] of [['agar', selectedSkinAgar, setSelectedSkinAgar], ['surviv', selectedSkinSurviv, setSelectedSkinSurviv], ['slither', selectedSkin, setSelectedSkin]]) {
+            const signature = getSignatureSkin(value);
+            if (signature && (signature.gameMode !== mode || (!user?.isAdmin && !ownedSkinProducts.has(signature.productId)))) setter('#c080ff');
+        }
         if (selectedSkin === 'random' && !user?.isAdmin && !ownedSkinProducts.has('slither:rainbow')) {
             setSelectedSkin('#c080ff');
         }
@@ -355,7 +366,7 @@ export default function PreGame() {
         if (parseFlagSkin(selectedSkinAgar) && !user?.isAdmin && !ownedSkinProducts.has('flags:bundle')) {
             setSelectedSkinAgar('#c080ff');
         }
-    }, [ownedSkinProducts, selectedSkin, selectedSkinAgar, skinInventoryLoaded, user?.isAdmin]);
+    }, [ownedSkinProducts, selectedSkin, selectedSkinAgar, selectedSkinSurviv, skinInventoryLoaded, user?.isAdmin]);
 
     useEffect(() => {
         localStorage.setItem('selected_skin', selectedSkin);
@@ -472,7 +483,7 @@ export default function PreGame() {
 
     const entryFeeForSession = isAlreadyInGame && activeEntryFee != null ? activeEntryFee : selectedEntryFee;
     const isBattleRoyaleMode = isBRGamemode(selectedMode)
-        && (brAvailable || (isAlreadyInGame && isBRGamemode(currentGameMode)));
+        && (isBattleRoyaleAvailable(!!user?.isAdmin, selectedMode) || (isAlreadyInGame && isBRGamemode(currentGameMode)));
     const isCompetitiveSlitherMode = selectedMode === 'competitive-slither';
     const isSurvivMode = selectedMode === 'surviv';
     const fixedFreeModeEntryFee = getFreeModeEntryFee(selectedMode);
@@ -494,7 +505,7 @@ export default function PreGame() {
     const isSlitherFamily = selectedMode === 'slither'
         || selectedMode === 'competitive-slither'
         || (isBattleRoyaleMode && brVariant === 'slither');
-    const isSurvivFamily = isSurvivMode;
+    const isSurvivFamily = isSurvivMode || selectedMode === 'br-surviv';
     const isAgarFamily = selectedMode === 'agar'
         || selectedMode === 'competitive-agar'
         || (isBattleRoyaleMode && brVariant === 'agar');
@@ -723,6 +734,7 @@ export default function PreGame() {
 
     // Live leaderboard events (cashouts/deaths)
     useEffect(() => {
+        if (!SHOW_LIVE_LEADERBOARD_TAB) return undefined;
         let alive = true;
         const fetchLiveLeaderboard = async () => {
             try {
@@ -930,11 +942,11 @@ export default function PreGame() {
         localStorage.setItem('current_game_mode', activeMode);
         localStorage.setItem('selected_gamemode', activeMode);
 
-        const isBR = isBRGamemode(activeMode) && brAvailable;
+        const isBR = isBRGamemode(activeMode) && isBattleRoyaleAvailable(!!user?.isAdmin, activeMode);
         if (isBR) {
             const variant = activeMode.replace(/^br-/, '');
             if (isAlreadyInGame && canRejoinThisMode) {
-                const path = variant === 'slither' ? '/slither-game' : '/game';
+                const path = variant === 'surviv' ? '/surviv-game' : variant === 'slither' ? '/slither-game' : '/game';
                 setTimeout(() => navigate(path, {
                     state: { nickname, battleRoyale: true },
                 }), 400);
@@ -968,7 +980,7 @@ export default function PreGame() {
 
     const normalizeMode = (mode) => (mode || '').replace(/^br-/, '');
     const canRejoinThisMode = isAlreadyInGame && currentGameMode
-        && normalizeMode(selectedMode) === normalizeMode(currentGameMode)
+        && selectedMode === currentGameMode
         && (activeEntryFee == null || activeEntryFee === entryFeeForSession);
 
     const handleWithdraw = async () => {
@@ -1505,7 +1517,7 @@ export default function PreGame() {
                                     ? formatUsd(entryFeeForSession)
                                     : `From ${formatUsd(Math.min(...tierOptions))}`}
                             onSelectMode={(modeId) => {
-                                if (isBRGamemode(modeId) && !brAvailable) return;
+                                if (isBRGamemode(modeId) && !isBattleRoyaleAvailable(!!user?.isAdmin, modeId)) return;
                                 const nextMode = normalizeGamemodeForLobby(modeId, !!user?.isAdmin);
                                 modeSelectionMadeRef.current = true;
                                 localStorage.setItem('selected_gamemode', nextMode);
@@ -1746,7 +1758,14 @@ export default function PreGame() {
                                     </div>
                                     <div className={`hiw-dropdown${showHowItWorks ? ' hiw-dropdown--open' : ''}`}>
                                         <div className="hiw-content">
-                                            {isSurvivMode ? (
+                                            {isBattleRoyaleMode ? (
+                                                <>
+                                                    <div className="stat-row"><span>Match size</span><span>{brVariant === 'surviv' ? '10–25 players' : '5–10 players'}</span></div>
+                                                    <div className="stat-row"><span>Winner's share</span><span>92% of the pot</span></div>
+                                                    <div className="stat-row"><span>House fee</span><span>8%</span></div>
+                                                    <p>One life. No late joins. No cash-out. {brVariant === 'surviv' ? 'Loot weapons and supplies, escape the red zone, and be the last survivor.' : 'Be the last player standing.'}</p>
+                                                </>
+                                            ) : isSurvivMode ? (
                                                 <>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Entry fee</span>
@@ -1964,7 +1983,10 @@ export default function PreGame() {
                         <div className="right-panel-stack">
                             <div className="leaderboard-card" style={{ height: leaderboardHeight }}>
                                 <div className="tab-bar leaderboard-tab-bar">
-                                    {[{ id: 'alltime', label: 'Leaderboard' }, { id: 'live', label: 'LIVE', dot: true }].map(tab => (
+                                    {[
+                                        { id: 'alltime', label: 'Leaderboard' },
+                                        ...(SHOW_LIVE_LEADERBOARD_TAB ? [{ id: 'live', label: 'LIVE', dot: true }] : []),
+                                    ].map(tab => (
                                         <button
                                             key={tab.id}
                                             onClick={() => setLeaderboardTab(tab.id)}
@@ -2159,6 +2181,8 @@ export default function PreGame() {
             {/* Customizer Modal Overlay */}
             {showCustomizer && (() => {
                 const getChromaName = (color) => {
+                    const signature = getSignatureSkin(color);
+                    if (signature) return signature.name;
                     const flagCode = parseFlagSkin(color);
                     if (flagCode) {
                         const flag = getFlagSkin(flagCode);
@@ -2191,14 +2215,15 @@ export default function PreGame() {
                 const isRainbow = currentChroma === 'random' && customizerTab !== 'surviv';
                 const activeFlagCode = parseFlagSkin(currentChroma);
                 const isFlag = !!activeFlagCode && customizerTab !== 'surviv';
-                const specialSkin = customizerTab === 'slither' ? getSlitherSpecialSkin(currentChroma) : null;
+                const specialSkin = (customizerTab === 'slither' ? getSlitherSpecialSkin(currentChroma) : null) || getSignatureSkin(currentChroma);
                 const isSpecialSkin = !!specialSkin;
                 const isRandomSelection = currentChroma === 'random' || currentChroma === 'random_color';
                 const displayChroma = specialSkin ? specialSkin.colors[4] : (isRandomSelection || isFlag) ? '#80d0d0' : currentChroma;
                 const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
                 const ownsRainbow = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has(rainbowProductId));
                 const ownsFlagPack = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has('flags:bundle'));
-                const ownedSpecialSkinIds = new Set(SLITHER_SPECIAL_SKINS.filter((skin) => user?.isAdmin || ownedSkinProducts.has(skin.productId)).map((skin) => skin.id));
+                const availableSpecialSkins = customizerTab === 'slither' ? SLITHER_SPECIAL_SKINS : SIGNATURE_SKINS.filter(skin => skin.gameMode === customizerTab);
+                const ownedSpecialSkinIds = new Set(availableSpecialSkins.filter((skin) => user?.isAdmin || ownedSkinProducts.has(skin.productId)).map((skin) => skin.id));
 
                 const cycleChroma = (direction) => {
                     if (isFlag) {
@@ -2230,7 +2255,7 @@ export default function PreGame() {
                 };
 
                 const setSkinStyle = (style) => {
-                    const requestedSpecialSkin = getSlitherSpecialSkin(style);
+                    const requestedSpecialSkin = getSlitherSpecialSkin(style) || getSignatureSkin(style);
                     if ((style === 'rainbow' && !ownsRainbow) || (style === 'flags' && !ownsFlagPack) || (requestedSpecialSkin && !ownedSpecialSkinIds.has(requestedSpecialSkin.id))) {
                         setShowCustomizer(false);
                         navigate('/shop');
@@ -2373,7 +2398,7 @@ export default function PreGame() {
                                             </button>
                                         )}
 
-                                        {customizerTab === 'slither' && SLITHER_SPECIAL_SKINS.filter((skin) => ownedSpecialSkinIds.has(skin.id)).map((skin) => (
+                                        {availableSpecialSkins.map((skin) => (
                                             <button
                                                 key={skin.id}
                                                 type="button"
@@ -2381,9 +2406,9 @@ export default function PreGame() {
                                                 onClick={() => setSkinStyle(skin.id)}
                                             >
                                                 <div className={`skin-card-icon slither-special-icon slither-special-icon--${skin.id}`} style={{ backgroundImage: skin.badgeGradient }}>
-                                                    <span>{skin.id === 'aurora' ? '✦' : '☾'}</span>
+                                                    <span>{skin.id === 'prism' ? '◇' : skin.id === 'warden' ? '❯' : skin.id === 'leviathan' ? '≋' : skin.id === 'aurora' ? '✦' : '☾'}</span>
                                                 </div>
-                                                <span>{skin.name}</span>
+                                                <span>{skin.name}{!ownedSpecialSkinIds.has(skin.id) ? ' · Shop' : ''}</span>
                                             </button>
                                         ))}
                                         {customizerTab !== 'surviv' && ownsFlagPack && (
@@ -2458,7 +2483,7 @@ function randomPreviewColor(timeMs, brightness = 1) {
 const RANDOM_PREVIEW_SNAKE_COLORS = Object.freeze(Array.from({ length: 48 }, (_, index) => (
     randomPreviewColor((index / 48) * RANDOM_PREVIEW_DURATION_MS)
 )));
-function SurvivSkinPreview({ color, isLarge, nickname }) {
+export function SurvivSkinPreview({ color, isLarge, nickname, hideName = false }) {
     const canvasRef = useRef(null);
     const isRandom = color === 'random' || color === 'random_color';
     const displayColor = isRandom ? '#80d0d0' : color;
@@ -2497,7 +2522,7 @@ function SurvivSkinPreview({ color, isLarge, nickname }) {
                 angle: -0.18,
                 color: isRandom ? randomPreviewColor(time) : displayColor,
                 weapon: 'm416',
-                scale: isLarge ? 2.75 : 1.65,
+                scale: Math.min(isLarge ? 2.75 : 1.65, bounds.width / 140, bounds.height / 70),
             });
 
             if (isRandom) animationFrameId = requestAnimationFrame(paint);
@@ -2520,7 +2545,7 @@ function SurvivSkinPreview({ color, isLarge, nickname }) {
             style={{ '--surviv-skin-color': displayColor }}
         >
             <canvas ref={canvasRef} className="surviv-preview-canvas" aria-label="Surviv skin preview" />
-            {isLarge && <div className="surviv-preview-name">{displayName}</div>}
+            {isLarge && !hideName && <div className="surviv-preview-name">{displayName}</div>}
         </div>
     );
 }
@@ -2654,7 +2679,9 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
             const eyeR = Math.max(2.5, radius * 0.43);
             const pupilR = eyeR * 0.48;
 
-            for (const side of [-1, 1]) {
+            if (currentSpecialSkin?.id === 'leviathan') {
+                drawLeviathanEyes(ctx, pointX[0], pointY[0], radius, headAngle);
+            } else for (const side of [-1, 1]) {
                 const ex = pointX[0] + fwdX * eyeFwd + perpX * eyeSide * side;
                 const ey = pointY[0] + fwdY * eyeFwd + perpY * eyeSide * side;
                 ctx.beginPath();
@@ -2718,7 +2745,10 @@ export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) 
 
             const flagCode = parseFlagSkin(currentColor);
             const currentSpecialSkin = getSlitherSpecialSkin(currentColor);
-            if (flagCode) {
+            if (currentColor === 'prism') {
+                fillStyle = '#252052';
+                strokeStyle = '#7d83c3';
+            } else if (flagCode) {
                 fillStyle = '#ffffff';
                 strokeStyle = getFlagBorderColor(flagCode);
             } else if (currentColor === 'random') {
@@ -2811,9 +2841,10 @@ export function AgarBlobPreview({ color, isLarge, nickname, hideName = false }) 
                 ctx.lineWidth = isLarge ? 6 : 3;
                 ctx.shadowBlur = 0; // No drop shadow glow, identical to game
 
-                if (flagCode) {
+                if (flagCode || currentColor === 'prism') {
                     ctx.clip();
-                    drawFlag(ctx, flagCode, cx, cy, radius * 2.15, radius * 2.15);
+                    if (currentColor === 'prism') drawPrismSkin(ctx, cx, cy, radius);
+                    else drawFlag(ctx, flagCode, cx, cy, radius * 2.15, radius * 2.15);
                     ctx.restore();
                     ctx.save();
                     ctx.beginPath();

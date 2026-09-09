@@ -12,7 +12,7 @@ import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSna
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
-import { drawSlitherSpecialBody, drawSlitherSpecialDetails, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
+import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanEyes, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
 import { slitherCanvasDpr, slitherQualityForFrameTime } from './slitherPerformance.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -2092,7 +2092,7 @@ export class SlitherRenderer {
 
         if (specialSkin) {
             drawSlitherSpecialBody(ctx, specialSkin.id, bumps, bodyRadius, this._frame * 0.055, boosting);
-            drawSlitherSpecialDetails(ctx, specialSkin.id, bumps, bodyRadius, this._frame * 0.055);
+            drawSlitherSpecialDetails(ctx, specialSkin.id, bumps, bodyRadius, this._frame * 0.055, boosting);
         }
 
         if (boosting) {
@@ -2117,7 +2117,9 @@ export class SlitherRenderer {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
 
-        for (const side of [-1, 1]) {
+        if (specialSkin?.id === 'leviathan') {
+            drawLeviathanEyes(ctx, hx, hy, headEyeRadius, angle);
+        } else for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;
 

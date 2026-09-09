@@ -1,4 +1,14 @@
+import { skinAnimationTime } from './signatureSkins.js';
+
 export const SLITHER_SPECIAL_SKINS = Object.freeze([
+    Object.freeze({
+        id: 'leviathan', value: 'leviathan', productId: 'slither:leviathan',
+        name: 'Leviathan', usdPrice: 2, baseColor: '#123b43',
+        description: 'An abyssal jade dragon with overlapping scales, a gilded crown, amber slit eyes and pearl gills. A turquoise pulse runs down its crest while boosting.',
+        bodyGradient: ['#071e2b', '#15404e', '#24665e', '#123946'],
+        colors: ['#102e3c', '#216c75', '#49a69a', '#f0cc7b', '#64b9aa'],
+        badgeGradient: 'linear-gradient(135deg, #102e3c, #49a69a 60%, #f0cc7b)',
+    }),
     Object.freeze({
         id: 'aurora',
         value: 'aurora',
@@ -124,7 +134,11 @@ export function drawSlitherSpecialBody(ctx, skinId, points, radius, phase = 0, b
     const metrics = measureBodyPath(points);
 
     ctx.save();
-    if (skin.id === 'aurora') {
+    if (skin.id === 'leviathan') {
+        strokeBodyGradient(ctx, points, metrics, skin.bodyGradient, radius * 1.9, 1);
+        strokeBodyGradient(ctx, points, metrics, ['#1a7180', '#48bbaa', '#235162'], radius * 1.22, 0.72);
+        strokeBodyGradient(ctx, points, metrics, ['#cbad6f', '#ebd8a0', '#5e865f'], radius * 0.17, boosting ? 0.95 : 0.58);
+    } else if (skin.id === 'aurora') {
         ctx.globalCompositeOperation = 'lighter';
         ctx.shadowColor = '#49ffe4';
         ctx.shadowBlur = radius * (boosting ? 2.2 : 1.55);
@@ -161,7 +175,7 @@ export function drawSlitherSpecialBody(ctx, skinId, points, radius, phase = 0, b
     ctx.restore();
 }
 
-export function drawSlitherSpecialDetails(ctx, skinId, points, radius, phase = 0) {
+export function drawSlitherSpecialDetails(ctx, skinId, points, radius, phase = 0, boosting = false) {
     if (!ctx || !Array.isArray(points) || points.length < 3 || radius <= 0) return;
     const metrics = measureBodyPath(points);
     if (metrics.total <= radius * 2) return;
@@ -170,7 +184,63 @@ export function drawSlitherSpecialDetails(ctx, skinId, points, radius, phase = 0
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
 
-    if (skinId === 'aurora') {
+    if (skinId === 'leviathan') {
+        ctx.globalCompositeOperation = 'source-over';
+        const time = skinAnimationTime();
+        // Arclength spacing keeps scales consistent as the body bends and grows.
+        // The count is bounded independently of snake length.
+        let marker = 0;
+        for (let distance = Math.max(radius * 2.6, metrics.total - radius); distance > radius * 2.2 && marker < 100; distance -= Math.max(radius * 1.18, metrics.total / 100), marker++) {
+            const point = sampleBodyPath(points, metrics, distance);
+            ctx.save();
+            ctx.translate(point.x, point.y);
+            ctx.rotate(point.angle);
+            // Paired, overlapping scale plates with a highlighted leading edge.
+            for (const side of [-1, 1]) {
+                ctx.fillStyle = marker % 2 ? '#246e70' : '#328c80';
+                ctx.strokeStyle = '#0a303e'; ctx.lineWidth = radius * 0.08;
+                ctx.beginPath();
+                ctx.moveTo(radius * 0.62, side * radius * 0.16);
+                ctx.quadraticCurveTo(radius * 0.35, side * radius * 0.79, -radius * 0.36, side * radius * 0.9);
+                ctx.lineTo(-radius * 0.7, side * radius * 0.39);
+                ctx.lineTo(-radius * 0.15, 0);
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.strokeStyle = '#a9d6ac'; ctx.lineWidth = radius * 0.035;
+                ctx.beginPath();ctx.moveTo(radius*0.42,side*radius*0.25);ctx.quadraticCurveTo(radius*0.15,side*radius*0.62,-radius*0.32,side*radius*0.73);ctx.stroke();
+                // Bioluminescent gills stay inside the true body boundary.
+                ctx.strokeStyle = `rgba(131,251,222,${0.38+Math.sin(time*1.4-marker*0.6)*0.18})`;
+                ctx.lineWidth = radius * 0.055; ctx.beginPath();ctx.moveTo(-radius*0.1,side*radius*0.43);ctx.lineTo(-radius*0.37,side*radius*0.59);ctx.stroke();
+            }
+            // Gold dorsal blade, split into a pale and a shaded facet.
+            ctx.fillStyle = '#d6b36c'; ctx.strokeStyle='#443f27';ctx.lineWidth=radius*0.045;
+            ctx.beginPath();
+            ctx.moveTo(radius*0.63,0);ctx.lineTo(-radius*0.13,-radius*0.28);ctx.lineTo(-radius*0.5,0);ctx.lineTo(-radius*0.13,radius*0.28);ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.fillStyle='#fbdf9d';ctx.beginPath();ctx.moveTo(radius*0.56,0);ctx.lineTo(-radius*0.13,-radius*0.24);ctx.lineTo(-radius*0.43,0);ctx.closePath();ctx.fill();
+            // Inlaid pearls become a traveling crest pulse while boosting.
+            const crestLight = boosting ? 0.55 + 0.4 * Math.pow(Math.max(0, Math.cos(time * 5 - distance / radius * 0.48)), 3) : 0.36;
+            ctx.fillStyle=`rgba(172,255,226,${crestLight})`;
+            ctx.beginPath();ctx.ellipse(-radius*0.04,0,radius*0.18,radius*0.11,0,0,Math.PI*2);ctx.fill();
+            ctx.restore();
+        }
+        // A distinct head crown behind the existing eyes; no false horns/hitbox.
+        const head=points[0]; const next=points[1];
+        ctx.save();ctx.translate(head.x,head.y);ctx.rotate(Math.atan2(head.y-next.y,head.x-next.x));
+        ctx.fillStyle='#163d43';ctx.strokeStyle='#d9bc78';ctx.lineWidth=radius*0.06;
+        ctx.beginPath();ctx.moveTo(radius*0.1,0);ctx.lineTo(-radius*0.3,-radius*0.68);ctx.lineTo(-radius*1.05,-radius*0.48);ctx.lineTo(-radius*1.6,0);ctx.lineTo(-radius*1.05,radius*0.48);ctx.lineTo(-radius*0.3,radius*0.68);ctx.closePath();ctx.fill();ctx.stroke();
+        ctx.fillStyle='#f4d993';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-radius*0.8,-radius*0.18);ctx.lineTo(-radius*1.42,0);ctx.lineTo(-radius*0.8,radius*0.18);ctx.closePath();ctx.fill();
+        ctx.fillStyle='#a5ffde';ctx.beginPath();ctx.ellipse(-radius*0.74,0,radius*0.19,radius*0.1,0,0,Math.PI*2);ctx.fill();
+        // Twin swept crown plates and engraved gills stay within the head/neck.
+        for(const side of [-1,1]) {
+            ctx.fillStyle='#b28b50';ctx.strokeStyle='#233b39';ctx.lineWidth=radius*0.045;
+            ctx.beginPath();ctx.moveTo(-radius*0.18,side*radius*0.57);ctx.lineTo(-radius*0.66,side*radius*0.83);ctx.lineTo(-radius*1.4,side*radius*0.51);ctx.lineTo(-radius*0.61,side*radius*0.51);ctx.closePath();ctx.fill();ctx.stroke();
+            ctx.strokeStyle='#ffe2a4';ctx.lineWidth=radius*0.05;ctx.beginPath();ctx.moveTo(-radius*0.3,side*radius*0.59);ctx.lineTo(-radius*0.69,side*radius*0.75);ctx.lineTo(-radius*1.2,side*radius*0.53);ctx.stroke();
+            for(let i=0;i<3;i++) {
+                ctx.strokeStyle=i%2?'#78dcbf':'#e9e2b8';ctx.lineWidth=radius*0.055;
+                ctx.beginPath();ctx.moveTo(-radius*(1.3+i*0.25),side*radius*0.28);ctx.lineTo(-radius*(1.4+i*0.25),side*radius*0.64);ctx.stroke();
+            }
+        }
+        ctx.restore();
+    } else if (skinId === 'aurora') {
         const spacing = radius * 4.8;
         let marker = 0;
         for (let distance = radius * 2.8; distance < metrics.total - radius * 1.5 && marker < 36; distance += spacing, marker++) {
@@ -232,5 +302,25 @@ export function drawSlitherSpecialDetails(ctx, skinId, points, radius, phase = 0
         }
     }
 
+    ctx.restore();
+}
+
+// Shared head art: the live renderer and the shop use the same eye geometry.
+export function drawLeviathanEyes(ctx, x, y, radius, angle) {
+    ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+    for(const side of [-1,1]) {
+        ctx.save();ctx.translate(radius*0.26,side*radius*0.4);ctx.rotate(side*0.16);
+        ctx.fillStyle='#12323b';ctx.strokeStyle='#dcc286';ctx.lineWidth=radius*0.055;
+        ctx.beginPath();ctx.ellipse(0,0,radius*0.4,radius*0.29,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+        const iris=ctx.createLinearGradient(-radius*0.22,-radius*0.2,radius*0.2,radius*0.2);
+        iris.addColorStop(0,'#fff1b7');iris.addColorStop(0.55,'#eac66f');iris.addColorStop(1,'#bc7e35');
+        ctx.fillStyle=iris;ctx.beginPath();ctx.ellipse(radius*0.04,0,radius*0.29,radius*0.22,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#0a2832';ctx.beginPath();ctx.ellipse(radius*0.09,0,radius*0.055,radius*0.18,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#faffec';ctx.beginPath();ctx.arc(-radius*0.035,-radius*0.08,radius*0.06,0,Math.PI*2);ctx.fill();
+        ctx.restore();
+    }
+    // Two discreet nostrils and a thin jade bridge distinguish the face.
+    ctx.fillStyle='#071c24';
+    for(const side of [-1,1]) {ctx.beginPath();ctx.ellipse(radius*0.76,side*radius*0.16,radius*0.07,radius*0.035,side*0.35,0,Math.PI*2);ctx.fill();}
     ctx.restore();
 }

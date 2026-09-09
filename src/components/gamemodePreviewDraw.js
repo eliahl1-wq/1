@@ -453,8 +453,8 @@ function drawBRSlitherPreview(ctx, W, H) {
     }
 }
 
-function drawSurvivPreview(ctx, W, H) {
-    ctx.fillStyle = '#12141a';
+function drawSurvivPreview(ctx, W, H, { battleRoyale = false } = {}) {
+    ctx.fillStyle = battleRoyale ? '#344c32' : '#12141a';
     ctx.fillRect(0, 0, W, H);
 
     const cx = W / 2;
@@ -495,8 +495,24 @@ function drawSurvivPreview(ctx, W, H) {
     ctx.fillStyle = '#333';
     ctx.fillRect(me.x + 5, me.y - 3, 18, 6);
 
-    drawBalanceBadge(ctx, me.x, me.y + 22, 4.25, true);
-    drawCashoutProgressRing(ctx, me.x, me.y, 24, 0.4, { counterClockwise: true });
+    if (!battleRoyale) {
+        drawBalanceBadge(ctx, me.x, me.y + 22, 4.25, true);
+        drawCashoutProgressRing(ctx, me.x, me.y, 24, 0.4, { counterClockwise: true });
+    } else {
+        ctx.fillStyle = 'rgba(170, 35, 28, .34)';
+        ctx.beginPath();
+        ctx.rect(0, 0, W, H);
+        ctx.arc(cx, cy, W * .38, 0, Math.PI * 2, true);
+        ctx.fill();
+        ctx.strokeStyle = '#eff5de';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx + 24, cy - 14, W * .28, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = '#fffbd9';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx - 100, cy - 68); ctx.lineTo(cx - 48, cy - 34); ctx.stroke();
+    }
 
     ctx.fillStyle = '#ff6060';
     ctx.beginPath();
@@ -511,6 +527,7 @@ const DRAWERS = {
     'competitive-slither': (ctx, W, H) => drawCompetitiveSlitherPreview(ctx, W, H),
     'br-slither': (ctx, W, H) => drawBRSlitherPreview(ctx, W, H),
     surviv: (ctx, W, H) => drawSurvivPreview(ctx, W, H),
+    'br-surviv': (ctx, W, H) => drawSurvivPreview(ctx, W, H, { battleRoyale: true }),
 };
 
 export function drawGamemodePreview(ctx, W, H, mode, { fit = false } = {}) {

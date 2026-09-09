@@ -9,7 +9,8 @@ import { API_URL } from '../utils/apiBase';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
 import { flagSkinValue, DEFAULT_FLAG_CODE } from '../constants/flagSkins';
 import { SLITHER_SPECIAL_SKINS, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
-import { AgarBlobPreview, SnakeSkinPreview } from './PreGame';
+import { AgarBlobPreview, SnakeSkinPreview, SurvivSkinPreview } from './PreGame';
+import { SIGNATURE_SKINS, getSignatureSkin } from '../constants/signatureSkins';
 import '../styles/shop.css';
 import '../styles/shopV2.css';
 import '../styles/slitherSpecialSkins.css';
@@ -77,6 +78,14 @@ function SpecialSlitherPreview({ skin }) {
 }
 
 function ProductArtwork({ product, nickname }) {
+    const signature = getSignatureSkin(product?.skinId);
+    if (signature) return (
+        <div className="shop-rainbow-preview shop-special-preview" style={{ '--special-skin-glow': signature.colors[4] }} aria-hidden="true">
+            {signature.gameMode === 'surviv'
+                ? <SurvivSkinPreview color={signature.value} isLarge hideName />
+                : <AgarBlobPreview color={signature.value} isLarge hideName />}
+        </div>
+    );
     const specialSkin = getSlitherSpecialSkin(product?.skinId);
     if (!product) return null;
     if (product.skinId === 'flags') return <FlagPackPreview nickname={nickname} />;
@@ -206,7 +215,7 @@ export default function Shop() {
                 type: response.status === 202 ? 'pending' : 'success',
                 message: response.status === 202
                     ? 'Payment was broadcast and is being confirmed. Do not retry.'
-                    : `${getSlitherSpecialSkin(quote?.skinId)?.name || (quote?.skinId === 'flags' ? 'Flag Pack' : 'Rainbow')} unlocked successfully.`,
+                    : `${getSignatureSkin(quote?.skinId)?.name || getSlitherSpecialSkin(quote?.skinId)?.name || (quote?.skinId === 'flags' ? 'Flag Pack' : 'Rainbow')} unlocked successfully.`,
             });
         } catch (error) {
             setNotice({ type: 'error', message: error.message });
@@ -216,10 +225,16 @@ export default function Shop() {
     };
 
     const useSkin = (product) => {
+        const signature = getSignatureSkin(product.skinId);
+        if (signature) {
+            localStorage.setItem(signature.gameMode === 'surviv' ? 'selected_skin_surviv' : 'selected_skin_agar', signature.value);
+            navigate('/pre-game', { state: { selectedMode: signature.gameMode } });
+            return;
+        }
         const specialSkin = getSlitherSpecialSkin(product.skinId);
         if (specialSkin) {
             localStorage.setItem('selected_skin', specialSkin.value);
-            navigate('/pre-game', { state: { mode: 'slither' } });
+            navigate('/pre-game', { state: { selectedMode: 'slither' } });
             return;
         }
         if (product.skinId === 'flags') {
@@ -240,17 +255,19 @@ export default function Shop() {
         { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
         { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
         ...SLITHER_SPECIAL_SKINS.map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
+        ...SIGNATURE_SKINS.map((skin) => ({ id: skin.productId, gameMode: skin.gameMode, skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
     ], [catalog?.products]);
     const filteredProducts = useMemo(() => products.filter((product) => {
         if (activeFilter === 'owned') return ownedProducts.has(product.id);
         if (activeFilter === 'agar') return product.gameMode === 'agar' || product.gameMode === 'all';
         if (activeFilter === 'slither') return product.gameMode === 'slither' || product.gameMode === 'all';
+        if (activeFilter === 'surviv') return product.gameMode === 'surviv';
         return true;
     }), [activeFilter, ownedProducts, products]);
     const ownedCount = products.filter((product) => ownedProducts.has(product.id)).length;
     const selectedProduct = filteredProducts.find((product) => product.id === selectedProductId) || filteredProducts[0] || null;
     const selectedOwned = selectedProduct ? ownedProducts.has(selectedProduct.id) : false;
-    const selectedSpecialSkin = selectedProduct ? getSlitherSpecialSkin(selectedProduct.skinId) : null;
+    const selectedSpecialSkin = selectedProduct ? getSlitherSpecialSkin(selectedProduct.skinId) || getSignatureSkin(selectedProduct.skinId) : null;
 
     useEffect(() => {
         if (!filteredProducts.length) return;
@@ -308,6 +325,7 @@ export default function Shop() {
                         ['all', 'All cosmetics', products.length],
                         ['agar', 'Agar', products.filter((p) => p.gameMode === 'agar' || p.gameMode === 'all').length],
                         ['slither', 'Slither', products.filter((p) => p.gameMode === 'slither' || p.gameMode === 'all').length],
+                        ['surviv', 'Surviv', products.filter((p) => p.gameMode === 'surviv').length],
                         ['owned', 'My locker', ownedCount],
                     ].map(([value, label, count]) => (
                         <button key={value} type="button" className={activeFilter === value ? 'is-active' : ''} aria-pressed={activeFilter === value} onClick={() => setActiveFilter(value)}>
@@ -445,7 +463,7 @@ export default function Shop() {
                         </div>
                         <p className="shop-kicker"><span /> SECURE CHECKOUT</p>
                         <h2 id="shop-confirm-title">
-                            {getSlitherSpecialSkin(quote.skinId)?.name || (
+                            {getSignatureSkin(quote.skinId)?.name || getSlitherSpecialSkin(quote.skinId)?.name || (
                                 quote.skinId === 'flags'
                                     ? 'Agar + Slither Flag Pack'
                                     : (quote.gameMode === 'agar' ? 'Agar' : 'Slither') + ' Rainbow'

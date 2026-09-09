@@ -678,6 +678,28 @@ export function playSurvivEquipSound(weaponFamily = 'pistol') {
 }
 
 /** Compact pickup confirmation; useful without turning looting into a UI jingle. */
+export function playSurvivMatchCue(kind = 'countdown') {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+    const notes = kind === 'victory' ? [523, 659, 784, 1047] : kind === 'start' ? [440, 660, 880] : kind === 'zone' ? [440, 330] : [660];
+    notes.forEach((frequency, index) => {
+        const at = ctx.currentTime + index * .12;
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(.0001, at);
+        gain.gain.exponentialRampToValueAtTime(.07, at + .009);
+        gain.gain.exponentialRampToValueAtTime(.0001, at + .2);
+        oscillator.connect(gain);
+        gain.connect(getSurvivSfxOutput(ctx));
+        oscillator.start(at);
+        oscillator.stop(at + .22);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+    });
+    return true;
+}
+
 export function playSurvivPickupSound(kind = 'item') {
     const ctx = getCtx();
     if (!ctx || !unlocked || ctx.state !== 'running') return false;

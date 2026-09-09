@@ -4,7 +4,9 @@
 
 import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
+import { drawWardenOutfit, drawWardenGlove } from '../../constants/signatureSkins.js';
 import { ingestAirdropTimers, ingestExplosionEvents } from './worldEvents.js';
+import { presentBRZone } from './brZonePresentation.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
@@ -82,13 +84,14 @@ const PLAYER_HAND_RADIUS = 5.4;
 const WATER_MOVE_MULTIPLIER = 0.68;
 
 function drawPlayerHand(ctx, hand, playerColor) {
-    ctx.fillStyle = playerColor;
+    ctx.fillStyle = playerColor === 'warden' ? '#182b31' : playerColor;
     ctx.strokeStyle = PLAYER_HAND_OUTLINE;
     ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
     ctx.beginPath();
     ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    if (playerColor === 'warden') drawWardenGlove(ctx, hand.x, hand.y, PLAYER_HAND_RADIUS);
 }
 const FULL_AUTO_MOVE_MULTIPLIERS = Object.freeze({ smg: 0.78, assault: 0.74, lmg: 0.66 });
 
@@ -3065,6 +3068,7 @@ export class SurvivRenderer {
             }
         }
         this.zone = tick.zone || null;
+        this._zoneReceivedAt = Date.now();
         if (tick.minimap) this.minimap = tick.minimap;
 
         // Count alive players
@@ -4792,7 +4796,7 @@ export class SurvivRenderer {
         // Snapping its anchor to whole CSS pixels prevents text from becoming
         // blurry while the camera smoothly follows a moving player.
         const localPlayer = this.me || this._playersById.get(this.myId);
-        if (localPlayer && !this.isPlayerHidden(localPlayer, currentHouse, currentRoom)) {
+        if (!this.battleRoyale && localPlayer && !this.isPlayerHidden(localPlayer, currentHouse, currentRoom)) {
             const screenX = Math.round((localPlayer.x - this.camera.x) * z + W / 2);
             const playerScreenY = (localPlayer.y - this.camera.y) * z + H / 2;
             const screenY = Math.round(playerScreenY + (localPlayer.radius || 14) * z + 7);
@@ -4950,8 +4954,9 @@ export class SurvivRenderer {
 
     drawZone(ctx) {
         if (!this.zone) return;
-        const { x, y, radius, targetX, targetY, targetRadius } = this.zone;
-        if (!radius || radius <= 0) return;
+        const { x, y, radius, targetX, targetY, targetRadius } = this.battleRoyale
+            ? presentBRZone(this.zone, this._zoneReceivedAt, this._frameNow) : this.zone;
+        if (radius == null || radius < 0) return;
 
         const left = this._viewLeft;
         const right = this._viewRight;
@@ -5013,7 +5018,7 @@ export class SurvivRenderer {
                 Math.hypot(right - tx, bottom - ty),
             );
             if (targetMinDistance <= targetRadius + 10 && targetMaxDistance >= targetRadius - 10) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+                ctx.strokeStyle = this.battleRoyale ? 'rgba(255, 255, 240, 0.68)' : 'rgba(255, 255, 255, 0.25)';
                 ctx.lineWidth = 1.5;
                 ctx.setLineDash([6, 6]);
                 ctx.beginPath();
@@ -8612,7 +8617,7 @@ export class SurvivRenderer {
         ctx.fill();
 
         // Body circle — surviv.io style thick outline
-        ctx.fillStyle = p.color || '#77c7c8';
+        ctx.fillStyle = p.color === 'warden' ? '#e6ddd0' : p.color || '#77c7c8';
         ctx.strokeStyle = isMe ? '#ffffff' : 'rgba(14, 20, 18, 0.78)';
         ctx.lineWidth = isMe ? 2.35 : 1.85;
         ctx.beginPath();
@@ -8620,6 +8625,7 @@ export class SurvivRenderer {
         ctx.fill();
         ctx.stroke();
 
+        if (p.color === 'warden') drawWardenOutfit(ctx, r);
         const vestLevel = Math.max(0, Math.min(3, Number(p.vestLevel) || 0));
         if (vestLevel > 0) {
             const vestColors = ['transparent', '#d6d6ce', '#737b7d', '#171b1c'];
@@ -8633,6 +8639,8 @@ export class SurvivRenderer {
             ctx.stroke();
         }
 
+        // Warden's material lighting is already baked into its outfit texture.
+        if (p.color !== 'warden') {
         // Body highlight
         ctx.fillStyle = 'rgba(255,255,255,0.22)';
         ctx.beginPath();
@@ -8644,6 +8652,7 @@ export class SurvivRenderer {
         ctx.beginPath();
         ctx.arc(0, 3, r * 0.7, 0.3, Math.PI - 0.3);
         ctx.fill();
+        }
 
         const reloadProgress = p.reloading && p.reloadEndAtLocal && p.reloadMs
             ? clamp(1 - (p.reloadEndAtLocal - this._frameNow) / p.reloadMs, 0, 1)
@@ -10269,13 +10278,14 @@ export class SurvivRenderer {
             centerY: this.camera.y,
             viewHalfW,
             viewHalfH,
-            players: minimapPlayers,
+            players: this.battleRoyale ? minimapPlayers.filter(player => player.isYou) : minimapPlayers,
             food: lootDots,
             obstacles: this.minimap.obstacles?.length ? this.minimap.obstacles : this.obstacles,
             zone: this.zone?.radius > 0 ? {
                 cx: this.zone.x,
                 cy: this.zone.y,
                 radius: this.zone.radius,
+                ...(this.battleRoyale ? { targetX: this.zone.targetX, targetY: this.zone.targetY, targetRadius: this.zone.targetRadius } : {}),
             } : null,
             time: now,
         });
@@ -10796,6 +10806,7 @@ export function drawSurvivPlayerPreview(ctx, {
     color = '#77c7c8',
     weapon = 'm416',
     scale = 1,
+    vestLevel = 0,
 } = {}) {
     const renderer = Object.create(SurvivRenderer.prototype);
     renderer.myId = '__surviv_preview__';
@@ -10817,7 +10828,7 @@ export function drawSurvivPlayerPreview(ctx, {
         weapon,
         hp: 100,
         maxHp: 100,
-        vestLevel: 0,
+        vestLevel,
         walkBob: 0,
     }, false);
     ctx.restore();

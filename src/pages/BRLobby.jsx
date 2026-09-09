@@ -9,6 +9,7 @@ import { getOrCreatePresenceId } from '../utils/sitePresence';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
 import BrandLogo from '../components/BrandLogo';
+import '../game/surviv/survivBattleRoyale.css';
 
 const MIN_PLAYERS = 5;
 const MAX_PLAYERS = 10;
@@ -26,7 +27,7 @@ export default function BRLobby() {
     const entryFeeUsd = normalizeBREntryFee(
         location.state?.entryFeeUsd ?? localStorage.getItem('selected_entry_fee')
     );
-    const brMode = variant === 'slither' ? 'br-slither' : 'br-agar';
+    const brMode = `br-${variant}`;
 
     const [queueStatus, setQueueStatus] = useState(null);
     const [countdown, setCountdown] = useState(null);
@@ -62,7 +63,7 @@ export default function BRLobby() {
             if (joinedRef.current) return;
             joinedRef.current = true;
             setJoining(true);
-            const skinKey = variant === 'slither' ? 'selected_skin' : 'selected_skin_agar';
+            const skinKey = variant === 'surviv' ? 'selected_skin_surviv' : variant === 'slither' ? 'selected_skin' : 'selected_skin_agar';
             const preferredSkin = localStorage.getItem(skinKey) || '#c080ff';
             socket.emit('brJoinQueue', {
                 variant,
@@ -75,16 +76,27 @@ export default function BRLobby() {
         });
 
         socket.on('brQueueStatus', (status) => {
-            setQueueStatus(status);
+            setQueueStatus({ ...status, graceEndsAt: status.graceRemainingMs == null ? null : Date.now() + status.graceRemainingMs });
             setError('');
             setJoining(false);
         });
 
+        socket.on('disconnect', () => {
+            if (matchStartedRef.current) return;
+            setQueueStatus(null);
+            setJoining(false);
+            setError('Connection lost. Return to the lobby and check your balance before rejoining.');
+        });
+
         socket.on('brMatchCountdown', ({ seconds, prizePool, playerCount, variant: v }) => {
             matchStartedRef.current = true;
-            const mode = v === 'slither' ? 'br-slither' : 'br-agar';
+            const mode = `br-${v}`;
             localStorage.setItem('selected_gamemode', mode);
             localStorage.setItem('current_game_mode', mode);
+            if (v === 'surviv') {
+                navigate('/surviv-game', { state: { nickname: matchNickname, battleRoyale: true } });
+                return;
+            }
             const sec = Math.max(1, Math.ceil(Number(seconds) || 15));
             setCountdown({
                 endsAt: Date.now() + sec * 1000,
@@ -95,7 +107,7 @@ export default function BRLobby() {
 
         socket.on('brMatchStart', ({ variant: v }) => {
             matchStartedRef.current = true;
-            const path = v === 'slither' ? '/slither-game' : '/game';
+            const path = v === 'surviv' ? '/surviv-game' : v === 'slither' ? '/slither-game' : '/game';
             navigate(path, { state: { nickname: matchNickname, battleRoyale: true } });
         });
 
@@ -123,8 +135,8 @@ export default function BRLobby() {
     };
 
     const playersInQueue = queueStatus?.playersInQueue ?? 0;
-    const minPlayers = queueStatus?.minPlayers ?? MIN_PLAYERS;
-    const maxPlayers = queueStatus?.maxPlayers ?? MAX_PLAYERS;
+    const minPlayers = queueStatus?.minPlayers ?? (variant === 'surviv' ? 10 : MIN_PLAYERS);
+    const maxPlayers = queueStatus?.maxPlayers ?? (variant === 'surviv' ? 25 : MAX_PLAYERS);
     const needMore = Math.max(0, minPlayers - playersInQueue);
     const fillPct = Math.min(100, (playersInQueue / minPlayers) * 100);
 
@@ -139,7 +151,7 @@ export default function BRLobby() {
         : null;
 
     return (
-        <div className="br-lobby-shell">
+        <div className={`br-lobby-shell${variant === 'surviv' ? ' br-lobby-shell--surviv' : ''}`}>
             <Background />
             <nav className="topbar" style={{ width: '100%', zIndex: 2 }}>
                 <div className="topbar-left">
@@ -190,7 +202,14 @@ export default function BRLobby() {
                                 </div>
                             )}
 
-                            {(joining || !queueStatus) && (
+                            {variant === 'surviv' && <>
+                                <div className="sbr-lobby-slots" aria-label={`${playersInQueue} of ${maxPlayers} players`}>
+                                    {Array.from({ length: maxPlayers }, (_, i) => <i key={i} className={i < playersInQueue ? 'is-filled' : ''} />)}
+                                </div>
+                                <div className="sbr-lobby-rules"><span>ONE LIFE</span><span>NO CASH-OUT</span><span>LAST SURVIVOR WINS</span></div>
+                                <p style={{ fontSize: 11, color: '#aebfad', lineHeight: 1.6 }}>Winner receives 92% of entries · 8% house fee.<br />Leaving before the match is created refunds your entry.</p>
+                            </>}
+                            {(joining || !queueStatus) && !error && (
                                 <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '6px' }}>
                                     {[0, 1, 2].map(i => (
                                         <div

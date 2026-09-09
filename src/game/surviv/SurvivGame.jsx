@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 import { SurvivRenderer } from './SurvivRenderer.js';
 import { normalizeSurvivEntryFee } from '../../constants/economy';
+import SurvivBRHud from './SurvivBRHud.jsx';
+import { normalizeBREntryFee } from '../../constants/economy';
 import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
@@ -232,10 +234,15 @@ export default function SurvivGame() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, token: authToken, refreshUser, applyOptimisticBalanceDelta } = useAuth();
+    const [isBR] = useState(() => !!location.state?.battleRoyale || (localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode')) === 'br-surviv');
+    const sessionMode = isBR ? 'br-surviv' : 'surviv';
+    const brStateRef = useRef({ matchStatus: 'countdown' });
+    const [brActive, setBRActive] = useState(!isBR);
+    const [brResult, setBRResult] = useState(null);
     const balanceCurrency = getStoredBalanceCurrency();
     const gameSolPrice = Number(user?.solPrice) || 0;
 
-    const pendingAtMount = loadPendingResult('surviv');
+    const pendingAtMount = isBR ? null : loadPendingResult('surviv');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
 
     const canvasRef = useRef(null);
@@ -403,7 +410,7 @@ export default function SurvivGame() {
     const hideNames = localStorage.getItem('hide_player_names') === 'true';
 
     const matchNickname = location.state?.nickname || user?.username || 'Guest';
-    const entryFeeUsd = normalizeSurvivEntryFee(localStorage.getItem('selected_entry_fee'));
+    const entryFeeUsd = (isBR ? normalizeBREntryFee : normalizeSurvivEntryFee)(localStorage.getItem('selected_entry_fee'));
 
     useEffect(() => () => {
         if (pickupConfirmationTimerRef.current) clearTimeout(pickupConfirmationTimerRef.current);
@@ -459,7 +466,7 @@ export default function SurvivGame() {
     });
 
     const blockInputRef = useRef(false);
-    blockInputRef.current = isSpectating || isDead || cashedAmount !== null;
+    blockInputRef.current = isSpectating || isDead || cashedAmount !== null || (isBR && (!brActive || !!brResult));
 
     const enterSpectate = useCallback(() => {
         worldUpdatesEnabledRef.current = true;
@@ -482,6 +489,11 @@ export default function SurvivGame() {
     }, []);
 
     const handlePlayAgain = useCallback(() => {
+        if (isBR) {
+            localStorage.removeItem('current_game_mode');
+            navigate('/br-lobby', { state: { variant: 'surviv', entryFeeUsd, nickname: joinParamsRef.current.nickname } });
+            return;
+        }
         if (playAgainPendingRef.current) return;
         playAgainPendingRef.current = true;
         blockAutoJoinRef.current = false;
@@ -510,15 +522,16 @@ export default function SurvivGame() {
                 skinColor: preferredSkin,
             });
         }
-    }, [authToken, liveSession]);
+    }, [authToken, liveSession, isBR, entryFeeUsd, navigate]);
 
     const handleLobby = useCallback(() => {
         clearPendingResult('surviv');
         blockAutoJoinRef.current = true;
         worldUpdatesEnabledRef.current = false;
-        localStorage.setItem('selected_gamemode', 'surviv');
-        navigate('/pre-game', { state: { selectedMode: 'surviv' } });
-    }, [navigate]);
+        localStorage.setItem('selected_gamemode', sessionMode);
+        if (brResult) localStorage.removeItem('current_game_mode');
+        navigate('/pre-game', { state: { selectedMode: sessionMode } });
+    }, [navigate, sessionMode, brResult]);
 
     const startCashoutCountdown = useCallback((seconds) => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -550,7 +563,7 @@ export default function SurvivGame() {
     }, []);
 
     const canCashOutRef = useRef(false);
-    canCashOutRef.current = gameReady && isConnected && !cashoutPending && localTimer <= 0 && cashedAmount === null && !isDead;
+    canCashOutRef.current = !isBR && gameReady && isConnected && !cashoutPending && localTimer <= 0 && cashedAmount === null && !isDead;
 
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
@@ -676,6 +689,15 @@ export default function SurvivGame() {
         };
         const emitSurvivJoin = () => {
             if (!socket.connected || blockAutoJoinRef.current) return;
+            if (isBR) {
+                awaitingWelcomeRef.current = true;
+                setGameReady(false);
+                setConnectionError('');
+                localStorage.setItem('current_game_mode', 'br-surviv');
+                markGamemodePlayed('br-surviv');
+                socket.emit('brRejoinMatch', { token: authToken });
+                return;
+            }
             const preferredSkin = localStorage.getItem('selected_skin_surviv') || 'random';
             awaitingWelcomeRef.current = true;
             setGameReady(false);
@@ -872,7 +894,12 @@ export default function SurvivGame() {
         });
 
         socket.on('welcome', (player, world) => {
-            const isRejoin = !!world?.rejoin;
+            if (isBR && world?.mode !== 'br-surviv') return;
+            const isRejoin = !!world?.rejoin || (isBR && hasJoinedRef.current);
+            if (isBR) {
+                brStateRef.current = { ...world, receivedAt: performance.now() };
+                setBRActive(world.matchStatus === 'active');
+            }
             awaitingWelcomeRef.current = false;
             playAgainPendingRef.current = false;
             blockAutoJoinRef.current = false;
@@ -914,7 +941,8 @@ export default function SurvivGame() {
             setGameReady(true);
             refreshUser();
             setIsRejoining(false);
-            renderer.setInputEnabled(true);
+            renderer.battleRoyale = isBR;
+            renderer.setInputEnabled(!isBR || world.matchStatus === 'active');
             renderer.start();
 
             if (world?.cashOutRemaining > 0) {
@@ -928,6 +956,15 @@ export default function SurvivGame() {
 
         socket.on('survivTick', (tick) => {
             if (!worldUpdatesEnabledRef.current) return;
+            if (isBR) {
+                brStateRef.current = { ...tick, receivedAt: performance.now() };
+                const active = tick.matchStatus === 'active';
+                if (active !== (renderer._brActive === true)) {
+                    renderer._brActive = active;
+                    setBRActive(active);
+                    renderer.setInputEnabled(active && !blockAutoJoinRef.current);
+                }
+            }
             if (Array.isArray(tick.spectateTargets)) {
                 spectateTargetsRef.current = tick.spectateTargets;
             }
@@ -965,7 +1002,7 @@ export default function SurvivGame() {
                 }
             }
             if (tick.zone) {
-                const zoneSignature = `${Math.round((tick.zone.x || 0) / 10)}:${Math.round((tick.zone.y || 0) / 10)}:${Math.round((tick.zone.radius || 0) / 25)}`;
+                const zoneSignature = `${tick.zone.phase || 0}:${tick.zone.targetRadius || 0}:${Math.round((tick.zone.x || 0) / 10)}:${Math.round((tick.zone.y || 0) / 10)}:${Math.round((tick.zone.radius || 0) / 25)}`;
                 if (zoneSignature !== mapZoneSignatureRef.current) {
                     mapZoneSignatureRef.current = zoneSignature;
                     setMapZone(tick.zone);
@@ -1083,6 +1120,7 @@ export default function SurvivGame() {
         });
 
         socket.on('RIP', () => {
+            if (isBR) return;
             hideInventoryUi();
             worldUpdatesEnabledRef.current = false;
             cashoutActiveRef.current = false;
@@ -1093,6 +1131,7 @@ export default function SurvivGame() {
         });
 
         socket.on('died', (data) => {
+            if (isBR) return;
             hideInventoryUi();
             worldUpdatesEnabledRef.current = false;
             hasJoinedRef.current = false;
@@ -1111,6 +1150,41 @@ export default function SurvivGame() {
             });
             blockAutoJoinRef.current = true;
         });
+
+        if (isBR) {
+            const stopBRInput = () => {
+                hideInventoryUi();
+                clearPendingActions();
+                blockAutoJoinRef.current = true;
+                worldUpdatesEnabledRef.current = false;
+                hasJoinedRef.current = false;
+                renderer.clearInput();
+                renderer.setInputEnabled(false);
+                // Keep the frozen world responsive to viewport/orientation changes.
+                // Inputs and network state are stopped; only presentation continues.
+                renderer.start();
+                setIsDead(true);
+                setGameReady(true);
+                setIsConnected(true);
+            };
+            socket.on('brEliminated', (data) => {
+                stopBRInput();
+                setBRResult({ ...data });
+                localStorage.removeItem('current_game_mode');
+                refreshUser();
+            });
+            socket.on('brMatchEnd', (data) => {
+                if (data.winnerId === myIdRef.current || data.cancelled || data.noWinner) {
+                    stopBRInput();
+                    setBRResult({ ...data, cancelled: data.cancelled || data.noWinner, placement: data.winnerId === myIdRef.current ? 1 : null, kills: sessionStatsRef.current.eliminations });
+                    localStorage.removeItem('current_game_mode');
+                }
+            });
+            socket.on('brVictory', (data) => {
+                setBRResult(previous => ({ ...previous, ...data, confirmed: true, simulated: data.signature === 'simulated' }));
+                refreshUser();
+            });
+        }
 
         socket.on('forcedDisconnect', () => {
             hideInventoryUi();
@@ -1144,6 +1218,10 @@ export default function SurvivGame() {
                     alert('Not enough funds for another round. Your game result is still saved.');
                     return;
                 }
+            }
+            if (isBR && /payout/i.test(message)) {
+                setBRResult(previous => previous ? { ...previous, payoutError: true } : previous);
+                return;
             }
             console.error('Surviv socket error:', message);
             cashoutActiveRef.current = false;
@@ -1282,7 +1360,7 @@ export default function SurvivGame() {
             socket.off();
             socket.disconnect();
         };
-    }, [liveSession, authToken, matchNickname, entryFeeUsd, adminFreeSurvivEntry, navigate, startCashoutCountdown, refreshUser, closeFullMap, syncFullMapVisibility]);
+    }, [liveSession, authToken, matchNickname, entryFeeUsd, adminFreeSurvivEntry, navigate, startCashoutCountdown, refreshUser, closeFullMap, syncFullMapVisibility, isBR]);
 
     const handleHoldStart = useCallback(() => {
         const renderer = rendererRef.current;
@@ -1358,7 +1436,7 @@ export default function SurvivGame() {
         && (Number(me.hp) || 0) < (Number(me.maxHp) || 100)
         && medkitRemainingMs <= 0;
     return (
-        <div ref={viewportRef} className={`game-viewport surviv-game-page${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}${isFullMapOpen ? ' surviv-map-open' : ''}`} style={{
+        <div ref={viewportRef} className={`game-viewport surviv-game-page${isBR ? ' surviv-br-page' : ''}${IS_MOBILE ? ' game-viewport--mobile game-viewport--force-landscape' : ''}${isFullMapOpen ? ' surviv-map-open' : ''}`} style={{
             width: 'var(--game-viewport-width, 100dvw)',
             height: 'var(--game-viewport-height, 100dvh)',
             background: '#0a0a0c',
@@ -1405,14 +1483,15 @@ export default function SurvivGame() {
                         </h2>
                         <p style={{ opacity: 0.62, lineHeight: 1.5 }}>
                             {connectionError || (isRejoining
-                                ? 'Your player is protected briefly while the connection recovers.'
+                                ? (isBR ? 'Reconnecting to your existing match. Your survivor remains on the map.' : 'Your player is protected briefly while the connection recovers.')
                                 : `Entry: ${adminFreeSurvivEntry ? 'FREE ADMIN · PUBLIC MATCH' : formatBalanceAmount(entryFeeUsd, gameSolPrice, balanceCurrency)}. Waiting for the server to confirm your session.`)}
                         </p>
+                        {connectionError && <button type="button" onClick={handleLobby} style={{ padding: '10px 18px', background: '#d3e4b8', color: '#152119', border: 0, borderRadius: 7, cursor: 'pointer' }}>Back to lobby</button>}
                     </div>
                 </div>
             )}
 
-            {gameReady && cashedAmount === null && (
+            {gameReady && !isBR && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={!cashoutReady}
                     onHoldStart={handleHoldStart}
@@ -1520,7 +1599,7 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {leaderboard.length > 0 && gameReady && !showResultModal && (
+            {!isBR && leaderboard.length > 0 && gameReady && !showResultModal && (
                 <div className="game-leaderboard-panel surviv-leaderboard" aria-label="Leaderboard">
                     <h4 className="game-leaderboard-title">
                         Leaderboard
@@ -1536,7 +1615,7 @@ export default function SurvivGame() {
                                     {i + 1}. {(hideNames && entry.id !== myIdRef.current) ? '???' : entry.username}
                                 </span>
                                 <span className="game-leaderboard-value">
-                                    {formatBalanceAmount(entry.balance, gameSolPrice, balanceCurrency)}
+                                    {isBR ? `${entry.kills || 0} KILLS` : formatBalanceAmount(entry.balance, gameSolPrice, balanceCurrency)}
                                 </span>
                             </div>
                         ))}
@@ -1699,7 +1778,7 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {gameReady && !showResultModal && ((me?.kills || 0) > 0 || aliveCount > 0) && (
+            {!isBR && gameReady && !showResultModal && ((me?.kills || 0) > 0 || aliveCount > 0) && (
                 <div className="surviv-match-stats" aria-label="Match status" aria-live="polite">
                     {(me?.kills || 0) > 0 && (
                         <div className="surviv-kills-badge">
@@ -1724,7 +1803,7 @@ export default function SurvivGame() {
                 </div>
             )}
 
-            {showResultModal && (
+            {showResultModal && !isBR && (
                 <GameResultModal
                     type={cashedAmount != null ? 'cashout' : 'death'}
                     amount={cashedAmount}
@@ -1742,10 +1821,13 @@ export default function SurvivGame() {
                 />
             )}
 
+            {isBR && gameReady && <SurvivBRHud stateRef={brStateRef} alive={aliveCount} kills={me?.kills || 0} outsideZone={!!me?.outsideZone} result={brResult} onLobby={handleLobby} onQueue={handlePlayAgain} />}
+
             <GameSocialOverlay socket={socketRef.current} disabled={IS_MOBILE} onEmote={handleGameEmote} onChat={handleGameChat} />
 
             {isFullMapOpen && (
                 <SurvivFullMap
+                    battleRoyale={isBR}
                     map={fullMapData}
                     activityZones={mapActivityZones}
                     airdrops={mapAirdrops}

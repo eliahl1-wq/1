@@ -54,7 +54,7 @@ function drawObstacle(ctx, obstacle, toMap, scale) {
     ctx.restore();
 }
 
-export default function SurvivFullMap({ map, activityZones = [], airdrops = [], player, zone, onClose }) {
+export default function SurvivFullMap({ map, activityZones = [], airdrops = [], player, zone, onClose, battleRoyale = false }) {
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -94,10 +94,24 @@ export default function SurvivFullMap({ map, activityZones = [], airdrops = [], 
 
             if (zone?.radius > 0) {
                 const center = toMap(zone.x ?? zone.cx ?? 0, zone.y ?? zone.cy ?? 0);
+                ctx.fillStyle = 'rgba(155, 30, 26, .25)';
+                ctx.beginPath();
+                ctx.rect(padding, padding, innerSize, innerSize);
+                ctx.arc(center.x, center.y, zone.radius * scale, 0, Math.PI * 2, true);
+                ctx.fill();
                 ctx.beginPath();
                 ctx.arc(center.x, center.y, zone.radius * scale, 0, Math.PI * 2);
                 ctx.strokeStyle = 'rgba(220, 55, 48, 0.92)';
                 ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            if (zone?.targetRadius > 0 && zone.targetRadius < zone.radius) {
+                const target = toMap(zone.targetX ?? zone.x ?? 0, zone.targetY ?? zone.y ?? 0);
+                ctx.strokeStyle = '#f9ffe9';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(target.x, target.y, zone.targetRadius * scale, 0, Math.PI * 2);
                 ctx.stroke();
             }
 
@@ -175,14 +189,14 @@ export default function SurvivFullMap({ map, activityZones = [], airdrops = [], 
         const observer = new ResizeObserver(draw);
         observer.observe(canvas);
         return () => observer.disconnect();
-    }, [map, activityZones, airdrops, player?.x, player?.y, zone?.x, zone?.y, zone?.cx, zone?.cy, zone?.radius]);
+    }, [map, activityZones, airdrops, player?.x, player?.y, zone?.x, zone?.y, zone?.cx, zone?.cy, zone?.radius, zone?.targetX, zone?.targetY, zone?.targetRadius]);
 
     return (
         <div className="surviv-full-map-overlay" role="dialog" aria-modal="true" aria-label="Full match map">
             <div className="surviv-full-map-shell">
                 <div className="surviv-full-map-heading">
                     <strong>ISLAND MAP</strong>
-                    <span><i aria-hidden="true" /> ACTIVITY AREA</span>
+                    <span><i aria-hidden="true" /> {battleRoyale ? 'WHITE CIRCLE · NEXT SAFE ZONE' : 'ACTIVITY AREA'}</span>
                     <span className="surviv-full-map-drop-legend">◆ SUPPLY DROP</span>
                     <button type="button" onClick={onClose} aria-label="Close map">×</button>
                 </div>

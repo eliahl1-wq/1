@@ -23,6 +23,7 @@ export default function GamemodeDiscoveryPrompt({
         surviv: 'surviv',
         'br-agar': 'brAgar',
         'br-slither': 'brSlither',
+        'br-surviv': 'brSurviv',
     };
 
     const handleDismiss = () => {

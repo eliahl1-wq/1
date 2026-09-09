@@ -42,9 +42,8 @@ function PrivateRoute({ children }) {
 
 function isBattleRoyaleSession(isAdmin = false) {
   if (typeof window === 'undefined') return false;
-  if (!isBattleRoyaleAvailable(isAdmin)) return false;
   const mode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || '';
-  return mode.startsWith('br-');
+  return mode.startsWith('br-') && isBattleRoyaleAvailable(isAdmin, mode);
 }
 
 function isTournamentSession() {
@@ -137,6 +136,7 @@ function App() {
                 <Route path="/tournaments/:tournamentId/lobby" element={<PrivateRoute><PreGame /></PrivateRoute>} />
                 <Route path="/surviv" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
+                <Route path="/surviv-battle-royale" element={<PreGame />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/faq" element={<Faq />} />

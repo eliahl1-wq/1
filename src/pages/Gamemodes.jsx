@@ -21,6 +21,7 @@ const PLAYING_KEY = {
     surviv: 'surviv',
     'br-agar': 'brAgar',
     'br-slither': 'brSlither',
+    'br-surviv': 'brSurviv',
 };
 
 export default function Gamemodes() {
@@ -87,7 +88,7 @@ export default function Gamemodes() {
 
     const isSlitherTab = activeTab === 'slither' || activeTab === 'competitive-slither'
         || (brAvailable && activeTab === 'br-slither');
-    const isSurvivTab = activeTab === 'surviv';
+    const isSurvivTab = activeTab === 'surviv' || activeTab === 'br-surviv';
     const isAgarTab = activeTab === 'agar' || (brAvailable && activeTab === 'br-agar');
 
     useEffect(() => {

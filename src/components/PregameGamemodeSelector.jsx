@@ -10,6 +10,7 @@ const MODE_PRESENTATION = Object.freeze({
     surviv: { name: 'Surviv', subtype: 'Normal' },
     'br-agar': { name: 'Agar', subtype: 'Battle Royale' },
     'br-slither': { name: 'Slither', subtype: 'Battle Royale' },
+    'br-surviv': { name: 'Surviv', subtype: 'Battle Royale · 10–25' },
 });
 
 const PLAYING_KEYS = Object.freeze({
@@ -19,6 +20,7 @@ const PLAYING_KEYS = Object.freeze({
     surviv: 'surviv',
     'br-agar': 'brAgar',
     'br-slither': 'brSlither',
+    'br-surviv': 'brSurviv',
 });
 
 export function getGamemodePlayingCount(playersByGamemode, modeId) {
