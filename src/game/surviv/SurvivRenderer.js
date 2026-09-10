@@ -1193,11 +1193,13 @@ const WOOD_INTERIOR_PROP_VARIANTS = new Set([
     'bed', 'coffeeTable', 'nightstand', 'diningTable', 'desk', 'bookshelf',
     'displayShelf', 'salesCounter', 'wardrobe', 'sideboard', 'entryBench',
     'dresser', 'workbench', 'palletStack', 'weaponRack', 'mapTable', 'planterBox',
+    'cardTable', 'rouletteTable', 'cashierCounter',
 ]);
 const METAL_INTERIOR_PROP_VARIANTS = new Set([
     'bunkBed', 'prisonBench', 'hospitalBed', 'labBench', 'serverRack',
     'generator', 'storageShelf', 'locker', 'toolCabinet', 'medicalCabinet',
     'ammoLocker', 'controlConsole', 'machine', 'industrial',
+    'slotMachine', 'casinoSafe',
 ]);
 const SOFT_INTERIOR_PROP_VARIANTS = new Set(['sofa', 'armchair']);
 const CERAMIC_INTERIOR_PROP_VARIANTS = new Set(['toilet', 'bathtub', 'vanity', 'specimenTank']);
@@ -1360,7 +1362,86 @@ function drawFurnitureTopDown(ctx, o, variant) {
         }
     };
 
-    if (variant === 'floorLamp') {
+    if (variant === 'slotMachine') {
+        drawBox('#4c2835', '#1c171b', 5);
+        ctx.fillStyle = '#192629';
+        roundRect(ctx, -hw + 5, -hh + 6, w - 10, h * 0.47, 3);
+        ctx.fill();
+        ctx.strokeStyle = '#b99a54';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        const reelW = Math.max(5, (w - 18) / 3);
+        for (let index = 0; index < 3; index++) {
+            const reelX = -reelW * 1.08 + index * reelW * 1.08;
+            ctx.fillStyle = '#e7ddbd';
+            roundRect(ctx, reelX - reelW / 2, -hh + 12, reelW, Math.max(10, h * 0.20), 1.5);
+            ctx.fill();
+            ctx.fillStyle = ['#9d3f48', '#d2a443', '#4f8a66'][index];
+            ctx.beginPath();
+            ctx.arc(reelX, -hh + 12 + Math.max(10, h * 0.20) / 2, 2.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.fillStyle = '#c6a755';
+        ctx.beginPath(); ctx.arc(hw - 8, hh - 10, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#772e38';
+        roundRect(ctx, -hw + 7, hh * 0.22, w - 14, Math.max(8, h * 0.14), 2); ctx.fill();
+    } else if (variant === 'cardTable') {
+        const radius = Math.min(hw, hh);
+        ctx.fillStyle = 'rgba(8, 12, 10, 0.27)';
+        ctx.beginPath(); ctx.ellipse(3, 5, hw * 0.92, hh * 0.80, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#39231e';
+        ctx.beginPath(); ctx.ellipse(0, 2, hw * 0.78, hh * 0.70, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#245740';
+        ctx.strokeStyle = '#b69754';
+        ctx.lineWidth = Math.max(2, radius * 0.09);
+        ctx.beginPath(); ctx.ellipse(0, -1, hw * 0.72, hh * 0.62, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = 'rgba(230,220,182,0.34)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-hw * 0.38, 0); ctx.lineTo(hw * 0.38, 0); ctx.stroke();
+        for (const [px, py, color] of [[-0.22, -0.18, '#efe8d2'], [0.18, 0.12, '#d04c4c'], [0.03, -0.22, '#e0c455']]) {
+            ctx.fillStyle = color;
+            roundRect(ctx, px * w - 3, py * h - 2, 6, 4, 1); ctx.fill();
+        }
+    } else if (variant === 'rouletteTable') {
+        const radius = Math.min(hw, hh);
+        ctx.fillStyle = 'rgba(8, 12, 10, 0.27)';
+        ctx.beginPath(); ctx.ellipse(3, 5, radius * 0.86, radius * 0.70, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#39231e';
+        ctx.beginPath(); ctx.arc(0, 2, radius * 0.78, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1f523d';
+        ctx.strokeStyle = '#b99b56';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, -1, radius * 0.68, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        for (let index = 0; index < 12; index++) {
+            const angle = index / 12 * Math.PI * 2;
+            ctx.strokeStyle = index % 2 ? '#c8b77f' : '#8d3740';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(Math.cos(angle) * radius * 0.28, Math.sin(angle) * radius * 0.28 - 1);
+            ctx.lineTo(Math.cos(angle) * radius * 0.62, Math.sin(angle) * radius * 0.62 - 1); ctx.stroke();
+        }
+        ctx.fillStyle = '#d4b85f';
+        ctx.beginPath(); ctx.arc(0, -1, radius * 0.24, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#5b2c35';
+        ctx.beginPath(); ctx.arc(0, -1, radius * 0.11, 0, Math.PI * 2); ctx.fill();
+    } else if (variant === 'cashierCounter') {
+        drawBox('#53333c', '#231a1e', 5);
+        ctx.fillStyle = '#8a6551';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, 3); ctx.fill();
+        ctx.strokeStyle = '#c0a15c'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-hw + 10, 0); ctx.lineTo(hw - 10, 0); ctx.stroke();
+        ctx.fillStyle = '#273033';
+        roundRect(ctx, hw * 0.23, -hh * 0.45, hw * 0.48, hh * 0.72, 2); ctx.fill();
+        ctx.fillStyle = '#d8c46f';
+        for (let index = 0; index < 3; index++) ctx.fillRect(-hw * 0.62 + index * 9, -2, 5, 4);
+    } else if (variant === 'casinoSafe') {
+        drawBox('#424b4d', '#1b2224', 4);
+        ctx.fillStyle = '#687275';
+        roundRect(ctx, -hw + 5, -hh + 5, w - 10, h - 10, 2); ctx.fill();
+        ctx.strokeStyle = '#252d2f'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = '#d0b766'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, Math.min(hw, hh) * 0.36, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(5, 0); ctx.moveTo(0, -5); ctx.lineTo(0, 5); ctx.stroke();
+    } else if (variant === 'floorLamp') {
         ctx.fillStyle = 'rgba(8, 12, 11, 0.32)';
         ctx.beginPath(); ctx.ellipse(3, 5, hw * 0.82, hh * 0.55, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#343c3b';

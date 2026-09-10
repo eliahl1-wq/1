@@ -35,6 +35,11 @@ try {
         assert.ok(await preview.evaluate(img => img.complete && img.naturalWidth > 0));
         await page.locator('label.free-mode-option').click();
         assert.equal(await page.getByRole('checkbox', { name: 'Free play', exact: true }).isChecked(), true);
+        const tiers = page.locator('.lobby-tier-btn');
+        for (const button of await tiers.all()) {
+            assert.equal(await button.isDisabled(), true);
+            assert.ok((await button.innerText()).includes('Free'));
+        }
         await page.waitForTimeout(300);
         assert.equal(await page.evaluate(() => localStorage.getItem('public_free_mode')), 'true');
         await page.screenshot({ path: resolve(output, 'free-pregame.png') });

@@ -12,6 +12,7 @@ import { flagSkinValue, DEFAULT_FLAG_CODE } from '../constants/flagSkins';
 import { SLITHER_SPECIAL_SKINS, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
 import { AgarBlobPreview, SnakeSkinPreview, SurvivSkinPreview } from './PreGame';
 import { SIGNATURE_SKINS, getSignatureSkin } from '../constants/signatureSkins';
+import { isVisibleSkinProduct } from '../constants/skinAvailability';
 import '../styles/shop.css';
 import '../styles/shopV2.css';
 import '../styles/slitherSpecialSkins.css';
@@ -137,6 +138,7 @@ export default function Shop() {
     const [busy, setBusy] = useState('');
     const [notice, setNotice] = useState(null);
     const [activeFilter, setActiveFilter] = useState('all');
+    const [gameFilter, setGameFilter] = useState('all');
     const [selectedProductId, setSelectedProductId] = useState('');
 
     const load = useCallback(async () => {
@@ -251,20 +253,20 @@ export default function Shop() {
     };
     const agarAccess = publicConfig?.accessGranted === true;
     const shopReady = agarAccess && catalog?.ready === true && publicConfig?.shopReady === true;
-    const products = useMemo(() => catalog?.products || [
+    const products = useMemo(() => (catalog?.products || [
         { id: 'flags:bundle', gameMode: 'all', skinId: 'flags', name: 'Flag Pack', usdPrice: 1 },
         { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
         { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
         ...SLITHER_SPECIAL_SKINS.map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
         ...SIGNATURE_SKINS.map((skin) => ({ id: skin.productId, gameMode: skin.gameMode, skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
-    ], [catalog?.products]);
+    ]).filter(isVisibleSkinProduct), [catalog?.products]);
     const filteredProducts = useMemo(() => products.filter((product) => {
-        if (activeFilter === 'owned') return ownedProducts.has(product.id);
-        if (activeFilter === 'agar') return product.gameMode === 'agar' || product.gameMode === 'all';
-        if (activeFilter === 'slither') return product.gameMode === 'slither' || product.gameMode === 'all';
-        if (activeFilter === 'surviv') return product.gameMode === 'surviv';
+        if (activeFilter === 'owned' && !ownedProducts.has(product.id)) return false;
+        if (gameFilter === 'agar') return product.gameMode === 'agar' || product.gameMode === 'all';
+        if (gameFilter === 'slither') return product.gameMode === 'slither' || product.gameMode === 'all';
+        if (gameFilter === 'surviv') return product.gameMode === 'surviv';
         return true;
-    }), [activeFilter, ownedProducts, products]);
+    }), [activeFilter, gameFilter, ownedProducts, products]);
     const ownedCount = products.filter((product) => ownedProducts.has(product.id)).length;
     const selectedProduct = filteredProducts.find((product) => product.id === selectedProductId) || filteredProducts[0] || null;
     const selectedOwned = selectedProduct ? ownedProducts.has(selectedProduct.id) : false;
@@ -323,18 +325,39 @@ export default function Shop() {
                         <span>{notice.message}</span>
                     </div>
                 )}
-                <div className="shop-v2-filters" role="group" aria-label="Filter shop items">
-                    {[
-                        ['all', 'All cosmetics', products.length],
-                        ['agar', 'Agar', products.filter((p) => p.gameMode === 'agar' || p.gameMode === 'all').length],
-                        ['slither', 'Slither', products.filter((p) => p.gameMode === 'slither' || p.gameMode === 'all').length],
-                        ['surviv', 'Surviv', products.filter((p) => p.gameMode === 'surviv').length],
-                        ['owned', 'My locker', ownedCount],
-                    ].map(([value, label, count]) => (
-                        <button key={value} type="button" className={activeFilter === value ? 'is-active' : ''} aria-pressed={activeFilter === value} onClick={() => setActiveFilter(value)}>
-                            <span>{label}</span><b className="mono">{count}</b>
-                        </button>
-                    ))}
+                <div className="shop-v2-toolbar">
+                    <div className="shop-v2-filters" role="tablist" aria-label="Cosmetic collection">
+                        {[
+                            ['all', 'All Cosmetics', products.length],
+                            ['owned', 'My Locker', ownedCount],
+                        ].map(([value, label, count]) => (
+                            <button
+                                key={value}
+                                type="button"
+                                role="tab"
+                                className={activeFilter === value ? 'is-active' : ''}
+                                aria-selected={activeFilter === value}
+                                onClick={() => setActiveFilter(value)}
+                            >
+                                <span>{label}</span><b className="mono">{count}</b>
+                            </button>
+                        ))}
+                    </div>
+                    <label className="shop-v2-game-filter">
+                        <svg className="shop-v2-game-filter__icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 6h16M7 12h10M10 18h4" />
+                        </svg>
+                        <span>Game</span>
+                        <select value={gameFilter} onChange={(event) => setGameFilter(event.target.value)} aria-label="Filter cosmetics by game">
+                            <option value="all">All games</option>
+                            <option value="agar">Agar</option>
+                            <option value="slither">Slither</option>
+                            <option value="surviv">Surviv</option>
+                        </select>
+                        <svg className="shop-v2-game-filter__chevron" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m8 10 4 4 4-4" />
+                        </svg>
+                    </label>
                 </div>
 
                 {selectedProduct ? (
@@ -390,7 +413,10 @@ export default function Shop() {
                     </section>
                 ) : (
                     <div className="shop-empty-state">
-                        <span>0</span><h3>No owned skins yet</h3><p>Your unlocked cosmetics will appear here.</p><button type="button" onClick={() => setActiveFilter('all')}>Browse collection</button>
+                        <span>0</span>
+                        <h3>{activeFilter === 'owned' && ownedCount === 0 ? 'No owned skins yet' : 'No cosmetics found'}</h3>
+                        <p>{activeFilter === 'owned' && ownedCount === 0 ? 'Your unlocked cosmetics will appear here.' : 'Try another game filter to see more cosmetics.'}</p>
+                        <button type="button" onClick={() => { setActiveFilter('all'); setGameFilter('all'); }}>Browse collection</button>
                     </div>
                 )}
 

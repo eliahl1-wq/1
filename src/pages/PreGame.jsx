@@ -25,6 +25,7 @@ import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRende
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
 import { SIGNATURE_SKINS, getSignatureSkin, drawPrismSkin } from '../constants/signatureSkins';
+import { isVisibleSkinProduct, visibleSkinSelection } from '../constants/skinAvailability';
 import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
 import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
@@ -281,10 +282,10 @@ export default function PreGame() {
     );
 
     const [selectedSkin, setSelectedSkin] = useState(
-        () => localStorage.getItem('selected_skin') || '#c080ff'
+        () => visibleSkinSelection(localStorage.getItem('selected_skin')) || '#c080ff'
     );
     const [selectedSkinAgar, setSelectedSkinAgar] = useState(
-        () => localStorage.getItem('selected_skin_agar') || '#c080ff'
+        () => visibleSkinSelection(localStorage.getItem('selected_skin_agar')) || '#c080ff'
     );
     const [selectedSkinSurviv, setSelectedSkinSurviv] = useState(
         () => {
@@ -547,7 +548,7 @@ export default function PreGame() {
             setPublicFreeMode(false);
             return;
         }
-        if (!freePlay || !selectedMode || isBattleRoyaleMode) return;
+        if (!freePlay || !selectedMode || (isBattleRoyaleMode && selectedMode !== 'br-surviv')) return;
         if (selectedEntryFee !== fixedFreeModeEntryFee) {
             setSelectedEntryFee(fixedFreeModeEntryFee);
         }
@@ -1703,7 +1704,7 @@ export default function PreGame() {
                                         {tierOptions.map(tier => {
                                             const locked = isAlreadyInGame && activeEntryFee != null && tier !== activeEntryFee;
                                             const active = entryFeeForSession === tier;
-                                            const isFreeCovered = freePlay && !isBattleRoyaleMode;
+                                            const isFreeCovered = freePlay && (!isBattleRoyaleMode || selectedMode === 'br-surviv');
                                             const needsSelection = isAuthenticated && !!selectedMode && selectedEntryFee === null && !isAlreadyInGame;
                                             const isNormal5 = tier === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
                                             const hasFreeTicket = hasUnlockedFreeTicket(user);
@@ -1714,7 +1715,7 @@ export default function PreGame() {
                                                     key={tier}
                                                     type="button"
                                                     className={`lobby-tier-btn${active && !isFreeCovered ? ' lobby-tier-btn--active' : ''}${locked ? ' lobby-tier-btn--locked' : ''}${needsSelection ? ' lobby-tier-btn--needs-selection' : ''}${isFreeCovered ? ' lobby-tier-btn--free-covered' : ''}`}
-                                                    disabled={!selectedMode || locked || isMatchmaking || (freePlay && !isBattleRoyaleMode)}
+                                                    disabled={!selectedMode || locked || isMatchmaking || isFreeCovered}
                                                     onClick={() => !isAlreadyInGame && setSelectedEntryFee(tier)}
                                                 >
                                                     {isFreeCovered ? (
@@ -2229,7 +2230,7 @@ export default function PreGame() {
                 const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
                 const ownsRainbow = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has(rainbowProductId));
                 const ownsFlagPack = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has('flags:bundle'));
-                const availableSpecialSkins = customizerTab === 'slither' ? SLITHER_SPECIAL_SKINS : SIGNATURE_SKINS.filter(skin => skin.gameMode === customizerTab);
+                const availableSpecialSkins = (customizerTab === 'slither' ? SLITHER_SPECIAL_SKINS : SIGNATURE_SKINS.filter(skin => skin.gameMode === customizerTab)).filter(isVisibleSkinProduct);
                 const ownedSpecialSkinIds = new Set(availableSpecialSkins.filter((skin) => user?.isAdmin || ownedSkinProducts.has(skin.productId)).map((skin) => skin.id));
 
                 const cycleChroma = (direction) => {

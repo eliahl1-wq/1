@@ -25,7 +25,7 @@ export default function BRLobby() {
 
     const variant = location.state?.variant || localStorage.getItem('selected_gamemode')?.replace('br-', '') || 'agar';
     const freePlay = !!user?.freePlay || (variant === 'surviv' && isPublicFreeModeEnabled());
-    const entryFeeUsd = normalizeBREntryFee(
+    const entryFeeUsd = variant === 'surviv' && freePlay ? 10 : normalizeBREntryFee(
         location.state?.entryFeeUsd ?? localStorage.getItem('selected_entry_fee')
     );
     const brMode = `br-${variant}`;
