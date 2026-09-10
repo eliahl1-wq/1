@@ -5827,7 +5827,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 }
 
 .profile-product-surface {
-  background: var(--bg-2) !important;
+  background: var(--surface) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 13px !important;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;

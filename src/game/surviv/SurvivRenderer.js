@@ -84,7 +84,7 @@ const PLAYER_HAND_RADIUS = 5.4;
 const WATER_MOVE_MULTIPLIER = 0.68;
 
 function drawPlayerHand(ctx, hand, playerColor) {
-    ctx.fillStyle = playerColor === 'farmer' ? '#e6b68a' : playerColor;
+    ctx.fillStyle = playerColor === 'farmer' ? '#d7bc85' : playerColor;
     ctx.strokeStyle = PLAYER_HAND_OUTLINE;
     ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
     ctx.beginPath();
@@ -8616,7 +8616,7 @@ export class SurvivRenderer {
         ctx.fill();
 
         // Body circle — surviv.io style thick outline
-        ctx.fillStyle = p.color === 'farmer' ? '#467b98' : p.color || '#77c7c8';
+        ctx.fillStyle = p.color === 'farmer' ? '#587b86' : p.color || '#77c7c8';
         ctx.strokeStyle = isMe ? '#ffffff' : 'rgba(14, 20, 18, 0.78)';
         ctx.lineWidth = isMe ? 2.35 : 1.85;
         ctx.beginPath();
@@ -8638,7 +8638,7 @@ export class SurvivRenderer {
             ctx.stroke();
         }
 
-        // Warden's material lighting is already baked into its outfit texture.
+        // Farmer deliberately keeps flat 2D colors without generic glossy shading.
         if (p.color !== 'farmer') {
         // Body highlight
         ctx.fillStyle = 'rgba(255,255,255,0.22)';

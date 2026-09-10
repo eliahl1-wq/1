@@ -1,7 +1,7 @@
 // Original procedural artwork shared by the real renderers and shop previews.
 export const SIGNATURE_SKINS = Object.freeze([
     { id: 'prism', value: 'prism', productId: 'agar:prism', gameMode: 'agar', name: 'Prism Core', usdPrice: 2, baseColor: '#161333', colors: ['#161333', '#7855d6', '#cda4ff', '#64cfde', '#b792ff'], badgeGradient: 'linear-gradient(135deg, #161333, #9974ec, #77e1df)', description: 'A shattered amethyst geode with floating crystal spires, orbiting fragments and shifting pearlescent light deep inside its fractured shell.' },
-    { id: 'farmer', value: 'farmer', productId: 'surviv:farmer', gameMode: 'surviv', name: 'Farmer', usdPrice: 2, baseColor: '#dabb72', colors: ['#dabb72', '#f3dc97', '#87603a', '#467b98', '#e6b68a'], badgeGradient: 'linear-gradient(135deg, #467b98, #dabb72, #f3dc97)', description: 'A laid-back field outfit with a broad woven straw hat, a brown hatband, blue work clothes and bare hands.' },
+    { id: 'farmer', value: 'farmer', productId: 'surviv:farmer', gameMode: 'surviv', name: 'Farmer', usdPrice: 2, baseColor: '#d7bc85', colors: ['#d7bc85', '#e8c77c', '#80523b', '#587b86', '#b6543f'], badgeGradient: 'linear-gradient(135deg, #587b86, #d6ac5e, #b6543f)', description: 'A simple scarecrow-inspired farmer with a crooked straw hat, a patched crown, a stitched burlap face and a red neckerchief. Flat colors and bold outlines.' },
 ]);
 
 export function getSignatureSkin(value) {
@@ -135,36 +135,38 @@ export function drawPrismSkin(ctx, x, y, radius) {
 }
 
 function paintFarmerOutfit(ctx) {
-    // Simple top-down workwear, with the original round player silhouette.
-    ctx.fillStyle = '#467b98'; ctx.fillRect(-1, -1, 2, 2);
+    // Flat, chunky shapes: a scarecrow costume, not a shaded material study.
+    const ink = '#62492f';
+    ctx.fillStyle = '#587b86'; ctx.fillRect(-1, -1, 2, 2);
+    // Red neckerchief and a little exposed straw at the shoulders.
+    polygon(ctx, [[0.34,-0.72],[0.82,-0.38],[0.71,0.4],[0.3,0.72],[-0.05,0]], '#b6543f', ink, 0.045);
     for (const side of [-1, 1]) {
-        ctx.fillStyle = '#94b5c2'; ctx.fillRect(0.48, side * 0.6 - 0.08, 0.4, 0.16);
-        ctx.fillStyle = '#dfbc75'; ctx.beginPath(); ctx.arc(0.62, side * 0.52, 0.055, 0, Math.PI * 2); ctx.fill();
+        polygon(ctx, [[0.18,side*0.54],[0.36,side*0.87],[0.38,side*0.65],[0.56,side*0.8],[0.46,side*0.47]], '#dcb86d');
     }
-    // Slightly offset brim leaves a glimpse of denim at the front.
-    ctx.save(); ctx.translate(-0.1, 0);
-    ctx.fillStyle = '#203f5055'; ctx.beginPath(); ctx.ellipse(0.06, 0.06, 0.87, 0.89, 0, 0, Math.PI * 2); ctx.fill();
-    const straw = ctx.createLinearGradient(-0.7, -0.8, 0.6, 0.8);
-    straw.addColorStop(0, '#f7e3a6'); straw.addColorStop(0.5, '#ddbd72'); straw.addColorStop(1, '#aa7e40');
-    ctx.fillStyle = straw; ctx.strokeStyle = '#765631'; ctx.lineWidth = 0.04;
-    ctx.beginPath(); ctx.ellipse(0, 0, 0.85, 0.88, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // A few concentric woven rings read clearly even at gameplay scale.
-    ctx.strokeStyle = '#96713c55'; ctx.lineWidth = 0.012;
-    for (const r of [0.62, 0.7, 0.78]) { ctx.beginPath(); ctx.ellipse(0, 0, r, r * 1.04, 0, 0, Math.PI * 2); ctx.stroke(); }
-    for (let i = 0; i < 28; i++) {
-        const a = i * Math.PI / 14;
-        ctx.beginPath(); ctx.moveTo(...polar(a, 0.63)); ctx.lineTo(...polar(a + 0.025, 0.82)); ctx.stroke();
+    // Burlap sack face sits toward the aim direction; the hat leaves it readable.
+    polygon(ctx, [[-0.34,-0.45],[0.13,-0.61],[0.53,-0.43],[0.72,-0.12],[0.65,0.34],[0.2,0.55],[-0.29,0.35]], '#d7bc85', ink, 0.055);
+    ctx.strokeStyle = ink; ctx.lineWidth = 0.052; ctx.lineCap = 'round';
+    for (const side of [-1, 1]) {
+        const x = 0.25, y = side * 0.25;
+        ctx.beginPath(); ctx.moveTo(x-0.07,y-0.065); ctx.lineTo(x+0.07,y+0.065);
+        ctx.moveTo(x-0.07,y+0.065); ctx.lineTo(x+0.07,y-0.065); ctx.stroke();
     }
-    ctx.fillStyle = '#654128'; ctx.beginPath(); ctx.ellipse(0.015, 0.025, 0.57, 0.6, 0, 0, Math.PI * 2); ctx.fill();
-    const crown = ctx.createRadialGradient(-0.18, -0.22, 0.02, 0, 0, 0.63);
-    crown.addColorStop(0, '#f8e8b2'); crown.addColorStop(0.6, '#e6c980'); crown.addColorStop(1, '#b38a49');
-    ctx.fillStyle = crown; ctx.strokeStyle = '#8d6839'; ctx.lineWidth = 0.022;
-    ctx.beginPath(); ctx.ellipse(-0.055, -0.035, 0.48, 0.51, -0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = '#fff0bb88'; ctx.lineWidth = 0.025;
-    ctx.beginPath(); ctx.ellipse(-0.055, -0.035, 0.4, 0.43, -0.1, Math.PI, Math.PI * 1.8); ctx.stroke();
-    ctx.strokeStyle = '#b58f5155'; ctx.lineWidth = 0.016;
-    ctx.beginPath(); ctx.moveTo(-0.26, -0.06); ctx.quadraticCurveTo(-0.06, -0.18, 0.19, -0.07); ctx.stroke();
-    ctx.restore();
+    // Three large stitches read as a friendly sewn smile, even when zoomed out.
+    ctx.lineWidth = 0.036;
+    ctx.beginPath(); ctx.moveTo(0.48,-0.2); ctx.quadraticCurveTo(0.63,0,0.48,0.2); ctx.stroke();
+    for (const y of [-0.12, 0, 0.12]) {
+        ctx.beginPath(); ctx.moveTo(0.49,y-0.025); ctx.lineTo(0.61,y+0.025); ctx.stroke();
+    }
+    // Lopsided straw hat: an irregular broad brim and one simple crown shape.
+    polygon(ctx, [[-0.78,-0.41],[-0.49,-0.78],[-0.2,-0.83],[0.04,-0.71],[-0.04,-0.49],[0.03,-0.15],[-0.03,0.33],[0.12,0.63],[-0.11,0.8],[-0.43,0.73],[-0.76,0.48],[-0.86,0.06]], '#d6ac5e', ink, 0.055);
+    polygon(ctx, [[-0.72,-0.25],[-0.61,-0.53],[-0.34,-0.56],[-0.14,-0.38],[-0.13,0.36],[-0.42,0.5],[-0.66,0.29]], '#e8c77c', ink, 0.045);
+    polygon(ctx, [[-0.25,-0.46],[-0.12,-0.38],[-0.11,0.37],[-0.25,0.43]], '#80523b');
+    // One cloth patch and three straw cuts, no gradients, shine or fine weave.
+    polygon(ctx, [[-0.58,-0.12],[-0.38,-0.17],[-0.35,0.06],[-0.55,0.1]], '#ad784b', ink, 0.025);
+    ctx.strokeStyle = ink; ctx.lineWidth = 0.027;
+    for (const [x,y,dx,dy] of [[-0.55,-0.6,0.06,0.1],[-0.65,0.43,0.08,-0.06],[-0.15,0.65,-0.04,-0.1]]) {
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx,y+dy); ctx.stroke();
+    }
 }
 
 export function drawFarmerOutfit(ctx, radius) {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSnakeSegmentCanvas, snakeSegmentCache } from './snakeRender.js';
-import { getSignatureSkin, SIGNATURE_SKINS } from '../constants/signatureSkins.js';
+import { drawFarmerOutfit, getSignatureSkin, SIGNATURE_SKINS } from '../constants/signatureSkins.js';
 import { drawSlitherSpecialBody, drawSlitherSpecialDetails } from '../constants/slitherSpecialSkins.js';
 
 test('Leviathan retains default segment opacity, shaded volume and bounded material caching', () => {
@@ -50,4 +50,22 @@ test('Farmer replaces the retired product and normalizes saved Warden selections
     assert.equal(getSignatureSkin('warden'), getSignatureSkin('farmer'));
     assert.equal(getSignatureSkin('surviv:warden').productId, 'surviv:farmer');
     assert.equal(getSignatureSkin('farmer').gameMode, 'surviv');
+});
+
+test('Farmer uses cached flat artwork without gradients', () => {
+    const originalDocument = globalThis.document;
+    let textures = 0, draws = 0;
+    // Gradient APIs deliberately absent: the Farmer painting must stay flat 2D.
+    const ctx = Object.fromEntries(['save', 'restore', 'translate', 'scale', 'fillRect', 'beginPath', 'moveTo', 'lineTo', 'closePath', 'fill', 'stroke', 'quadraticCurveTo', 'arc', 'clip'].map(name => [name, () => {}]));
+    ctx.drawImage = () => draws++;
+    globalThis.document = { createElement: () => { textures++; return { getContext: () => ctx }; } };
+    try {
+        drawFarmerOutfit(ctx, 14);
+        drawFarmerOutfit(ctx, 28);
+        assert.equal(textures, 1);
+        assert.equal(draws, 2);
+    } finally {
+        if (originalDocument === undefined) delete globalThis.document;
+        else globalThis.document = originalDocument;
+    }
 });
