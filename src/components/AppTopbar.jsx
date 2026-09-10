@@ -88,7 +88,7 @@ export default function AppTopbar({ children }) {
 
             {user && (
                 <button type="button" className={linkClass('/profile')} aria-current={currentPage('/profile')} onClick={() => navigate('/profile')}>
-                    Performance
+                    Portfolio
                 </button>
             )}
             {user?.isAdmin && (

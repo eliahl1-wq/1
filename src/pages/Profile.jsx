@@ -119,6 +119,25 @@ export default function Profile() {
     const totalWon = processedLogs.filter(l => l.netProfit > 0).reduce((acc, l) => acc + l.netProfit, 0);
     const totalLost = processedLogs.filter(l => l.netProfit < 0).reduce((acc, l) => acc + Math.abs(l.netProfit), 0);
 
+    const dailyPnl = Array.from({ length: 7 }, (_, index) => {
+        const date = new Date();
+        date.setHours(0, 0, 0, 0);
+        date.setDate(date.getDate() - (6 - index));
+        const nextDate = new Date(date);
+        nextDate.setDate(nextDate.getDate() + 1);
+        const value = processedLogs.reduce((sum, log) => {
+            const createdAt = new Date(log.createdAt).getTime();
+            return createdAt >= date.getTime() && createdAt < nextDate.getTime() ? sum + log.netProfit : sum;
+        }, 0);
+        return {
+            key: date.toISOString(),
+            label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+            value,
+        };
+    });
+    const maxDailyPnl = Math.max(1, ...dailyPnl.map(day => Math.abs(day.value)));
+    const todayPnl = dailyPnl[dailyPnl.length - 1]?.value || 0;
+
     // Cumulative points in selected currency
     const pnlConversion = displayCur === 'SOL' ? (1 / solPrice) : 1;
     let cumulative = 0;
@@ -227,10 +246,10 @@ export default function Profile() {
             <Background />
             <AppTopbar />
 
-            <div className="page-content" style={{ maxWidth: '780px' }}>
+            <div className="page-content profile-page-content">
 
                 {/* ── Page header ── */}
-                <ProductPageHeader title="Account" onBack={() => navigate(-1)} />
+                <ProductPageHeader title="Profile" onBack={() => navigate(-1)} />
 
                 {/* Main card */}
                 <div className="product-surface profile-product-surface">
@@ -255,7 +274,7 @@ export default function Profile() {
                         {activeTab === 'stats' ? (
 
                             /* ══ Stats view ══ */
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div className="profile-stats-view">
 
                                 {/* Account Balance Banner */}
                                 <div className="profile-balance-panel" style={{
@@ -375,6 +394,37 @@ export default function Profile() {
                                     ))}
                                 </div>
 
+                                <section className="profile-daily-pnl" aria-labelledby="daily-pnl-title">
+                                    <div className="profile-daily-pnl__heading">
+                                        <div>
+                                            <span className="label" id="daily-pnl-title">Daily P&amp;L</span>
+                                            <small>Last 7 days</small>
+                                        </div>
+                                        <div className="profile-daily-pnl__today">
+                                            <span>Today</span>
+                                            <strong className="mono" style={{ color: todayPnl >= 0 ? C_GREEN : C_RED }}>
+                                                {formatVal(todayPnl, true)}
+                                            </strong>
+                                        </div>
+                                    </div>
+                                    <div className="profile-daily-pnl__chart">
+                                        {dailyPnl.map(day => {
+                                            const height = day.value === 0 ? 2 : Math.max(8, Math.round((Math.abs(day.value) / maxDailyPnl) * 44));
+                                            return (
+                                                <div className="profile-daily-pnl__day" key={day.key} title={`${day.label}: ${formatVal(day.value, true)}`}>
+                                                    <div className="profile-daily-pnl__bar-area">
+                                                        <span
+                                                            className={`profile-daily-pnl__bar${day.value < 0 ? ' is-negative' : day.value > 0 ? ' is-positive' : ' is-flat'}`}
+                                                            style={{ height: `${height}px` }}
+                                                        />
+                                                    </div>
+                                                    <span>{day.label}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+
                                 {/* Equity chart */}
                                 <div className="profile-equity-panel" style={{
                                     position: 'relative',
@@ -397,9 +447,13 @@ export default function Profile() {
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position: 'relative', zIndex: 1 }}>
                                         <span className="label">Equity Curve</span>
-                                        {hoveredPoint && (
+                                        {hoveredPoint ? (
                                             <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED }}>
                                                 {formatVal(hoveredPoint.cumVal, true)}
+                                            </span>
+                                        ) : (
+                                            <span className="profile-equity-summary mono" style={{ color: totalPnL >= 0 ? C_GREEN : C_RED }}>
+                                                {formatVal(totalPnL, true)}
                                             </span>
                                         )}
                                     </div>
@@ -577,8 +631,14 @@ export default function Profile() {
                                 </div>
 
                                 {/* Session log */}
-                                <div>
-                                    <div className="label" style={{ marginBottom: '10px' }}>Session History</div>
+                                <div className="profile-session-section">
+                                    <div id="session-history-hdr" className="profile-session-heading">
+                                        <div>
+                                            <span className="label">Session History</span>
+                                            <small>Your latest completed games</small>
+                                        </div>
+                                        <span className="profile-session-count mono">{processedLogs.length} sessions</span>
+                                    </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                         {processedLogs.length === 0 ? (
                                             <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-3)', fontSize: '0.78rem', fontWeight: 600 }}>

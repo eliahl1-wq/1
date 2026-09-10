@@ -14,6 +14,7 @@ import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.j
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
 import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanEyes, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
 import { slitherCanvasDpr, slitherQualityForFrameTime } from './slitherPerformance.js';
+import { drawGoldenBlob, GOLDEN_BLOB_HALO_SCALE } from './goldenBlobVisual.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
 
@@ -1077,19 +1078,16 @@ export class SlitherRenderer {
     _foodSprite(hue, rPx, golden, deathDrop, arenaDeathDrop = false) {
         // Keep arena death food at exactly the normal death-food sprite size.
         // Only its gradient is more golden and less hazy.
-        const halo = Math.ceil(rPx * (golden ? 2.5 : deathDrop ? 1.35 : 1.45));
-        const key = `f13|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}|${arenaDeathDrop ? 1 : 0}`;
+        const halo = Math.ceil(rPx * (golden ? GOLDEN_BLOB_HALO_SCALE : deathDrop ? 1.35 : 1.45));
+        const key = `f14|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}|${arenaDeathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
-            const grad = g.createRadialGradient(c, c, 0, c, c, halo);
             if (golden) {
-                const sat = 90;
-                grad.addColorStop(0, `hsla(55, ${sat}%, 70%, 0.70)`);
-                grad.addColorStop(0.35, `hsla(52, ${sat}%, 60%, 0.40)`);
-                grad.addColorStop(0.55, `hsla(48, ${sat}%, 50%, 0.15)`);
-                grad.addColorStop(0.75, `hsla(42, ${sat}%, 45%, 0.04)`);
-                grad.addColorStop(1, `hsla(35, ${sat}%, 45%, 0)`);
-            } else if (arenaDeathDrop) {
+                drawGoldenBlob(g, c, c, rPx);
+                return;
+            }
+            const grad = g.createRadialGradient(c, c, 0, c, c, halo);
+            if (arenaDeathDrop) {
                 const sat = 92;
                 grad.addColorStop(0, `hsla(55, ${sat}%, 72%, 0.72)`);
                 grad.addColorStop(0.62, `hsla(51, ${sat}%, 60%, 0.32)`);
@@ -1337,9 +1335,11 @@ export class SlitherRenderer {
             let alpha = 1;
 
             if (isGolden) {
-                const pulse = Math.sin(now * 0.006 + f.x) * 0.15;
-                sizeMul = 0.85 + pulse;
-                alpha = 0.75 + Math.sin(now * 0.008 + f.x + f.y) * 0.25;
+                // Calm breathing light: the old 30% size swing and 50% alpha
+                // swing made premium food look unstable rather than polished.
+                const pulse = Math.sin(now * 0.0035 + anim.phase);
+                sizeMul = 0.98 + pulse * 0.035;
+                alpha = 0.95 + pulse * 0.05;
             } else if (f.deathDrop) {
                 sizeMul = 1.2 + ((f.radius || 3) - 2) * 0.14;
                 if (animateFood) {
@@ -1405,7 +1405,9 @@ export class SlitherRenderer {
                 continue;
             }
 
-            const spriteR = 4;
+            // Render the pearl at twice the normal source resolution so the
+            // rim and specular highlights remain clean on high-DPI displays.
+            const spriteR = isGolden ? 8 : 4;
             const sprite = this._foodSprite(
                 hue,
                 spriteR,
@@ -1417,11 +1419,9 @@ export class SlitherRenderer {
             const half = size / 2;
 
             if (isGolden) {
-                ctx.globalCompositeOperation = 'lighter';
                 ctx.globalAlpha = alpha;
                 ctx.drawImage(sprite, Math.round(fx - half), Math.round(fy - half), size, size);
                 ctx.globalAlpha = 1.0;
-                ctx.globalCompositeOperation = 'source-over';
             } else {
                 if (alpha < 0.99) {
                     ctx.globalAlpha = alpha;

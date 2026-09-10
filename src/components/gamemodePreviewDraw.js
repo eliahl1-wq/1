@@ -5,6 +5,7 @@
 import { drawFood, drawOrganicCell } from '../game/agar/render.js';
 import { drawCashoutProgressRing } from '../game/cashoutRing.js';
 import { drawBalanceBadge } from '../game/balanceBadge.js';
+import { drawGoldenBlob } from '../game/slither/goldenBlobVisual.js';
 
 const FULL = Math.PI * 2;
 const LOOSE_BORDERS = { left: -9999, right: 9999, top: -9999, bottom: 9999 };
@@ -276,17 +277,15 @@ function sampleSnakePath(startX, startY, angle, length, count) {
 }
 
 function drawSlitherFood(ctx, x, y, r, hue, golden = false) {
-    const halo = golden ? r * 2.4 : r * 1.6;
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, halo);
     if (golden) {
-        grad.addColorStop(0, 'hsla(55, 100%, 100%, 1)');
-        grad.addColorStop(0.35, 'hsla(48, 100%, 62%, 0.95)');
-        grad.addColorStop(1, 'hsla(40, 100%, 45%, 0)');
-    } else {
-        grad.addColorStop(0, `hsla(${hue}, 100%, 88%, 0.95)`);
-        grad.addColorStop(0.4, `hsla(${hue}, 100%, 58%, 0.75)`);
-        grad.addColorStop(1, `hsla(${hue}, 100%, 45%, 0)`);
+        drawGoldenBlob(ctx, x, y, r);
+        return;
     }
+    const halo = r * 1.6;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, halo);
+    grad.addColorStop(0, `hsla(${hue}, 100%, 88%, 0.95)`);
+    grad.addColorStop(0.4, `hsla(${hue}, 100%, 58%, 0.75)`);
+    grad.addColorStop(1, `hsla(${hue}, 100%, 45%, 0)`);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(x, y, halo, 0, FULL);
