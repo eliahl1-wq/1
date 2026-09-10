@@ -47,10 +47,11 @@ export default function Profile() {
     const [gameLogs, setGameLogs] = useState([]);
     const [displayCur] = useBalanceCurrency();
     const [currentPage, setCurrentPage] = useState(1);
+    const [playScope, setPlayScope] = useState('real');
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [displayCur]);
+    }, [displayCur, playScope]);
     const [usernameInput, setUsernameInput] = useState(user?.username || '');
     const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
     const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
@@ -74,7 +75,7 @@ export default function Profile() {
                 setGameLogs(data.filter(tx => {
                     const reason = tx.meta?.reason || '';
                     return (tx.type === 'withdraw' && (reason.includes('Arena Cashout') || reason.includes('BR Victory')))
-                        || (tx.type === 'game' && (reason === 'Arena Death' || reason === 'BR Eliminated'));
+                        || (tx.type === 'game' && ['Arena Death', 'BR Eliminated', 'Surviv Death'].includes(reason));
                 }));
             } catch { }
         };
@@ -98,12 +99,18 @@ export default function Profile() {
     };
 
     // ── Chart data ────────────────────────────────────
-    const processedLogs = [...gameLogs].reverse().map(log => {
+    const scopedGameLogs = gameLogs.filter(log => {
+        const freePlay = log.meta?.simulated === true || log.meta?.adminFreeEntry === true;
+        if (playScope === 'free') return freePlay;
+        return !freePlay && log.meta?.isFreeTicketPlay !== true && log.meta?.event !== 'free_ticket_cashout';
+    });
+
+    const processedLogs = [...scopedGameLogs].reverse().map(log => {
         const isCashout = log.type === 'withdraw' && ((log.meta?.reason || '').includes('Arena Cashout') || (log.meta?.reason || '').includes('BR Victory'));
         const amount = Number(log.amount) || 0;
         const entryCost = Number(log.meta?.entryFeeUsd) || 10;
         const netProfit = isCashout ? (amount - entryCost) : (0 - entryCost);
-        return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount, isCashout };
+        return { ...log, netProfit: isNaN(netProfit) ? 0 : netProfit, grossAmount: amount, isCashout, isFreePlay: playScope === 'free' };
     });
 
     const totalPnL = processedLogs.reduce((acc, l) => acc + l.netProfit, 0);
@@ -251,13 +258,10 @@ export default function Profile() {
                 {/* ── Page header ── */}
                 <ProductPageHeader title="Profile" onBack={() => navigate(-1)} />
 
-                {/* Main card */}
-                <div className="product-surface profile-product-surface">
-
-                    {/* ── Tab bar ── */}
+                <div className="profile-subnav">
                     <div className="profile-tabs">
                         {[
-                            { id: 'stats', label: 'Performance' },
+                            { id: 'stats', label: 'Portfolio' },
                             { id: 'profile', label: 'Settings' },
                         ].map(tab => (
                             <button
@@ -269,6 +273,20 @@ export default function Profile() {
                             </button>
                         ))}
                     </div>
+                    {activeTab === 'stats' && (
+                        <div className="profile-play-scope" aria-label="Portfolio game type">
+                            <button type="button" className={playScope === 'real' ? 'is-active' : ''} onClick={() => { setPlayScope('real'); setHoveredPoint(null); }}>
+                                Real play
+                            </button>
+                            <button type="button" className={playScope === 'free' ? 'is-active' : ''} onClick={() => { setPlayScope('free'); setHoveredPoint(null); }}>
+                                Free play
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Main card */}
+                <div className="product-surface profile-product-surface">
 
                     <div className="product-surface__body">
                         {activeTab === 'stats' ? (
@@ -317,10 +335,10 @@ export default function Profile() {
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <SolLogo size={24} style={{ marginRight: '2px' }} />
-                                                    <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                                                    <span className="mono profile-primary-balance" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
                                                         {(user?.balance || 0).toFixed(4)}
                                                     </span>
-                                                    <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>SOL</span>
+                                                    <span className="mono profile-primary-balance__currency" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>SOL</span>
                                                 </div>
                                                 <div className="mono" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-3)', paddingLeft: '28px' }}>
                                                     ≈ ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)} USD
@@ -329,10 +347,10 @@ export default function Profile() {
                                         ) : (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <span className="mono" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                                                    <span className="mono profile-primary-balance" style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--text-h)', letterSpacing: '-0.03em', lineHeight: 1 }}>
                                                         ${((user?.balance || 0) * (user?.solPrice || 0)).toFixed(2)}
                                                     </span>
-                                                    <span className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>USD</span>
+                                                    <span className="mono profile-primary-balance__currency" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-h)' }}>USD</span>
                                                 </div>
                                                 <div className="mono" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                     ≈ <SolLogo size={12} /> {(user?.balance || 0).toFixed(4)} SOL
@@ -446,7 +464,7 @@ export default function Profile() {
                                     }} />
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position: 'relative', zIndex: 1 }}>
-                                        <span className="label">Equity Curve</span>
+                                        <span className="label">{playScope === 'free' ? 'Free Play P&L' : 'Real Play P&L'}</span>
                                         {hoveredPoint ? (
                                             <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: hoveredPoint.cumVal >= 0 ? C_GREEN : C_RED }}>
                                                 {formatVal(hoveredPoint.cumVal, true)}
@@ -458,7 +476,7 @@ export default function Profile() {
                                         )}
                                     </div>
 
-                                    <div style={{ position: 'relative', width: '100%', height: '220px' }}>
+                                    <div style={{ position: 'relative', width: '100%', height: '180px' }}>
                                         <svg
                                             viewBox="0 0 100 100"
                                             preserveAspectRatio="none"
@@ -635,7 +653,7 @@ export default function Profile() {
                                     <div id="session-history-hdr" className="profile-session-heading">
                                         <div>
                                             <span className="label">Session History</span>
-                                            <small>Your latest completed games</small>
+                                            <small>{playScope === 'free' ? 'Simulated free-play games only' : 'Real SOL games only'}</small>
                                         </div>
                                         <span className="profile-session-count mono">{processedLogs.length} sessions</span>
                                     </div>
@@ -682,6 +700,7 @@ export default function Profile() {
                                                                     <div>
                                                                         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: win ? 'var(--green)' : 'var(--red)' }}>
                                                                             {log.type === 'withdraw' ? 'Cashout' : 'Eliminated'} · <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{getGamemodeLabel(log)}</span>
+                                                                            {log.isFreePlay && <span className="profile-free-play-badge">Free play</span>}
                                                                         </div>
                                                                         <div style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginTop: '1px' }}>
                                                                             {new Date(log.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -742,7 +761,12 @@ export default function Profile() {
                         ) : (
 
                             /* ══ Settings view ══ */
-                            <div style={{ maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                            <div className="profile-settings-view" style={{ maxWidth: '520px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                                <header className="profile-settings-heading">
+                                    <span className="label">Account settings</span>
+                                    <p>Manage your public username and payout destination.</p>
+                                </header>
 
                                 {/* Username */}
                                 <div>
