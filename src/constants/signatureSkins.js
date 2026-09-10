@@ -1,11 +1,13 @@
 // Original procedural artwork shared by the real renderers and shop previews.
 export const SIGNATURE_SKINS = Object.freeze([
     { id: 'prism', value: 'prism', productId: 'agar:prism', gameMode: 'agar', name: 'Prism Core', usdPrice: 2, baseColor: '#161333', colors: ['#161333', '#7855d6', '#cda4ff', '#64cfde', '#b792ff'], badgeGradient: 'linear-gradient(135deg, #161333, #9974ec, #77e1df)', description: 'A shattered amethyst geode with floating crystal spires, orbiting fragments and shifting pearlescent light deep inside its fractured shell.' },
-    { id: 'warden', value: 'warden', productId: 'surviv:warden', gameMode: 'surviv', name: 'Copper Warden', usdPrice: 2, baseColor: '#18282e', colors: ['#18282e', '#e6ddd0', '#b76c45', '#f4bc86', '#bc7953'], badgeGradient: 'linear-gradient(135deg, #18282e, #bc7953, #eee2ce)', description: 'An artisan expedition outfit: hammered copper panels, ivory field cloth, a jade compass insignia and matching plated gloves.' },
+    { id: 'farmer', value: 'farmer', productId: 'surviv:farmer', gameMode: 'surviv', name: 'Farmer', usdPrice: 2, baseColor: '#dabb72', colors: ['#dabb72', '#f3dc97', '#87603a', '#467b98', '#e6b68a'], badgeGradient: 'linear-gradient(135deg, #467b98, #dabb72, #f3dc97)', description: 'A laid-back field outfit with a broad woven straw hat, a brown hatband, blue work clothes and bare hands.' },
 ]);
 
 export function getSignatureSkin(value) {
-    return SIGNATURE_SKINS.find(skin => skin.id === value || skin.productId === value) || null;
+    // Old saved selections resolve to the replacement, never to a second shop item.
+    const canonical = value === 'warden' ? 'farmer' : value === 'surviv:warden' ? 'surviv:farmer' : value;
+    return SIGNATURE_SKINS.find(skin => skin.id === canonical || skin.productId === canonical) || null;
 }
 
 let motionPreference;
@@ -27,7 +29,7 @@ const polar = (angle, r) => [Math.cos(angle) * r, Math.sin(angle) * r];
 
 // Only two bounded textures are cached. Fine facets never regenerate per cell/frame.
 let prismShell;
-let wardenSuit;
+let farmerOutfit;
 function texture(paint) {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 512;
@@ -132,70 +134,41 @@ export function drawPrismSkin(ctx, x, y, radius) {
     ctx.restore();
 }
 
-function paintWardenSuit(ctx) {
-    ctx.fillStyle='#14272d';ctx.fillRect(-1,-1,2,2);
-    // Woven field cloth is cached, so tiny weave lines cost nothing per frame.
-    ctx.lineWidth=0.006;ctx.strokeStyle='#b1d5c414';
-    for(let i=-24;i<=24;i++) {
-        const p=i/24;ctx.beginPath();ctx.moveTo(-1,p);ctx.lineTo(1,p+0.28);ctx.moveTo(p,-1);ctx.lineTo(p+0.2,1);ctx.stroke();
+function paintFarmerOutfit(ctx) {
+    // Simple top-down workwear, with the original round player silhouette.
+    ctx.fillStyle = '#467b98'; ctx.fillRect(-1, -1, 2, 2);
+    for (const side of [-1, 1]) {
+        ctx.fillStyle = '#94b5c2'; ctx.fillRect(0.48, side * 0.6 - 0.08, 0.4, 0.16);
+        ctx.fillStyle = '#dfbc75'; ctx.beginPath(); ctx.arc(0.62, side * 0.52, 0.055, 0, Math.PI * 2); ctx.fill();
     }
-    // A recessed copper perimeter, interrupted by the two ivory shoulder panels.
-    const copper=ctx.createLinearGradient(-1,-1,0.8,1);
-    copper.addColorStop(0,'#f4d2a1');copper.addColorStop(0.38,'#b97848');copper.addColorStop(0.7,'#71412d');copper.addColorStop(1,'#dc9a62');
-    ctx.strokeStyle=copper;ctx.lineWidth=0.19;ctx.beginPath();ctx.arc(0,0,0.82,0,Math.PI*2);ctx.stroke();
-    for(const side of [-1,1]) {
-        polygon(ctx,[[-0.46,side*0.34],[-0.23,side*0.81],[0.28,side*0.81],[0.55,side*0.54],[0.23,side*0.36]],'#e9e1cf','#101d25',0.045);
-        ctx.strokeStyle='#fff9e6';ctx.lineWidth=0.025;ctx.beginPath();ctx.moveTo(-0.22,side*0.74);ctx.lineTo(0.22,side*0.74);ctx.lineTo(0.42,side*0.55);ctx.stroke();
-        polygon(ctx,[[-0.3,side*0.36],[-0.2,side*0.61],[-0.09,side*0.64],[0.02,side*0.36]],'#c18354');
-        for(let i=0;i<3;i++) {ctx.fillStyle='#395454';ctx.fillRect(0.17+i*0.09,side*0.52-0.025,0.045,0.09);}
+    // Slightly offset brim leaves a glimpse of denim at the front.
+    ctx.save(); ctx.translate(-0.1, 0);
+    ctx.fillStyle = '#203f5055'; ctx.beginPath(); ctx.ellipse(0.06, 0.06, 0.87, 0.89, 0, 0, Math.PI * 2); ctx.fill();
+    const straw = ctx.createLinearGradient(-0.7, -0.8, 0.6, 0.8);
+    straw.addColorStop(0, '#f7e3a6'); straw.addColorStop(0.5, '#ddbd72'); straw.addColorStop(1, '#aa7e40');
+    ctx.fillStyle = straw; ctx.strokeStyle = '#765631'; ctx.lineWidth = 0.04;
+    ctx.beginPath(); ctx.ellipse(0, 0, 0.85, 0.88, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // A few concentric woven rings read clearly even at gameplay scale.
+    ctx.strokeStyle = '#96713c55'; ctx.lineWidth = 0.012;
+    for (const r of [0.62, 0.7, 0.78]) { ctx.beginPath(); ctx.ellipse(0, 0, r, r * 1.04, 0, 0, Math.PI * 2); ctx.stroke(); }
+    for (let i = 0; i < 28; i++) {
+        const a = i * Math.PI / 14;
+        ctx.beginPath(); ctx.moveTo(...polar(a, 0.63)); ctx.lineTo(...polar(a + 0.025, 0.82)); ctx.stroke();
     }
-    // Central stitched placket and hexagonal jade insignia, not an equipment icon.
-    polygon(ctx,[[-0.72,-0.31],[-0.46,-0.45],[0.56,-0.26],[0.7,0],[0.56,0.26],[-0.46,0.45],[-0.72,0.31]],'#243d40','#091a20',0.035);
-    ctx.strokeStyle='#c69464';ctx.lineWidth=0.028;ctx.beginPath();ctx.moveTo(-0.65,-0.29);ctx.lineTo(-0.32,-0.36);ctx.lineTo(0.51,-0.22);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(-0.65,0.29);ctx.lineTo(-0.32,0.36);ctx.lineTo(0.51,0.22);ctx.stroke();
-    polygon(ctx,[[-0.27,-0.26],[0.02,-0.37],[0.28,-0.2],[0.28,0.2],[0.02,0.37],[-0.27,0.26]],copper,'#091b24',0.035);
-    polygon(ctx,[[-0.19,-0.17],[0.01,-0.26],[0.2,-0.13],[0.2,0.13],[0.01,0.26],[-0.19,0.17]],'#122f39','#eccda1',0.015);
-    polygon(ctx,[[-0.1,0],[0.015,-0.19],[0.12,0],[0.015,0.19]],'#76d2c4');
-    polygon(ctx,[[-0.1,0],[0.015,-0.19],[0.015,0.19]],'#d0f0d8');
-    for(const side of [-1,1]) for(let i=0;i<3;i++) {ctx.fillStyle='#a4b6a5';ctx.fillRect(-0.58+i*0.09,side*0.15,0.04,0.025);}
-    for(let i=0;i<8;i++){const a=i*Math.PI/4;ctx.fillStyle='#f4c996';ctx.beginPath();ctx.arc(...polar(a,0.82),0.026,0,Math.PI*2);ctx.fill();}
-    // Asymmetric hammered copper shoulder; ivory opposite panel stays visible.
-    polygon(ctx,[[-0.62,-0.43],[-0.39,-0.83],[0.06,-0.9],[0.44,-0.72],[0.53,-0.49],[0.12,-0.39],[-0.2,-0.5]],copper,'#14252b',0.045);
-    polygon(ctx,[[-0.36,-0.75],[0.06,-0.81],[0.34,-0.67],[0.14,-0.55],[-0.24,-0.62]],'#d8aa76');
-    ctx.strokeStyle='#ffdfb1';ctx.lineWidth=0.025;ctx.beginPath();ctx.moveTo(-0.43,-0.68);ctx.lineTo(-0.34,-0.78);ctx.lineTo(0.06,-0.85);ctx.lineTo(0.39,-0.7);ctx.stroke();
-    for(let i=0;i<11;i++) {
-        const x=-0.27+(i%4)*0.14;const y=-0.7+Math.floor(i/4)*0.047;
-        ctx.fillStyle=i%2?'#885d3c38':'#fff2c936';ctx.beginPath();ctx.ellipse(x,y,0.025,0.012,0.4,0,Math.PI*2);ctx.fill();
-    }
-    // A directional compass crest is deliberately separate from equipment tiers.
-    ctx.strokeStyle='#94dfc6';ctx.lineWidth=0.016;
-    for(let i=0;i<4;i++) { const a=i*Math.PI/2;ctx.beginPath();ctx.moveTo(...polar(a,0.13));ctx.lineTo(...polar(a,0.22));ctx.stroke(); }
-    polygon(ctx,[[0,-0.2],[0.072,-0.04],[0,0.15],[-0.072,-0.04]],'#b4f3d5','#122f39',0.014);
-    // Small stitched rank bars on the ivory sleeve remain legible when zoomed out.
-    ctx.strokeStyle='#8f553a';ctx.lineWidth=0.042;
-    for(let i=0;i<2;i++) {const y=0.56+i*0.1;ctx.beginPath();ctx.moveTo(-0.1,y);ctx.lineTo(0.03,y+0.055);ctx.lineTo(0.16,y);ctx.stroke();}
-}
-
-export function drawWardenOutfit(ctx, radius) {
-    wardenSuit ||= texture(paintWardenSuit);
-    ctx.save();ctx.beginPath();ctx.arc(0,0,radius-1.5,0,Math.PI*2);ctx.clip();
-    ctx.drawImage(wardenSuit,-radius,-radius,radius*2,radius*2);ctx.restore();
-}
-
-export function drawWardenGlove(ctx, x, y, radius) {
-    ctx.save();ctx.translate(x,y);ctx.scale(radius,radius);
-    ctx.beginPath();ctx.arc(0,0,0.82,0,Math.PI*2);ctx.clip();
-    polygon(ctx,[[-0.75,-0.7],[-0.3,-0.8],[-0.15,0.8],[-0.62,0.8]],'#b47a50');
-    polygon(ctx,[[-0.15,-0.53],[0.46,-0.55],[0.71,-0.19],[0.7,0.33],[0.31,0.56],[-0.15,0.43]],'#d09e70','#654932',0.08);
-    ctx.fillStyle='#283e42';ctx.fillRect(0.02,-0.36,0.36,0.65);
-    ctx.fillStyle='#9fe3d4';ctx.fillRect(0.08,-0.31,0.09,0.22);ctx.fillRect(0.24,-0.31,0.09,0.22);
-    // Three separate knuckle plates, stitched cuff and a restrained edge glint.
-    for(let i=0;i<3;i++) {
-        const y=-0.33+i*0.24;
-        polygon(ctx,[[0.36,y],[0.62,y+0.02],[0.65,y+0.16],[0.37,y+0.17]],i%2?'#bd814f':'#e4ba83','#644831',0.025);
-    }
-    ctx.strokeStyle='#f3d9a9';ctx.lineWidth=0.034;
-    ctx.beginPath();ctx.moveTo(-0.1,-0.51);ctx.lineTo(0.43,-0.52);ctx.lineTo(0.61,-0.32);ctx.stroke();
-    for(let i=0;i<4;i++) {ctx.fillStyle='#f1dab3';ctx.fillRect(-0.57,-0.43+i*0.24,0.09,0.04);}
+    ctx.fillStyle = '#654128'; ctx.beginPath(); ctx.ellipse(0.015, 0.025, 0.57, 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    const crown = ctx.createRadialGradient(-0.18, -0.22, 0.02, 0, 0, 0.63);
+    crown.addColorStop(0, '#f8e8b2'); crown.addColorStop(0.6, '#e6c980'); crown.addColorStop(1, '#b38a49');
+    ctx.fillStyle = crown; ctx.strokeStyle = '#8d6839'; ctx.lineWidth = 0.022;
+    ctx.beginPath(); ctx.ellipse(-0.055, -0.035, 0.48, 0.51, -0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#fff0bb88'; ctx.lineWidth = 0.025;
+    ctx.beginPath(); ctx.ellipse(-0.055, -0.035, 0.4, 0.43, -0.1, Math.PI, Math.PI * 1.8); ctx.stroke();
+    ctx.strokeStyle = '#b58f5155'; ctx.lineWidth = 0.016;
+    ctx.beginPath(); ctx.moveTo(-0.26, -0.06); ctx.quadraticCurveTo(-0.06, -0.18, 0.19, -0.07); ctx.stroke();
     ctx.restore();
+}
+
+export function drawFarmerOutfit(ctx, radius) {
+    farmerOutfit ||= texture(paintFarmerOutfit);
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, radius - 1.5, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(farmerOutfit, -radius, -radius, radius * 2, radius * 2); ctx.restore();
 }

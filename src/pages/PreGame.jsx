@@ -26,7 +26,7 @@ import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
 import { SIGNATURE_SKINS, getSignatureSkin, drawPrismSkin } from '../constants/signatureSkins';
 import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
-import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanEyes, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
+import { SLITHER_SPECIAL_SKINS, drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, getSlitherSpecialSkin } from '../constants/slitherSpecialSkins';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import AgarLogo from '../features/agar/ui/AgarLogo';
 import { formatAgarAmount } from '../features/agar/formatAgarAmount';
@@ -287,7 +287,10 @@ export default function PreGame() {
         () => localStorage.getItem('selected_skin_agar') || '#c080ff'
     );
     const [selectedSkinSurviv, setSelectedSkinSurviv] = useState(
-        () => localStorage.getItem('selected_skin_surviv') || 'random_color'
+        () => {
+            const saved = localStorage.getItem('selected_skin_surviv');
+            return getSignatureSkin(saved)?.value || saved || 'random_color';
+        }
     );
 
     const [hasSeenRainbow, setHasSeenRainbow] = useState(
@@ -2410,7 +2413,7 @@ export default function PreGame() {
                                                 onClick={() => setSkinStyle(skin.id)}
                                             >
                                                 <div className={`skin-card-icon slither-special-icon slither-special-icon--${skin.id}`} style={{ backgroundImage: skin.badgeGradient }}>
-                                                    <span>{skin.id === 'prism' ? '◇' : skin.id === 'warden' ? '❯' : skin.id === 'leviathan' ? '≋' : skin.id === 'aurora' ? '✦' : '☾'}</span>
+                                                    <span>{skin.id === 'prism' ? '◇' : skin.id === 'farmer' ? '☀' : skin.id === 'leviathan' ? '≋' : skin.id === 'aurora' ? '✦' : '☾'}</span>
                                                 </div>
                                                 <span>{skin.name}{!ownedSpecialSkinIds.has(skin.id) ? ' · Shop' : ''}</span>
                                             </button>
@@ -2594,7 +2597,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const rainbowCanvases = rainbowColors.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
         const specialSkinCanvases = new Map(SLITHER_SPECIAL_SKINS.map((skin) => [
             skin.id,
-            getSnakeSegmentCanvas(radius, skin.baseColor),
+            getSnakeSegmentCanvas(radius, skin.baseColor, skin.id === 'leviathan', skin.id === 'leviathan' ? 'leviathan' : ''),
         ]));
         const detailPoints = Array.from({ length: segmentsCount }, () => ({ x: 0, y: 0 }));
         const randomColorCanvases = RANDOM_PREVIEW_SNAKE_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
@@ -2645,6 +2648,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
             // Same cached in-game segment sprites as before. The only change is
             // using direct transforms instead of allocating objects each frame.
             for (let i = segmentsCount - 1; i >= 0; i--) {
+                if (currentSpecialSkin?.id === 'leviathan' && i === 0) continue;
                 const adjacent = i > 0 ? i - 1 : 1;
                 const segmentAngle = i > 0
                     ? Math.atan2(pointY[adjacent] - pointY[i], pointX[adjacent] - pointX[i])
@@ -2684,7 +2688,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
             const pupilR = eyeR * 0.48;
 
             if (currentSpecialSkin?.id === 'leviathan') {
-                drawLeviathanEyes(ctx, pointX[0], pointY[0], radius, headAngle);
+                drawLeviathanHead(ctx, pointX[0], pointY[0], radius, headAngle);
             } else for (const side of [-1, 1]) {
                 const ex = pointX[0] + fwdX * eyeFwd + perpX * eyeSide * side;
                 const ey = pointY[0] + fwdY * eyeFwd + perpY * eyeSide * side;

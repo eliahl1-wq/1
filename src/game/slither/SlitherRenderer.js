@@ -12,7 +12,7 @@ import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSna
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
-import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanEyes, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
+import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
 import { slitherCanvasDpr, slitherQualityForFrameTime } from './slitherPerformance.js';
 import { drawGoldenBlob, GOLDEN_BLOB_HALO_SCALE } from './goldenBlobVisual.js';
 // stackblur-canvas removed — sprites use soft gradients instead
@@ -1563,8 +1563,8 @@ export class SlitherRenderer {
         }
         ctx.restore();
     }
-    _paintSnakeSegment(g, c, rPx, cs, contrast = 1, preserveTone = false) {
-        const segmentCanvas = getSnakeSegmentCanvas(rPx, cs, preserveTone);
+    _paintSnakeSegment(g, c, rPx, cs, contrast = 1, preserveTone = false, material = '') {
+        const segmentCanvas = getSnakeSegmentCanvas(rPx, cs, preserveTone, material);
         g.save();
         g.translate(c, c);
         const half = segmentCanvas.width / 2;
@@ -1722,8 +1722,8 @@ export class SlitherRenderer {
     /**
      * Pre-render normal segment + optional glow/boost overlays into o.pr_imgs cache.
      */
-    _getSnakePrImgs(cs, rPx, needs = {}, preserveTone = false) {
-        const key = `${cs}|${rPx}|${preserveTone ? 'raw' : 'vivid'}`;
+    _getSnakePrImgs(cs, rPx, needs = {}, preserveTone = false, material = '') {
+        const key = `${cs}|${rPx}|${preserveTone ? 'raw' : 'vivid'}|${material}`;
         let pair = this._prImgs.get(key);
         const bodySS = rPx <= 44 ? this._bodySS : rPx <= 84 ? 1.5 : 1.25;
 
@@ -1739,10 +1739,10 @@ export class SlitherRenderer {
 
         if (!pair.normal) {
             pair.normal = this._getSprite(`pr_norm_v39|${key}`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, preserveTone);
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1, preserveTone, material);
             });
             pair.boostBody = this._getSprite(`pr_norm_v39|${key}|boost`, ssSize, (g, sz) => {
-                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04, preserveTone);
+                this._paintSnakeSegment(g, sz / 2, ssR, cs, 1.04, preserveTone, material);
             });
         }
 
@@ -1822,7 +1822,9 @@ export class SlitherRenderer {
         let pack = this._specialSkinStampPacks.get(key);
         if (!pack) {
             const colors = [skin.baseColor];
-            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds));
+            const stamps = colors.map((color) => skin.id === 'leviathan'
+                ? this._getSnakePrImgs(color, cacheR, prNeeds, true, 'leviathan')
+                : this._getSnakeSegmentStamp(color, cacheR, prNeeds));
             pack = { cacheR, prKey, colors, stamps, skinId: skin.id };
             if (this._specialSkinStampPacks.size >= 24) {
                 this._specialSkinStampPacks.delete(this._specialSkinStampPacks.keys().next().value);
@@ -2061,6 +2063,8 @@ export class SlitherRenderer {
             const p = bumps[i];
             if (p.x < -80 || p.y < -80 || p.x > this.W + 80 || p.y > this.H + 80) continue;
 
+            // The custom snout replaces the first sphere instead of hiding inside it.
+            if (specialSkin?.id === 'leviathan' && i === 0) continue;
             let sprite;
             let currentStampScale = stampScale;
             let currentDw = dw;
@@ -2118,7 +2122,7 @@ export class SlitherRenderer {
         ctx.globalCompositeOperation = 'source-over';
 
         if (specialSkin?.id === 'leviathan') {
-            drawLeviathanEyes(ctx, hx, hy, headEyeRadius, angle);
+            drawLeviathanHead(ctx, hx, hy, headEyeRadius, angle);
         } else for (const side of [-1, 1]) {
             const ex = hx + fwdX * eyeFwd + perpX * eyeSide * side;
             const ey = hy + fwdY * eyeFwd + perpY * eyeSide * side;

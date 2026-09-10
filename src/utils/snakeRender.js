@@ -66,8 +66,8 @@ export function normalizeColor(hex) {
     };
 }
 
-export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false) {
-    const key = `${Math.round(radius * 10)}_${preserveTone ? 'raw_' : ''}${hexColor}`;
+export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false, material = '') {
+    const key = `${Math.round(radius * 10)}_${preserveTone ? 'raw_' : ''}${hexColor}_${material}`;
     if (snakeSegmentCache.has(key)) return snakeSegmentCache.get(key);
 
     const R = radius;
@@ -110,9 +110,31 @@ export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false) {
             let alpha = h_val < 1.5 ? Math.max(0, Math.min(1, h_val / 1.5)) : 1.0;
             
             const idx = (t * canvasSize + e) * 4;
-            data[idx] = Math.min(255, col.r * l_final);
-            data[idx+1] = Math.min(255, col.g * l_final);
-            data[idx+2] = Math.min(255, col.b * l_final);
+            let red = col.r, green = col.g, blue = col.b;
+            if (material === 'leviathan') {
+                // Pigment lives inside each default shaded sphere, not over the body path.
+                // Curved, staggered scale seams follow the rounded surface of the segment.
+                const x = dx / s, y = dy / s, flank = Math.abs(y);
+                // A restrained rear contact shadow separates the overlapping lobes.
+                l_final *= 1 - 0.19 * Math.pow(Math.max(0, -x), 4);
+                const row = Math.floor((y + 1) / 0.32);
+                const rowY = ((y + 1) / 0.32 - row) * 2 - 1;
+                const phase = ((x + (row % 2) * 0.24 + 0.18 * (1 - rowY * rowY)) / 0.48 % 1 + 1) % 1;
+                const edge = phase < 0.085 ? 0.64 : phase > 0.84 ? 1.17 : 1;
+                red = (49 - flank * 25) * edge;
+                green = (166 - flank * 65) * edge;
+                blue = (143 - flank * 12) * edge;
+                // Narrow warm dorsal scales and pearly lateral flecks within each segment.
+                const ridge = Math.max(0, 1 - flank / 0.16);
+                red += ridge * 152; green += ridge * 25; blue -= ridge * 50;
+                const fleck = Math.max(0, 1 - Math.abs(flank - 0.55) / 0.09) * Math.max(0, (phase - 0.72) / 0.28);
+                red += fleck * 90; green += fleck * 60; blue += fleck * 45;
+                const shine = Math.pow(Math.max(0, 1 - Math.hypot(x + 0.28, y + 0.27) / 0.7), 3) * 45;
+                red += shine; green += shine; blue += shine;
+            }
+            data[idx] = Math.min(255, red * l_final);
+            data[idx+1] = Math.min(255, green * l_final);
+            data[idx+2] = Math.min(255, blue * l_final);
             data[idx+3] = alpha * 255;
         }
     }

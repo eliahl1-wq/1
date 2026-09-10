@@ -4,7 +4,7 @@
 
 import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
-import { drawWardenOutfit, drawWardenGlove } from '../../constants/signatureSkins.js';
+import { drawFarmerOutfit } from '../../constants/signatureSkins.js';
 import { ingestAirdropTimers, ingestExplosionEvents } from './worldEvents.js';
 import { presentBRZone } from './brZonePresentation.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
@@ -84,14 +84,13 @@ const PLAYER_HAND_RADIUS = 5.4;
 const WATER_MOVE_MULTIPLIER = 0.68;
 
 function drawPlayerHand(ctx, hand, playerColor) {
-    ctx.fillStyle = playerColor === 'warden' ? '#182b31' : playerColor;
+    ctx.fillStyle = playerColor === 'farmer' ? '#e6b68a' : playerColor;
     ctx.strokeStyle = PLAYER_HAND_OUTLINE;
     ctx.lineWidth = PLAYER_HAND_OUTLINE_WIDTH;
     ctx.beginPath();
     ctx.arc(hand.x, hand.y, PLAYER_HAND_RADIUS, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    if (playerColor === 'warden') drawWardenGlove(ctx, hand.x, hand.y, PLAYER_HAND_RADIUS);
 }
 const FULL_AUTO_MOVE_MULTIPLIERS = Object.freeze({ smg: 0.78, assault: 0.74, lmg: 0.66 });
 
@@ -8617,7 +8616,7 @@ export class SurvivRenderer {
         ctx.fill();
 
         // Body circle — surviv.io style thick outline
-        ctx.fillStyle = p.color === 'warden' ? '#e6ddd0' : p.color || '#77c7c8';
+        ctx.fillStyle = p.color === 'farmer' ? '#467b98' : p.color || '#77c7c8';
         ctx.strokeStyle = isMe ? '#ffffff' : 'rgba(14, 20, 18, 0.78)';
         ctx.lineWidth = isMe ? 2.35 : 1.85;
         ctx.beginPath();
@@ -8625,7 +8624,7 @@ export class SurvivRenderer {
         ctx.fill();
         ctx.stroke();
 
-        if (p.color === 'warden') drawWardenOutfit(ctx, r);
+        if (p.color === 'farmer') drawFarmerOutfit(ctx, r);
         const vestLevel = Math.max(0, Math.min(3, Number(p.vestLevel) || 0));
         if (vestLevel > 0) {
             const vestColors = ['transparent', '#d6d6ce', '#737b7d', '#171b1c'];
@@ -8640,7 +8639,7 @@ export class SurvivRenderer {
         }
 
         // Warden's material lighting is already baked into its outfit texture.
-        if (p.color !== 'warden') {
+        if (p.color !== 'farmer') {
         // Body highlight
         ctx.fillStyle = 'rgba(255,255,255,0.22)';
         ctx.beginPath();

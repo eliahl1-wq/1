@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppTopbar from '../components/AppTopbar';
 import Background from '../components/Background';
+import ProductPageHeader from '../components/ProductPageHeader';
 import AgarLogo from '../features/agar/ui/AgarLogo';
 import { useAgarToken } from '../features/agar/ui/AgarTokenContext';
 import { useAuth } from '../context/AuthContext';
@@ -281,24 +282,26 @@ export default function Shop() {
             <Background />
             <AppTopbar />
             <main className="shop-shell shop-v2">
-                <header className="shop-v2-header">
-                    <div>
-                        <p className="shop-kicker"><span /> ARENIFI COSMETICS</p>
-                        <h1>Skin locker</h1>
-                        <p>Preview the collection. Find your identity. Own it permanently.</p>
-                    </div>
-                    <section className="shop-balance-card" aria-label={`Your ${config.symbol} balance`}>
-                        <div className="shop-balance-logo"><AgarLogo size={36} config={config} /></div>
-                        <div className="shop-balance-copy">
-                            <span>WALLET BALANCE</span>
-                            <strong className="mono">{!agarAccess ? 'Coming Soon' : balanceLoading ? '...' : `${formatAgarAmount(walletBalance)} ${config.symbol}`}</strong>
-                            <small>{agarAccess ? `${ownedCount}/${products.length} cosmetics owned` : 'Admin preview only'}</small>
-                        </div>
-                        <button type="button" className="shop-balance-add" aria-label={`Buy ${config.symbol}`} title={agarAccess ? `Buy ${config.symbol}` : 'Coming Soon'} disabled={!agarAccess} onClick={() => openAgarModal({ action: 'BUY' })}>
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-                        </button>
-                    </section>
-                </header>
+                <ProductPageHeader
+                    className="shop-v2-header"
+                    eyebrow="Shop"
+                    title="Cosmetics"
+                    description="Preview and unlock permanent skins for every Arenifi gamemode."
+                    onBack={() => navigate('/pre-game')}
+                    actions={(
+                        <section className="shop-balance-card" aria-label={`Your ${config.symbol} balance`}>
+                            <div className="shop-balance-logo"><AgarLogo size={32} config={config} /></div>
+                            <div className="shop-balance-copy">
+                                <span>WALLET BALANCE</span>
+                                <strong className="mono">{!agarAccess ? 'Coming Soon' : balanceLoading ? '...' : `${formatAgarAmount(walletBalance)} ${config.symbol}`}</strong>
+                                <small>{agarAccess ? `${ownedCount}/${products.length} cosmetics owned` : 'Admin preview only'}</small>
+                            </div>
+                            <button type="button" className="shop-balance-add" aria-label={`Buy ${config.symbol}`} title={agarAccess ? `Buy ${config.symbol}` : 'Coming Soon'} disabled={!agarAccess} onClick={() => openAgarModal({ action: 'BUY' })}>
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                            </button>
+                        </section>
+                    )}
+                />
                 {!shopReady && (
                     <div className="shop-launch-banner" role="status">
                         <div className="shop-banner-icon">
