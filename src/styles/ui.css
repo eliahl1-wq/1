@@ -5819,3 +5819,255 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
     border: 0;
   }
 }
+
+/* Profile portfolio: one unified surface, with hierarchy from spacing and dividers. */
+.profile-page-content {
+  width: min(1180px, calc(100% - 32px));
+  max-width: 1180px;
+}
+
+.profile-product-surface {
+  background: rgba(16, 17, 22, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 13px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
+  overflow: hidden;
+}
+
+.profile-product-surface > .product-surface__body {
+  padding: 0 !important;
+}
+
+.profile-product-surface .profile-tabs {
+  min-height: 50px;
+  padding-inline: 22px;
+  background: rgba(8, 9, 13, 0.22);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+.profile-stats-view {
+  display: grid !important;
+  grid-template-columns: minmax(230px, 0.85fr) minmax(380px, 1.75fr) minmax(210px, 0.75fr) !important;
+  gap: 0 !important;
+  align-items: stretch;
+}
+
+.profile-stats-view > .profile-balance-panel {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 286px;
+  margin: 0 !important;
+  padding: 22px !important;
+  align-items: flex-start !important;
+  flex-direction: column;
+  justify-content: space-between !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.profile-balance-panel > div:first-child {
+  display: block !important;
+}
+
+.profile-stats-view > .profile-balance-panel > div:last-child {
+  width: 100%;
+  padding-top: 14px;
+  align-items: flex-start !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.065);
+}
+
+.profile-stats-view > .profile-equity-panel {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0 !important;
+  padding: 20px 22px 12px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.profile-equity-panel > div:first-child {
+  display: block !important;
+}
+
+.profile-stats-view > .profile-stat-grid {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex !important;
+  flex-direction: column;
+  gap: 0 !important;
+  margin: 0 !important;
+}
+
+.profile-stats-view > .profile-stat-grid > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  padding: 18px 17px !important;
+  flex-direction: column;
+  justify-content: center;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065) !important;
+  border-radius: 0 !important;
+}
+
+.profile-stats-view > .profile-stat-grid > div:last-child {
+  border-bottom: 0 !important;
+}
+
+.profile-stats-view > .profile-stat-grid > div:hover {
+  background: rgba(255, 255, 255, 0.018) !important;
+}
+
+.profile-stats-view > .profile-secondary-stats {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-height: 50px;
+  margin: 0 !important;
+  padding: 0 22px !important;
+  align-items: center;
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 0 !important;
+}
+
+.profile-stats-view > .profile-daily-pnl {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin: 0;
+  padding: 19px 22px 16px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0;
+}
+
+.profile-daily-pnl__chart {
+  gap: clamp(8px, 2vw, 24px);
+}
+
+.profile-daily-pnl__bar-area {
+  border-bottom-color: rgba(255, 255, 255, 0.055);
+}
+
+.profile-stats-view > .profile-session-section {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  margin: 0;
+  padding: 20px 22px 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.profile-session-row {
+  padding: 12px 4px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055) !important;
+  border-radius: 0 !important;
+}
+
+.profile-session-row:hover {
+  background: rgba(255, 255, 255, 0.015) !important;
+}
+
+@media (max-width: 920px) {
+  .profile-stats-view {
+    grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.35fr) !important;
+  }
+
+  .profile-stats-view > .profile-balance-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .profile-stats-view > .profile-stat-grid {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .profile-stats-view > .profile-equity-panel {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-right: 0 !important;
+  }
+
+  .profile-stats-view > .profile-secondary-stats { grid-row: 3; }
+  .profile-stats-view > .profile-daily-pnl { grid-row: 4; }
+  .profile-stats-view > .profile-session-section { grid-row: 5; }
+}
+
+@media (max-width: 620px) {
+  .profile-page-content {
+    width: min(100% - 20px, 580px);
+  }
+
+  .profile-stats-view {
+    grid-template-columns: 1fr !important;
+  }
+
+  .profile-stats-view > .profile-balance-panel,
+  .profile-stats-view > .profile-stat-grid,
+  .profile-stats-view > .profile-equity-panel,
+  .profile-stats-view > .profile-secondary-stats,
+  .profile-stats-view > .profile-daily-pnl,
+  .profile-stats-view > .profile-session-section {
+    grid-column: 1;
+  }
+
+  .profile-stats-view > .profile-balance-panel {
+    grid-row: 1;
+    min-height: 190px;
+    border-right: 0 !important;
+  }
+
+  .profile-stats-view > .profile-stat-grid {
+    grid-row: 2;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .profile-stats-view > .profile-stat-grid > div {
+    padding: 14px 10px !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-bottom: 0 !important;
+  }
+
+  .profile-stats-view > .profile-stat-grid > div:last-child {
+    border-right: 0 !important;
+  }
+
+  .profile-stats-view > .profile-stat-grid .mono {
+    font-size: 1rem !important;
+  }
+
+  .profile-stats-view > .profile-equity-panel { grid-row: 3; }
+  .profile-stats-view > .profile-secondary-stats { grid-row: 4; }
+  .profile-stats-view > .profile-daily-pnl { grid-row: 5; }
+  .profile-stats-view > .profile-session-section { grid-row: 6; }
+}
+
+@media (max-width: 440px) {
+  .profile-stats-view > .profile-stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .profile-stats-view > .profile-stat-grid > div {
+    border-right: 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  }
+
+  .profile-stats-view > .profile-secondary-stats {
+    padding: 12px 18px !important;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

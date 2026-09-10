@@ -657,6 +657,7 @@ export default function Profile() {
                                                         return (
                                                             <div
                                                                 key={log._id}
+                                                                className="profile-session-row"
                                                                 style={{
                                                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                                                     padding: '10px 14px',
@@ -665,8 +666,6 @@ export default function Profile() {
                                                                     border: '1px solid var(--border)',
                                                                     transition: 'background 0.1s',
                                                                 }}
-                                                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
-                                                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                                                             >
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                                     <div style={{
