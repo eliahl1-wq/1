@@ -1079,7 +1079,7 @@ export class SlitherRenderer {
         // Keep arena death food at exactly the normal death-food sprite size.
         // Only its gradient is more golden and less hazy.
         const halo = Math.ceil(rPx * (golden ? GOLDEN_BLOB_HALO_SCALE : deathDrop ? 1.35 : 1.45));
-        const key = `f14|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}|${arenaDeathDrop ? 1 : 0}`;
+        const key = `f15|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}|${arenaDeathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             if (golden) {
@@ -1335,11 +1335,10 @@ export class SlitherRenderer {
             let alpha = 1;
 
             if (isGolden) {
-                // Calm breathing light: the old 30% size swing and 50% alpha
-                // swing made premium food look unstable rather than polished.
+                // Soft breathing light with no opaque or sharply defined phase.
                 const pulse = Math.sin(now * 0.0035 + anim.phase);
-                sizeMul = 0.98 + pulse * 0.035;
-                alpha = 0.95 + pulse * 0.05;
+                sizeMul = 1 + pulse * 0.045;
+                alpha = 0.84 + pulse * 0.08;
             } else if (f.deathDrop) {
                 sizeMul = 1.2 + ((f.radius || 3) - 2) * 0.14;
                 if (animateFood) {
@@ -1405,8 +1404,8 @@ export class SlitherRenderer {
                 continue;
             }
 
-            // Render the pearl at twice the normal source resolution so the
-            // rim and specular highlights remain clean on high-DPI displays.
+            // Render the layered glow at twice the normal source resolution so
+            // its transparency fade remains smooth on high-DPI displays.
             const spriteR = isGolden ? 8 : 4;
             const sprite = this._foodSprite(
                 hue,
