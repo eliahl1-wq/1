@@ -316,7 +316,186 @@
 .shop-v2-tile-status { position: absolute; right: 10px; bottom: 8px; color: var(--accent); font-family: var(--mono); font-size: .53rem; }
 .shop-v2-tile-status.is-owned { color: #51d598; }
 
+.shop-locker {
+    padding: 4px 0 8px;
+}
+
+.shop-locker__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 18px;
+}
+
+.shop-locker__eyebrow {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: .68rem;
+    font-weight: 720;
+    letter-spacing: .11em;
+}
+
+.shop-locker__header h2 {
+    margin: 0;
+    color: var(--text-h);
+    font-family: var(--display);
+    font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+    font-weight: 730;
+    letter-spacing: -.03em;
+}
+
+.shop-locker__header p {
+    margin: 0 0 2px;
+    color: var(--text-muted);
+    font-size: .82rem;
+}
+
+.shop-locker__header p strong {
+    color: var(--text-h);
+    font-size: .9rem;
+}
+
+.shop-locker__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.shop-locker-card {
+    min-width: 0;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    border-radius: var(--r-lg);
+    transition: transform .16s ease, border-color .16s ease, background-color .16s ease;
+}
+
+.shop-locker-card:hover {
+    background: var(--bg-2);
+    border-color: var(--border-accent);
+    transform: translateY(-2px);
+}
+
+.shop-locker-card__art {
+    position: relative;
+    height: 172px;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 50% 46%, var(--accent-dim), transparent 48%),
+        var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+
+.shop-locker-card__art > .shop-rainbow-preview {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    min-height: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.shop-locker-card__art > .shop-rainbow-preview > .agar-preview-wrapper,
+.shop-locker-card__art > .shop-rainbow-preview > .surviv-skin-preview,
+.shop-locker-card__art > .shop-rainbow-preview > .snake-preview-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.shop-locker-card__art > span {
+    position: absolute;
+    z-index: 6;
+    top: 10px;
+    left: 10px;
+    padding: 5px 8px;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    font-size: .7rem;
+    font-weight: 680;
+    line-height: 1;
+    text-transform: capitalize;
+    backdrop-filter: blur(7px);
+}
+
+.shop-locker-card__body {
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 13px;
+}
+
+.shop-locker-card__body > div {
+    min-width: 0;
+}
+
+.shop-locker-card__body small {
+    display: block;
+    margin-bottom: 3px;
+    color: #51d598;
+    font-family: var(--mono);
+    font-size: .65rem;
+    font-weight: 720;
+    letter-spacing: .08em;
+}
+
+.shop-locker-card__body h3 {
+    overflow: hidden;
+    margin: 0;
+    color: var(--text-h);
+    font-family: var(--display);
+    font-size: .94rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.shop-locker-card__body button {
+    min-width: 90px;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 12px;
+    color: var(--text-h);
+    background: var(--bg-3);
+    border: 1px solid var(--border-2);
+    border-radius: 7px;
+    font-size: .78rem;
+    font-weight: 690;
+    cursor: pointer;
+    transition: color .15s ease, background-color .15s ease, border-color .15s ease;
+}
+
+.shop-locker-card__body button svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.shop-locker-card__body button:hover {
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+}
+
 .shop-v2 .shop-empty-state { min-height: 420px; margin-top: 12px; background: var(--surface); border-color: var(--border-2); border-radius: var(--r-lg); }
+.shop-v2 .shop-locker-empty { min-height: 320px; margin-top: 0; }
 .shop-v2 .shop-economy-note { margin-top: 14px; padding: 15px 17px; background: var(--surface); border-color: var(--border); border-radius: var(--r-lg); box-shadow: none; }
 .shop-v2 .shop-economy-icon { width: 35px; height: 35px; flex-basis: 35px; border-radius: 8px; }
 .shop-v2 .shop-economy-intro h2 { font-size: .82rem; }
@@ -340,6 +519,10 @@
     .shop-v2-title { padding: 20px 0 17px; }
     .shop-v2-title h2 { font-size: clamp(1.75rem, 8vw, 2.2rem); }
     .shop-v2 .shop-economy-note { grid-template-columns: 1fr; gap: 14px; }
+    .shop-locker__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .shop-locker-card__art { height: 150px; }
+    .shop-locker-card__body { align-items: stretch; flex-direction: column; }
+    .shop-locker-card__body button { width: 100%; }
 }
 
 @media (max-width: 600px) {
@@ -389,9 +572,16 @@
     .shop-v2-checkout .shop-buy-button { width: 100%; }
     .shop-v2-rail { padding: 12px; }
     .shop-v2-rail-track { grid-auto-columns: 218px; }
+    .shop-locker__header { align-items: flex-start; flex-direction: column; gap: 7px; margin-bottom: 14px; }
+    .shop-locker__grid { grid-template-columns: 1fr; gap: 10px; }
+    .shop-locker-card { display: grid; grid-template-columns: minmax(128px, .9fr) minmax(0, 1.1fr); }
+    .shop-locker-card__art { height: 142px; border-right: 1px solid var(--border); border-bottom: 0; }
+    .shop-locker-card__body { justify-content: center; padding: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .shop-v2-tile,
-    .shop-v2-filters button { transition: none; }
+    .shop-v2-filters button,
+    .shop-locker-card,
+    .shop-locker-card__body button { transition: none; }
 }

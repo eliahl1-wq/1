@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getSnakeSegmentCanvas, snakeSegmentCache } from './snakeRender.js';
-import { drawFarmerOutfit, getSignatureSkin, SIGNATURE_SKINS } from '../constants/signatureSkins.js';
+import { drawFarmerOutfit, drawFarmerHat, getSignatureSkin, SIGNATURE_SKINS } from '../constants/signatureSkins.js';
 import { drawSlitherSpecialBody, drawSlitherSpecialDetails } from '../constants/slitherSpecialSkins.js';
 
 test('Leviathan retains default segment opacity, shaded volume and bounded material caching', () => {
@@ -61,7 +61,9 @@ test('Farmer uses cached flat artwork without gradients', () => {
     globalThis.document = { createElement: () => { textures++; return { getContext: () => ctx }; } };
     try {
         drawFarmerOutfit(ctx, 14);
+        drawFarmerHat(ctx, 14);
         drawFarmerOutfit(ctx, 28);
+        drawFarmerHat(ctx, 28);
         assert.equal(textures, 1);
         assert.equal(draws, 2);
     } finally {

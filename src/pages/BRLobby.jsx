@@ -195,14 +195,13 @@ export default function BRLobby() {
                                 Need at least {minPlayers} players · up to {maxPlayers} per match
                             </p>
 
-                            {freePlay && (
+                            {freePlay && variant !== 'surviv' && (
                                 <div style={{
                                     marginBottom: '16px', padding: '10px 14px',
                                     background: 'rgba(255, 180, 0, 0.1)', border: '1px solid rgba(255, 180, 0, 0.3)',
                                     borderRadius: '12px', color: '#FFD080', fontSize: '0.78rem', fontWeight: 600,
                                 }}>
                                     TEST MODE — Free play, no real SOL used
-                                    {variant === 'surviv' && <div style={{ marginTop: 6 }}>Empty slots fill with bots after 15 seconds without a new player joining. Solo: you + 9 bots.</div>}
                                 </div>
                             )}
 

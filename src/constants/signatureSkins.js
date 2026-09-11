@@ -1,7 +1,7 @@
 // Original procedural artwork shared by the real renderers and shop previews.
 export const SIGNATURE_SKINS = Object.freeze([
     { id: 'prism', value: 'prism', productId: 'agar:prism', gameMode: 'agar', name: 'Prism Core', usdPrice: 2, baseColor: '#161333', colors: ['#161333', '#7855d6', '#cda4ff', '#64cfde', '#b792ff'], badgeGradient: 'linear-gradient(135deg, #161333, #9974ec, #77e1df)', description: 'A shattered amethyst geode with floating crystal spires, orbiting fragments and shifting pearlescent light deep inside its fractured shell.' },
-    { id: 'farmer', value: 'farmer', productId: 'surviv:farmer', gameMode: 'surviv', name: 'Farmer', usdPrice: 2, baseColor: '#d7bc85', colors: ['#d7bc85', '#e8c77c', '#80523b', '#587b86', '#b6543f'], badgeGradient: 'linear-gradient(135deg, #587b86, #d6ac5e, #b6543f)', description: 'A simple scarecrow-inspired farmer with a crooked straw hat, a patched crown, a stitched burlap face and a red neckerchief. Flat colors and bold outlines.' },
+    { id: 'farmer', value: 'farmer', productId: 'surviv:farmer', gameMode: 'surviv', name: 'Farmer', usdPrice: 2, baseColor: '#d7bc85', colors: ['#d7bc85', '#e8c77c', '#80523b', '#587b86', '#b6543f'], badgeGradient: 'linear-gradient(135deg, #587b86, #d6ac5e, #b6543f)', description: 'An oversized straw hat with a broad brim and brown band, a glimpse of the farmer beneath, and a wheat straw held in the mouth. Simple flat colors and bold outlines.' },
 ]);
 
 export function getSignatureSkin(value) {
@@ -134,43 +134,61 @@ export function drawPrismSkin(ctx, x, y, radius) {
     ctx.restore();
 }
 
-function paintFarmerOutfit(ctx) {
-    // Flat, chunky shapes: a scarecrow costume, not a shaded material study.
-    const ink = '#62492f';
-    ctx.fillStyle = '#587b86'; ctx.fillRect(-1, -1, 2, 2);
-    // Red neckerchief and a little exposed straw at the shoulders.
-    polygon(ctx, [[0.34,-0.72],[0.82,-0.38],[0.71,0.4],[0.3,0.72],[-0.05,0]], '#b6543f', ink, 0.045);
-    for (const side of [-1, 1]) {
-        polygon(ctx, [[0.18,side*0.54],[0.36,side*0.87],[0.38,side*0.65],[0.56,side*0.8],[0.46,side*0.47]], '#dcb86d');
+function paintFarmerHat(ctx) {
+    const ink = '#6c4c2e';
+    // Transparent padded texture: the brim can extend beyond the original body.
+    ctx.scale(0.625, 0.625);
+    ctx.translate(-0.16, 0);
+    // A sliver of face beneath the front brim, with a straw held at the mouth.
+    polygon(ctx, [[0.7,0.1],[1.07,0.22],[1.1,0.43],[0.83,0.56]], '#d7bc85', ink, 0.045);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = ink; ctx.lineWidth = 0.055;
+    ctx.beginPath(); ctx.moveTo(1.01,0.35); ctx.lineTo(1.12,0.39); ctx.stroke();
+    ctx.strokeStyle = '#74592f'; ctx.lineWidth = 0.065;
+    ctx.beginPath(); ctx.moveTo(1.05,0.38); ctx.quadraticCurveTo(1.33,0.6,1.52,0.76); ctx.stroke();
+    ctx.strokeStyle = '#e4c779'; ctx.lineWidth = 0.033; ctx.stroke();
+    for (const [x,y] of [[1.3,0.58],[1.4,0.67],[1.49,0.74]]) {
+        polygon(ctx, [[x-0.06,y],[x-0.1,y-0.16],[x+0.025,y-0.035]], '#d6b46b', ink, 0.015);
+        polygon(ctx, [[x-0.05,y+0.015],[x-0.15,y+0.1],[x+0.03,y+0.065]], '#e6ca82', ink, 0.015);
     }
-    // Burlap sack face sits toward the aim direction; the hat leaves it readable.
-    polygon(ctx, [[-0.34,-0.45],[0.13,-0.61],[0.53,-0.43],[0.72,-0.12],[0.65,0.34],[0.2,0.55],[-0.29,0.35]], '#d7bc85', ink, 0.055);
-    ctx.strokeStyle = ink; ctx.lineWidth = 0.052; ctx.lineCap = 'round';
-    for (const side of [-1, 1]) {
-        const x = 0.25, y = side * 0.25;
-        ctx.beginPath(); ctx.moveTo(x-0.07,y-0.065); ctx.lineTo(x+0.07,y+0.065);
-        ctx.moveTo(x-0.07,y+0.065); ctx.lineTo(x+0.07,y-0.065); ctx.stroke();
-    }
-    // Three large stitches read as a friendly sewn smile, even when zoomed out.
-    ctx.lineWidth = 0.036;
-    ctx.beginPath(); ctx.moveTo(0.48,-0.2); ctx.quadraticCurveTo(0.63,0,0.48,0.2); ctx.stroke();
-    for (const y of [-0.12, 0, 0.12]) {
-        ctx.beginPath(); ctx.moveTo(0.49,y-0.025); ctx.lineTo(0.61,y+0.025); ctx.stroke();
-    }
-    // Lopsided straw hat: an irregular broad brim and one simple crown shape.
-    polygon(ctx, [[-0.78,-0.41],[-0.49,-0.78],[-0.2,-0.83],[0.04,-0.71],[-0.04,-0.49],[0.03,-0.15],[-0.03,0.33],[0.12,0.63],[-0.11,0.8],[-0.43,0.73],[-0.76,0.48],[-0.86,0.06]], '#d6ac5e', ink, 0.055);
-    polygon(ctx, [[-0.72,-0.25],[-0.61,-0.53],[-0.34,-0.56],[-0.14,-0.38],[-0.13,0.36],[-0.42,0.5],[-0.66,0.29]], '#e8c77c', ink, 0.045);
-    polygon(ctx, [[-0.25,-0.46],[-0.12,-0.38],[-0.11,0.37],[-0.25,0.43]], '#80523b');
-    // One cloth patch and three straw cuts, no gradients, shine or fine weave.
-    polygon(ctx, [[-0.58,-0.12],[-0.38,-0.17],[-0.35,0.06],[-0.55,0.1]], '#ad784b', ink, 0.025);
-    ctx.strokeStyle = ink; ctx.lineWidth = 0.027;
-    for (const [x,y,dx,dy] of [[-0.55,-0.6,0.06,0.1],[-0.65,0.43,0.08,-0.06],[-0.15,0.65,-0.04,-0.1]]) {
+    // Broad softly uneven brim, about 25% wider than the player.
+    ctx.fillStyle = '#d9b367'; ctx.strokeStyle = ink; ctx.lineWidth = 0.065;
+    ctx.beginPath(); ctx.moveTo(1.02,-0.27);
+    ctx.quadraticCurveTo(0.94,-1.03,0.2,-1.19);
+    ctx.quadraticCurveTo(-0.58,-1.4,-1.08,-0.75);
+    ctx.quadraticCurveTo(-1.5,-0.15,-1.18,0.53);
+    ctx.quadraticCurveTo(-0.86,1.23,-0.12,1.22);
+    ctx.quadraticCurveTo(0.67,1.27,1.01,0.56);
+    ctx.quadraticCurveTo(1.12,0.17,1.02,-0.27);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // One broad hatband, one flat crown. No shiny lighting or tiny woven texture.
+    ctx.fillStyle = '#825337'; ctx.beginPath(); ctx.moveTo(0.58,-0.3);
+    ctx.quadraticCurveTo(0.4,-0.81,-0.25,-0.77);
+    ctx.quadraticCurveTo(-0.91,-0.72,-0.82,0.05);
+    ctx.quadraticCurveTo(-0.79,0.78,-0.11,0.79);
+    ctx.quadraticCurveTo(0.63,0.74,0.58,-0.3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#edcd84'; ctx.strokeStyle = ink; ctx.lineWidth = 0.045;
+    ctx.beginPath(); ctx.moveTo(0.43,-0.34);
+    ctx.quadraticCurveTo(0.23,-0.75,-0.31,-0.69);
+    ctx.quadraticCurveTo(-0.82,-0.61,-0.73,0.02);
+    ctx.quadraticCurveTo(-0.68,0.61,-0.17,0.64);
+    ctx.quadraticCurveTo(0.5,0.6,0.43,-0.34); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Small crown crease and three sparse straw marks keep the top view legible.
+    ctx.strokeStyle = '#b48b48'; ctx.lineWidth = 0.035;
+    ctx.beginPath(); ctx.moveTo(-0.36,-0.3); ctx.quadraticCurveTo(-0.13,-0.39,0.09,-0.22); ctx.stroke();
+    for (const [x,y,dx,dy] of [[-0.94,-0.63,0.12,0.1],[-0.81,0.8,0.08,-0.13],[0.62,0.85,-0.08,-0.12]]) {
         ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx,y+dy); ctx.stroke();
     }
 }
 
 export function drawFarmerOutfit(ctx, radius) {
-    farmerOutfit ||= texture(paintFarmerOutfit);
     ctx.save(); ctx.beginPath(); ctx.arc(0, 0, radius - 1.5, 0, Math.PI * 2); ctx.clip();
-    ctx.drawImage(farmerOutfit, -radius, -radius, radius * 2, radius * 2); ctx.restore();
+    ctx.fillStyle = '#587b86'; ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
+    ctx.restore();
+}
+
+// Painted after weapon/hands so the brim gently overlaps their inner edges.
+export function drawFarmerHat(ctx, radius) {
+    farmerOutfit ||= texture(paintFarmerHat);
+    ctx.drawImage(farmerOutfit, -radius * 1.6, -radius * 1.6, radius * 3.2, radius * 3.2);
 }

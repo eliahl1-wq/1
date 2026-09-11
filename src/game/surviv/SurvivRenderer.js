@@ -4,7 +4,7 @@
 
 import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
-import { drawFarmerOutfit } from '../../constants/signatureSkins.js';
+import { drawFarmerOutfit, drawFarmerHat } from '../../constants/signatureSkins.js';
 import { ingestAirdropTimers, ingestExplosionEvents } from './worldEvents.js';
 import { presentBRZone } from './brZonePresentation.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
@@ -8745,6 +8745,8 @@ export class SurvivRenderer {
         }
         this.drawWeapon(ctx, p.weapon, r, p.meleeStartedAt, p.meleeUntil, p.color, p.walkBob || 0, p.meleeHand);
         ctx.restore();
+
+        if (p.color === 'farmer') drawFarmerHat(ctx, r);
 
         const hitAt = this._playerHitAt.get(p.id);
         if (hitAt) {

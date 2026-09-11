@@ -286,11 +286,13 @@ export default function Shop() {
             <main className="shop-shell shop-v2">
                 <ProductPageHeader
                     className="shop-v2-header"
-                    eyebrow="Shop"
-                    title="Cosmetics"
-                    description="Preview and unlock permanent skins for every Arenifi gamemode."
+                    eyebrow={activeFilter === 'owned' ? 'Collection' : 'Shop'}
+                    title={activeFilter === 'owned' ? 'My Locker' : 'Cosmetics'}
+                    description={activeFilter === 'owned'
+                        ? 'Your unlocked skins, ready to equip.'
+                        : 'Preview and unlock permanent skins for every Arenifi gamemode.'}
                     onBack={() => navigate('/pre-game')}
-                    actions={(
+                    actions={activeFilter === 'all' ? (
                         <section className="shop-balance-card" aria-label={`Your ${config.symbol} balance`}>
                             <div className="shop-balance-logo"><AgarLogo size={32} config={config} /></div>
                             <div className="shop-balance-copy">
@@ -302,9 +304,9 @@ export default function Shop() {
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                             </button>
                         </section>
-                    )}
+                    ) : null}
                 />
-                {!shopReady && (
+                {activeFilter === 'all' && !shopReady && (
                     <div className="shop-launch-banner" role="status">
                         <div className="shop-banner-icon">
                             <ShopStatusIcon type="pending" />
@@ -360,7 +362,48 @@ export default function Shop() {
                     </label>
                 </div>
 
-                {selectedProduct ? (
+                {activeFilter === 'owned' ? (
+                    filteredProducts.length > 0 ? (
+                        <section className="shop-locker" aria-labelledby="shop-locker-title">
+                            <header className="shop-locker__header">
+                                <div>
+                                    <span className="shop-locker__eyebrow">YOUR COLLECTION</span>
+                                    <h2 id="shop-locker-title">Unlocked cosmetics</h2>
+                                </div>
+                                <p><strong className="mono">{filteredProducts.length}</strong> {filteredProducts.length === 1 ? 'skin' : 'skins'}</p>
+                            </header>
+                            <div className="shop-locker__grid">
+                                {filteredProducts.map((product) => (
+                                    <article className="shop-locker-card" key={product.id}>
+                                        <div className="shop-locker-card__art" aria-label={`${getProductDisplayName(product)} preview`}>
+                                            <ProductArtwork product={product} nickname={user?.username} />
+                                            <span>{product.gameMode === 'all' ? 'Agar + Slither' : product.gameMode}</span>
+                                        </div>
+                                        <div className="shop-locker-card__body">
+                                            <div>
+                                                <small>OWNED</small>
+                                                <h3>{getProductDisplayName(product)}</h3>
+                                            </div>
+                                            <button type="button" onClick={() => useSkin(product)}>
+                                                Equip
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                                            </button>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        </section>
+                    ) : (
+                        <div className="shop-empty-state shop-locker-empty">
+                            <span>0</span>
+                            <h3>{ownedCount === 0 ? 'No owned skins yet' : 'No skins for this game'}</h3>
+                            <p>{ownedCount === 0 ? 'Unlock a cosmetic in the shop and it will appear here.' : 'Choose another game from the filter to see the rest of your locker.'}</p>
+                            <button type="button" onClick={() => ownedCount === 0 ? setActiveFilter('all') : setGameFilter('all')}>
+                                {ownedCount === 0 ? 'Browse cosmetics' : 'Show all skins'}
+                            </button>
+                        </div>
+                    )
+                ) : selectedProduct ? (
                     <section className="shop-v2-showcase" aria-labelledby="shop-selected-title">
                         <div className="shop-v2-details">
                             <div className="shop-v2-meta">
@@ -420,7 +463,7 @@ export default function Shop() {
                     </div>
                 )}
 
-                {filteredProducts.length > 0 && (
+                {activeFilter === 'all' && filteredProducts.length > 0 && (
                     <section className="shop-v2-rail" aria-labelledby="shop-collection-title">
                         <header><div><span>COLLECTION</span><h2 id="shop-collection-title">Select a cosmetic</h2></div><small>{filteredProducts.length} ITEMS</small></header>
                         <div className="shop-v2-rail-track">
@@ -439,7 +482,7 @@ export default function Shop() {
                     </section>
                 )}
 
-                <section className="shop-economy-note" aria-labelledby="shop-economy-title">
+                {activeFilter === 'all' && <section className="shop-economy-note" aria-labelledby="shop-economy-title">
                     <div className="shop-economy-intro">
                         <div className="shop-economy-icon">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -470,7 +513,7 @@ export default function Shop() {
                             Atomic, account-bound and final after confirmation
                         </p>
                     </div>
-                </section>
+                </section>}
             </main>
 
             {quote && (
