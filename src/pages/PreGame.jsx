@@ -37,9 +37,8 @@ import { formatGameSolAmount, formatWalletBalanceAmount } from '../utils/display
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.gg/m5mWMu8aF';
-// Keep the live cashout/death feed implemented, but hidden until it is ready
-// to be exposed again in the pregame leaderboard card.
-const SHOW_LIVE_LEADERBOARD_TAB = false;
+// Live cashout/death activity is available beside the main leaderboard.
+const SHOW_LIVE_LEADERBOARD_TAB = true;
 
 /* ── Solana logo icon ── */
 const SolLogo = ({ size = 13, style }) => (

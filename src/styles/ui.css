@@ -6224,3 +6224,75 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
     padding: 20px 18px 24px;
   }
 }
+.bug-resolved-notice {
+    position: fixed;
+    z-index: 2200;
+    top: 72px;
+    right: 20px;
+    width: min(390px, calc(100vw - 28px));
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 12px;
+    align-items: start;
+    padding: 15px 14px;
+    border: 1px solid rgba(139, 92, 246, .42);
+    border-radius: 14px;
+    background: rgba(17, 18, 24, .97);
+    box-shadow: 0 18px 55px rgba(0, 0, 0, .42), 0 0 28px rgba(124, 58, 237, .12);
+    color: var(--text-h);
+}
+
+.bug-resolved-notice__icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: white;
+    font-weight: 900;
+}
+
+.bug-resolved-notice strong { display: block; font-size: .88rem; }
+.bug-resolved-notice p { margin: 3px 0 5px; color: var(--text-2); font-size: .78rem; }
+.bug-resolved-notice .bug-resolved-notice__reply {
+    margin: 7px 0;
+    padding: 8px 9px;
+    border-left: 2px solid #8b5cf6;
+    border-radius: 5px;
+    background: rgba(139, 92, 246, .09);
+    color: var(--text-h);
+    line-height: 1.4;
+}
+.bug-resolved-notice small {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--text-3);
+    font-size: .7rem;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+.bug-resolved-notice__count {
+    align-self: center;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(139, 92, 246, .16);
+    color: #c4b5fd;
+    font-size: .68rem;
+    font-weight: 800;
+}
+.bug-resolved-notice > button {
+    border: 0;
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 2px;
+}
+.bug-resolved-notice > button:hover { color: white; }
+
+@media (max-width: 640px) {
+    .bug-resolved-notice { top: 64px; right: 14px; }
+}

@@ -10,10 +10,11 @@ import BrandLogo from './BrandLogo';
 export default function AppTopbar({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     const [balanceCurrency, setBalanceCurrency] = useBalanceCurrency();
     const [menuOpen, setMenuOpen] = useState(false);
     const [hasTournamentNotification, setHasTournamentNotification] = useState(false);
+    const [resolvedBugNotifications, setResolvedBugNotifications] = useState([]);
 
     useEffect(() => {
         setMenuOpen(false);
@@ -44,6 +45,45 @@ export default function AppTopbar({ children }) {
             window.removeEventListener(TOURNAMENT_SEEN_EVENT, handleSeen);
         };
     }, []);
+
+    useEffect(() => {
+        if (!token) {
+            setResolvedBugNotifications([]);
+            return undefined;
+        }
+        let active = true;
+        const load = async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/bug-reports/resolved-notifications`, {
+                    cache: 'no-store',
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (active) setResolvedBugNotifications(Array.isArray(data.notifications) ? data.notifications : []);
+            } catch {
+                // Notifications retry quietly without affecting navigation.
+            }
+        };
+        load();
+        const poll = window.setInterval(load, 60_000);
+        return () => {
+            active = false;
+            window.clearInterval(poll);
+        };
+    }, [token]);
+
+    const dismissResolvedBugNotification = async (reportId) => {
+        setResolvedBugNotifications(current => current.filter(item => String(item.id) !== String(reportId)));
+        try {
+            await fetch(`${API_URL}/api/bug-reports/${reportId}/resolution-read`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+        } catch {
+            // It may briefly return after reload if persistence failed.
+        }
+    };
     const isPathActive = (path) => {
         if (path === '/pre-game') {
             return ['/pre-game', '/agar', '/slither', '/surviv'].includes(location.pathname);
@@ -167,6 +207,20 @@ export default function AppTopbar({ children }) {
                         <div className="topbar-mobile-status"><span className="live-dot" />EU-West · Online</div>
                     </div>
                 </div>
+            )}
+
+            {resolvedBugNotifications[0] && (
+                <aside className="bug-resolved-notice" role="status" aria-live="polite">
+                    <span className="bug-resolved-notice__icon" aria-hidden="true">✓</span>
+                    <div>
+                        <strong>Bug resolved</strong>
+                        <p>Your bug report has been resolved.</p>
+                        {resolvedBugNotifications[0].resolutionMessage && <p className="bug-resolved-notice__reply">{resolvedBugNotifications[0].resolutionMessage}</p>}
+                        <small>{resolvedBugNotifications[0].message}</small>
+                    </div>
+                    {resolvedBugNotifications.length > 1 && <span className="bug-resolved-notice__count">+{resolvedBugNotifications.length - 1}</span>}
+                    <button type="button" aria-label="Dismiss resolved bug notification" onClick={() => dismissResolvedBugNotification(resolvedBugNotifications[0].id)}>×</button>
+                </aside>
             )}
         </>
     );

@@ -425,6 +425,34 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
         }
     };
 
+    const refreshRealBalance = async () => {
+        setVisualBalanceSaving(true);
+        setVisualBalanceMessage('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${userId}/refresh-balance`, {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+            setDetail(current => ({
+                ...current,
+                user: {
+                    ...current.user,
+                    balanceSol: result.balanceSol,
+                    balanceUsd: result.balanceUsd,
+                    displayBalanceUsd: result.displayBalanceUsd,
+                    visualBalanceOverrideUsd: null,
+                },
+            }));
+            setVisualBalanceInput(String(result.displayBalanceUsd));
+            setVisualBalanceMessage(`Real wallet balance refreshed: ${formatUsd(result.balanceUsd)} (${formatSol(result.balanceSol)}).`);
+            await onRefresh?.();
+        } catch (err) {
+            setVisualBalanceMessage(err.message || 'Could not refresh the real wallet balance.');
+        } finally {
+            setVisualBalanceSaving(false);
+        }
+    };
+
     const changePassword = async () => {
         if (newPassword.length < 8 || newPassword.length > 128) {
             setAccountActionError(true);
@@ -665,6 +693,9 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                             </button>
                                             <button type="button" className="btn btn-ghost" disabled={visualBalanceSaving || u.visualBalanceOverrideUsd == null} onClick={() => updateVisualBalance(true)}>
                                                 Reset to real balance
+                                            </button>
+                                            <button type="button" className="btn btn-ghost" disabled={visualBalanceSaving} onClick={refreshRealBalance}>
+                                                {visualBalanceSaving ? 'Refreshing…' : 'Refresh real balance'}
                                             </button>
                                         </div>
                                         {visualBalanceMessage && (
@@ -1266,12 +1297,18 @@ export default function AdminDashboard() {
     };
 
     const updateBugReportStatus = async (reportId, status) => {
+        let resolutionMessage = '';
+        if (status === 'resolved') {
+            const reply = window.prompt('Write a message to the user about what was resolved (optional):');
+            if (reply == null) return;
+            resolutionMessage = reply.trim();
+        }
         setActionLoading(true);
         setActionMsg('');
         try {
             const data = await fetchAdmin(`/api/admin/bug-reports/${reportId}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ status }),
+                body: JSON.stringify({ status, resolutionMessage }),
             });
             setBugReports(current => current.map(report => String(report._id) === String(reportId) ? data.report : report));
             setActionMsg(status === 'resolved' ? '✅ Bug report marked as resolved.' : '✅ Bug report reopened.');
@@ -1496,6 +1533,9 @@ export default function AdminDashboard() {
                                             <span className={`admin-bug-report__status is-${report.status}`}>{report.status}</span>
                                         </div>
                                         <p>{report.message}</p>
+                                        {report.status === 'resolved' && report.resolutionMessage && (
+                                            <p style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(139,92,246,.08)', border: '1px solid rgba(139,92,246,.22)' }}><strong>Reply:</strong> {report.resolutionMessage}</p>
+                                        )}
                                         <div className="admin-bug-report__footer">
                                             <div>
                                                 <span>{report.gamemode || 'No gamemode'}</span>
