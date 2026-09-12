@@ -364,6 +364,9 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
     const [visualBalanceInput, setVisualBalanceInput] = useState('');
     const [visualBalanceSaving, setVisualBalanceSaving] = useState(false);
     const [visualBalanceMessage, setVisualBalanceMessage] = useState('');
+    const [walletTokens, setWalletTokens] = useState(null);
+    const [walletTokensLoading, setWalletTokensLoading] = useState(false);
+    const [convertingTokenMint, setConvertingTokenMint] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [withdrawAmountUsd, setWithdrawAmountUsd] = useState('');
@@ -425,13 +428,28 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
         }
     };
 
-    const refreshRealBalance = async () => {
-        setVisualBalanceSaving(true);
+    const scanWalletTokens = async () => {
+        setWalletTokensLoading(true);
         setVisualBalanceMessage('');
         try {
-            const result = await fetchAdmin(`/api/admin/users/${userId}/refresh-balance`, {
+            const result = await fetchAdmin(`/api/admin/users/${userId}/token-balances`);
+            setWalletTokens(result.tokens || []);
+            setVisualBalanceMessage(result.tokens?.length ? `Found ${result.tokens.length} token balance${result.tokens.length === 1 ? '' : 's'}.` : 'No SPL tokens with a balance were found.');
+        } catch (err) {
+            setVisualBalanceMessage(err.message || 'Could not scan the wallet tokens.');
+        } finally {
+            setWalletTokensLoading(false);
+        }
+    };
+
+    const convertWalletTokenToSol = async (tokenBalance) => {
+        if (!window.confirm(`Convert the full ${tokenBalance.amount} ${tokenBalance.symbol || 'tokens'} position (${tokenBalance.mint}) to SOL? This is a real irreversible on-chain swap.`)) return;
+        setConvertingTokenMint(tokenBalance.mint);
+        setVisualBalanceMessage('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${userId}/convert-token-to-sol`, {
                 method: 'POST',
-                body: JSON.stringify({}),
+                body: JSON.stringify({ mint: tokenBalance.mint, confirmation: `CONVERT ${tokenBalance.mint}` }),
             });
             setDetail(current => ({
                 ...current,
@@ -443,13 +461,14 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                     visualBalanceOverrideUsd: null,
                 },
             }));
+            setWalletTokens(current => current?.filter(token => token.mint !== tokenBalance.mint) || []);
             setVisualBalanceInput(String(result.displayBalanceUsd));
-            setVisualBalanceMessage(`Real wallet balance refreshed: ${formatUsd(result.balanceUsd)} (${formatSol(result.balanceSol)}).`);
+            setVisualBalanceMessage(`Converted to SOL successfully. New balance: ${formatUsd(result.balanceUsd)} (${formatSol(result.balanceSol)}).`);
             await onRefresh?.();
         } catch (err) {
-            setVisualBalanceMessage(err.message || 'Could not refresh the real wallet balance.');
+            setVisualBalanceMessage(err.message || 'Could not convert this token to SOL.');
         } finally {
-            setVisualBalanceSaving(false);
+            setConvertingTokenMint('');
         }
     };
 
@@ -694,14 +713,36 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                             <button type="button" className="btn btn-ghost" disabled={visualBalanceSaving || u.visualBalanceOverrideUsd == null} onClick={() => updateVisualBalance(true)}>
                                                 Reset to real balance
                                             </button>
-                                            <button type="button" className="btn btn-ghost" disabled={visualBalanceSaving} onClick={refreshRealBalance}>
-                                                {visualBalanceSaving ? 'Refreshing…' : 'Refresh real balance'}
-                                            </button>
                                         </div>
                                         {visualBalanceMessage && (
                                             <p style={{ margin: '10px 0 0', color: visualBalanceMessage.includes('Could not') || visualBalanceMessage.includes('valid') ? '#ef4444' : '#4ade80', fontSize: '0.75rem' }}>
                                                 {visualBalanceMessage}
                                             </p>
+                                        )}
+                                    </section>
+
+                                    <section style={{ padding: '16px', border: '1px solid rgba(34,197,94,.3)', borderRadius: 'var(--r-xl)', background: 'rgba(34,197,94,.055)' }}>
+                                        <p className="label" style={{ marginBottom: '8px' }}>Other wallet tokens</p>
+                                        <p style={{ margin: '0 0 12px', color: 'var(--text-2)', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                                            Scan the account address for SPL tokens and convert one complete token balance to native SOL through Jupiter. SOL remains in this account wallet.
+                                        </p>
+                                        <button type="button" className="btn btn-ghost" disabled={walletTokensLoading || !!convertingTokenMint} onClick={scanWalletTokens}>
+                                            {walletTokensLoading ? 'Scanning…' : walletTokens == null ? 'Scan token balances' : 'Scan again'}
+                                        </button>
+                                        {walletTokens && (
+                                            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                                                {walletTokens.length === 0 ? <span style={{ color: 'var(--text-3)', fontSize: '.75rem' }}>No tokens found.</span> : walletTokens.map(tokenBalance => (
+                                                    <div key={tokenBalance.mint} style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'rgba(0,0,0,.18)' }}>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <strong>{tokenBalance.amount} {tokenBalance.symbol || 'tokens'}</strong>
+                                                            <span className="mono" style={{ display: 'block', marginTop: 3, color: 'var(--text-3)', fontSize: '.66rem', overflowWrap: 'anywhere' }}>{tokenBalance.mint}</span>
+                                                        </div>
+                                                        <button type="button" className="btn btn-primary" disabled={!!convertingTokenMint} onClick={() => convertWalletTokenToSol(tokenBalance)}>
+                                                            {convertingTokenMint === tokenBalance.mint ? 'Converting…' : 'Convert to SOL'}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
                                     </section>
 
