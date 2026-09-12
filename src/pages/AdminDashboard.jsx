@@ -942,6 +942,9 @@ export default function AdminDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
     const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
+    const [rewardOwnership, setRewardOwnership] = useState(null);
+    const [rewardOwnershipLoading, setRewardOwnershipLoading] = useState(false);
+    const [rewardOwnerSearch, setRewardOwnerSearch] = useState('');
     const [bugReports, setBugReports] = useState([]);
     const [bugReportsLoading, setBugReportsLoading] = useState(false);
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
@@ -996,6 +999,16 @@ export default function AdminDashboard() {
             setBugReports(data.reports ?? []);
         } finally {
             setBugReportsLoading(false);
+        }
+    }, [fetchAdmin]);
+
+    const fetchRewardOwnership = useCallback(async () => {
+        setRewardOwnershipLoading(true);
+        try {
+            const data = await fetchAdmin('/api/admin/dashboard/rewards');
+            setRewardOwnership(data);
+        } finally {
+            setRewardOwnershipLoading(false);
         }
     }, [fetchAdmin]);
 
@@ -1080,6 +1093,11 @@ export default function AdminDashboard() {
         if (tab !== 'reports') return;
         fetchBugReports().catch(err => setError(err.message));
     }, [tab, fetchBugReports]);
+
+    useEffect(() => {
+        if (tab !== 'rewards') return;
+        fetchRewardOwnership().catch(err => setError(err.message));
+    }, [tab, fetchRewardOwnership]);
 
     useEffect(() => {
         if (tab !== 'users') return undefined;
@@ -1332,6 +1350,15 @@ export default function AdminDashboard() {
     const filteredLiveFeed = liveCategoryFilter
         ? liveFeed.filter(item => item.category === liveCategoryFilter)
         : liveFeed;
+
+    const filteredRewardOwners = (rewardOwnership?.owners || []).filter(owner => {
+        const search = rewardOwnerSearch.trim().toLowerCase();
+        return !search || owner.username?.toLowerCase().includes(search) || owner.email?.toLowerCase().includes(search);
+    });
+    const rewardTotals = rewardOwnership?.totals || {};
+    const rewardWalletBalanceUsd = Number(wallets?.rewardWallet?.balanceUsd) || 0;
+    const rewardWalletLiabilityUsd = Number(rewardTotals.rewardWalletLiabilityUsd) || 0;
+    const rewardWalletCoverageUsd = rewardWalletBalanceUsd - rewardWalletLiabilityUsd;
 
     const openUserFromFeed = (userId) => {
         if (userId) setSelectedUserId(String(userId));
@@ -1735,6 +1762,107 @@ export default function AdminDashboard() {
 
                 {tab === 'rewards' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div className="admin-reward-summary">
+                            <StatCard
+                                label="Reward wallet"
+                                value={formatUsd(rewardWalletBalanceUsd)}
+                                sub={wallets?.rewardWallet?.balanceSol != null ? formatSol(wallets.rewardWallet.balanceSol) : 'On-chain balance'}
+                            />
+                            <StatCard
+                                label="Owed to users"
+                                value={formatUsd(rewardWalletLiabilityUsd)}
+                                sub={`${rewardTotals.rewardWalletOwners ?? 0} users own reward-wallet funds`}
+                            />
+                            <StatCard
+                                label={rewardWalletCoverageUsd >= 0 ? 'Wallet coverage' : 'Wallet shortfall'}
+                                value={formatUsd(Math.abs(rewardWalletCoverageUsd))}
+                                sub={rewardWalletCoverageUsd >= 0 ? 'Balance remaining after all player liabilities' : 'Still required to cover every player liability'}
+                            />
+                            <StatCard
+                                label="Tournament rewards"
+                                value={formatUsd(rewardTotals.tournamentLiabilityUsd)}
+                                sub="Separate from the main reward wallet"
+                            />
+                        </div>
+
+                        <Panel title="What the reward wallet owes" sub="Current player liabilities grouped by the exact reason the funds are reserved.">
+                            <div className="admin-reward-breakdown">
+                                <div><span>Starter challenges</span><strong>{formatUsd(rewardTotals.starterUsd)}</strong><small>Credited after free-ticket and starter tasks</small></div>
+                                <div><span>Permanent available</span><strong>{formatUsd(rewardTotals.permanentUsd)}</strong><small>Completed $50 cashout-volume cycles</small></div>
+                                <div><span>Permanent progress</span><strong>{formatUsd(rewardTotals.permanentProgressUsd)}</strong><small>Earned reserve in incomplete cycles</small></div>
+                                <div><span>Retained cashouts</span><strong>{formatUsd(rewardTotals.retainedUsd)}</strong><small>Could not be sent below Solana rent minimum</small></div>
+                                <div><span>Active claims</span><strong>{formatUsd(rewardTotals.reservedUsd)}</strong><small>Locked while a payout settles</small></div>
+                            </div>
+                        </Panel>
+
+                        <Panel title={`Reward ownership (${filteredRewardOwners.length})`} sub="Click a user to inspect their complete account, game and reward history.">
+                            <AdminFilterBar right={
+                                <button type="button" className="btn btn-ghost" onClick={() => fetchRewardOwnership().catch(err => setError(err.message))} disabled={rewardOwnershipLoading}>
+                                    {rewardOwnershipLoading ? 'Updating…' : 'Refresh'}
+                                </button>
+                            }>
+                                <label className="admin-filter-field">
+                                    <span className="admin-filter-label">Find user</span>
+                                    <input className="admin-filter-input" value={rewardOwnerSearch} onChange={event => setRewardOwnerSearch(event.target.value)} placeholder="Username or email" />
+                                </label>
+                            </AdminFilterBar>
+                            <DataTable
+                                columns={[
+                                    { key: 'user', label: 'User', render: owner => (
+                                        <div className="admin-reward-owner-user">
+                                            <button type="button" className="admin-link-btn" onClick={() => setSelectedUserId(String(owner.id))}>{owner.username}</button>
+                                            <small>{owner.email || 'No email'}{owner.isOwnerAccount ? ' · Your account' : ''}</small>
+                                        </div>
+                                    )},
+                                    { key: 'rewardWalletUsd', label: 'Reward wallet', render: owner => <strong className="mono">{formatUsd(owner.rewardWalletUsd)}</strong> },
+                                    { key: 'reasons', label: 'Owned for', render: owner => owner.reasons?.length ? (
+                                        <div className="admin-reward-reasons">
+                                            {owner.reasons.map(reason => <span key={reason.key}>{reason.label} <strong>{formatUsd(reason.amountUsd)}</strong></span>)}
+                                        </div>
+                                    ) : <span style={{ color: 'var(--text-3)' }}>No current balance</span> },
+                                    { key: 'starter', label: 'Starter challenge', render: owner => (
+                                        <div className="admin-reward-progress-cell">
+                                            <strong>{owner.starterChallenge.status.replace('-', ' ')}</strong>
+                                            <small>$5: {owner.starterChallenge.fiveDollarGames}/{owner.starterChallenge.fiveDollarRequired} · $10: {owner.starterChallenge.tenDollarGames}/{owner.starterChallenge.tenDollarRequired}</small>
+                                            <small>{formatUsd(owner.breakdown.starterFundedUsd)} funded</small>
+                                        </div>
+                                    )},
+                                    { key: 'permanent', label: 'Permanent progress', render: owner => (
+                                        <div className="admin-reward-progress-cell">
+                                            <strong>{formatUsd(owner.breakdown.permanentProgressVolumeUsd)} / {formatUsd(owner.breakdown.permanentCycleVolumeUsd)}</strong>
+                                            <small>{owner.breakdown.permanentCyclesCompleted} cycles · {formatUsd(owner.breakdown.permanentLifetimeEarnedUsd)} lifetime earned</small>
+                                        </div>
+                                    )},
+                                    { key: 'other', label: 'Other / status', render: owner => (
+                                        <div className="admin-reward-progress-cell">
+                                            {owner.otherRewardsUsd > 0 && <strong>{formatUsd(owner.otherRewardsUsd)} tournament</strong>}
+                                            <small>{owner.freeTicket.available ? 'Free ticket available' : owner.freeTicket.used ? 'Free ticket used' : 'No free ticket used'}</small>
+                                            {owner.rewardsDisabled && <span className="admin-reward-blocked">Rewards blocked</span>}
+                                            {(owner.claimInProgress || owner.tournamentClaimInProgress) && <span className="admin-reward-processing">Claim processing</span>}
+                                        </div>
+                                    )},
+                                ]}
+                                rows={filteredRewardOwners}
+                                loading={rewardOwnershipLoading && !rewardOwnership}
+                                emptyMessage="No users currently have reward ownership or challenge progress"
+                            />
+                        </Panel>
+
+                        <Panel title="Reward activity" sub="Credits, challenge progress, unlocks, retained payouts and claims — newest first.">
+                            <DataTable
+                                columns={[
+                                    { key: 'createdAt', label: 'When', render: row => <span title={formatDate(row.createdAt)}>{formatRelativeTime(row.createdAt)}</span> },
+                                    { key: 'user', label: 'User', render: row => row.userId ? <button type="button" className="admin-link-btn" onClick={() => setSelectedUserId(String(row.userId))}>{row.username}</button> : row.username },
+                                    { key: 'title', label: 'What happened', render: row => <div className="admin-reward-activity-title"><strong>{row.title}</strong><small>{row.details}</small></div> },
+                                    { key: 'wallet', label: 'Source', render: row => <span className={`admin-reward-source is-${row.wallet}`}>{row.wallet === 'tournament' ? 'Tournament wallet' : 'Reward wallet'}</span> },
+                                    { key: 'amountUsd', label: 'Amount', render: row => <strong className="mono" style={{ color: row.amountUsd < 0 ? 'var(--red)' : row.amountUsd > 0 ? 'var(--green)' : 'var(--text-3)' }}>{row.amountUsd ? `${row.amountUsd > 0 ? '+' : '-'}${formatUsd(Math.abs(row.amountUsd))}` : '—'}</strong> },
+                                ]}
+                                rows={rewardOwnership?.activity || []}
+                                loading={rewardOwnershipLoading && !rewardOwnership}
+                                emptyMessage="No reward activity yet"
+                            />
+                        </Panel>
+
                         <Panel
                             title={`Shared deposit-wallet alerts (${rewardAlerts.filter(alert => alert.status === 'pending').length} pending)`}
                             sub="Alerts are informational only. They never change reward or affiliate access automatically."

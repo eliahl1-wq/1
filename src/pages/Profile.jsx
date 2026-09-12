@@ -32,6 +32,7 @@ const getGamemodeLabel = (log) => {
     if (rawMode === 'competitive-slither') return 'Arena Slither';
     if (rawMode === 'slither') return 'Classic Slither';
     if (rawMode === 'agar') return 'Classic Agar';
+    if (rawMode === 'surviv') return 'Surviv';
 
     // Fallbacks
     if (rawMode.toLowerCase().includes('slither')) return 'Slither';
@@ -48,6 +49,18 @@ export default function Profile() {
     const [displayCur] = useBalanceCurrency();
     const [currentPage, setCurrentPage] = useState(1);
     const [playScope, setPlayScope] = useState('real');
+    const [logsReloadKey, setLogsReloadKey] = useState(0);
+    const [adminGameDraft, setAdminGameDraft] = useState({
+        mode: 'agar',
+        result: 'win',
+        scope: 'real',
+        count: '1',
+        entryFeeUsd: '10',
+        cashoutUsd: '15',
+        playedAt: new Date().toISOString().slice(0, 16),
+    });
+    const [adminGameSaving, setAdminGameSaving] = useState(false);
+    const [adminGameNotice, setAdminGameNotice] = useState(null);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -72,6 +85,7 @@ export default function Profile() {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const data = await res.json();
+                if (!res.ok || !Array.isArray(data)) return;
                 setGameLogs(data.filter(tx => {
                     const reason = tx.meta?.reason || '';
                     return (tx.type === 'withdraw' && (reason.includes('Arena Cashout') || reason.includes('BR Victory')))
@@ -81,7 +95,7 @@ export default function Profile() {
         };
         fetchLogs();
         refreshUser();
-    }, [token, refreshUser]);
+    }, [token, refreshUser, logsReloadKey]);
 
     // ── Currency Converter Helper ─────────────────────
     const solPrice = user?.solPrice || 70;
@@ -246,6 +260,58 @@ export default function Profile() {
         }
     };
 
+    const updateAdminGameDraft = (key, value) => {
+        setAdminGameDraft(current => ({ ...current, [key]: value }));
+        setAdminGameNotice(null);
+    };
+
+    const saveAdminGames = async () => {
+        if (!user?.isAdmin || adminGameSaving) return;
+        setAdminGameSaving(true);
+        setAdminGameNotice(null);
+        try {
+            const response = await fetch(`${API_URL}/api/admin/performance/self/games`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(adminGameDraft),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Could not add games.');
+            setPlayScope(adminGameDraft.scope);
+            setCurrentPage(1);
+            setLogsReloadKey(value => value + 1);
+            setAdminGameNotice({ type: 'success', message: data.message || 'Games added.' });
+        } catch (error) {
+            setAdminGameNotice({ type: 'error', message: error.message });
+        } finally {
+            setAdminGameSaving(false);
+        }
+    };
+
+    const clearAdminGames = async () => {
+        if (!user?.isAdmin || adminGameSaving || !window.confirm('Remove only the games added through this admin panel?')) return;
+        setAdminGameSaving(true);
+        setAdminGameNotice(null);
+        try {
+            const response = await fetch(`${API_URL}/api/admin/performance/self/games`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Could not remove added games.');
+            setCurrentPage(1);
+            setLogsReloadKey(value => value + 1);
+            setAdminGameNotice({ type: 'success', message: data.message || 'Added games removed.' });
+        } catch (error) {
+            setAdminGameNotice({ type: 'error', message: error.message });
+        } finally {
+            setAdminGameSaving(false);
+        }
+    };
+
 
     // ── Render ─────────────────────────────────────────
     return (
@@ -369,6 +435,68 @@ export default function Profile() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {user?.isAdmin && (
+                                    <details className="profile-admin-games">
+                                        <summary>
+                                            <span><i /> Admin performance controls</span>
+                                            <small>Add games to test Portfolio stats</small>
+                                        </summary>
+                                        <div className="profile-admin-games__body">
+                                            <p>Added sessions affect only your Portfolio display. They never change balances, rewards, challenges, or site-wide admin statistics.</p>
+                                            <div className="profile-admin-games__grid">
+                                                <label>
+                                                    <span>Game</span>
+                                                    <select value={adminGameDraft.mode} onChange={event => updateAdminGameDraft('mode', event.target.value)}>
+                                                        <option value="agar">Agar Normal</option>
+                                                        <option value="slither">Slither Normal</option>
+                                                        <option value="competitive-slither">Slither Arena</option>
+                                                        <option value="surviv">Surviv</option>
+                                                        <option value="br-agar">Agar Battle Royale</option>
+                                                        <option value="br-slither">Slither Battle Royale</option>
+                                                    </select>
+                                                </label>
+                                                <label>
+                                                    <span>Result</span>
+                                                    <select value={adminGameDraft.result} onChange={event => updateAdminGameDraft('result', event.target.value)}>
+                                                        <option value="win">Cashout / win</option>
+                                                        <option value="loss">Eliminated / loss</option>
+                                                    </select>
+                                                </label>
+                                                <label>
+                                                    <span>Portfolio</span>
+                                                    <select value={adminGameDraft.scope} onChange={event => updateAdminGameDraft('scope', event.target.value)}>
+                                                        <option value="real">Real play</option>
+                                                        <option value="free">Free play</option>
+                                                    </select>
+                                                </label>
+                                                <label>
+                                                    <span>Games</span>
+                                                    <input type="number" min="1" max="100" step="1" value={adminGameDraft.count} onChange={event => updateAdminGameDraft('count', event.target.value)} />
+                                                </label>
+                                                <label>
+                                                    <span>Entry fee (USD)</span>
+                                                    <input type="number" min="0.01" max="10000" step="0.01" value={adminGameDraft.entryFeeUsd} onChange={event => updateAdminGameDraft('entryFeeUsd', event.target.value)} />
+                                                </label>
+                                                <label>
+                                                    <span>Cashout per game (USD)</span>
+                                                    <input type="number" min="0" max="1000000" step="0.01" value={adminGameDraft.cashoutUsd} disabled={adminGameDraft.result === 'loss'} onChange={event => updateAdminGameDraft('cashoutUsd', event.target.value)} />
+                                                </label>
+                                                <label>
+                                                    <span>Date</span>
+                                                    <input type="datetime-local" value={adminGameDraft.playedAt} onChange={event => updateAdminGameDraft('playedAt', event.target.value)} />
+                                                </label>
+                                            </div>
+                                            <div className="profile-admin-games__actions">
+                                                {adminGameNotice && <span className={`is-${adminGameNotice.type}`}>{adminGameNotice.message}</span>}
+                                                <button type="button" className="btn btn-ghost" disabled={adminGameSaving} onClick={clearAdminGames}>Clear added games</button>
+                                                <button type="button" className="btn btn-primary" disabled={adminGameSaving} onClick={saveAdminGames}>
+                                                    {adminGameSaving ? 'Saving…' : `Add ${Math.max(1, Number(adminGameDraft.count) || 1)} game${Number(adminGameDraft.count) === 1 ? '' : 's'}`}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
+                                )}
 
                                 {/* Main Stat cards */}
                                 <div className="profile-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
