@@ -169,6 +169,8 @@ function OutcomeBadge({ outcome }) {
         'No reward': { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
         'In progress': { bg: 'rgba(59,130,246,0.12)', color: 'var(--blue)' },
         'Free play': { bg: 'rgba(139,92,246,0.14)', color: '#c4b5fd' },
+        'Real money': { bg: 'rgba(34,197,94,0.12)', color: 'var(--green)' },
+        'Free ticket': { bg: 'rgba(234,179,8,0.12)', color: 'var(--yellow)' },
         excluded: { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
     };
     const style = colors[outcome] || { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-2)' };
@@ -1430,6 +1432,24 @@ export default function AdminDashboard() {
                                 <StatCard label="Platform earnings" value={formatUsd(overview?.ownerEarningsUsd)} sub={`${overview?.ownerSweepCount ?? 0} completed sweeps`} />
                                 <StatCard label="Rewards owed" value={formatUsd((overview?.totalSponsoredRewards ?? 0) + (overview?.totalPermanentRewards ?? 0) + (overview?.totalPermanentProgressReserve ?? 0) + (overview?.totalRetainedWinnings ?? 0))} sub={`${overview?.activeSponsoredPlayers ?? 0} active reward users`} />
                                 <StatCard label="Needs attention" value={rewardAlerts.filter(alert => alert.status === 'pending').length + pendingRewardClaims.length} sub="Reward alerts and unsettled claims" />
+                                <article className="admin-commerce-summary">
+                                    <p className="admin-commerce-summary__label">Skins &amp; {overview?.tokenSymbol || 'ARC'}</p>
+                                    <div className="admin-commerce-summary__metrics">
+                                        <div>
+                                            <span>Skin buyers</span>
+                                            <strong>{overview?.skinBuyerCount ?? '—'}</strong>
+                                        </div>
+                                        <div>
+                                            <span>User holdings</span>
+                                            <strong>{overview?.userTokenBalanceUsd == null ? '—' : formatUsd(overview.userTokenBalanceUsd)}</strong>
+                                        </div>
+                                    </div>
+                                    <p className="admin-commerce-summary__sub">
+                                        {overview?.userTokenBalanceUsd == null
+                                            ? 'Live market value unavailable'
+                                            : `${overview?.tokenHolderCount ?? 0} account holder(s) · on-chain value`}
+                                    </p>
+                                </article>
                                 <StatCard
                                     label="Your accounts"
                                     value={formatUsd(overview?.ownerAccountBalanceUsd)}
@@ -1535,7 +1555,9 @@ export default function AdminDashboard() {
 
                         <Panel
                             title={`Players in arenas (${activeUsers?.currentlyInGame ?? 0} total)`}
-                            sub={livePlayers.length ? 'Currently staking in arena tiers' : 'No human players in matches right now'}
+                            sub={livePlayers.length
+                                ? `${livePlayers.filter(player => player.playType === 'free-play').length} free play · ${livePlayers.filter(player => player.playType === 'real-money').length} real money`
+                                : 'No human players in matches right now'}
                         >
                             <DataTable
                                 columns={[
@@ -1543,6 +1565,9 @@ export default function AdminDashboard() {
                                         <button type="button" className="admin-link-btn" onClick={() => openUserFromFeed(r.id)}>{r.username}</button>
                                     )},
                                     { key: 'mode', label: 'Game', render: r => r.mode?.charAt(0).toUpperCase() + r.mode?.slice(1) },
+                                    { key: 'playType', label: 'Play type', render: r => (
+                                        <OutcomeBadge outcome={r.playType === 'free-play' ? 'Free play' : r.playType === 'free-ticket' ? 'Free ticket' : 'Real money'} />
+                                    )},
                                     { key: 'entryFeeUsd', label: 'Entry stake', render: r => formatUsd(r.entryFeeUsd) },
                                 ]}
                                 rows={livePlayers}
