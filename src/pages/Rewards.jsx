@@ -10,6 +10,18 @@ import '../styles/rewards.css';
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
 import { formatGameSolAmount } from '../utils/displayCurrency';
 
+function AdminRewardNumberField({ label, value, onChange, onAdd, step = '1', max = '1000000' }) {
+    return (
+        <label className="rewards-admin-field">
+            <span>{label}</span>
+            <div>
+                <input type="number" min="0" max={max} step={step} value={value} onChange={(event) => onChange(event.target.value)} />
+                {onAdd && <button type="button" onClick={onAdd}>+1</button>}
+            </div>
+        </label>
+    );
+}
+
 export default function Rewards() {
     const { user, loading, refreshUser } = useAuth();
     const navigate = useNavigate();
@@ -20,6 +32,9 @@ export default function Rewards() {
     const [claimStatus, setClaimStatus] = useState(null); // { type: 'success'|'error'|'loading', message: string }
     const [affiliateData, setAffiliateData] = useState(null);
     const [activeView, setActiveView] = useState(() => window.location.hash === '#affiliate-rewards' ? 'affiliate' : 'game');
+    const [adminRewardDraft, setAdminRewardDraft] = useState(null);
+    const [adminRewardSaving, setAdminRewardSaving] = useState(false);
+    const [adminRewardNotice, setAdminRewardNotice] = useState(null);
     const claimLockRef = useRef(false);
     const solPrice = Number(user?.solPrice) || 0;
     const isSolView = balanceCurrency === 'SOL' && solPrice > 0;
@@ -33,6 +48,28 @@ export default function Rewards() {
     useEffect(() => {
         setActiveView(location.hash === '#affiliate-rewards' ? 'affiliate' : 'game');
     }, [location.hash]);
+
+    useEffect(() => {
+        if (!user?.isAdmin) {
+            setAdminRewardDraft(null);
+            return;
+        }
+        setAdminRewardDraft({
+            completedFiveDollarGames: Number(user.completedFiveDollarNormalGames) || 0,
+            completedTenDollarGames: Number(user.completedTenDollarNormalGames) || 0,
+            starterBalanceUsd: Number(user.sponsoredRewardsBalance) || 0,
+            fundedRewardsUsd: Number(user.fundedRewardsUsd) || 0,
+            permanentProgressUsd: Number(user.permanentRewards?.progressVolumeUsd) || 0,
+            permanentBalanceUsd: Number(user.permanentRewards?.balanceUsd) || 0,
+            permanentCyclesCompleted: Number(user.permanentRewards?.cyclesCompleted) || 0,
+            retainedBalanceUsd: Number(user.rentFallbackBalanceUsd) || 0,
+            tournamentBalanceUsd: Number(user.tournamentRewardsBalance) || 0,
+            ticketState: user.hasFreeTicket && !user.freeTicketUsed
+                ? 'ready'
+                : user.freeTicketUsed ? 'used' : 'locked',
+            starterUnlocked: !!(user.sponsoredRewardsUnlocked && user.sponsoredRewardsCompleted),
+        });
+    }, [user]);
 
     useEffect(() => {
         document.title = 'Rewards | Arenifi';
@@ -263,6 +300,43 @@ export default function Rewards() {
         }
     };
 
+    const updateAdminRewardDraft = (key, value) => {
+        setAdminRewardDraft(current => current ? { ...current, [key]: value } : current);
+        setAdminRewardNotice(null);
+    };
+
+    const addAdminGame = (key) => {
+        setAdminRewardDraft(current => current ? {
+            ...current,
+            [key]: Math.max(0, Math.floor(Number(current[key]) || 0) + 1),
+        } : current);
+        setAdminRewardNotice(null);
+    };
+
+    const saveAdminRewardState = async () => {
+        if (!user.isAdmin || !adminRewardDraft || adminRewardSaving) return;
+        setAdminRewardSaving(true);
+        setAdminRewardNotice(null);
+        try {
+            const response = await fetch(`${API_URL}/api/admin/rewards/self`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(adminRewardDraft),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Could not update reward values.');
+            await refreshUser({ forceBalance: false });
+            setAdminRewardNotice({ type: 'success', message: data.message || 'Reward values updated.' });
+        } catch (error) {
+            setAdminRewardNotice({ type: 'error', message: error.message });
+        } finally {
+            setAdminRewardSaving(false);
+        }
+    };
+
     const selectView = (view) => {
         setActiveView(view);
         navigate(view === 'affiliate' ? '/rewards#affiliate-rewards' : '/rewards', { replace: true });
@@ -320,6 +394,59 @@ export default function Rewards() {
 
                 <div className={activeView === 'game' ? 'rewards-view is-active' : 'rewards-view'}>
                     {user.rewardsDisabled && <div className="product-alert product-alert--error">Rewards are under review.</div>}
+
+                    {user.isAdmin && adminRewardDraft && (
+                        <details className="rewards-admin-controls">
+                            <summary>
+                                <span><i /> Admin reward controls</span>
+                                <small>Adjust your test values</small>
+                            </summary>
+                            <div className="rewards-admin-controls__body">
+                                <p className="rewards-admin-controls__warning">These values update your real admin reward state. The adjustment is excluded from game statistics.</p>
+                                <div className="rewards-admin-controls__grid">
+                                    <AdminRewardNumberField
+                                        label="$5 Normal games"
+                                        value={adminRewardDraft.completedFiveDollarGames}
+                                        onChange={(value) => updateAdminRewardDraft('completedFiveDollarGames', value)}
+                                        onAdd={() => addAdminGame('completedFiveDollarGames')}
+                                        max="10000"
+                                    />
+                                    <AdminRewardNumberField
+                                        label="$10 Normal games"
+                                        value={adminRewardDraft.completedTenDollarGames}
+                                        onChange={(value) => updateAdminRewardDraft('completedTenDollarGames', value)}
+                                        onAdd={() => addAdminGame('completedTenDollarGames')}
+                                        max="10000"
+                                    />
+                                    <AdminRewardNumberField label="Starter balance (USD)" value={adminRewardDraft.starterBalanceUsd} step="0.01" onChange={(value) => updateAdminRewardDraft('starterBalanceUsd', value)} />
+                                    <AdminRewardNumberField label="Starter funded (USD)" value={adminRewardDraft.fundedRewardsUsd} step="0.01" onChange={(value) => updateAdminRewardDraft('fundedRewardsUsd', value)} />
+                                    <AdminRewardNumberField label="Next reward progress (USD)" value={adminRewardDraft.permanentProgressUsd} step="0.01" max="49.999999" onChange={(value) => updateAdminRewardDraft('permanentProgressUsd', value)} />
+                                    <AdminRewardNumberField label="Game reward balance (USD)" value={adminRewardDraft.permanentBalanceUsd} step="0.01" onChange={(value) => updateAdminRewardDraft('permanentBalanceUsd', value)} />
+                                    <AdminRewardNumberField label="Completed reward cycles" value={adminRewardDraft.permanentCyclesCompleted} onChange={(value) => updateAdminRewardDraft('permanentCyclesCompleted', value)} max="100000" />
+                                    <AdminRewardNumberField label="Retained balance (USD)" value={adminRewardDraft.retainedBalanceUsd} step="0.01" onChange={(value) => updateAdminRewardDraft('retainedBalanceUsd', value)} />
+                                    <AdminRewardNumberField label="Tournament balance (USD)" value={adminRewardDraft.tournamentBalanceUsd} step="0.01" onChange={(value) => updateAdminRewardDraft('tournamentBalanceUsd', value)} />
+                                    <label className="rewards-admin-field">
+                                        <span>Free ticket</span>
+                                        <select value={adminRewardDraft.ticketState} onChange={(event) => updateAdminRewardDraft('ticketState', event.target.value)}>
+                                            <option value="locked">Locked</option>
+                                            <option value="ready">Ready to use</option>
+                                            <option value="used">Used</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <label className="rewards-admin-check">
+                                    <input type="checkbox" checked={adminRewardDraft.starterUnlocked} onChange={(event) => updateAdminRewardDraft('starterUnlocked', event.target.checked)} />
+                                    <span>Starter reward unlocked</span>
+                                </label>
+                                <div className="rewards-admin-controls__actions">
+                                    {adminRewardNotice && <span className={`is-${adminRewardNotice.type}`}>{adminRewardNotice.message}</span>}
+                                    <button type="button" onClick={saveAdminRewardState} disabled={adminRewardSaving}>
+                                        {adminRewardSaving ? 'Saving…' : 'Save reward values'}
+                                    </button>
+                                </div>
+                            </div>
+                        </details>
+                    )}
 
                     <section className="rewards-overview" aria-labelledby="game-rewards-heading">
                         <div className="rewards-overview-mark" aria-hidden="true">R</div>
