@@ -96,6 +96,7 @@ export default function RewardsWidget() {
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
     const permanentRewards = user.permanentRewards || {};
     const permanentBalance = Number(permanentRewards.balanceUsd) || 0;
+    const permanentProgressReward = Number(permanentRewards.progressRewardUsd) || 0;
     const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
     const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
@@ -106,9 +107,12 @@ export default function RewardsWidget() {
         ? `${(permanentCycleReward / solPrice).toFixed(6)} SOL`
         : `$${permanentCycleReward.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
-    const totalBalance = promoBalance + permanentBalance + rentFallbackBalance;
-    const hasBalance = totalBalance > 0;
     const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
+    const starterOwedBalance = Number.isFinite(Number(user.starterRewardOwedUsd))
+        ? Math.max(0, Number(user.starterRewardOwedUsd))
+        : (isCompleted ? promoBalance : Math.min(promoBalance, Math.max(0, Number(user.fundedRewardsUsd) || 0)));
+    const totalBalance = starterOwedBalance + permanentBalance + permanentProgressReward + rentFallbackBalance;
+    const hasBalance = totalBalance > 0;
     const canClaim = rentFallbackBalance > 0 || (!user.rewardsDisabled && (permanentBalance > 0 || (isCompleted && promoBalance > 0)));
 
     const fallbackMultiplier = Math.ceil(Math.max(5, promoBalance) / 5);

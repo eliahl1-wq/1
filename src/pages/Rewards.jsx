@@ -145,15 +145,19 @@ export default function Rewards() {
     const isCompleted = user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked;
 
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
+    const starterOwedBalance = Number.isFinite(Number(user.starterRewardOwedUsd))
+        ? Math.max(0, Number(user.starterRewardOwedUsd))
+        : (isCompleted ? promoBalance : Math.min(promoBalance, Math.max(0, Number(user.fundedRewardsUsd) || 0)));
     const permanentRewards = user.permanentRewards || {};
     const permanentBalance = Number(permanentRewards.balanceUsd) || 0;
+    const permanentProgressReward = Number(permanentRewards.progressRewardUsd) || 0;
     const permanentProgress = Number(permanentRewards.progressVolumeUsd) || 0;
     const permanentProgressPct = Number(permanentRewards.progressPct) || 0;
     const permanentCycleVolume = Number(permanentRewards.cycleVolumeUsd) || 50;
     const permanentCycleReward = Number(permanentRewards.rewardPerCycleUsd) || 2;
     const nextRewardLabel = rewardMoney(permanentCycleReward);
     const rentFallbackBalance = Number(user.rentFallbackBalanceUsd) || 0;
-    const currentBalance = promoBalance + permanentBalance + rentFallbackBalance;
+    const currentBalance = starterOwedBalance + permanentBalance + permanentProgressReward + rentFallbackBalance;
     const claimableBalance = rentFallbackBalance + (!user.rewardsDisabled
         ? permanentBalance + (isCompleted ? promoBalance : 0)
         : 0);
@@ -350,7 +354,7 @@ export default function Rewards() {
                                 <div className="rewards-claim-amount mono">{rewardMoney(claimableBalance)}</div>
                                 <span className="rewards-claim-caption">Available</span>
                                 <div className="rewards-claim-chips">
-                                    <span>Game <b className="mono">{rewardMoney(promoBalance + permanentBalance)}</b></span>
+                                    <span>Game <b className="mono">{rewardMoney(starterOwedBalance + permanentBalance + permanentProgressReward)}</b></span>
                                     <span>Retained <b className="mono">{rewardMoney(rentFallbackBalance)}</b></span>
                                 </div>
                                 <button type="button" className="btn btn-primary rewards-full-button" onClick={handleClaim} disabled={!canClaim || claimStatus?.type === 'loading' || user.rewardClaimInProgress}>
@@ -380,7 +384,7 @@ export default function Rewards() {
                                 ) : user.freeTicketUsed && !isCompleted && !user.rewardsDisabled ? (
                                     <div className="rewards-active-content rewards-starter-content">
                                         <strong>Starter reward</strong>
-                                        <span>Reward: {rewardMoney(promoBalance)}</span>
+                                        <span>Next reward: {rewardMoney(promoBalance)}</span>
                                         <div className="rewards-mini-task">
                                             <div><span>{req5} × $5 games</span><b>{normal5Progress}/{req5}</b></div>
                                             <i><em style={{ width: `${(normal5Progress / req5) * 100}%` }} /></i>

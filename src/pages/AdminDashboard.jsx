@@ -640,7 +640,7 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                 value={formatUsd(u.displayBalanceUsd ?? u.balanceUsd)}
                                 sub={u.visualBalanceOverrideUsd != null ? `Real: ${formatUsd(u.balanceUsd)} · UI only` : formatSol(u.balanceSol)}
                             />
-                            <StatCard label="Available rewards" value={formatUsd(rewards?.totalAvailableUsd)} sub={u.rewardsDisabled ? 'Rewards blocked' : 'Permanent + starter + retained + tournament'} />
+                            <StatCard label="Reward reserve" value={formatUsd(rewards?.totalAvailableUsd)} sub={u.rewardsDisabled ? 'Rewards blocked' : 'Only funded starter + permanent + retained + tournament'} />
                             <StatCard label="Playtime" value={formatDuration(u.playtime ?? 0)} sub={`Last active ${formatRelativeTime(u.latestActivityAt)}`} />
                             <StatCard label="Games played" value={stats.gamesPlayed} sub={`${stats.wins}W · ${stats.losses}L · ${stats.deaths} deaths`} />
                             <StatCard label="Played for" value={formatUsd(stats.gameSpentUsd)} sub="Paid games only" />
