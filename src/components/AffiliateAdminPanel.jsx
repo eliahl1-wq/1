@@ -62,15 +62,54 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
     };
     if (loading && !data) return <div className="affiliate-loading"><span className="spinner" /> Loading affiliates…</div>;
     if (!data) return <div className="affiliate-notice">{message || 'Could not load affiliates.'}</div>;
+    const owedAffiliates = data.affiliates
+        .filter(row => Number(row.pendingCommissionUsd) + Number(row.availableCommissionUsd) > 0)
+        .sort((a, b) => (Number(b.pendingCommissionUsd) + Number(b.availableCommissionUsd)) - (Number(a.pendingCommissionUsd) + Number(a.availableCommissionUsd)));
+    const activePayoutByProfile = new Map(data.payouts
+        .filter(payout => ['requested', 'processing'].includes(payout.status))
+        .map(payout => [String(payout.affiliateProfileId), payout]));
 
     return (
         <div className="affiliate-admin-stack">
             {message && <div className="affiliate-notice">{message}</div>}
             <section className="affiliate-stat-grid">
                 <article><span>Affiliates</span><strong>{data.affiliates.length}</strong></article>
+                <article><span>Total owed</span><strong>{usd(data.totals?.outstandingCommissionUsd)}</strong></article>
+                <article><span>Pending hold</span><strong>{usd(data.totals?.pendingCommissionUsd)}</strong></article>
+                <article><span>Available</span><strong>{usd(data.totals?.availableCommissionUsd)}</strong></article>
                 <article><span>Payout requests</span><strong>{data.payouts.filter(p => ['requested', 'processing'].includes(p.status)).length}</strong></article>
                 <article><span>Open risk flags</span><strong>{data.riskFlags.length}</strong></article>
-                <article><span>Recent commissions</span><strong>{data.commissions.length}</strong></article>
+                <article><span>Paid all time</span><strong>{usd(data.totals?.paidCommissionUsd)}</strong></article>
+            </section>
+
+            <section className="affiliate-table-panel">
+                <div className="affiliate-section-heading">
+                    <div>
+                        <span className="affiliate-kicker">House wallet liability</span>
+                        <h2>Affiliate rewards owed</h2>
+                        <small>Affiliate commission stays reserved in the house wallet, not the main reward wallet. Pending amounts are in the 7-day hold; available amounts can be requested for payout.</small>
+                    </div>
+                    <strong className="affiliate-liability-total">{usd(data.totals?.outstandingCommissionUsd)}</strong>
+                </div>
+                <div className="affiliate-table-scroll">
+                    <table className="affiliate-table">
+                        <thead><tr><th>User</th><th>Pending</th><th>Available</th><th>Active payout</th><th>Total owed</th><th>Reason</th></tr></thead>
+                        <tbody>{owedAffiliates.length === 0 ? <tr><td colSpan="6" className="affiliate-empty">No affiliate rewards are currently owed.</td></tr> : owedAffiliates.map(row => {
+                            const activePayout = activePayoutByProfile.get(String(row.id));
+                            const totalOwed = Number(row.pendingCommissionUsd) + Number(row.availableCommissionUsd);
+                            return (
+                                <tr key={`owed-${row.id}`}>
+                                    <td><strong>{row.username}</strong><small>{row.email || row.referralCode}</small></td>
+                                    <td>{usd(row.pendingCommissionUsd)}<small>7-day hold</small></td>
+                                    <td>{usd(row.availableCommissionUsd)}<small>{row.suspended ? 'Affiliate suspended' : 'Ready to request'}</small></td>
+                                    <td>{activePayout ? <><strong>{usd(activePayout.amountUsd)}</strong><small>{activePayout.status}</small></> : '—'}</td>
+                                    <td><strong>{usd(totalOwed)}</strong></td>
+                                    <td><small>{row.referralCount} referrals · commission from real referred-player cashout fees</small></td>
+                                </tr>
+                            );
+                        })}</tbody>
+                    </table>
+                </div>
             </section>
 
             <section className="affiliate-table-panel">

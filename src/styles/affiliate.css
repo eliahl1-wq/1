@@ -321,6 +321,12 @@
 .affiliate-table th,
 .affiliate-table td { color: var(--text-subtle); }
 .affiliate-status { border-radius: var(--r-md); font-weight: 700; }
+.affiliate-liability-total {
+    flex: 0 0 auto;
+    color: var(--text-h);
+    font: 800 1.35rem var(--mono);
+    letter-spacing: -.04em;
+}
 
 @media (max-width: 720px) {
     .affiliate-hero { padding: 40px 16px 32px; }

@@ -942,6 +942,7 @@ export default function AdminDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
     const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
+    const [failedRewardClaims, setFailedRewardClaims] = useState([]);
     const [rewardOwnership, setRewardOwnership] = useState(null);
     const [rewardOwnershipLoading, setRewardOwnershipLoading] = useState(false);
     const [rewardOwnerSearch, setRewardOwnerSearch] = useState('');
@@ -1049,6 +1050,7 @@ export default function AdminDashboard() {
             setSweeps(sw.sweeps ?? []);
             setRewardAlerts(security.alerts ?? []);
             setPendingRewardClaims(security.pendingClaims ?? []);
+            setFailedRewardClaims(security.failedClaims ?? []);
             setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(pregameDisplay.playingOffsets || {}) });
             await Promise.all([
                 fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded),
@@ -1165,6 +1167,7 @@ export default function AdminDashboard() {
             const data = await fetchAdmin('/api/admin/reward-security-alerts');
             setRewardAlerts(data.alerts ?? []);
             setPendingRewardClaims(data.pendingClaims ?? []);
+            setFailedRewardClaims(data.failedClaims ?? []);
             setActionMsg(action === 'approve' ? '✅ Alert dismissed. Account access was not changed.' : '✅ Rewards manually disabled; existing balances were preserved.');
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
@@ -1219,6 +1222,48 @@ export default function AdminDashboard() {
         '/api/admin/reward-pool/sweep-surplus',
         'Withdraw only the currently safe reward-pool surplus to the owner vault? Player liabilities and active claims remain reserved.',
     );
+
+    const setNewGameJoinLock = async (locked) => {
+        const message = locked
+            ? 'Lock all NEW game entries?\n\nPlayers already in a match stay connected and can keep playing or cash out. Rejoins to an existing match remain available.'
+            : 'Open new game entries again?';
+        if (!window.confirm(message)) return;
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            const result = await fetchAdmin('/api/admin/runtime/join-lock', {
+                method: 'PUT',
+                body: JSON.stringify({ locked }),
+            });
+            setServerStatus(current => ({ ...(current || {}), newGameJoinsLocked: result.newGameJoinsLocked }));
+            setActionMsg(`✅ ${result.message}`);
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const resetUnfinishedRewards = async (owner) => {
+        const confirmation = window.prompt(
+            `Reset only UNFINISHED rewards for ${owner.username}?\n\nThis forfeits their unused free ticket, unfinished starter reward and incomplete permanent-cycle progress. Claimable rewards, retained cashouts, tournament rewards, lifetime history, active matches and active claims are protected.\n\nType RESET ${owner.username} to continue.`
+        );
+        if (confirmation == null) return;
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            const result = await fetchAdmin(`/api/admin/users/${owner.id}/reset-unfinished-rewards`, {
+                method: 'POST',
+                body: JSON.stringify({ confirmation }),
+            });
+            setActionMsg(`✅ ${result.message}`);
+            await Promise.all([fetchRewardOwnership(), loadData()]);
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     const toggleTxSelection = (id) => {
         setSelectedTxIds(prev => {
@@ -1355,6 +1400,9 @@ export default function AdminDashboard() {
         const search = rewardOwnerSearch.trim().toLowerCase();
         return !search || owner.username?.toLowerCase().includes(search) || owner.email?.toLowerCase().includes(search);
     });
+    const challengeRewardOwners = filteredRewardOwners.filter(owner =>
+        owner.breakdown?.starterUsd > 0 || owner.starterChallenge?.status === 'in-progress' || owner.freeTicket?.available
+    );
     const rewardTotals = rewardOwnership?.totals || {};
     const rewardWalletBalanceUsd = Number(wallets?.rewardWallet?.balanceUsd) || 0;
     const rewardWalletLiabilityUsd = Number(rewardTotals.rewardWalletLiabilityUsd) || 0;
@@ -1787,12 +1835,30 @@ export default function AdminDashboard() {
 
                         <Panel title="What the reward wallet owes" sub="Current player liabilities grouped by the exact reason the funds are reserved.">
                             <div className="admin-reward-breakdown">
-                                <div><span>Starter challenges</span><strong>{formatUsd(rewardTotals.starterUsd)}</strong><small>Credited after free-ticket and starter tasks</small></div>
+                                <div><span>Starter reserve</span><strong>{formatUsd(rewardTotals.starterUsd)}</strong><small>Only the funded or unlocked part</small></div>
+                                <div><span>Unfunded potential</span><strong>{formatUsd(rewardTotals.starterUnfundedUsd)}</strong><small>Not currently owed by the reward wallet</small></div>
                                 <div><span>Permanent available</span><strong>{formatUsd(rewardTotals.permanentUsd)}</strong><small>Completed $50 cashout-volume cycles</small></div>
                                 <div><span>Permanent progress</span><strong>{formatUsd(rewardTotals.permanentProgressUsd)}</strong><small>Earned reserve in incomplete cycles</small></div>
                                 <div><span>Retained cashouts</span><strong>{formatUsd(rewardTotals.retainedUsd)}</strong><small>Could not be sent below Solana rent minimum</small></div>
                                 <div><span>Active claims</span><strong>{formatUsd(rewardTotals.reservedUsd)}</strong><small>Locked while a payout settles</small></div>
                             </div>
+                        </Panel>
+
+                        <Panel title={`Challenge rewards owed (${challengeRewardOwners.length})`} sub="Starter rewards and the exact challenge progress attached to each account.">
+                            <DataTable
+                                columns={[
+                                    { key: 'user', label: 'User', render: owner => <button type="button" className="admin-link-btn" onClick={() => setSelectedUserId(String(owner.id))}>{owner.username}</button> },
+                                    { key: 'owed', label: 'Starter reward owed', render: owner => <strong className="mono">{formatUsd(owner.breakdown.starterUsd)}</strong> },
+                                    { key: 'funded', label: 'Funded by games', render: owner => formatUsd(owner.breakdown.starterFundedUsd) },
+                                    { key: 'ticket', label: 'Free ticket', render: owner => owner.freeTicket.available ? 'Available' : owner.freeTicket.used ? 'Used' : owner.freeTicket.challengeCompleted ? 'Completed' : 'Not unlocked' },
+                                    { key: 'five', label: '$5 challenge', render: owner => `${owner.starterChallenge.fiveDollarGames} / ${owner.starterChallenge.fiveDollarRequired} games` },
+                                    { key: 'ten', label: '$10 challenge', render: owner => `${owner.starterChallenge.tenDollarGames} / ${owner.starterChallenge.tenDollarRequired} games` },
+                                    { key: 'status', label: 'Status', render: owner => <OutcomeBadge outcome={owner.starterChallenge.status === 'completed' ? 'Reward earned' : owner.starterChallenge.status === 'in-progress' ? 'In progress' : 'No reward'} /> },
+                                ]}
+                                rows={challengeRewardOwners}
+                                loading={rewardOwnershipLoading && !rewardOwnership}
+                                emptyMessage="No active challenge rewards or progress"
+                            />
                         </Panel>
 
                         <Panel title={`Reward ownership (${filteredRewardOwners.length})`} sub="Click a user to inspect their complete account, game and reward history.">
@@ -1824,7 +1890,7 @@ export default function AdminDashboard() {
                                         <div className="admin-reward-progress-cell">
                                             <strong>{owner.starterChallenge.status.replace('-', ' ')}</strong>
                                             <small>$5: {owner.starterChallenge.fiveDollarGames}/{owner.starterChallenge.fiveDollarRequired} · $10: {owner.starterChallenge.tenDollarGames}/{owner.starterChallenge.tenDollarRequired}</small>
-                                            <small>{formatUsd(owner.breakdown.starterFundedUsd)} funded</small>
+                                            <small>{formatUsd(owner.breakdown.starterUsd)} reserved · {formatUsd(owner.breakdown.starterPotentialUsd)} potential</small>
                                         </div>
                                     )},
                                     { key: 'permanent', label: 'Permanent progress', render: owner => (
@@ -1841,6 +1907,30 @@ export default function AdminDashboard() {
                                             {(owner.claimInProgress || owner.tournamentClaimInProgress) && <span className="admin-reward-processing">Claim processing</span>}
                                         </div>
                                     )},
+                                    { key: 'actions', label: 'Actions', render: owner => {
+                                        const hasUnfinished = owner.breakdown.starterPotentialUsd > 0
+                                            || owner.breakdown.permanentProgressUsd > 0
+                                            || owner.breakdown.permanentProgressVolumeUsd > 0
+                                            || owner.freeTicket.available
+                                            || owner.freeTicket.challengeCompleted;
+                                        const protectedReward = owner.starterChallenge.status === 'completed'
+                                            || owner.breakdown.permanentUsd > 0
+                                            || owner.breakdown.retainedUsd > 0
+                                            || owner.claimInProgress;
+                                        const disabled = actionLoading || protectedReward || !hasUnfinished;
+                                        return (
+                                            <button
+                                                type="button"
+                                                className="btn btn-danger"
+                                                disabled={disabled}
+                                                title={protectedReward ? 'Claimable funds are protected and cannot be reset' : !hasUnfinished ? 'No unfinished reward state to reset' : 'Forfeit only unfinished reward progress'}
+                                                onClick={() => resetUnfinishedRewards(owner)}
+                                                style={{ padding: '8px 10px', fontSize: '0.7rem', whiteSpace: 'nowrap' }}
+                                            >
+                                                Reset unfinished
+                                            </button>
+                                        );
+                                    } },
                                 ]}
                                 rows={filteredRewardOwners}
                                 loading={rewardOwnershipLoading && !rewardOwnership}
@@ -1908,7 +1998,22 @@ export default function AdminDashboard() {
                                 loading={false}
                                 emptyMessage="No unsettled reward claims"
                             />
-                        </Panel>                    </div>
+                        </Panel>
+                        <Panel title="Recent failed claims" sub="The exact backend reason is shown here so reward-wallet, RPC, rent, and configuration failures can be distinguished.">
+                            <DataTable
+                                columns={[
+                                    { key: 'user', label: 'User', render: claim => claim.userId?.username || claim.userId?.email || 'Unknown' },
+                                    { key: 'amount', label: 'Amount', render: claim => formatUsd(claim.amountUsd) },
+                                    { key: 'error', label: 'Reason', render: claim => <span style={{ color: 'var(--red)' }}>{claim.error || 'Unknown failure'}</span> },
+                                    { key: 'signature', label: 'Signature', render: claim => claim.signature ? <span className="mono">{truncateAddr(claim.signature)}</span> : 'Not broadcast' },
+                                    { key: 'updated', label: 'When', render: claim => formatDate(claim.updatedAt || claim.createdAt) },
+                                ]}
+                                rows={failedRewardClaims}
+                                loading={false}
+                                emptyMessage="No failed reward claims"
+                            />
+                        </Panel>
+                    </div>
                 )}
                 {tab === 'operations' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1930,8 +2035,8 @@ export default function AdminDashboard() {
                             />
                             <StatCard
                                 label="Arena Status"
-                                value={serverStatus?.isResetting ? 'Resetting' : 'Live'}
-                                sub={serverStatus?.brUntouchedOnArenaReset ? 'BR wallets never swept on arena reset' : ''}
+                                value={serverStatus?.newGameJoinsLocked ? 'Draining' : serverStatus?.isResetting ? 'Resetting' : 'Live'}
+                                sub={serverStatus?.newGameJoinsLocked ? 'New entries locked · existing players stay live' : serverStatus?.brUntouchedOnArenaReset ? 'BR wallets never swept on arena reset' : ''}
                             />
                         </div>
 
@@ -1965,6 +2070,15 @@ export default function AdminDashboard() {
 
                         <Panel title="Admin actions" sub="No terminal commands needed">
                             <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                                <button
+                                    type="button"
+                                    className={serverStatus?.newGameJoinsLocked ? 'btn btn-primary' : 'btn btn-danger'}
+                                    disabled={actionLoading}
+                                    onClick={() => setNewGameJoinLock(!serverStatus?.newGameJoinsLocked)}
+                                    style={{ padding: '12px 20px', fontSize: '0.82rem' }}
+                                >
+                                    {serverStatus?.newGameJoinsLocked ? 'Open New Game Entries' : 'Lock New Entries & Drain'}
+                                </button>
                                 <button
                                     type="button"
                                     className="btn btn-primary"
