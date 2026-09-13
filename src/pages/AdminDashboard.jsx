@@ -1406,7 +1406,8 @@ export default function AdminDashboard() {
     const rewardTotals = rewardOwnership?.totals || {};
     const rewardWalletBalanceUsd = Number(wallets?.rewardWallet?.balanceUsd) || 0;
     const rewardWalletLiabilityUsd = Number(rewardTotals.rewardWalletLiabilityUsd) || 0;
-    const rewardWalletCoverageUsd = rewardWalletBalanceUsd - rewardWalletLiabilityUsd;
+    const pendingHouseRewardUsd = Number(rewardTotals.pendingHouseUsd) || 0;
+    const rewardWalletCoverageUsd = rewardWalletBalanceUsd + pendingHouseRewardUsd - rewardWalletLiabilityUsd;
 
     const openUserFromFeed = (userId) => {
         if (userId) setSelectedUserId(String(userId));
@@ -1822,9 +1823,14 @@ export default function AdminDashboard() {
                                 sub={`${rewardTotals.rewardWalletOwners ?? 0} users own reward-wallet funds`}
                             />
                             <StatCard
+                                label="Pending from house"
+                                value={formatUsd(pendingHouseRewardUsd)}
+                                sub="Already reserved and moved on the next settlement"
+                            />
+                            <StatCard
                                 label={rewardWalletCoverageUsd >= 0 ? 'Wallet coverage' : 'Wallet shortfall'}
                                 value={formatUsd(Math.abs(rewardWalletCoverageUsd))}
-                                sub={rewardWalletCoverageUsd >= 0 ? 'Balance remaining after all player liabilities' : 'Still required to cover every player liability'}
+                                sub={rewardWalletCoverageUsd >= 0 ? 'Wallet plus pending reserve after player liabilities' : 'Still required after pending house reserve'}
                             />
                             <StatCard
                                 label="Tournament rewards"

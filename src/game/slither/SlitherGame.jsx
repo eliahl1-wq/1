@@ -89,6 +89,7 @@ export default function SlitherGame() {
     const worldUpdatesEnabledRef = useRef(!pendingAtMount);
 
     const myIdRef = useRef(null);
+    const activeGameSessionIdRef = useRef(null);
     const prevBalanceRef = useRef(null);
     const prevKillsRef = useRef(null);
 
@@ -114,6 +115,7 @@ export default function SlitherGame() {
     const [cashedAmount, setCashedAmount] = useState(() => (
         pendingAtMount?.type === 'cashout' ? pendingAtMount.cashedAmount : null
     ));
+    const [cashoutRetainedForClaim, setCashoutRetainedForClaim] = useState(() => !!pendingAtMount?.retainedForClaim);
     const [showResultModal, setShowResultModal] = useState(() => !!pendingAtMount);
     const [isSpectating, setIsSpectating] = useState(false);
     const [isRejoining, setIsRejoining] = useState(false);
@@ -568,6 +570,7 @@ export default function SlitherGame() {
             setCashoutPending(false);
             setIsDead(false);
             setCashedAmount(null);
+            setCashoutRetainedForClaim(false);
             setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
             clearPendingResult('slither');
             const mode = gameSizes?.mode || lobbyModeForSession(joinParamsRef.current.isCompetitive);
@@ -606,6 +609,7 @@ export default function SlitherGame() {
                 setBrShowIntro(true);
             }
             myIdRef.current = playerSettings.id;
+            activeGameSessionIdRef.current = playerSettings.gameSessionId || null;
             renderer.resetSession();
             renderer.start();
             sessionStartAtRef.current = Date.now();
@@ -732,7 +736,11 @@ export default function SlitherGame() {
 
 
 
-        socket.on('cashOutSuccess', ({ amount }) => {
+        socket.on('cashOutSuccess', ({ amount, gameSessionId, retainedForClaim = false }) => {
+            if (gameSessionId && activeGameSessionIdRef.current && gameSessionId !== activeGameSessionIdRef.current) {
+                console.warn('Ignored stale Slither cashout result from another game session.');
+                return;
+            }
             cashoutActiveRef.current = false;
             cashoutReconnectRef.current = false;
             blockAutoJoinRef.current = true;
@@ -764,11 +772,13 @@ export default function SlitherGame() {
             };
             setSessionStats(stats);
             setCashedAmount(amount);
+            setCashoutRetainedForClaim(retainedForClaim);
             setShowResultModal(true);
             setIsSpectating(false);
             savePendingResult('slither', {
                 type: 'cashout',
                 cashedAmount: amount,
+                retainedForClaim,
                 ...stats,
                 isCompetitive: joinParamsRef.current.isCompetitive,
             });
@@ -1054,6 +1064,7 @@ export default function SlitherGame() {
                 <GameResultModal
                     type={cashedAmount !== null ? 'cashout' : 'death'}
                     amount={cashedAmount ?? undefined}
+                    retainedForClaim={cashoutRetainedForClaim}
                     timeSurvivedMs={sessionStats.timeSurvivedMs}
                     eliminations={sessionStats.eliminations}
                     walletBalanceUsd={user?.balanceUsd ?? (user?.balanceSol ?? 0) * (user?.solPrice ?? 0)}

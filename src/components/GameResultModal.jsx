@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { formatGameSolAmount, formatWalletBalanceAmount, getStoredBalanceCurrency } from '../utils/displayCurrency.js';
 
 function SolLogo({ size = 12 }) {
@@ -108,6 +108,7 @@ function HomeIcon() {
 export default function GameResultModal({
     type,
     amount,
+    retainedForClaim = false,
     timeSurvivedMs = 0,
     eliminations = 0,
     walletBalanceUsd = 0,
@@ -122,29 +123,10 @@ export default function GameResultModal({
 }) {
     const isWin = type === 'cashout';
     const showSol = getStoredBalanceCurrency() === 'SOL' && Number(solPrice) > 0;
-    const [displayAmount, setDisplayAmount] = useState(0);
-
-    useEffect(() => {
-        if (!isWin || amount == null) {
-            setDisplayAmount(0);
-            return undefined;
-        }
-
-        const target = Number(amount) || 0;
-        const start = performance.now();
-        const duration = 900;
-        let raf;
-
-        const tick = (t) => {
-            const p = Math.min(1, (t - start) / duration);
-            const eased = 1 - Math.pow(1 - p, 4);
-            setDisplayAmount(eased * target);
-            if (p < 1) raf = requestAnimationFrame(tick);
-        };
-        raf = requestAnimationFrame(tick);
-
-        return () => cancelAnimationFrame(raf);
-    }, [isWin, amount]);
+    // A financial result must show its final value immediately. The old
+    // count-up animation visibly passed through values such as "$2" on its
+    // way to a $6.96 payout and made correct cashouts look underpaid on video.
+    const displayAmount = isWin ? Math.max(0, Number(amount) || 0) : 0;
 
     const amountSol = solPrice > 0 ? displayAmount / solPrice : 0;
     const formattedAmountSol = showSol
@@ -164,9 +146,11 @@ export default function GameResultModal({
                         <div className="game-result-trophy" aria-hidden="true">
                             <TrophyIcon />
                         </div>
-                        <h2 className="game-result-title game-result-title--win">Cashout Successful!</h2>
+                        <h2 className="game-result-title game-result-title--win">
+                            {retainedForClaim ? 'Cashout Saved!' : 'Cashout Successful!'}
+                        </h2>
 
-                        <p className="game-result-label">Amount Received</p>
+                        <p className="game-result-label">{retainedForClaim ? 'Available in Rewards' : 'Amount Received'}</p>
                         <div className="game-result-amount">
                             {showSol ? <><SolLogo size={28} />{formattedAmountSol}</> : `$${displayAmount.toFixed(2)}`}
                         </div>
@@ -175,6 +159,9 @@ export default function GameResultModal({
                                 ? `$${displayAmount.toFixed(2)}`
                                 : <><SolLogo size={12} />{formattedAmountSol}</>}
                         </p>
+                        {retainedForClaim && (
+                            <p className="game-result-caption">House liquidity was temporarily low, so the full amount was saved for claim instead of being reduced.</p>
+                        )}
 
                         <div className="game-result-divider" />
 

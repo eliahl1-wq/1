@@ -260,6 +260,7 @@ export default function SurvivGame() {
     const playAgainPendingRef = useRef(false);
     const worldUpdatesEnabledRef = useRef(!pendingAtMount);
     const myIdRef = useRef(null);
+    const activeGameSessionIdRef = useRef(null);
     const cashOutTotalRef = useRef(CASHOUT_SECONDS);
     const cashOutEndAtRef = useRef(0);
     const sessionStartAtRef = useRef(null);
@@ -303,6 +304,7 @@ export default function SurvivGame() {
     const [cashedAmount, setCashedAmount] = useState(() => (
         pendingAtMount?.type === 'cashout' ? pendingAtMount.cashedAmount : null
     ));
+    const [cashoutRetainedForClaim, setCashoutRetainedForClaim] = useState(() => !!pendingAtMount?.retainedForClaim);
     const [showResultModal, setShowResultModal] = useState(() => !!pendingAtMount);
     const [isSpectating, setIsSpectating] = useState(false);
     const [inventoryDrag, setInventoryDrag] = useState(null);
@@ -928,12 +930,14 @@ export default function SurvivGame() {
             }
             setIsDead(false);
             setCashedAmount(null);
+            setCashoutRetainedForClaim(false);
             setShowResultModal(false);
             setIsSpectating(false);
             setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
             setCashoutPending(false);
             hasJoinedRef.current = true;
             myIdRef.current = player.id;
+            activeGameSessionIdRef.current = player.gameSessionId || null;
             renderer.setMyId(player.id);
             if (!isRejoin || !sessionStartAtRef.current) sessionStartAtRef.current = Date.now();
             setCurrentBalance(player.dollarBalance ?? 0);
@@ -1095,7 +1099,11 @@ export default function SurvivGame() {
             renderer.setHud({ cashoutEndAt: 0, cashoutSeconds: 0 });
         });
 
-        socket.on('cashOutSuccess', ({ amount }) => {
+        socket.on('cashOutSuccess', ({ amount, gameSessionId, retainedForClaim = false }) => {
+            if (gameSessionId && activeGameSessionIdRef.current && gameSessionId !== activeGameSessionIdRef.current) {
+                console.warn('Ignored stale Surviv cashout result from another game session.');
+                return;
+            }
             hideInventoryUi();
             cashoutActiveRef.current = false;
             worldUpdatesEnabledRef.current = false;
@@ -1105,6 +1113,7 @@ export default function SurvivGame() {
             const eliminations = Number(renderer.me?.kills) || sessionStatsRef.current.eliminations || 0;
             setSessionStats({ timeSurvivedMs: survived, eliminations });
             setCashedAmount(amount);
+            setCashoutRetainedForClaim(retainedForClaim);
             setShowResultModal(true);
             setIsDead(false);
             renderer.clearInput();
@@ -1112,6 +1121,7 @@ export default function SurvivGame() {
             savePendingResult('surviv', {
                 type: 'cashout',
                 cashedAmount: amount,
+                retainedForClaim,
                 timeSurvivedMs: survived,
                 eliminations,
             });
@@ -1807,6 +1817,7 @@ export default function SurvivGame() {
                 <GameResultModal
                     type={cashedAmount != null ? 'cashout' : 'death'}
                     amount={cashedAmount}
+                    retainedForClaim={cashoutRetainedForClaim}
                     timeSurvivedMs={sessionStats.timeSurvivedMs}
                     eliminations={sessionStats.eliminations}
                     walletBalanceUsd={user?.balanceUsd ?? 0}

@@ -110,6 +110,7 @@ export default function Game() {
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null });
     const myIdRef = useRef(null);
+    const activeGameSessionIdRef = useRef(null);
     const prevBalanceRef = useRef(null);
     const prevKillsRef = useRef(null);
     const timerIntervalRef = useRef(null);
@@ -143,6 +144,7 @@ export default function Game() {
     const [cashedAmount, setCashedAmount] = useState(() => (
         pendingAtMount?.type === 'cashout' ? pendingAtMount.cashedAmount : null
     ));
+    const [cashoutRetainedForClaim, setCashoutRetainedForClaim] = useState(() => !!pendingAtMount?.retainedForClaim);
     const [showResultModal, setShowResultModal] = useState(() => !!pendingAtMount);
     const [isSpectating, setIsSpectating] = useState(false);
     const [isRejoining, setIsRejoining] = useState(false);
@@ -456,6 +458,7 @@ export default function Game() {
             setCashoutPending(false);
             setIsDead(false);
             setCashedAmount(null);
+            setCashoutRetainedForClaim(false);
             setSessionStats({ timeSurvivedMs: 0, eliminations: 0 });
             setIsSpectating(false);
             foodCacheRef.current.clear();
@@ -477,6 +480,7 @@ export default function Game() {
                 setBrShowIntro(true);
             }
             myIdRef.current = playerSettings.id;
+            activeGameSessionIdRef.current = playerSettings.gameSessionId || null;
             gameData.current.player = playerSettings;
             cameraZoomRef.current = 1;
             playerWheelZoomRef.current = 1;
@@ -615,7 +619,11 @@ export default function Game() {
             })));
         });
 
-        socket.on('cashOutSuccess', ({ amount }) => {
+        socket.on('cashOutSuccess', ({ amount, gameSessionId, retainedForClaim = false }) => {
+            if (gameSessionId && activeGameSessionIdRef.current && gameSessionId !== activeGameSessionIdRef.current) {
+                console.warn('Ignored stale cashout result from another game session.');
+                return;
+            }
             cashoutActiveRef.current = false;
             cashoutReconnectRef.current = false;
             blockAutoJoinRef.current = true;
@@ -635,11 +643,13 @@ export default function Game() {
             };
             setSessionStats(stats);
             setCashedAmount(amount);
+            setCashoutRetainedForClaim(retainedForClaim);
             setShowResultModal(true);
             setIsSpectating(false);
             savePendingResult('agar', {
                 type: 'cashout',
                 cashedAmount: amount,
+                retainedForClaim,
                 ...stats,
             });
             refreshUser?.();
@@ -1149,6 +1159,7 @@ export default function Game() {
                 <GameResultModal
                     type={cashedAmount !== null ? 'cashout' : 'death'}
                     amount={cashedAmount ?? undefined}
+                    retainedForClaim={cashoutRetainedForClaim}
                     timeSurvivedMs={sessionStats.timeSurvivedMs}
                     eliminations={sessionStats.eliminations}
                     walletBalanceUsd={user?.balanceUsd ?? (user?.balanceSol ?? 0) * (user?.solPrice ?? 0)}
