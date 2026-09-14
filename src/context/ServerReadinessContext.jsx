@@ -72,14 +72,15 @@ export function useServerReadiness() {
 }
 
 export function ServerUpdateBanner() {
-    const { updating } = useServerReadiness();
+    const { updating, phase } = useServerReadiness();
     if (!updating) return null;
+    const releaseInProgress = phase === 'resetting' || phase === 'deploying';
     return (
         <div className="server-update-banner" role="status" aria-live="polite">
             <span className="server-update-banner__spinner" aria-hidden="true" />
             <span>
-                <strong>Updating servers…</strong>
-                <small>New games will reopen automatically when the game server is ready.</small>
+                <strong>{releaseInProgress ? 'Updating servers…' : 'Starting game server…'}</strong>
+                <small>{releaseInProgress ? 'The new version will be ready shortly.' : 'Games will open automatically when startup is complete.'}</small>
             </span>
         </div>
     );

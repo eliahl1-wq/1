@@ -152,7 +152,10 @@ const getChromaName = (color) => {
 
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
-    const { updating: serverUpdating } = useServerReadiness();
+    const { updating: serverUpdating, phase: serverPhase } = useServerReadiness();
+    const serverUnavailableLabel = serverPhase === 'resetting' || serverPhase === 'deploying'
+        ? 'Updating servers…'
+        : 'Starting game server…';
     const navigate = useNavigate();
     const location = useLocation();
     const {
@@ -1100,7 +1103,7 @@ export default function PreGame() {
             : (isAlreadyInGame && canRejoinThisMode)
                 ? 'Rejoin'
                 : serverUpdating
-                    ? 'Updating servers…'
+                    ? serverUnavailableLabel
                 : (isAlreadyInGame && !canRejoinThisMode)
                     ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'surviv' ? 'Surviv' : currentGameMode === 'slither' || currentGameMode === 'competitive-slither' ? 'Slither' : 'Agar')} — switch mode`
                     : !selectedMode
@@ -1624,7 +1627,7 @@ export default function PreGame() {
                                 >
                                     <PlayIcon />
                                     <span className="play-btn-label">
-                                        {serverUpdating ? 'Updating servers…' : `Play $${Number(tournament?.entryFeeUsd || 0).toFixed(0)}`}
+                                        {serverUpdating ? serverUnavailableLabel : `Play $${Number(tournament?.entryFeeUsd || 0).toFixed(0)}`}
                                     </span>
                                 </button>
                             </div>
