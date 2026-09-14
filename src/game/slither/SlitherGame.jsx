@@ -104,6 +104,7 @@ export default function SlitherGame() {
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
 
     const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
+    const [joinMessage, setJoinMessage] = useState('Connecting to Arena…');
 
     const [currentBalance, setCurrentBalance] = useState(1.0);
 
@@ -532,6 +533,7 @@ export default function SlitherGame() {
 
         socket.on('connect', () => {
             setIsConnected(true);
+            if (!gameReady) setJoinMessage('Checking your match…');
             if (!hasJoinedRef.current && !blockAutoJoinRef.current) {
                 const { nickname, entryFeeUsd: fee, isBR: br } = joinParamsRef.current;
                 if (joinParamsRef.current.isTournament) {
@@ -561,6 +563,11 @@ export default function SlitherGame() {
                 }
                 hasJoinedRef.current = true;
             }
+        });
+
+        socket.on('joinProgress', (payload) => {
+            const message = typeof payload === 'string' ? payload : payload?.message;
+            if (message) setJoinMessage(message);
         });
 
 
@@ -1200,13 +1207,13 @@ export default function SlitherGame() {
                     <div style={{ textAlign: 'center' }}>
 
                         <h2 style={{ marginBottom: '10px' }}>
-                            {isBattleRoyale ? 'Joining Battle Royale…' : 'Connecting to Arena…'}
+                            {isBattleRoyale ? 'Joining Battle Royale…' : joinMessage}
                         </h2>
 
                         <p style={{ opacity: 0.5 }}>
                             {isBattleRoyale
                                 ? 'Syncing match — no cash-out in this mode'
-                                : `Make sure you have at least ${formatBalanceAmount(entryFeeUsd, gameSolPrice, balanceCurrency)} balance.`}
+                                : 'Your entry is being verified. Keep this window open; you will enter automatically when it is ready.'}
                         </p>
 
                     </div>

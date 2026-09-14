@@ -340,6 +340,7 @@ export default function SurvivGame() {
     };
     const [isRejoining, setIsRejoining] = useState(false);
     const [connectionError, setConnectionError] = useState('');
+    const [joinMessage, setJoinMessage] = useState('Joining Surviv…');
     const [sessionStats, setSessionStatsState] = useState(() => (
         pendingAtMount
             ? { timeSurvivedMs: pendingAtMount.timeSurvivedMs ?? 0, eliminations: pendingAtMount.eliminations ?? 0 }
@@ -862,12 +863,17 @@ export default function SurvivGame() {
             const rejoining = hasJoinedRef.current;
             setIsConnected(true);
             setConnectionError('');
+            if (!rejoining) setJoinMessage('Checking your match…');
             if (!blockAutoJoinRef.current) {
                 setIsRejoining(rejoining);
                 emitSurvivJoin();
             } else if (worldUpdatesEnabledRef.current) {
                 renderer.start();
             }
+        });
+        socket.on('joinProgress', (payload) => {
+            const message = typeof payload === 'string' ? payload : payload?.message;
+            if (message && awaitingWelcomeRef.current) setJoinMessage(message);
         });
         socket.on('disconnect', () => {
             hideInventoryUi();
@@ -1493,7 +1499,7 @@ export default function SurvivGame() {
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
                     <div style={{ textAlign: 'center', maxWidth: 420, padding: 24 }}>
                         <h2 style={{ marginBottom: '10px' }}>
-                            {connectionError ? 'Connection interrupted' : (isRejoining ? 'Rejoining your match...' : 'Joining Surviv...')}
+                            {connectionError ? 'Connection interrupted' : (isRejoining ? 'Rejoining your match...' : joinMessage)}
                         </h2>
                         <p style={{ opacity: 0.62, lineHeight: 1.5 }}>
                             {connectionError || (isRejoining

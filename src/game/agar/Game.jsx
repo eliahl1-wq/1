@@ -105,6 +105,7 @@ export default function Game() {
     const worldEmotesRef = useRef(new Map());
     const worldChatsRef = useRef(new Map());
     const hasJoinedGameRef = useRef(false);
+    const gameReadyRef = useRef(!!pendingAtMount);
     const [currentTime, setCurrentTime] = useState(Date.now());
 
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
@@ -138,6 +139,9 @@ export default function Game() {
     const WORLD_SIZE = 6000;
 
     const [isConnected, setIsConnected] = useState(() => !!pendingAtMount);
+    const [gameReady, setGameReady] = useState(() => !!pendingAtMount);
+    const [joinMessage, setJoinMessage] = useState('Connecting to Arena…');
+    const [joinError, setJoinError] = useState('');
     const [currentBalance, setCurrentBalance] = useState(0);
     const [leaderboard, setLeaderboard] = useState([]);
     const hideNames = localStorage.getItem('hide_player_names') === 'true';
@@ -344,9 +348,10 @@ export default function Game() {
     }, []);
 
     const canCashOutRef = useRef(false);
-    canCashOutRef.current = !isBattleRoyale && localTimer <= 0 && cashedAmount === null && !isDead;
+    canCashOutRef.current = !isBattleRoyale && gameReady && isConnected
+        && localTimer <= 0 && cashedAmount === null && !isDead;
 
-    const cashoutReady = !isBattleRoyale && isConnected && !isDead && cashedAmount === null;
+    const cashoutReady = !isBattleRoyale && gameReady && isConnected && !isDead && cashedAmount === null;
 
     const handleCashOut = useCallback(() => {
         if (!canCashOutRef.current) return;
@@ -389,6 +394,11 @@ export default function Game() {
 
     useEffect(() => {
         if (!liveSession) return undefined;
+
+        gameReadyRef.current = false;
+        setGameReady(false);
+        setJoinError('');
+        setJoinMessage('Connecting to Arena…');
 
         if (!token) {
             if (socketRef.current) {
@@ -448,6 +458,7 @@ export default function Game() {
         socket.on('connect', () => {
             console.log('Connected to socket server');
             setIsConnected(true);
+            if (!gameReadyRef.current) setJoinMessage('Checking your match…');
             refreshUser?.();
             if (!hasJoinedGameRef.current && !blockAutoJoinRef.current) {
                 if (isTournamentMode) {
@@ -483,7 +494,16 @@ export default function Game() {
             // Denna används inte längre då servern skickar 'welcome'
         });
 
+        socket.on('joinProgress', (payload) => {
+            if (gameReadyRef.current) return;
+            const message = typeof payload === 'string' ? payload : payload?.message;
+            if (message) setJoinMessage(message);
+        });
+
         socket.on('welcome', (playerSettings, gameSizes) => {
+            gameReadyRef.current = true;
+            setGameReady(true);
+            setJoinError('');
             playAgainPendingRef.current = false;
             blockAutoJoinRef.current = false;
             worldUpdatesEnabledRef.current = true;
@@ -757,6 +777,9 @@ export default function Game() {
         socket.on('disconnect', (reason) => {
             console.log('Socket disconnected:', reason);
             setIsConnected(false);
+            gameReadyRef.current = false;
+            setGameReady(false);
+            setJoinMessage('Reconnecting to your match…');
             hasJoinedGameRef.current = false;
             if (cashoutActiveRef.current) {
                 cashoutReconnectRef.current = true;
@@ -768,11 +791,20 @@ export default function Game() {
         socket.on('connect_error', (err) => {
             console.error('Connection failed, retrying...', err.message);
             setIsConnected(false); // Reflektera att vi inte är anslutna i UI
+            gameReadyRef.current = false;
+            setGameReady(false);
+            setJoinMessage('Reconnecting to the game server…');
         });
 
         socket.on('error', (msg) => {
             console.error('Server error:', msg);
             setCashoutPending(false);
+            if (!gameReadyRef.current && typeof msg === 'string') {
+                setJoinError(msg);
+                setJoinMessage('Could not join arena');
+                blockAutoJoinRef.current = true;
+                hasJoinedGameRef.current = false;
+            }
             if (playAgainPendingRef.current) {
                 playAgainPendingRef.current = false;
                 blockAutoJoinRef.current = true;
@@ -846,7 +878,7 @@ export default function Game() {
         });
 
         const handleKeyDown = (e) => {
-            if (cashoutActiveRef.current) return;
+            if (!gameReadyRef.current || cashoutActiveRef.current) return;
             if (e.code === 'Space') { 
                 socketRef.current?.emit('2'); // Split
             } else if (e.code === 'KeyW') {
@@ -1131,7 +1163,7 @@ export default function Game() {
     }, [isConnected, isDead, brZone, cashedAmount, isSpectating, baseViewZoom, getSpectatorCamera, specCamRef]);
 
     const handleMouseMove = (e) => {
-        if (isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
+        if (!gameReadyRef.current || isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
@@ -1150,7 +1182,7 @@ export default function Game() {
     };
 
     const handleTouch = (e) => {
-        if (isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
+        if (!gameReadyRef.current || isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const t = e.touches?.[0];
@@ -1218,7 +1250,7 @@ export default function Game() {
                 />
             )}
 
-            {IS_MOBILE && isConnected && !isDead && cashedAmount === null && !isSpectating && (
+            {IS_MOBILE && gameReady && isConnected && !isDead && cashedAmount === null && !isSpectating && (
                 <AgarMobileControls 
                     onSplit={() => socketRef.current?.emit('2')} 
                     onEject={() => socketRef.current?.emit('1')} 
@@ -1353,17 +1385,22 @@ export default function Game() {
                 }
             `}</style>
 
-            {!isConnected && (
+            {liveSession && (!isConnected || !gameReady) && !showResultModal && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
-                    <div style={{ textAlign: 'center' }}>
+                    <div style={{ textAlign: 'center', maxWidth: 440, padding: 24 }}>
                         <h2 style={{ marginBottom: '10px' }}>
-                            {isBattleRoyale ? 'Joining Battle Royale…' : 'Connecting to Arena…'}
+                            {joinError ? 'Could not join arena' : (isBattleRoyale ? 'Joining Battle Royale…' : joinMessage)}
                         </h2>
                         <p style={{ opacity: 0.5 }}>
-                            {isBattleRoyale
+                            {joinError || (isBattleRoyale
                                 ? 'Syncing match — no cash-out in this mode'
-                                : `Make sure you have at least ${formatBalanceAmount(entryFeeUsd, gameSolPrice, balanceCurrency)} balance.`}
+                                : `Your entry is being verified. Keep this window open; you will enter automatically when it is ready.`)}
                         </p>
+                        {joinError && (
+                            <button type="button" className="ui-btn ui-btn-primary" onClick={handleLobby} style={{ marginTop: 14 }}>
+                                Back to pregame
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -1378,7 +1415,7 @@ export default function Game() {
                 />
             )}
 
-            {!isBattleRoyale && cashedAmount === null && (
+            {gameReady && !isBattleRoyale && cashedAmount === null && (
                 <GameCashoutBar
                     disabled={!cashoutReady}
                     onHoldStart={handleHoldStart}
@@ -1405,7 +1442,7 @@ export default function Game() {
                 onComplete={dismissBrIntro}
             />
 
-            {!IS_MOBILE && (
+            {!IS_MOBILE && gameReady && (
             <div className="game-controls-hint">
                 SPACE to Split • W to Eject • Mouse to Move
             </div>
