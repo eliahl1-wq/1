@@ -958,6 +958,21 @@ export default function AdminDashboard() {
     const [adminIssuesLoading, setAdminIssuesLoading] = useState(false);
     const [adminIssueStatus, setAdminIssueStatus] = useState('open');
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
+    const tabRef = useRef(tab);
+    const filterUserIdRef = useRef(filterUserId);
+    const showExcludedRef = useRef(showExcluded);
+    const showExcludedUsersRef = useRef(showExcludedUsers);
+    const userSortRef = useRef(userSort);
+    const serverStatusRequestRef = useRef(null);
+    const liveFeedRequestRef = useRef(null);
+    const usersRequestRef = useRef(null);
+    const transactionsRequestRef = useRef(null);
+
+    tabRef.current = tab;
+    filterUserIdRef.current = filterUserId;
+    showExcludedRef.current = showExcluded;
+    showExcludedUsersRef.current = showExcludedUsers;
+    userSortRef.current = userSort;
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -975,31 +990,46 @@ export default function AdminDashboard() {
     }, [token]);
 
     const fetchServerStatus = useCallback(async () => {
-        try {
-            const status = await fetchAdmin('/api/admin/dashboard/server-status');
-            setServerStatus(status);
-        } catch {
-            /* keep last known status */
-        }
+        if (serverStatusRequestRef.current) return serverStatusRequestRef.current;
+        const request = fetchAdmin('/api/admin/dashboard/server-status')
+            .then(status => {
+                setServerStatus(status);
+                return status;
+            })
+            .catch(() => null)
+            .finally(() => {
+                if (serverStatusRequestRef.current === request) serverStatusRequestRef.current = null;
+            });
+        serverStatusRequestRef.current = request;
+        return request;
     }, [fetchAdmin]);
 
     const fetchLiveFeed = useCallback(async (silent = true) => {
         if (!silent) setLiveRefreshing(true);
-        try {
-            const data = await fetchAdmin('/api/admin/dashboard/live-feed?limit=80');
-            setLiveFeed(data.feed ?? []);
-            setLivePlayers(data.inGamePlayers ?? []);
-            setLiveUpdatedAt(data.serverTime ?? new Date().toISOString());
-            setActiveUsers(prev => ({
-                ...(prev || {}),
-                currentlyInGame: data.currentlyInGame ?? 0,
-                inGamePlayers: data.inGamePlayers ?? [],
-            }));
-        } catch {
-            /* keep last feed */
-        } finally {
+        if (liveFeedRequestRef.current) {
+            await liveFeedRequestRef.current;
             if (!silent) setLiveRefreshing(false);
+            return;
         }
+        const request = fetchAdmin('/api/admin/dashboard/live-feed?limit=80')
+            .then(data => {
+                setLiveFeed(data.feed ?? []);
+                setLivePlayers(data.inGamePlayers ?? []);
+                setLiveUpdatedAt(data.serverTime ?? new Date().toISOString());
+                setActiveUsers(prev => ({
+                    ...(prev || {}),
+                    currentlyInGame: data.currentlyInGame ?? 0,
+                    inGamePlayers: data.inGamePlayers ?? [],
+                }));
+                return data;
+            })
+            .catch(() => null)
+            .finally(() => {
+                if (liveFeedRequestRef.current === request) liveFeedRequestRef.current = null;
+            });
+        liveFeedRequestRef.current = request;
+        await request;
+        if (!silent) setLiveRefreshing(false);
     }, [fetchAdmin]);
 
     const fetchMainHouseLive = useCallback(async (silent = true) => {
@@ -1075,7 +1105,8 @@ export default function AdminDashboard() {
         }
     }, [fetchAdmin]);
 
-    const fetchTransactions = useCallback(async (filters = txFilter, includeExcluded = showExcluded) => {
+    const fetchTransactions = useCallback(async (filters = txFilterRef.current, includeExcluded = showExcludedRef.current, skipIfBusy = false) => {
+        if (skipIfBusy && transactionsRequestRef.current) return transactionsRequestRef.current;
         const params = new URLSearchParams();
         if (filters.userId) params.set('userId', filters.userId);
         if (filters.category) params.set('category', filters.category);
@@ -1083,43 +1114,88 @@ export default function AdminDashboard() {
         if (filters.search?.trim()) params.set('search', filters.search.trim());
         if (includeExcluded) params.set('showExcluded', 'true');
         const q = params.toString() ? `?${params}` : '';
-        const data = await fetchAdmin(`/api/admin/dashboard/transactions${q}`);
-        setTransactions(data.transactions ?? []);
-        return data;
-    }, [fetchAdmin, txFilter, showExcluded]);
+        const request = fetchAdmin(`/api/admin/dashboard/transactions${q}`)
+            .then(data => {
+                setTransactions(data.transactions ?? []);
+                return data;
+            })
+            .finally(() => {
+                if (transactionsRequestRef.current === request) transactionsRequestRef.current = null;
+            });
+        transactionsRequestRef.current = request;
+        return request;
+    }, [fetchAdmin]);
 
-    const loadData = useCallback(async (userId = filterUserId, includeExcluded = showExcluded, includeExcludedUsers = showExcludedUsers, sort = userSort) => {
+    const fetchUsers = useCallback(async (includeExcluded = showExcludedUsersRef.current, sort = userSortRef.current, skipIfBusy = false) => {
+        if (skipIfBusy && usersRequestRef.current) return usersRequestRef.current;
+        const params = new URLSearchParams();
+        if (includeExcluded) params.set('showExcluded', 'true');
+        if (sort) params.set('sort', sort);
+        const request = fetchAdmin(`/api/admin/dashboard/users${params.size ? `?${params}` : ''}`)
+            .then(data => {
+                setUsers(data.users ?? []);
+                return data;
+            })
+            .finally(() => {
+                if (usersRequestRef.current === request) usersRequestRef.current = null;
+            });
+        usersRequestRef.current = request;
+        return request;
+    }, [fetchAdmin]);
+
+    const loadData = useCallback(async (
+        userId = filterUserIdRef.current,
+        includeExcluded = showExcludedRef.current,
+        includeExcludedUsers = showExcludedUsersRef.current,
+        sort = userSortRef.current,
+    ) => {
         setLoading(true);
         setError('');
-        try {
-            const userParams = new URLSearchParams();
-            if (includeExcludedUsers) userParams.set('showExcluded', 'true');
-            if (sort) userParams.set('sort', sort);
-            const userQuery = userParams.toString() ? `?${userParams}` : '';
-            const [ov, au, us, wal, sw, security, pregameDisplay] = await Promise.all([
-                fetchAdmin('/api/admin/dashboard/overview'),
-                fetchAdmin('/api/admin/dashboard/active-users'),
-                fetchAdmin(`/api/admin/dashboard/users${userQuery}`),
-                fetchAdmin('/api/admin/dashboard/wallets'),
-                fetchAdmin('/api/admin/dashboard/sweeps'),
-                fetchAdmin('/api/admin/reward-security-alerts'),
-                fetchAdmin('/api/pregame/display-settings'),
-            ]);
-            setOverview(ov);
-            setActiveUsers(au);
-            setUsers(us.users ?? []);
-            setWallets(wal);
-            setSweeps(sw.sweeps ?? []);
-            setRewardAlerts(security.alerts ?? []);
-            setPendingRewardClaims(security.pendingClaims ?? []);
-            setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(pregameDisplay.playingOffsets || {}) });
+        const jobs = [];
+        const add = (promise, apply) => jobs.push(Promise.resolve(promise).then(apply));
+        const currentTab = tabRef.current;
+
+        if (currentTab === 'overview') {
+            add(fetchAdmin('/api/admin/dashboard/overview'), setOverview);
+            add(fetchAdmin('/api/admin/dashboard/active-users'), setActiveUsers);
+            add(fetchAdmin('/api/admin/dashboard/wallets'), setWallets);
+            add(fetchAdmin('/api/admin/reward-security-alerts'), security => {
+                setRewardAlerts(security.alerts ?? []);
+                setPendingRewardClaims(security.pendingClaims ?? []);
+            });
+            add(fetchAdmin('/api/pregame/display-settings'), pregameDisplay => {
+                setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(pregameDisplay.playingOffsets || {}) });
+            });
             fetchAdmin('/api/admin/issues?status=open&limit=1')
                 .then(issueData => setAdminIssueSummary(issueData.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0 }))
                 .catch(() => {});
-            await Promise.all([
-                fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded),
-                fetchLiveFeed(true),
-            ]);
+        } else if (currentTab === 'users') {
+            jobs.push(fetchUsers(includeExcludedUsers, sort));
+        } else if (currentTab === 'activity') {
+            add(fetchAdmin('/api/admin/dashboard/active-users'), setActiveUsers);
+            jobs.push(fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded));
+            jobs.push(fetchLiveFeed(true));
+        } else if (currentTab === 'rewards') {
+            jobs.push(fetchRewardOwnership());
+            add(fetchAdmin('/api/admin/dashboard/wallets'), setWallets);
+            add(fetchAdmin('/api/admin/reward-security-alerts'), security => {
+                setRewardAlerts(security.alerts ?? []);
+                setPendingRewardClaims(security.pendingClaims ?? []);
+            });
+        } else if (currentTab === 'operations') {
+            add(fetchAdmin('/api/admin/dashboard/wallets'), setWallets);
+            add(fetchAdmin('/api/admin/dashboard/sweeps'), sw => setSweeps(sw.sweeps ?? []));
+            jobs.push(fetchServerStatus());
+        } else if (currentTab === 'main-house') {
+            jobs.push(fetchMainHouseLive(false));
+        }
+
+        try {
+            const results = await Promise.allSettled(jobs);
+            const failures = results.filter(result => result.status === 'rejected');
+            if (jobs.length > 0 && failures.length === jobs.length) {
+                throw failures[0].reason;
+            }
             setSelectedTxIds(new Set());
             setSelectedUserIds(new Set());
         } catch (err) {
@@ -1127,18 +1203,22 @@ export default function AdminDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [fetchAdmin, filterUserId, showExcluded, showExcludedUsers, userSort, fetchTransactions, fetchLiveFeed]);
+    }, [fetchAdmin, fetchLiveFeed, fetchMainHouseLive, fetchRewardOwnership, fetchServerStatus, fetchTransactions, fetchUsers]);
 
     useEffect(() => {
         document.title = 'Admin | Arenifi';
-        loadData();
-    }, [loadData]);
+    }, []);
 
     useEffect(() => {
+        loadData();
+    }, [tab, loadData]);
+
+    useEffect(() => {
+        if (tab !== 'overview' && tab !== 'operations' && tab !== 'main-house') return undefined;
         fetchServerStatus();
-        const id = setInterval(fetchServerStatus, 1000);
+        const id = setInterval(fetchServerStatus, 2000);
         return () => clearInterval(id);
-    }, [fetchServerStatus]);
+    }, [tab, fetchServerStatus]);
 
     useEffect(() => {
         if (tab !== 'activity' && tab !== 'overview') return undefined;
@@ -1150,14 +1230,13 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (tab !== 'activity') return undefined;
         const id = setInterval(() => {
-            fetchTransactions(txFilter, showExcluded).catch(() => {});
+            fetchTransactions(txFilter, showExcluded, true).catch(() => {});
         }, 5000);
         return () => clearInterval(id);
     }, [tab, txFilter, showExcluded, fetchTransactions]);
 
     useEffect(() => {
         if (tab !== 'main-house') return undefined;
-        fetchMainHouseLive(false).catch(() => {});
         const id = setInterval(() => fetchMainHouseLive(true).catch(() => {}), 5000);
         return () => clearInterval(id);
     }, [tab, fetchMainHouseLive]);
@@ -1175,26 +1254,16 @@ export default function AdminDashboard() {
     }, [tab, fetchAdminIssues]);
 
     useEffect(() => {
-        if (tab !== 'rewards') return;
-        fetchRewardOwnership().catch(err => setError(err.message));
-    }, [tab, fetchRewardOwnership]);
-
-    useEffect(() => {
         if (tab !== 'users') return undefined;
         let alive = true;
         const refreshUsers = async () => {
-            const params = new URLSearchParams();
-            if (showExcludedUsers) params.set('showExcluded', 'true');
-            if (userSort) params.set('sort', userSort);
             try {
-                const data = await fetchAdmin(`/api/admin/dashboard/users${params.size ? `?${params}` : ''}`);
-                if (alive) setUsers(data.users ?? []);
+                if (alive) await fetchUsers(showExcludedUsers, userSort, true);
             } catch { /* keep the latest list */ }
         };
-        refreshUsers();
         const id = setInterval(refreshUsers, 5000);
         return () => { alive = false; clearInterval(id); };
-    }, [tab, fetchAdmin, showExcludedUsers, userSort]);
+    }, [tab, fetchUsers, showExcludedUsers, userSort]);
 
     const togglePersonalFreePlay = async (enabled) => {
         setActionLoading(true);
@@ -1348,7 +1417,7 @@ export default function AdminDashboard() {
                 body: JSON.stringify({ confirmation }),
             });
             setActionMsg(`✅ ${result.message}`);
-            await Promise.all([fetchRewardOwnership(), loadData()]);
+            await loadData();
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
         } finally {
