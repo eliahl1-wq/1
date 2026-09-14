@@ -72,7 +72,10 @@ export default class ChatClient {
 
         // Colours the chat input correctly.
         newline.className = (me) ? 'me' : 'friend';
-        newline.innerHTML = '<b>' + ((name.length < 1) ? 'An unnamed cell' : name) + '</b>: ' + message;
+        var sender = document.createElement('b');
+        sender.textContent = (String(name || '').length < 1) ? 'An unnamed cell' : String(name);
+        newline.appendChild(sender);
+        newline.appendChild(document.createTextNode(': ' + String(message || '')));
 
         this.appendMessage(newline);
     }
@@ -86,7 +89,7 @@ export default class ChatClient {
 
         // Colours the chat input correctly.
         newline.className = 'system';
-        newline.innerHTML = message;
+        newline.textContent = String(message || '');
 
         // Append messages to the logs.
         this.appendMessage(newline);

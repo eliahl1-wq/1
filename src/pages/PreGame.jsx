@@ -1005,7 +1005,9 @@ export default function PreGame() {
             const d = await r.json();
             if (!r.ok) throw new Error(d.message || 'Withdrawal failed');
             await refreshUser();
-            setStatusMsg('✅ Funds sent to your wallet!');
+            setStatusMsg(d.processing
+                ? '⏳ Withdrawal submitted. It will confirm or restore automatically.'
+                : '✅ Funds sent to your wallet!');
             setWithdrawAmount('');
             setWithdrawAll(false);
         } catch (e) { setStatusMsg(`❌ ${e.message}`); }

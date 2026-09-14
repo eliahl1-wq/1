@@ -212,7 +212,7 @@ function setupSocket(socket) {
         socket.emit('gotit', player);
         global.gameStart = true;
         window.chat.addSystemLine('Connected to the game!');
-        window.chat.addSystemLine('Type <b>-help</b> for a list of commands.');
+        window.chat.addSystemLine('Type -help for a list of commands.');
         if (global.mobile) {
             document.getElementById('gameAreaWrapper').removeChild(document.getElementById('chatbox'));
         }
@@ -227,36 +227,33 @@ function setupSocket(socket) {
         //const killer = isUnnamedCell(data.playerWhoAtePlayerName) ? 'An unnamed cell' : data.playerWhoAtePlayerName;
 
         //window.chat.addSystemLine('{GAME} - <b>' + (player) + '</b> was eaten by <b>' + (killer) + '</b>');
-        window.chat.addSystemLine('{GAME} - <b>' + (player) + '</b> was eaten');
+        window.chat.addSystemLine('{GAME} - ' + player + ' was eaten');
     });
 
     socket.on('playerDisconnect', (data) => {
-        window.chat.addSystemLine('{GAME} - <b>' + (isUnnamedCell(data.name) ? 'An unnamed cell' : data.name) + '</b> disconnected.');
+        window.chat.addSystemLine('{GAME} - ' + (isUnnamedCell(data.name) ? 'An unnamed cell' : data.name) + ' disconnected.');
     });
 
     socket.on('playerJoin', (data) => {
-        window.chat.addSystemLine('{GAME} - <b>' + (isUnnamedCell(data.name) ? 'An unnamed cell' : data.name) + '</b> joined.');
+        window.chat.addSystemLine('{GAME} - ' + (isUnnamedCell(data.name) ? 'An unnamed cell' : data.name) + ' joined.');
     });
 
     socket.on('leaderboard', (data) => {
-        leaderboard = data.leaderboard;
-        var status = '<span class="title">Leaderboard</span>';
+        leaderboard = Array.isArray(data?.leaderboard) ? data.leaderboard : [];
+        var status = document.getElementById('status');
+        status.replaceChildren();
+        var title = document.createElement('span');
+        title.className = 'title';
+        title.textContent = 'Leaderboard';
+        status.appendChild(title);
         for (var i = 0; i < leaderboard.length; i++) {
-            status += '<br />';
-            if (leaderboard[i].id == player.id) {
-                if (leaderboard[i].name.length !== 0)
-                    status += '<span class="me">' + (i + 1) + '. ' + leaderboard[i].name + "</span>";
-                else
-                    status += '<span class="me">' + (i + 1) + ". An unnamed cell</span>";
-            } else {
-                if (leaderboard[i].name.length !== 0)
-                    status += (i + 1) + '. ' + leaderboard[i].name;
-                else
-                    status += (i + 1) + '. An unnamed cell';
-            }
+            status.appendChild(document.createElement('br'));
+            var name = String(leaderboard[i]?.name || '') || 'An unnamed cell';
+            var line = document.createElement('span');
+            if (leaderboard[i]?.id == player.id) line.className = 'me';
+            line.textContent = (i + 1) + '. ' + name;
+            status.appendChild(line);
         }
-        //status += '<br />Players: ' + data.players;
-        document.getElementById('status').innerHTML = status;
     });
 
     socket.on('serverMSG', function (data) {
