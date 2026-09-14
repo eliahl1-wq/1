@@ -660,6 +660,10 @@ export default function SurvivGame() {
             auth: { token: authToken, presenceId: getOrCreatePresenceId() },
             transports: ['websocket', 'polling'],
             reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 2000,
+            reconnectionDelayMax: 5000,
+            randomizationFactor: 0.35,
         });
         socketRef.current = socket;
         let lastContinuousInput = '';

@@ -21,6 +21,7 @@ import { trackMixpanelEvent } from '../utils/mixpanel';
 import { isBattleRoyaleAvailable, isBattleRoyaleMode as isBRGamemode, normalizeGamemodeForLobby } from '../constants/features';
 import { buildPresenceHeaders } from '../utils/sitePresence';
 import { API_URL } from '../utils/apiBase';
+import { useServerReadiness } from '../context/ServerReadinessContext';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
@@ -151,6 +152,7 @@ const getChromaName = (color) => {
 
 export default function PreGame() {
     const { user, logout, token, login, refreshUser, isAuthenticated } = useAuth();
+    const { updating: serverUpdating } = useServerReadiness();
     const navigate = useNavigate();
     const location = useLocation();
     const {
@@ -187,6 +189,7 @@ export default function PreGame() {
                 if (!response.ok) throw new Error(data.error || 'Could not load tournament');
                 if (active) {
                     setTournament(data.tournament);
+                    setSelectedMode(data.tournament.gameMode === 'agar' ? 'agar' : 'slither');
                     setTournamentError('');
                     document.title = `${data.tournament.name} | Arenifi`;
                 }
@@ -877,7 +880,7 @@ export default function PreGame() {
     const attemptsUsed = tournament?.me?.entries || 0;
     const maxTournamentAttempts = tournament?.maxAttempts ?? 3;
     const attemptsRemaining = tournament?.me?.attemptsRemaining ?? maxTournamentAttempts;
-    const canPlayTournament = tournament?.status === 'live' && attemptsRemaining > 0;
+    const canPlayTournament = !serverUpdating && tournament?.status === 'live' && attemptsRemaining > 0;
     const tournamentStatusText = (() => {
         if (!tournament) return '';
         if (tournament.status === 'scheduled') return `Tournament starting in ${formatCountdown(tournament.startAt, tournamentNow)}`;
@@ -889,14 +892,16 @@ export default function PreGame() {
     const playTournament = () => {
         if (!canPlayTournament) return;
         const matchNickname = hideNames ? ' ' : (user?.username || nickname);
+        const tournamentGameMode = tournament.gameMode === 'agar' ? 'agar' : 'slither';
+        const tournamentSessionMode = `tournament-${tournamentGameMode}`;
         clearAllPendingResults();
-        localStorage.setItem('current_game_mode', 'tournament-slither');
-        localStorage.setItem('selected_gamemode', 'tournament-slither');
-        localStorage.setItem('selected_entry_fee', '1');
+        localStorage.setItem('current_game_mode', tournamentSessionMode);
+        localStorage.setItem('selected_gamemode', tournamentSessionMode);
+        localStorage.setItem('selected_entry_fee', String(tournament.entryFeeUsd));
         localStorage.setItem('current_tournament_id', tournament.id);
-        navigate('/slither-game', {
+        navigate(tournamentGameMode === 'agar' ? '/game' : '/slither-game', {
             state: {
-                selectedMode: 'tournament-slither',
+                selectedMode: tournamentSessionMode,
                 tournamentId: tournament.id,
                 nickname: matchNickname,
             },
@@ -909,6 +914,7 @@ export default function PreGame() {
         if (!selectedMode) return;
 
         if (isAlreadyInGame && !canRejoinThisMode) return;
+        if (serverUpdating && !(isAlreadyInGame && canRejoinThisMode)) return;
 
         if (!canJoin && !isAlreadyInGame) {
             navigate('/lobby', { state: { depositIntent: true, selectedMode, requiredBalanceUsd: entryFeeForSession } });
@@ -1062,6 +1068,7 @@ export default function PreGame() {
     // ── Play button variant ─────────────────────────────
     const playBtnClass = !isAuthenticated ? 'play-btn play-btn-login'
         : (isAlreadyInGame && canRejoinThisMode) ? 'play-btn play-btn-rejoin'
+            : serverUpdating ? 'play-btn play-btn-disabled'
             : (isAlreadyInGame && !canRejoinThisMode) ? 'play-btn play-btn-disabled'
                 : !selectedMode || selectedEntryFee === null ? 'play-btn play-btn-disabled'
                     : canJoin ? 'play-btn play-btn-ready'
@@ -1082,6 +1089,8 @@ export default function PreGame() {
         : !isAuthenticated ? 'Play Now'
             : (isAlreadyInGame && canRejoinThisMode)
                 ? 'Rejoin'
+                : serverUpdating
+                    ? 'Updating servers…'
                 : (isAlreadyInGame && !canRejoinThisMode)
                     ? `In ${currentGameMode?.startsWith('br-') ? 'BR' : (currentGameMode === 'surviv' ? 'Surviv' : currentGameMode === 'slither' || currentGameMode === 'competitive-slither' ? 'Slither' : 'Agar')} — switch mode`
                     : !selectedMode
@@ -1467,7 +1476,7 @@ export default function PreGame() {
                     {tournamentId ? (
                         <div className="mode-card mode-card--tournament" ref={modeCardRef}>
                             <img
-                                src="/normal slither.png"
+                                src={tournament?.imageUrl || (tournament?.gameMode === 'agar' ? '/mass-grab.png' : '/normal slither.png')}
                                 alt=""
                                 className="mode-card-preview"
                                 style={{ opacity: 0.15, filter: 'blur(2px)' }}
@@ -1495,7 +1504,7 @@ export default function PreGame() {
                                         ${(tournament?.me?.balanceUsd || 0).toFixed(2)}
                                     </div>
                                     <p style={{ color: 'var(--text-3)', fontSize: '0.65rem', lineHeight: '1.4', margin: 0 }}>
-                                        Banked cashouts across all 5 runs are accumulated here.
+                                        Banked cashouts across {maxTournamentAttempts === 1 ? 'your match' : `all ${maxTournamentAttempts} matches`} are accumulated here.
                                     </p>
                                 </div>
 
@@ -1578,7 +1587,7 @@ export default function PreGame() {
                                 <div className="entry-row" style={{ marginBottom: '14px' }}>
                                     <span className="label">Entry fee</span>
                                     <span className="mono" style={{ color: 'var(--text-h)', fontSize: '0.85rem', fontWeight: 700 }}>
-                                        $1.00 per attempt
+                                        ${Number(tournament?.entryFeeUsd || 0).toFixed(2)} per attempt
                                     </span>
                                 </div>
 
@@ -1602,7 +1611,9 @@ export default function PreGame() {
                                     onClick={playTournament}
                                 >
                                     <PlayIcon />
-                                    <span className="play-btn-label">Play $1</span>
+                                    <span className="play-btn-label">
+                                        {serverUpdating ? 'Updating servers…' : `Play $${Number(tournament?.entryFeeUsd || 0).toFixed(0)}`}
+                                    </span>
                                 </button>
                             </div>
 
@@ -1739,7 +1750,7 @@ export default function PreGame() {
                                 <button
                                     className={playBtnClass}
                                     onClick={handleStartMatch}
-                                    disabled={isMatchmaking || (isAlreadyInGame && !canRejoinThisMode) || (isAuthenticated && !isAlreadyInGame && (!selectedMode || selectedEntryFee === null))}
+                                    disabled={isMatchmaking || (serverUpdating && !(isAlreadyInGame && canRejoinThisMode)) || (isAlreadyInGame && !canRejoinThisMode) || (isAuthenticated && !isAlreadyInGame && (!selectedMode || selectedEntryFee === null))}
                                 >
                                     {showPlayIcon && <PlayIcon />}
                                     <span className="play-btn-label">{playBtnLabel}</span>

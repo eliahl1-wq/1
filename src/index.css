@@ -1081,3 +1081,35 @@ a:focus-visible {
 .btn:active:not(:disabled){transform:translateY(0) scale(.985)}
 .btn:disabled{opacity:.42}
 @media(max-width:768px){.btn{min-height:42px;font-size:.84rem}.btn-primary{font-size:.86rem}}
+
+.server-update-banner {
+  position: fixed;
+  z-index: 100000;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: min(430px, calc(100vw - 24px));
+  padding: 11px 14px;
+  border: 1px solid rgba(173, 152, 255, 0.32);
+  border-radius: 10px;
+  background: rgba(28, 28, 32, 0.96);
+  color: var(--text-h);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.42), 0 0 24px rgba(124, 111, 240, 0.1);
+  backdrop-filter: blur(16px);
+}
+.server-update-banner > span:last-child { display: grid; gap: 2px; }
+.server-update-banner strong { font-size: 0.82rem; font-weight: 700; }
+.server-update-banner small { color: var(--text-2); font-size: 0.68rem; }
+.server-update-banner__spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(173, 152, 255, 0.25);
+  border-top-color: #ad98ff;
+  border-radius: 50%;
+  animation: server-update-spin 0.8s linear infinite;
+}
+@keyframes server-update-spin { to { transform: rotate(360deg); } }

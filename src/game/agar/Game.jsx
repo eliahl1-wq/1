@@ -175,7 +175,14 @@ export default function Game() {
     const brIntroTriggeredRef = useRef(false);
     const foodCacheRef = useRef(new Map());
     const canvasDprRef = useRef(1);
-    const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: DEFAULT_ENTRY_FEE, mode: 'agar' });
+    const storedSessionMode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || 'agar';
+    const joinParamsRef = useRef({
+        nickname: location.state?.nickname || user?.username || 'Guest',
+        entryFeeUsd: Number(localStorage.getItem('selected_entry_fee')) || DEFAULT_ENTRY_FEE,
+        mode: 'agar',
+        isTournament: storedSessionMode === 'tournament-agar',
+        tournamentId: location.state?.tournamentId || localStorage.getItem('current_tournament_id'),
+    });
     const cameraZoomRef = useRef(1);
     const playerWheelZoomRef = useRef(1);
     const cameraFrameTimeRef = useRef(0);
@@ -253,6 +260,11 @@ export default function Game() {
 
     const handlePlayAgain = useCallback(() => {
         if (playAgainPendingRef.current) return;
+        if (joinParamsRef.current.isTournament) {
+            clearPendingResult('agar');
+            navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+            return;
+        }
         const { nickname, entryFeeUsd: fee, mode } = joinParamsRef.current;
         const playMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
         localStorage.setItem('current_game_mode', playMode);
@@ -281,13 +293,17 @@ export default function Game() {
                 publicFreeMode: isPublicFreeModeEnabled(),
             });
         }
-    }, [token, liveSession]);
+    }, [token, liveSession, navigate]);
 
     const handleLobby = useCallback(() => {
         clearPendingResult('agar');
         playAgainPendingRef.current = false;
         blockAutoJoinRef.current = true;
         worldUpdatesEnabledRef.current = false;
+        if (joinParamsRef.current.isTournament) {
+            navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+            return;
+        }
         localStorage.removeItem('current_game_mode');
         const mode = joinParamsRef.current.mode;
         const selectedMode = mode.startsWith('br-') ? mode.replace(/^br-/, '') : mode;
@@ -393,6 +409,9 @@ export default function Game() {
 
         const matchNickname = hideNames ? ' ' : (location.state?.nickname || user?.username || 'Guest');
         const storedMode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || 'agar';
+        const tournamentId = location.state?.tournamentId || localStorage.getItem('current_tournament_id');
+        const isTournamentMode = storedMode === 'tournament-agar'
+            || location.state?.selectedMode === 'tournament-agar';
         const wantsBattleRoyale = storedMode === 'br-agar' || !!location.state?.battleRoyale;
         const sessionMode = wantsBattleRoyale ? 'br-agar' : 'agar';
         if (wantsBattleRoyale) {
@@ -407,6 +426,8 @@ export default function Game() {
             nickname: matchNickname,
             entryFeeUsd,
             mode: sessionMode,
+            isTournament: isTournamentMode,
+            tournamentId,
         };
 
         const socket = io(API_URL, {
@@ -415,8 +436,10 @@ export default function Game() {
             upgrade: true,
             rememberUpgrade: true,
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 2000,
+            reconnectionDelayMax: 5000,
+            randomizationFactor: 0.35,
             timeout: 20000,
         });
 
@@ -427,7 +450,16 @@ export default function Game() {
             setIsConnected(true);
             refreshUser?.();
             if (!hasJoinedGameRef.current && !blockAutoJoinRef.current) {
-                if (wantsBattleRoyale) {
+                if (isTournamentMode) {
+                    const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || '#c080ff';
+                    socket.emit('joinTournamentGame', {
+                        username: matchNickname,
+                        token,
+                        tournamentId,
+                        skinColor: preferredSkinAgar,
+                        skinId: getPremiumSkinId(preferredSkinAgar),
+                    });
+                } else if (wantsBattleRoyale) {
                     socket.emit('brRejoinMatch', { token });
                 } else {
                     const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || '#c080ff';
@@ -466,7 +498,12 @@ export default function Game() {
             const isRejoin = gameSizes?.rejoin === true;
             console.log(isRejoin ? 'Rejoined arena' : 'Welcome to Arena');
             foodCacheRef.current.clear(); // Prevent flickering from old food cache
-            localStorage.setItem('current_game_mode', gameSizes?.mode || 'agar');
+            const persistedMode = gameSizes?.tournament ? 'tournament-agar' : (gameSizes?.mode || 'agar');
+            localStorage.setItem('current_game_mode', persistedMode);
+            localStorage.setItem('selected_gamemode', persistedMode);
+            if (gameSizes?.tournamentId) {
+                localStorage.setItem('current_tournament_id', gameSizes.tournamentId);
+            }
             if (gameSizes?.entryFeeUsd) {
                 localStorage.setItem('selected_entry_fee', String(gameSizes.entryFeeUsd));
             }
@@ -635,7 +672,11 @@ export default function Game() {
             cashOutEndAtRef.current = 0;
             setCashOutEndAt(0);
             setLocalTimer(0);
-            localStorage.removeItem('current_game_mode');
+            if (joinParamsRef.current.isTournament) {
+                localStorage.setItem('current_game_mode', 'tournament-agar');
+            } else {
+                localStorage.removeItem('current_game_mode');
+            }
             const startedAt = sessionStartAtRef.current || Date.now();
             const stats = {
                 timeSurvivedMs: Date.now() - startedAt,
@@ -682,7 +723,11 @@ export default function Game() {
                 ...stats,
             });
             const wasBR = localStorage.getItem('current_game_mode')?.startsWith('br-');
-            localStorage.removeItem('current_game_mode');
+            if (joinParamsRef.current.isTournament) {
+                localStorage.setItem('current_game_mode', 'tournament-agar');
+            } else {
+                localStorage.removeItem('current_game_mode');
+            }
             if (wasBR) {
                 setTimeout(() => {
                     navigate('/gamemodes', { state: { selectedMode: 'agar' } });
@@ -694,7 +739,16 @@ export default function Game() {
             blockAutoJoinRef.current = true;
             worldUpdatesEnabledRef.current = false;
             console.warn('Session replaced by another window.');
+            if (joinParamsRef.current.isTournament) {
+                navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+                return;
+            }
             navigate('/pre-game');
+        });
+
+        socket.on('tournamentEnded', () => {
+            clearPendingResult('agar');
+            navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
         });
 
         socket.on('died', handleDeath);
@@ -746,18 +800,34 @@ export default function Game() {
                     worldUpdatesEnabledRef.current = true;
                     setIsRejoining(true);
                     const params = joinParamsRef.current;
-                    const playMode = params.mode.startsWith('br-') ? params.mode.replace(/^br-/, '') : params.mode;
-                    socketRef.current.emit('joinGame', {
-                        username: params.nickname,
-                        token,
-                        mode: playMode,
-                        entryFeeUsd: params.entryFeeUsd,
-                        skinColor: localStorage.getItem('selected_skin_agar') || '#c080ff',
-                        skinId: getPremiumSkinId(localStorage.getItem('selected_skin_agar') || '#c080ff'),
-                        useFreeTicket: false,
-                        publicFreeMode: isPublicFreeModeEnabled(),
-                    });
+                    const preferredSkinAgar = localStorage.getItem('selected_skin_agar') || '#c080ff';
+                    if (params.isTournament) {
+                        socketRef.current.emit('joinTournamentGame', {
+                            username: params.nickname,
+                            token,
+                            tournamentId: params.tournamentId,
+                            skinColor: preferredSkinAgar,
+                            skinId: getPremiumSkinId(preferredSkinAgar),
+                        });
+                    } else {
+                        const playMode = params.mode.startsWith('br-') ? params.mode.replace(/^br-/, '') : params.mode;
+                        socketRef.current.emit('joinGame', {
+                            username: params.nickname,
+                            token,
+                            mode: playMode,
+                            entryFeeUsd: params.entryFeeUsd,
+                            skinColor: preferredSkinAgar,
+                            skinId: getPremiumSkinId(preferredSkinAgar),
+                            useFreeTicket: false,
+                            publicFreeMode: isPublicFreeModeEnabled(),
+                        });
+                    }
                 }
+            }
+            if (joinParamsRef.current.isTournament && typeof msg === 'string') {
+                alert(msg);
+                navigate(`/tournaments/${joinParamsRef.current.tournamentId}/lobby`);
+                return;
             }
             if (typeof msg === 'string' && /insufficient/i.test(msg)) {
                 refreshUser?.({ forceBalance: true });

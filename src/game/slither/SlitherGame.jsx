@@ -519,8 +519,10 @@ export default function SlitherGame() {
             upgrade: true,
             rememberUpgrade: true,
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 2000,
+            reconnectionDelayMax: 5000,
+            randomizationFactor: 0.35,
             timeout: 20000,
         });
 

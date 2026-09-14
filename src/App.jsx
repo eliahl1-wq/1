@@ -22,6 +22,7 @@ import Shop from './pages/Shop';
 import ReferralCapture from './components/ReferralCapture';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ServerReadinessProvider, ServerUpdateBanner } from './context/ServerReadinessContext';
 
 import { MIN_ENTRY_FEE } from './constants/economy';
 import { hasUnlockedFreeTicket } from './utils/freeTicket';
@@ -49,7 +50,8 @@ function isBattleRoyaleSession(isAdmin = false) {
 function isTournamentSession() {
   if (typeof window === 'undefined') return false;
   const mode = localStorage.getItem('current_game_mode') || localStorage.getItem('selected_gamemode') || '';
-  return mode === 'tournament-slither' && !!localStorage.getItem('current_tournament_id');
+  return (mode === 'tournament-slither' || mode === 'tournament-agar')
+    && !!localStorage.getItem('current_tournament_id');
 }
 
 function hasStoredActiveGameSession() {
@@ -102,6 +104,8 @@ function AdminRoute({ children }) {
 function App() {
   return (
     <Router>
+      <ServerReadinessProvider>
+            <ServerUpdateBanner />
             <AuthProvider>
               <SitePresenceRunner />
               <ReferralCapture />
@@ -148,6 +152,7 @@ function App() {
               </Routes>
               </AgarTokenExperience>
             </AuthProvider>
+      </ServerReadinessProvider>
     </Router>
   );
 }

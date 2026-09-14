@@ -1220,8 +1220,22 @@ export default function AdminDashboard() {
 
     const sweepRewardSurplus = () => runAdminAction(
         '/api/admin/reward-pool/sweep-surplus',
-        'Withdraw only the currently safe reward-pool surplus to the owner vault? Player liabilities and active claims remain reserved.',
+        'Withdraw only the currently safe reward-pool surplus to the owner vault? Player rewards, affiliate commissions and active claims remain reserved.',
     );
+
+    const copyRewardWalletAddress = async () => {
+        const address = wallets?.rewardWallet?.address;
+        if (!address) {
+            setActionMsg('❌ Reward Wallet is not configured.');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(address);
+            setActionMsg('✅ Reward Wallet address copied. Send SOL to this address, then refresh the dashboard.');
+        } catch {
+            window.prompt('Copy the Reward Wallet address:', address);
+        }
+    };
 
     const setNewGameJoinLock = async (locked) => {
         const message = locked
@@ -1544,7 +1558,7 @@ export default function AdminDashboard() {
                                 />
                                 <WalletCard 
                                     title="Reward Wallet" 
-                                    label="Sponsors & Tourneys"
+                                    label="Rewards & Affiliates"
                                     address={wallets?.rewardWallet?.address} 
                                     sol={wallets?.rewardWallet ? formatSol(wallets.rewardWallet.balanceSol) : '—'} 
                                     usd={wallets?.rewardWallet ? formatUsd(wallets.rewardWallet.balanceUsd) : '—'} 
@@ -1818,9 +1832,9 @@ export default function AdminDashboard() {
                                 sub={wallets?.rewardWallet?.balanceSol != null ? formatSol(wallets.rewardWallet.balanceSol) : 'On-chain balance'}
                             />
                             <StatCard
-                                label="Owed to users"
+                                label="Protected liabilities"
                                 value={formatUsd(rewardWalletLiabilityUsd)}
-                                sub={`${rewardTotals.rewardWalletOwners ?? 0} users own reward-wallet funds`}
+                                sub={`${formatUsd(rewardTotals.affiliateUsd)} affiliate · ${formatUsd(rewardTotals.playerRewardWalletLiabilityUsd)} player rewards`}
                             />
                             <StatCard
                                 label="Pending from house"
@@ -1839,7 +1853,21 @@ export default function AdminDashboard() {
                             />
                         </div>
 
-                        <Panel title="What the reward wallet owes" sub="Current player liabilities grouped by the exact reason the funds are reserved.">
+                        <Panel title="Add funds manually" sub="Send SOL directly to the Reward Wallet. This does not change any reward or affiliate balances; it only covers the wallet on-chain.">
+                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                <code className="mono" style={{ overflowWrap: 'anywhere', color: 'var(--text-h)' }}>
+                                    {wallets?.rewardWallet?.address || 'Reward Wallet is not configured'}
+                                </code>
+                                <button type="button" className="btn btn-primary" disabled={!wallets?.rewardWallet?.address} onClick={copyRewardWalletAddress}>
+                                    Copy deposit address
+                                </button>
+                                <button type="button" className="btn btn-ghost" onClick={() => loadData()} disabled={actionLoading}>
+                                    Refresh balance
+                                </button>
+                            </div>
+                        </Panel>
+
+                        <Panel title="What the reward wallet owes" sub="Protected player and affiliate liabilities. Only the remainder can be withdrawn as owner surplus.">
                             <div className="admin-reward-breakdown">
                                 <div><span>Starter reserve</span><strong>{formatUsd(rewardTotals.starterUsd)}</strong><small>Only the funded or unlocked part</small></div>
                                 <div><span>Unfunded potential</span><strong>{formatUsd(rewardTotals.starterUnfundedUsd)}</strong><small>Not currently owed by the reward wallet</small></div>
@@ -1847,6 +1875,7 @@ export default function AdminDashboard() {
                                 <div><span>Permanent progress</span><strong>{formatUsd(rewardTotals.permanentProgressUsd)}</strong><small>Earned reserve in incomplete cycles</small></div>
                                 <div><span>Retained cashouts</span><strong>{formatUsd(rewardTotals.retainedUsd)}</strong><small>Could not be sent below Solana rent minimum</small></div>
                                 <div><span>Active claims</span><strong>{formatUsd(rewardTotals.reservedUsd)}</strong><small>Locked while a payout settles</small></div>
+                                <div><span>Affiliate commissions</span><strong>{formatUsd(rewardTotals.affiliateUsd)}</strong><small>Pending, available and active affiliate payouts</small></div>
                             </div>
                         </Panel>
 

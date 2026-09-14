@@ -15,7 +15,8 @@ function formatDate(value) {
 }
 
 export default function TournamentAdminPanel({ fetchAdmin, setActionMsg }) {
-    const [name, setName] = useState('Balance Grab');
+    const [tournamentType, setTournamentType] = useState('mass-grab');
+    const [name, setName] = useState('Mass Grab');
     const [startAt, setStartAt] = useState(defaultLocalTime);
     const [tournaments, setTournaments] = useState([]);
     const [busy, setBusy] = useState(false);
@@ -42,7 +43,7 @@ export default function TournamentAdminPanel({ fetchAdmin, setActionMsg }) {
         try {
             await fetchAdmin('/api/admin/tournaments', {
                 method: 'POST',
-                body: JSON.stringify({ name, startAt: new Date(startAt).toISOString() }),
+                body: JSON.stringify({ tournamentType, name, startAt: new Date(startAt).toISOString() }),
             });
             setActionMsg('✅ Tournament scheduled');
             setStartAt(defaultLocalTime());
@@ -87,11 +88,26 @@ export default function TournamentAdminPanel({ fetchAdmin, setActionMsg }) {
             <section className="admin-panel" style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', overflow: 'hidden' }}>
                 <div className="admin-panel-head" style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)' }}>
                     <div>
-                        <h3>Schedule Balance Grab</h3>
-                        <p>Slither only · 30 minutes · $1 per attempt · maximum 5 attempts</p>
+                        <h3>Schedule tournament</h3>
+                        <p>{tournamentType === 'mass-grab' ? 'Agar · 30 minutes · one $2 match' : 'Slither · 30 minutes · three $1 matches'}</p>
                     </div>
                 </div>
-                <form onSubmit={schedule} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(220px, 1fr) auto', gap: 12, padding: 18, alignItems: 'end' }}>
+                <form onSubmit={schedule} style={{ display: 'grid', gridTemplateColumns: 'minmax(160px, .8fr) minmax(180px, 1fr) minmax(220px, 1fr) auto', gap: 12, padding: 18, alignItems: 'end' }}>
+                    <label className="admin-filter-field">
+                        <span className="admin-filter-label">Tournament type</span>
+                        <select
+                            className="admin-filter-input"
+                            value={tournamentType}
+                            onChange={event => {
+                                const next = event.target.value;
+                                setTournamentType(next);
+                                setName(next === 'mass-grab' ? 'Mass Grab' : 'Balance Grab');
+                            }}
+                        >
+                            <option value="mass-grab">Mass Grab · Agar</option>
+                            <option value="balance-grab">Balance Grab · Slither</option>
+                        </select>
+                    </label>
                     <label className="admin-filter-field">
                         <span className="admin-filter-label">Tournament name</span>
                         <input className="admin-filter-input" value={name} minLength={3} maxLength={60} required onChange={event => setName(event.target.value)} />
@@ -129,7 +145,10 @@ export default function TournamentAdminPanel({ fetchAdmin, setActionMsg }) {
                         <tbody>
                             {tournaments.map(tournament => (
                                 <tr key={tournament.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                    <td style={{ padding: '14px 16px', color: 'var(--text-h)', fontWeight: 700 }}>{tournament.name}</td>
+                                    <td style={{ padding: '14px 16px', color: 'var(--text-h)', fontWeight: 700 }}>
+                                        {tournament.name}
+                                        <div style={{ color: 'var(--text-3)', fontSize: '.66rem', marginTop: 3, textTransform: 'capitalize' }}>{tournament.gameMode}</div>
+                                    </td>
                                     <td style={{ padding: '14px 16px', textTransform: 'capitalize' }}>{tournament.status}</td>
                                     <td style={{ padding: '14px 16px' }}>{formatDate(tournament.startAt)}</td>
                                     <td style={{ padding: '14px 16px' }}>${tournament.prizePotUsd.toFixed(2)}</td>

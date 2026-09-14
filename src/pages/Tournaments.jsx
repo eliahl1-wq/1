@@ -20,6 +20,14 @@ function formatCountdown(target, now) {
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function formatUsd(value) {
+    return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function attemptLabel(count) {
+    return `${count} ${count === 1 ? 'attempt' : 'attempts'}`;
+}
+
 export default function Tournaments() {
     const navigate = useNavigate();
     const { user, token } = useAuth();
@@ -110,15 +118,15 @@ export default function Tournaments() {
                     {!loading && ordered.length === 0 && (
                         <div className="tournament-empty">
                             <strong className="tournament-empty-title">No tournament scheduled</strong>
-                            The next Balance Grab will appear here as soon as it is booked.
+                            The next tournament will appear here as soon as it is booked.
                         </div>
                     )}
                     {ordered.map(tournament => (
                         <article key={tournament.id} className={`tournament-card tournament-card--${tournament.status}`}>
                             <div className="tournament-card-media">
                                 <img
-                                    src="/normal slither.png"
-                                    alt="Slither Normal"
+                                    src={tournament.imageUrl || (tournament.gameMode === 'agar' ? '/mass-grab.png' : '/normal slither.png')}
+                                    alt={`${tournament.name} ${tournament.gameMode === 'agar' ? 'Agar' : 'Slither'} tournament`}
                                     className="tournament-card-img"
                                     draggable={false}
                                 />
@@ -135,7 +143,9 @@ export default function Tournaments() {
                                 </div>
                             </div>
                             <div className="tournament-card-content">
-                                <div className="tournament-mode-label">Balance Grab · Slither</div>
+                                <div className="tournament-mode-label">
+                                    {tournament.name} · {tournament.gameMode === 'agar' ? 'Agar' : 'Slither'}
+                                </div>
                                 <h2>{tournament.name}</h2>
 
                                 <div className={`tournament-prize-hero-box ${tournament.status === 'live' ? 'tournament-prize-hero-box--live' : ''}`}>
@@ -152,7 +162,7 @@ export default function Tournaments() {
                                 <div className="tournament-details-grid">
                                     <div className="tournament-detail-item">
                                         <span className="label">Entry fee</span>
-                                        <strong>$1.00</strong>
+                                        <strong>{formatUsd(tournament.entryFeeUsd)}</strong>
                                     </div>
                                     <div className="tournament-detail-item">
                                         <span className="label">Players</span>
@@ -206,14 +216,14 @@ export default function Tournaments() {
                             {selectedRulesTournament.name}
                         </h3>
                         <p className="tournament-rules-eyebrow">
-                            Balance Grab Rules & Info
+                            {selectedRulesTournament.name} Rules &amp; Info
                         </p>
 
                         <div className="tournament-rules-list">
-                            <p>Start fee is <strong>$1.00</strong> per attempt. You can play a maximum of <strong>{selectedRulesTournament.maxAttempts} attempts</strong>.</p>
-                            <p>Each run starts at a $1.00 stake. You can cash out at any point to save your current balance to the tournament leaderboard.</p>
+                            <p>Start fee is <strong>{formatUsd(selectedRulesTournament.entryFeeUsd)}</strong> per attempt. You can play a maximum of <strong>{attemptLabel(selectedRulesTournament.maxAttempts)}</strong>.</p>
+                            <p>Each run starts at a {formatUsd(selectedRulesTournament.gameplayStartBalanceUsd || selectedRulesTournament.entryFeeUsd)} stake. You can cash out at any point to save your current balance to the tournament leaderboard.</p>
                             <p>If you die during a run, you bank <strong>$0.00</strong> for that attempt.</p>
-                            <p>Your total score is the sum of all your banked cashouts across the {selectedRulesTournament.maxAttempts} runs.</p>
+                            <p>Your total score is the sum of all your banked cashouts across {attemptLabel(selectedRulesTournament.maxAttempts)}.</p>
                             <p>The <strong>top 3 players</strong> on the leaderboard at the end of the tournament split the entire prize pot:
                                     <br />
                                     - 1st Place: <strong>60%</strong>
