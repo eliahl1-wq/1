@@ -27,6 +27,8 @@ const TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: 'Users' },
     { id: 'activity', label: 'Activity' },
+    { id: 'main-house', label: 'Main house' },
+    { id: 'issues', label: 'Issues' },
     { id: 'reports', label: 'Bug reports' },
     { id: 'tournaments', label: 'Tournaments' },
     { id: 'affiliates', label: 'Affiliates' },
@@ -930,6 +932,8 @@ export default function AdminDashboard() {
     const [liveCategoryFilter, setLiveCategoryFilter] = useState('');
     const [liveUpdatedAt, setLiveUpdatedAt] = useState(null);
     const [liveRefreshing, setLiveRefreshing] = useState(false);
+    const [mainHouseLive, setMainHouseLive] = useState(null);
+    const [mainHouseLoading, setMainHouseLoading] = useState(false);
     const [userSearch, setUserSearch] = useState('');
     const [serverStatus, setServerStatus] = useState(null);
     const [actionMsg, setActionMsg] = useState('');
@@ -942,13 +946,16 @@ export default function AdminDashboard() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
     const [pendingRewardClaims, setPendingRewardClaims] = useState([]);
-    const [failedRewardClaims, setFailedRewardClaims] = useState([]);
     const [rewardOwnership, setRewardOwnership] = useState(null);
     const [rewardOwnershipLoading, setRewardOwnershipLoading] = useState(false);
     const [rewardOwnerSearch, setRewardOwnerSearch] = useState('');
     const [showAllRewardOwners, setShowAllRewardOwners] = useState(false);
     const [bugReports, setBugReports] = useState([]);
     const [bugReportsLoading, setBugReportsLoading] = useState(false);
+    const [adminIssues, setAdminIssues] = useState([]);
+    const [adminIssueSummary, setAdminIssueSummary] = useState({ totalOpen: 0, critical: 0, error: 0, warning: 0 });
+    const [adminIssuesLoading, setAdminIssuesLoading] = useState(false);
+    const [adminIssueStatus, setAdminIssueStatus] = useState('open');
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
@@ -994,6 +1001,16 @@ export default function AdminDashboard() {
         }
     }, [fetchAdmin]);
 
+    const fetchMainHouseLive = useCallback(async (silent = true) => {
+        if (!silent) setMainHouseLoading(true);
+        try {
+            const data = await fetchAdmin('/api/admin/dashboard/main-house-live');
+            setMainHouseLive(data);
+        } finally {
+            if (!silent) setMainHouseLoading(false);
+        }
+    }, [fetchAdmin]);
+
     const fetchBugReports = useCallback(async () => {
         setBugReportsLoading(true);
         try {
@@ -1003,6 +1020,17 @@ export default function AdminDashboard() {
             setBugReportsLoading(false);
         }
     }, [fetchAdmin]);
+
+    const fetchAdminIssues = useCallback(async (silent = false) => {
+        if (!silent) setAdminIssuesLoading(true);
+        try {
+            const data = await fetchAdmin(`/api/admin/issues?status=${encodeURIComponent(adminIssueStatus)}&limit=200`);
+            setAdminIssues(data.issues ?? []);
+            setAdminIssueSummary(data.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0 });
+        } finally {
+            if (!silent) setAdminIssuesLoading(false);
+        }
+    }, [fetchAdmin, adminIssueStatus]);
 
     const fetchRewardOwnership = useCallback(async () => {
         setRewardOwnershipLoading(true);
@@ -1051,8 +1079,10 @@ export default function AdminDashboard() {
             setSweeps(sw.sweeps ?? []);
             setRewardAlerts(security.alerts ?? []);
             setPendingRewardClaims(security.pendingClaims ?? []);
-            setFailedRewardClaims(security.failedClaims ?? []);
             setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(pregameDisplay.playingOffsets || {}) });
+            fetchAdmin('/api/admin/issues?status=open&limit=1')
+                .then(issueData => setAdminIssueSummary(issueData.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0 }))
+                .catch(() => {});
             await Promise.all([
                 fetchTransactions({ ...txFilterRef.current, userId: userId || txFilterRef.current.userId }, includeExcluded),
                 fetchLiveFeed(true),
@@ -1093,9 +1123,23 @@ export default function AdminDashboard() {
     }, [tab, txFilter, showExcluded, fetchTransactions]);
 
     useEffect(() => {
+        if (tab !== 'main-house') return undefined;
+        fetchMainHouseLive(false).catch(err => setError(err.message));
+        const id = setInterval(() => fetchMainHouseLive(true).catch(() => {}), 5000);
+        return () => clearInterval(id);
+    }, [tab, fetchMainHouseLive]);
+
+    useEffect(() => {
         if (tab !== 'reports') return;
         fetchBugReports().catch(err => setError(err.message));
     }, [tab, fetchBugReports]);
+
+    useEffect(() => {
+        if (tab !== 'issues') return undefined;
+        fetchAdminIssues(false).catch(err => setError(err.message));
+        const id = setInterval(() => fetchAdminIssues(true).catch(() => {}), 10_000);
+        return () => clearInterval(id);
+    }, [tab, fetchAdminIssues]);
 
     useEffect(() => {
         if (tab !== 'rewards') return;
@@ -1168,7 +1212,6 @@ export default function AdminDashboard() {
             const data = await fetchAdmin('/api/admin/reward-security-alerts');
             setRewardAlerts(data.alerts ?? []);
             setPendingRewardClaims(data.pendingClaims ?? []);
-            setFailedRewardClaims(data.failedClaims ?? []);
             setActionMsg(action === 'approve' ? '✅ Alert dismissed. Account access was not changed.' : '✅ Rewards manually disabled; existing balances were preserved.');
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
@@ -1452,6 +1495,23 @@ export default function AdminDashboard() {
         }
     };
 
+    const updateAdminIssueStatus = async (issueId, status) => {
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            await fetchAdmin(`/api/admin/issues/${issueId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status }),
+            });
+            await fetchAdminIssues(true);
+            setActionMsg(status === 'resolved' ? '✅ Issue marked as resolved.' : '✅ Issue reopened.');
+        } catch (err) {
+            setActionMsg(`❌ ${err.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
@@ -1500,7 +1560,7 @@ export default function AdminDashboard() {
                             onClick={() => setTab(t.id)}
 
                         >
-                            {t.label}
+                            {t.label}{t.id === 'issues' && adminIssueSummary.totalOpen > 0 ? ` (${adminIssueSummary.totalOpen})` : ''}
                         </button>
                     ))}
                 </div>
@@ -1636,6 +1696,88 @@ export default function AdminDashboard() {
                 )}
 
                 {tab === 'token-launch' && <TokenLaunchAdminPanel fetchAdmin={fetchAdmin} />}
+
+                {tab === 'issues' && (
+                    <section className="admin-issues" aria-labelledby="admin-issues-title">
+                        <div className="admin-issues__header">
+                            <div>
+                                <span>SYSTEM MONITOR</span>
+                                <h2 id="admin-issues-title">Issues</h2>
+                                <p>Cashout, wallet, Solana and game-value problems collected by the backend.</p>
+                            </div>
+                            <div className="admin-issues__actions">
+                                <div className="admin-issues__view-toggle" role="group" aria-label="Issue view">
+                                    <button type="button" className={adminIssueStatus === 'open' ? 'is-active' : ''} onClick={() => setAdminIssueStatus('open')}>Open</button>
+                                    <button type="button" className={adminIssueStatus === 'all' ? 'is-active' : ''} onClick={() => setAdminIssueStatus('all')}>History</button>
+                                </div>
+                                <button type="button" className="btn btn-ghost" disabled={adminIssuesLoading} onClick={() => fetchAdminIssues(false).catch(err => setError(err.message))}>
+                                    {adminIssuesLoading ? 'Loading…' : 'Refresh'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="admin-issues__summary">
+                            <article className="is-total"><span>Open</span><strong>{adminIssueSummary.totalOpen}</strong></article>
+                            <article className="is-critical"><span>Critical</span><strong>{adminIssueSummary.critical}</strong></article>
+                            <article className="is-error"><span>Errors</span><strong>{adminIssueSummary.error}</strong></article>
+                            <article className="is-warning"><span>Warnings</span><strong>{adminIssueSummary.warning}</strong></article>
+                        </div>
+
+                        {adminIssuesLoading && adminIssues.length === 0 ? (
+                            <div className="admin-issues__empty">Loading issues…</div>
+                        ) : adminIssues.length === 0 ? (
+                            <div className="admin-issues__empty">{adminIssueStatus === 'open' ? 'No open issues.' : 'No issues have been recorded yet.'}</div>
+                        ) : (
+                            <div className="admin-issues__list">
+                                {adminIssues.map(issue => {
+                                    const hasAmounts = issue.expectedUsd != null || issue.actualUsd != null || issue.differenceUsd != null;
+                                    return (
+                                        <article key={issue._id} className={`admin-issue is-${issue.severity}${issue.status === 'resolved' ? ' is-resolved' : ''}`}>
+                                            <div className="admin-issue__topline">
+                                                <div className="admin-issue__badges">
+                                                    <span className={`admin-issue__severity is-${issue.severity}`}>{issue.severity}</span>
+                                                    <span>{issue.category}</span>
+                                                    <code>{issue.code}</code>
+                                                </div>
+                                                <span>{formatRelativeTime(issue.lastSeenAt)}</span>
+                                            </div>
+                                            <div className="admin-issue__body">
+                                                <div>
+                                                    <h3>{issue.title}</h3>
+                                                    <p>{issue.message}</p>
+                                                </div>
+                                                {hasAmounts && (
+                                                    <div className="admin-issue__amounts">
+                                                        <div><span>Expected</span><strong>{issue.expectedUsd == null ? '—' : formatUsd(issue.expectedUsd)}</strong></div>
+                                                        <div><span>Actual</span><strong>{issue.actualUsd == null ? '—' : formatUsd(issue.actualUsd)}</strong></div>
+                                                        <div><span>Difference</span><strong>{issue.differenceUsd == null ? '—' : formatUsd(issue.differenceUsd)}</strong></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="admin-issue__footer">
+                                                <div>
+                                                    {issue.username && <span>User: <strong>{issue.username}</strong></span>}
+                                                    {issue.mode && <span>Mode: <strong>{issue.mode}</strong></span>}
+                                                    {issue.roomId && <span>Room: <code>{issue.roomId}</code></span>}
+                                                    <span>Seen: <strong>{issue.occurrences || 1}×</strong></span>
+                                                    <span>First: {formatDate(issue.firstSeenAt)}</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-ghost"
+                                                    disabled={actionLoading}
+                                                    onClick={() => updateAdminIssueStatus(issue._id, issue.status === 'resolved' ? 'open' : 'resolved')}
+                                                >
+                                                    {issue.status === 'resolved' ? 'Reopen' : 'Mark resolved'}
+                                                </button>
+                                            </div>
+                                        </article>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
+                )}
 
                 {tab === 'reports' && (
                     <section className="admin-bug-reports" aria-labelledby="admin-bug-reports-title">
@@ -1825,6 +1967,78 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
+                {tab === 'main-house' && (
+                    <div className="admin-house-live">
+                        <div className="admin-house-live__heading">
+                            <div>
+                                <div className="admin-house-live__eyebrow"><LiveIndicator active /> Current server session</div>
+                                <h2>Main house distribution</h2>
+                                <p>
+                                    Live in-memory ownership since {formatDate(mainHouseLive?.sessionStartedAt)}. Free play, free tickets, tournaments and Battle Royale are excluded.
+                                </p>
+                            </div>
+                            <button type="button" className="btn btn-ghost" disabled={mainHouseLoading} onClick={() => fetchMainHouseLive(false).catch(err => setError(err.message))}>
+                                {mainHouseLoading ? 'Updating…' : 'Refresh'}
+                            </button>
+                        </div>
+
+                        <div className="admin-house-live__wallet">
+                            <div>
+                                <span>On-chain main house</span>
+                                <strong>{mainHouseLive?.wallet?.balanceUsd == null ? '—' : formatUsd(mainHouseLive.wallet.balanceUsd)}</strong>
+                                <small>{mainHouseLive?.wallet?.balanceSol == null ? (mainHouseLive?.wallet?.error || 'Not configured') : formatSol(mainHouseLive.wallet.balanceSol)}</small>
+                            </div>
+                            <code className="mono">{mainHouseLive?.wallet?.address || 'Main house wallet not configured'}</code>
+                        </div>
+
+                        <div className="admin-house-metrics">
+                            <StatCard label="Players hold" value={formatUsd(mainHouseLive?.totals?.playerBalanceUsd)} sub={`${mainHouseLive?.totals?.activePlayers ?? 0} active player(s)`} />
+                            <StatCard label="Food on maps" value={formatUsd(mainHouseLive?.totals?.mapFoodUsd)} sub="Spawned and collectible now" />
+                            <StatCard label="Food reserve" value={formatUsd(mainHouseLive?.totals?.unspawnedFoodUsd)} sub="Funded but not spawned yet" />
+                            <StatCard label="Active bots hold" value={formatUsd(mainHouseLive?.totals?.activeBotBalanceUsd)} sub={`${mainHouseLive?.totals?.activeBots ?? 0} active bot(s)`} />
+                            <StatCard label="Unspawned bot budget" value={formatUsd(mainHouseLive?.totals?.unspawnedBotBudgetUsd)} sub="Available for future bots" />
+                            <StatCard label="Owner accrued" value={formatUsd(mainHouseLive?.totals?.ownerAccruedUsd)} sub="Current session, before reset sweep" />
+                        </div>
+
+                        <Panel title="Balance by room" sub={`Currently tracked in active worlds: ${formatUsd(mainHouseLive?.totals?.currentTrackedUsd)}. Cashout fields are session history and are not added twice.`}>
+                            <DataTable
+                                columns={[
+                                    { key: 'room', label: 'Room', render: room => <div className="admin-reward-progress-cell"><strong>{room.label}</strong><small>{room.players.length} players · {room.activeBotCount} bots</small></div> },
+                                    { key: 'players', label: 'Players', render: room => formatUsd(room.playerBalanceUsd) },
+                                    { key: 'mapFood', label: 'Food on map', render: room => formatUsd(room.mapFoodUsd) },
+                                    { key: 'reserve', label: 'Unspawned', render: room => <div className="admin-reward-progress-cell"><strong>{formatUsd(room.unspawnedFoodUsd)}</strong><small>{formatUsd(room.unspawnedBotBudgetUsd)} bot budget</small></div> },
+                                    { key: 'bots', label: 'Active bots', render: room => formatUsd(room.activeBotBalanceUsd) },
+                                    { key: 'owner', label: 'Owner', render: room => formatUsd(room.ownerAccruedUsd) },
+                                    { key: 'cashouts', label: 'Session cashouts', render: room => <div className="admin-reward-progress-cell"><strong>{formatUsd(room.playerCashoutsUsd)} players</strong><small>{formatUsd(room.botCashoutsUsd)} from {room.botCashoutCount} bot cashout(s)</small></div> },
+                                ]}
+                                rows={mainHouseLive?.rooms || []}
+                                loading={mainHouseLoading && !mainHouseLive}
+                                emptyMessage="No paid rooms are active"
+                            />
+                        </Panel>
+
+                        <Panel title="Who owns the live player balance" sub="Every real-money player balance currently held inside a paid game.">
+                            <DataTable
+                                columns={[
+                                    { key: 'player', label: 'Player', render: row => <strong>{row.username}</strong> },
+                                    { key: 'game', label: 'Game', render: row => row.mode },
+                                    { key: 'room', label: 'Room', render: row => row.roomLabel },
+                                    { key: 'balance', label: 'Balance', render: row => <strong className="mono">{formatUsd(row.balanceUsd)}</strong> },
+                                    { key: 'status', label: 'Status', render: row => row.cashingOut ? <span className="admin-reward-processing">Cashing out</span> : row.disconnected ? 'Disconnected' : 'Playing' },
+                                ]}
+                                rows={(mainHouseLive?.rooms || []).flatMap(room => room.players.map(player => ({ ...player, id: `${room.id}:${player.id}`, roomLabel: room.label })))}
+                                loading={mainHouseLoading && !mainHouseLive}
+                                emptyMessage="No real-money players currently in game"
+                            />
+                        </Panel>
+
+                        <div className="admin-house-session-note">
+                            <strong>Session totals</strong>
+                            <span>Players cashed out {formatUsd(mainHouseLive?.totals?.playerCashoutsUsd)} · bots cashed out {formatUsd(mainHouseLive?.totals?.botCashoutsUsd)} across {mainHouseLive?.totals?.botCashoutCount ?? 0} completed bot cashouts.</span>
+                        </div>
+                    </div>
+                )}
+
                 {tab === 'rewards' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div className="admin-reward-summary">
@@ -1841,7 +2055,7 @@ export default function AdminDashboard() {
                             <StatCard
                                 label="Pending from house"
                                 value={formatUsd(pendingHouseRewardUsd)}
-                                sub="Already reserved and moved on the next settlement"
+                                sub="Still in the house wallet; transferred at the next settlement"
                             />
                             <StatCard
                                 label={rewardWalletCoverageUsd >= 0 ? 'Wallet coverage' : 'Wallet shortfall'}
@@ -1892,6 +2106,7 @@ export default function AdminDashboard() {
                                     <input className="admin-filter-input" value={rewardOwnerSearch} onChange={event => setRewardOwnerSearch(event.target.value)} placeholder="Username or email" />
                                 </label>
                             </AdminFilterBar>
+                            <div className="admin-reward-scroll-region">
                             <DataTable
                                 columns={[
                                     { key: 'user', label: 'User', render: owner => (
@@ -1951,6 +2166,7 @@ export default function AdminDashboard() {
                                 loading={rewardOwnershipLoading && !rewardOwnership}
                                 emptyMessage="No users currently have reward ownership or challenge progress"
                             />
+                            </div>
                             {filteredRewardOwners.length > 8 && (
                                 <div className="admin-reward-list-footer">
                                     <span>Showing {visibleRewardOwners.length} of {filteredRewardOwners.length}</span>
@@ -1962,6 +2178,7 @@ export default function AdminDashboard() {
                         </Panel>
 
                         <Panel title="Reward wallet movement" sub="Latest recorded money entering or leaving the reward wallet. Reserved amounts are shown separately and have not moved on-chain yet.">
+                            <div className="admin-reward-scroll-region">
                             <DataTable
                                 columns={[
                                     { key: 'createdAt', label: 'When', render: row => <span title={formatDate(row.createdAt)}>{formatRelativeTime(row.createdAt)}</span> },
@@ -1981,9 +2198,11 @@ export default function AdminDashboard() {
                                 loading={rewardOwnershipLoading && !rewardOwnership}
                                 emptyMessage="No recorded reward-wallet movement yet"
                             />
+                            </div>
                         </Panel>
 
                         <Panel title="Recent reward claims" sub="Latest player claims with the exact reward sources, settlement status and transaction reference.">
+                            <div className="admin-reward-scroll-region">
                             <DataTable
                                 columns={[
                                     { key: 'createdAt', label: 'When', render: claim => <span title={formatDate(claim.createdAt)}>{formatRelativeTime(claim.createdAt)}</span> },
@@ -1996,6 +2215,7 @@ export default function AdminDashboard() {
                                 loading={rewardOwnershipLoading && !rewardOwnership}
                                 emptyMessage="No reward claims yet"
                             />
+                            </div>
                         </Panel>
 
                         <details className="admin-reward-secondary">
@@ -2017,9 +2237,9 @@ export default function AdminDashboard() {
                             title={`Shared deposit-wallet alerts (${rewardAlerts.filter(alert => alert.status === 'pending').length} pending)`}
                             sub="Alerts are informational only. They never change reward or affiliate access automatically."
                         >
-                            {rewardAlerts.length === 0 ? (
-                                <div style={{ padding: '24px', color: 'var(--text-2)', fontSize: '0.82rem' }}>No linked-wallet alerts.</div>
-                            ) : rewardAlerts.map(alert => (
+                            {rewardAlerts.filter(alert => alert.status === 'pending').length === 0 ? (
+                                <div style={{ padding: '24px', color: 'var(--text-2)', fontSize: '0.82rem' }}>No pending linked-wallet alerts.</div>
+                            ) : rewardAlerts.filter(alert => alert.status === 'pending').slice(0, 5).map(alert => (
                                 <div key={alert._id} style={{ padding: '18px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: '16px', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <div style={{ minWidth: 0 }}>
                                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '7px' }}>
@@ -2044,34 +2264,6 @@ export default function AdminDashboard() {
                                     )}
                                 </div>
                             ))}
-                        </Panel>
-                        <Panel title={`Claims awaiting settlement (${pendingRewardClaims.length})`} sub="Broadcast claims reconcile automatically. Reserved claims stay locked for investigation rather than risking a double payment.">
-                            <DataTable
-                                columns={[
-                                    { key: 'user', label: 'User', render: claim => claim.userId?.username || claim.userId?.email || 'Unknown' },
-                                    { key: 'amount', label: 'Amount', render: claim => formatUsd(claim.amountUsd) },
-                                    { key: 'status', label: 'Status', render: claim => <strong style={{ textTransform: 'capitalize' }}>{claim.status}</strong> },
-                                    { key: 'signature', label: 'Signature', render: claim => claim.signature ? <span className="mono">{truncateAddr(claim.signature)}</span> : 'Not recorded' },
-                                    { key: 'created', label: 'Created', render: claim => formatDate(claim.createdAt) },
-                                ]}
-                                rows={pendingRewardClaims}
-                                loading={false}
-                                emptyMessage="No unsettled reward claims"
-                            />
-                        </Panel>
-                        <Panel title="Recent failed claims" sub="The exact backend reason is shown here so reward-wallet, RPC, rent, and configuration failures can be distinguished.">
-                            <DataTable
-                                columns={[
-                                    { key: 'user', label: 'User', render: claim => claim.userId?.username || claim.userId?.email || 'Unknown' },
-                                    { key: 'amount', label: 'Amount', render: claim => formatUsd(claim.amountUsd) },
-                                    { key: 'error', label: 'Reason', render: claim => <span style={{ color: 'var(--red)' }}>{claim.error || 'Unknown failure'}</span> },
-                                    { key: 'signature', label: 'Signature', render: claim => claim.signature ? <span className="mono">{truncateAddr(claim.signature)}</span> : 'Not broadcast' },
-                                    { key: 'updated', label: 'When', render: claim => formatDate(claim.updatedAt || claim.createdAt) },
-                                ]}
-                                rows={failedRewardClaims}
-                                loading={false}
-                                emptyMessage="No failed reward claims"
-                            />
                         </Panel>
                     </div>
                 )}
