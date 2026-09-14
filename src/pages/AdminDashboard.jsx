@@ -1009,6 +1009,34 @@ export default function AdminDashboard() {
             setMainHouseLive(data);
             setMainHouseError('');
         } catch (error) {
+            if (/HTTP 404\b/.test(error.message || '')) {
+                // Compatibility with a production backend that predates the
+                // live distribution endpoint. The legacy wallets endpoint can
+                // still prove whether the main house is configured and show
+                // its on-chain balance without inventing live room totals.
+                try {
+                    const legacyWallets = await fetchAdmin('/api/admin/dashboard/wallets');
+                    setWallets(legacyWallets);
+                    setMainHouseLive({
+                        wallet: legacyWallets.mainHouse || {
+                            address: null,
+                            balanceSol: null,
+                            balanceUsd: null,
+                            error: null,
+                        },
+                        sessionStartedAt: null,
+                        serverTime: Date.now(),
+                        totals: {},
+                        rooms: [],
+                        legacyFallback: true,
+                    });
+                    setMainHouseError('Live distribution requires the latest backend deployment. Showing the current on-chain wallet balance.');
+                    return;
+                } catch {
+                    // Preserve the original 404 because it identifies the
+                    // missing backend route more accurately than the fallback.
+                }
+            }
             setMainHouseError(error.message || 'Could not load live Main house data.');
             throw error;
         } finally {
