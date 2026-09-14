@@ -946,6 +946,7 @@ export default function AdminDashboard() {
     const [rewardOwnership, setRewardOwnership] = useState(null);
     const [rewardOwnershipLoading, setRewardOwnershipLoading] = useState(false);
     const [rewardOwnerSearch, setRewardOwnerSearch] = useState('');
+    const [showAllRewardOwners, setShowAllRewardOwners] = useState(false);
     const [bugReports, setBugReports] = useState([]);
     const [bugReportsLoading, setBugReportsLoading] = useState(false);
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
@@ -1414,9 +1415,10 @@ export default function AdminDashboard() {
         const search = rewardOwnerSearch.trim().toLowerCase();
         return !search || owner.username?.toLowerCase().includes(search) || owner.email?.toLowerCase().includes(search);
     });
-    const challengeRewardOwners = filteredRewardOwners.filter(owner =>
-        owner.breakdown?.starterUsd > 0 || owner.starterChallenge?.status === 'in-progress' || owner.freeTicket?.available
-    );
+    const visibleRewardOwners = showAllRewardOwners ? filteredRewardOwners : filteredRewardOwners.slice(0, 8);
+    const recentRewardClaims = (rewardOwnership?.claims || []).slice(0, 12);
+    const recentWalletActivity = (rewardOwnership?.walletActivity || []).slice(0, 14);
+    const recentRewardActivity = (rewardOwnership?.activity || []).slice(0, 10);
     const rewardTotals = rewardOwnership?.totals || {};
     const rewardWalletBalanceUsd = Number(wallets?.rewardWallet?.balanceUsd) || 0;
     const rewardWalletLiabilityUsd = Number(rewardTotals.rewardWalletLiabilityUsd) || 0;
@@ -1879,24 +1881,7 @@ export default function AdminDashboard() {
                             </div>
                         </Panel>
 
-                        <Panel title={`Challenge rewards owed (${challengeRewardOwners.length})`} sub="Starter rewards and the exact challenge progress attached to each account.">
-                            <DataTable
-                                columns={[
-                                    { key: 'user', label: 'User', render: owner => <button type="button" className="admin-link-btn" onClick={() => setSelectedUserId(String(owner.id))}>{owner.username}</button> },
-                                    { key: 'owed', label: 'Starter reward owed', render: owner => <strong className="mono">{formatUsd(owner.breakdown.starterUsd)}</strong> },
-                                    { key: 'funded', label: 'Funded by games', render: owner => formatUsd(owner.breakdown.starterFundedUsd) },
-                                    { key: 'ticket', label: 'Free ticket', render: owner => owner.freeTicket.available ? 'Available' : owner.freeTicket.used ? 'Used' : owner.freeTicket.challengeCompleted ? 'Completed' : 'Not unlocked' },
-                                    { key: 'five', label: '$5 challenge', render: owner => `${owner.starterChallenge.fiveDollarGames} / ${owner.starterChallenge.fiveDollarRequired} games` },
-                                    { key: 'ten', label: '$10 challenge', render: owner => `${owner.starterChallenge.tenDollarGames} / ${owner.starterChallenge.tenDollarRequired} games` },
-                                    { key: 'status', label: 'Status', render: owner => <OutcomeBadge outcome={owner.starterChallenge.status === 'completed' ? 'Reward earned' : owner.starterChallenge.status === 'in-progress' ? 'In progress' : 'No reward'} /> },
-                                ]}
-                                rows={challengeRewardOwners}
-                                loading={rewardOwnershipLoading && !rewardOwnership}
-                                emptyMessage="No active challenge rewards or progress"
-                            />
-                        </Panel>
-
-                        <Panel title={`Reward ownership (${filteredRewardOwners.length})`} sub="Click a user to inspect their complete account, game and reward history.">
+                        <Panel title={`Who is owed rewards (${filteredRewardOwners.length})`} sub="One compact list for every player reward, challenge and balance. Click a user for full details.">
                             <AdminFilterBar right={
                                 <button type="button" className="btn btn-ghost" onClick={() => fetchRewardOwnership().catch(err => setError(err.message))} disabled={rewardOwnershipLoading}>
                                     {rewardOwnershipLoading ? 'Updating…' : 'Refresh'}
@@ -1915,31 +1900,26 @@ export default function AdminDashboard() {
                                             <small>{owner.email || 'No email'}{owner.isOwnerAccount ? ' · Your account' : ''}</small>
                                         </div>
                                     )},
-                                    { key: 'rewardWalletUsd', label: 'Reward wallet', render: owner => <strong className="mono">{formatUsd(owner.rewardWalletUsd)}</strong> },
-                                    { key: 'reasons', label: 'Owned for', render: owner => owner.reasons?.length ? (
-                                        <div className="admin-reward-reasons">
-                                            {owner.reasons.map(reason => <span key={reason.key}>{reason.label} <strong>{formatUsd(reason.amountUsd)}</strong></span>)}
-                                        </div>
-                                    ) : <span style={{ color: 'var(--text-3)' }}>No current balance</span> },
-                                    { key: 'starter', label: 'Starter challenge', render: owner => (
+                                    { key: 'owed', label: 'Currently owed', render: owner => (
                                         <div className="admin-reward-progress-cell">
-                                            <strong>{owner.starterChallenge.status.replace('-', ' ')}</strong>
-                                            <small>$5: {owner.starterChallenge.fiveDollarGames}/{owner.starterChallenge.fiveDollarRequired} · $10: {owner.starterChallenge.tenDollarGames}/{owner.starterChallenge.tenDollarRequired}</small>
-                                            <small>{formatUsd(owner.breakdown.starterUsd)} reserved · {formatUsd(owner.breakdown.starterPotentialUsd)} potential</small>
+                                            <strong className="mono">{formatUsd(owner.rewardWalletUsd)}</strong>
+                                            <div className="admin-reward-reasons">
+                                                {owner.reasons?.length
+                                                    ? owner.reasons.map(reason => <span key={reason.key}>{reason.label} <strong>{formatUsd(reason.amountUsd)}</strong></span>)
+                                                    : <small>No current balance</small>}
+                                            </div>
                                         </div>
                                     )},
-                                    { key: 'permanent', label: 'Permanent progress', render: owner => (
+                                    { key: 'progress', label: 'Progress & status', render: owner => (
                                         <div className="admin-reward-progress-cell">
-                                            <strong>{formatUsd(owner.breakdown.permanentProgressVolumeUsd)} / {formatUsd(owner.breakdown.permanentCycleVolumeUsd)}</strong>
-                                            <small>{owner.breakdown.permanentCyclesCompleted} cycles · {formatUsd(owner.breakdown.permanentLifetimeEarnedUsd)} lifetime earned</small>
-                                        </div>
-                                    )},
-                                    { key: 'other', label: 'Other / status', render: owner => (
-                                        <div className="admin-reward-progress-cell">
-                                            {owner.otherRewardsUsd > 0 && <strong>{formatUsd(owner.otherRewardsUsd)} tournament</strong>}
-                                            <small>{owner.freeTicket.available ? 'Free ticket available' : owner.freeTicket.used ? 'Free ticket used' : 'No free ticket used'}</small>
-                                            {owner.rewardsDisabled && <span className="admin-reward-blocked">Rewards blocked</span>}
-                                            {(owner.claimInProgress || owner.tournamentClaimInProgress) && <span className="admin-reward-processing">Claim processing</span>}
+                                            <strong>Starter: {owner.starterChallenge.status.replace('-', ' ')}</strong>
+                                            <small>$5 {owner.starterChallenge.fiveDollarGames}/{owner.starterChallenge.fiveDollarRequired} · $10 {owner.starterChallenge.tenDollarGames}/{owner.starterChallenge.tenDollarRequired}</small>
+                                            <small>Permanent {formatUsd(owner.breakdown.permanentProgressVolumeUsd)} / {formatUsd(owner.breakdown.permanentCycleVolumeUsd)} · {owner.breakdown.permanentCyclesCompleted} cycles</small>
+                                            <div className="admin-reward-inline-status">
+                                                {owner.freeTicket.available && <span>Free ticket</span>}
+                                                {owner.rewardsDisabled && <span className="admin-reward-blocked">Rewards blocked</span>}
+                                                {(owner.claimInProgress || owner.tournamentClaimInProgress) && <span className="admin-reward-processing">Claim processing</span>}
+                                            </div>
                                         </div>
                                     )},
                                     { key: 'actions', label: 'Actions', render: owner => {
@@ -1967,26 +1947,71 @@ export default function AdminDashboard() {
                                         );
                                     } },
                                 ]}
-                                rows={filteredRewardOwners}
+                                rows={visibleRewardOwners}
                                 loading={rewardOwnershipLoading && !rewardOwnership}
                                 emptyMessage="No users currently have reward ownership or challenge progress"
                             />
+                            {filteredRewardOwners.length > 8 && (
+                                <div className="admin-reward-list-footer">
+                                    <span>Showing {visibleRewardOwners.length} of {filteredRewardOwners.length}</span>
+                                    <button type="button" className="btn btn-ghost" onClick={() => setShowAllRewardOwners(value => !value)}>
+                                        {showAllRewardOwners ? 'Show fewer' : 'Show all'}
+                                    </button>
+                                </div>
+                            )}
                         </Panel>
 
-                        <Panel title="Reward activity" sub="Credits, challenge progress, unlocks, retained payouts and claims — newest first.">
+                        <Panel title="Reward wallet movement" sub="Latest recorded money entering or leaving the reward wallet. Reserved amounts are shown separately and have not moved on-chain yet.">
+                            <DataTable
+                                columns={[
+                                    { key: 'createdAt', label: 'When', render: row => <span title={formatDate(row.createdAt)}>{formatRelativeTime(row.createdAt)}</span> },
+                                    { key: 'title', label: 'Movement', render: row => <div className="admin-reward-activity-title"><strong>{row.title}</strong><small>{row.details}</small></div> },
+                                    { key: 'direction', label: 'Type', render: row => <span className={`admin-wallet-flow is-${row.direction}`}>{row.direction === 'in' ? 'Received' : row.direction === 'out' ? 'Paid out' : 'Reserved'}</span> },
+                                    { key: 'amountUsd', label: 'Amount', render: row => (
+                                        <div className="admin-reward-flow-amount">
+                                            <strong className="mono" style={{ color: row.direction === 'out' ? 'var(--red)' : row.direction === 'in' ? 'var(--green)' : 'var(--text-h)' }}>
+                                                {row.amountUsd ? `${row.direction === 'out' ? '-' : row.amountUsd > 0 ? '+' : ''}${formatUsd(Math.abs(row.amountUsd))}` : '—'}
+                                            </strong>
+                                            {row.solAmount != null && <small>{formatSol(row.solAmount)}</small>}
+                                        </div>
+                                    )},
+                                    { key: 'status', label: 'Status', render: row => <strong className={`admin-claim-status is-${row.status}`}>{row.status}</strong> },
+                                ]}
+                                rows={recentWalletActivity}
+                                loading={rewardOwnershipLoading && !rewardOwnership}
+                                emptyMessage="No recorded reward-wallet movement yet"
+                            />
+                        </Panel>
+
+                        <Panel title="Recent reward claims" sub="Latest player claims with the exact reward sources, settlement status and transaction reference.">
+                            <DataTable
+                                columns={[
+                                    { key: 'createdAt', label: 'When', render: claim => <span title={formatDate(claim.createdAt)}>{formatRelativeTime(claim.createdAt)}</span> },
+                                    { key: 'user', label: 'User', render: claim => claim.userId ? <button type="button" className="admin-link-btn" onClick={() => setSelectedUserId(String(claim.userId))}>{claim.username}</button> : claim.username },
+                                    { key: 'amount', label: 'Claim', render: claim => <div className="admin-reward-progress-cell"><strong className="mono">{formatUsd(claim.amountUsd)}</strong><small>Starter {formatUsd(claim.sponsoredAmountUsd)} · permanent {formatUsd(claim.permanentAmountUsd)} · retained {formatUsd(claim.retainedAmountUsd)}</small></div> },
+                                    { key: 'status', label: 'Status', render: claim => <div className="admin-reward-progress-cell"><strong className={`admin-claim-status is-${claim.status}`}>{claim.status}</strong>{claim.error && <small className="admin-claim-error">{claim.error}</small>}</div> },
+                                    { key: 'signature', label: 'Transaction', render: claim => claim.signature ? <span className="mono" title={claim.signature}>{truncateAddr(claim.signature)}</span> : <span style={{ color: 'var(--text-3)' }}>Not broadcast</span> },
+                                ]}
+                                rows={recentRewardClaims}
+                                loading={rewardOwnershipLoading && !rewardOwnership}
+                                emptyMessage="No reward claims yet"
+                            />
+                        </Panel>
+
+                        <details className="admin-reward-secondary">
+                            <summary>Other reward events <span>{rewardOwnership?.activity?.length || 0}</span></summary>
                             <DataTable
                                 columns={[
                                     { key: 'createdAt', label: 'When', render: row => <span title={formatDate(row.createdAt)}>{formatRelativeTime(row.createdAt)}</span> },
                                     { key: 'user', label: 'User', render: row => row.userId ? <button type="button" className="admin-link-btn" onClick={() => setSelectedUserId(String(row.userId))}>{row.username}</button> : row.username },
                                     { key: 'title', label: 'What happened', render: row => <div className="admin-reward-activity-title"><strong>{row.title}</strong><small>{row.details}</small></div> },
-                                    { key: 'wallet', label: 'Source', render: row => <span className={`admin-reward-source is-${row.wallet}`}>{row.wallet === 'tournament' ? 'Tournament wallet' : 'Reward wallet'}</span> },
-                                    { key: 'amountUsd', label: 'Amount', render: row => <strong className="mono" style={{ color: row.amountUsd < 0 ? 'var(--red)' : row.amountUsd > 0 ? 'var(--green)' : 'var(--text-3)' }}>{row.amountUsd ? `${row.amountUsd > 0 ? '+' : '-'}${formatUsd(Math.abs(row.amountUsd))}` : '—'}</strong> },
+                                    { key: 'amountUsd', label: 'Amount', render: row => <strong className="mono">{row.amountUsd ? formatUsd(Math.abs(row.amountUsd)) : '—'}</strong> },
                                 ]}
-                                rows={rewardOwnership?.activity || []}
-                                loading={rewardOwnershipLoading && !rewardOwnership}
-                                emptyMessage="No reward activity yet"
+                                rows={recentRewardActivity}
+                                loading={false}
+                                emptyMessage="No other reward activity"
                             />
-                        </Panel>
+                        </details>
 
                         <Panel
                             title={`Shared deposit-wallet alerts (${rewardAlerts.filter(alert => alert.status === 'pending').length} pending)`}
