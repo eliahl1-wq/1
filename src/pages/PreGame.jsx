@@ -590,7 +590,15 @@ export default function PreGame() {
     const balanceUsd = user?.balanceUsd ?? (balanceSol * solPrice);
     const isNormal5 = entryFeeForSession === 5 && !isBattleRoyaleMode && !isCompetitiveSlitherMode && !isSurvivMode;
     const hasFreeTicket = hasUnlockedFreeTicket(user);
-    const canJoin = !!selectedMode && selectedEntryFee !== null && (freePlay || (isNormal5 && hasFreeTicket) || balanceUsd >= entryFeeForSession);
+    const willUseFreeTicket = isNormal5 && hasFreeTicket;
+    const isAdminStartingBalanceOnly = !!user?.isAdmin
+        && !freePlay
+        && !isBattleRoyaleMode
+        && !isCompetitiveSlitherMode
+        && !isSurvivMode
+        && !willUseFreeTicket;
+    const requiredEntryUsd = isAdminStartingBalanceOnly ? economy.startBalance : entryFeeForSession;
+    const canJoin = !!selectedMode && selectedEntryFee !== null && (freePlay || willUseFreeTicket || balanceUsd >= requiredEntryUsd);
 
     // ── Format helpers ─────────────────────────────────
     const fmt = formatWalletBalanceAmount;
@@ -917,13 +925,15 @@ export default function PreGame() {
         if (serverUpdating && !(isAlreadyInGame && canRejoinThisMode)) return;
 
         if (!canJoin && !isAlreadyInGame) {
-            navigate('/lobby', { state: { depositIntent: true, selectedMode, requiredBalanceUsd: entryFeeForSession } });
+            navigate('/lobby', { state: { depositIntent: true, selectedMode, requiredBalanceUsd: requiredEntryUsd } });
             return;
         }
 
         trackMixpanelEvent('game_started', {
             mode: selectedMode,
             entry_fee_usd: entryFeeForSession,
+            paid_entry_usd: requiredEntryUsd,
+            admin_starting_balance_only: isAdminStartingBalanceOnly,
             free_mode: freePlay,
             is_battle_royale: isBattleRoyaleMode,
             is_rejoin: isAlreadyInGame && canRejoinThisMode,
@@ -1529,6 +1539,8 @@ export default function PreGame() {
                             guideSelection={isAuthenticated && !isAlreadyInGame}
                             entryFeeLabel={freePlay
                                 ? 'FREE'
+                                : isAdminStartingBalanceOnly
+                                    ? `${formatUsd(economy.startBalance)} admin entry`
                                 : entryFeeForSession != null
                                     ? formatUsd(entryFeeForSession)
                                     : `From ${formatUsd(Math.min(...tierOptions))}`}
@@ -1745,6 +1757,11 @@ export default function PreGame() {
                                             ✨ free ticket available
                                         </div>
                                     )}
+                                    {selectedMode && isAdminStartingBalanceOnly && (
+                                        <div className="lobby-stake-note" aria-live="polite">
+                                            Admin entry: only {formatUsd(economy.startBalance)} starting balance is charged. No food or bots are funded.
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button
@@ -1836,8 +1853,8 @@ export default function PreGame() {
                                             ) : (
                                                 <>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                        <span>Entry fee</span>
-                                                        <span className="mono">{formatUsd(economyFeeForDisplay)}</span>
+                                                        <span>{isAdminStartingBalanceOnly ? 'Your admin entry' : 'Entry fee'}</span>
+                                                        <span className="mono">{formatUsd(isAdminStartingBalanceOnly ? economy.startBalance : economyFeeForDisplay)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Starting balance</span>
@@ -1849,7 +1866,7 @@ export default function PreGame() {
                                                     <div className="divider" style={{ margin: '6px 0' }} />
                                                     <div className="stat-row">
                                                         <span>Golden Blob value</span>
-                                                        <span className="mono text-green">{formatUsd(economy.goldenBlobValue)}</span>
+                                                        <span className="mono text-green">{isAdminStartingBalanceOnly ? 'Not funded' : formatUsd(economy.goldenBlobValue)}</span>
                                                     </div>
                                                 </>
                                             )}

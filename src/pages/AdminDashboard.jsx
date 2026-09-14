@@ -934,6 +934,7 @@ export default function AdminDashboard() {
     const [liveRefreshing, setLiveRefreshing] = useState(false);
     const [mainHouseLive, setMainHouseLive] = useState(null);
     const [mainHouseLoading, setMainHouseLoading] = useState(false);
+    const [mainHouseError, setMainHouseError] = useState('');
     const [userSearch, setUserSearch] = useState('');
     const [serverStatus, setServerStatus] = useState(null);
     const [actionMsg, setActionMsg] = useState('');
@@ -969,7 +970,7 @@ export default function AdminDashboard() {
         });
         if (res.status === 403) throw new Error('Admin access required');
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.message || data.error || 'Request failed');
+        if (!res.ok) throw new Error(data.message || data.error || `Request failed (HTTP ${res.status})`);
         return data;
     }, [token]);
 
@@ -1006,6 +1007,10 @@ export default function AdminDashboard() {
         try {
             const data = await fetchAdmin('/api/admin/dashboard/main-house-live');
             setMainHouseLive(data);
+            setMainHouseError('');
+        } catch (error) {
+            setMainHouseError(error.message || 'Could not load live Main house data.');
+            throw error;
         } finally {
             if (!silent) setMainHouseLoading(false);
         }
@@ -1124,7 +1129,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (tab !== 'main-house') return undefined;
-        fetchMainHouseLive(false).catch(err => setError(err.message));
+        fetchMainHouseLive(false).catch(() => {});
         const id = setInterval(() => fetchMainHouseLive(true).catch(() => {}), 5000);
         return () => clearInterval(id);
     }, [tab, fetchMainHouseLive]);
@@ -1969,6 +1974,9 @@ export default function AdminDashboard() {
 
                 {tab === 'main-house' && (
                     <div className="admin-house-live">
+                        {mainHouseError && (
+                            <div className="product-alert product-alert--error">{mainHouseError}</div>
+                        )}
                         <div className="admin-house-live__heading">
                             <div>
                                 <div className="admin-house-live__eyebrow"><LiveIndicator active /> Current server session</div>
@@ -1977,7 +1985,7 @@ export default function AdminDashboard() {
                                     Live in-memory ownership since {formatDate(mainHouseLive?.sessionStartedAt)}. Free play, free tickets, tournaments and Battle Royale are excluded.
                                 </p>
                             </div>
-                            <button type="button" className="btn btn-ghost" disabled={mainHouseLoading} onClick={() => fetchMainHouseLive(false).catch(err => setError(err.message))}>
+                            <button type="button" className="btn btn-ghost" disabled={mainHouseLoading} onClick={() => fetchMainHouseLive(false).catch(() => {})}>
                                 {mainHouseLoading ? 'Updating…' : 'Refresh'}
                             </button>
                         </div>
@@ -1986,9 +1994,11 @@ export default function AdminDashboard() {
                             <div>
                                 <span>On-chain main house</span>
                                 <strong>{mainHouseLive?.wallet?.balanceUsd == null ? '—' : formatUsd(mainHouseLive.wallet.balanceUsd)}</strong>
-                                <small>{mainHouseLive?.wallet?.balanceSol == null ? (mainHouseLive?.wallet?.error || 'Not configured') : formatSol(mainHouseLive.wallet.balanceSol)}</small>
+                                <small>{mainHouseLive?.wallet?.balanceSol == null
+                                    ? (mainHouseLive ? (mainHouseLive.wallet?.error || 'Not configured') : 'Live data unavailable')
+                                    : formatSol(mainHouseLive.wallet.balanceSol)}</small>
                             </div>
-                            <code className="mono">{mainHouseLive?.wallet?.address || 'Main house wallet not configured'}</code>
+                            <code className="mono">{mainHouseLive?.wallet?.address || (mainHouseLive ? 'Main house wallet not configured' : 'Waiting for backend data')}</code>
                         </div>
 
                         <div className="admin-house-metrics">
