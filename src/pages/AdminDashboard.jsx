@@ -1530,6 +1530,66 @@ export default function AdminDashboard() {
             { ids, isOwnerAccount },
         );
     };
+
+    const bulkWithdrawOwnerBalances = async () => {
+        const selectedAccounts = users.filter(account => selectedUserIds.has(String(account.id)));
+        if (!selectedAccounts.length) return;
+        const nonOwnerAccounts = selectedAccounts.filter(account => !account.isOwnerAccount);
+        if (nonOwnerAccounts.length) {
+            setActionMsg('❌ Every selected account must be marked as “Your account” before it can be withdrawn.');
+            return;
+        }
+        if (selectedAccounts.length > 25) {
+            setActionMsg('❌ Select at most 25 accounts per bulk withdrawal.');
+            return;
+        }
+        const accountsWithBalance = selectedAccounts.filter(account => Number(account.balanceSol) > 0);
+        if (!accountsWithBalance.length) {
+            setActionMsg('❌ The selected accounts have no balance to withdraw.');
+            return;
+        }
+
+        const destinationInput = window.prompt(
+            `Send the full balance from ${accountsWithBalance.length} account(s) to which Solana wallet?`,
+            user?.walletAddress || '',
+        );
+        if (destinationInput == null) return;
+        const destinationAddress = destinationInput.trim();
+        if (!destinationAddress) {
+            setActionMsg('❌ Enter a destination wallet.');
+            return;
+        }
+        const estimatedUsd = accountsWithBalance.reduce((sum, account) => sum + (Number(account.balanceUsd) || 0), 0);
+        if (!window.confirm(
+            `Withdraw the FULL balance from ${accountsWithBalance.length} of your accounts to ${destinationAddress}?\n\nEstimated dashboard balance: ${formatUsd(estimatedUsd)}. Each wallet pays its own Solana network fee. This creates real, irreversible on-chain transactions.`,
+        )) return;
+
+        setActionLoading(true);
+        setActionMsg('');
+        try {
+            const ids = accountsWithBalance.map(account => String(account.id));
+            const result = await fetchAdmin('/api/admin/users/bulk-withdraw', {
+                method: 'POST',
+                body: JSON.stringify({
+                    ids,
+                    destinationAddress,
+                    confirmation: `WITHDRAW ALL ${ids.length}`,
+                }),
+            });
+            const failedResults = (result.results || []).filter(item => item.status === 'failed');
+            const failedText = failedResults.length
+                ? ` Failed: ${failedResults.map(item => `${item.username} (${item.message})`).join(', ')}`
+                : '';
+            setActionMsg(`${result.failed ? '⚠️' : '✅'} ${result.message} Sent ${formatSol(result.sentSolAmount)}.${failedText}`);
+            setSelectedUserIds(new Set(failedResults.map(item => String(item.userId))));
+            await fetchUsers(showExcludedUsersRef.current, userSortRef.current);
+        } catch (err) {
+            setActionMsg(`❌ ${err.message || 'Bulk withdrawal failed.'}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const applyTxFilters = (patch) => {
         const next = { ...txFilterRef.current, ...patch };
         setTxFilter(next);
@@ -1551,6 +1611,10 @@ export default function AdminDashboard() {
     const filteredUsers = userSearch.trim()
         ? users.filter(u => u.username.toLowerCase().includes(userSearch.trim().toLowerCase()))
         : users;
+    const selectedUsers = users.filter(account => selectedUserIds.has(String(account.id)));
+    const selectedOwnerUsers = selectedUsers.filter(account => account.isOwnerAccount);
+    const selectedOwnerBalanceUsd = selectedOwnerUsers.reduce((sum, account) => sum + (Number(account.balanceUsd) || 0), 0);
+    const selectedUsersIncludePlayerAccount = selectedUsers.some(account => !account.isOwnerAccount);
 
     const filteredLiveFeed = liveCategoryFilter
         ? liveFeed.filter(item => item.category === liveCategoryFilter)
@@ -2625,8 +2689,31 @@ export default function AdminDashboard() {
                         <AdminFilterBar right={
                             <>
                                 <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>{selectedUserIds.size} selected</span>
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                    disabled={actionLoading || !filteredUsers.some(account => account.isOwnerAccount && Number(account.balanceSol) > 0)}
+                                    onClick={() => setSelectedUserIds(new Set(
+                                        filteredUsers
+                                            .filter(account => account.isOwnerAccount && Number(account.balanceSol) > 0)
+                                            .map(account => String(account.id)),
+                                    ))}
+                                >
+                                    Select funded accounts
+                                </button>
                                 <button type="button" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={() => setSelectedOwnerStatus(true)}>Add to your accounts</button>
                                 <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={() => setSelectedOwnerStatus(false)}>Remove ownership</button>
+                                <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    style={{ padding: '6px 12px', fontSize: '0.72rem' }}
+                                    disabled={actionLoading || selectedOwnerUsers.length === 0 || selectedUsersIncludePlayerAccount}
+                                    title={selectedUsersIncludePlayerAccount ? 'All selected accounts must be marked as Your account' : 'Withdraw each selected owner account’s full balance to one wallet'}
+                                    onClick={bulkWithdrawOwnerBalances}
+                                >
+                                    {actionLoading ? 'Processing…' : `Withdraw full balances${selectedOwnerUsers.length ? ` · ${formatUsd(selectedOwnerBalanceUsd)}` : ''}`}
+                                </button>
                                 <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={bulkExcludeUsers}>Exclude</button>
                                 <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={bulkRestoreUsers}>Restore</button>
                             </>
