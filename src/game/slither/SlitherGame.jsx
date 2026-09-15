@@ -62,7 +62,8 @@ export default function SlitherGame() {
 
     const { user, token: authToken, refreshUser, applyOptimisticBalanceDelta } = useAuth();
     const balanceCurrency = getStoredBalanceCurrency();
-    const gameSolPrice = Number(user?.solPrice) || 0;
+    const [serverSolPrice, setServerSolPrice] = useState(0);
+    const gameSolPrice = serverSolPrice || Number(user?.solPrice) || 0;
 
     const pendingAtMount = loadPendingResult('slither');
     const blockAutoJoinRef = useRef(!!pendingAtMount);
@@ -573,6 +574,7 @@ export default function SlitherGame() {
 
 
         socket.on('welcome', (playerSettings, gameSizes) => {
+            if (Number(gameSizes?.solPrice) > 0) setServerSolPrice(Number(gameSizes.solPrice));
             playAgainPendingRef.current = false;
             blockAutoJoinRef.current = false;
             worldUpdatesEnabledRef.current = true;

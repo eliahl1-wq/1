@@ -93,7 +93,8 @@ export default function Game() {
     const viewportRef = useRef(null);
     const { user, token, refreshUser, applyOptimisticBalanceDelta } = useAuth();
     const balanceCurrency = getStoredBalanceCurrency();
-    const gameSolPrice = Number(user?.solPrice) || 0;
+    const [serverSolPrice, setServerSolPrice] = useState(0);
+    const gameSolPrice = serverSolPrice || Number(user?.solPrice) || 0;
     global.balanceCurrency = balanceCurrency;
     global.solPrice = gameSolPrice;
 
@@ -501,6 +502,7 @@ export default function Game() {
         });
 
         socket.on('welcome', (playerSettings, gameSizes) => {
+            if (Number(gameSizes?.solPrice) > 0) setServerSolPrice(Number(gameSizes.solPrice));
             gameReadyRef.current = true;
             setGameReady(true);
             setJoinError('');
