@@ -24,12 +24,14 @@ function reset(next) {
         loot: [], obstacles: [], spawnPoints: [], landmarks: [], spectators: [],
         _nextSurvivBotSyncAt: Infinity, _nextSurvivAirdropAt: Infinity };
     blastX = 0; blastY = 0;
-    if (scene === 'glasshouse') {
+    if (scene === 'glasshouse' || scene === 'casino' || scene === 'intersection') {
         const map = generateSurvivMap(10000);
         Object.assign(room, map);
-        const landmark = map.landmarks.find(item => item.type === 'glasshouse');
-        blastX = landmark?.x ?? -3500;
-        blastY = landmark?.y ?? 900;
+        const landmark = map.landmarks.find(item => item.type === (
+            scene === 'casino' ? 'casino' : 'glasshouse-gardens'
+        ));
+        blastX = scene === 'intersection' ? 2500 : (landmark?.x ?? -3500);
+        blastY = scene === 'intersection' ? 2000 : (landmark?.y ?? 900);
     } else {
         room.obstacles = [
             prop('pad', 'field', 0, 0, 540, 330, { collidable: false, variant: 'gravel' }),
@@ -69,6 +71,8 @@ function tick() {
 document.querySelector('#yard').onclick = () => reset('yard');
 document.querySelector('#drop').onclick = () => reset('drop');
 document.querySelector('#glasshouse').onclick = () => reset('glasshouse');
+document.querySelector('#casino').onclick = () => reset('casino');
+document.querySelector('#intersection').onclick = () => reset('intersection');
 document.querySelector('#blast').onclick = () => {
     room.bullets.push({ id: `test-${Date.now()}`, ownerId: me.id, x: blastX, y: blastY,
         vx: 0, vy: 0, damage: 140, isGrenade: true, detonateAt: 0, bornAt: Date.now() });

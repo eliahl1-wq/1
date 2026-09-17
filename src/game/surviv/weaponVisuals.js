@@ -72,6 +72,10 @@ function normalizeWeaponId(id) {
 
 export function getSurvivWeaponVisualProfile(id) {
     const weaponId = String(id || 'fists').toLowerCase();
+    if (weaponId === 'knife') {
+        return Object.freeze({ id: weaponId, style: 'knife', dual: false, muzzleScale: 0,
+            metal: '#aebdc4', dark: '#192326', furniture: '#39483e', accent: '#edf2ed' });
+    }
     if (weaponId === 'fists' || weaponId === 'knife') {
         return Object.freeze({ id: weaponId, style: weaponId, dual: false, muzzleScale: 0 });
     }
@@ -239,9 +243,21 @@ function buildFirearmSideArt(profile) {
 
     if (profile.style === 'fists') return { parts, cuts };
     if (profile.style === 'knife') {
-        add(polygonPath([[6, 18], [39, 18], [92, 7], [96, 11], [41, 27], [6, 27]]), 'metal');
-        add(rectPath(5, 15, 37, 16), 'furniture');
-        add(rectPath(39, 13, 4, 20), 'dark');
+        // Original drop-point combat knife: full tang, shaped grip, steel
+        // guard, flat blade face and a continuous sharpened bevel.
+        add('M4 16L10 14H33L39 17V28L33 31H10L4 28Z', 'dark');
+        add('M8 18L13 16H31L35 18V27L30 29H13L8 27Z', 'furniture');
+        add('M4 16H9V29H4Z', 'metal');
+        for (const x of [14, 20, 26]) line(`M${x} 18L${x + 2} 27`, 'dark', 1.5);
+        add(ellipsePath(11, 22.5, 1.7, 1.7), 'metal');
+        add(ellipsePath(31, 22.5, 1.7, 1.7), 'metal');
+        add('M37 11L42 12L43 17H72Q83 17 97 22L80 30Q75 32 65 32H43L41 35H36L37 27Z', 'dark');
+        add('M43 18H72Q84 18 95 22L79 29Q73 31 65 31H43Z', 'metal');
+        add('M46 26H74L95 22L79 29Q73 31 65 31H46Z', 'accent');
+        add('M72 18Q84 19 95 22L77 22Z', 'accent');
+        line('M48 21H72', 'dark', 1.5);
+        line('M45 18V29', 'furniture', 1.2);
+        add('M38 12H40L41 18V28L39 34H37L38 27Z', 'metal');
         return { parts, cuts };
     }
 
