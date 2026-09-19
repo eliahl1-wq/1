@@ -591,6 +591,47 @@ function playMechanismClick(ctx, destination, at, options = {}) {
     source.stop(at + duration + 0.009);
 }
 
+/**
+ * A tiny prize-wheel style click for the cashout count-up. It intentionally
+ * stays dry and quiet so repeated ticks add motion without becoming a melody
+ * or competing with the result modal.
+ */
+export function playCashoutCountTick(progress = 0, finalTick = false) {
+    const ctx = getCtx();
+    if (!ctx || !unlocked || ctx.state !== 'running') return false;
+
+    const normalized = Math.max(0, Math.min(1, Number(progress) || 0));
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = finalTick ? 0.36 : 0.25;
+    bus.connect(getFoodPickupMaster(ctx));
+
+    playMechanismClick(ctx, bus, t, {
+        frequency: 1650 + normalized * 850 + (Math.random() - 0.5) * 90,
+        q: 1.05,
+        level: finalTick ? 0.105 : 0.075,
+        duration: finalTick ? 0.026 : 0.018,
+        variation: Math.floor(Math.random() * 16),
+    });
+
+    const tone = ctx.createOscillator();
+    const toneGain = ctx.createGain();
+    tone.type = 'triangle';
+    tone.frequency.value = 470 + normalized * 230;
+    toneGain.gain.setValueAtTime(finalTick ? 0.052 : 0.035, t);
+    toneGain.gain.exponentialRampToValueAtTime(0.0001, t + (finalTick ? 0.038 : 0.024));
+    tone.connect(toneGain);
+    toneGain.connect(bus);
+    tone.start(t);
+    tone.stop(t + (finalTick ? 0.042 : 0.028));
+    tone.onended = () => {
+        tone.disconnect();
+        toneGain.disconnect();
+        bus.disconnect();
+    };
+    return true;
+}
+
 /** Dry, non-tonal empty-magazine click. */
 export function playSurvivDryFireSound() {
     const ctx = getCtx();

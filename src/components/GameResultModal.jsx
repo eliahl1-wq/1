@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { formatGameSolAmount, formatWalletBalanceAmount, getStoredBalanceCurrency } from '../utils/displayCurrency.js';
+import { playCashoutCountTick } from '../audio/synthSounds.js';
 
 function SolLogo({ size = 12 }) {
     return <img className="game-result-sol-logo" src="/solana-sol-logo.png" alt="Solana" style={{ width: size, height: size }} />;
@@ -123,10 +124,42 @@ export default function GameResultModal({
 }) {
     const isWin = type === 'cashout';
     const showSol = getStoredBalanceCurrency() === 'SOL' && Number(solPrice) > 0;
-    // A financial result must show its final value immediately. The old
-    // count-up animation visibly passed through values such as "$2" on its
-    // way to a $6.96 payout and made correct cashouts look underpaid on video.
-    const displayAmount = isWin ? Math.max(0, Number(amount) || 0) : 0;
+    const [displayAmount, setDisplayAmount] = useState(0);
+
+    useEffect(() => {
+        if (!isWin || amount == null) {
+            setDisplayAmount(0);
+            return undefined;
+        }
+
+        const target = Math.max(0, Number(amount) || 0);
+        const start = performance.now();
+        const duration = 900;
+        let frameId;
+        let nextTickAt = 0;
+        let playedFinalTick = false;
+
+        const tick = now => {
+            const elapsed = now - start;
+            const progress = Math.min(1, elapsed / duration);
+            const easedProgress = 1 - Math.pow(1 - progress, 4);
+            setDisplayAmount(progress >= 1 ? target : easedProgress * target);
+            if (target > 0 && elapsed >= nextTickAt && progress < 1) {
+                playCashoutCountTick(progress);
+                // Fast at first, then settles like a prize wheel near the end.
+                nextTickAt = elapsed + 34 + progress * 42;
+            }
+            if (progress < 1) {
+                frameId = requestAnimationFrame(tick);
+            } else if (target > 0 && !playedFinalTick) {
+                playedFinalTick = true;
+                playCashoutCountTick(1, true);
+            }
+        };
+
+        frameId = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frameId);
+    }, [isWin, amount]);
 
     const amountSol = solPrice > 0 ? displayAmount / solPrice : 0;
     const formattedAmountSol = showSol
