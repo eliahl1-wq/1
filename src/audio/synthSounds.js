@@ -592,9 +592,9 @@ function playMechanismClick(ctx, destination, at, options = {}) {
 }
 
 /**
- * A tiny prize-wheel style click for the cashout count-up. It intentionally
- * stays dry and quiet so repeated ticks add motion without becoming a melody
- * or competing with the result modal.
+ * A tiny cash-counter/coin tick for the cashout count-up. A bright contact
+ * transient and two short sine partials keep it crisp and metallic without
+ * the hollow plastic body of a low triangle oscillator.
  */
 export function playCashoutCountTick(progress = 0, finalTick = false) {
     const ctx = getCtx();
@@ -603,30 +603,46 @@ export function playCashoutCountTick(progress = 0, finalTick = false) {
     const normalized = Math.max(0, Math.min(1, Number(progress) || 0));
     const t = ctx.currentTime;
     const bus = ctx.createGain();
-    bus.gain.value = finalTick ? 0.36 : 0.25;
+    bus.gain.value = finalTick ? 0.34 : 0.27;
     bus.connect(getFoodPickupMaster(ctx));
 
     playMechanismClick(ctx, bus, t, {
-        frequency: 1650 + normalized * 850 + (Math.random() - 0.5) * 90,
-        q: 1.05,
-        level: finalTick ? 0.105 : 0.075,
-        duration: finalTick ? 0.026 : 0.018,
+        frequency: 3050 + normalized * 650 + (Math.random() - 0.5) * 120,
+        q: 1.7,
+        level: finalTick ? 0.09 : 0.064,
+        duration: finalTick ? 0.022 : 0.013,
         variation: Math.floor(Math.random() * 16),
     });
 
-    const tone = ctx.createOscillator();
-    const toneGain = ctx.createGain();
-    tone.type = 'triangle';
-    tone.frequency.value = 470 + normalized * 230;
-    toneGain.gain.setValueAtTime(finalTick ? 0.052 : 0.035, t);
-    toneGain.gain.exponentialRampToValueAtTime(0.0001, t + (finalTick ? 0.038 : 0.024));
-    tone.connect(toneGain);
-    toneGain.connect(bus);
-    tone.start(t);
-    tone.stop(t + (finalTick ? 0.042 : 0.028));
-    tone.onended = () => {
-        tone.disconnect();
-        toneGain.disconnect();
+    const duration = finalTick ? 0.052 : 0.029;
+    const fundamental = ctx.createOscillator();
+    const fundamentalGain = ctx.createGain();
+    fundamental.type = 'sine';
+    fundamental.frequency.setValueAtTime(1120 + normalized * 250, t);
+    fundamental.frequency.exponentialRampToValueAtTime(1320 + normalized * 280, t + duration * 0.72);
+    fundamentalGain.gain.setValueAtTime(finalTick ? 0.048 : 0.031, t);
+    fundamentalGain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    fundamental.connect(fundamentalGain);
+    fundamentalGain.connect(bus);
+
+    const shimmer = ctx.createOscillator();
+    const shimmerGain = ctx.createGain();
+    shimmer.type = 'sine';
+    shimmer.frequency.value = 2320 + normalized * 420 + (Math.random() - 0.5) * 45;
+    shimmerGain.gain.setValueAtTime(finalTick ? 0.024 : 0.014, t);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.7);
+    shimmer.connect(shimmerGain);
+    shimmerGain.connect(bus);
+
+    fundamental.start(t);
+    shimmer.start(t);
+    fundamental.stop(t + duration + 0.004);
+    shimmer.stop(t + duration + 0.004);
+    fundamental.onended = () => {
+        fundamental.disconnect();
+        fundamentalGain.disconnect();
+        shimmer.disconnect();
+        shimmerGain.disconnect();
         bus.disconnect();
     };
     return true;
