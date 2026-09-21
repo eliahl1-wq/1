@@ -20,6 +20,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [withdrawAll, setWithdrawAll] = useState(false);
     const [newCoinConfirmation, setNewCoinConfirmation] = useState('');
+    const [creatorFees, setCreatorFees] = useState(null);
 
     const load = async () => {
         const value = await fetchAdmin('/api/admin/token-launch');
@@ -33,8 +34,15 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
         setPosition(value.position);
         setOwnerRevenueAddress(value.ownerRevenueAddress || '');
     };
+    const loadCreatorFees = async () => {
+        const value = await fetchAdmin('/api/admin/token-launch/creator-fees');
+        setCreatorFees(value);
+        setOwnerRevenueAddress(value.destination || '');
+    };
     useEffect(() => {
-        if (launch?.status === 'launched' && launch?.launchWalletAddress) loadPosition().catch(error => setNotice(error.message));
+        if (launch?.status === 'launched' && launch?.launchWalletAddress) {
+            Promise.all([loadPosition(), loadCreatorFees()]).catch(error => setNotice(error.message));
+        }
     }, [launch?.status, launch?.launchWalletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const run = async (kind, path, body) => {
@@ -90,6 +98,22 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
             setWithdrawAmount('');
             setWithdrawAll(false);
             setNotice(`Withdrew ${Number(result.sentSol).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL to ${result.destination}.`);
+        } catch (error) { setNotice(error.message); } finally { setBusy(''); }
+    };
+
+    const claimCreatorFees = async () => {
+        const claimableSol = Number(creatorFees?.claimableSol || 0);
+        if (claimableSol <= 0) return setNotice('There are no Pump creator fees available to claim.');
+        if (!window.confirm(`Claim ${claimableSol.toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL in Pump creator fees and send it to ${creatorFees.destination}? This is an on-chain transaction and cannot be reversed.`)) return;
+        setBusy('creator-fees'); setNotice('');
+        try {
+            const result = await fetchAdmin('/api/admin/token-launch/claim-creator-fees', {
+                method: 'POST',
+                body: JSON.stringify({ confirmation: `CLAIM FEES ${launch.launchWalletAddress}` }),
+            });
+            setLaunch(result.launch);
+            setNotice(`Claimed ${Number(result.claimedSol).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL to ${result.destination}.`);
+            await Promise.all([loadPosition(), loadCreatorFees()]);
         } catch (error) { setNotice(error.message); } finally { setBusy(''); }
     };
 
@@ -163,6 +187,22 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
             {launched && <section className="admin-panel" style={{ padding: 22, display: 'grid', gap: 18 }}>
                 <div><h2 className="admin-section-title">Launched</h2><code style={{ overflowWrap: 'anywhere' }}>{launch.mintAddress}</code><div style={{ marginTop: 10 }}><a href={`https://solscan.io/tx/${launch.signature}`} target="_blank" rel="noreferrer">View launch transaction</a></div></div>
                 {launch.launchWalletAddress ? <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, display: 'grid', gap: 14 }}>
+                    <div style={{ display: 'grid', gap: 12, paddingBottom: 18, borderBottom: '1px solid var(--border)' }}>
+                        <div>
+                            <p className="shop-kicker"><span /> PUMP CREATOR FEES</p>
+                            <h2 className="admin-section-title">Claim creator fees</h2>
+                            <p style={{ color: 'var(--text-3)', margin: 0 }}>Claims the available Pump.fun creator fees and forwards exactly that amount to the configured owner revenue wallet. Existing SOL in the launch wallet is not included.</p>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+                            <div className="admin-panel" style={{ padding: 14 }}><span className="admin-filter-label">Available</span><strong style={{ display: 'block', fontSize: 22, marginTop: 6 }}>{creatorFees ? `${Number(creatorFees.claimableSol).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL` : '—'}</strong></div>
+                            <div className="admin-panel" style={{ padding: 14 }}><span className="admin-filter-label">Destination</span><code style={{ display: 'block', marginTop: 8, overflowWrap: 'anywhere' }}>{creatorFees?.destination || ownerRevenueAddress || 'Not configured'}</code></div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+                            <button className="btn btn-primary" disabled={!!busy || !creatorFees || Number(creatorFees.claimableSol) <= 0 || !creatorFees.destination} onClick={claimCreatorFees}>{busy === 'creator-fees' ? 'Claiming…' : 'Claim to owner vault'}</button>
+                            <button className="btn btn-ghost" disabled={!!busy} onClick={() => loadCreatorFees().catch(error => setNotice(error.message))}>Refresh creator fees</button>
+                        </div>
+                        {creatorFees?.lastClaimSignature && <a href={`https://solscan.io/tx/${creatorFees.lastClaimSignature}`} target="_blank" rel="noreferrer">View latest creator-fee claim</a>}
+                    </div>
                     <div>
                         <p className="shop-kicker"><span /> CREATOR POSITION</p>
                         <h2 className="admin-section-title">Sell {launch.symbol} for SOL</h2>
@@ -180,7 +220,7 @@ export default function TokenLaunchAdminPanel({ fetchAdmin }) {
                     <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
                         <button className="btn btn-danger" disabled={!!busy || !position || Number(position.tokenAmount) <= 0 || !sellAmount || Number(sellAmount) <= 0} onClick={() => sell(false)}>{busy === 'sell' ? 'Selling…' : `Sell ${launch.symbol}`}</button>
                         <button className="btn btn-ghost" disabled={!!busy || !position || Number(position.tokenAmount) <= 0} onClick={() => sell(true)}>Sell max</button>
-                        <button className="btn btn-ghost" disabled={!!busy} onClick={() => loadPosition().catch(error => setNotice(error.message))}>Refresh balances</button>
+                        <button className="btn btn-ghost" disabled={!!busy} onClick={() => Promise.all([loadPosition(), loadCreatorFees()]).catch(error => setNotice(error.message))}>Refresh balances</button>
                     </div>
                     {launch.lastSellSignature && <a href={`https://solscan.io/tx/${launch.lastSellSignature}`} target="_blank" rel="noreferrer">View latest sell transaction</a>}
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18, display: 'grid', gap: 12 }}>
