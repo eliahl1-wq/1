@@ -969,6 +969,7 @@ export default function AdminDashboard() {
     const [adminIssuesLoading, setAdminIssuesLoading] = useState(false);
     const [adminIssueStatus, setAdminIssueStatus] = useState('open');
     const [adminIssueCategory, setAdminIssueCategory] = useState('all');
+    const [adminIssuesCompatibilityNotice, setAdminIssuesCompatibilityNotice] = useState('');
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
     const tabRef = useRef(tab);
     const filterUserIdRef = useRef(filterUserId);
@@ -1101,7 +1102,43 @@ export default function AdminDashboard() {
         try {
             const params = new URLSearchParams({ status: adminIssueStatus, limit: '200' });
             if (adminIssueCategory !== 'all') params.set('category', adminIssueCategory);
-            const data = await fetchAdmin(`/api/admin/issues?${params}`);
+            let data;
+            try {
+                data = await fetchAdmin(`/api/admin/issues?${params}`);
+                setAdminIssuesCompatibilityNotice('');
+            } catch (error) {
+                const oldBackendCategoryError = adminIssueCategory !== 'all'
+                    && /invalid issue category/i.test(error.message || '');
+                if (!oldBackendCategoryError) throw error;
+
+                // Rolling deploy compatibility: an updated frontend can be
+                // served briefly while Railway still runs the previous issue
+                // API. Fetch the unfiltered list so the tab remains usable.
+                const fallbackParams = new URLSearchParams({ status: adminIssueStatus, limit: '200' });
+                const fallback = await fetchAdmin(`/api/admin/issues?${fallbackParams}`);
+                let rewardAlertsFallback = [];
+                if (adminIssueCategory === 'rewards') {
+                    const rewards = await fetchAdmin('/api/admin/reward-security-alerts').catch(() => ({ alerts: [] }));
+                    rewardAlertsFallback = (rewards.alerts || [])
+                        .filter(alert => adminIssueStatus !== 'open' || alert.status === 'pending')
+                        .map(alert => ({
+                            ...alert,
+                            accounts: (alert.userIds || []).map(user => ({
+                                userId: String(user?._id || user),
+                                username: user?.username || '',
+                                email: user?.email || '',
+                                rewardsDisabled: !!user?.rewardsDisabled,
+                                signals: null,
+                            })),
+                        }));
+                }
+                data = {
+                    ...fallback,
+                    issues: (fallback.issues || []).filter(issue => issue.category === adminIssueCategory),
+                    rewardAlerts: rewardAlertsFallback,
+                };
+                setAdminIssuesCompatibilityNotice('Railway is still running the previous Issues API. Deploy the latest backend to activate anti-cheat records and linked-account context.');
+            }
             setAdminIssues(data.issues ?? []);
             setRewardAlerts(data.rewardAlerts ?? []);
             setAdminIssueSummary(data.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0, byCategory: {} });
@@ -1922,6 +1959,10 @@ export default function AdminDashboard() {
                                 </button>
                             ))}
                         </div>
+
+                        {adminIssuesCompatibilityNotice && (
+                            <div className="admin-issues__compatibility-notice">{adminIssuesCompatibilityNotice}</div>
+                        )}
 
                         {adminIssuesLoading && adminIssues.length === 0 && rewardAlerts.length === 0 ? (
                             <div className="admin-issues__empty">Loading issues…</div>

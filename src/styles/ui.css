@@ -5775,6 +5775,16 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   font: 750 .52rem var(--mono);
 }
 
+.admin-issues__compatibility-notice {
+  padding: 11px 13px;
+  color: #f4cf79;
+  background: color-mix(in srgb, #d99a20 9%, var(--bg-1));
+  border: 1px solid color-mix(in srgb, #d99a20 32%, var(--border-2));
+  border-radius: var(--r-md);
+  font-size: .72rem;
+  line-height: 1.55;
+}
+
 .admin-issues__list {
   display: grid;
   gap: 9px;
