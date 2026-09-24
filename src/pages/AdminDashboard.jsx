@@ -37,6 +37,17 @@ const TABS = [
     { id: 'token-launch', label: 'Token launch' },
 ];
 
+const ISSUE_CATEGORY_TABS = [
+    { id: 'all', label: 'All' },
+    { id: 'anticheat', label: 'Anti-cheat' },
+    { id: 'rewards', label: 'Reward alerts' },
+    { id: 'cashout', label: 'Cashouts' },
+    { id: 'economy', label: 'Economy' },
+    { id: 'wallet', label: 'Wallets' },
+    { id: 'solana', label: 'Solana' },
+    { id: 'system', label: 'System' },
+];
+
 const USER_SORT_OPTIONS = [
     { value: 'activity_desc', label: 'Active first' },
     { value: 'last_active_desc', label: 'Recently active' },
@@ -954,9 +965,10 @@ export default function AdminDashboard() {
     const [bugReports, setBugReports] = useState([]);
     const [bugReportsLoading, setBugReportsLoading] = useState(false);
     const [adminIssues, setAdminIssues] = useState([]);
-    const [adminIssueSummary, setAdminIssueSummary] = useState({ totalOpen: 0, critical: 0, error: 0, warning: 0 });
+    const [adminIssueSummary, setAdminIssueSummary] = useState({ totalOpen: 0, critical: 0, error: 0, warning: 0, byCategory: {} });
     const [adminIssuesLoading, setAdminIssuesLoading] = useState(false);
     const [adminIssueStatus, setAdminIssueStatus] = useState('open');
+    const [adminIssueCategory, setAdminIssueCategory] = useState('all');
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
     const tabRef = useRef(tab);
     const filterUserIdRef = useRef(filterUserId);
@@ -1087,13 +1099,16 @@ export default function AdminDashboard() {
     const fetchAdminIssues = useCallback(async (silent = false) => {
         if (!silent) setAdminIssuesLoading(true);
         try {
-            const data = await fetchAdmin(`/api/admin/issues?status=${encodeURIComponent(adminIssueStatus)}&limit=200`);
+            const params = new URLSearchParams({ status: adminIssueStatus, limit: '200' });
+            if (adminIssueCategory !== 'all') params.set('category', adminIssueCategory);
+            const data = await fetchAdmin(`/api/admin/issues?${params}`);
             setAdminIssues(data.issues ?? []);
-            setAdminIssueSummary(data.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0 });
+            setRewardAlerts(data.rewardAlerts ?? []);
+            setAdminIssueSummary(data.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0, byCategory: {} });
         } finally {
             if (!silent) setAdminIssuesLoading(false);
         }
-    }, [fetchAdmin, adminIssueStatus]);
+    }, [fetchAdmin, adminIssueStatus, adminIssueCategory]);
 
     const fetchRewardOwnership = useCallback(async () => {
         setRewardOwnershipLoading(true);
@@ -1166,8 +1181,8 @@ export default function AdminDashboard() {
             add(fetchAdmin('/api/pregame/display-settings'), pregameDisplay => {
                 setPregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING, ...(pregameDisplay.playingOffsets || {}) });
             });
-            fetchAdmin('/api/admin/issues?status=open&limit=1')
-                .then(issueData => setAdminIssueSummary(issueData.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0 }))
+            fetchAdmin('/api/admin/issues?status=open&summaryOnly=true')
+                .then(issueData => setAdminIssueSummary(issueData.summary ?? { totalOpen: 0, critical: 0, error: 0, warning: 0, byCategory: {} }))
                 .catch(() => {});
         } else if (currentTab === 'users') {
             jobs.push(fetchUsers(includeExcludedUsers, sort));
@@ -1314,6 +1329,7 @@ export default function AdminDashboard() {
             const data = await fetchAdmin('/api/admin/reward-security-alerts');
             setRewardAlerts(data.alerts ?? []);
             setPendingRewardClaims(data.pendingClaims ?? []);
+            if (tabRef.current === 'issues') await fetchAdminIssues(true);
             setActionMsg(action === 'approve' ? '✅ Alert dismissed. Account access was not changed.' : '✅ Rewards manually disabled; existing balances were preserved.');
         } catch (err) {
             setActionMsg(`❌ ${err.message}`);
@@ -1889,14 +1905,80 @@ export default function AdminDashboard() {
                             <article className="is-warning"><span>Warnings</span><strong>{adminIssueSummary.warning}</strong></article>
                         </div>
 
-                        {adminIssuesLoading && adminIssues.length === 0 ? (
+                        <div className="admin-issues__category-tabs" role="tablist" aria-label="Issue category">
+                            {ISSUE_CATEGORY_TABS.map(category => (
+                                <button
+                                    key={category.id}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={adminIssueCategory === category.id}
+                                    className={adminIssueCategory === category.id ? 'is-active' : ''}
+                                    onClick={() => setAdminIssueCategory(category.id)}
+                                >
+                                    {category.label}
+                                    {adminIssueStatus === 'open' && category.id !== 'all' && Number(adminIssueSummary.byCategory?.[category.id]) > 0
+                                        ? <span>{adminIssueSummary.byCategory[category.id]}</span>
+                                        : null}
+                                </button>
+                            ))}
+                        </div>
+
+                        {adminIssuesLoading && adminIssues.length === 0 && rewardAlerts.length === 0 ? (
                             <div className="admin-issues__empty">Loading issues…</div>
-                        ) : adminIssues.length === 0 ? (
+                        ) : adminIssues.length === 0 && rewardAlerts.length === 0 ? (
                             <div className="admin-issues__empty">{adminIssueStatus === 'open' ? 'No open issues.' : 'No issues have been recorded yet.'}</div>
                         ) : (
                             <div className="admin-issues__list">
+                                {rewardAlerts.map(alert => (
+                                    <article key={`reward-${alert._id}`} className={`admin-issue admin-issue--reward is-warning${alert.status !== 'pending' ? ' is-resolved' : ''}`}>
+                                        <div className="admin-issue__topline">
+                                            <div className="admin-issue__badges">
+                                                <span className="admin-issue__severity is-warning">warning</span>
+                                                <span>rewards</span>
+                                                <code>shared_deposit_wallet</code>
+                                            </div>
+                                            <span>{formatRelativeTime(alert.updatedAt || alert.createdAt)}</span>
+                                        </div>
+                                        <div className="admin-issue__body">
+                                            <div>
+                                                <h3>Accounts share a deposit wallet</h3>
+                                                <p>Informational account-link alert. Nothing is disabled automatically; review the linked accounts below.</p>
+                                                <code className="admin-issue__wallet">{alert.sourceWallet}</code>
+                                            </div>
+                                        </div>
+                                        <div className="admin-issue__accounts">
+                                            {(alert.accounts || []).map(account => (
+                                                <div key={account.userId} className="admin-issue__account">
+                                                    <strong>{account.username || account.email || account.userId}</strong>
+                                                    <div>
+                                                        {account.signals?.reusedIp && <span>Reused IP</span>}
+                                                        {account.signals?.reusedDevice && <span>Same device</span>}
+                                                        {account.signals?.similarName && <span>Similar name</span>}
+                                                        {account.signals?.antiCheatIssueCount > 0 && <span className="is-risk">Anti-cheat {account.signals.antiCheatIssueCount}</span>}
+                                                        {account.signals?.priorIssueCount > 0 && <span>Prior issues {account.signals.priorIssueCount}</span>}
+                                                        {account.rewardsDisabled && <span className="is-risk">Rewards disabled</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="admin-issue__footer">
+                                            <div>
+                                                <span>Status: <strong>{alert.status}</strong></span>
+                                                <span>Accounts: <strong>{(alert.accounts || []).length}</strong></span>
+                                                <span>First: {formatDate(alert.createdAt)}</span>
+                                            </div>
+                                            {alert.status === 'pending' && (
+                                                <div className="admin-issue__reward-actions">
+                                                    <button type="button" className="btn btn-ghost" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'approve')}>Dismiss</button>
+                                                    <button type="button" className="btn btn-danger" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'deny')}>Disable rewards</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </article>
+                                ))}
                                 {adminIssues.map(issue => {
                                     const hasAmounts = issue.expectedUsd != null || issue.actualUsd != null || issue.differenceUsd != null;
+                                    const signals = issue.accountSignals;
                                     return (
                                         <article key={issue._id} className={`admin-issue is-${issue.severity}${issue.status === 'resolved' ? ' is-resolved' : ''}`}>
                                             <div className="admin-issue__topline">
@@ -1911,6 +1993,9 @@ export default function AdminDashboard() {
                                                 <div>
                                                     <h3>{issue.title}</h3>
                                                     <p>{issue.message}</p>
+                                                    {issue.category === 'anticheat' && issue.context?.riskScore != null && (
+                                                        <div className="admin-issue__risk-score">Review score <strong>{issue.context.riskScore}/100</strong> · no automatic action taken</div>
+                                                    )}
                                                 </div>
                                                 {hasAmounts && (
                                                     <div className="admin-issue__amounts">
@@ -1920,6 +2005,21 @@ export default function AdminDashboard() {
                                                     </div>
                                                 )}
                                             </div>
+                                            {signals && (
+                                                <div className="admin-issue__signals">
+                                                    {signals.reusedIp && <span>Reused IP</span>}
+                                                    {signals.reusedDevice && <span>Same device</span>}
+                                                    {signals.similarName && <span>Similar account name</span>}
+                                                    {signals.antiCheatIssueCount > 1 && <span className="is-risk">Anti-cheat history {signals.antiCheatIssueCount}</span>}
+                                                    {signals.priorIssueCount > 1 && <span>Prior issues {signals.priorIssueCount}</span>}
+                                                    {signals.pendingRewardAlertCount > 0 && <span>Reward alert</span>}
+                                                    {signals.linkedAccounts?.map(account => (
+                                                        <span key={account.userId} title={account.reasons.join(', ')}>
+                                                            Linked: {account.username} ({account.reasons.map(reason => reason.replaceAll('_', ' ')).join(', ')})
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <div className="admin-issue__footer">
                                                 <div>
                                                     {issue.username && <span>User: <strong>{issue.username}</strong></span>}
@@ -2404,38 +2504,6 @@ export default function AdminDashboard() {
                             />
                         </details>
 
-                        <Panel
-                            title={`Shared deposit-wallet alerts (${rewardAlerts.filter(alert => alert.status === 'pending').length} pending)`}
-                            sub="Alerts are informational only. They never change reward or affiliate access automatically."
-                        >
-                            {rewardAlerts.filter(alert => alert.status === 'pending').length === 0 ? (
-                                <div style={{ padding: '24px', color: 'var(--text-2)', fontSize: '0.82rem' }}>No pending linked-wallet alerts.</div>
-                            ) : rewardAlerts.filter(alert => alert.status === 'pending').slice(0, 5).map(alert => (
-                                <div key={alert._id} style={{ padding: '18px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: '16px', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <div style={{ minWidth: 0 }}>
-                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '7px' }}>
-                                            <CategoryBadge category={alert.status === 'approved' ? 'deposit' : alert.status === 'denied' ? 'death' : 'withdraw'} />
-                                            <strong style={{ color: 'var(--text-h)', textTransform: 'capitalize' }}>{alert.status}</strong>
-                                        </div>
-                                        <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-2)', wordBreak: 'break-all' }}>{alert.sourceWallet}</div>
-                                        <div style={{ marginTop: '7px', fontSize: '0.78rem', color: 'var(--text-1)' }}>
-                                            {(alert.userIds || []).map(user => user.username || user.email || user._id).join(' · ')}
-                                        </div>
-                                        <div style={{ marginTop: '4px', fontSize: '0.68rem', color: 'var(--text-3)' }}>{formatDate(alert.createdAt)}</div>
-                                    </div>
-                                    {alert.status === 'pending' && (
-                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                            <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'approve')}>
-                                                Dismiss alert
-                                            </button>
-                                            <button type="button" className="btn btn-danger" disabled={actionLoading} onClick={() => resolveRewardAlert(alert, 'deny')}>
-                                                Disable rewards
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </Panel>
                     </div>
                 )}
                 {tab === 'operations' && (
