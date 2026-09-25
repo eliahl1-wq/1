@@ -1,6 +1,7 @@
 // Developer-only, real server simulation + real renderer. No sockets, accounts,
 // entry fees or production calls. Open /surviv-playtest.html with `npm run dev`.
 import { SurvivRenderer } from '../src/game/surviv/SurvivRenderer.js';
+import { createPrimaryFireInput, listenForInputInterruption } from '../src/game/surviv/inputLifecycle.js';
 import { applySurvivFireInput, broadcastSurvivState, createSurvivPlayer,
     equipSurvivWeaponSlot, generateSurvivMap, processSurvivRoom,
     spawnSurvivAirdrop, toggleSurvivDoor, beginSurvivReload } from '../../phantom-game-server/surviv-engine.js';
@@ -24,11 +25,11 @@ function reset(next) {
         loot: [], obstacles: [], spawnPoints: [], landmarks: [], spectators: [],
         _nextSurvivBotSyncAt: Infinity, _nextSurvivAirdropAt: Infinity };
     blastX = 0; blastY = 0;
-    if (scene === 'glasshouse' || scene === 'casino' || scene === 'intersection') {
+    if (scene === 'glasshouse' || scene === 'casino' || scene === 'intersection' || scene === 'ironworks') {
         const map = generateSurvivMap(10000);
         Object.assign(room, map);
         const landmark = map.landmarks.find(item => item.type === (
-            scene === 'casino' ? 'casino' : 'glasshouse-gardens'
+            scene === 'casino' ? 'casino' : scene === 'ironworks' ? 'ironworks' : 'glasshouse-gardens'
         ));
         blastX = scene === 'intersection' ? 2500 : (landmark?.x ?? -3500);
         blastY = scene === 'intersection' ? 2000 : (landmark?.y ?? 900);
@@ -84,11 +85,21 @@ window.addEventListener('keydown', event => {
     if (event.key.toLowerCase() === 'r') beginSurvivReload(me, Date.now());
 });
 window.addEventListener('keyup', event => renderer.handleKeyUp(event));
-canvas.addEventListener('pointermove', event => renderer.handlePointerMove(event.clientX, event.clientY));
-canvas.addEventListener('pointerdown', () => renderer.handlePointerDown());
-window.addEventListener('pointerup', () => renderer.handlePointerUp());
-window.addEventListener('blur', () => renderer.clearInput());
+const fireInput = createPrimaryFireInput({ renderer, canStart: () => !!me && me.hp > 0,
+    send: input => { if (me) applySurvivFireInput(me, input.shooting, input.firePressId); } });
+canvas.addEventListener('pointermove', event => { fireInput.move(event); renderer.handlePointerMove(event.clientX, event.clientY); });
+canvas.addEventListener('pointerdown', event => {
+    if (fireInput.press(event)) canvas.setPointerCapture(event.pointerId);
+});
+window.addEventListener('pointerup', event => fireInput.release(event));
+window.addEventListener('pointercancel', event => fireInput.cancel(event));
+canvas.addEventListener('lostpointercapture', event => fireInput.cancel(event));
+const removeInterruptListeners = listenForInputInterruption(window, document, () => fireInput.neutralize());
 reset('yard');
 renderer.start();
 const interval = setInterval(tick, 25);
-window.addEventListener('pagehide', () => { clearInterval(interval); renderer.destroy(); });
+window.addEventListener('pagehide', () => { clearInterval(interval); removeInterruptListeners(); renderer.destroy(); });
+
+// Read the already-running instance: dynamically importing this Vite HTML entry
+// can create a second module instance under a different URL and reset the canvas.
+window.__survivPlaytest = { renderer, reset, get room() { return room; }, get me() { return me; } };

@@ -39,6 +39,7 @@ import {
     getSurvivWeaponVisualProfile,
 } from './weaponVisuals.js';
 import { stabilizeHouseSelection } from './houseTransition.js';
+import { appendHouseFootprintPath, buildVisibilityRayIndex, castVisibilityRay, getHouseBoundarySegments } from './visibilityGeometry.js';
 
 const WEAPON_LABELS = Object.fromEntries(
     Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.label]),
@@ -1954,6 +1955,7 @@ export class SurvivRenderer {
         this._doorwaysByHouseId = new Map();
         this._interiorFogHouseIds = new Set();
         this._losSegmentsByHouseId = new Map();
+        this._losRayIndexesByHouseId = new Map();
         this._losVerticesByHouseId = new Map();
         this._nearbyLosSegments = [];
         this._renderObstaclesByHouseId = new Map();
@@ -2341,6 +2343,7 @@ export class SurvivRenderer {
         this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
         this._losSegmentsByHouseId.clear();
+        this._losRayIndexesByHouseId.clear();
         this._losVerticesByHouseId.clear();
         this._renderObstaclesByHouseId.clear();
         this._collisionBuckets.clear();
@@ -3701,6 +3704,7 @@ export class SurvivRenderer {
         this._doorwaysByHouseId.clear();
         this._interiorFogHouseIds.clear();
         this._losSegmentsByHouseId.clear();
+        this._losRayIndexesByHouseId.clear();
         this._losVerticesByHouseId.clear();
         this._renderObstaclesByHouseId.clear();
         this._collisionBuckets.clear();
@@ -3835,16 +3839,7 @@ export class SurvivRenderer {
 
             // Build LOS geometry once per static world snapshot. The complete
             // boundary intentionally seals every doorway while a player is in.
-            const minX = house.x - house.w / 2;
-            const maxX = house.x + house.w / 2;
-            const minY = house.y - house.h / 2;
-            const maxY = house.y + house.h / 2;
-            const segments = [
-                { ax: minX, ay: minY, bx: maxX, by: minY },
-                { ax: maxX, ay: minY, bx: maxX, by: maxY },
-                { ax: maxX, ay: maxY, bx: minX, by: maxY },
-                { ax: minX, ay: maxY, bx: minX, by: minY },
-            ];
+            const segments = getHouseBoundarySegments(house);
             const houseObstacles = this._renderObstaclesByHouseId.get(house.id) || [];
             for (const obstacle of houseObstacles) {
                 if (!LOS_BLOCKING_KINDS.has(obstacle.kind)) continue;
@@ -3885,6 +3880,8 @@ export class SurvivRenderer {
                 }
             }
             this._losSegmentsByHouseId.set(house.id, segments);
+            // Tiny rooms cost less to scan directly than to traverse a tree.
+            this._losRayIndexesByHouseId.set(house.id, segments.length > 48 ? buildVisibilityRayIndex(segments) : null);
             this._losVerticesByHouseId.set(house.id, vertices);
         }
         this._obstacleRevision++;
@@ -4096,7 +4093,7 @@ export class SurvivRenderer {
 
         ctx.save();
         ctx.beginPath();
-        ctx.rect(house.x - house.w / 2, house.y - house.h / 2, house.w, house.h);
+        appendHouseFootprintPath(ctx, house);
         ctx.clip();
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -4375,7 +4372,7 @@ export class SurvivRenderer {
      * Rays immediately beside each corner stop the visible edge from jumping
      * between fixed angular samples while the player moves.
      */
-    _buildVisibilityPolygon(px, py, segments, vertices, maxDist) {
+    _buildVisibilityPolygon(px, py, segments, vertices, maxDist, rayIndex = null) {
         const baseRayCount = 96;
         const endpointEpsilon = 0.00003;
         const maxEndpointDistSq = (maxDist + 2) * (maxDist + 2);
@@ -4400,7 +4397,8 @@ export class SurvivRenderer {
             if (angle - previousAngle < 1e-8) continue;
             previousAngle = angle;
             const point = polygon[pointCount] || (polygon[pointCount] = { x: 0, y: 0 });
-            this._castRay(px, py, Math.cos(angle), Math.sin(angle), segments, maxDist, point);
+            if (rayIndex) castVisibilityRay(rayIndex, px, py, Math.cos(angle), Math.sin(angle), maxDist, point);
+            else this._castRay(px, py, Math.cos(angle), Math.sin(angle), segments, maxDist, point);
             pointCount++;
         }
         polygon.length = pointCount;
@@ -4431,9 +4429,10 @@ export class SurvivRenderer {
             || !polygon
             || playerMoved;
         if (needsRebuild) {
-            const segments = this._gatherWallSegments(camX, camY, viewW, viewH, z, currentHouse, px, py, maxDist);
+            const segments = this._losSegmentsByHouseId.get(currentHouse.id) || [];
             const vertices = this._losVerticesByHouseId.get(currentHouse.id) || [];
-            polygon = this._buildVisibilityPolygon(px, py, segments, vertices, maxDist);
+            const rayIndex = this._losRayIndexesByHouseId.get(currentHouse.id);
+            polygon = this._buildVisibilityPolygon(px, py, segments, vertices, maxDist, rayIndex);
             this._losCacheKey = cacheKey;
             this._losCachedPolygon = polygon;
             this._losLastPlayerX = px;
@@ -4480,12 +4479,7 @@ export class SurvivRenderer {
         ctx.fillStyle = 'rgba(7, 10, 15, 0.48)';
         ctx.beginPath();
         ctx.rect(camX - ext, camY - ext, ext * 2, ext * 2);
-        ctx.rect(
-            currentHouse.x - currentHouse.w / 2 + inset,
-            currentHouse.y - currentHouse.h / 2 + inset,
-            currentHouse.w - inset * 2,
-            currentHouse.h - inset * 2,
-        );
+        appendHouseFootprintPath(ctx, currentHouse, inset);
         ctx.fill('evenodd');
         ctx.restore();
     }

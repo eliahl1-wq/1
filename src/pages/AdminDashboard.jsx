@@ -356,6 +356,84 @@ function DataTable({ columns, rows, loading, emptyMessage }) {
     );
 }
 
+function AntiCheatEvidence({ replay }) {
+    const frames = Array.isArray(replay?.frames) ? replay.frames : [];
+    const [frameIndex, setFrameIndex] = useState(0);
+    const [playing, setPlaying] = useState(false);
+
+    useEffect(() => {
+        setFrameIndex(0);
+        setPlaying(false);
+    }, [replay]);
+
+    useEffect(() => {
+        if (!playing || frames.length < 2) return undefined;
+        const timer = setInterval(() => {
+            setFrameIndex(index => (index + 1) % frames.length);
+        }, 140);
+        return () => clearInterval(timer);
+    }, [playing, frames.length]);
+
+    if (!frames.length) return null;
+    const safeIndex = Math.min(frameIndex, frames.length - 1);
+    const frame = frames[safeIndex] || {};
+    const visibleRange = Math.max(300, Number(replay.visibleRange) || 1200);
+    const scale = 82 / visibleRange;
+    const clamp = (value, limit) => Math.max(-limit, Math.min(limit, value));
+    const aimX = Math.cos(Number(frame.aim) || 0) * 88;
+    const aimY = Math.sin(Number(frame.aim) || 0) * 88;
+
+    return (
+        <div className="admin-anticheat-replay">
+            <div className="admin-anticheat-replay__header">
+                <div>
+                    <strong>Server evidence playback</strong>
+                    <span>Recent server-observed aim and nearby targets—not a client video.</span>
+                </div>
+                <div>
+                    <button type="button" onClick={() => setFrameIndex(index => Math.max(0, index - 1))} aria-label="Previous evidence frame">‹</button>
+                    <button type="button" className="is-play" onClick={() => setPlaying(value => !value)}>{playing ? 'Pause' : 'Play'}</button>
+                    <button type="button" onClick={() => setFrameIndex(index => Math.min(frames.length - 1, index + 1))} aria-label="Next evidence frame">›</button>
+                </div>
+            </div>
+            <svg viewBox="-170 -96 340 192" role="img" aria-label="Reconstruction of player aim and nearby targets">
+                <rect x="-170" y="-96" width="340" height="192" rx="10" className="admin-anticheat-replay__field" />
+                <circle cx="0" cy="0" r="82" className="admin-anticheat-replay__range" />
+                <line x1="0" y1="0" x2={aimX} y2={aimY} className={`admin-anticheat-replay__aim${frame.shooting ? ' is-firing' : ''}`} />
+                {(frame.targets || []).map(target => {
+                    const x = clamp((Number(target.dx) || 0) * scale, 156);
+                    const y = clamp((Number(target.dy) || 0) * scale, 82);
+                    const locked = target.id === frame.closestTargetId;
+                    return (
+                        <g key={target.id} transform={`translate(${x} ${y})`}>
+                            <circle r={locked ? 6 : 4} className={`admin-anticheat-replay__target${locked ? ' is-locked' : ''}${target.offscreen ? ' is-offscreen' : ''}`} />
+                            <text x="8" y="3">{target.bot ? 'BOT' : 'P'}</text>
+                        </g>
+                    );
+                })}
+                <circle cx="0" cy="0" r="7" className="admin-anticheat-replay__player" />
+            </svg>
+            <input
+                type="range"
+                min="0"
+                max={Math.max(0, frames.length - 1)}
+                value={safeIndex}
+                onChange={event => {
+                    setPlaying(false);
+                    setFrameIndex(Number(event.target.value));
+                }}
+                aria-label="Evidence playback position"
+            />
+            <div className="admin-anticheat-replay__meta">
+                <span>{((Number(frame.t) || 0) / 1000).toFixed(1)}s</span>
+                <span>{frame.weapon || 'unknown weapon'}</span>
+                <span>{frame.shooting ? 'Firing' : 'Not firing'}</span>
+                {frame.centerRatio != null && <span>Aim error {Number(frame.centerRatio).toFixed(3)}× target radius</span>}
+            </div>
+        </div>
+    );
+}
+
 function Panel({ title, sub, children }) {
     return (
         <section className="admin-panel">
@@ -2037,6 +2115,16 @@ export default function AdminDashboard() {
                                                     {issue.category === 'anticheat' && issue.context?.riskScore != null && (
                                                         <div className="admin-issue__risk-score">Review score <strong>{issue.context.riskScore}/100</strong> · no automatic action taken</div>
                                                     )}
+                                                    {issue.category === 'anticheat' && (
+                                                        <div className="admin-issue__anticheat-facts">
+                                                            {issue.context?.signal && <span>Signal: <strong>{String(issue.context.signal).replaceAll('_', ' ')}</strong></span>}
+                                                            {issue.context?.shotSamples != null && <span>Shots sampled: <strong>{issue.context.shotSamples}</strong></span>}
+                                                            {issue.context?.rapidSnaps != null && <span>Rapid snaps: <strong>{issue.context.rapidSnaps}</strong></span>}
+                                                            {issue.context?.perfectTrackingSamples != null && <span>Perfect tracking: <strong>{issue.context.perfectTrackingSamples}/{issue.context.trackingSamples}</strong></span>}
+                                                            {issue.context?.peakPerSecond != null && <span>Peak inputs/s: <strong>{issue.context.peakPerSecond}</strong></span>}
+                                                            {issue.context?.invalidInputsInWindow != null && <span>Invalid inputs: <strong>{issue.context.invalidInputsInWindow}</strong></span>}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 {hasAmounts && (
                                                     <div className="admin-issue__amounts">
@@ -2060,6 +2148,9 @@ export default function AdminDashboard() {
                                                         </span>
                                                     ))}
                                                 </div>
+                                            )}
+                                            {issue.category === 'anticheat' && issue.context?.evidenceReplay && (
+                                                <AntiCheatEvidence replay={issue.context.evidenceReplay} />
                                             )}
                                             <div className="admin-issue__footer">
                                                 <div>

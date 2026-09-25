@@ -28,6 +28,7 @@ import { nextWeaponSlot } from '../../utils/gameWheel.js';
 import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 import { getSurvivWeaponFamily, getSurvivWeaponRarity, SURVIV_AMMO_CATALOG, SURVIV_WEAPON_CATALOG } from './weaponCatalog.js';
 import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
+import { createPrimaryFireInput, listenForInputInterruption } from './inputLifecycle.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -773,12 +774,24 @@ export default function SurvivGame() {
             }
             renderer.handleKeyUp(e);
         };
+        const fireInput = createPrimaryFireInput({
+            renderer,
+            canStart: () => !blockInputRef.current && !cashoutActiveRef.current && !mapOpenRef.current,
+            send: (payload) => {
+                if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
+                    // Releases must survive transport backpressure, especially
+                    // when hidden tabs stop the periodic input refresh below.
+                    socket.emit('survivInput', payload);
+                }
+            },
+        });
         const onPointerMove = (e) => {
+            fireInput.move(e);
             if (cashoutActiveRef.current || mapOpenRef.current || (IS_MOBILE && e.pointerType !== 'mouse')) return;
             renderer.handlePointerMove(e.clientX, e.clientY);
         };
         const onPointerDown = (e) => {
-            if (cashoutActiveRef.current || mapOpenRef.current) return;
+            if (blockInputRef.current || cashoutActiveRef.current || mapOpenRef.current) return;
             if (IS_MOBILE && e.pointerType !== 'mouse') {
                 const interaction = renderer.getTappedInteraction(e.clientX, e.clientY);
                 if (interaction?.kind === 'door' && interaction.target?.id) {
@@ -790,24 +803,11 @@ export default function SurvivGame() {
                 }
                 return;
             }
-            if (e.button !== 0) return;
-            renderer.handlePointerMove(e.clientX, e.clientY);
-            renderer.handlePointerDown();
-            if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
-                const payload = renderer.getInputPayload();
-                payload.shooting = true;
-                socket.emit('survivInput', payload);
-            }
+            if (!fireInput.press(e)) return;
+            try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* Pointer already ended. */ }
         };
-        const onPointerUp = () => {
-            if (cashoutActiveRef.current) return;
-            renderer.handlePointerUp();
-            if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
-                const payload = renderer.getInputPayload();
-                payload.shooting = false;
-                socket.emit('survivInput', payload);
-            }
-        };
+        const onPointerUp = (e) => fireInput.release(e);
+        const onPointerCancel = (e) => fireInput.cancel(e);
         let lastWeaponWheelAt = 0;
         let wheelWeaponSlot = null;
         const onWheel = (e) => {
@@ -827,15 +827,8 @@ export default function SurvivGame() {
             equipSlotPendingRef.current = wheelWeaponSlot;
         };
         const neutralizeInput = () => {
-            renderer.clearInput();
             clearPendingActions();
-            if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
-                const neutral = renderer.getInputPayload();
-                neutral.dx = 0;
-                neutral.dy = 0;
-                neutral.shooting = false;
-                socket.volatile.emit('survivInput', neutral);
-            }
+            fireInput.neutralize();
         };
         const onWindowBlur = () => {
             mapHeldRef.current = false;
@@ -845,19 +838,16 @@ export default function SurvivGame() {
         const onFocusIn = (event) => {
             if (isTextEntryTarget(event.target)) neutralizeInput();
         };
-        const onVisibilityChange = () => {
-            if (document.hidden) neutralizeInput();
-        };
-
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
         canvasRef.current.addEventListener('pointermove', onPointerMove);
         canvasRef.current.addEventListener('pointerdown', onPointerDown);
         canvasRef.current.addEventListener('wheel', onWheel, { passive: false });
+        canvasRef.current.addEventListener('lostpointercapture', onPointerCancel);
         window.addEventListener('pointerup', onPointerUp);
-        window.addEventListener('blur', onWindowBlur);
+        window.addEventListener('pointercancel', onPointerCancel);
+        const removeInputInterruptionListeners = listenForInputInterruption(window, document, onWindowBlur);
         document.addEventListener('focusin', onFocusIn);
-        document.addEventListener('visibilitychange', onVisibilityChange);
 
         socket.on('connect', () => {
             const rejoining = hasJoinedRef.current;
@@ -1370,12 +1360,13 @@ export default function SurvivGame() {
             window.removeEventListener('keydown', onKeyDown);
             window.removeEventListener('keyup', onKeyUp);
             window.removeEventListener('pointerup', onPointerUp);
-            window.removeEventListener('blur', onWindowBlur);
+            window.removeEventListener('pointercancel', onPointerCancel);
+            removeInputInterruptionListeners();
             document.removeEventListener('focusin', onFocusIn);
-            document.removeEventListener('visibilitychange', onVisibilityChange);
             canvasRef.current?.removeEventListener('pointermove', onPointerMove);
             canvasRef.current?.removeEventListener('pointerdown', onPointerDown);
             canvasRef.current?.removeEventListener('wheel', onWheel);
+            canvasRef.current?.removeEventListener('lostpointercapture', onPointerCancel);
             renderer.destroy();
             socket.off();
             socket.disconnect();

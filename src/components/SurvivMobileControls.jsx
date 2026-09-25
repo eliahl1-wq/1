@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { isTouchDevice } from '../utils/mobile';
+import { listenForInputInterruption } from '../game/surviv/inputLifecycle.js';
 
 const IS_MOBILE = isTouchDevice();
 
@@ -69,16 +70,27 @@ function VirtualJoystick({ label, variant, onChange }) {
         onChange?.(next.x, next.y, next.magnitude);
     }, [onChange, updateVisual]);
 
-    const release = useCallback((event) => {
-        if (pointerIdRef.current !== event.pointerId) return;
-        stopPointer(event);
+    const reset = useCallback(() => {
+        if (pointerIdRef.current == null) return;
         pointerIdRef.current = null;
         geometryRef.current = null;
         updateVisual(0, 0, false);
         onChange?.(0, 0, 0);
     }, [onChange, updateVisual]);
 
-    useEffect(() => () => onChange?.(0, 0, 0), [onChange]);
+    const release = useCallback((event) => {
+        if (pointerIdRef.current !== event.pointerId) return;
+        stopPointer(event);
+        reset();
+    }, [reset]);
+
+    useEffect(() => {
+        const removeListeners = listenForInputInterruption(window, document, reset);
+        return () => {
+            removeListeners();
+            reset();
+        };
+    }, [reset]);
 
     return (
         <div
