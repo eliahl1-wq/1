@@ -55,8 +55,32 @@
 .affiliate-notice { border: 1px solid rgba(55,230,160,.25); background: rgba(55,230,160,.07); color: var(--text-h); border-radius: 12px; padding: 12px 15px; margin-bottom: 14px; }
 .affiliate-loading { padding: 70px 20px; text-align: center; color: var(--text-2); }
 .affiliate-admin-stack { display: flex; flex-direction: column; gap: 18px; }
+.affiliate-payout-queue { display: grid; gap: 10px; padding: 10px 14px 16px; }
+.affiliate-payout-request {
+    display: grid;
+    grid-template-columns: minmax(180px, .8fr) minmax(260px, 1.35fr) auto;
+    align-items: center;
+    gap: 18px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255,255,255,.018);
+}
+.affiliate-payout-request.is-actionable { border-color: rgba(124,58,255,.38); background: rgba(124,58,255,.055); }
+.affiliate-payout-request__main { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.affiliate-payout-request__main strong { display: block; margin: 4px 0; color: var(--text-h); font: 850 1.2rem var(--mono); }
+.affiliate-payout-request__main small { display: block; color: var(--text-3); font-size: .7rem; }
+.affiliate-payout-request__user { color: var(--text-2); font-size: .76rem; font-weight: 750; }
+.affiliate-payout-request__wallet { min-width: 0; }
+.affiliate-payout-request__wallet span { display: block; margin-bottom: 5px; color: var(--text-3); font-size: .65rem; font-weight: 750; text-transform: uppercase; }
+.affiliate-payout-request__wallet code { display: block; overflow: hidden; color: var(--text-2); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.affiliate-payout-request__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.affiliate-payout-request__actions .btn { white-space: nowrap; }
 @media (max-width: 980px) {
     .affiliate-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .affiliate-payout-request { grid-template-columns: 1fr auto; }
+    .affiliate-payout-request__wallet { grid-column: 1 / -1; grid-row: 2; }
+    .affiliate-payout-request__actions { grid-column: 2; grid-row: 1; }
 }
 @media (max-width: 720px) {
     .affiliate-explainer-grid, .affiliate-stat-grid { grid-template-columns: 1fr; }
@@ -65,6 +89,11 @@
     .affiliate-math-flow i { display: none; }
     .affiliate-terms ul { columns: 1; }
     .affiliate-hero { padding-top: 46px; }
+    .affiliate-payout-request { grid-template-columns: 1fr; }
+    .affiliate-payout-request__wallet,
+    .affiliate-payout-request__actions { grid-column: 1; grid-row: auto; }
+    .affiliate-payout-request__actions { justify-content: stretch; }
+    .affiliate-payout-request__actions .btn { flex: 1; }
 }
 
 /* Rewards-page integration: use the same surfaces and hierarchy as the rest of Rewards. */

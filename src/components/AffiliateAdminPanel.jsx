@@ -68,6 +68,11 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
     const activePayoutByProfile = new Map(data.payouts
         .filter(payout => ['requested', 'processing'].includes(payout.status))
         .map(payout => [String(payout.affiliateProfileId), payout]));
+    const orderedPayouts = [...data.payouts].sort((a, b) => {
+        const active = status => ['requested', 'processing'].includes(status) ? 1 : 0;
+        return active(b.status) - active(a.status)
+            || new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime();
+    });
 
     return (
         <div className="affiliate-admin-stack">
@@ -85,9 +90,9 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
             <section className="affiliate-table-panel">
                 <div className="affiliate-section-heading">
                     <div>
-                        <span className="affiliate-kicker">House wallet liability</span>
+                        <span className="affiliate-kicker">Affiliate liability</span>
                         <h2>Affiliate rewards owed</h2>
-                        <small>Affiliate commission stays reserved in the house wallet, not the main reward wallet. Pending amounts are in the 7-day hold; available amounts can be requested for payout.</small>
+                        <small>Pending amounts are in the 7-day hold. Approved payouts are sent from the Reward Wallet to the affiliate's saved address.</small>
                     </div>
                     <strong className="affiliate-liability-total">{usd(data.totals?.outstandingCommissionUsd)}</strong>
                 </div>
@@ -163,26 +168,58 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
             </section>
 
             <section className="affiliate-table-panel">
-                <div className="affiliate-section-heading"><div><span className="affiliate-kicker">Review queue</span><h2>Payout requests</h2></div></div>
-                <div className="affiliate-table-scroll">
-                    <table className="affiliate-table">
-                        <thead><tr><th>Requested</th><th>Amount</th><th>Wallet</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody>{data.payouts.length === 0 ? <tr><td colSpan="5" className="affiliate-empty">No payout requests.</td></tr> : data.payouts.map(row => (
-                            <tr key={row.id}>
-                                <td>{when(row.requestedAt)}</td><td>{usd(row.amountUsd)}</td><td className="mono">{row.destinationWallet}</td><td>{row.status}</td>
-                                <td>
-                                    {['requested', 'processing'].includes(row.status) && <>
-                                        <button className="btn btn-primary" onClick={() => mutate(`/api/admin/affiliate-payouts/${row.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'approve' }) })}>{row.status === 'processing' ? 'Resume' : 'Approve'}</button>
-                                        {row.status === 'requested' && <button className="btn btn-ghost" onClick={() => {
-                                            const reason = window.prompt('Rejection reason:');
-                                            if (reason) mutate(`/api/admin/affiliate-payouts/${row.id}/action`, { method: 'POST', body: JSON.stringify({ action: 'reject', reason }) });
-                                        }}>Reject</button>}
-                                    </>}
-                                </td>
-                            </tr>
-                        ))}</tbody>
-                    </table>
+                <div className="affiliate-section-heading">
+                    <div><span className="affiliate-kicker">Review queue</span><h2>Payout requests</h2></div>
+                    <small>Approve sends SOL from the Reward Wallet to the saved payout address.</small>
                 </div>
+                {orderedPayouts.length === 0 ? (
+                    <div className="affiliate-empty">No payout requests.</div>
+                ) : (
+                    <div className="affiliate-payout-queue">
+                        {orderedPayouts.map(row => {
+                            const actionable = ['requested', 'processing'].includes(row.status);
+                            return (
+                                <article className={`affiliate-payout-request${actionable ? ' is-actionable' : ''}`} key={row.id}>
+                                    <div className="affiliate-payout-request__main">
+                                        <div>
+                                            <span className="affiliate-payout-request__user">{row.affiliateUsername || 'Affiliate payout'}</span>
+                                            <strong>{usd(row.amountUsd)}</strong>
+                                            <small>{when(row.requestedAt)}</small>
+                                        </div>
+                                        <span className={`affiliate-status affiliate-status--${row.status}`}>{row.status}</span>
+                                    </div>
+                                    <div className="affiliate-payout-request__wallet">
+                                        <span>Destination</span>
+                                        <code title={row.destinationWallet}>{row.destinationWallet}</code>
+                                    </div>
+                                    {actionable && (
+                                        <div className="affiliate-payout-request__actions">
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary"
+                                                onClick={() => mutate(`/api/admin/affiliate-payouts/${row.id}/action`, {
+                                                    method: 'POST',
+                                                    body: JSON.stringify({ action: 'approve' }),
+                                                })}
+                                            >
+                                                {row.status === 'processing' ? 'Resume payout' : 'Approve payout'}
+                                            </button>
+                                            {row.status === 'requested' && (
+                                                <button type="button" className="btn btn-ghost" onClick={() => {
+                                                    const reason = window.prompt('Rejection reason:');
+                                                    if (reason) mutate(`/api/admin/affiliate-payouts/${row.id}/action`, {
+                                                        method: 'POST',
+                                                        body: JSON.stringify({ action: 'reject', reason }),
+                                                    });
+                                                }}>Reject</button>
+                                            )}
+                                        </div>
+                                    )}
+                                </article>
+                            );
+                        })}
+                    </div>
+                )}
             </section>
 
             <section className="affiliate-table-panel">
