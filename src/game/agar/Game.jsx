@@ -881,7 +881,9 @@ export default function Game() {
 
         const handleKeyDown = (e) => {
             if (!gameReadyRef.current || cashoutActiveRef.current) return;
+            if (e.repeat) return;
             if (e.code === 'Space') { 
+                e.preventDefault();
                 socketRef.current?.emit('2'); // Split
             } else if (e.code === 'KeyW') {
                 socketRef.current?.emit('1'); // Eject

@@ -224,6 +224,8 @@ export default function Profile() {
                     localStorage.setItem('match_nickname', data.user.username);
                 }
                 setUsernameMsg('success');
+            } else if (data.code === 'EMAIL_VERIFICATION_REQUIRED') {
+                navigate('/verify-email', { state: { returnTo: '/profile' } });
             } else {
                 setUsernameMsg(data.message || 'error');
             }

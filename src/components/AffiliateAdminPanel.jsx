@@ -3,11 +3,30 @@ import '../styles/affiliate.css';
 
 const usd = value => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const when = value => value ? new Date(value).toLocaleString() : '—';
+const PAGE_SIZE = 20;
+
+function AffiliatePager({ page, total, onChange }) {
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (pages <= 1) return null;
+    return (
+        <div className="affiliate-pagination">
+            <span>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(total, page * PAGE_SIZE)} of {total}</span>
+            <div>
+                <button type="button" className="btn btn-ghost" disabled={page <= 1} onClick={() => onChange(page - 1)}>Previous</button>
+                <strong>Page {page} / {pages}</strong>
+                <button type="button" className="btn btn-ghost" disabled={page >= pages} onClick={() => onChange(page + 1)}>Next</button>
+            </div>
+        </div>
+    );
+}
 
 export default function AffiliateAdminPanel({ fetchAdmin }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
+    const [view, setView] = useState('payouts');
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -73,6 +92,30 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
         return active(b.status) - active(a.status)
             || new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime();
     });
+    const normalizedSearch = search.trim().toLowerCase();
+    const matchesSearch = row => !normalizedSearch || [
+        row.username,
+        row.email,
+        row.referralCode,
+        row.affiliateUsername,
+        row.referredUsername,
+        row.destinationWallet,
+        row.type,
+        row.severity,
+        row.status,
+    ].some(value => String(value || '').toLowerCase().includes(normalizedSearch));
+    const lists = {
+        payouts: orderedPayouts.filter(matchesSearch),
+        affiliates: data.affiliates.filter(matchesSearch),
+        owed: owedAffiliates.filter(matchesSearch),
+        commissions: data.commissions.filter(matchesSearch),
+        risks: data.riskFlags.filter(matchesSearch),
+    };
+    const activeList = lists[view] || [];
+    const pageCount = Math.max(1, Math.ceil(activeList.length / PAGE_SIZE));
+    const safePage = Math.min(page, pageCount);
+    const pageRows = activeList.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+    const switchView = next => { setView(next); setSearch(''); setPage(1); };
 
     return (
         <div className="affiliate-admin-stack">
@@ -87,7 +130,32 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                 <article><span>Paid all time</span><strong>{usd(data.totals?.paidCommissionUsd)}</strong></article>
             </section>
 
-            <section className="affiliate-table-panel">
+            <nav className="affiliate-admin-tabs" aria-label="Affiliate admin sections">
+                {[
+                    ['payouts', `Payouts (${orderedPayouts.filter(row => ['requested', 'processing'].includes(row.status)).length})`],
+                    ['affiliates', `Affiliates (${data.affiliates.length})`],
+                    ['owed', `Owed (${owedAffiliates.length})`],
+                    ['commissions', 'Commissions'],
+                    ['risks', `Risk flags (${data.riskFlags.length})`],
+                    ['maintenance', 'Maintenance'],
+                ].map(([id, label]) => (
+                    <button key={id} type="button" className={view === id ? 'is-active' : ''} onClick={() => switchView(id)}>{label}</button>
+                ))}
+            </nav>
+
+            {view !== 'maintenance' && (
+                <div className="affiliate-list-tools">
+                    <input
+                        type="search"
+                        value={search}
+                        placeholder={`Search ${view}…`}
+                        onChange={event => { setSearch(event.target.value); setPage(1); }}
+                    />
+                    <span>{activeList.length} results</span>
+                </div>
+            )}
+
+            {view === 'owed' && <section className="affiliate-table-panel">
                 <div className="affiliate-section-heading">
                     <div>
                         <span className="affiliate-kicker">Affiliate liability</span>
@@ -99,7 +167,7 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                 <div className="affiliate-table-scroll">
                     <table className="affiliate-table">
                         <thead><tr><th>User</th><th>Pending</th><th>Available</th><th>Active payout</th><th>Total owed</th><th>Reason</th></tr></thead>
-                        <tbody>{owedAffiliates.length === 0 ? <tr><td colSpan="6" className="affiliate-empty">No affiliate rewards are currently owed.</td></tr> : owedAffiliates.map(row => {
+                        <tbody>{pageRows.length === 0 ? <tr><td colSpan="6" className="affiliate-empty">No affiliate rewards are currently owed.</td></tr> : pageRows.map(row => {
                             const activePayout = activePayoutByProfile.get(String(row.id));
                             const totalOwed = Number(row.pendingCommissionUsd) + Number(row.availableCommissionUsd);
                             return (
@@ -115,9 +183,10 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                         })}</tbody>
                     </table>
                 </div>
-            </section>
+                <AffiliatePager page={safePage} total={activeList.length} onChange={setPage} />
+            </section>}
 
-            <section className="affiliate-table-panel">
+            {view === 'maintenance' && <section className="affiliate-table-panel">
                 <div className="affiliate-section-heading">
                     <div>
                         <span className="affiliate-kicker">Pool maintenance</span>
@@ -134,14 +203,14 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                         FACTORY RESET AFFILIATE POOL
                     </button>
                 </div>
-            </section>
+            </section>}
 
-            <section className="affiliate-table-panel">
+            {view === 'affiliates' && <section className="affiliate-table-panel">
                 <div className="affiliate-section-heading"><div><span className="affiliate-kicker">Management</span><h2>Affiliates</h2></div></div>
                 <div className="affiliate-table-scroll">
                     <table className="affiliate-table">
                         <thead><tr><th>User</th><th>Code</th><th>Referrals</th><th>Volume</th><th>Pending</th><th>Available</th><th>Paid</th><th>Tier</th><th>Risk</th><th>Actions</th></tr></thead>
-                        <tbody>{data.affiliates.map(row => (
+                        <tbody>{pageRows.length === 0 ? <tr><td colSpan="10" className="affiliate-empty">No affiliates match this filter.</td></tr> : pageRows.map(row => (
                             <tr key={row.id}>
                                 <td><strong>{row.username}</strong><small>{row.email}</small></td>
                                 <td className="mono">{row.referralCode}</td><td>{row.referralCount}</td><td>{usd(row.referredCashoutVolumeUsd)}</td>
@@ -165,18 +234,19 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                         ))}</tbody>
                     </table>
                 </div>
-            </section>
+                <AffiliatePager page={safePage} total={activeList.length} onChange={setPage} />
+            </section>}
 
-            <section className="affiliate-table-panel">
+            {view === 'payouts' && <section className="affiliate-table-panel">
                 <div className="affiliate-section-heading">
                     <div><span className="affiliate-kicker">Review queue</span><h2>Payout requests</h2></div>
                     <small>Approve sends SOL from the Reward Wallet to the saved payout address.</small>
                 </div>
-                {orderedPayouts.length === 0 ? (
+                {pageRows.length === 0 ? (
                     <div className="affiliate-empty">No payout requests.</div>
                 ) : (
                     <div className="affiliate-payout-queue">
-                        {orderedPayouts.map(row => {
+                        {pageRows.map(row => {
                             const actionable = ['requested', 'processing'].includes(row.status);
                             return (
                                 <article className={`affiliate-payout-request${actionable ? ' is-actionable' : ''}`} key={row.id}>
@@ -220,14 +290,15 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                         })}
                     </div>
                 )}
-            </section>
+                <AffiliatePager page={safePage} total={activeList.length} onChange={setPage} />
+            </section>}
 
-            <section className="affiliate-table-panel">
+            {view === 'commissions' && <section className="affiliate-table-panel">
                 <div className="affiliate-section-heading"><div><span className="affiliate-kicker">Audit</span><h2>Recent commissions</h2></div></div>
                 <div className="affiliate-table-scroll">
                     <table className="affiliate-table">
                         <thead><tr><th>Date</th><th>Affiliate</th><th>Referred</th><th>Mode</th><th>Gross</th><th>Fee</th><th>Commission</th><th>Status</th><th>Action</th></tr></thead>
-                        <tbody>{data.commissions.map(row => (
+                        <tbody>{pageRows.length === 0 ? <tr><td colSpan="9" className="affiliate-empty">No commissions match this filter.</td></tr> : pageRows.map(row => (
                             <tr key={row.id}>
                                 <td>{when(row.date)}</td><td>{row.affiliateUsername}</td><td>{row.referredUsername}</td><td>{row.gameMode}</td>
                                 <td>{usd(row.grossCashoutUsd)}</td><td>{usd(row.platformFeeUsd)}</td><td>{usd(row.commissionUsd)}</td><td>{row.status}</td>
@@ -239,14 +310,15 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                         ))}</tbody>
                     </table>
                 </div>
-            </section>
+                <AffiliatePager page={safePage} total={activeList.length} onChange={setPage} />
+            </section>}
 
-            <section className="affiliate-table-panel">
+            {view === 'risks' && <section className="affiliate-table-panel">
                 <div className="affiliate-section-heading"><div><span className="affiliate-kicker">Anti-abuse</span><h2>Open risk flags</h2></div></div>
                 <div className="affiliate-table-scroll">
                     <table className="affiliate-table">
                         <thead><tr><th>Date</th><th>Type</th><th>Severity</th><th>Evidence</th><th>Actions</th></tr></thead>
-                        <tbody>{data.riskFlags.length === 0 ? <tr><td colSpan="5" className="affiliate-empty">No open flags.</td></tr> : data.riskFlags.map(row => (
+                        <tbody>{pageRows.length === 0 ? <tr><td colSpan="5" className="affiliate-empty">No open flags.</td></tr> : pageRows.map(row => (
                             <tr key={row._id}>
                                 <td>{when(row.createdAt)}</td><td>{row.type}</td><td>{row.severity}</td><td className="mono">{JSON.stringify(row.evidence || {})}</td>
                                 <td>
@@ -257,7 +329,8 @@ export default function AffiliateAdminPanel({ fetchAdmin }) {
                         ))}</tbody>
                     </table>
                 </div>
-            </section>
+                <AffiliatePager page={safePage} total={activeList.length} onChange={setPage} />
+            </section>}
         </div>
     );
 }

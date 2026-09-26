@@ -1022,6 +1022,10 @@ export default function PreGame() {
                 body: JSON.stringify({ amountUSD: usdAmt, destinationAddress: withdrawAddress, withdrawAll })
             });
             const d = await r.json();
+            if (!r.ok && d.code === 'EMAIL_VERIFICATION_REQUIRED') {
+                navigate('/verify-email', { state: { returnTo: '/pre-game' } });
+                return;
+            }
             if (!r.ok) throw new Error(d.message || 'Withdrawal failed');
             await refreshUser();
             setStatusMsg(d.processing

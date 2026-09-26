@@ -298,6 +298,22 @@ function AdminFilterBar({ children, right }) {
     );
 }
 
+function AdminPager({ page, totalPages, total, pageSize, onChange }) {
+    if (!total || totalPages <= 1) return null;
+    const first = ((page - 1) * pageSize) + 1;
+    const last = Math.min(total, page * pageSize);
+    return (
+        <div className="admin-pagination">
+            <span>{first}–{last} of {total}</span>
+            <div>
+                <button type="button" className="btn btn-ghost" disabled={page <= 1} onClick={() => onChange(page - 1)}>Previous</button>
+                <strong>Page {page} / {totalPages}</strong>
+                <button type="button" className="btn btn-ghost" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>Next</button>
+            </div>
+        </div>
+    );
+}
+
 function WalletCard({ title, label, address, sol, usd, themeColor }) {
     return (
         <article className="admin-wallet-card" style={{ '--admin-wallet-accent': themeColor }}>
@@ -840,7 +856,13 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
                                     <section style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', background: 'rgba(255,255,255,0.02)' }}>
                                         <p className="label" style={{ marginBottom: '12px' }}>Account & access</p>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-                                            <div><span style={{ color: 'var(--text-2)' }}>Email</span><br />{u.email || '—'}</div>
+                                            <div>
+                                                <span style={{ color: 'var(--text-2)' }}>Email</span><br />
+                                                {u.email || '—'}
+                                                <span style={{ display: 'block', marginTop: 3, color: u.emailVerified ? '#4ade80' : u.email ? '#f59e0b' : '#94a3b8', fontSize: '.7rem', fontWeight: 700 }}>
+                                                    {u.emailVerified ? '✓ Verified' : u.email ? '○ Unverified' : '— No email connected'}
+                                                </span>
+                                            </div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Joined</span><br />{formatDate(u.createdAt)}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Last activity</span><br />{formatDate(u.latestActivityAt)}</div>
                                             <div><span style={{ color: 'var(--text-2)' }}>Reporting</span><br />{u.excludedFromReports ? 'Excluded' : 'Included'}</div>
@@ -1012,6 +1034,7 @@ export default function AdminDashboard() {
     const [wallets, setWallets] = useState(null);
     const [sweeps, setSweeps] = useState([]);
     const [transactions, setTransactions] = useState([]);
+    const [txPage, setTxPage] = useState(1);
     const [filterUserId, setFilterUserId] = useState('');
     const [txFilter, setTxFilter] = useState({ userId: '', category: '', type: '', search: '' });
     const txFilterRef = useRef(txFilter);
@@ -1025,6 +1048,9 @@ export default function AdminDashboard() {
     const [mainHouseLoading, setMainHouseLoading] = useState(false);
     const [mainHouseError, setMainHouseError] = useState('');
     const [userSearch, setUserSearch] = useState('');
+    const [userAccountType, setUserAccountType] = useState('all');
+    const [userPage, setUserPage] = useState(1);
+    const [userMeta, setUserMeta] = useState({ total: 0, page: 1, limit: 25, totalPages: 1 });
     const [serverStatus, setServerStatus] = useState(null);
     const [actionMsg, setActionMsg] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
@@ -1048,12 +1074,20 @@ export default function AdminDashboard() {
     const [adminIssueStatus, setAdminIssueStatus] = useState('open');
     const [adminIssueCategory, setAdminIssueCategory] = useState('all');
     const [adminIssuesCompatibilityNotice, setAdminIssuesCompatibilityNotice] = useState('');
+    const [adminIssueSearch, setAdminIssueSearch] = useState('');
+    const [adminIssuePage, setAdminIssuePage] = useState(1);
+    const [bugReportSearch, setBugReportSearch] = useState('');
+    const [bugReportStatus, setBugReportStatus] = useState('all');
+    const [bugReportPage, setBugReportPage] = useState(1);
     const [pregamePlayingOffsets, setPregamePlayingOffsets] = useState({ ...EMPTY_PREGAME_PLAYING });
     const tabRef = useRef(tab);
     const filterUserIdRef = useRef(filterUserId);
     const showExcludedRef = useRef(showExcluded);
     const showExcludedUsersRef = useRef(showExcludedUsers);
     const userSortRef = useRef(userSort);
+    const userSearchRef = useRef(userSearch);
+    const userAccountTypeRef = useRef(userAccountType);
+    const userPageRef = useRef(userPage);
     const serverStatusRequestRef = useRef(null);
     const liveFeedRequestRef = useRef(null);
     const usersRequestRef = useRef(null);
@@ -1064,6 +1098,9 @@ export default function AdminDashboard() {
     showExcludedRef.current = showExcluded;
     showExcludedUsersRef.current = showExcludedUsers;
     userSortRef.current = userSort;
+    userSearchRef.current = userSearch;
+    userAccountTypeRef.current = userAccountType;
+    userPageRef.current = userPage;
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -1256,14 +1293,33 @@ export default function AdminDashboard() {
         return request;
     }, [fetchAdmin]);
 
-    const fetchUsers = useCallback(async (includeExcluded = showExcludedUsersRef.current, sort = userSortRef.current, skipIfBusy = false) => {
+    const fetchUsers = useCallback(async (
+        includeExcluded = showExcludedUsersRef.current,
+        sort = userSortRef.current,
+        skipIfBusy = false,
+        requestedPage = userPageRef.current,
+        search = userSearchRef.current,
+        accountType = userAccountTypeRef.current,
+    ) => {
         if (skipIfBusy && usersRequestRef.current) return usersRequestRef.current;
         const params = new URLSearchParams();
         if (includeExcluded) params.set('showExcluded', 'true');
         if (sort) params.set('sort', sort);
+        params.set('page', String(requestedPage));
+        params.set('limit', '25');
+        if (search.trim()) params.set('search', search.trim());
+        if (accountType !== 'all') params.set('accountType', accountType);
         const request = fetchAdmin(`/api/admin/dashboard/users${params.size ? `?${params}` : ''}`)
             .then(data => {
                 setUsers(data.users ?? []);
+                const nextMeta = {
+                    total: Number(data.total) || 0,
+                    page: Number(data.page) || 1,
+                    limit: Number(data.limit) || 25,
+                    totalPages: Number(data.totalPages) || 1,
+                };
+                setUserMeta(nextMeta);
+                if (nextMeta.page !== userPageRef.current) setUserPage(nextMeta.page);
                 return data;
             })
             .finally(() => {
@@ -1393,7 +1449,17 @@ export default function AdminDashboard() {
         };
         const id = setInterval(refreshUsers, 5000);
         return () => { alive = false; clearInterval(id); };
-    }, [tab, fetchUsers, showExcludedUsers, userSort]);
+    }, [tab, fetchUsers, showExcludedUsers, userSort, userAccountType, userPage]);
+
+    useEffect(() => {
+        if (tab !== 'users') return undefined;
+        const id = setTimeout(() => {
+            setUserPage(1);
+            fetchUsers(showExcludedUsersRef.current, userSortRef.current, false, 1, userSearchRef.current, userAccountTypeRef.current)
+                .catch(err => setError(err.message));
+        }, 300);
+        return () => clearTimeout(id);
+    }, [tab, userSearch, fetchUsers]);
 
     const togglePersonalFreePlay = async (enabled) => {
         setActionLoading(true);
@@ -1567,10 +1633,11 @@ export default function AdminDashboard() {
     };
 
     const toggleSelectAllTx = () => {
-        if (selectedTxIds.size === transactions.length) {
+        const visibleIds = visibleTransactions.map(t => String(t.id));
+        if (visibleIds.length > 0 && visibleIds.every(id => selectedTxIds.has(id))) {
             setSelectedTxIds(new Set());
         } else {
-            setSelectedTxIds(new Set(transactions.map(t => String(t.id))));
+            setSelectedTxIds(new Set(visibleIds));
         }
     };
 
@@ -1725,10 +1792,12 @@ export default function AdminDashboard() {
         const next = { ...txFilterRef.current, ...patch };
         setTxFilter(next);
         setFilterUserId(next.userId || '');
+        setTxPage(1);
         fetchTransactions(next, showExcluded).catch(err => setError(err.message));
     };
 
     const runTxSearch = () => {
+        setTxPage(1);
         fetchTransactions(txFilterRef.current, showExcluded).catch(err => setError(err.message));
     };
 
@@ -1736,12 +1805,43 @@ export default function AdminDashboard() {
         const next = { userId: '', category: '', type: '', search: '' };
         setFilterUserId('');
         setTxFilter(next);
+        setTxPage(1);
         fetchTransactions(next, showExcluded).catch(err => setError(err.message));
     };
 
-    const filteredUsers = userSearch.trim()
-        ? users.filter(u => u.username.toLowerCase().includes(userSearch.trim().toLowerCase()))
-        : users;
+    const filteredUsers = users;
+    const TX_PAGE_SIZE = 30;
+    const txTotalPages = Math.max(1, Math.ceil(transactions.length / TX_PAGE_SIZE));
+    const safeTxPage = Math.min(txPage, txTotalPages);
+    const visibleTransactions = transactions.slice((safeTxPage - 1) * TX_PAGE_SIZE, safeTxPage * TX_PAGE_SIZE);
+
+    const issueNeedle = adminIssueSearch.trim().toLowerCase();
+    const issueMatches = item => !issueNeedle || [item.title, item.message, item.code, item.username, item.category, item.sourceWallet]
+        .some(value => String(value || '').toLowerCase().includes(issueNeedle));
+    const matchingRewardAlerts = rewardAlerts.filter(issueMatches);
+    const matchingAdminIssues = adminIssues.filter(issueMatches);
+    const ISSUE_PAGE_SIZE = 20;
+    const issueTotal = matchingRewardAlerts.length + matchingAdminIssues.length;
+    const issueTotalPages = Math.max(1, Math.ceil(issueTotal / ISSUE_PAGE_SIZE));
+    const safeIssuePage = Math.min(adminIssuePage, issueTotalPages);
+    const issueStart = (safeIssuePage - 1) * ISSUE_PAGE_SIZE;
+    const issueEnd = issueStart + ISSUE_PAGE_SIZE;
+    const visibleRewardAlerts = matchingRewardAlerts.slice(issueStart, issueEnd);
+    const visibleAdminIssues = matchingAdminIssues.slice(
+        Math.max(0, issueStart - matchingRewardAlerts.length),
+        Math.max(0, issueEnd - matchingRewardAlerts.length),
+    );
+
+    const bugNeedle = bugReportSearch.trim().toLowerCase();
+    const filteredBugReports = bugReports.filter(report => (
+        (bugReportStatus === 'all' || report.status === bugReportStatus)
+        && (!bugNeedle || [report.username, report.message, report.gamemode, report.page, report.resolutionMessage]
+            .some(value => String(value || '').toLowerCase().includes(bugNeedle)))
+    ));
+    const BUG_PAGE_SIZE = 20;
+    const bugTotalPages = Math.max(1, Math.ceil(filteredBugReports.length / BUG_PAGE_SIZE));
+    const safeBugPage = Math.min(bugReportPage, bugTotalPages);
+    const visibleBugReports = filteredBugReports.slice((safeBugPage - 1) * BUG_PAGE_SIZE, safeBugPage * BUG_PAGE_SIZE);
     const selectedUsers = users.filter(account => selectedUserIds.has(String(account.id)));
     const selectedOwnerUsers = selectedUsers.filter(account => account.isOwnerAccount);
     const selectedOwnerBalanceUsd = selectedOwnerUsers.reduce((sum, account) => sum + (Number(account.balanceUsd) || 0), 0);
@@ -2004,8 +2104,8 @@ export default function AdminDashboard() {
                             </div>
                             <div className="admin-issues__actions">
                                 <div className="admin-issues__view-toggle" role="group" aria-label="Issue view">
-                                    <button type="button" className={adminIssueStatus === 'open' ? 'is-active' : ''} onClick={() => setAdminIssueStatus('open')}>Open</button>
-                                    <button type="button" className={adminIssueStatus === 'all' ? 'is-active' : ''} onClick={() => setAdminIssueStatus('all')}>History</button>
+                                    <button type="button" className={adminIssueStatus === 'open' ? 'is-active' : ''} onClick={() => { setAdminIssueStatus('open'); setAdminIssuePage(1); }}>Open</button>
+                                    <button type="button" className={adminIssueStatus === 'all' ? 'is-active' : ''} onClick={() => { setAdminIssueStatus('all'); setAdminIssuePage(1); }}>History</button>
                                 </div>
                                 <button type="button" className="btn btn-ghost" disabled={adminIssuesLoading} onClick={() => fetchAdminIssues(false).catch(err => setError(err.message))}>
                                     {adminIssuesLoading ? 'Loading…' : 'Refresh'}
@@ -2028,7 +2128,7 @@ export default function AdminDashboard() {
                                     role="tab"
                                     aria-selected={adminIssueCategory === category.id}
                                     className={adminIssueCategory === category.id ? 'is-active' : ''}
-                                    onClick={() => setAdminIssueCategory(category.id)}
+                                    onClick={() => { setAdminIssueCategory(category.id); setAdminIssuePage(1); }}
                                 >
                                     {category.label}
                                     {adminIssueStatus === 'open' && category.id !== 'all' && Number(adminIssueSummary.byCategory?.[category.id]) > 0
@@ -2038,17 +2138,24 @@ export default function AdminDashboard() {
                             ))}
                         </div>
 
+                        <AdminFilterBar>
+                            <label className="admin-filter-field">
+                                <span className="admin-filter-label">Search issues</span>
+                                <input className="admin-filter-input" type="search" placeholder="User, code or message…" value={adminIssueSearch} onChange={event => { setAdminIssueSearch(event.target.value); setAdminIssuePage(1); }} />
+                            </label>
+                        </AdminFilterBar>
+
                         {adminIssuesCompatibilityNotice && (
                             <div className="admin-issues__compatibility-notice">{adminIssuesCompatibilityNotice}</div>
                         )}
 
                         {adminIssuesLoading && adminIssues.length === 0 && rewardAlerts.length === 0 ? (
                             <div className="admin-issues__empty">Loading issues…</div>
-                        ) : adminIssues.length === 0 && rewardAlerts.length === 0 ? (
-                            <div className="admin-issues__empty">{adminIssueStatus === 'open' ? 'No open issues.' : 'No issues have been recorded yet.'}</div>
+                        ) : issueTotal === 0 ? (
+                            <div className="admin-issues__empty">{adminIssueSearch ? 'No issues match this search.' : adminIssueStatus === 'open' ? 'No open issues.' : 'No issues have been recorded yet.'}</div>
                         ) : (
                             <div className="admin-issues__list">
-                                {rewardAlerts.map(alert => (
+                                {visibleRewardAlerts.map(alert => (
                                     <article key={`reward-${alert._id}`} className={`admin-issue admin-issue--reward is-warning${alert.status !== 'pending' ? ' is-resolved' : ''}`}>
                                         <div className="admin-issue__topline">
                                             <div className="admin-issue__badges">
@@ -2095,7 +2202,7 @@ export default function AdminDashboard() {
                                         </div>
                                     </article>
                                 ))}
-                                {adminIssues.map(issue => {
+                                {visibleAdminIssues.map(issue => {
                                     const hasAmounts = issue.expectedUsd != null || issue.actualUsd != null || issue.differenceUsd != null;
                                     const signals = issue.accountSignals;
                                     return (
@@ -2123,6 +2230,11 @@ export default function AdminDashboard() {
                                                             {issue.context?.perfectTrackingSamples != null && <span>Perfect tracking: <strong>{issue.context.perfectTrackingSamples}/{issue.context.trackingSamples}</strong></span>}
                                                             {issue.context?.peakPerSecond != null && <span>Peak inputs/s: <strong>{issue.context.peakPerSecond}</strong></span>}
                                                             {issue.context?.invalidInputsInWindow != null && <span>Invalid inputs: <strong>{issue.context.invalidInputsInWindow}</strong></span>}
+                                                            {issue.context?.reason && <span>Reason: <strong>{issue.context.reason}</strong></span>}
+                                                            {(issue.context?.xType || issue.context?.yType) && (
+                                                                <span>Input shape: <strong>x={issue.context?.hasX ? issue.context.xType : 'missing'}, y={issue.context?.hasY ? issue.context.yType : 'missing'}</strong></span>
+                                                            )}
+                                                            {(issue.context?.inGameUsername || issue.reportedUsername) && <span>In-game name: <strong>{issue.context?.inGameUsername || issue.reportedUsername}</strong></span>}
                                                         </div>
                                                     )}
                                                 </div>
@@ -2174,6 +2286,7 @@ export default function AdminDashboard() {
                                 })}
                             </div>
                         )}
+                        <AdminPager page={safeIssuePage} totalPages={issueTotalPages} total={issueTotal} pageSize={ISSUE_PAGE_SIZE} onChange={setAdminIssuePage} />
                     </section>
                 )}
 
@@ -2190,13 +2303,25 @@ export default function AdminDashboard() {
                             </button>
                         </div>
 
+                        <AdminFilterBar>
+                            <FilterSelect label="Status" value={bugReportStatus} onChange={event => { setBugReportStatus(event.target.value); setBugReportPage(1); }} options={[
+                                { value: 'all', label: 'All reports' },
+                                { value: 'open', label: 'Open' },
+                                { value: 'resolved', label: 'Resolved' },
+                            ]} />
+                            <label className="admin-filter-field">
+                                <span className="admin-filter-label">Search reports</span>
+                                <input className="admin-filter-input" type="search" placeholder="User or report text…" value={bugReportSearch} onChange={event => { setBugReportSearch(event.target.value); setBugReportPage(1); }} />
+                            </label>
+                        </AdminFilterBar>
+
                         {bugReportsLoading && bugReports.length === 0 ? (
                             <div className="admin-bug-reports__empty">Loading reports…</div>
-                        ) : bugReports.length === 0 ? (
-                            <div className="admin-bug-reports__empty">No bug reports yet.</div>
+                        ) : filteredBugReports.length === 0 ? (
+                            <div className="admin-bug-reports__empty">No bug reports match these filters.</div>
                         ) : (
                             <div className="admin-bug-reports__list">
-                                {bugReports.map(report => (
+                                {visibleBugReports.map(report => (
                                     <article key={report._id} className={`admin-bug-report${report.status === 'resolved' ? ' is-resolved' : ''}`}>
                                         <div className="admin-bug-report__topline">
                                             <div>
@@ -2227,6 +2352,7 @@ export default function AdminDashboard() {
                                 ))}
                             </div>
                         )}
+                        <AdminPager page={safeBugPage} totalPages={bugTotalPages} total={filteredBugReports.length} pageSize={BUG_PAGE_SIZE} onChange={setBugReportPage} />
                     </section>
                 )}
 
@@ -2883,8 +3009,8 @@ export default function AdminDashboard() {
 
                 {tab === 'users' && (
                     <Panel
-                        title={`${users.length} registered accounts`}
-                        sub="Click a row to see full account details, transactions, and game history."
+                        title={`${userMeta.total} registered accounts`}
+                        sub="25 accounts per page · search and filters run on the server for faster loading."
                     >
                         <AdminFilterBar right={
                             <>
@@ -2918,13 +3044,32 @@ export default function AdminDashboard() {
                                 <button type="button" className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '0.72rem' }} disabled={actionLoading || selectedUserIds.size === 0} onClick={bulkRestoreUsers}>Restore</button>
                             </>
                         }>
-                            <FilterSelect label="Sort" value={userSort} onChange={e => { setUserSort(e.target.value); loadData(filterUserId, showExcluded, showExcludedUsers, e.target.value); }} options={USER_SORT_OPTIONS} />
+                            <FilterSelect label="Sort" value={userSort} onChange={e => {
+                                const nextSort = e.target.value;
+                                setUserSort(nextSort);
+                                setUserPage(1);
+                                fetchUsers(showExcludedUsers, nextSort, false, 1).catch(err => setError(err.message));
+                            }} options={USER_SORT_OPTIONS} />
+                            <FilterSelect label="Account" value={userAccountType} onChange={e => {
+                                const nextType = e.target.value;
+                                setUserAccountType(nextType);
+                                setUserPage(1);
+                                fetchUsers(showExcludedUsers, userSort, false, 1, userSearch, nextType).catch(err => setError(err.message));
+                            }} options={[
+                                { value: 'all', label: 'All accounts' },
+                                { value: 'player', label: 'Players' },
+                                { value: 'owner', label: 'Your accounts' },
+                            ]} />
                             <label className="admin-filter-field">
                                 <span className="admin-filter-label">Search</span>
-                                <input className="admin-filter-input" type="text" placeholder="Username…" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+                                <input className="admin-filter-input" type="text" placeholder="Username, email or wallet…" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
                             </label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-2)', cursor: 'pointer', alignSelf: 'flex-end', paddingBottom: '2px' }}>
-                                <input type="checkbox" checked={showExcludedUsers} onChange={e => { setShowExcludedUsers(e.target.checked); loadData(filterUserId, showExcluded, e.target.checked); }} />
+                                <input type="checkbox" checked={showExcludedUsers} onChange={e => {
+                                    setShowExcludedUsers(e.target.checked);
+                                    setUserPage(1);
+                                    fetchUsers(e.target.checked, userSort, false, 1).catch(err => setError(err.message));
+                                }} />
                                 Show excluded
                             </label>
                         </AdminFilterBar>
@@ -2986,7 +3131,26 @@ export default function AdminDashboard() {
                                                     </td>
                                                     <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-h)' }}>
                                                         {u.username}
-                                                        {u.email && <div style={{ marginTop: '3px', color: 'var(--text-3)', fontSize: '0.68rem', fontWeight: 400 }}>{u.email}</div>}
+                                                        {u.email ? (
+                                                            <div style={{ marginTop: '3px', color: 'var(--text-3)', fontSize: '0.68rem', fontWeight: 400 }}>
+                                                                {u.email}
+                                                                <span
+                                                                    title={u.emailVerifiedAt ? `Verified ${formatDate(u.emailVerifiedAt)}` : 'Email has not been verified'}
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 3,
+                                                                        marginLeft: 7,
+                                                                        color: u.emailVerified ? '#4ade80' : '#f59e0b',
+                                                                        fontWeight: 700,
+                                                                    }}
+                                                                >
+                                                                    {u.emailVerified ? '✓ Verified' : '○ Unverified'}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ marginTop: '3px', color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>— No email</div>
+                                                        )}
                                                     </td>
                                                     <td style={{ padding: '12px 16px' }}><UserActivityBadge status={u.activityStatus} /></td>
                                                     <td style={{ padding: '12px 16px', color: 'var(--text-2)', whiteSpace: 'nowrap' }} title={formatDate(u.lastActiveAt)}>
@@ -3018,6 +3182,17 @@ export default function AdminDashboard() {
                                 </table>
                             </div>
                         )}
+                        <AdminPager
+                            page={userMeta.page}
+                            totalPages={userMeta.totalPages}
+                            total={userMeta.total}
+                            pageSize={userMeta.limit}
+                            onChange={nextPage => {
+                                setUserPage(nextPage);
+                                setSelectedUserIds(new Set());
+                                fetchUsers(showExcludedUsers, userSort, false, nextPage).catch(err => setError(err.message));
+                            }}
+                        />
                     </Panel>
                 )}
 
@@ -3064,7 +3239,7 @@ export default function AdminDashboard() {
                                     <thead>
                                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
                                             <th style={{ padding: '12px 16px', width: 40 }}>
-                                                <input type="checkbox" checked={transactions.length > 0 && selectedTxIds.size === transactions.length} onChange={toggleSelectAllTx} />
+                                                <input type="checkbox" checked={visibleTransactions.length > 0 && visibleTransactions.every(tx => selectedTxIds.has(String(tx.id)))} onChange={toggleSelectAllTx} />
                                             </th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>When</th>
                                             <th style={{ textAlign: 'left', padding: '12px 16px', color: 'var(--text-2)', fontSize: '0.72rem' }}>Category</th>
@@ -3075,7 +3250,7 @@ export default function AdminDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {transactions.map(tx => {
+                                        {visibleTransactions.map(tx => {
                                             const id = String(tx.id);
                                             const isExcluded = tx.excludedFromReports;
                                             const isFreePlay = tx.meta?.simulated === true;
@@ -3103,6 +3278,7 @@ export default function AdminDashboard() {
                                 </table>
                             </div>
                         )}
+                        <AdminPager page={safeTxPage} totalPages={txTotalPages} total={transactions.length} pageSize={TX_PAGE_SIZE} onChange={next => { setTxPage(next); setSelectedTxIds(new Set()); }} />
                     </Panel>
                 )}
             </div>

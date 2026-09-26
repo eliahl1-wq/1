@@ -65,8 +65,14 @@ export default function RegisterPage() {
                 }
                 clearStoredReferral();
                 setIsSuccess(true);
-                setMessage('Account created. Redirecting to login…');
-                setTimeout(() => navigate('/login'), 2000);
+                setMessage(data.message || 'Account created. Check your inbox to verify your email.');
+                setTimeout(() => navigate('/verify-email', {
+                    replace: true,
+                    state: {
+                        email: data.email || email,
+                        emailSent: data.verificationEmailSent === true,
+                    },
+                }), 1200);
             } else {
                 setIsSuccess(false);
                 setMessage(data.message || 'Registration failed.');

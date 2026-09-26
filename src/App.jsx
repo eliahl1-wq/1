@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import VerifyEmail from './pages/VerifyEmail';
 import Lobby from './pages/Lobby';
 import PreGame from './pages/PreGame';
 import Transactions from './pages/Transactions';
@@ -113,6 +114,7 @@ function App() {
               <Routes>
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/lobby" element={<PrivateRoute><Lobby /></PrivateRoute>} />
                 <Route path="/pre-game" element={<PreGame />} />
                 <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
