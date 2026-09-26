@@ -12,6 +12,7 @@ export default function VerifyEmail() {
     const location = useLocation();
     const navigate = useNavigate();
     const verificationToken = searchParams.get('token') || '';
+    const changeStage = searchParams.get('change') || '';
     const [email, setEmail] = useState(user?.email || location.state?.email || '');
     const [status, setStatus] = useState(location.state?.emailSent ? 'sent' : 'idle');
     const [message, setMessage] = useState(location.state?.emailSent
@@ -28,7 +29,7 @@ export default function VerifyEmail() {
     }, [user?.email]);
 
     useEffect(() => {
-        if (!verificationToken) return;
+        if (!verificationToken || changeStage) return;
         let active = true;
         setBusy(true);
         setStatus('confirming');
@@ -52,7 +53,24 @@ export default function VerifyEmail() {
             })
             .finally(() => { if (active) setBusy(false); });
         return () => { active = false; };
-    }, [verificationToken, token, refreshUser]);
+    }, [verificationToken, changeStage, token, refreshUser]);
+
+    const confirmEmailChange = async () => {
+        setBusy(true);
+        setMessage('');
+        try {
+            const response = await fetch(`${API_URL}/api/email-change/confirm`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: verificationToken, stage: changeStage }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Could not confirm email change.');
+            setStatus(data.complete ? 'verified' : 'sent');
+            setMessage(data.message);
+            if (data.complete && token) await refreshUser();
+        } catch (error) { setStatus('error'); setMessage(error.message); }
+        finally { setBusy(false); }
+    };
 
     const sendVerification = async event => {
         event.preventDefault();
@@ -96,7 +114,14 @@ export default function VerifyEmail() {
                 <AuthBrand subtitle="Secure your Arenifi account." />
                 <AuthPanel>
                     <AuthAlert tone={tone}>{message}</AuthAlert>
-                    {verificationToken && status === 'confirming' ? (
+                    {changeStage ? (
+                        <div className="auth-email-state">
+                            <h2>{status === 'verified' ? 'Email changed' : changeStage === 'old' ? 'Approve email change' : 'Verify new email'}</h2>
+                            <p>{status === 'sent' ? 'Check your new inbox to finish the change.' : status === 'verified' ? 'Your new email is verified and ready to use.' : 'Press confirm to continue the email change you requested.'}</p>
+                            {!['sent', 'verified'].includes(status) && <button className="btn btn-primary auth-submit" disabled={busy} onClick={confirmEmailChange}>{busy ? 'Confirming…' : 'Confirm'}</button>}
+                            <Link className="auth-back-link" to={token ? '/profile' : '/login'}>{token ? 'Back to profile' : 'Log in'}</Link>
+                        </div>
+                    ) : verificationToken && status === 'confirming' ? (
                         <div className="auth-email-state"><span className="spinner" /> Verifying your email…</div>
                     ) : verified ? (
                         <div className="auth-email-state">
@@ -122,6 +147,7 @@ export default function VerifyEmail() {
                                     onChange={event => setEmail(event.target.value)}
                                     placeholder="you@example.com"
                                     required
+                                    readOnly={!!user?.email}
                                     autoComplete="email"
                                 />
                             </AuthField>

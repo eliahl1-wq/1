@@ -66,6 +66,25 @@ export default function Profile() {
         setCurrentPage(1);
     }, [displayCur, playScope]);
     const [usernameInput, setUsernameInput] = useState(user?.username || '');
+    const [newEmail, setNewEmail] = useState('');
+    const [emailNotice, setEmailNotice] = useState('');
+    const [emailBusy, setEmailBusy] = useState(false);
+    const handleChangeEmail = async event => {
+        event.preventDefault();
+        setEmailBusy(true);
+        setEmailNotice('');
+        try {
+            const response = await fetch(`${API_URL}/api/email-change/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ email: newEmail }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Could not start email change.');
+            setEmailNotice(data.message);
+        } catch (error) { setEmailNotice(error.message); }
+        finally { setEmailBusy(false); }
+    };
     const [walletInput, setWalletInput] = useState(user?.walletAddress || '');
     const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
     const [usernameMsg, setUsernameMsg] = useState('');
@@ -899,6 +918,18 @@ export default function Profile() {
                                 </header>
 
                                 {/* Username */}
+                                <section>
+                                    <label className="label" style={{ display: 'block', marginBottom: 6 }}>Email address</label>
+                                    <p style={{ color: 'var(--text-2)', fontSize: '.82rem' }}>{user?.email || 'No email connected'} {user?.emailVerified ? '✓' : ''}</p>
+                                    {user?.email ? <form onSubmit={handleChangeEmail}>
+                                        <p style={{ color: 'var(--text-3)', fontSize: '.78rem' }}>Confirm using your current email, then verify your new address.</p>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <input className="input" type="email" aria-label="New email address" placeholder="New email address" required maxLength={254} value={newEmail} onChange={event => setNewEmail(event.target.value)} style={{ flex: 1, minWidth: 0 }} />
+                                            <button className="btn btn-primary" type="submit" disabled={emailBusy}>{emailBusy ? 'Sending…' : 'Change email'}</button>
+                                        </div>
+                                        {emailNotice && <p role="status" style={{ color: 'var(--text-2)', fontSize: '.8rem' }}>{emailNotice}</p>}
+                                    </form> : <button className="btn btn-primary" onClick={() => navigate('/verify-email', { state: { returnTo: '/profile' } })}>Add email</button>}
+                                </section>
                                 <div>
                                     <label className="label" style={{ display: 'block', marginBottom: '6px' }}>Username</label>
                                     <div style={{ display: 'flex', gap: '8px' }}>
