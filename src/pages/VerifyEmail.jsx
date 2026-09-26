@@ -4,6 +4,7 @@ import Background from '../components/Background';
 import { AuthAlert, AuthBrand, AuthField, AuthForm, AuthPanel } from '../components/AuthScaffold';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
+import { readEmailApiResponse } from '../utils/emailApiResponse';
 import '../styles/ui.css';
 
 export default function VerifyEmail() {
@@ -63,8 +64,7 @@ export default function VerifyEmail() {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: verificationToken, stage: changeStage }),
             });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.message || 'Could not confirm email change.');
+            const data = await readEmailApiResponse(response);
             setStatus(data.complete ? 'verified' : 'sent');
             setMessage(data.message);
             if (data.complete && token) await refreshUser();

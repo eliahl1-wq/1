@@ -7,6 +7,7 @@ import ProductPageHeader from '../components/ProductPageHeader';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
 import { API_URL } from '../utils/apiBase';
+import { readEmailApiResponse } from '../utils/emailApiResponse';
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
 
 const SolLogo = ({ size = 13, style }) => (
@@ -79,8 +80,7 @@ export default function Profile() {
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ email: newEmail }),
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Could not start email change.');
+            const data = await readEmailApiResponse(response);
             setEmailNotice(data.message);
         } catch (error) { setEmailNotice(error.message); }
         finally { setEmailBusy(false); }
