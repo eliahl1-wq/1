@@ -1602,16 +1602,16 @@ export default function AdminDashboard() {
     };
 
     const resetUnfinishedRewards = async (owner) => {
-        const confirmation = window.prompt(
-            `Reset only UNFINISHED rewards for ${owner.username}?\n\nThis forfeits their unused free ticket, unfinished starter reward and incomplete permanent-cycle progress. Claimable rewards, retained cashouts, tournament rewards, lifetime history, active matches and active claims are protected.\n\nType RESET ${owner.username} to continue.`
+        const confirmed = window.confirm(
+            `Reset only UNFINISHED rewards for ${owner.username}?\n\nThis forfeits their unused free ticket, unfinished starter reward and incomplete permanent-cycle progress. Claimable rewards, retained cashouts, tournament rewards, lifetime history, active matches and active claims are protected.`
         );
-        if (confirmation == null) return;
+        if (!confirmed) return;
         setActionLoading(true);
         setActionMsg('');
         try {
             const result = await fetchAdmin(`/api/admin/users/${owner.id}/reset-unfinished-rewards`, {
                 method: 'POST',
-                body: JSON.stringify({ confirmation }),
+                body: JSON.stringify({ confirmed: true }),
             });
             setActionMsg(`✅ ${result.message}`);
             await loadData();
