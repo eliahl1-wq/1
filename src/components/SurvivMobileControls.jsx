@@ -126,6 +126,7 @@ function VirtualJoystick({ label, variant, onChange }) {
 }
 
 function ActionIcon({ type }) {
+    if (type === 'cancel') return <path d="m6 6 12 12M18 6 6 18" />;
     if (type === 'map') {
         return <><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z" /><path d="M9 3v15M15 6v15" /></>;
     }
@@ -197,6 +198,7 @@ function SurvivMobileControls({
     canReload,
     canHeal,
     isReloading,
+    isHealing = false,
     medkitCount = 0,
 }) {
     if (!IS_MOBILE) return null;
@@ -206,8 +208,8 @@ function SurvivMobileControls({
             <VirtualJoystick label="Move" variant="move" onChange={onMove} />
             <div className="surviv-mobile-actions">
                 <ActionButton label="Map" shortLabel="MAP" type="map" onPress={onMap} />
-                <ActionButton label={isReloading ? 'Reloading' : 'Reload weapon'} shortLabel={isReloading ? '...' : 'RLD'} type="reload" onPress={onReload} active={isReloading} disabled={!canReload} />
-                <ActionButton label="Use medkit" shortLabel="MED" badge={medkitCount} type="heal" onPress={onHeal} disabled={!canHeal} />
+                <ActionButton label={isReloading ? 'Cancel reload' : 'Reload weapon'} shortLabel={isReloading ? 'CANCEL' : 'RLD'} type={isReloading ? 'cancel' : 'reload'} onPress={onReload} active={isReloading} disabled={!canReload && !isReloading} />
+                <ActionButton label={isHealing ? 'Cancel healing' : 'Use medkit'} shortLabel={isHealing ? 'CANCEL' : 'MED'} badge={medkitCount} type={isHealing ? 'cancel' : 'heal'} onPress={onHeal} active={isHealing} disabled={!canHeal && !isHealing} />
             </div>
             <VirtualJoystick label="Aim and fire" variant="aim" onChange={onAim} />
         </div>

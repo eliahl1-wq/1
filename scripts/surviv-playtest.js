@@ -4,7 +4,7 @@ import { SurvivRenderer } from '../src/game/surviv/SurvivRenderer.js';
 import { createPrimaryFireInput, listenForInputInterruption } from '../src/game/surviv/inputLifecycle.js';
 import { applySurvivFireInput, broadcastSurvivState, createSurvivPlayer,
     equipSurvivWeaponSlot, generateSurvivMap, processSurvivRoom,
-    spawnSurvivAirdrop, toggleSurvivDoor, beginSurvivReload } from '../../phantom-game-server/surviv-engine.js';
+    spawnSurvivAirdrop, toggleSurvivDoor, beginSurvivReload, cancelSurvivAction } from '../../phantom-game-server/surviv-engine.js';
 
 if (!import.meta.env.DEV) throw new Error('Local playtest requires the development server.');
 const canvas = document.querySelector('#game');
@@ -67,7 +67,7 @@ function tick() {
     const state = processSurvivRoom(room, io, Date.now() + 600000);
     broadcastSurvivState(room, io, state, {});
     const elapsed = performance.now() - started;
-    status.textContent = `WASD move · mouse fire · F door/pickup · R reload\n${scene} · HP ${Math.ceil(me.hp)} · ammo ${me.weapon.ammo} · ${room.obstacles.length} objects\nsimulation + snapshot ${elapsed.toFixed(2)} ms · ${latestTick?.explosions.length || 0} explosion events · ${renderer.particles.length} particles`;
+    status.textContent = `WASD move · mouse fire · F door/pickup · R reload · X cancel\n${scene} · HP ${Math.ceil(me.hp)} · ammo ${me.weapon.ammo} · ${room.obstacles.length} objects\nsimulation + snapshot ${elapsed.toFixed(2)} ms · ${latestTick?.explosions.length || 0} explosion events · ${renderer.particles.length} particles`;
 }
 document.querySelector('#yard').onclick = () => reset('yard');
 document.querySelector('#drop').onclick = () => reset('drop');
@@ -83,6 +83,7 @@ window.addEventListener('keydown', event => {
     if (action?.startsWith('toggleDoor:')) { me.toggleDoorId = action.slice('toggleDoor:'.length); toggleSurvivDoor(me, room, Date.now()); }
     if (action === 'pickupWeapon') me.pickupWeaponPending = true;
     if (event.key.toLowerCase() === 'r') beginSurvivReload(me, Date.now());
+    if (event.key.toLowerCase() === 'x') cancelSurvivAction(me);
 });
 window.addEventListener('keyup', event => renderer.handleKeyUp(event));
 const fireInput = createPrimaryFireInput({ renderer, canStart: () => !!me && me.hp > 0,

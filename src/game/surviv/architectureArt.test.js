@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { drawCraftedFurniture, drawRoofCourses, drawRoofWingRelief, drawInteriorAccessories } from './architectureArt.js';
+import { drawCraftedFurniture, drawCraftedFixtures, drawRoofCourses, drawRoofWingRelief, drawInteriorAccessories } from './architectureArt.js';
 
 function recorder() {
     const calls = [];
@@ -49,4 +49,30 @@ test('roof courses and remaining interior details have bounded, stable geometry'
         drawInteriorAccessories(a.ctx, {w:82,h:44}, variant);
         assert.ok(a.calls.length > 2);
     }
+});
+
+test('crafted fixtures stay deterministic, clipped and bounded across authoritative aspect ratios', () => {
+    const variants = ['kitchenCounter', 'labBench', 'bookshelf', 'displayShelf', 'storageShelf', 'controlConsole', 'machine', 'industrial', 'generator', 'serverRack', 'bathtub', 'vanity'];
+    for (const variant of variants) {
+        for (const [w, h] of [[118, 34], [34, 118], [82, 44], [24, 24]]) {
+            const a = recorder(), b = recorder();
+            const o = { w, h, x: 200, y: -700, variant, hp: 34, maxHp: 48 };
+            assert.equal(drawCraftedFixtures(a.ctx, o, variant), true);
+            assert.equal(drawCraftedFixtures(b.ctx, { ...o, x: -500, y: 800 }, variant), true);
+            assert.deepEqual(a.calls, b.calls, `${variant} remains reusable at other world coordinates`);
+            assert.equal(a.calls.filter(c => c[0] === 'save').length, 1);
+            assert.equal(a.calls.filter(c => c[0] === 'restore').length, 1);
+            assert.equal(a.calls.filter(c => c[0] === 'clip').length, 1);
+            assert.deepEqual(a.calls.find(c => c[0] === 'rect'), ['rect', -Math.max(w, h) / 2, -Math.min(w, h) / 2, Math.max(w, h), Math.min(w, h)]);
+            assert.equal(a.calls.some(c => c[0] === 'rotate'), h > w);
+            assert.ok(a.calls.length < 650, `${variant} has bounded sprite generation cost`);
+            assert.ok(!a.calls.some(c => ['shadowBlur', 'createLinearGradient', 'createRadialGradient', 'filter'].includes(c[0])), 'no frame-dependent or expensive material effects');
+        }
+    }
+    for (const o of [{ w: 20, h: 60 }, { w: 30, h: Infinity }, { w: NaN, h: 30 }]) {
+        const a = recorder();
+        assert.equal(drawCraftedFixtures(a.ctx, o, 'labBench'), false);
+        assert.deepEqual(a.calls, [], 'unsupported geometry preserves the fallback canvas state');
+    }
+    assert.equal(drawCraftedFixtures(recorder().ctx, { w: 34, h: 70 }, 'unknown'), false);
 });

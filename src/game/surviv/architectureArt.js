@@ -102,6 +102,150 @@ export function drawCraftedFurniture(c, o, variant) {
     return true;
 }
 
+const CRAFTED_FIXTURES = new Set([
+    'kitchenCounter', 'labBench', 'bookshelf', 'displayShelf', 'storageShelf',
+    'controlConsole', 'machine', 'industrial', 'generator', 'serverRack',
+    'bathtub', 'vanity',
+]);
+
+// Appliances and shelves use the same long-axis orientation as furniture.
+// Dimensions come from the authoritative blocker, so detail never invents a
+// larger silhouette or changes collision. No time, randomness or blur filters:
+// the complete result is suitable for the renderer's existing sprite cache.
+export function drawCraftedFixtures(c, o, variant) {
+    if (!CRAFTED_FIXTURES.has(variant)) return false;
+    const w = Math.max(o.w, o.h), h = Math.min(o.w, o.h);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || h < 24) return false;
+    c.save();
+    if (o.h > o.w) c.rotate(Math.PI / 2);
+    const x = -w / 2, y = -h / 2;
+    c.beginPath(); c.rect(x, y, w, h); c.clip();
+    const s = Math.min(1, h / 34);
+    const metal = !['bookshelf', 'displayShelf', 'bathtub', 'vanity'].includes(variant);
+    const edge = metal ? '#25373b' : variant === 'bathtub' ? '#637c7f' : '#433226';
+    const shell = variant === 'kitchenCounter' ? '#817f70' : variant === 'labBench' ? '#829e9a'
+        : variant === 'bathtub' ? '#a9bcb8' : variant === 'vanity' ? '#8a7052'
+        : metal ? '#738889' : '#997650';
+    rect(c, x + 1, y + 3, w - 2, h - 4, edge, 3 * s);
+    rect(c, x + 1, y + 1, w - 2, h - 5, shell, 3 * s, edge);
+
+    if (variant === 'kitchenCounter' || variant === 'labBench') {
+        const lab = variant === 'labBench';
+        rect(c, x + 3, y + 3, w - 6, h - 9, lab ? '#d5e3db' : '#d0cdbc', 2 * s, lab ? '#66827d' : '#a19c85');
+        const zoneW = (w - 16) * .35, zoneH = (h - 12) * .7;
+        const zx = x + 7, zy = -zoneH / 2 - 1;
+        if (lab) {
+            // A work mat, specimen slide and pipette read as a laboratory, not
+            // the kitchen's sink with three coloured dots pasted on top.
+            rect(c, zx, zy, zoneW, zoneH, '#658e88', 2 * s, '#416964');
+            rect(c, zx + zoneW * .14, zy + zoneH * .2, zoneW * .55, zoneH * .56, '#bdd3c4', s, '#8ea89d');
+            dot(c, zx + zoneW * .4, zy + zoneH * .48, Math.min(2.5, zoneH * .13), '#819c78');
+            line(c, zx + zoneW * .73, zy + 3, zx + zoneW * .85, zy + zoneH - 3, '#dedec3', 2 * s);
+            const rackX = x + w * .55, rackW = Math.max(8, w * .31);
+            rect(c, rackX, -h * .23, rackW, h * .37, '#536e69', 2 * s, '#395451');
+            for (let i = 0; i < 3; i++) {
+                const px = rackX + rackW * (.2 + i * .3), r = Math.min(4 * s, rackW * .11);
+                dot(c, px, -h * .05, r + s, '#b0c6b9');
+                dot(c, px, -h * .05, r, ['#7faaa1', '#ba9278', '#a3ad75'][i]);
+                line(c, px - r * .35, -h * .05 - r * .4, px - r * .35, -h * .05 + r * .35, '#e9eee1', s);
+            }
+        } else {
+            rect(c, zx, zy, zoneW, zoneH, '#8da3a0', 3 * s, '#697f7c');
+            rect(c, zx + 3 * s, zy + 3 * s, zoneW - 6 * s, zoneH - 6 * s, '#536f71', 2 * s, '#b8c6ba');
+            dot(c, zx + zoneW * .56, zy + zoneH * .55, 1.4 * s, '#c5cebf');
+            const fx = zx + zoneW * .45;
+            line(c, fx, zy + 2, fx, zy - 3 * s, '#394f52', 3 * s);
+            line(c, fx, zy - 3 * s, fx + 5 * s, zy - 3 * s, '#d5ded0', 2 * s);
+            const stoveX = x + w * .57, stoveW = w * .32;
+            rect(c, stoveX, -h * .24, stoveW, h * .39, '#394746', 2 * s, '#66736b');
+            for (const px of [.28, .73]) {
+                const r = Math.min(4.8 * s, stoveW * .18);
+                dot(c, stoveX + stoveW * px, -h * .04, r, '#7b8981');
+                dot(c, stoveX + stoveW * px, -h * .04, r * .61, '#354141');
+            }
+        }
+        line(c, x + 5, h / 2 - 5, w / 2 - 5, h / 2 - 5, lab ? '#9fb9ac' : '#a7a28a', 2 * s);
+        for (const at of [.22, .72]) line(c, x + w * at, h / 2 - 4, x + w * at + Math.min(9, w * .1), h / 2 - 4, '#455650', 1.5 * s);
+    } else if (['bookshelf', 'displayShelf', 'storageShelf'].includes(variant)) {
+        const storage = variant === 'storageShelf';
+        const bays = Math.max(2, Math.min(4, Math.floor(w / 35)));
+        const bw = (w - 10) / bays;
+        for (let i = 0; i < bays; i++) {
+            const bx = x + 5 + i * bw, iw = bw - 3;
+            rect(c, bx, y + 5, iw, h - 13, storage ? '#3a5054' : '#62472f', s);
+            if (storage) {
+                rect(c, bx + 2, y + 7, iw - 4, h - 18, i % 2 ? '#818d7a' : '#ad8959', s, '#404d42');
+                line(c, bx + iw * .48, y + 8, bx + iw * .48, h / 2 - 12, '#d2c394', 2 * s);
+                line(c, bx + 3, y + h * .48, bx + iw - 3, y + h * .48, '#5b6551', s);
+            } else {
+                const count = Math.max(2, Math.min(5, Math.floor(iw / 5)));
+                const bookW = (iw - 4) / count;
+                for (let b = 0; b < count; b++) {
+                    const bx2 = bx + 2 + b * bookW;
+                    const inset = (b + i) % 3 * 1.2 * s;
+                    rect(c, bx2, y + 7 + inset, bookW - .9, h - 18 - inset, ['#92644e', '#6b8b8a', '#a89c74', '#7a865f'][(b + i) % 4], .5);
+                    line(c, bx2 + .8, y + 10 + inset, bx2 + bookW - 1.8, y + 10 + inset, '#c4bf9a', s);
+                }
+            }
+            if (i > 0) line(c, bx - 2, y + 4, bx - 2, h / 2 - 5, storage ? '#94a8a4' : '#bb9462', 2 * s);
+        }
+    } else if (variant === 'bathtub' || variant === 'vanity') {
+        const bath = variant === 'bathtub';
+        rect(c, x + 3, y + 3, w - 6, h - 9, '#dbe3d5', bath ? h * .28 : 2 * s, '#a5b9ad');
+        const bw = bath ? w - 18 : w * .52, bh = bath ? h - 17 : h * .47;
+        const bx = bath ? x + 9 : -bw / 2;
+        rect(c, bx, -bh / 2 - 1, bw, bh, '#8faeac', bath ? bh * .4 : bh * .35, '#f1f1e5');
+        rect(c, bx + 3 * s, -bh / 2 + 2 * s - 1, bw - 6 * s, bh - 5 * s, '#c1d2c8', bh * .25);
+        const drain = bath ? bx + bw - 6 * s : bw * .23;
+        dot(c, drain, 0, 1.6 * s, '#6e8782');
+        const fx = bath ? bx + 5 * s : -bw * .15;
+        line(c, fx, -bh / 2 - 2 * s, fx, -bh / 2 + 4 * s, '#536f6d', 3 * s);
+        line(c, fx - s, -bh / 2 - 2 * s, fx - s, -bh / 2 + 3 * s, '#e2e9d9', 1.2 * s);
+        if (!bath) rect(c, w * .29, -h * .05, w * .1, h * .16, '#d8c59a', s, '#adab8f');
+    } else if (variant === 'serverRack') {
+        rect(c, x + 4, y + 4, w - 8, h - 10, '#283b41', s, '#526a70');
+        const count = Math.max(3, Math.min(6, Math.floor(w / 17)));
+        const bay = (w - 12) / count;
+        for (let i = 0; i < count; i++) {
+            const px = x + 6 + i * bay;
+            rect(c, px, y + 6, bay - 2, h - 15, i % 2 ? '#455d63' : '#344b52', s);
+            for (let j = 0; j < 3; j++) line(c, px + 2, y + 10 + j * 3 * s, px + bay - 5, y + 10 + j * 3 * s, '#20343b', s);
+            dot(c, px + bay / 2 - 1, h / 2 - 11 * s, 1.2 * s, i % 3 ? '#84b29b' : '#95b3bc');
+        }
+    } else if (variant === 'controlConsole') {
+        const screenW = w * .45, screenH = h * .52;
+        rect(c, x + 5, -screenH / 2 - 1, screenW, screenH, '#243b3d', 2 * s, '#98b3ab');
+        rect(c, x + 8, -screenH / 2 + 2, screenW - 6, screenH - 6, '#72a4a0', s);
+        const sy = -screenH / 2 + 5, sx = x + 11;
+        line(c, sx, sy, sx + screenW * .28, sy, '#b2cbc0', s);
+        line(c, sx, sy + 4 * s, sx + screenW * .46, sy + 4 * s, '#466e6b', s);
+        line(c, sx, sy + 8 * s, sx + screenW * .2, sy + 8 * s, '#b2cbc0', s);
+        for (let i = 0; i < 3; i++) {
+            const px = x + w * (.65 + i * .1);
+            dot(c, px, -h * .09, 3 * s, '#3c5657');
+            dot(c, px, -h * .09 - s, 2 * s, ['#c3ad71', '#98ba9c', '#b28370'][i]);
+            line(c, px - 2 * s, h * .12, px + 2 * s, h * .12, '#253c3f', 2 * s);
+        }
+    } else {
+        // Machines and generators retain distinct mechanical silhouettes.
+        const generator = variant === 'generator';
+        const pw = w * (generator ? .57 : .7), ph = h - 14;
+        rect(c, x + 6, -ph / 2 - 1, pw, ph, '#354b4e', 3 * s, '#95aaa4');
+        for (let i = 0; i < 5; i++) {
+            const px = x + 10 + (pw - 8) * i / 5;
+            line(c, px, -ph / 2 + 3, px, ph / 2 - 3, '#6f8b8d', 2 * s);
+            line(c, px + 2 * s, -ph / 2 + 3, px + 2 * s, ph / 2 - 3, '#223c40', s);
+        }
+        const capX = x + w * .83;
+        dot(c, capX, -h * .1, Math.min(5 * s, w * .075), generator ? '#c2a866' : '#899f96');
+        line(c, capX - 2 * s, -h * .1, capX + 2 * s, -h * .1, '#4e6659', 1.5 * s);
+        rect(c, capX - 3 * s, h * .12, 6 * s, 3 * s, generator ? '#ac7a67' : '#cad0b1', s);
+    }
+    line(c, x + 4, y + 2, w / 2 - 4, y + 2, 'rgba(239,244,217,.36)', s);
+    c.restore();
+    return true;
+}
+
 export function drawRoofCourses(c, w, h, variant) {
     const metal = ['warehouse', 'ironworks', 'lodge', 'snow-lab', 'barn'].includes(variant);
     const stepY = metal ? 64 : 18;

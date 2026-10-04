@@ -38,12 +38,17 @@ try {
         const { default: Controls } = await import('/src/components/SurvivMobileControls.jsx');
         const host = document.createElement('div'); document.body.appendChild(host);
         const style = document.createElement('style');
-        style.textContent = '.surviv-mobile-controls{position:fixed;inset:90px 20px;display:flex;gap:100px;z-index:99}.surviv-mobile-stick{width:130px;height:130px;touch-action:none;background:#234}.surviv-mobile-actions{display:none}';
+        style.textContent = '.surviv-mobile-controls{position:fixed;inset:90px 20px;display:flex;gap:80px;z-index:99}.surviv-mobile-stick{width:130px;height:130px;touch-action:none;background:#234}.surviv-mobile-actions{display:flex;flex-direction:column;width:110px}';
         document.head.appendChild(style);
         window.inputSamples = { move: [], aim: [] };
-        createRoot(host).render(React.createElement(Controls, {
+        const root = createRoot(host);
+        window.actionSamples = { reload: 0, heal: 0 };
+        window.renderControls = (props = {}) => root.render(React.createElement(Controls, {
             onMove: (...p) => window.inputSamples.move.push(p), onAim: (...p) => window.inputSamples.aim.push(p),
+            onReload: () => window.actionSamples.reload++, onHeal: () => window.actionSamples.heal++,
+            ...props,
         }));
+        window.renderControls();
     });
     const stick = mobile.getByRole('application', { name: 'Move', exact: true });
     await stick.waitFor();
@@ -54,9 +59,20 @@ try {
     await mobile.evaluate(() => window.dispatchEvent(new Event('orientationchange')));
     assert.deepEqual(await mobile.evaluate(() => window.inputSamples.move.at(-1)), [0, 0, 0]);
     await mobile.mouse.up();
+    await mobile.evaluate(() => window.renderControls({ isReloading: true, canReload: false }));
+    const cancelReload = mobile.getByRole('button', { name: 'Cancel reload', exact: true });
+    await cancelReload.click();
+    assert.equal(await mobile.evaluate(() => window.actionSamples.reload), 1, 'active reload remains cancellable when normal reload is ineligible');
+    await mobile.evaluate(() => window.renderControls({ isHealing: true, canHeal: false }));
+    await mobile.getByRole('button', { name: 'Cancel healing', exact: true }).click();
+    assert.equal(await mobile.evaluate(() => window.actionSamples.heal), 1, 'active heal uses the existing medkit button for cancellation');
+    await mobile.evaluate(() => window.renderControls());
+    assert.equal(await mobile.getByRole('button', { name: 'Reload weapon', exact: true }).isDisabled(), true);
+    assert.equal(await mobile.getByRole('button', { name: 'Use medkit', exact: true }).isDisabled(), true);
+    await mobile.mouse.move(bounds.x + bounds.width * .85, bounds.y + bounds.height * .5);
     await mobile.mouse.down();
     assert.ok(await mobile.evaluate(() => window.inputSamples.move.at(-1)[2] > .1), 'stick can be reacquired after interruption');
     await mobile.mouse.up();
     assert.deepEqual(errors, []);
-    console.log('Desktop chord/release/focus and actual mobile joystick interruption checks passed.');
+    console.log('Desktop chord/release/focus, mobile joystick interruption and compact action-cancel checks passed.');
 } finally { await browser.close(); }

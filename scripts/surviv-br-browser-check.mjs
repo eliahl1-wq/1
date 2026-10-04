@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const api = 'http://127.0.0.1:5057';
-const origin = 'http://127.0.0.1:5174';
+const origin = process.env.SURVIV_PLAYTEST_ORIGIN || 'http://127.0.0.1:5174';
 const fixture = () => fetch(`${api}/fixture`).then(response => response.json());
 const act = action => fetch(`${api}/fixture/${action}`, { method: 'POST' });
 const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : {}) });
@@ -89,6 +89,17 @@ try {
     await page.waitForTimeout(350);
     await page.mouse.up();
     assert.ok((await fixture()).player.ammo < 30, 'real firing consumes server magazine');
+    await page.waitForTimeout(100);
+    const beforeReload = (await fixture()).player;
+    await page.keyboard.press('r');
+    await page.waitForFunction(async url => (await fetch(url).then(r => r.json())).player?.reloading,
+        `${api}/fixture`, {timeout:3000});
+    await page.keyboard.press('x');
+    await page.waitForFunction(async url => !(await fetch(url).then(r => r.json())).player?.reloading,
+        `${api}/fixture`, {timeout:3000});
+    const afterCancel = (await fixture()).player;
+    assert.equal(afterCancel.ammo,beforeReload.ammo,'cancel does not insert rounds');
+    assert.deepEqual(afterCancel.ammoReserves,beforeReload.ammoReserves,'real Socket.IO cancellation conserves reserve ammo');
     await page.screenshot({ path: resolve(output, 'in-game.png') });
     await page.keyboard.press('m');
     await page.getByRole('dialog', { name: 'Full match map' }).waitFor();
@@ -140,6 +151,6 @@ try {
     await touch.getByRole('button', { name: 'Back to lobby', exact: true }).click();
     await touch.waitForURL('**/pre-game');
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log(JSON.stringify({ passed: true, scenarios: ['public selection', '10-player queue', 'locked countdown', 'movement', 'pickup', 'firing', 'safe-zone map', 'rejoin', 'victory payout', 'queue again'], screenshots: output }, null, 2));
+    console.log(JSON.stringify({ passed: true, scenarios: ['public selection', '10-player queue', 'locked countdown', 'movement', 'pickup', 'firing', 'reload/cancel via Socket.IO', 'safe-zone map', 'rejoin', 'victory payout', 'queue again'], screenshots: output }, null, 2));
     }
 } finally { await browser.close(); }

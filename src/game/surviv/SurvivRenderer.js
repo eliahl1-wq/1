@@ -7,7 +7,7 @@ import { formatBalanceAmount } from '../../utils/displayCurrency.js';
 import { drawFarmerOutfit, drawFarmerHat } from '../../constants/signatureSkins.js';
 import { ingestAirdropTimers, ingestExplosionEvents } from './worldEvents.js';
 import { presentBRZone } from './brZonePresentation.js';
-import { drawCraftedFurniture, drawRoofCourses, drawRoofWingRelief, drawInteriorAccessories } from './architectureArt.js';
+import { drawCraftedFurniture, drawCraftedFixtures, drawRoofCourses, drawRoofWingRelief, drawInteriorAccessories } from './architectureArt.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
@@ -40,6 +40,8 @@ import {
 } from './weaponVisuals.js';
 import { stabilizeHouseSelection } from './houseTransition.js';
 import { appendHouseFootprintPath, buildVisibilityRayIndex, castVisibilityRay, getHouseBoundarySegments } from './visibilityGeometry.js';
+import { buildRenderSpatialIndex, queryRenderSpatialIndex } from './renderSpatialIndex.js';
+import { advanceWalkPose, didCompleteReload, isSameEquippedWeapon, localPresentationAim } from './playerPresentation.js';
 
 const WEAPON_LABELS = Object.fromEntries(
     Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.label]),
@@ -1297,7 +1299,7 @@ function drawInteriorPropFinish(ctx, o, variant, w, h) {
 }
 
 function drawFurnitureTopDown(ctx, o, variant) {
-    if (drawCraftedFurniture(ctx, o, variant)) {
+    if (drawCraftedFurniture(ctx, o, variant) || drawCraftedFixtures(ctx, o, variant)) {
         drawInteriorPropFinish(ctx, o, variant, o.w, o.h);
         return;
     }
@@ -1979,6 +1981,10 @@ export class SurvivRenderer {
         this._visibleRoads = [];
         this._visibleBridges = [];
         this._visibleWorldObstacles = [];
+        this._visibleHouseRoofs = [];
+        this._visibleExteriorDoors = [];
+        this._renderIndexesBySource = new Map();
+        this._renderQueryBounds = { left: 0, right: 0, top: 0, bottom: 0 };
         this._obstacleRenderSignature = '';
         this._obstacleRevision = 0;
         this._viewLeft = -Infinity;
@@ -2010,6 +2016,7 @@ export class SurvivRenderer {
         };
         this.keys = { w: false, a: false, s: false, d: false };
         this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
+        this._hasPointerAim = false;
         this._firePressId = 0;
         this._canvasLeft = 0;
         this._canvasTop = 0;
@@ -2128,6 +2135,7 @@ export class SurvivRenderer {
         // Previous ammo for detecting shots fired
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
+        this._prevWeaponSlot = 2;
         this._prevReloading = false;
         this._reloadAudioPrimed = false;
         this._prevMedkitRemainingMs = 0;
@@ -2348,6 +2356,7 @@ export class SurvivRenderer {
         this._renderObstaclesByHouseId.clear();
         this._collisionBuckets.clear();
         this._houseBuckets.clear();
+        this._renderIndexesBySource.clear();
         this._playersById.clear();
         this._meleeAnimations.clear();
         this._lastPlayedMeleeAttackIds.clear();
@@ -2356,6 +2365,8 @@ export class SurvivRenderer {
         this._visibleRoads.length = 0;
         this._visibleBridges.length = 0;
         this._visibleWorldObstacles.length = 0;
+        this._visibleHouseRoofs.length = 0;
+        this._visibleExteriorDoors.length = 0;
         this._obstacleRenderSignature = '';
         this._obstacleRevision++;
         this._roofSpriteCache.clear();
@@ -2395,6 +2406,7 @@ export class SurvivRenderer {
         this._prevHp = 100;
         this._prevAmmo = -1;
         this._prevWeapon = 'fists';
+        this._prevWeaponSlot = 2;
         this._prevReloading = false;
         this._reloadAudioPrimed = false;
         this._prevMedkitRemainingMs = 0;
@@ -2429,6 +2441,7 @@ export class SurvivRenderer {
             inventory: { weapons: [], medkits: 0, ammoReserves: {}, chestsOpened: 0 },
         };
         this.clearInput();
+        this._hasPointerAim = false;
         this._interpMe = null;
         this._interpBullets.clear();
         this.myId = null;
@@ -2593,6 +2606,12 @@ export class SurvivRenderer {
 
         this.me.x = state.x;
         this.me.y = state.y;
+        // Only our pose follows the current pointer/touch aim immediately.
+        // The server still owns shots, hit tests and every remote player's aim.
+        const canAimLocally = this.inputEnabled && !this.spectatorMode
+            && (this._hasPointerAim || this.mobileAim.active);
+        state.angle = localPresentationAim(state.angle,
+            canAimLocally ? this.getInputPayload().aimAngle : NaN, canAimLocally);
         this.me.angle = state.angle;
         if (!this.externalCameraGetter && !this.spectatorMode) {
             this.camera.x = state.x;
@@ -2975,20 +2994,11 @@ export class SurvivRenderer {
             if (!activeMarkerIds.has(id)) this._graveFirstSeenAt.delete(id);
         }
 
-        // Accumulate walk cycle & bob for each player
+        // Pose state survives snapshots; actual interpolated travel advances
+        // it per rendered frame below rather than restarting at every 40 Hz tick.
         const activePlayerIds = new Set();
         for (const p of this.players) {
             activePlayerIds.add(p.id);
-            const prevPos = this._prevPlayers.get(p.id) || { x: p.x, y: p.y };
-            const distMoved = Math.hypot(p.x - prevPos.x, p.y - prevPos.y);
-            if (distMoved > 0.05 && distMoved < 40) {
-                p.walkCycle = (p.walkCycle || 0) + distMoved * 0.16;
-                p.walkBob = Math.sin(p.walkCycle);
-            } else {
-                p.walkBob = (p.walkBob || 0) * 0.85;
-                if (Math.abs(p.walkBob) < 0.01) p.walkBob = 0;
-            }
-            this._prevPlayers.set(p.id, { x: p.x, y: p.y });
         }
         for (const playerId of this._prevPlayers.keys()) {
             if (!activePlayerIds.has(playerId)) this._prevPlayers.delete(playerId);
@@ -3247,10 +3257,15 @@ export class SurvivRenderer {
             this._prevHp = me.hp || 0;
 
             const isReloading = !!me.reloading;
+            const previousEquipment = { weapon: this._prevWeapon, slot: this._prevWeaponSlot,
+                ammo: this._prevAmmo, reloading: this._prevReloading };
+            const currentEquipment = { weapon: me.weapon, slot: me.activeWeaponSlot,
+                ammo: me.ammo, reloading: isReloading };
+            const sameEquipment = isSameEquippedWeapon(previousEquipment, currentEquipment);
             if (this._reloadAudioPrimed && isReloading !== this._prevReloading) {
                 if (isReloading) {
                     playSurvivReloadSound('start', getSurvivWeaponFamily(me.weapon));
-                } else if (Number(me.ammo) > this._prevAmmo) {
+                } else if (didCompleteReload(previousEquipment, currentEquipment)) {
                     // A canceled reload should not falsely play the magazine-lock cue.
                     playSurvivReloadSound('complete', getSurvivWeaponFamily(me.weapon));
                 }
@@ -3270,7 +3285,7 @@ export class SurvivRenderer {
             this._healAudioPrimed = true;
 
             // Detect shots fired → muzzle flash + camera recoil
-            if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && me.weapon === this._prevWeapon && me.weapon !== 'fists' && !me.reloading) {
+            if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && sameEquipment && me.weapon !== 'fists' && !me.reloading) {
                 const weaponFamily = getSurvivWeaponFamily(me.weapon);
                 playSurvivGunshot(weaponFamily, { distance: 0, pan: 0 });
                 this._muzzleFlash = 1.0;
@@ -3320,12 +3335,13 @@ export class SurvivRenderer {
             this._prevAmmo = me.ammo ?? this._prevAmmo;
 
             // Detect weapon switch → animation
-            if (me.weapon !== this._prevWeapon) {
+            if (!sameEquipment) {
                 this._weaponSwitchT = 1.0;
                 this._weaponSwitchFrom = this._prevWeapon;
                 if (this._gunAudioPrimed) playSurvivEquipSound(getSurvivWeaponFamily(me.weapon));
                 this._prevWeapon = me.weapon;
             }
+            this._prevWeaponSlot = me.activeWeaponSlot;
 
             // Low ammo warning pulse
             if (me.weapon !== 'fists' && !me.reloading && me.ammo <= 3 && me.ammo > 0) {
@@ -3519,6 +3535,7 @@ export class SurvivRenderer {
     }
 
     handlePointerMove(clientX, clientY) {
+        this._hasPointerAim = true;
         // Do not force a layout read for every high-polling-rate mouse event.
         // World coordinates are recalculated from the latest screen position in
         // getInputPayload, where they are actually consumed.
@@ -3806,6 +3823,11 @@ export class SurvivRenderer {
         this.roadObstacles.sort((a, b) => roadLayer(a) - roadLayer(b));
         this.rebuildSurfaceChunkSources();
         this.sortedWorldObstacles = solid.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+        this._renderIndexesBySource.clear();
+        for (const source of [this.sortedWorldObstacles, this.houseFloors, this.doorways,
+            this.fieldObstacles, this.waterObstacles, this.roadObstacles, this.bridgeObstacles]) {
+            if (source.length > 32) this._renderIndexesBySource.set(source, buildRenderSpatialIndex(source));
+        }
         for (const obstacle of this.sortedWorldObstacles) {
             if (!obstacle._insideHouseId) continue;
             const houseObstacles = this._renderObstaclesByHouseId.get(obstacle._insideHouseId);
@@ -3929,14 +3951,30 @@ export class SurvivRenderer {
             && y + pad >= this._viewTop && y - pad <= this._viewBottom;
     }
 
-    collectVisibleObstacles(source, target, pad, currentHouse, currentRoom) {
+    collectInViewObstacles(source, target, pad = 0) {
         target.length = 0;
-        for (const obstacle of source) {
-            if (this.isObstacleInView(obstacle, pad)
-                && this.shouldDrawObstacle(obstacle, currentHouse, currentRoom)) {
-                target.push(obstacle);
-            }
+        const index = this._renderIndexesBySource.get(source);
+        if (index) {
+            const bounds = this._renderQueryBounds;
+            bounds.left = this._viewLeft - pad;
+            bounds.right = this._viewRight + pad;
+            bounds.top = this._viewTop - pad;
+            bounds.bottom = this._viewBottom + pad;
+            return queryRenderSpatialIndex(index, bounds, target);
         }
+        for (const obstacle of source) {
+            if (this.isObstacleInView(obstacle, pad)) target.push(obstacle);
+        }
+        return target;
+    }
+
+    collectVisibleObstacles(source, target, pad, currentHouse, currentRoom) {
+        this.collectInViewObstacles(source, target, pad);
+        let count = 0;
+        for (const obstacle of target) {
+            if (this.shouldDrawObstacle(obstacle, currentHouse, currentRoom)) target[count++] = obstacle;
+        }
+        target.length = count;
         return target;
     }
 
@@ -4788,7 +4826,7 @@ export class SurvivRenderer {
             for (const o of visibleWorldObstacles) {
                 if (o.kind === 'entrancePad') this.drawObstacle(ctx, o);
             }
-            for (const o of this.houseFloors) {
+            for (const o of this.collectInViewObstacles(this.houseFloors, this._visibleHouseRoofs, 80)) {
                 if ((!currentHouse || currentHouse.id !== o.id) && this.isObstacleInView(o, 80)) {
                     this.drawHouseEntrancePad(ctx, o);
                     this.drawHouseRoof(ctx, o);
@@ -4796,7 +4834,7 @@ export class SurvivRenderer {
             }
             // Exterior doors are clipped to the outside of the roof. A closed
             // door leaves a small lip; an outward-open door shows its full leaf.
-            for (const door of this.doorways) {
+            for (const door of this.collectInViewObstacles(this.doorways, this._visibleExteriorDoors, 40)) {
                 if (door.entranceRole !== 'interiorDoor' && this.isObstacleInView(door, 40)) {
                     this.drawExteriorDoorOutside(ctx, door);
                 }
@@ -4853,6 +4891,9 @@ export class SurvivRenderer {
                     p.angle = ip.angle;
                 }
             }
+            const pose = advanceWalkPose(this._prevPlayers.get(p.id), p.x, p.y, dt);
+            this._prevPlayers.set(p.id, pose);
+            p.walkBob = pose.bob;
             if (!this.isPointInView(p.x, p.y, 90)) continue;
             if (this.isPlayerHidden(p, currentHouse, currentRoom)) continue;
             this.drawPlayer(ctx, p);

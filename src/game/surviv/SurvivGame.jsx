@@ -29,6 +29,7 @@ import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 import { getSurvivWeaponFamily, getSurvivWeaponRarity, SURVIV_AMMO_CATALOG, SURVIV_WEAPON_CATALOG } from './weaponCatalog.js';
 import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
 import { createPrimaryFireInput, listenForInputInterruption } from './inputLifecycle.js';
+import { createSurvivInputTransport } from './inputTransport.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -53,6 +54,7 @@ const WEAPON_AMMO_TYPES = Object.fromEntries(
 );
 
 const SURVIV_RELOAD_UI_STEP_MS = 100;
+const SURVIV_MOVE_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright']);
 
 function isTextEntryTarget(target) {
     if (!(target instanceof Element)) return false;
@@ -254,6 +256,7 @@ export default function SurvivGame() {
     const handleGameEmote = useCallback((payload) => rendererRef.current?.showEmote(payload), []);
     const handleGameChat = useCallback((payload) => rendererRef.current?.showChat(payload), []);
     const inputIntervalRef = useRef(null);
+    const flushInputRef = useRef(null);
     const timerIntervalRef = useRef(null);
     const hasJoinedRef = useRef(false);
     const awaitingWelcomeRef = useRef(false);
@@ -267,6 +270,7 @@ export default function SurvivGame() {
     const sessionStartAtRef = useRef(null);
     const joinParamsRef = useRef({ nickname: 'Guest', entryFeeUsd: 5, adminFreeSurvivEntry: false });
     const reloadPendingRef = useRef(false);
+    const cancelActionPendingRef = useRef(false);
     const useMedkitPendingRef = useRef(false);
     // `true` preserves keyboard-nearest pickup; a string targets the exact
     // ground weapon tapped on touch devices.
@@ -668,11 +672,11 @@ export default function SurvivGame() {
             randomizationFactor: 0.35,
         });
         socketRef.current = socket;
-        let lastContinuousInput = '';
-        let lastInputSentAt = 0;
+        const inputTransport = createSurvivInputTransport({ socket });
 
         const clearPendingActions = () => {
             reloadPendingRef.current = false;
+            cancelActionPendingRef.current = false;
             useMedkitPendingRef.current = false;
             throwGrenadePendingRef.current = false;
             swapWeaponSlotsPendingRef.current = null;
@@ -745,6 +749,16 @@ export default function SurvivGame() {
                 if (mapOpenRef.current) closeFullMap();
                 return;
             }
+            if (k === 'x') {
+                e.preventDefault();
+                if (!e.repeat) {
+                    reloadPendingRef.current = false;
+                    useMedkitPendingRef.current = false;
+                    cancelActionPendingRef.current = true;
+                    flushInputRef.current?.(true);
+                }
+                return;
+            }
             const action = renderer.handleKeyDown(e);
             if (action === 'reload') reloadPendingRef.current = true;
             if (action === 'useMedkit') useMedkitPendingRef.current = true;
@@ -765,6 +779,7 @@ export default function SurvivGame() {
             if (typeof action === 'string' && action.startsWith('equipSlot:')) {
                 equipSlotPendingRef.current = Number(action.split(':')[1]);
             }
+            if (action || (!e.repeat && SURVIV_MOVE_KEYS.has(k))) flushInputRef.current?.(true);
         };
         const onKeyUp = (e) => {
             if (e.key.toLowerCase() === 'tab') {
@@ -773,6 +788,7 @@ export default function SurvivGame() {
                 syncFullMapVisibility();
             }
             renderer.handleKeyUp(e);
+            if (SURVIV_MOVE_KEYS.has(e.key.toLowerCase())) flushInputRef.current?.(true);
         };
         const fireInput = createPrimaryFireInput({
             renderer,
@@ -781,7 +797,7 @@ export default function SurvivGame() {
                 if (socket.connected && hasJoinedRef.current && !awaitingWelcomeRef.current) {
                     // Releases must survive transport backpressure, especially
                     // when hidden tabs stop the periodic input refresh below.
-                    socket.emit('survivInput', payload);
+                    inputTransport.send(payload, { reliable: true, force: true });
                 }
             },
         });
@@ -801,6 +817,7 @@ export default function SurvivGame() {
                 } else if (interaction?.kind === 'weapon' && interaction.target?.id) {
                     pickupWeaponPendingRef.current = interaction.target.id;
                 }
+                if (interaction) flushInputRef.current?.(true);
                 return;
             }
             if (!fireInput.press(e)) return;
@@ -825,6 +842,7 @@ export default function SurvivGame() {
             wheelWeaponSlot = nextWeaponSlot(currentSlot, e.deltaY, SURVIV_WEAPON_SLOTS.length);
             lastWeaponWheelAt = now;
             equipSlotPendingRef.current = wheelWeaponSlot;
+            flushInputRef.current?.(true);
         };
         const neutralizeInput = () => {
             clearPendingActions();
@@ -850,6 +868,7 @@ export default function SurvivGame() {
         document.addEventListener('focusin', onFocusIn);
 
         socket.on('connect', () => {
+            inputTransport.reset();
             const rejoining = hasJoinedRef.current;
             setIsConnected(true);
             setConnectionError('');
@@ -1258,7 +1277,7 @@ export default function SurvivGame() {
             alert(message);
         });
 
-        inputIntervalRef.current = setInterval(() => {
+        const flushInput = (reliable = false) => {
             if (
                 !socket.connected
                 || !hasJoinedRef.current
@@ -1270,6 +1289,11 @@ export default function SurvivGame() {
 
             const payload = renderer.getInputPayload();
             let hasAction = false;
+            if (cancelActionPendingRef.current) {
+                payload.cancelAction = true;
+                cancelActionPendingRef.current = false;
+                hasAction = true;
+            }
             if (reloadPendingRef.current) {
                 payload.reload = true;
                 reloadPendingRef.current = false;
@@ -1336,25 +1360,16 @@ export default function SurvivGame() {
                 hasAction = true;
             }
 
-            const continuousSignature = [
-                Math.round((Number(payload.dx) || 0) * 1000),
-                Math.round((Number(payload.dy) || 0) * 1000),
-                Math.round((Number(payload.aimAngle) || 0) * 1000),
-                payload.shooting ? 1 : 0,
-                Number(payload.firePressId) || 0,
-            ].join(':');
-            const now = Date.now();
-            if (!hasAction && continuousSignature === lastContinuousInput && now - lastInputSentAt < 250) return;
-            lastContinuousInput = continuousSignature;
-            lastInputSentAt = now;
-            if (hasAction) socket.emit('survivInput', payload);
-            else socket.volatile.emit('survivInput', payload);
-        }, 1000 / 60);
+            inputTransport.send(payload, { reliable, hasAction });
+        };
+        flushInputRef.current = flushInput;
+        inputIntervalRef.current = setInterval(flushInput, 1000 / 60);
 
         if (blockAutoJoinRef.current && worldUpdatesEnabledRef.current) renderer.start();
 
         return () => {
             worldUpdatesEnabledRef.current = false;
+            if (flushInputRef.current === flushInput) flushInputRef.current = null;
             clearInterval(inputIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             window.removeEventListener('keydown', onKeyDown);
@@ -1399,11 +1414,20 @@ export default function SurvivGame() {
     }, []);
 
     const handleMobileMove = useCallback((dx, dy) => {
-        rendererRef.current?.setMobileMove(dx, dy);
+        const renderer = rendererRef.current;
+        if (!renderer) return;
+        const wasMoving = Math.hypot(renderer.mobileMove.x, renderer.mobileMove.y) > 0.04;
+        renderer.setMobileMove(dx, dy);
+        const isMoving = Math.hypot(renderer.mobileMove.x, renderer.mobileMove.y) > 0.04;
+        if (wasMoving !== isMoving) flushInputRef.current?.(true);
     }, []);
 
     const handleMobileAim = useCallback((dx, dy, magnitude) => {
-        rendererRef.current?.setMobileAim(dx, dy, magnitude);
+        const renderer = rendererRef.current;
+        if (!renderer) return;
+        const wasShooting = renderer.mobileAim.shooting;
+        renderer.setMobileAim(dx, dy, magnitude);
+        if (wasShooting !== renderer.mobileAim.shooting) flushInputRef.current?.(true);
     }, []);
 
     const handleMobileMap = useCallback(() => {
@@ -1412,11 +1436,21 @@ export default function SurvivGame() {
     }, [syncFullMapVisibility]);
 
     const handleMobileReload = useCallback(() => {
-        reloadPendingRef.current = true;
+        if (rendererRef.current?.me?.reloading) {
+            reloadPendingRef.current = false;
+            useMedkitPendingRef.current = false;
+            cancelActionPendingRef.current = true;
+        } else reloadPendingRef.current = true;
+        flushInputRef.current?.(true);
     }, []);
 
     const handleMobileHeal = useCallback(() => {
-        useMedkitPendingRef.current = true;
+        if (Number(rendererRef.current?.me?.medkitRemainingMs) > 0) {
+            reloadPendingRef.current = false;
+            useMedkitPendingRef.current = false;
+            cancelActionPendingRef.current = true;
+        } else useMedkitPendingRef.current = true;
+        flushInputRef.current?.(true);
     }, []);
 
     const handleAdminSpawnBot = useCallback(() => {
@@ -1482,6 +1516,7 @@ export default function SurvivGame() {
                     canReload={canMobileReload}
                     canHeal={canMobileHeal}
                     isReloading={!!me?.reloading}
+                    isHealing={medkitRemainingMs > 0}
                     medkitCount={me?.inventory?.medkits || 0}
                 />
             )}
@@ -1548,6 +1583,7 @@ export default function SurvivGame() {
                     <span><kbd>F</kbd> INTERACT</span>
                     <span><kbd>R</kbd> RELOAD</span>
                     <span><kbd>H</kbd> HEAL</span>
+                    <span><kbd>X</kbd> CANCEL</span>
                     <span><kbd>TAB</kbd> MAP</span>
                 </div>
             )}
