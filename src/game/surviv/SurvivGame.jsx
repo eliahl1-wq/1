@@ -665,6 +665,7 @@ export default function SurvivGame() {
         const socket = io(API_URL, {
             auth: { token: authToken, presenceId: getOrCreatePresenceId() },
             transports: ['websocket', 'polling'],
+            tryAllTransports: true,
             reconnection: true,
             reconnectionAttempts: Infinity,
             reconnectionDelay: 2000,

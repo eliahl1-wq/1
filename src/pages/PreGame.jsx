@@ -8,6 +8,7 @@ import '../styles/slitherSpecialSkins.css';
 import '../styles/pregameModeSelector.css';
 import CurrencySwitchButton from '../components/CurrencySwitchButton';
 import PregameGameBackground from '../components/PregameGameBackground';
+import { preloadGameForMode } from '../game/gameModules.js';
 import { drawSurvivPlayerPreview } from '../game/surviv/SurvivRenderer.js';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
@@ -392,6 +393,15 @@ export default function PreGame() {
     const [selectedMode, setSelectedMode] = useState(
         () => resolvePreGameMode(location.pathname, location.state?.selectedMode)
     );
+    useEffect(() => {
+        if (!selectedMode) return;
+        // Load the chosen match UI while the player chooses the amount, so the
+        // play click does not also wait for an unrelated admin or game bundle.
+        const timer = window.setTimeout(() => {
+            void preloadGameForMode(selectedMode).catch(() => {});
+        }, 120);
+        return () => window.clearTimeout(timer);
+    }, [selectedMode]);
     const [selectedEntryFee, setSelectedEntryFee] = useState(() => {
         const stored = localStorage.getItem('selected_entry_fee');
         return (stored && stored !== 'null') ? Number(stored) : null;
@@ -429,7 +439,7 @@ export default function PreGame() {
         if (freshSelectionInitializedRef.current) return;
         freshSelectionInitializedRef.current = true;
 
-        const isPlainPregameVisit = location.pathname === '/pre-game'
+        const isPlainPregameVisit = (location.pathname === '/' || location.pathname === '/pre-game')
             && !location.state?.selectedMode
             && !tournamentId;
         if (!isPlainPregameVisit) return;
@@ -460,6 +470,8 @@ export default function PreGame() {
             setSelectedMode(resolvePreGameMode('/slither', location.state?.selectedMode, !!user?.isAdmin));
         } else if (location.pathname === '/agar') {
             setSelectedMode('agar');
+        } else if (location.pathname === '/surviv') {
+            setSelectedMode('surviv');
         } else if (location.state?.selectedMode) {
             setSelectedMode(normalizeGamemodeForLobby(location.state.selectedMode, !!user?.isAdmin));
         }
@@ -640,6 +652,10 @@ export default function PreGame() {
         }
         if (location.pathname === '/slither') {
             setPageSeo(SEO.slither);
+            return;
+        }
+        if (location.pathname === '/surviv') {
+            setPageSeo(SEO.surviv);
             return;
         }
         setPageSeo(SEO.home);
@@ -1100,6 +1116,25 @@ export default function PreGame() {
     const modeBaseName = modeSubtitle === 'Normal'
         ? `${modeCardTitle} Normal`
         : `${modeCardTitle} ${modeSubtitle}`;
+    const guestSeoCopy = location.pathname === '/agar'
+        ? {
+            title: 'Play Agar online for free or with SOL stakes',
+            subtitle: 'Collect pellets, grow your mass and outplay competitors in Arenifi’s browser-based Agar arenas.',
+        }
+        : location.pathname === '/slither'
+            ? {
+                title: 'Play Slither online for free or with SOL stakes',
+                subtitle: 'Grow your snake, trap opponents and compete on the live leaderboard from your browser.',
+            }
+            : location.pathname === '/surviv'
+                ? {
+                    title: 'Play Arenifi Surviv battle royale online',
+                    subtitle: 'Loot equipment, fight for position and survive the shrinking zone in a top-down browser arena.',
+                }
+                : {
+                    title: 'Play Agar, Slither and Surviv arenas on Arenifi',
+                    subtitle: 'Choose free play or an available SOL-staked match, then compete in real time from your browser.',
+                };
 
     const playBtnLabel = isMatchmaking
         ? <><span className="spinner" /> {isBattleRoyaleMode ? 'Finding match…' : 'Joining…'}</>
@@ -1127,10 +1162,6 @@ export default function PreGame() {
     // ── Render ─────────────────────────────────────────
     return (
         <div className="page-shell page-shell--pregame">
-            <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
-                <h1>Arenifi — {modeBaseName} multiplayer arenas</h1>
-                <p>Play {modeBaseName}.io on Arenifi. Choose free play or a SOL-staked match, compete live, and cash out your balance.</p>
-            </div>
             <PregameGameBackground
                 mode={selectedMode}
                 slitherColor={selectedSkin}
@@ -1480,7 +1511,7 @@ export default function PreGame() {
             )}
 
             {/* ── Main layout ── */}
-            {!isAuthenticated && <GuestWelcomeBanner />}
+            {!isAuthenticated && <GuestWelcomeBanner {...guestSeoCopy} />}
 
             {tournamentId && tournamentLoading ? (
                 <div className="tournament-empty" style={{ margin: '15vh auto', maxWidth: 520, textAlign: 'center', color: 'var(--text-2)' }}>
@@ -2132,21 +2163,6 @@ export default function PreGame() {
                             <path
                                 fill="currentColor"
                                 d="M19.5 5.34A16.3 16.3 0 0 0 15.44 4l-.5 1.02a15.1 15.1 0 0 0-5.87 0L8.56 4A16.5 16.5 0 0 0 4.5 5.35C1.93 9.15 1.23 12.85 1.58 16.5a16.6 16.6 0 0 0 4.98 2.52l1.2-1.65a10.6 10.6 0 0 1-1.89-.91l.46-.36c3.64 1.69 7.6 1.69 11.2 0l.47.36c-.6.36-1.24.67-1.9.91l1.2 1.65a16.5 16.5 0 0 0 4.98-2.52c.42-4.23-.72-7.9-2.78-11.16ZM8.52 14.3c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.88 2.27-2 2.27Zm6.96 0c-1.1 0-2-1.02-2-2.27s.88-2.27 2-2.27c1.13 0 2.02 1.03 2 2.27 0 1.25-.87 2.27-2 2.27Z"
-                            />
-                        </svg>
-                    </a>
-                    <a
-                        className="pregame-social-link pregame-social-link--x"
-                        href="https://x.com/agarstake"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="Follow Arenifi on X"
-                        title="Follow Arenifi on X"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                                fill="currentColor"
-                                d="M18.9 2H22l-6.77 7.74L23.2 22h-6.24l-4.89-6.39L6.48 22H3.36l7.26-8.3L2.97 2h6.4l4.42 5.84L18.9 2Zm-1.09 17.84h1.73L8.43 4.05H6.58l11.23 15.79Z"
                             />
                         </svg>
                     </a>

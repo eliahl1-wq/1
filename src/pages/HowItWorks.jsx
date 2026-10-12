@@ -23,19 +23,19 @@ const STEPS = [
     {
         num: '03',
         title: 'Pick a mode & stake',
-        desc: `Choose Agar or Slither, select your entry tier ($${ENTRY_TIERS.join(' / $')}), and enter the arena against real players.`,
+        desc: `Choose a game mode, then select free play or an available entry tier ($${ENTRY_TIERS.join(' / $')} for supported normal arenas).`,
         icon: '⚔',
     },
     {
         num: '04',
         title: 'Grow & dominate',
-        desc: 'Eat food, absorb rivals, and grow your balance in the arena. Every kill drops loot — every death drops yours.',
+        desc: 'Collect resources, outplay opponents and grow your arena balance. Some modes also use server-controlled bots to keep matches active.',
         icon: '🎯',
     },
     {
         num: '05',
         title: 'Cash out anytime',
-        desc: 'Hold the cash-out button when you\'re ready. Your arena balance converts to SOL in your wallet instantly. No waiting.',
+        desc: 'In supported modes, hold the cash-out button when you\'re ready. After server confirmation and the displayed fee, the balance is credited to your Arenifi account for withdrawal.',
         icon: '💰',
     },
 ];
@@ -53,7 +53,7 @@ const MODES = [
     },
     {
         name: 'Slither Arena',
-        desc: 'Competitive mode with shrinking zones and separate stake pools. Real players only.',
+        desc: 'Competitive mode with shrinking zones and separate stake pools.',
         stakes: '$2 / $5',
     },
 ];
@@ -75,7 +75,7 @@ export default function HowItWorks() {
                     <p className="label">Guide</p>
                     <h1 className="info-hero-title">How Arenifi works</h1>
                     <p className="info-hero-sub">
-                        Real-money Agar.io and Slither.io on Solana. Five steps from signup to cashout.
+                        Free-play and eligible SOL-staked browser arenas. Five steps from signup to cashout.
                     </p>
                 </div>
 
@@ -108,13 +108,13 @@ export default function HowItWorks() {
                 <section className="info-section info-cta-block">
                     <h2 className="info-section-title">Ready to play?</h2>
                     <p className="info-hero-sub" style={{ marginBottom: '20px' }}>
-                        Join thousands of players competing for real crypto rewards.
+                        Choose a game mode and review the current entry option before you play.
                     </p>
                     <div className="info-cta-row">
                         <button type="button" className="btn btn-primary" onClick={() => navigate('/register')}>
                             Create account
                         </button>
-                        <button type="button" className="btn btn-ghost" onClick={() => navigate('/pre-game')}>
+                        <button type="button" className="btn btn-ghost" onClick={() => navigate('/')}>
                             Go to lobby
                         </button>
                     </div>

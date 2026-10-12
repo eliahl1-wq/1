@@ -5,9 +5,10 @@ export default function AppFooter({ showStatus = true }) {
     return (
         <footer className="app-footer">
             <nav className="footer-links" aria-label="Site links">
+                <Link to="/gamemodes">Game Modes</Link>
+                <Link to="/tournaments">Tournaments</Link>
                 <Link to="/how-it-works">How it Works</Link>
                 <Link to="/faq">FAQ</Link>
-                <Link to="/rewards#affiliate-rewards">Affiliate</Link>
                 <a href="mailto:support@arenifi.fun">Support</a>
                 {showStatus && (
                     <span className="footer-status">

@@ -1863,6 +1863,24 @@
   line-height: 1.45;
 }
 
+.guest-banner-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 8px;
+  font-size: 0.64rem;
+  font-weight: 650;
+}
+
+.guest-banner-links a {
+  color: var(--text-3);
+  text-decoration: none;
+}
+
+.guest-banner-links a:hover {
+  color: var(--accent);
+}
+
 .guest-banner-steps {
   display: flex;
   flex-direction: column;

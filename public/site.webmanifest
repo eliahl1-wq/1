@@ -3,7 +3,7 @@
   "short_name": "Arenifi",
   "description": "Competitive multiplayer browser games with free-play and SOL-staked arenas.",
   "id": "/",
-  "start_url": "/pre-game",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0f",

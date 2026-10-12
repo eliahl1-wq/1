@@ -2064,6 +2064,7 @@ export class SurvivRenderer {
         window.addEventListener('resize', this._onResize);
         window.addEventListener('gamelayoutchange', this._onResize);
         window.visualViewport?.addEventListener('resize', this._onResize);
+        document.addEventListener('fullscreenchange', this._onResize);
 
         // --- New visual feedback systems ---
         // Particle system (muzzle flash, bullet impacts, debris)
@@ -2276,6 +2277,7 @@ export class SurvivRenderer {
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener('gamelayoutchange', this._onResize);
         window.visualViewport?.removeEventListener('resize', this._onResize);
+        document.removeEventListener('fullscreenchange', this._onResize);
     }
 
     start() {
@@ -2285,6 +2287,11 @@ export class SurvivRenderer {
         this._lastFrameAt = performance.now();
         const loop = (now) => {
             if (!this.running) return;
+            if (document.hidden) {
+                this._lastFrameAt = now;
+                this._raf = requestAnimationFrame(loop);
+                return;
+            }
             const dt = Math.min(0.05, Math.max(0.001, (now - this._lastFrameAt) / 1000));
             this._lastFrameAt = now;
             this.draw(dt);

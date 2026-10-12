@@ -85,8 +85,8 @@ export default function AppTopbar({ children }) {
         }
     };
     const isPathActive = (path) => {
-        if (path === '/pre-game') {
-            return ['/pre-game', '/agar', '/slither', '/surviv'].includes(location.pathname);
+        if (path === '/') {
+            return ['/', '/pre-game', '/agar', '/slither', '/surviv'].includes(location.pathname);
         }
         return location.pathname === path || location.pathname.startsWith(`${path}/`);
     };
@@ -104,7 +104,7 @@ export default function AppTopbar({ children }) {
 
     const navItems = (
         <>
-            <button type="button" className={linkClass('/pre-game')} aria-current={currentPage('/pre-game')} onClick={() => navigate('/pre-game')}>
+            <button type="button" className={linkClass('/')} aria-current={currentPage('/')} onClick={() => navigate('/')}>
                 Play
             </button>
             <button type="button" className={linkClass('/gamemodes')} aria-current={currentPage('/gamemodes')} onClick={() => navigate('/gamemodes')}>
@@ -163,7 +163,7 @@ export default function AppTopbar({ children }) {
                         </svg>
                     </button>
 
-                    <button type="button" className="logo" aria-label="Arenifi home" onClick={() => navigate('/pre-game')}>
+                    <button type="button" className="logo" aria-label="Arenifi home" onClick={() => navigate('/')}>
                         <BrandLogo responsive />
                     </button>
 

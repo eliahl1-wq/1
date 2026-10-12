@@ -24,7 +24,8 @@ import { isTouchDevice, getMobileCanvasDpr } from '../../utils/mobile';
 import { clearPendingResult, loadPendingResult, savePendingResult } from '../../utils/gamePendingResult.js';
 import { getOrCreatePresenceId } from '../../utils/sitePresence.js';
 import { getGameScreenSize, mapPointerToGameSpace, GAME_LAYOUT_CHANGE, getMobileViewZoom } from '../../utils/forcedLandscape';
-import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
+import { normalizeMinimapData } from '../minimap.js';
+import { GameMinimapCache } from '../minimapCache.js';
 import { playFoodEatSound, unlockGameAudio } from '../../audio/synthSounds.js';
 import { stopSessionRecording } from '../../utils/mixpanel';
 import '../../styles/gameInGame.css';
@@ -32,6 +33,8 @@ import { API_URL } from '../../utils/apiBase';
 import { adjustPlayerWheelZoom } from '../../utils/gameWheel.js';
 import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
+import { agarInputSignature, createLatestInputSender } from '../latestInput.js';
+import { AgarPresentation } from './presentation.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -55,8 +58,8 @@ function pruneAgarFoodCache(foodMap, px, py, screenW, screenH, users, myId) {
     const margin = 280;
     const halfW = screenW / 2 + margin;
     const halfH = screenH / 2 + margin;
-    const IN_VIEW_MISS_LIMIT = 48;
-    const OFF_VIEW_MISS_LIMIT = 18;
+    const IN_VIEW_MISS_LIMIT = 3;
+    const OFF_VIEW_MISS_LIMIT = 5;
     for (const [id, f] of foodMap) {
         const miss = f._missStreak || 0;
         if (miss === 0) continue;
@@ -103,6 +106,18 @@ export default function Game() {
     const location = useLocation();
     const navigate = useNavigate();
     const socketRef = useRef(null);
+    const inputSenderRef = useRef(null);
+    const latestInputRef = useRef({ x: 220, y: 0 });
+    const inputIntervalRef = useRef(null);
+    const queueSteering = useCallback((payload, options = {}) => {
+        latestInputRef.current = { ...latestInputRef.current, ...payload };
+        const socket = socketRef.current;
+        if (!socket?.connected) return;
+        if (inputSenderRef.current?.socket !== socket) {
+            inputSenderRef.current = { socket, sender: createLatestInputSender({ socket, event: '0', signature: agarInputSignature }) };
+        }
+        inputSenderRef.current.sender.send(latestInputRef.current, options);
+    }, []);
     const worldEmotesRef = useRef(new Map());
     const worldChatsRef = useRef(new Map());
     const hasJoinedGameRef = useRef(false);
@@ -111,6 +126,14 @@ export default function Game() {
 
     // Använd Refs för data som ändras ofta för att slippa starta om loopen
     const gameData = useRef({ player: {}, users: [], food: [], viruses: [], ejected: [], rewardInfo: null });
+    const presentationRef = useRef(new AgarPresentation());
+    const cellDrawPoolRef = useRef([]);
+    const cellDrawBufferRef = useRef([]);
+    const foodDrawPoolRef = useRef([]);
+    const foodDrawBufferRef = useRef([]);
+    const leaderboardSignatureRef = useRef('');
+    const foodPruneAtRef = useRef(0);
+    const minimapCacheRef = useRef(new GameMinimapCache());
     const myIdRef = useRef(null);
     const activeGameSessionIdRef = useRef(null);
     const prevBalanceRef = useRef(null);
@@ -172,6 +195,16 @@ export default function Game() {
     };
     const [isBattleRoyale, setIsBattleRoyale] = useState(initialBR);
     const [brZone, setBrZone] = useState(null);
+    const brZoneRef = useRef(null);
+    const brZoneUiAtRef = useRef(0);
+    const updateBrZone = useCallback(zone => {
+        brZoneRef.current = zone;
+        const now = performance.now();
+        if (now - brZoneUiAtRef.current >= 100 || brZoneUiAtRef.current === 0) {
+            brZoneUiAtRef.current = now;
+            setBrZone(zone);
+        }
+    }, []);
     const [brPrizePool, setBrPrizePool] = useState(0);
     const [brAliveCount, setBrAliveCount] = useState(0);
     const [brVictoryAmount, setBrVictoryAmount] = useState(null);
@@ -443,7 +476,8 @@ export default function Game() {
 
         const socket = io(API_URL, {
             auth: { token, presenceId: getOrCreatePresenceId() },
-            transports: ['polling', 'websocket'],
+            transports: ['websocket', 'polling'],
+            tryAllTransports: true,
             upgrade: true,
             rememberUpgrade: true,
             reconnection: true,
@@ -455,8 +489,12 @@ export default function Game() {
         });
 
         socketRef.current = socket;
+        inputIntervalRef.current = setInterval(() => {
+            if (gameReadyRef.current && worldUpdatesEnabledRef.current && !cashoutActiveRef.current) queueSteering({});
+        }, 25);
 
         socket.on('connect', () => {
+            inputSenderRef.current?.sender.reset();
             console.log('Connected to socket server');
             setIsConnected(true);
             if (!gameReadyRef.current) setJoinMessage('Checking your match…');
@@ -502,6 +540,11 @@ export default function Game() {
         });
 
         socket.on('welcome', (playerSettings, gameSizes) => {
+            presentationRef.current.reset();
+            presentationRef.current.update([playerSettings], performance.now());
+            foodCacheRef.current.clear();
+            gameData.current.rewardInfo = null;
+            leaderboardSignatureRef.current = '';
             if (Number(gameSizes?.solPrice) > 0) setServerSolPrice(Number(gameSizes.solPrice));
             gameReadyRef.current = true;
             setGameReady(true);
@@ -533,7 +576,7 @@ export default function Game() {
             global.battleRoyale = !!gameSizes?.battleRoyale;
             if (gameSizes?.prizePool) setBrPrizePool(gameSizes.prizePool);
             if (gameSizes?.playerCount) setBrPlayerCount(gameSizes.playerCount);
-            if (gameSizes?.zone) setBrZone(gameSizes.zone);
+            if (gameSizes?.zone) updateBrZone(gameSizes.zone);
             if (gameSizes?.battleRoyale && gameSizes?.prizePool && !brIntroTriggeredRef.current) {
                 brIntroTriggeredRef.current = true;
                 setBrShowIntro(true);
@@ -561,9 +604,9 @@ export default function Game() {
             if (canvas && socketRef.current?.connected) {
                 const { width, height } = getGameScreenSize();
                 const viewZoom = getMobileViewZoom();
-                socketRef.current.emit('0', {
-                    x: playerSettings.x ?? playerSettings.cells?.[0]?.x ?? 0,
-                    y: playerSettings.y ?? playerSettings.cells?.[0]?.y ?? 0,
+                queueSteering({
+                    x: 220,
+                    y: 0,
                     screenWidth: width / viewZoom,
                     screenHeight: height / viewZoom,
                 });
@@ -601,34 +644,39 @@ export default function Game() {
 
         socket.on('serverTellPlayerMove', (playerData, userData, foodList, massList, virusList, rewardInfo) => {
             if (!worldUpdatesEnabledRef.current) return;
+            presentationRef.current.update(userData, performance.now());
             const foodMap = foodCacheRef.current;
-            const seen = new Set();
-            for (const f of foodList || []) {
-                seen.add(f.id);
-                foodMap.set(f.id, { ...f, _missStreak: 0 });
-            }
-            for (const [id, f] of foodMap) {
-                if (seen.has(id)) continue;
-                const nextMiss = (f._missStreak || 0) + 1;
-                if (foodEatenByPlayer(f, myIdRef.current, userData)) {
-                    playFoodEatSound();
-                    foodMap.delete(id);
-                } else {
-                    foodMap.set(id, { ...f, _missStreak: nextMiss });
+            if (Array.isArray(foodList)) {
+                const seen = new Set();
+                for (const f of foodList) {
+                    seen.add(f.id);
+                    const cached = foodMap.get(f.id);
+                    if (cached) { Object.assign(cached, f); cached._missStreak = 0; }
+                    else foodMap.set(f.id, { ...f, _missStreak: 0 });
+                }
+                for (const [id, f] of foodMap) {
+                    if (seen.has(id)) continue;
+                    const nextMiss = (f._missStreak || 0) + 1;
+                    if (foodEatenByPlayer(f, myIdRef.current, userData)) {
+                        playFoodEatSound();
+                        foodMap.delete(id);
+                    } else {
+                        f._missStreak = nextMiss;
+                    }
                 }
             }
             gameData.current = {
                 player: playerData,
                 users: userData,
-                food: Array.from(foodMap.values()),
+                food: [],
                 ejected: massList,
                 viruses: virusList,
-                rewardInfo,
+                rewardInfo: { ...gameData.current.rewardInfo, ...rewardInfo },
             };
             if (rewardInfo?.battleRoyale) {
                 setIsBattleRoyale(true);
                 global.battleRoyale = true;
-                if (rewardInfo.zone) setBrZone(rewardInfo.zone);
+                if (rewardInfo.zone) updateBrZone(rewardInfo.zone);
                 if (rewardInfo.prizePool != null) setBrPrizePool(rewardInfo.prizePool);
                 if (rewardInfo.aliveCount != null) setBrAliveCount(rewardInfo.aliveCount);
             }
@@ -651,7 +699,7 @@ export default function Game() {
                 setBrShowIntro(true);
             }
         });
-        socket.on('brZoneUpdate', (zone) => setBrZone(zone));
+        socket.on('brZoneUpdate', updateBrZone);
         socket.on('brVictory', ({ amount }) => {
             setBrVictoryAmount(amount);
             localStorage.removeItem('current_game_mode');
@@ -670,6 +718,9 @@ export default function Game() {
                     prevKillsRef.current = me.kills ?? 0;
                 }
             }
+            const signature = lb.map(p => `${p.id}:${p.name || p.username || ''}:${p.balance}:${p.kills}:${p.mass}`).join('|');
+            if (signature === leaderboardSignatureRef.current) return;
+            leaderboardSignatureRef.current = signature;
             setLeaderboard(lb.map(p => ({
                 ...p,
                 balance: parseFloat(p.balance) || 0,
@@ -891,18 +942,22 @@ export default function Game() {
         };
 
         window.addEventListener('resize', handleResize);
+        window.visualViewport?.addEventListener('resize', handleResize);
+        document.addEventListener('fullscreenchange', handleResize);
         window.addEventListener(GAME_LAYOUT_CHANGE, handleResize);
         window.addEventListener('keydown', handleKeyDown);
         handleResize();
 
         return () => {
+            clearInterval(inputIntervalRef.current);
+            inputIntervalRef.current = null;
             worldUpdatesEnabledRef.current = false;
             cancelAnimationFrame(animationFrameId.current);
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('resize', handleResize);
+            window.visualViewport?.removeEventListener('resize', handleResize);
+            document.removeEventListener('fullscreenchange', handleResize);
             window.removeEventListener(GAME_LAYOUT_CHANGE, handleResize);
-
-            if (cashoutActiveRef.current) return;
 
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             if (socketRef.current) {
@@ -935,9 +990,7 @@ export default function Game() {
         if (canvas.style.width !== cssWidth) canvas.style.width = cssWidth;
         if (canvas.style.height !== cssHeight) canvas.style.height = cssHeight;
         if (socketRef.current?.connected) {
-            socketRef.current.emit('0', {
-                x: 0,
-                y: 0,
+            queueSteering({
                 screenWidth: width / viewZoom,
                 screenHeight: height / viewZoom,
             });
@@ -947,10 +1000,19 @@ export default function Game() {
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const graph = canvas.getContext('2d');
+        const graph = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        const pointScratch = { x: 0, y: 0 };
         
         const gameLoop = () => {
-            const { player, users, viruses, ejected, zoneSize } = gameData.current;
+            if (document.hidden) {
+                cameraFrameTimeRef.current = 0;
+                animationFrameId.current = requestAnimationFrame(gameLoop);
+                return;
+            }
+            const brZone = brZoneRef.current;
+            const { viruses, ejected, zoneSize } = gameData.current;
+            const users = presentationRef.current.sample(performance.now());
+            const player = users.find(user => user.id === myIdRef.current) || gameData.current.player;
             const { width, height } = getGameScreenSize();
             const dpr = canvasDprRef.current;
             graph.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -981,7 +1043,7 @@ export default function Game() {
                 const sentViewport = cameraViewportRef.current;
                 const sentAt = Date.now();
                 if (sentAt - sentViewport.sentAt >= 250 && Math.abs(viewZoom - sentViewport.zoom) >= 0.015) {
-                    socketRef.current.emit('0', {
+                    queueSteering({
                         screenWidth: width / viewZoom,
                         screenHeight: height / viewZoom,
                     });
@@ -991,10 +1053,11 @@ export default function Game() {
             const canRenderWorld = isConnected && (!isDead || isSpectating) && (hasPlayer || cashedAmount !== null || isSpectating);
             
             if (canRenderWorld) {
-                const worldToScreen = (wx, wy) => ({
-                    x: (wx - camX) * viewZoom + screen.width / 2,
-                    y: (wy - camY) * viewZoom + screen.height / 2,
-                });
+                const worldToScreen = (wx, wy) => {
+                    pointScratch.x = (wx - camX) * viewZoom + screen.width / 2;
+                    pointScratch.y = (wy - camY) * viewZoom + screen.height / 2;
+                    return pointScratch;
+                };
 
                 graph.fillStyle = global.backgroundColor;
                 graph.fillRect(0, 0, screen.width, screen.height);
@@ -1019,21 +1082,30 @@ export default function Game() {
                     graph.restore();
                 }
                 
-                pruneAgarFoodCache(foodCacheRef.current, camX, camY, screen.width / viewZoom, screen.height / viewZoom, users, myIdRef.current);
+                if (frameNow - foodPruneAtRef.current >= 80) {
+                    foodPruneAtRef.current = frameNow;
+                    pruneAgarFoodCache(foodCacheRef.current, camX, camY, screen.width / viewZoom, screen.height / viewZoom, users, myIdRef.current);
+                }
                 const halfW = screen.width / (2 * viewZoom) + 120;
                 const halfH = screen.height / (2 * viewZoom) + 120;
                 const myCells = users.find(u => u.id === myIdRef.current)?.cells || [];
-                const batchedFood = [];
+                const batchedFood = foodDrawBufferRef.current;
+                const foodPool = foodDrawPoolRef.current;
+                batchedFood.length = 0;
                 for (const f of foodCacheRef.current.values()) {
                     if (Math.abs(f.x - camX) > halfW || Math.abs(f.y - camY) > halfH) continue;
                     const fr = (f.radius || 5);
                     const underMe = myCells.some((c) => {
-                        const d = Math.hypot(c.x - f.x, c.y - f.y);
-                        return d < Math.max((c.radius || 0) - fr * 0.15, fr * 0.25);
+                        const dx = c.x - f.x, dy = c.y - f.y;
+                        const radius = Math.max((c.radius || 0) - fr * 0.15, fr * 0.25);
+                        return dx * dx + dy * dy < radius * radius;
                     });
                     if (underMe) continue;
                     const point = worldToScreen(f.x, f.y);
-                    const screenFood = { x: point.x, y: point.y, radius: fr * viewZoom, hue: f.hue };
+                    const index = batchedFood.length;
+                    const screenFood = foodPool[index] || (foodPool[index] = {});
+                    screenFood.x = point.x; screenFood.y = point.y;
+                    screenFood.radius = fr * viewZoom; screenFood.hue = f.hue;
                     if (f.golden || IS_MOBILE) {
                         renderUtils.drawFood(point, { ...f, radius: screenFood.radius }, graph, IS_MOBILE);
                     } else {
@@ -1058,13 +1130,17 @@ export default function Game() {
                 };
 
                 // Rita celler
-                const cellsToDraw = users.flatMap(u => {
+                const cellsToDraw = cellDrawBufferRef.current;
+                const cellPool = cellDrawPoolRef.current;
+                cellsToDraw.length = 0;
+                for (const u of users) {
                     const totalCellMass = (u.cells || []).reduce((sum, cell) => sum + (Number(cell.balance) || 0), 0);
                     const totalDollarBalance = Number(u.dollarBalance ?? u.balance ?? 0) || 0;
-                    return (u.cells || []).map(c => {
+                    for (const c of u.cells || []) {
                         const massShare = totalCellMass > 0 ? (Number(c.balance) || 0) / totalCellMass : 0;
-                        return {
-                            ...c,
+                        const index = cellsToDraw.length;
+                        const drawCell = cellPool[index] || (cellPool[index] = {});
+                        Object.assign(drawCell, c, {
                             name: u.username,
                             isMe: u.id === myIdRef.current,
                             isCashingOut: u.isCashingOut,
@@ -1072,13 +1148,14 @@ export default function Game() {
                             cashoutHoldActive: u.cashoutHoldActive,
                             cashoutHoldStartedAt: u.cashoutHoldStartedAt,
                             dollarBalance: totalDollarBalance * massShare,
-                            color: u.color.fill || u.color,
-                            borderColor: u.color.border || '#000',
+                            color: u.color?.fill || u.color || '#888888',
+                            borderColor: u.color?.border || '#000',
                             radius: (c.radius || 0) * viewZoom,
                             ...worldToScreen(c.x, c.y),
-                        };
-                    });
-                });
+                        });
+                        cellsToDraw.push(drawCell);
+                    }
+                }
                 
                 renderUtils.drawCells(cellsToDraw, { border: 6 * viewZoom, textBorderSize: 3 * viewZoom, textColor: '#fff', textBorder: '#000' }, 1, borders, graph, IS_MOBILE, hideNames);
                 const emoteNow = performance.now();
@@ -1143,7 +1220,7 @@ export default function Game() {
                         viruses: (viruses || []).map(v => ({ x: v.x, y: v.y })),
                         ejected: (ejected || []).map(m => ({ x: m.x, y: m.y })),
                     });
-                drawGameMinimap(graph, {
+                minimapCacheRef.current.draw(graph, {
                     screenW: screen.width,
                     screenH: screen.height,
                     isMobile: IS_MOBILE,
@@ -1164,14 +1241,14 @@ export default function Game() {
         };
         gameLoop();
         return () => cancelAnimationFrame(animationFrameId.current);
-    }, [isConnected, isDead, brZone, cashedAmount, isSpectating, baseViewZoom, getSpectatorCamera, specCamRef]);
+    }, [isConnected, isDead, cashedAmount, isSpectating, baseViewZoom, getSpectatorCamera, specCamRef]);
 
     const handleMouseMove = (e) => {
         if (!gameReadyRef.current || isSpectating || isDead || cashedAmount !== null || cashoutActiveRef.current) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(e.clientX, e.clientY, canvas);
-        socketRef.current?.emit('0', {
+        queueSteering({
             x: x / cameraZoomRef.current,
             y: y / cameraZoomRef.current,
             screenWidth: screenWidth / cameraZoomRef.current,
@@ -1192,7 +1269,7 @@ export default function Game() {
         const t = e.touches?.[0];
         if (!t) return;
         const { x, y, screenWidth, screenHeight } = mapPointerToGameSpace(t.clientX, t.clientY, canvas);
-        socketRef.current?.emit('0', {
+        queueSteering({
             x: x / cameraZoomRef.current,
             y: y / cameraZoomRef.current,
             screenWidth: screenWidth / cameraZoomRef.current,

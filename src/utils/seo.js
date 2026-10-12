@@ -1,12 +1,39 @@
-const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://arenifi.fun').replace(/\/$/, '');
+export const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://arenifi.fun').replace(/\/$/, '');
 
-export const BASE_KEYWORDS = [
-    'arenifi', 'competitive browser games', 'multiplayer io games',
-    'agar with money', 'agar.io with money', 'play agar for money', 'real money agar', 'real money agario',
-    'slither with money', 'slither.io with money', 'play slither for money', 'real money slither', 'real money slitherio',
-    'io games with money', 'real money io games', 'free play io games', 'crypto browser games',
-    'solana wager game', 'solana io game', 'earn crypto playing games', 'cash out crypto games',
-].join(', ');
+const DEFAULT_SOCIAL_IMAGE = `${SITE_URL}/arenifi-logo.png`;
+const ROUTE_SCHEMA_ID = 'arenifi-route-structured-data';
+
+const NOINDEX_EXACT_PATHS = new Set([
+    '/login',
+    '/register',
+    '/verify-email',
+    '/lobby',
+    '/game',
+    '/slither-game',
+    '/surviv-game',
+    '/transactions',
+    '/profile',
+    '/rewards',
+    '/shop',
+    '/br-lobby',
+    '/surviv-battle-royale',
+    '/pre-game',
+]);
+
+function normalizePath(pathname = '/') {
+    const path = String(pathname || '/').split(/[?#]/, 1)[0] || '/';
+    if (path === '/') return '/';
+    return `/${path.replace(/^\/+|\/+$/g, '')}`;
+}
+
+export function isNoIndexPath(pathname = '/') {
+    const path = normalizePath(pathname);
+    return NOINDEX_EXACT_PATHS.has(path)
+        || path === '/admin'
+        || path.startsWith('/admin/')
+        || path.startsWith('/studio/')
+        || /^\/tournaments\/[^/]+\/lobby$/.test(path);
+}
 
 function upsertMeta(selector, attrs) {
     let el = document.head.querySelector(selector);
@@ -29,13 +56,84 @@ function upsertLink(rel, href) {
     el.setAttribute('href', href);
 }
 
-/**
- * tabTitle     → browser tab only (short)
- * description  → Google meta description (not Discord/OG)
- * keywords     → meta keywords
- * Social tags are updated alongside the visible route metadata.
- */
-export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
+function canonicalUrl(path = '/') {
+    const normalized = normalizePath(path);
+    return normalized === '/' ? `${SITE_URL}/` : `${SITE_URL}${normalized}`;
+}
+
+function setStructuredData(value) {
+    document.getElementById(ROUTE_SCHEMA_ID)?.remove();
+    if (!value) return;
+
+    const script = document.createElement('script');
+    script.id = ROUTE_SCHEMA_ID;
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify(value);
+    document.head.appendChild(script);
+}
+
+export function applyRouteSeoPolicy(pathname = window.location.pathname) {
+    const noindex = isNoIndexPath(pathname);
+    const content = noindex
+        ? 'noindex, nofollow, noarchive'
+        : 'index, follow, max-image-preview:large';
+    upsertMeta('meta[name="robots"]', { name: 'robots', content });
+    upsertMeta('meta[name="googlebot"]', { name: 'googlebot', content });
+    if (noindex) setStructuredData(null);
+    return noindex;
+}
+
+function breadcrumbSchema(label, path) {
+    if (!path || path === '/') return null;
+    return {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+            {
+                '@type': 'ListItem',
+                position: 1,
+                name: 'Arenifi',
+                item: `${SITE_URL}/`,
+            },
+            {
+                '@type': 'ListItem',
+                position: 2,
+                name: label,
+                item: canonicalUrl(path),
+            },
+        ],
+    };
+}
+
+function gameSchema(name, description, path) {
+    return {
+        '@context': 'https://schema.org',
+        '@graph': [
+            {
+                '@type': 'VideoGame',
+                name,
+                description,
+                url: canonicalUrl(path),
+                gamePlatform: 'Web browser',
+                applicationCategory: 'Game',
+                operatingSystem: 'Any',
+                isAccessibleForFree: true,
+                publisher: { '@id': `${SITE_URL}/#organization` },
+            },
+            breadcrumbSchema(name, path),
+        ].filter(Boolean),
+    };
+}
+
+/** Update route-specific metadata after React navigation. */
+export function setPageSeo({
+    tabTitle,
+    description,
+    path = '/',
+    noindex,
+    ogType = 'website',
+    socialImage = DEFAULT_SOCIAL_IMAGE,
+    structuredData,
+}) {
     if (tabTitle) document.title = tabTitle;
 
     if (description) {
@@ -49,104 +147,165 @@ export function setPageSeo({ tabTitle, description, keywords, path = '' }) {
         upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: tabTitle });
     }
 
-    if (keywords) {
-        upsertMeta('meta[name="keywords"]', { name: 'keywords', content: keywords });
-    }
-
-    const canonical = `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+    const canonical = canonicalUrl(path);
     upsertLink('canonical', canonical);
     upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical });
+    upsertMeta('meta[property="og:type"]', { property: 'og:type', content: ogType });
+    upsertMeta('meta[property="og:image"]', { property: 'og:image', content: socialImage });
+    upsertMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: socialImage });
+    upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' });
+
+    const shouldNoIndex = noindex ?? isNoIndexPath(window.location.pathname);
+    const robots = shouldNoIndex
+        ? 'noindex, nofollow, noarchive'
+        : 'index, follow, max-image-preview:large';
+    upsertMeta('meta[name="robots"]', { name: 'robots', content: robots });
+    upsertMeta('meta[name="googlebot"]', { name: 'googlebot', content: robots });
+    setStructuredData(shouldNoIndex ? null : structuredData);
 }
+
+const HOME_DESCRIPTION = 'Play Agar, Slither and Surviv-style multiplayer games on Arenifi. Choose free play or enter SOL-staked matches where available.';
+const AGAR_DESCRIPTION = 'Play Agar online on Arenifi in free-play or SOL-staked arenas. Collect pellets, grow your mass and outplay other competitors.';
+const SLITHER_DESCRIPTION = 'Play Slither online on Arenifi in free-play or SOL-staked arenas. Grow your snake, trap opponents and compete on the live leaderboard.';
+const SURVIV_DESCRIPTION = 'Play Arenifi Surviv, a top-down browser battle royale with looting, ranged combat and a shrinking play zone.';
 
 export const SEO = {
     home: {
-        tabTitle: 'Arenifi | Competitive Browser Games with SOL Stakes',
-        description: 'Play competitive Agar, Slither and Surviv-style browser games on Arenifi. Choose free play or enter SOL-staked matches and compete live.',
-        keywords: BASE_KEYWORDS,
+        tabTitle: 'Play Agar & Slither for Money or Free | Arenifi',
+        description: HOME_DESCRIPTION,
         path: '/',
+        structuredData: {
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: 'Arenifi browser game arenas',
+            description: HOME_DESCRIPTION,
+            url: `${SITE_URL}/`,
+            isPartOf: { '@id': `${SITE_URL}/#website` },
+        },
     },
     agar: {
-        tabTitle: 'Play Agar Online | Arenifi',
-        description: 'Enter the high-stakes Agar arena. Wager SOL against real players, grow your mass, dominate the map, and cash out your crypto instantly.',
-        keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
+        tabTitle: 'Play Agar Online for Free or SOL Stakes | Arenifi',
+        description: AGAR_DESCRIPTION,
         path: '/agar',
+        structuredData: gameSchema('Arenifi Agar', AGAR_DESCRIPTION, '/agar'),
     },
     slither: {
-        tabTitle: 'Play Slither Online | Arenifi',
-        description: 'Join the ultimate competitive Slither arena. Stake SOL, outmaneuver opponents, claim the leaderboard, and cash out immediately.',
-        keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
+        tabTitle: 'Play Slither Online for Free or SOL Stakes | Arenifi',
+        description: SLITHER_DESCRIPTION,
         path: '/slither',
+        structuredData: gameSchema('Arenifi Slither', SLITHER_DESCRIPTION, '/slither'),
+    },
+    surviv: {
+        tabTitle: 'Play Surviv Battle Royale Online | Arenifi',
+        description: SURVIV_DESCRIPTION,
+        path: '/surviv',
+        structuredData: gameSchema('Arenifi Surviv', SURVIV_DESCRIPTION, '/surviv'),
+    },
+    gamemodes: {
+        tabTitle: 'Arenifi Game Modes | Agar, Slither & Surviv',
+        description: 'Compare Arenifi game modes, live player counts and entry options for Agar, Slither and Surviv.',
+        path: '/gamemodes',
+        structuredData: {
+            '@context': 'https://schema.org',
+            '@graph': [
+                {
+                    '@type': 'CollectionPage',
+                    name: 'Arenifi game modes',
+                    url: `${SITE_URL}/gamemodes`,
+                    description: 'A catalog of the playable Agar, Slither and Surviv modes on Arenifi.',
+                },
+                breadcrumbSchema('Game modes', '/gamemodes'),
+            ],
+        },
     },
     gamemodesAgar: {
         tabTitle: 'Agar Game Modes | Arenifi',
-        description: 'Choose your Agar mode: high-stakes Normal or winner-takes-all Battle Royale. Secure your entry and compete for the Solana prize pool.',
-        keywords: `${BASE_KEYWORDS}, agar.io real money, wager agar`,
+        description: 'Compare Arenifi Agar modes, live player counts and available entry options.',
         path: '/gamemodes',
     },
     gamemodesSlither: {
         tabTitle: 'Slither Game Modes | Arenifi',
-        description: 'Choose your Slither mode: high-stakes Normal or winner-takes-all Battle Royale. Secure your entry and compete for the Solana prize pool.',
-        keywords: `${BASE_KEYWORDS}, slither.io real money, wager slither`,
+        description: 'Compare Arenifi Slither modes, live player counts and available entry options.',
         path: '/gamemodes',
-    },
-    preGameAgar: {
-        tabTitle: 'Join an Agar Match | Arenifi',
-        description: 'Select your entry tier and jump straight into the Agar action. High stakes, real opponents, instant crypto cashouts.',
-        keywords: `${BASE_KEYWORDS}, agar.io cash out`,
-        path: '/pre-game',
     },
     gamemodesSurviv: {
-        tabTitle: 'Surviv Arena | Arenifi',
-        description: 'Surviv Normal — $5 entry top-down battle royale. Loot, fight, and cash out your balance anytime.',
-        keywords: `${BASE_KEYWORDS}, surviv.io real money, battle royale shooter`,
+        tabTitle: 'Surviv Game Modes | Arenifi',
+        description: 'Compare Arenifi Surviv modes, live player counts and available entry options.',
         path: '/gamemodes',
     },
-    preGameSlither: {
-        tabTitle: 'Join a Slither Match | Arenifi',
-        description: 'Select your entry tier and jump straight into the Slither action. High stakes, real opponents, instant crypto cashouts.',
-        keywords: `${BASE_KEYWORDS}, slither.io cash out`,
-        path: '/pre-game',
+    tournaments: {
+        tabTitle: 'Arenifi Tournaments | Live Browser Game Competitions',
+        description: 'View live and scheduled Arenifi tournaments, including entry fees, prize pools, attempts and standings.',
+        path: '/tournaments',
+        structuredData: {
+            '@context': 'https://schema.org',
+            '@graph': [
+                {
+                    '@type': 'CollectionPage',
+                    name: 'Arenifi tournaments',
+                    url: `${SITE_URL}/tournaments`,
+                    description: 'Live and scheduled Arenifi browser game tournaments.',
+                },
+                breadcrumbSchema('Tournaments', '/tournaments'),
+            ],
+        },
     },
     lobby: {
         tabTitle: 'Wallet & Lobby | Arenifi',
-        description: 'Manage your funds and deposit Solana (SOL) using your personal address or QR code to enter the arenas.',
-        keywords: `${BASE_KEYWORDS}, deposit solana, crypto game lobby`,
+        description: 'Manage your Arenifi balance and deposits.',
         path: '/lobby',
+        noindex: true,
     },
     login: {
         tabTitle: 'Log In | Arenifi',
         description: 'Log in securely to your Arenifi account.',
-        keywords: `${BASE_KEYWORDS}, arenifi login`,
         path: '/login',
+        noindex: true,
     },
     register: {
         tabTitle: 'Create an Account | Arenifi',
-        description: 'Create an Arenifi account to join multiplayer arenas, track performance and manage your balance.',
-        keywords: `${BASE_KEYWORDS}, arenifi register, sign up`,
+        description: 'Create an Arenifi account to join multiplayer arenas and manage your balance.',
         path: '/register',
+        noindex: true,
     },
     profile: {
         tabTitle: 'Profile & Performance | Arenifi',
-        description: 'Review your Arenifi profile, game performance and account settings.',
-        keywords: `${BASE_KEYWORDS}, arenifi profile, stats`,
+        description: 'Review your Arenifi profile and game performance.',
         path: '/profile',
+        noindex: true,
     },
     transactions: {
         tabTitle: 'Transaction History | Arenifi',
-        description: 'Review deposits, withdrawals and account transactions on Arenifi.',
-        keywords: `${BASE_KEYWORDS}, arenifi transactions, withdrawals`,
+        description: 'Review your Arenifi account transactions.',
         path: '/transactions',
+        noindex: true,
     },
     howItWorks: {
-        tabTitle: 'How Arenifi Works',
-        description: 'Learn the mechanics of our high-stakes Web3 arenas. Master the economy, understand cashouts, and start winning Solana.',
-        keywords: `${BASE_KEYWORDS}, how to play, cash out`,
+        tabTitle: 'How Arenifi Works | Games, Stakes & Cashouts',
+        description: 'Learn how Arenifi accounts, free play, SOL deposits, entry options, arena balances, fees and withdrawals work.',
         path: '/how-it-works',
+        structuredData: {
+            '@context': 'https://schema.org',
+            '@graph': [
+                {
+                    '@type': 'HowTo',
+                    name: 'How to play on Arenifi',
+                    description: 'Create an account, choose a mode, select free play or an available SOL-staked match, play and withdraw eligible account funds.',
+                    step: [
+                        { '@type': 'HowToStep', position: 1, name: 'Create an account' },
+                        { '@type': 'HowToStep', position: 2, name: 'Choose a game mode' },
+                        { '@type': 'HowToStep', position: 3, name: 'Select free play or an entry option' },
+                        { '@type': 'HowToStep', position: 4, name: 'Play the match' },
+                        { '@type': 'HowToStep', position: 5, name: 'Cash out and withdraw eligible funds' },
+                    ],
+                },
+                breadcrumbSchema('How it works', '/how-it-works'),
+            ],
+        },
     },
     faq: {
-        tabTitle: 'Help & FAQ | Arenifi',
-        description: 'Find answers about Arenifi accounts, gameplay, deposits, withdrawals and game rules.',
-        keywords: `${BASE_KEYWORDS}, faq, help, support`,
+        tabTitle: 'Arenifi Help & FAQ | Accounts, Games & Payments',
+        description: 'Find answers about Arenifi accounts, gameplay, deposits, withdrawals, fees and game rules.',
         path: '/faq',
     },
 };

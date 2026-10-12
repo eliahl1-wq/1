@@ -89,9 +89,9 @@ export default function RewardsWidget() {
 
     if (!user || !isInitialized) return null;
 
-    const allowedPaths = ['/pre-game', '/agar', '/slither', '/surviv', '/competitive-slither', '/competitive-agar'];
+    const allowedPaths = ['/', '/pre-game', '/agar', '/slither', '/surviv', '/competitive-slither', '/competitive-agar'];
     if (!allowedPaths.includes(location.pathname)) return null;
-    const isPregame = location.pathname === '/pre-game';
+    const isPregame = location.pathname === '/' || location.pathname === '/pre-game';
 
     const promoBalance = Number(user.sponsoredRewardsBalance) || 0;
     const permanentRewards = user.permanentRewards || {};
@@ -380,7 +380,7 @@ export default function RewardsWidget() {
 
             {/* Toggle Button Container */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {location.pathname === '/pre-game' && (
+                {isPregame && (
                     <button
                         type="button"
                         className="agar-price-pill"
@@ -396,7 +396,7 @@ export default function RewardsWidget() {
                         </span>
                     </button>
                 )}
-                {location.pathname === '/pre-game' && (
+                {isPregame && (
                     <div className="sol-price-pill" style={{ position: 'static', margin: 0, height: '28px', display: 'flex', alignItems: 'center', gap: '6px', boxSizing: 'border-box' }}>
                         <SolLogo size={14} />
                         <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--green)', fontWeight: 700 }}>

@@ -6,8 +6,13 @@ export default function GamePlusCursor() {
     useEffect(() => {
         const cursor = cursorRef.current;
         if (!cursor || !window.matchMedia('(pointer: fine)').matches) return undefined;
+        let frame = 0;
+        let x = 0;
+        let y = 0;
 
         const hide = () => {
+            cancelAnimationFrame(frame);
+            frame = 0;
             cursor.dataset.visible = 'false';
         };
         const move = (event) => {
@@ -24,8 +29,13 @@ export default function GamePlusCursor() {
                 return;
             }
 
-            cursor.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0)`;
-            cursor.dataset.visible = 'true';
+            x = event.clientX;
+            y = event.clientY;
+            if (!frame) frame = requestAnimationFrame(() => {
+                frame = 0;
+                cursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+                cursor.dataset.visible = 'true';
+            });
         };
 
         window.addEventListener('pointermove', move, { passive: true });
@@ -33,6 +43,7 @@ export default function GamePlusCursor() {
         window.addEventListener('blur', hide);
         document.addEventListener('mouseleave', hide);
         return () => {
+            cancelAnimationFrame(frame);
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerdown', move);
             window.removeEventListener('blur', hide);

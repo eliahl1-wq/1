@@ -4,7 +4,7 @@
 
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS, getRemoteCashoutRingProgress } from '../cashoutRing.js';
 import { drawBalanceBadge } from '../balanceBadge.js';
-import { drawGameMinimap, normalizeMinimapData } from '../minimap.js';
+import { normalizeMinimapData } from '../minimap.js';
 import { getGameScreenSize, GAME_LAYOUT_CHANGE } from '../../utils/forcedLandscape.js';
 import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
@@ -13,7 +13,9 @@ import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
 import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
 import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
-import { slitherCanvasDpr, slitherQualityForFrameTime } from './slitherPerformance.js';
+import { slitherCanvasDpr, createSlitherQualityGovernor } from './slitherPerformance.js';
+import { decodeSlitherTick } from './snapshotProtocol.js';
+import { GameMinimapCache } from '../minimapCache.js';
 import { drawGoldenBlob, GOLDEN_BLOB_HALO_SCALE } from './goldenBlobVisual.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -137,7 +139,7 @@ export class SlitherRenderer {
             : ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
-        this.ctx = canvas.getContext('2d', { alpha: false });
+        this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.imageSmoothingQuality = 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
@@ -202,6 +204,7 @@ export class SlitherRenderer {
         this._smoothSeen = new Set();
         this._screenScratch = { x: 0, y: 0 };
         this._quality = 1;
+        this._qualityGovernor = createSlitherQualityGovernor();
         this._frameMsEwma = 16.67;
         this._qualityEvalFrame = 0;
         this._rainbowStampPack = null;
@@ -210,6 +213,7 @@ export class SlitherRenderer {
         this._deathClusterIds = new Set();
         this._deathFoodScratch = [];
         this._minimapFallback = { players: [], food: [] };
+        this._minimapCache = new GameMinimapCache();
         this._minimapFrame = 0;
         this._hlBlurCv = null;
         this._hlBlurCtx = null;
@@ -221,16 +225,15 @@ export class SlitherRenderer {
         this._onMouseMove = (e) => this._handleMouse(e);
         this._onMouseDown = (e) => {
             if (!this._inputEnabled || this.spectatorMode) return;
-            if (e.target !== this.canvas) return;
+            if (e.target !== this.canvas || e.button !== 0) return;
             unlockGameAudio();
             this.boost = true;
             this._emitInput?.();
         };
         this._onMouseUp = (e) => {
-            if (!this._inputEnabled || this.spectatorMode) return;
-            if (e.target !== this.canvas) return;
+            if (e.button !== 0 || !this.boost) return;
             this.boost = false;
-            this._emitInput?.();
+            this._emitInput?.({ reliable: true });
         };
         this._onWheel = (e) => {
             if (this.isMobile || this.spectatorMode || e.target !== this.canvas) return;
@@ -288,8 +291,21 @@ export class SlitherRenderer {
             this._touchSteering = false;
             this._emitInput?.();
         };
+        this._onInputInterruption = () => {
+            this.boost = false;
+            this._steerTouchId = null;
+            this._boostTouchId = null;
+            this._touchSteering = false;
+            this._emitInput?.({ reliable: true, force: true });
+        };
+        this._onVisibilityChange = () => {
+            if (document.hidden) this._onInputInterruption();
+            this._lastFrameTime = 0;
+        };
 
         window.addEventListener('resize', this._onResize);
+        window.visualViewport?.addEventListener('resize', this._onResize);
+        document.addEventListener('fullscreenchange', this._onResize);
         window.addEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
         document.addEventListener('mousemove', this._onMouseMove);
         document.addEventListener('mousedown', this._onMouseDown);
@@ -299,6 +315,8 @@ export class SlitherRenderer {
         document.addEventListener('touchstart', this._onTouchStart, { passive: false });
         document.addEventListener('touchend', this._onTouchEnd);
         document.addEventListener('touchcancel', this._onTouchEnd);
+        window.addEventListener('blur', this._onInputInterruption);
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
 
         this.resize();
     }
@@ -306,13 +324,13 @@ export class SlitherRenderer {
     _pickDpr() {
         if (this._fixedDpr > 0) return this._fixedDpr;
         // Fullscreen and screen capture make fill-rate the bottleneck. Cap total
-        // backing pixels and temporarily lower them only after sustained slow frames.
+        // backing pixels. Cosmetic quality never resizes this surface mid-match.
         return slitherCanvasDpr({
             width: this.W || window.innerWidth,
             height: this.H || window.innerHeight,
             rawDpr: window.devicePixelRatio || 1,
             isMobile: this.isMobile,
-            quality: this._quality,
+            quality: 1,
         });
     }
 
@@ -332,6 +350,7 @@ export class SlitherRenderer {
     }
 
     resize() {
+        this._cachedRect = null;
         let width;
         let height;
         if (this._fixedViewWidth > 0 && this._fixedViewHeight > 0) {
@@ -359,8 +378,10 @@ export class SlitherRenderer {
 
     _setInputFromScreen(sx, sy) {
         if (!this._inputEnabled || this.spectatorMode) return;
-        if (!this._cachedRect || this._frame % 60 === 0) {
+        const inputNow = performance.now();
+        if (!this._cachedRect || inputNow - (this._cachedRectAt || 0) >= 250) {
             this._cachedRect = this.canvas.getBoundingClientRect();
+            this._cachedRectAt = inputNow;
         }
         const rect = this._cachedRect;
         const x = sx - rect.left - this.W / 2;
@@ -406,6 +427,7 @@ export class SlitherRenderer {
     }
 
     updateState(tick) {
+        tick = decodeSlitherTick(tick);
         if (tick.snakes) {
             this.targetSnakes = tick.snakes;
             this._sortDirty = true;
@@ -798,6 +820,11 @@ export class SlitherRenderer {
         this._lastFrameTime = 0;
         const loop = () => {
             if (!this.running) return;
+            if (document.hidden) {
+                this._lastFrameTime = 0;
+                this._raf = requestAnimationFrame(loop);
+                return;
+            }
             if (this.spectatorMode && this._externalCameraGetter) {
                 const cam = this._externalCameraGetter();
                 if (cam) {
@@ -821,20 +848,7 @@ export class SlitherRenderer {
     }
 
     _updateAdaptiveQuality(frameMs) {
-        // Ignore tab switches/debugger stalls; they do not represent sustained GPU load.
-        if (!Number.isFinite(frameMs) || frameMs <= 0 || frameMs > 100) return;
-        this._frameMsEwma += (frameMs - this._frameMsEwma) * 0.08;
-        if (++this._qualityEvalFrame < 30) return;
-        this._qualityEvalFrame = 0;
-
-        const avg = this._frameMsEwma;
-        const target = slitherQualityForFrameTime(this._quality, avg);
-
-        // Drop promptly under capture/fullscreen load, recover only after the
-        // frame time is safely back at a normal 60 Hz budget.
-        if (target < this._quality || (target > this._quality && avg <= 17.1)) {
-            this._quality = target;
-        }
+        this._quality = this._qualityGovernor.update(frameMs);
     }
 
     /** Get (or build once) a cached sprite canvas. Cheap FIFO eviction — no full-cache sort. */
@@ -2463,7 +2477,7 @@ export class SlitherRenderer {
             }
             const skipMinimapFood = this._foodDrawList.length > 180;
             const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
-            drawGameMinimap(ctx, {
+            this._minimapCache.draw(ctx, {
                 screenW: W,
                 screenH: H,
                 isMobile: this.isMobile,
@@ -2497,6 +2511,8 @@ export class SlitherRenderer {
         this.smooth.clear();
         this._holdStartAt = 0;
         window.removeEventListener('resize', this._onResize);
+        window.visualViewport?.removeEventListener('resize', this._onResize);
+        document.removeEventListener('fullscreenchange', this._onResize);
         window.removeEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
         document.removeEventListener('mousemove', this._onMouseMove);
         document.removeEventListener('mousedown', this._onMouseDown);
@@ -2506,5 +2522,7 @@ export class SlitherRenderer {
         document.removeEventListener('touchstart', this._onTouchStart);
         document.removeEventListener('touchend', this._onTouchEnd);
         document.removeEventListener('touchcancel', this._onTouchEnd);
+        window.removeEventListener('blur', this._onInputInterruption);
+        document.removeEventListener('visibilitychange', this._onVisibilityChange);
     }
 }

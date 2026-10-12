@@ -1,19 +1,27 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-export default function GuestWelcomeBanner() {
+export default function GuestWelcomeBanner({
+    title = 'Play Agar, Slither and Surviv arenas on Arenifi',
+    subtitle = 'Choose free play or an available SOL-staked match, then compete in real time from your browser.',
+}) {
     const navigate = useNavigate();
 
     return (
         <div className="guest-banner">
             <div className="guest-banner-content">
-                <p className="guest-banner-tag">Real-money PvP</p>
-                <h2 className="guest-banner-title">
-                    Stake SOL. Dominate the arena. Cash out instantly.
-                </h2>
+                <p className="guest-banner-tag">Free play &amp; SOL arenas</p>
+                <h1 className="guest-banner-title">{title}</h1>
                 <p className="guest-banner-sub">
-                    Agar &amp; Slither with real stakes — compete against live players, not bots.
+                    {subtitle}
                 </p>
+                <nav className="guest-banner-links" aria-label="Explore Arenifi">
+                    <Link to="/agar">Agar</Link>
+                    <Link to="/slither">Slither</Link>
+                    <Link to="/surviv">Surviv</Link>
+                    <Link to="/tournaments">Tournaments</Link>
+                    <Link to="/how-it-works">How it works</Link>
+                </nav>
             </div>
             <div className="guest-banner-steps">
                 <div className="guest-step">

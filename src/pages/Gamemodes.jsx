@@ -92,13 +92,12 @@ export default function Gamemodes() {
     const isAgarTab = activeTab === 'agar' || (brAvailable && activeTab === 'br-agar');
 
     useEffect(() => {
-        if (isSurvivTab) setPageSeo(SEO.gamemodesSurviv ?? SEO.gamemodesAgar);
-        else setPageSeo(isSlitherTab ? SEO.gamemodesSlither : SEO.gamemodesAgar);
-    }, [isSlitherTab, isSurvivTab]);
+        setPageSeo(SEO.gamemodes);
+    }, []);
 
     const handleSelectMode = (modeId) => {
         localStorage.setItem('selected_gamemode', modeId);
-        navigate('/pre-game', { state: { selectedMode: modeId } });
+        navigate('/', { state: { selectedMode: modeId } });
     };
 
     const activeModes = isAgarTab ? agarModes : isSurvivTab ? survivModes : slitherModes;

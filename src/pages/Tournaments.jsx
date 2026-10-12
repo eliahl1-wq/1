@@ -7,6 +7,7 @@ import ProductPageHeader from '../components/ProductPageHeader';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../utils/apiBase';
 import { markActiveTournamentsSeen } from '../utils/tournamentNotifications';
+import { setPageSeo, SEO } from '../utils/seo';
 import '../styles/ui.css';
 import '../styles/tournaments.css';
 
@@ -38,7 +39,7 @@ export default function Tournaments() {
     const [selectedRulesTournament, setSelectedRulesTournament] = useState(null);
 
     useEffect(() => {
-        document.title = 'Tournaments | Arenifi';
+        setPageSeo(SEO.tournaments);
         const timer = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(timer);
     }, []);

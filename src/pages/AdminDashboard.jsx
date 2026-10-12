@@ -1308,7 +1308,11 @@ export default function AdminDashboard() {
         });
         if (res.status === 403) throw new Error('Admin access required');
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.message || data.error || `Request failed (HTTP ${res.status})`);
+        if (!res.ok) {
+            const error = new Error(data.message || data.error || `Request failed (HTTP ${res.status})`);
+            error.status = res.status;
+            throw error;
+        }
         return data;
     }, [token]);
 
@@ -2026,7 +2030,9 @@ export default function AdminDashboard() {
                 ? `✅ Scanned ${scannedAccounts} accounts and found ${tokenCount} SPL token balance${tokenCount === 1 ? '' : 's'}${errorCount ? ` · ${errorCount} scan errors` : ''}.`
                 : `✅ Scanned ${scannedAccounts} accounts. No SPL token balances were found${errorCount ? ` · ${errorCount} scan errors` : ''}.`);
         } catch (error) {
-            setActionMsg(`❌ ${error.message || 'Could not scan all SPL token balances.'}`);
+            setActionMsg(error.status === 404
+                ? '⏳ SPL token scanning is included in the pending backend release and becomes available after the next scheduled server reset/deployment.'
+                : `❌ ${error.message || 'Could not scan all SPL token balances.'}`);
             setSplTokenScan(current => current ? { ...current, completed: false } : null);
         } finally {
             setSplTokenScanning(false);

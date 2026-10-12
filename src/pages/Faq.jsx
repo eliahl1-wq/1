@@ -3,12 +3,12 @@ import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
 import '../styles/ui.css';
-import { setPageSeo, SEO } from '../utils/seo';
+import { setPageSeo, SEO, SITE_URL } from '../utils/seo';
 
 const FAQ_ITEMS = [
     {
         q: 'Does Arenifi support real-money matches?',
-        a: 'Yes. You deposit real Solana (SOL) and compete against other players for real stakes. Your arena balance reflects actual USD value, and cashouts are sent as SOL to your wallet.',
+        a: 'Yes, where staked play is available. You deposit Solana (SOL), choose an eligible entry option and play for an arena balance. Successful cashouts credit your Arenifi account balance, which can then be withdrawn as SOL.',
     },
     {
         q: 'How do I deposit?',
@@ -16,7 +16,7 @@ const FAQ_ITEMS = [
     },
     {
         q: 'How does cashing out work?',
-        a: 'While in a game, hold the cash-out button for a few seconds. Your current arena balance (minus a small fee) is credited to your Arenifi wallet instantly. You can then withdraw to any Solana address.',
+        a: 'While in a supported game, hold the cash-out button for a few seconds. After the server confirms it, your arena balance minus the displayed fee is credited to your Arenifi account. You can then request a withdrawal to a Solana address.',
     },
     {
         q: 'What happens if I die?',
@@ -27,12 +27,12 @@ const FAQ_ITEMS = [
         a: 'Agar and Slither Normal support $5, $10, and $20 entry tiers — each tier has its own player pool. Slither Arena uses $2 and $5 tiers with separate matchmaking.',
     },
     {
-        q: 'Are there bots?',
-        a: 'No. Arenifi matches you with real players only. Each stake tier runs in its own pool so you compete against players at your level.',
+        q: 'Do games use bots?',
+        a: 'Some Arenifi modes use server-controlled bots to keep the arena active. Live player counts are shown separately in the mode selector when available.',
     },
     {
-        q: 'Is my deposit safe?',
-        a: 'Deposits are held in a custodial wallet system secured on Solana. Withdrawals are processed on-chain. Never share your password or deposit address with anyone claiming to be support.',
+        q: 'How are deposits held?',
+        a: 'Arenifi uses custodial deposit wallets and processes withdrawals on Solana. Crypto and custodial services involve risk. Never share your password or wallet secret with anyone claiming to be support.',
     },
     {
         q: 'Which wallets can I deposit from?',
@@ -44,7 +44,7 @@ const FAQ_ITEMS = [
     },
     {
         q: 'How do I contact support?',
-        a: 'Email us at support@arenifi.fun with your username and a description of the issue. We typically respond within 24 hours.',
+        a: 'Email support@arenifi.fun with your username and a description of the issue, or use the Report bug button for technical problems.',
     },
 ];
 
@@ -52,7 +52,32 @@ export default function Faq() {
     const [openIndex, setOpenIndex] = useState(0);
 
     useEffect(() => {
-        setPageSeo(SEO.faq);
+        setPageSeo({
+            ...SEO.faq,
+            structuredData: {
+                '@context': 'https://schema.org',
+                '@graph': [
+                    {
+                        '@type': 'FAQPage',
+                        mainEntity: FAQ_ITEMS.map(item => ({
+                            '@type': 'Question',
+                            name: item.q,
+                            acceptedAnswer: {
+                                '@type': 'Answer',
+                                text: item.a,
+                            },
+                        })),
+                    },
+                    {
+                        '@type': 'BreadcrumbList',
+                        itemListElement: [
+                            { '@type': 'ListItem', position: 1, name: 'Arenifi', item: `${SITE_URL}/` },
+                            { '@type': 'ListItem', position: 2, name: 'FAQ', item: `${SITE_URL}/faq` },
+                        ],
+                    },
+                ],
+            },
+        });
     }, []);
 
     return (

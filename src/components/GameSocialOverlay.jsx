@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getChatBubbleLayout } from '../game/chatBubbleLayout.js';
 
 // Keep source ASCII-only so deployment tooling cannot corrupt UTF-8 emoji bytes.
 export const EMOTES = [
@@ -39,38 +40,8 @@ export function drawChatBubble(ctx, text, x, y, size = 12) {
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
 
-    const maxTextWidth = size * 18;
-    const maxLines = 3;
-    const lines = [];
-    let current = '';
-    for (const character of String(text)) {
-        const candidate = current + character;
-        if (current && ctx.measureText(candidate).width > maxTextWidth) {
-            lines.push(current.trim());
-            current = character.trimStart();
-            if (lines.length === maxLines) break;
-        } else {
-            current = candidate;
-        }
-    }
-    if (lines.length < maxLines && current.trim()) lines.push(current.trim());
-    const consumed = lines.join('').replace(/\s/g, '').length;
-    const original = String(text).replace(/\s/g, '');
-    if (consumed < original.length && lines.length) {
-        let last = lines.length - 1;
-        while (lines[last] && ctx.measureText(`${lines[last]}…`).width > maxTextWidth) {
-            lines[last] = lines[last].slice(0, -1);
-        }
-        lines[last] = `${lines[last]}…`;
-    }
+    const { lines, lineHeight, bubbleWidth, bubbleHeight } = getChatBubbleLayout(ctx, text, size);
     if (!lines.length) { ctx.restore(); return; }
-
-    const lineHeight = size * 1.22;
-    const textWidth = Math.max(...lines.map((line) => ctx.measureText(line).width));
-    const paddingX = Math.max(3, size * 0.77);
-    const paddingY = Math.max(2, size * 0.61);
-    const bubbleWidth = textWidth + paddingX * 2;
-    const bubbleHeight = lines.length * lineHeight + paddingY * 2;
     const rectX = x - bubbleWidth / 2;
     const rectY = y - bubbleHeight / 2;
 

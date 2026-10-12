@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -7,14 +7,15 @@ import Lobby from './pages/Lobby';
 import PreGame from './pages/PreGame';
 import Transactions from './pages/Transactions';
 import Profile from './pages/Profile';
-import Game from './game/agar/Game'; // Uppdaterad sökväg
-import SlitherGame from './game/slither/SlitherGame'; // Nytt läge
-const SurvivGame = lazy(() => import('./game/surviv/SurvivGame'));
+import { loadAgarGame, loadSlitherGame, loadSurvivGame } from './game/gameModules.js';
+const Game = lazy(loadAgarGame);
+const SlitherGame = lazy(loadSlitherGame);
+const SurvivGame = lazy(loadSurvivGame);
 const SlitherStudio = lazy(() => import('./game/slither/studio/SlitherStudio'));
 const SlitherStudioRender = lazy(() => import('./game/slither/studio/SlitherStudioRender'));
 import Gamemodes from './pages/Gamemodes';
 import BRLobby from './pages/BRLobby';
-import AdminDashboard from './pages/AdminDashboard';
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 import HowItWorks from './pages/HowItWorks';
 import Faq from './pages/Faq';
 import Rewards from './pages/Rewards';
@@ -31,6 +32,17 @@ import { isBattleRoyaleAvailable } from './constants/features';
 import useSitePresence from './hooks/useSitePresence';
 import AgarTokenExperience from './features/agar/ui/AgarTokenExperience';
 import { isPublicFreeModeEnabled } from './utils/freeMode';
+import { applyRouteSeoPolicy } from './utils/seo';
+
+function RouteSeoPolicy() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    applyRouteSeoPolicy(pathname);
+  }, [pathname]);
+
+  return null;
+}
 
 function SitePresenceRunner() {
   useSitePresence();
@@ -38,7 +50,8 @@ function SitePresenceRunner() {
 }
 
 function PrivateRoute({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <AppLoadingScreen />;
   return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
@@ -89,7 +102,7 @@ function PublicRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return <AppLoadingScreen />;
   if (isAuthenticated) {
-    return <Navigate to="/pre-game" />;
+    return <Navigate to="/" />;
   }
   return children;
 }
@@ -98,7 +111,7 @@ function AdminRoute({ children }) {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) return <AppLoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!user?.isAdmin) return <Navigate to="/pre-game" />;
+  if (!user?.isAdmin) return <Navigate to="/" />;
   return children;
 }
 
@@ -107,6 +120,7 @@ function App() {
     <Router>
       <ServerReadinessProvider>
             <ServerUpdateBanner />
+            <RouteSeoPolicy />
             <AuthProvider>
               <SitePresenceRunner />
               <ReferralCapture />
@@ -117,19 +131,19 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/lobby" element={<PrivateRoute><Lobby /></PrivateRoute>} />
                 <Route path="/pre-game" element={<PreGame />} />
-                <Route path="/game" element={<ArenaRoute><Game /></ArenaRoute>} />
-                <Route path="/slither-game" element={<ArenaRoute><SlitherGame /></ArenaRoute>} />
+                <Route path="/game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><Game /></Suspense></ArenaRoute>} />
+                <Route path="/slither-game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><SlitherGame /></Suspense></ArenaRoute>} />
                 <Route
                   path="/studio/slither"
                   element={import.meta.env.DEV
                     ? <Suspense fallback={<AppLoadingScreen />}><SlitherStudio /></Suspense>
-                    : <Navigate to="/pre-game" replace />}
+                    : <Navigate to="/" replace />}
                 />
                 <Route
                   path="/studio/slither/render"
                   element={import.meta.env.DEV
                     ? <Suspense fallback={<AppLoadingScreen />}><SlitherStudioRender /></Suspense>
-                    : <Navigate to="/pre-game" replace />}
+                    : <Navigate to="/" replace />}
                 />
 
                 <Route path="/surviv-game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><SurvivGame /></Suspense></ArenaRoute>} />
@@ -143,14 +157,14 @@ function App() {
                 <Route path="/surviv" element={<PreGame />} />
                 <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
                 <Route path="/surviv-battle-royale" element={<PreGame />} />
-                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                <Route path="/admin" element={<AdminRoute><Suspense fallback={<AppLoadingScreen />}><AdminDashboard /></Suspense></AdminRoute>} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/faq" element={<Faq />} />
                 <Route path="/rewards" element={<PrivateRoute><Rewards /></PrivateRoute>} />
                 <Route path="/shop" element={<PrivateRoute><Shop /></PrivateRoute>} />
                 <Route path="/affiliate-program" element={<Navigate to="/rewards#affiliate-rewards" replace />} />
                 <Route path="/affiliate" element={<Navigate to="/rewards#affiliate-rewards" replace />} />
-                <Route path="/" element={<Navigate to="/pre-game" />} />
+                <Route path="/" element={<PreGame />} />
               </Routes>
               </AgarTokenExperience>
             </AuthProvider>

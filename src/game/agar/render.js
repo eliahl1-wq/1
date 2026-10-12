@@ -51,11 +51,13 @@ const drawFood = (position, food, graph, highQuality = false) => {
 };
 
 const FOOD_HUE_BUCKETS = 18;
+const foodBuckets = Array.from({ length: FOOD_HUE_BUCKETS }, () => []);
 
 /** Draw normal pellets in a handful of paths instead of one draw call per pellet. */
 const drawFoodBatch = (foods, graph) => {
     if (!foods?.length) return;
-    const buckets = Array.from({ length: FOOD_HUE_BUCKETS }, () => []);
+    const buckets = foodBuckets;
+    for (const bucket of buckets) bucket.length = 0;
 
     for (const food of foods) {
         const hue = ((Number(food.hue) || 0) % 360 + 360) % 360;
@@ -228,6 +230,7 @@ function drawPlayerCashoutRing(graph, cell) {
 
 const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQuality = false, hideNames = false) => {
     for (let cell of cells) {
+        const name = String(cell.name || '');
         const flagCode = parseFlagSkin(cell.color);
         if (cell.color === 'prism') {
             graph.fillStyle = '#252052';
@@ -256,9 +259,9 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
         // Dynamisk fontstorlek: aggressivare skalning för korta namn (som 'eli')
         let fontSize = cell.radius / 1.8;
         let lengthMultiplier = 1;
-        if (cell.name.length > 3) lengthMultiplier = 0.7;
-        if (cell.name.length > 7) lengthMultiplier = 0.5;
-        if (cell.name.length > 12) lengthMultiplier = 0.35;
+        if (name.length > 3) lengthMultiplier = 0.7;
+        if (name.length > 7) lengthMultiplier = 0.5;
+        if (name.length > 12) lengthMultiplier = 0.35;
         fontSize = Math.max(fontSize * lengthMultiplier, 14);
         
         graph.lineWidth = playerConfig.textBorderSize;
@@ -274,8 +277,8 @@ const drawCells = (cells, playerConfig, toggleMassState, borders, graph, highQua
         
         const nameY = cell.y - (cell.radius * 0.1);
         if (!hideNames || cell.isMe) {
-            graph.strokeText(cell.name, cell.x, nameY);
-            graph.fillText(cell.name, cell.x, nameY);
+            graph.strokeText(name, cell.x, nameY);
+            graph.fillText(name, cell.x, nameY);
         }
 
         if (!global.battleRoyale && cell.radius >= 22) {

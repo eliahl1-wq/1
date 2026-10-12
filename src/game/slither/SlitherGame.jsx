@@ -8,6 +8,8 @@ import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 
 import { SlitherRenderer } from './SlitherRenderer.js';
+import { createLatestInputSender, slitherInputSignature } from '../latestInput.js';
+import { decodeSlitherTick } from './snapshotProtocol.js';
 
 import { normalizeEntryFee, normalizeBREntryFee, normalizeCompetitiveEntryFee } from '../../constants/economy';
 import { BRIntroOverlay, BRVictoryOverlay } from '../../components/BRGameOverlays';
@@ -482,26 +484,18 @@ export default function SlitherGame() {
 
 
 
-        const lastInputSentRef = { dx: NaN, dy: NaN, boost: null };
-
-        const emitInput = () => {
+        let inputSender = null;
+        let inputSocket = null;
+        const emitInput = (options = {}) => {
             if (blockInputRef.current) return;
             if (!socketRef.current?.connected || !rendererRef.current) return;
             const inp = rendererRef.current.getInput();
-            const now = Date.now();
-            if (
-                inp.dx === lastInputSentRef.dx
-                && inp.dy === lastInputSentRef.dy
-                && inp.boost === lastInputSentRef.boost
-                && (now - (lastInputSentRef.time || 0)) < 100
-            ) return;
-            lastInputSentRef.dx = inp.dx;
-            lastInputSentRef.dy = inp.dy;
-            lastInputSentRef.boost = inp.boost;
-            lastInputSentRef.time = now;
-            // Movement is superseded by the next packet; dropping an old packet
-            // is better than queueing stale steering behind congested snapshots.
-            socketRef.current.volatile.emit('slitherInput', inp);
+            if (inputSocket !== socketRef.current) {
+                inputSocket = socketRef.current;
+                inputSender = createLatestInputSender({ socket: inputSocket, event: 'slitherInput',
+                    signature: slitherInputSignature, edge: payload => !!payload.boost });
+            }
+            inputSender.send(inp, options);
         };
 
         renderer.setInputEmitter(emitInput);
@@ -514,7 +508,7 @@ export default function SlitherGame() {
         if (isBR) setIsBattleRoyale(true);
 
         const socket = io(API_URL, {
-            auth: { token: authToken, presenceId: getOrCreatePresenceId() },
+            auth: { token: authToken, presenceId: getOrCreatePresenceId(), snapshotProtocol: 2 },
             // WebSocket first for low-latency play; fall back to polling when necessary
             transports: ['websocket', 'polling'],
             tryAllTransports: true,
@@ -533,6 +527,7 @@ export default function SlitherGame() {
 
 
         socket.on('connect', () => {
+            inputSender?.reset();
             setIsConnected(true);
             if (!gameReady) setJoinMessage('Checking your match…');
             if (!hasJoinedRef.current && !blockAutoJoinRef.current) {
@@ -648,6 +643,7 @@ export default function SlitherGame() {
 
         socket.on('slitherTick', (tick) => {
             if (!worldUpdatesEnabledRef.current) return;
+            tick = decodeSlitherTick(tick);
             const mergedTick = tick.competitiveSlither && tick.zone
                 ? { ...tick, competitiveSlither: true, circularMap: true }
                 : tick;
