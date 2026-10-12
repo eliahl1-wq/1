@@ -27,3 +27,22 @@ export function didCompleteReload(previous, next) {
 export function localPresentationAim(serverAngle, inputAngle, canAimLocally) {
     return canAimLocally && Number.isFinite(inputAngle) ? inputAngle : serverAngle;
 }
+const WEAPON_FIRE_POSES = {
+    pistol: [1.2, 105], revolver: [1.6, 120], dmr: [1.9, 120], smg: [0.9, 80], assault: [1.5, 95],
+    shotgun: [3.1, 150], sniper: [3.4, 165], lmg: [1.8, 110], default: [1.4, 100],
+};
+// Small weapon-only kick; neither aim, spread nor the player's body is displaced.
+export function weaponFirePose(family, elapsedMs) {
+    const [distance, duration] = WEAPON_FIRE_POSES[family] || WEAPON_FIRE_POSES.default;
+    const age = Math.max(0, Number.isNaN(Number(elapsedMs)) ? Infinity : Number(elapsedMs));
+    const remaining = Math.max(0, 1 - age / duration);
+    return { kick: distance * remaining * remaining, flash: Math.max(0, 1 - age / 55) };
+}
+
+export function stableActionDeadline(previousEnd, remainingMs, receivedAt) {
+    if (!(remainingMs > 0)) return 0;
+    const next = receivedAt + remainingMs;
+    // Preserve smooth progress across ordinary network arrival jitter. Larger
+    // corrections still follow authority (a canceled/restarted action, etc.).
+    return previousEnd > receivedAt && Math.abs(previousEnd - next) <= 90 ? previousEnd : next;
+}

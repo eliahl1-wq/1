@@ -96,6 +96,13 @@ function formatSol(n) {
     return `${Number(n).toFixed(4)} SOL`;
 }
 
+function formatCompactNumber(n, maximumFractionDigits = 1) {
+    return Number(n ?? 0).toLocaleString(undefined, {
+        notation: Math.abs(Number(n ?? 0)) >= 1000 ? 'compact' : 'standard',
+        maximumFractionDigits,
+    });
+}
+
 function formatDate(d) {
     if (!d) return '—';
     return new Date(d).toLocaleString();
@@ -335,6 +342,188 @@ function StatCard({ label, value, sub }) {
             <p className="admin-stat-card__value">{value}</p>
             {sub && <p className="admin-stat-card__sub">{sub}</p>}
         </article>
+    );
+}
+
+function OverviewKpiCard({ label, value, sub, change, previous, accent = 'violet', onClick }) {
+    const interactive = typeof onClick === 'function';
+    const hasChange = change !== undefined;
+    const changeLabel = change == null
+        ? 'New'
+        : `${change > 0 ? '+' : ''}${change}%`;
+    const changeTone = change == null || change === 0 ? 'neutral' : change > 0 ? 'up' : 'down';
+    const Component = interactive ? 'button' : 'article';
+    return (
+        <Component
+            type={interactive ? 'button' : undefined}
+            className={`admin-overview-kpi admin-overview-kpi--${accent}${interactive ? ' is-interactive' : ''}`}
+            onClick={onClick}
+        >
+            <div className="admin-overview-kpi__topline">
+                <span>{label}</span>
+                {hasChange && <span className={`admin-overview-kpi__change is-${changeTone}`}>{changeLabel}</span>}
+            </div>
+            <strong>{value}</strong>
+            <p>{sub}</p>
+            {previous != null && <small>Previous period: {previous}</small>}
+            {interactive && <i aria-hidden="true">↗</i>}
+        </Component>
+    );
+}
+
+const OVERVIEW_CHART_METRICS = {
+    users: {
+        label: 'Users',
+        series: [{ key: 'registrations', label: 'Registrations', color: '#9b87ff' }],
+        format: value => formatCompactNumber(value, 0),
+    },
+    games: {
+        label: 'Games',
+        series: [
+            { key: 'paidGames', label: 'Real money', color: '#35d69f' },
+            { key: 'freeGames', label: 'Free play', color: '#8f78ff' },
+        ],
+        format: value => formatCompactNumber(value, 0),
+    },
+    value: {
+        label: 'Value',
+        series: [
+            { key: 'paidVolumeUsd', label: 'Played', color: '#8f78ff' },
+            { key: 'cashoutUsd', label: 'Cashed out', color: '#35d69f' },
+            { key: 'depositsUsd', label: 'Deposited', color: '#f2b84b' },
+        ],
+        format: value => formatUsd(value),
+    },
+};
+
+function OverviewTrendChart({ daily = [] }) {
+    const [metric, setMetric] = useState('games');
+    const [hoverIndex, setHoverIndex] = useState(null);
+    const config = OVERVIEW_CHART_METRICS[metric];
+    const width = 760;
+    const height = 250;
+    const left = 46;
+    const right = 18;
+    const top = 18;
+    const bottom = 34;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const values = config.series.flatMap(series => daily.map(point => Number(point[series.key]) || 0));
+    const maxValue = Math.max(1, ...values);
+    const xFor = index => left + (daily.length <= 1 ? plotWidth / 2 : (index / (daily.length - 1)) * plotWidth);
+    const yFor = value => top + plotHeight - ((Number(value) || 0) / maxValue) * plotHeight;
+    const pathFor = key => daily.map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index).toFixed(2)} ${yFor(point[key]).toFixed(2)}`).join(' ');
+    const areaFor = key => daily.length
+        ? `${pathFor(key)} L ${xFor(daily.length - 1).toFixed(2)} ${top + plotHeight} L ${xFor(0).toFixed(2)} ${top + plotHeight} Z`
+        : '';
+    const hovered = hoverIndex == null ? null : daily[hoverIndex];
+    const dateLabel = date => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+    return (
+        <section className="admin-overview-chart-card">
+            <header className="admin-overview-card-header">
+                <div>
+                    <span>Trend</span>
+                    <h2>Platform activity</h2>
+                    <p>Daily totals for the selected period. Hover the graph for exact values.</p>
+                </div>
+                <div className="admin-overview-segmented" role="group" aria-label="Chart metric">
+                    {Object.entries(OVERVIEW_CHART_METRICS).map(([key, option]) => (
+                        <button key={key} type="button" className={metric === key ? 'is-active' : ''} onClick={() => setMetric(key)}>{option.label}</button>
+                    ))}
+                </div>
+            </header>
+            <div className="admin-overview-chart-wrap" onMouseLeave={() => setHoverIndex(null)}>
+                <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${config.label} trend chart`}>
+                    {[0, 0.5, 1].map(ratio => {
+                        const y = top + plotHeight - ratio * plotHeight;
+                        return (
+                            <g key={ratio}>
+                                <line x1={left} x2={width - right} y1={y} y2={y} className="admin-overview-chart__grid" />
+                                <text x={left - 9} y={y + 4} textAnchor="end" className="admin-overview-chart__axis">{config.format(maxValue * ratio)}</text>
+                            </g>
+                        );
+                    })}
+                    {config.series.map((series, seriesIndex) => (
+                        <g key={series.key}>
+                            {seriesIndex === 0 && <path d={areaFor(series.key)} fill={`url(#overview-gradient-${metric})`} className="admin-overview-chart__area" />}
+                            <path d={pathFor(series.key)} fill="none" stroke={series.color} className="admin-overview-chart__line" />
+                        </g>
+                    ))}
+                    <defs>
+                        <linearGradient id={`overview-gradient-${metric}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0" stopColor={config.series[0].color} stopOpacity="0.24" />
+                            <stop offset="1" stopColor={config.series[0].color} stopOpacity="0" />
+                        </linearGradient>
+                    </defs>
+                    {daily.map((point, index) => (
+                        <rect
+                            key={point.date}
+                            x={Math.max(left, xFor(index) - (plotWidth / Math.max(1, daily.length)) / 2)}
+                            y={top}
+                            width={Math.max(5, plotWidth / Math.max(1, daily.length))}
+                            height={plotHeight}
+                            fill="transparent"
+                            onMouseEnter={() => setHoverIndex(index)}
+                        />
+                    ))}
+                    {hovered && (
+                        <g>
+                            <line x1={xFor(hoverIndex)} x2={xFor(hoverIndex)} y1={top} y2={top + plotHeight} className="admin-overview-chart__cursor" />
+                            {config.series.map(series => <circle key={series.key} cx={xFor(hoverIndex)} cy={yFor(hovered[series.key])} r="4" fill={series.color} className="admin-overview-chart__point" />)}
+                        </g>
+                    )}
+                    {daily.length > 0 && [0, Math.floor((daily.length - 1) / 2), daily.length - 1].map((index, labelIndex) => (
+                        <text key={`${index}-${labelIndex}`} x={xFor(index)} y={height - 8} textAnchor={labelIndex === 0 ? 'start' : labelIndex === 2 ? 'end' : 'middle'} className="admin-overview-chart__axis">{dateLabel(daily[index].date)}</text>
+                    ))}
+                </svg>
+                {hovered && (
+                    <div className="admin-overview-chart-tooltip" style={{ left: `${(xFor(hoverIndex) / width) * 100}%` }}>
+                        <strong>{dateLabel(hovered.date)}</strong>
+                        {config.series.map(series => (
+                            <span key={series.key}><i style={{ background: series.color }} />{series.label}<b>{config.format(hovered[series.key])}</b></span>
+                        ))}
+                    </div>
+                )}
+            </div>
+            <footer className="admin-overview-chart-legend">
+                {config.series.map(series => <span key={series.key}><i style={{ background: series.color }} />{series.label}</span>)}
+            </footer>
+        </section>
+    );
+}
+
+function overviewModeLabel(mode) {
+    const labels = {
+        agar: 'Agar · Normal',
+        slither: 'Slither · Normal',
+        surviv: 'Surviv',
+        'competitive-slither': 'Slither · Arena',
+        'br-agar': 'Agar · Battle Royale',
+        'br-slither': 'Slither · Battle Royale',
+    };
+    return labels[mode] || String(mode || 'Unknown').replace(/-/g, ' ');
+}
+
+function OverviewModeBreakdown({ modes = [], onOpenActivity }) {
+    const maxGames = Math.max(1, ...modes.map(mode => Number(mode.games) || 0));
+    return (
+        <section className="admin-overview-card admin-overview-modes">
+            <header className="admin-overview-card-header">
+                <div><span>Game mix</span><h2>Most played modes</h2><p>Real-money and free-play sessions stay separated.</p></div>
+            </header>
+            <div className="admin-overview-mode-list">
+                {modes.length === 0 && <p className="admin-overview-empty">No matches in this period.</p>}
+                {modes.map(mode => (
+                    <button key={mode.mode} type="button" className="admin-overview-mode-row" onClick={onOpenActivity}>
+                        <span className="admin-overview-mode-row__name">{overviewModeLabel(mode.mode)}<small>{mode.uniquePlayers} player{mode.uniquePlayers === 1 ? '' : 's'}</small></span>
+                        <span className="admin-overview-mode-row__bar"><i style={{ width: `${(mode.games / maxGames) * 100}%` }} /></span>
+                        <span className="admin-overview-mode-row__values"><strong>{mode.games}</strong><small>{mode.paidGames} paid · {mode.freeGames} free</small></span>
+                        <span aria-hidden="true">›</span>
+                    </button>
+                ))}
+            </div>
+        </section>
     );
 }
 
@@ -1029,6 +1218,7 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [overview, setOverview] = useState(null);
+    const [overviewRangeDays, setOverviewRangeDays] = useState(30);
     const [activeUsers, setActiveUsers] = useState(null);
     const [users, setUsers] = useState([]);
     const [wallets, setWallets] = useState(null);
@@ -1058,6 +1248,11 @@ export default function AdminDashboard() {
     const [showExcludedUsers, setShowExcludedUsers] = useState(false);
     const [selectedTxIds, setSelectedTxIds] = useState(new Set());
     const [selectedUserIds, setSelectedUserIds] = useState(new Set());
+    const [splTokenScan, setSplTokenScan] = useState(null);
+    const [splTokenScanning, setSplTokenScanning] = useState(false);
+    const [splTokenTransferring, setSplTokenTransferring] = useState(false);
+    const [splTokenSelection, setSplTokenSelection] = useState(new Set());
+    const [splTokenDestinationMode, setSplTokenDestinationMode] = useState('owner_vault');
     const [userSort, setUserSort] = useState('balance_desc');
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
@@ -1342,7 +1537,7 @@ export default function AdminDashboard() {
         const currentTab = tabRef.current;
 
         if (currentTab === 'overview') {
-            add(fetchAdmin('/api/admin/dashboard/overview'), setOverview);
+            add(fetchAdmin(`/api/admin/dashboard/overview?days=${overviewRangeDays}`), setOverview);
             add(fetchAdmin('/api/admin/dashboard/active-users'), setActiveUsers);
             add(fetchAdmin('/api/admin/dashboard/wallets'), setWallets);
             add(fetchAdmin('/api/admin/reward-security-alerts'), security => {
@@ -1389,7 +1584,7 @@ export default function AdminDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [fetchAdmin, fetchLiveFeed, fetchMainHouseLive, fetchRewardOwnership, fetchServerStatus, fetchTransactions, fetchUsers]);
+    }, [fetchAdmin, fetchLiveFeed, fetchMainHouseLive, fetchRewardOwnership, fetchServerStatus, fetchTransactions, fetchUsers, overviewRangeDays]);
 
     useEffect(() => {
         document.title = 'Admin | Arenifi';
@@ -1788,6 +1983,125 @@ export default function AdminDashboard() {
         }
     };
 
+    const scanAllSplTokens = async () => {
+        setSplTokenScanning(true);
+        setSplTokenSelection(new Set());
+        setActionMsg('');
+        let cursor = '';
+        let scannedAccounts = 0;
+        let totalAccounts = null;
+        let ownerVaultAddress = null;
+        const accountMap = new Map();
+        try {
+            do {
+                const params = new URLSearchParams({ limit: '40' });
+                if (cursor) params.set('cursor', cursor);
+                const page = await fetchAdmin(`/api/admin/spl-tokens/scan?${params}`);
+                scannedAccounts += Number(page.scannedAccounts) || 0;
+                if (page.totalAccounts != null) totalAccounts = Number(page.totalAccounts) || 0;
+                if (page.ownerVaultAddress) ownerVaultAddress = page.ownerVaultAddress;
+                for (const account of page.accounts || []) accountMap.set(String(account.userId), account);
+                cursor = page.nextCursor || '';
+                setSplTokenScan({
+                    accounts: [...accountMap.values()],
+                    scannedAccounts,
+                    totalAccounts: totalAccounts ?? scannedAccounts,
+                    ownerVaultAddress,
+                    completed: !cursor,
+                });
+            } while (cursor);
+
+            const accounts = [...accountMap.values()];
+            const defaultSelection = new Set();
+            for (const account of accounts) {
+                if (!account.hasSigningKey) continue;
+                for (const tokenBalance of account.tokens || []) {
+                    defaultSelection.add(`${account.userId}:${tokenBalance.programId}:${tokenBalance.mint}`);
+                }
+            }
+            setSplTokenSelection(defaultSelection);
+            const tokenCount = accounts.reduce((sum, account) => sum + (account.tokens?.length || 0), 0);
+            const errorCount = accounts.filter(account => account.error).length;
+            setActionMsg(tokenCount
+                ? `✅ Scanned ${scannedAccounts} accounts and found ${tokenCount} SPL token balance${tokenCount === 1 ? '' : 's'}${errorCount ? ` · ${errorCount} scan errors` : ''}.`
+                : `✅ Scanned ${scannedAccounts} accounts. No SPL token balances were found${errorCount ? ` · ${errorCount} scan errors` : ''}.`);
+        } catch (error) {
+            setActionMsg(`❌ ${error.message || 'Could not scan all SPL token balances.'}`);
+            setSplTokenScan(current => current ? { ...current, completed: false } : null);
+        } finally {
+            setSplTokenScanning(false);
+        }
+    };
+
+    const transferSelectedSplTokens = async () => {
+        const positions = (splTokenScan?.accounts || []).flatMap(account => (account.tokens || []).map(tokenBalance => ({
+            account,
+            tokenBalance,
+            key: `${account.userId}:${tokenBalance.programId}:${tokenBalance.mint}`,
+        }))).filter(position => splTokenSelection.has(position.key));
+        const transferable = positions.filter(position => position.account.hasSigningKey
+            && (splTokenDestinationMode === 'owner_vault'
+                ? !!splTokenScan?.ownerVaultAddress
+                : !!position.account.walletAddress));
+        if (!transferable.length) {
+            setActionMsg('❌ No selected token balances can be transferred to that destination.');
+            return;
+        }
+        if (transferable.length > 150) {
+            setActionMsg('❌ Select at most 150 token balances per transfer.');
+            return;
+        }
+        const skippedBeforeTransfer = positions.length - transferable.length;
+        const destinationLabel = splTokenDestinationMode === 'owner_vault'
+            ? `Owner Vault (${truncateAddr(splTokenScan?.ownerVaultAddress)})`
+            : 'each user’s connected wallet';
+        if (!window.confirm(
+            `Transfer ${transferable.length} complete SPL token balance${transferable.length === 1 ? '' : 's'} to ${destinationLabel}?\n\nBalances are checked again on-chain before transfer. Each source wallet pays its own network fee and any destination token-account rent. This is irreversible.${skippedBeforeTransfer ? `\n\n${skippedBeforeTransfer} selected balance(s) cannot be transferred because the signing key or user wallet is missing.` : ''}`,
+        )) return;
+
+        setSplTokenTransferring(true);
+        setActionMsg('');
+        try {
+            const result = await fetchAdmin('/api/admin/spl-tokens/transfer', {
+                method: 'POST',
+                body: JSON.stringify({
+                    destinationMode: splTokenDestinationMode,
+                    selections: transferable.map(position => ({
+                        userId: position.account.userId,
+                        mint: position.tokenBalance.mint,
+                        programId: position.tokenBalance.programId,
+                    })),
+                    confirmation: `TRANSFER SPL ${transferable.length} ${splTokenDestinationMode}`,
+                }),
+            });
+            const confirmedKeys = new Set((result.results || [])
+                .filter(item => item.status === 'confirmed')
+                .map(item => `${item.userId}:${item.programId}:${item.mint}`));
+            const failedKeys = new Set((result.results || [])
+                .filter(item => item.status === 'failed')
+                .map(item => `${item.userId}:${item.programId}:${item.mint}`));
+            setSplTokenScan(current => current ? {
+                ...current,
+                accounts: current.accounts.map(account => ({
+                    ...account,
+                    tokens: (account.tokens || []).filter(tokenBalance => !confirmedKeys.has(`${account.userId}:${tokenBalance.programId}:${tokenBalance.mint}`)),
+                })),
+            } : current);
+            setSplTokenSelection(failedKeys);
+            const failureDetails = (result.results || [])
+                .filter(item => item.status === 'failed')
+                .slice(0, 4)
+                .map(item => `${item.username || 'Account'}: ${item.message}`)
+                .join(' · ');
+            setActionMsg(`${result.failed ? '⚠️' : '✅'} ${result.message}${failureDetails ? ` ${failureDetails}` : ''}`);
+            await fetchUsers(showExcludedUsersRef.current, userSortRef.current, false, userPageRef.current).catch(() => {});
+        } catch (error) {
+            setActionMsg(`❌ ${error.message || 'SPL token transfer failed.'}`);
+        } finally {
+            setSplTokenTransferring(false);
+        }
+    };
+
     const applyTxFilters = (patch) => {
         const next = { ...txFilterRef.current, ...patch };
         setTxFilter(next);
@@ -1846,6 +2160,17 @@ export default function AdminDashboard() {
     const selectedOwnerUsers = selectedUsers.filter(account => account.isOwnerAccount);
     const selectedOwnerBalanceUsd = selectedOwnerUsers.reduce((sum, account) => sum + (Number(account.balanceUsd) || 0), 0);
     const selectedUsersIncludePlayerAccount = selectedUsers.some(account => !account.isOwnerAccount);
+    const splTokenPositions = (splTokenScan?.accounts || []).flatMap(account => (account.tokens || []).map(tokenBalance => ({
+        account,
+        tokenBalance,
+        key: `${account.userId}:${tokenBalance.programId}:${tokenBalance.mint}`,
+    })));
+    const splTransferablePositions = splTokenPositions.filter(position => position.account.hasSigningKey
+        && (splTokenDestinationMode === 'owner_vault'
+            ? !!splTokenScan?.ownerVaultAddress
+            : !!position.account.walletAddress));
+    const splSelectedTransferableCount = splTransferablePositions.filter(position => splTokenSelection.has(position.key)).length;
+    const splScanErrorCount = (splTokenScan?.accounts || []).filter(account => account.error).length;
 
     const filteredLiveFeed = liveCategoryFilter
         ? liveFeed.filter(item => item.category === liveCategoryFilter)
@@ -1909,6 +2234,17 @@ export default function AdminDashboard() {
         }
     };
 
+    const overviewAnalytics = overview?.analytics || {};
+    const overviewTotals = overviewAnalytics.totals || {};
+    const overviewPrevious = overviewAnalytics.previous || {};
+    const overviewChanges = overviewAnalytics.changes || {};
+    const overviewAverages = overviewAnalytics.averages || {};
+    const overviewRates = overviewAnalytics.rates || {};
+    const pendingAttention = rewardAlerts.filter(alert => alert.status === 'pending').length
+        + pendingRewardClaims.length
+        + (adminIssueSummary.totalOpen || 0);
+    const onlineNow = Math.max(activeUsers?.sitePresence?.length ?? 0, activeUsers?.currentlyInGame ?? 0);
+
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
             <Background />
@@ -1963,132 +2299,150 @@ export default function AdminDashboard() {
                 </div>
 
                 {tab === 'overview' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                        <div className="admin-override-panel" style={{
-                            display: 'grid',
-                            gap: '12px',
-                            padding: '18px',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--r-lg)',
-                            background: 'rgba(139,92,246,0.08)',
-                        }}>
+                    <div className="admin-overview-dashboard">
+                        <section className="admin-overview-intro">
                             <div>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-h)' }}>Displayed “Playing” base values</div>
-                                <div style={{ marginTop: '4px', color: 'var(--text-3)', fontSize: '0.72rem' }}>
-                                    Used on both Pregame and Gamemodes. Each value is added to that gamemode’s live players, so 10 becomes 11 when one real player joins.
-                                </div>
+                                <span className="admin-overview-eyebrow">PLATFORM PULSE</span>
+                                <h2>Overview</h2>
+                                <p>Growth, engagement and money flow in one place. Free play never counts as paid volume.</p>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
-                                {PREGAME_PLAYING_MODES.map(mode => (
-                                    <label key={mode.key} style={{ display: 'grid', gap: '6px' }}>
-                                        <span style={{ fontSize: '0.7rem', fontWeight: 750, color: 'var(--text-2)' }}>{mode.label}</span>
-                                        <input
-                                            className="admin-input"
-                                            type="number"
-                                            min="0"
-                                            max="999999"
-                                            step="1"
-                                            value={pregamePlayingOffsets[mode.key] ?? 0}
-                                            onChange={event => setPregamePlayingOffsets(current => ({ ...current, [mode.key]: event.target.value }))}
-                                            style={{ width: '100%', padding: '9px 11px' }}
-                                        />
-                                    </label>
+                            <div className="admin-overview-range" role="group" aria-label="Overview period">
+                                {[7, 30, 90].map(days => (
+                                    <button key={days} type="button" className={overviewRangeDays === days ? 'is-active' : ''} onClick={() => setOverviewRangeDays(days)}>{days}D</button>
                                 ))}
                             </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => savePregamePlayingOffsets()}>
-                                    Save for everyone
-                                </button>
-                                <button type="button" className="btn btn-ghost" disabled={actionLoading} onClick={() => savePregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING })}>
-                                    Reset all to 0
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <h2 className="admin-section-title">On-chain wallets</h2>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
-                                <WalletCard 
-                                    title="Main House" 
-                                    label="Automated"
-                                    address={wallets?.mainHouse?.address} 
-                                    sol={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} 
-                                    usd={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : '—'} 
-                                    themeColor="#3b82f6"
-                                />
-                                <WalletCard 
-                                    title="Reward Wallet" 
-                                    label="Rewards & Affiliates"
-                                    address={wallets?.rewardWallet?.address} 
-                                    sol={wallets?.rewardWallet ? formatSol(wallets.rewardWallet.balanceSol) : '—'} 
-                                    usd={wallets?.rewardWallet ? formatUsd(wallets.rewardWallet.balanceUsd) : '—'} 
-                                    themeColor="#a855f7"
-                                />
-                                <WalletCard 
-                                    title="Tournament Wallet" 
-                                    label="Entry Fees & Prizes"
-                                    address={wallets?.tournamentWallet?.address} 
-                                    sol={wallets?.tournamentWallet ? formatSol(wallets.tournamentWallet.balanceSol) : '—'} 
-                                    usd={wallets?.tournamentWallet ? formatUsd(wallets.tournamentWallet.balanceUsd) : '—'} 
-                                    themeColor="#ec4899"
-                                />
-                                <WalletCard 
-                                    title="Owner Vault" 
-                                    label="Profits"
-                                    address={wallets?.ownerVault?.address} 
-                                    sol={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'} 
-                                    usd={wallets?.ownerVault ? formatUsd(wallets.ownerVault.balanceUsd) : '—'} 
-                                    themeColor="#22c55e"
-                                />
-                                <WalletCard 
-                                    title="BR Wallets (Sum)" 
-                                    label="Matches"
-                                    address={wallets?.brWallets?.length ? `${wallets.brWallets.length} active wallets` : 'None active'}
-                                    sol={wallets?.brWallets ? formatSol(wallets.brWallets.reduce((acc, w) => acc + w.balanceSol, 0)) : '0.0000 SOL'} 
-                                    usd={wallets?.brWallets ? formatUsd(wallets.brWallets.reduce((acc, w) => acc + w.balanceUsd, 0)) : '$0.00'} 
-                                    themeColor="#f59e0b"
-                                />
-                            </div>
+                        </section>
+
+                        <div className="admin-overview-live-strip">
+                            <button type="button" onClick={() => setTab('activity')}><i className="is-live" /><span>Online now</span><strong>{onlineNow}</strong><small>{activeUsers?.currentlyInGame ?? 0} playing</small></button>
+                            <div><span>Avg. players / day</span><strong>{overviewAverages.uniquePlayersPerDay ?? 0}</strong><small>{overviewAverages.gamesPerDay ?? 0} games / day</small></div>
+                            <div><span>New users who played</span><strong>{overviewRates.newUserPlayPct ?? 0}%</strong><small>{overviewTotals.newUsersWhoPlayed ?? 0} of {overviewTotals.newUsers ?? 0}</small></div>
+                            <div><span>New users who paid</span><strong>{overviewRates.newUserPaidPct ?? 0}%</strong><small>{overviewTotals.newUsersWhoPaid ?? 0} converted</small></div>
+                            <button type="button" className={pendingAttention > 0 ? 'has-attention' : ''} onClick={() => setTab('issues')}><i /><span>Needs attention</span><strong>{pendingAttention}</strong><small>issues &amp; reward checks</small></button>
                         </div>
 
-                        <div>
-                            <h2 className="admin-section-title">Platform overview</h2>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
-                                <StatCard label="Online now" value={(activeUsers?.sitePresence?.length ?? 0) + (activeUsers?.currentlyInGame ?? 0)} sub={`${activeUsers?.currentlyInGame ?? 0} playing · ${activeUsers?.sitePresence?.length ?? 0} browsing`} />
-                                <StatCard label="Registered users" value={overview?.totalAccounts ?? '—'} sub={`${formatUsd(overview?.totalUserBalanceUsd)} held in balances`} />
-                                <StatCard label="Total deposits" value={formatUsd(overview?.totalDepositsUsd)} sub={`${overview?.depositCount ?? 0} deposits`} />
-                                <StatCard label="Platform earnings" value={formatUsd(overview?.ownerEarningsUsd)} sub={`${overview?.ownerSweepCount ?? 0} completed sweeps`} />
-                                <StatCard label="Rewards owed" value={formatUsd((overview?.totalSponsoredRewards ?? 0) + (overview?.totalPermanentRewards ?? 0) + (overview?.totalPermanentProgressReserve ?? 0) + (overview?.totalRetainedWinnings ?? 0))} sub={`${overview?.activeSponsoredPlayers ?? 0} active reward users`} />
-                                <StatCard label="Needs attention" value={rewardAlerts.filter(alert => alert.status === 'pending').length + pendingRewardClaims.length} sub="Reward alerts and unsettled claims" />
-                                <article className="admin-commerce-summary">
-                                    <p className="admin-commerce-summary__label">Skins &amp; {overview?.tokenSymbol || 'ARC'}</p>
-                                    <div className="admin-commerce-summary__metrics">
-                                        <div>
-                                            <span>Skin buyers</span>
-                                            <strong>{overview?.skinBuyerCount ?? '—'}</strong>
-                                        </div>
-                                        <div>
-                                            <span>User holdings</span>
-                                            <strong>{overview?.userTokenBalanceUsd == null ? '—' : formatUsd(overview.userTokenBalanceUsd)}</strong>
-                                        </div>
-                                    </div>
-                                    <p className="admin-commerce-summary__sub">
-                                        {overview?.userTokenBalanceUsd == null
-                                            ? 'Live market value unavailable'
-                                            : `${overview?.tokenHolderCount ?? 0} account holder(s) · on-chain value`}
-                                    </p>
-                                </article>
-                                <StatCard
-                                    label="Your accounts"
-                                    value={formatUsd(overview?.ownerAccountBalanceUsd)}
-                                    sub={`${overview?.ownerAccountCount ?? 0} owned account(s) · ${formatSol(overview?.ownerAccountBalanceSol)}`}
-                                    accent={{
-                                        background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(59,130,246,0.12))',
-                                        border: 'rgba(139,92,246,0.5)',
-                                        shadow: '0 12px 30px rgba(76,29,149,0.14)',
-                                    }}
-                                />
-                            </div>
+                        <div className="admin-overview-kpi-grid">
+                            <OverviewKpiCard
+                                label="New registrations"
+                                value={formatCompactNumber(overviewTotals.newUsers, 0)}
+                                sub={`${overviewAverages.registrationsPerDay ?? 0} average per day`}
+                                change={overviewChanges.newUsers}
+                                previous={formatCompactNumber(overviewPrevious.newUsers, 0)}
+                                accent="violet"
+                                onClick={() => { setUserSort('newest'); setUserPage(1); setTab('users'); }}
+                            />
+                            <OverviewKpiCard
+                                label="Active accounts"
+                                value={formatCompactNumber(overviewTotals.activeUsers, 0)}
+                                sub={`${overviewRates.activeAccountPct ?? 0}% of ${overviewAnalytics.playerAccountCount ?? 0} player accounts`}
+                                change={overviewChanges.activeUsers}
+                                previous={formatCompactNumber(overviewPrevious.activeUsers, 0)}
+                                accent="blue"
+                                onClick={() => { setUserSort('activity_desc'); setUserPage(1); setTab('users'); }}
+                            />
+                            <OverviewKpiCard
+                                label="Games played"
+                                value={formatCompactNumber(overviewTotals.games, 0)}
+                                sub={`${overviewTotals.paidGames ?? 0} paid · ${overviewTotals.freeGames ?? 0} free`}
+                                change={overviewChanges.games}
+                                previous={formatCompactNumber(overviewPrevious.games, 0)}
+                                accent="green"
+                                onClick={() => { setLiveCategoryFilter('entry'); setTab('activity'); }}
+                            />
+                            <OverviewKpiCard
+                                label="Unique players"
+                                value={formatCompactNumber(overviewTotals.uniquePlayers, 0)}
+                                sub={`${overviewTotals.uniquePaidPlayers ?? 0} played with real money`}
+                                change={overviewChanges.uniquePlayers}
+                                previous={formatCompactNumber(overviewPrevious.uniquePlayers, 0)}
+                                accent="pink"
+                                onClick={() => { setUserSort('game_spend_desc'); setUserPage(1); setTab('users'); }}
+                            />
+                            <OverviewKpiCard
+                                label="Played volume"
+                                value={formatUsd(overviewTotals.paidVolumeUsd)}
+                                sub={`${formatUsd(overviewAverages.paidEntryUsd)} average paid entry`}
+                                change={overviewChanges.paidVolumeUsd}
+                                previous={formatUsd(overviewPrevious.paidVolumeUsd)}
+                                accent="amber"
+                                onClick={() => { setTxFilter(current => ({ ...current, category: 'entry' })); setTab('activity'); }}
+                            />
+                            <OverviewKpiCard
+                                label="Deposits"
+                                value={formatUsd(overviewTotals.depositsUsd)}
+                                sub={`${overviewTotals.deposits ?? 0} confirmed deposits`}
+                                change={overviewChanges.depositsUsd}
+                                previous={formatUsd(overviewPrevious.depositsUsd)}
+                                accent="cyan"
+                                onClick={() => { setTxFilter(current => ({ ...current, category: 'deposit' })); setTab('activity'); }}
+                            />
                         </div>
+
+                        <div className="admin-overview-primary-grid">
+                            <OverviewTrendChart daily={overviewAnalytics.daily || []} />
+                            <section className="admin-overview-card admin-overview-engagement">
+                                <header className="admin-overview-card-header"><div><span>Quality</span><h2>Engagement funnel</h2><p>How account growth turns into actual play.</p></div></header>
+                                <div className="admin-overview-funnel">
+                                    {[
+                                        ['Active account rate', overviewRates.activeAccountPct, `${overviewTotals.activeUsers ?? 0} active`],
+                                        ['New users played', overviewRates.newUserPlayPct, `${overviewTotals.newUsersWhoPlayed ?? 0} players`],
+                                        ['New users paid', overviewRates.newUserPaidPct, `${overviewTotals.newUsersWhoPaid ?? 0} paid`],
+                                        ['Paid game share', overviewRates.paidGamePct, `${overviewTotals.paidGames ?? 0} paid games`],
+                                    ].map(([label, value, note]) => (
+                                        <div key={label} className="admin-overview-funnel__row">
+                                            <span>{label}<small>{note}</small></span><strong>{value ?? 0}%</strong>
+                                            <div><i style={{ width: `${Math.max(0, Math.min(100, Number(value) || 0))}%` }} /></div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="admin-overview-mini-finance">
+                                    <div><span>Cashouts</span><strong>{formatUsd(overviewTotals.cashoutUsd)}</strong></div>
+                                    <div><span>Cashout fees</span><strong>{formatUsd(overviewTotals.feesUsd)}</strong></div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div className="admin-overview-secondary-grid">
+                            <OverviewModeBreakdown modes={overviewAnalytics.modes || []} onOpenActivity={() => setTab('activity')} />
+                            <section className="admin-overview-card admin-overview-lifetime">
+                                <header className="admin-overview-card-header"><div><span>All time</span><h2>Platform snapshot</h2><p>Current totals across real accounts and wallets.</p></div></header>
+                                <div className="admin-overview-lifetime__grid">
+                                    <button type="button" onClick={() => setTab('users')}><span>Registered accounts</span><strong>{overview?.totalAccounts ?? '—'}</strong><small>{formatUsd(overview?.totalUserBalanceUsd)} held</small></button>
+                                    <button type="button" onClick={() => { setTxFilter(current => ({ ...current, category: 'deposit' })); setTab('activity'); }}><span>Total deposits</span><strong>{formatUsd(overview?.totalDepositsUsd)}</strong><small>{overview?.depositCount ?? 0} deposits</small></button>
+                                    <button type="button" onClick={() => setTab('operations')}><span>Platform earnings</span><strong>{formatUsd(overview?.ownerEarningsUsd)}</strong><small>{overview?.ownerSweepCount ?? 0} sweeps</small></button>
+                                    <button type="button" onClick={() => setTab('rewards')}><span>Rewards owed</span><strong>{formatUsd((overview?.totalSponsoredRewards ?? 0) + (overview?.totalPermanentRewards ?? 0) + (overview?.totalPermanentProgressReserve ?? 0) + (overview?.totalRetainedWinnings ?? 0))}</strong><small>{overview?.activeSponsoredPlayers ?? 0} reward users</small></button>
+                                    <button type="button" onClick={() => { setUserAccountType('owner'); setUserPage(1); setTab('users'); }}><span>Your accounts</span><strong>{formatUsd(overview?.ownerAccountBalanceUsd)}</strong><small>{overview?.ownerAccountCount ?? 0} accounts</small></button>
+                                    <div><span>Skins &amp; {overview?.tokenSymbol || 'ARC'}</span><strong>{overview?.skinBuyerCount ?? '—'} buyers</strong><small>{overview?.userTokenBalanceUsd == null ? 'Market value unavailable' : `${formatUsd(overview.userTokenBalanceUsd)} user holdings`}</small></div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <details className="admin-overview-details">
+                            <summary><span><strong>On-chain wallets</strong><small>House, rewards, tournaments and owner funds</small></span><i>›</i></summary>
+                            <div className="admin-overview-wallet-grid">
+                                <WalletCard title="Main House" label="Automated" address={wallets?.mainHouse?.address} sol={wallets?.mainHouse ? formatSol(wallets.mainHouse.balanceSol) : '—'} usd={wallets?.mainHouse ? formatUsd(wallets.mainHouse.balanceUsd) : '—'} themeColor="#3b82f6" />
+                                <WalletCard title="Reward Wallet" label="Rewards & Affiliates" address={wallets?.rewardWallet?.address} sol={wallets?.rewardWallet ? formatSol(wallets.rewardWallet.balanceSol) : '—'} usd={wallets?.rewardWallet ? formatUsd(wallets.rewardWallet.balanceUsd) : '—'} themeColor="#a855f7" />
+                                <WalletCard title="Tournament Wallet" label="Entry Fees & Prizes" address={wallets?.tournamentWallet?.address} sol={wallets?.tournamentWallet ? formatSol(wallets.tournamentWallet.balanceSol) : '—'} usd={wallets?.tournamentWallet ? formatUsd(wallets.tournamentWallet.balanceUsd) : '—'} themeColor="#ec4899" />
+                                <WalletCard title="Owner Vault" label="Profits" address={wallets?.ownerVault?.address} sol={wallets?.ownerVault ? formatSol(wallets.ownerVault.balanceSol) : '—'} usd={wallets?.ownerVault ? formatUsd(wallets.ownerVault.balanceUsd) : '—'} themeColor="#22c55e" />
+                                <WalletCard title="BR Wallets (Sum)" label="Matches" address={wallets?.brWallets?.length ? `${wallets.brWallets.length} active wallets` : 'None active'} sol={wallets?.brWallets ? formatSol(wallets.brWallets.reduce((acc, wallet) => acc + wallet.balanceSol, 0)) : '0.0000 SOL'} usd={wallets?.brWallets ? formatUsd(wallets.brWallets.reduce((acc, wallet) => acc + wallet.balanceUsd, 0)) : '$0.00'} themeColor="#f59e0b" />
+                            </div>
+                        </details>
+
+                        <details className="admin-overview-details">
+                            <summary><span><strong>Displayed “Playing” base values</strong><small>Manual public counters for Pregame and Gamemodes</small></span><i>›</i></summary>
+                            <div className="admin-overview-playing-settings">
+                                <p>Each base value is added to live players. If the base is 10 and one player joins, visitors see 11.</p>
+                                <div>
+                                    {PREGAME_PLAYING_MODES.map(mode => (
+                                        <label key={mode.key}><span>{mode.label}</span><input className="admin-input" type="number" min="0" max="999999" step="1" value={pregamePlayingOffsets[mode.key] ?? 0} onChange={event => setPregamePlayingOffsets(current => ({ ...current, [mode.key]: event.target.value }))} /></label>
+                                    ))}
+                                </div>
+                                <footer>
+                                    <button type="button" className="btn btn-primary" disabled={actionLoading} onClick={() => savePregamePlayingOffsets()}>Save for everyone</button>
+                                    <button type="button" className="btn btn-ghost" disabled={actionLoading} onClick={() => savePregamePlayingOffsets({ ...EMPTY_PREGAME_PLAYING })}>Reset all to 0</button>
+                                </footer>
+                            </div>
+                        </details>
                     </div>
                 )}
 
@@ -3008,6 +3362,89 @@ export default function AdminDashboard() {
                 )}
 
                 {tab === 'users' && (
+                    <div className="admin-users-stack">
+                    <section className="admin-spl-manager">
+                        <header className="admin-spl-manager__header">
+                            <div>
+                                <span>SPL ASSET RECOVERY</span>
+                                <h2>Token balances across all accounts</h2>
+                                <p>Scan every custodial deposit wallet, select complete token positions and send them to Owner Vault or each user’s connected wallet.</p>
+                            </div>
+                            <button type="button" className="btn btn-ghost" disabled={splTokenScanning || splTokenTransferring} onClick={scanAllSplTokens}>
+                                {splTokenScanning ? `Scanning ${splTokenScan?.scannedAccounts ?? 0} / ${splTokenScan?.totalAccounts ?? '…'}` : splTokenScan ? 'Scan all again' : 'Scan all accounts'}
+                            </button>
+                        </header>
+
+                        {splTokenScanning && (
+                            <div className="admin-spl-progress" aria-live="polite">
+                                <i><span style={{ width: `${Math.min(100, ((splTokenScan?.scannedAccounts || 0) / Math.max(1, splTokenScan?.totalAccounts || 1)) * 100)}%` }} /></i>
+                                <span>Scanning wallet {splTokenScan?.scannedAccounts ?? 0} of {splTokenScan?.totalAccounts ?? '…'}</span>
+                            </div>
+                        )}
+
+                        {splTokenScan && (
+                            <>
+                                <div className="admin-spl-manager__toolbar">
+                                    <div className="admin-overview-segmented" role="group" aria-label="SPL token destination">
+                                        <button type="button" className={splTokenDestinationMode === 'owner_vault' ? 'is-active' : ''} disabled={!splTokenScan.ownerVaultAddress} onClick={() => setSplTokenDestinationMode('owner_vault')}>Owner Vault</button>
+                                        <button type="button" className={splTokenDestinationMode === 'user_wallet' ? 'is-active' : ''} onClick={() => setSplTokenDestinationMode('user_wallet')}>User wallets</button>
+                                    </div>
+                                    <div className="admin-spl-manager__summary">
+                                        <span><strong>{splTokenPositions.length}</strong> balances</span>
+                                        <span><strong>{new Set(splTokenPositions.map(position => position.account.userId)).size}</strong> accounts</span>
+                                        {splScanErrorCount > 0 && <span className="is-warning"><strong>{splScanErrorCount}</strong> scan errors</span>}
+                                    </div>
+                                    <div className="admin-spl-manager__actions">
+                                        <button type="button" className="btn btn-ghost" disabled={!splTransferablePositions.length || splTokenTransferring} onClick={() => setSplTokenSelection(new Set(splTransferablePositions.map(position => position.key)))}>Select transferable</button>
+                                        <button type="button" className="btn btn-ghost" disabled={!splTokenSelection.size || splTokenTransferring} onClick={() => setSplTokenSelection(new Set())}>Clear</button>
+                                        <button type="button" className="btn btn-primary" disabled={!splSelectedTransferableCount || splTokenScanning || splTokenTransferring} onClick={transferSelectedSplTokens}>
+                                            {splTokenTransferring ? 'Transferring…' : `Transfer ${splSelectedTransferableCount} balance${splSelectedTransferableCount === 1 ? '' : 's'}`}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {splTokenPositions.length > 0 ? (
+                                    <div className="admin-spl-table-wrap">
+                                        <table className="admin-spl-table">
+                                            <thead><tr><th /><th>Account</th><th>Token balance</th><th>Mint / program</th><th>Destination</th><th>Status</th></tr></thead>
+                                            <tbody>
+                                                {splTokenPositions.map(position => {
+                                                    const canTransfer = position.account.hasSigningKey
+                                                        && (splTokenDestinationMode === 'owner_vault'
+                                                            ? !!splTokenScan.ownerVaultAddress
+                                                            : !!position.account.walletAddress);
+                                                    const destination = splTokenDestinationMode === 'owner_vault'
+                                                        ? splTokenScan.ownerVaultAddress
+                                                        : position.account.walletAddress;
+                                                    return (
+                                                        <tr key={position.key} className={!canTransfer ? 'is-disabled' : ''}>
+                                                            <td><input type="checkbox" disabled={!canTransfer || splTokenTransferring} checked={splTokenSelection.has(position.key) && canTransfer} onChange={() => setSplTokenSelection(current => {
+                                                                const next = new Set(current);
+                                                                if (next.has(position.key)) next.delete(position.key); else next.add(position.key);
+                                                                return next;
+                                                            })} /></td>
+                                                            <td><strong>{position.account.username}</strong><small className="mono">{truncateAddr(position.account.depositAddress)}</small></td>
+                                                            <td><strong>{position.tokenBalance.amount} {position.tokenBalance.symbol || 'tokens'}</strong><small>{position.tokenBalance.tokenAccountCount} token account{position.tokenBalance.tokenAccountCount === 1 ? '' : 's'}</small></td>
+                                                            <td><span className="mono">{truncateAddr(position.tokenBalance.mint)}</span><small>{position.tokenBalance.programId === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ? 'Token-2022' : 'SPL Token'}</small></td>
+                                                            <td><span className="mono">{destination ? truncateAddr(destination) : 'Missing wallet'}</span><small>{splTokenDestinationMode === 'owner_vault' ? 'Owner Vault' : 'Connected user wallet'}</small></td>
+                                                            <td>{!position.account.hasSigningKey ? <span className="admin-spl-status is-error">No signing key</span> : !destination ? <span className="admin-spl-status is-warning">No user wallet</span> : <span className="admin-spl-status is-ready">Ready</span>}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : !splTokenScanning && <div className="admin-spl-empty">No SPL token balances were found.</div>}
+
+                                {splScanErrorCount > 0 && (
+                                    <details className="admin-spl-errors">
+                                        <summary>{splScanErrorCount} wallet scan error{splScanErrorCount === 1 ? '' : 's'}</summary>
+                                        {(splTokenScan.accounts || []).filter(account => account.error).map(account => <p key={account.userId}><strong>{account.username}</strong> · {account.error}</p>)}
+                                    </details>
+                                )}
+                            </>
+                        )}
+                    </section>
                     <Panel
                         title={`${userMeta.total} registered accounts`}
                         sub="25 accounts per page · search and filters run on the server for faster loading."
@@ -3194,6 +3631,7 @@ export default function AdminDashboard() {
                             }}
                         />
                     </Panel>
+                    </div>
                 )}
 
                 {tab === 'activity' && (

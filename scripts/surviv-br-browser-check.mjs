@@ -100,6 +100,27 @@ try {
     const afterCancel = (await fixture()).player;
     assert.equal(afterCancel.ammo,beforeReload.ammo,'cancel does not insert rounds');
     assert.deepEqual(afterCancel.ammoReserves,beforeReload.ammoReserves,'real Socket.IO cancellation conserves reserve ammo');
+    await act('healing');
+    const healButton = page.getByRole('button', {name:'Use medkit, 2 remaining',exact:true});
+    await healButton.waitFor();
+    await healButton.click();
+    const cancelHealing = page.getByRole('button',{name:'Cancel healing',exact:true});
+    await cancelHealing.waitFor();
+    assert.equal(await cancelHealing.isEnabled(),true);
+    await page.screenshot({path:resolve(output,'healing.png')});
+    await cancelHealing.click();
+    await page.waitForFunction(async url => !(await fetch(url).then(r=>r.json())).player?.healing,`${api}/fixture`);
+    const healedCanceled=(await fixture()).player;
+    assert.equal(healedCanceled.hp,60); assert.equal(healedCanceled.medkits,2);
+    assert.equal(healedCanceled.ammo,afterCancel.ammo);
+    await healButton.waitFor();
+    await page.keyboard.press('h');
+    await cancelHealing.waitFor();
+    // Observe the completed action in the actual HUD before asserting the
+    // authoritative inventory; an elapsed clock alone is not completion.
+    await page.getByRole('button',{name:'Use medkit, 1 remaining',exact:true}).waitFor({timeout:6000});
+    assert.equal((await fixture()).player.hp,100);
+    assert.equal((await fixture()).player.medkits,1,'completed heal consumes exactly one medkit');
     await page.screenshot({ path: resolve(output, 'in-game.png') });
     await page.keyboard.press('m');
     await page.getByRole('dialog', { name: 'Full match map' }).waitFor();
@@ -151,6 +172,6 @@ try {
     await touch.getByRole('button', { name: 'Back to lobby', exact: true }).click();
     await touch.waitForURL('**/pre-game');
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log(JSON.stringify({ passed: true, scenarios: ['public selection', '10-player queue', 'locked countdown', 'movement', 'pickup', 'firing', 'reload/cancel via Socket.IO', 'safe-zone map', 'rejoin', 'victory payout', 'queue again'], screenshots: output }, null, 2));
+    console.log(JSON.stringify({ passed: true, scenarios: ['public selection', '10-player queue', 'locked countdown', 'movement', 'pickup', 'firing', 'reload/cancel via Socket.IO', 'HUD healing/cancel/complete', 'safe-zone map', 'rejoin', 'victory payout', 'queue again', 'mobile layout'], screenshots: output }, null, 2));
     }
 } finally { await browser.close(); }

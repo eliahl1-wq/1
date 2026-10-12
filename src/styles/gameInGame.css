@@ -3843,6 +3843,7 @@ body.game-session-active #root {
     height: 2px;
     background: rgba(244, 226, 171, 0.74);
     opacity: 1;
+    transition: width 0.1s linear;
 }
 
 .surviv-game-page .surviv-weapons-hotbar .surviv-utility-stack .hotbar-slot {
@@ -3871,6 +3872,21 @@ body.game-session-active #root {
 
 .surviv-game-page .surviv-weapons-hotbar .surviv-utility-stack .hotbar-slot:disabled {
     opacity: 0.22;
+}
+
+.surviv-game-page .surviv-weapons-hotbar .surviv-utility-stack .medkit-hotbar-slot.is-using {
+    color: #83e5a1 !important;
+    opacity: 1;
+}
+
+.surviv-game-page .surviv-weapons-hotbar .surviv-utility-stack .medkit-hotbar-slot.is-using:focus-visible {
+    outline: 1px solid #83e5a1;
+    outline-offset: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .surviv-game-page .hotbar-reload-sweep,
+    .surviv-game-page .surviv-medkit-timer-fill { transition: none; }
 }
 
 .surviv-game-page .surviv-utility-stack .hotbar-weapon-icon-wrap,

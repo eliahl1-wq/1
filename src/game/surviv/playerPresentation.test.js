@@ -1,6 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceWalkPose, didCompleteReload, isSameEquippedWeapon, localPresentationAim } from './playerPresentation.js';
+import { advanceWalkPose, didCompleteReload, isSameEquippedWeapon, localPresentationAim, stableActionDeadline, weaponFirePose } from './playerPresentation.js';
+
+test('weapon-only kick settles monotonically at identical elapsed times for all frame rates', () => {
+    for (const family of ['pistol','revolver','smg','assault','shotgun','sniper','lmg','dmr']) {
+        let last = Infinity;
+        for (let ms=0;ms<=300;ms+=5) {
+            const pose = weaponFirePose(family,ms);
+            assert.ok(pose.kick<=last && pose.kick>=0 && pose.kick<=3.4);
+            assert.ok(pose.flash>=0 && pose.flash<=1); last=pose.kick;
+        }
+        assert.deepEqual(weaponFirePose(family,300),{kick:0,flash:0});
+    }
+    assert.ok(weaponFirePose('sniper',0).kick>weaponFirePose('smg',0).kick);
+});
+
+test('action progress ignores small packet-arrival jitter, but honors cancellation and large corrections', () => {
+    assert.equal(stableActionDeadline(0,2500,1000),3500);
+    assert.equal(stableActionDeadline(3500,2400,1130),3500);
+    assert.equal(stableActionDeadline(3500,2300,1170),3500);
+    assert.equal(stableActionDeadline(3500,0,1200),0);
+    assert.equal(stableActionDeadline(3500,2500,1500),4000);
+});
 
 test('walking phase follows rendered distance rather than restarting each snapshot', () => {
     let at60 = advanceWalkPose(null, 0, 0, 0), at144 = advanceWalkPose(null, 0, 0, 0);

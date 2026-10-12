@@ -1720,7 +1720,10 @@ export default function SurvivGame() {
                             aria-label={`Throw grenade, ${me.inventory?.grenades || 0} remaining`}
                             title={(me.inventory?.grenades || 0) > 0 ? 'Throw grenade (4)' : 'No grenades'}
                             onClick={() => {
-                                if ((me.inventory?.grenades || 0) > 0) throwGrenadePendingRef.current = true;
+                                if ((me.inventory?.grenades || 0) > 0) {
+                                    throwGrenadePendingRef.current = true;
+                                    flushInputRef.current?.(true);
+                                }
                             }}
                         >
                             <span className="hotbar-slot-key">4</span>
@@ -1736,14 +1739,12 @@ export default function SurvivGame() {
                         <button
                             type="button"
                             className={'hotbar-slot medkit-hotbar-slot ' + ((me.inventory?.medkits || 0) > 0 ? 'has-item' : 'empty-slot') + (medkitRemainingMs > 0 ? ' is-using' : '')}
-                            disabled={!canMobileHeal}
-                            aria-label={'Use medkit, ' + (me.inventory?.medkits || 0) + ' remaining'}
+                            disabled={!canMobileHeal && medkitRemainingMs <= 0}
+                            aria-label={medkitRemainingMs > 0 ? 'Cancel healing' : 'Use medkit, ' + (me.inventory?.medkits || 0) + ' remaining'}
                             title={(me.inventory?.medkits || 0) > 0
-                                ? (canMobileHeal ? 'Use medkit (H)' : (medkitRemainingMs > 0 ? 'Using medkit' : 'Health is already full'))
+                                ? (medkitRemainingMs > 0 ? 'Cancel healing (X)' : (canMobileHeal ? 'Use medkit (H)' : 'Health is already full'))
                                 : 'No medkits'}
-                            onClick={() => {
-                                if (canMobileHeal) useMedkitPendingRef.current = true;
-                            }}
+                            onClick={handleMobileHeal}
                         >
                             <span className="hotbar-slot-key">H</span>
                             <div className="hotbar-weapon-icon-wrap medkit-hotbar-icon" aria-hidden="true">
@@ -1752,7 +1753,7 @@ export default function SurvivGame() {
                                     <path d="M12 8v8M8 12h8" />
                                 </svg>
                             </div>
-                            <span className="hotbar-slot-name-compact">MEDKIT</span>
+                            <span className="hotbar-slot-name-compact">{medkitRemainingMs > 0 ? 'CANCEL' : 'MEDKIT'}</span>
                             <span className="hotbar-slot-ammo">{me.inventory?.medkits || 0}</span>
                             {medkitRemainingMs > 0 && (
                                 <span className="medkit-hotbar-progress" style={{ '--medkit-progress': (medkitProgress * 100) + '%' }} />
@@ -1790,6 +1791,7 @@ export default function SurvivGame() {
                                 onClick={() => {
                                     if (weaponId) {
                                         equipSlotPendingRef.current = slotIdx;
+                                        flushInputRef.current?.(true);
                                     }
                                 }}
                             >

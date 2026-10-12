@@ -106,7 +106,7 @@ export const SURVIV_AMMO_CATALOG = Object.freeze({
     '9mm': { label: '9mm', color: '#f5d547', max: 180 },
     '12g': { label: '12 Gauge', color: '#f05a5a', max: 48 },
     '556': { label: '5.56mm', color: '#63d471', max: 180 },
-    '762': { label: '7.62mm', color: '#5aa9f8', max: 120 },
+    '762': { label: '7.62mm', color: '#5aa9f8', max: 90 },
     '45acp': { label: '.45 ACP', color: '#b6f06a', max: 120 },
     '50ae': { label: '.50 AE', color: '#6ee7f2', max: 42 },
     '308': { label: '.308 Subsonic', color: '#33434d', max: 30 },

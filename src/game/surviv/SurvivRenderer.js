@@ -5,9 +5,10 @@
 import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
 import { drawFarmerOutfit, drawFarmerHat } from '../../constants/signatureSkins.js';
-import { ingestAirdropTimers, ingestExplosionEvents } from './worldEvents.js';
+import { confirmedContactTrace, ingestAirdropTimers, ingestCombatEvents, ingestExplosionEvents } from './worldEvents.js';
 import { presentBRZone } from './brZonePresentation.js';
 import { drawCraftedFurniture, drawCraftedFixtures, drawRoofCourses, drawRoofWingRelief, drawInteriorAccessories } from './architectureArt.js';
+import { drawCraftedOutdoorProp } from './outdoorPropArt.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
@@ -41,7 +42,7 @@ import {
 import { stabilizeHouseSelection } from './houseTransition.js';
 import { appendHouseFootprintPath, buildVisibilityRayIndex, castVisibilityRay, getHouseBoundarySegments } from './visibilityGeometry.js';
 import { buildRenderSpatialIndex, queryRenderSpatialIndex } from './renderSpatialIndex.js';
-import { advanceWalkPose, didCompleteReload, isSameEquippedWeapon, localPresentationAim } from './playerPresentation.js';
+import { advanceWalkPose, didCompleteReload, isSameEquippedWeapon, localPresentationAim, stableActionDeadline, weaponFirePose } from './playerPresentation.js';
 
 const WEAPON_LABELS = Object.fromEntries(
     Object.entries(SURVIV_WEAPON_CATALOG).map(([id, definition]) => [id, definition.label]),
@@ -1262,6 +1263,11 @@ function drawInteriorPropFinish(ctx, o, variant, w, h) {
         ctx.stroke();
     }
 
+    if (!o._skipDamageMarks) drawInteriorDamageMarks(ctx, o, variant, w, h);
+}
+
+function drawInteriorDamageMarks(ctx, o, variant, w, h) {
+    const minSize = Math.min(w, h);
     const maxHp = Number(o.maxHp);
     const hp = Number(o.hp);
     if (!(maxHp > 0) || !Number.isFinite(hp)) return;
@@ -1270,8 +1276,8 @@ function drawInteriorPropFinish(ctx, o, variant, w, h) {
 
     // Authoritative damage is readable on the object itself. Deterministic
     // marks avoid animated noise and remain cheap enough for dense interiors.
-    const metal = METAL_INTERIOR_PROP_VARIANTS.has(variant);
-    const ceramic = CERAMIC_INTERIOR_PROP_VARIANTS.has(variant);
+    const metal = o.kind === 'barrel' || METAL_INTERIOR_PROP_VARIANTS.has(variant);
+    const ceramic = o.kind === 'rock' || CERAMIC_INTERIOR_PROP_VARIANTS.has(variant);
     ctx.strokeStyle = ceramic
         ? `rgba(57, 74, 77, ${0.30 + damage * 0.36})`
         : metal
@@ -2143,6 +2149,9 @@ export class SurvivRenderer {
         this._lastDryFireAt = 0;
         this._gunAudioPrimed = false;
         this._lastObjectImpactId = null;
+        this._seenCombatEvents = new Map();
+        this._weaponShots = new Map();
+        this._authoritativeCombatEvents = false;
         // Weapon switch animation
         this._weaponSwitchT = 0;
         this._weaponSwitchFrom = 'fists';
@@ -2414,6 +2423,9 @@ export class SurvivRenderer {
         this._lastDryFireAt = 0;
         this._gunAudioPrimed = false;
         this._lastObjectImpactId = null;
+        this._seenCombatEvents.clear();
+        this._weaponShots.clear();
+        this._authoritativeCombatEvents = false;
         this._weaponSwitchT = 0;
         this._weaponSwitchFrom = 'fists';
         this._muzzleFlash = 0;
@@ -2805,6 +2817,64 @@ export class SurvivRenderer {
         return nextLoot;
     }
 
+    presentGunshot(event, receivedAt) {
+        const startedAt = receivedAt - event.ageMs;
+        if ((this._weaponShots.get(event.ownerId)?.startedAt || 0) >= startedAt) return;
+        this._weaponShots.set(event.ownerId, { ...event, startedAt });
+        const local = event.ownerId === this.myId;
+        const listener = this._playersById.get(this.myId) || this.me || this.camera;
+        const dx = local ? 0 : event.x - (Number(listener?.x) || 0);
+        const dy = local ? 0 : event.y - (Number(listener?.y) || 0);
+        const family = getSurvivWeaponFamily(event.weaponType);
+        playSurvivGunshot(family, { distance: Math.hypot(dx, dy), pan: clamp(dx / 720, -0.78, 0.78) });
+        if (event.ageMs < 100 && family !== 'revolver') {
+            const side = event.angle + Math.PI / 2;
+            const along = weaponMuzzleDistance(event.weaponType) * .48;
+            const age = event.ageMs / 1000;
+            const vx = Math.cos(side) * 60, vy = Math.sin(side) * 60;
+            this.particles.push({ x: event.x + Math.cos(event.angle) * along + vx * age,
+                y: event.y + Math.sin(event.angle) * along + vy * age,
+                vx, vy, life: .38 - age, maxLife: .38, type: 'shell', size: 1.6,
+                rotation: event.angle + age * 8, rotSpeed: 8,
+                color: family === 'shotgun' ? '#ac6551' : '#c4ad74' });
+        }
+        if (local && event.ageMs < 100) {
+            this.cameraShake.intensity = Math.min(5, this.cameraShake.intensity + (WEAPON_SHAKE[family] || 1) * 0.65);
+        }
+    }
+
+    presentBulletImpact(event) {
+        if (event.objectId) this._combatImpactObjects.add(event.objectId);
+        const contact = confirmedContactTrace(event, this._interpBullets.has(event.bulletId));
+        if (contact && this.localShotTracers.length < 60) this.localShotTracers.push(contact);
+        const blood = event.material === 'blood';
+        if (blood) this.spawnBloodDecal(event.x, event.y);
+        const palettes = { blood: '#d65a50', wood: '#ba9663', stone: '#bbc0b9',
+            metal: '#ead5a3', foliage: '#739b52', soft: '#b5a17b' };
+        const color = palettes[event.material] || palettes.stone;
+        const count = blood ? 4 : event.material === 'metal' ? 2 : 3;
+        const age = event.ageMs / 1000;
+        for (let i = 0; i < count; i++) {
+            const angle = event.angle + Math.PI + (Math.random() - .5) * 1.6;
+            const speed = 45 + Math.random() * 55;
+            const vx = Math.cos(angle) * speed, vy = Math.sin(angle) * speed;
+            const duration = .23 + Math.random() * .09;
+            if (age >= duration) continue;
+            this.particles.push({ x: event.x + vx * age, y: event.y + vy * age,
+                vx, vy, life: duration - age, maxLife: duration,
+                size: blood ? 1.8 + Math.random() * 1.1 : 1.2 + Math.random(), color,
+                type: blood ? 'blood' : event.material === 'metal' ? 'spark' : 'wood' });
+        }
+        const listener = this._playersById.get(this.myId) || this.me || this.camera;
+        const dx = event.x - (Number(listener?.x) || 0), dy = event.y - (Number(listener?.y) || 0);
+        // Blood already has the authoritative hit-confirm cue; a shotgun fan
+        // must not create a stack of identical material sounds in one snapshot.
+        if (!blood && event.ageMs < 160 && this._combatImpactSounds < 3) {
+            playSurvivImpactSound(event.material, { distance: Math.hypot(dx, dy), pan: clamp(dx / 720, -0.78, 0.78) });
+            this._combatImpactSounds++;
+        }
+    }
+
     _ingestBulletSnapshots(bullets, receivedAt) {
         const activeIds = new Set();
         const heardReports = new Set();
@@ -2817,7 +2887,7 @@ export class SurvivRenderer {
                     confirmedLocalShotWeaponTypes.add(bullet.weaponType);
                 }
                 const reportKey = `${bullet.ownerId || 'unknown'}:${bullet.weaponType || 'unknown'}`;
-                if (this._gunAudioPrimed
+                if (!this._authoritativeCombatEvents && this._gunAudioPrimed
                     && bullet.ownerId !== this.myId
                     && !bullet.isGrenade
                     && bullet.weaponType !== 'grenade'
@@ -2917,11 +2987,15 @@ export class SurvivRenderer {
             const continuingMelee = meleeRemainingMs > 0
                 && meleeAnimation?.attackId === meleeAttackId
                 && meleeAnimation.weapon === player.weapon;
+            const previousPose = this._playersById.get(player.id);
+            const sameEquipment = previousPose?.weapon === player.weapon
+                && previousPose?.activeWeaponSlot === player.activeWeaponSlot;
             return {
                 ...player,
-                reloadEndAtLocal: player.reloading
-                    ? receivedAt + Math.max(0, Number(player.reloadRemainingMs) || 0)
-                    : 0,
+                reloadEndAtLocal: stableActionDeadline(sameEquipment ? previousPose?.reloadEndAtLocal : 0,
+                    player.reloading ? Number(player.reloadRemainingMs) || 0 : 0, receivedAt),
+                medkitEndAtLocal: stableActionDeadline(previousPose?.medkitEndAtLocal,
+                    Number(player.medkitRemainingMs) || 0, receivedAt),
                 // Never fall back to stale server timestamps. Only the locally
                 // registered, previously unseen attack id may drive visuals.
                 meleeStartedAt: continuingMelee ? meleeAnimation.startedAt : 0,
@@ -2941,7 +3015,16 @@ export class SurvivRenderer {
             : rawPlayers;
         this._playersById.clear();
         for (const player of this.players) this._playersById.set(player.id, player);
-        if (tick.objectImpact?.id && tick.objectImpact.id !== this._lastObjectImpactId) {
+        this._authoritativeCombatEvents = Array.isArray(tick.combatEvents);
+        this._combatImpactObjects = new Set((tick.combatEvents || []).filter(e => e.type === 'impact' && e.objectId).map(e => e.objectId));
+        this._combatImpactSounds = 0;
+        if (this._authoritativeCombatEvents) {
+            ingestCombatEvents(tick.combatEvents, this._seenCombatEvents, receivedAt,
+                event => this.presentGunshot(event, receivedAt),
+                event => this.presentBulletImpact(event, receivedAt));
+        }
+        if (tick.objectImpact?.id && tick.objectImpact.id !== this._lastObjectImpactId
+            && !this._combatImpactObjects.has(tick.objectImpact.objectId)) {
             this._lastObjectImpactId = tick.objectImpact.id;
             const listener = me || this.camera;
             const dx = (Number(tick.objectImpact.x) || 0) - (Number(listener?.x) || 0);
@@ -3009,13 +3092,17 @@ export class SurvivRenderer {
         for (const playerId of this._lastPlayedMeleeAttackIds.keys()) {
             if (!activePlayerIds.has(playerId)) this._lastPlayedMeleeAttackIds.delete(playerId);
         }
+        for (const [playerId, shot] of this._weaponShots) {
+            if (!activePlayerIds.has(playerId) || receivedAt - shot.startedAt > 400) this._weaponShots.delete(playerId);
+        }
         while (this._seenDeathMarkerIds.size > 200) {
             this._seenDeathMarkerIds.delete(this._seenDeathMarkerIds.values().next().value);
         }
 
-        // Track disappeared bullets for impact particles
-        const prevBullets = this.bullets || [];
-        const currentBulletIds = new Set((tick.bullets || []).map(b => b.id));
+        // Legacy presentation only. Authoritative events avoid per-projectile
+        // neighbourhood searches and never mistake viewport culling for a hit.
+        const prevBullets = this._authoritativeCombatEvents && Array.isArray(tick.explosions) ? [] : this.bullets || [];
+        const currentBulletIds = prevBullets.length ? new Set((tick.bullets || []).map(b => b.id)) : null;
         for (const b of prevBullets) {
             if (!currentBulletIds.has(b.id)) {
                 if (b.isGrenade || b.weaponType === 'grenade') {
@@ -3025,6 +3112,7 @@ export class SurvivRenderer {
                     }
                     continue;
                 }
+                if (this._authoritativeCombatEvents) continue;
                 // A projectile can disappear because it reached max range. Only
                 // create an impact when geometry or a player is actually nearby;
                 // false mid-air sparks make misses look laggy and imprecise.
@@ -3135,7 +3223,7 @@ export class SurvivRenderer {
                     const dx = (Number(obstacle.x) || 0) - (Number(listener?.x) || 0);
                     const dy = (Number(obstacle.y) || 0) - (Number(listener?.y) || 0);
                     const distance = Math.hypot(dx, dy);
-                    if (distance <= 1050 && impactSoundsPlayed < 4) {
+                    if (distance <= 1050 && impactSoundsPlayed < 4 && !this._combatImpactObjects.has(obstacle.id)) {
                         playSurvivImpactSound(survivObjectImpactMaterial(obstacle), {
                             distance,
                             pan: clamp(dx / 720, -0.78, 0.78),
@@ -3285,7 +3373,7 @@ export class SurvivRenderer {
             this._healAudioPrimed = true;
 
             // Detect shots fired → muzzle flash + camera recoil
-            if (this._prevAmmo >= 0 && me.ammo < this._prevAmmo && sameEquipment && me.weapon !== 'fists' && !me.reloading) {
+            if (!this._authoritativeCombatEvents && this._prevAmmo >= 0 && me.ammo < this._prevAmmo && sameEquipment && me.weapon !== 'fists' && !me.reloading) {
                 const weaponFamily = getSurvivWeaponFamily(me.weapon);
                 playSurvivGunshot(weaponFamily, { distance: 0, pan: 0 });
                 this._muzzleFlash = 1.0;
@@ -6178,7 +6266,10 @@ export class SurvivRenderer {
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
-        if (kind === 'entrancePad') {
+        if (drawCraftedOutdoorProp(ctx, o)) {
+            // Keep the shared shadow, damage feedback and cache surrounding it.
+            if (!o._skipDamageMarks) drawInteriorDamageMarks(ctx, o, o.variant, o.w, o.h);
+        } else if (kind === 'entrancePad') {
             const palette = {
                 woodDeck: ['#765b3d', '#533c29', 'rgba(225,190,135,0.22)'],
                 steelPlate: ['#59686e', '#39464b', 'rgba(193,216,222,0.20)'],
@@ -7786,7 +7877,7 @@ export class SurvivRenderer {
             cacheCtx.scale(scale, scale);
             cacheCtx.translate(-o.x, -o.y);
             if (renderPhase === 'canopy') this.drawTreeCanopy(cacheCtx, o, false);
-            else this.drawObstacle(cacheCtx, o, false);
+            else this.drawObstacle(cacheCtx, { ...o, _skipDamageMarks: true }, false);
             const pixels = width * height;
             sprite = { canvas, width, height, worldWidth, worldHeight, pixels };
 
@@ -7812,6 +7903,14 @@ export class SurvivRenderer {
             sprite.worldWidth,
             sprite.worldHeight,
         );
+        if (renderPhase === 'base' && ['furniture', 'machine', 'rock', 'barrel'].includes(kind)
+            && Number(o.maxHp) > 0 && Number(o.hp) <= Number(o.maxHp) * .92) {
+            ctx.save();
+            ctx.translate(o.x + shake.x, o.y + shake.y);
+            ctx.rotate(o.rotation || 0);
+            drawInteriorDamageMarks(ctx, o, kind === 'machine' ? 'machine' : o.variant, o.w, o.h);
+            ctx.restore();
+        }
         return true;
     }
 
@@ -8715,7 +8814,7 @@ export class SurvivRenderer {
             ctx.restore();
             return;
         }
-        const angle = Math.atan2(b.vy || 0, b.vx || 1);
+        const angle = Number.isFinite(b.angle) ? b.angle : Math.atan2(b.vy || 0, b.vx || 1);
         ctx.save();
         ctx.translate(b.x, b.y);
         ctx.rotate(angle);
@@ -8729,8 +8828,8 @@ export class SurvivRenderer {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.62)';
         ctx.lineWidth = spec.thickness;
         ctx.beginPath();
-        ctx.moveTo(-spec.trailLen * 0.72, 0);
-        ctx.lineTo(spec.tipLen, 0);
+        ctx.moveTo(-Math.min(spec.trailLen * 0.72, b.contactLength ?? Infinity), 0);
+        ctx.lineTo(b.contactLength != null ? 0 : spec.tipLen, 0);
         ctx.stroke();
 
         ctx.restore();
@@ -8863,7 +8962,12 @@ export class SurvivRenderer {
         const reloadProgress = p.reloading && p.reloadEndAtLocal && p.reloadMs
             ? clamp(1 - (p.reloadEndAtLocal - this._frameNow) / p.reloadMs, 0, 1)
             : 0;
+        const shot = this._weaponShots?.get(p.id);
+        const firePose = shot?.weaponType === p.weapon && shot?.slot === p.activeWeaponSlot
+            ? weaponFirePose(getSurvivWeaponFamily(p.weapon), this._frameNow - shot.startedAt)
+            : { kick: 0, flash: 0 };
         ctx.save();
+        if (firePose.kick > 0) ctx.translate(-firePose.kick, 0);
         if (reloadProgress > 0 && reloadProgress < 1) {
             const handling = Math.sin(reloadProgress * Math.PI);
             ctx.translate(-handling * 2.2, handling * 0.7);
@@ -8889,11 +8993,13 @@ export class SurvivRenderer {
             }
         }
 
-        // Muzzle flash on self
-        if (isMe && this._muzzleFlash > 0.1) {
+        // A visible shooter's report remains visible even if its bullet hit
+        // between snapshots. Suppressed guns retain a much quieter flash.
+        const muzzleFlash = this._authoritativeCombatEvents ? firePose.flash : (isMe ? this._muzzleFlash : 0);
+        if (muzzleFlash > 0.1) {
             const barrelDist = weaponMuzzleDistance(p.weapon, r);
             ctx.save();
-            ctx.globalAlpha = this._muzzleFlash * 0.9;
+            ctx.globalAlpha = muzzleFlash * (['vss', 'awms', 'm4a1s'].includes(p.weapon) ? 0.3 : 0.8);
             const flashGrad = ctx.createRadialGradient(barrelDist, 0, 0.8, barrelDist, 0, 8);
             flashGrad.addColorStop(0, '#ffffff');
             flashGrad.addColorStop(0.3, '#ffee88');
@@ -8907,9 +9013,13 @@ export class SurvivRenderer {
             ctx.restore();
         }
 
-        // Reload progress ring near weapon
-        if (p.reloading && p.reloadEndAtLocal && p.reloadMs && p.reloadEndAtLocal > this._frameNow) {
-            const progress = reloadProgress;
+        // Both timed actions share the same compact, smoothly clocked indicator.
+        const healing = p.medkitEndAtLocal > this._frameNow;
+        const actionProgress = healing
+            ? clamp(1 - (p.medkitEndAtLocal - this._frameNow) / (p.medkitUseMs || 2500), 0, 1)
+            : reloadProgress;
+        if (healing || (p.reloading && p.reloadEndAtLocal > this._frameNow)) {
+            const progress = actionProgress;
             if (progress > 0 && progress < 1) {
                 const ringX = r + 12;
                 const ringY = -12;
@@ -8931,7 +9041,7 @@ export class SurvivRenderer {
                 // Progress
                 ctx.beginPath();
                 ctx.arc(ringX, ringY, ringRadius, startAngle, endAngle);
-                ctx.strokeStyle = '#ffffff';
+                ctx.strokeStyle = healing ? '#83e5a1' : '#ffffff';
                 ctx.lineWidth = ringLineWidth;
                 ctx.stroke();
 
