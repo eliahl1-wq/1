@@ -1253,6 +1253,8 @@ export default function AdminDashboard() {
     const [splTokenTransferring, setSplTokenTransferring] = useState(false);
     const [splTokenSelection, setSplTokenSelection] = useState(new Set());
     const [splTokenDestinationMode, setSplTokenDestinationMode] = useState('owner_vault');
+    const [splFeeMode, setSplFeeMode] = useState('source');
+    const [splMaxFeeSol, setSplMaxFeeSol] = useState('0.01');
     const [userSort, setUserSort] = useState('balance_desc');
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
@@ -2011,6 +2013,7 @@ export default function AdminDashboard() {
                     scannedAccounts,
                     totalAccounts: totalAccounts ?? scannedAccounts,
                     ownerVaultAddress,
+                    feeSponsor: page.feeSponsor || { configured: false },
                     completed: !cursor,
                 });
             } while (cursor);
@@ -2061,8 +2064,17 @@ export default function AdminDashboard() {
         const destinationLabel = splTokenDestinationMode === 'owner_vault'
             ? `Owner Vault (${truncateAddr(splTokenScan?.ownerVaultAddress)})`
             : 'each user’s connected wallet';
+        const sponsoring = splFeeMode === 'admin_sponsor';
+        if (sponsoring && (!splTokenScan?.feeSponsor?.configured || !Number.isFinite(Number(splMaxFeeSol))
+            || Number(splMaxFeeSol) <= 0 || Number(splMaxFeeSol) > splTokenScan.feeSponsor.maxFeeSol)) {
+            setActionMsg(`❌ Configure the admin fee wallet and choose a budget above 0 and at most ${splTokenScan?.feeSponsor?.maxFeeSol || 0.25} SOL.`);
+            return;
+        }
+        const feeExplanation = sponsoring
+            ? `Admin fee wallet ${splTokenScan.feeSponsor.address} pays network fees and any destination token-account rent. Maximum combined budget: ${splMaxFeeSol} SOL. Source accounts need no SOL. Transfers stop when the budget is reached.`
+            : 'Each source wallet pays its own network fee and any destination token-account rent.';
         if (!window.confirm(
-            `Transfer ${transferable.length} complete SPL token balance${transferable.length === 1 ? '' : 's'} to ${destinationLabel}?\n\nBalances are checked again on-chain before transfer. Each source wallet pays its own network fee and any destination token-account rent. This is irreversible.${skippedBeforeTransfer ? `\n\n${skippedBeforeTransfer} selected balance(s) cannot be transferred because the signing key or user wallet is missing.` : ''}`,
+            `Transfer ${transferable.length} complete SPL token balance${transferable.length === 1 ? '' : 's'} to ${destinationLabel}?\n\nBalances are checked again on-chain before transfer. ${feeExplanation} This is irreversible.${skippedBeforeTransfer ? `\n\n${skippedBeforeTransfer} selected balance(s) cannot be transferred because the signing key or user wallet is missing.` : ''}`,
         )) return;
 
         setSplTokenTransferring(true);
@@ -2072,6 +2084,9 @@ export default function AdminDashboard() {
                 method: 'POST',
                 body: JSON.stringify({
                     destinationMode: splTokenDestinationMode,
+                    feeMode: splFeeMode,
+                    ...(sponsoring ? { maxFeeSol: splMaxFeeSol,
+                        feeConfirmation: `SPONSOR SPL ${transferable.length} ${splMaxFeeSol}` } : {}),
                     selections: transferable.map(position => ({
                         userId: position.account.userId,
                         mint: position.tokenBalance.mint,
@@ -2099,7 +2114,7 @@ export default function AdminDashboard() {
                 .slice(0, 4)
                 .map(item => `${item.username || 'Account'}: ${item.message}`)
                 .join(' · ');
-            setActionMsg(`${result.failed ? '⚠️' : '✅'} ${result.message}${failureDetails ? ` ${failureDetails}` : ''}`);
+            setActionMsg(`${result.failed ? '⚠️' : '✅'} ${result.message}${sponsoring ? ` Fee budget reserved: ${result.feeBudgetReservedSol || 0} SOL (includes rent; uncertain submissions remain reserved).` : ''}${failureDetails ? ` ${failureDetails}` : ''}`);
             await fetchUsers(showExcludedUsersRef.current, userSortRef.current, false, userPageRef.current).catch(() => {});
         } catch (error) {
             setActionMsg(`❌ ${error.message || 'SPL token transfer failed.'}`);
@@ -3390,6 +3405,19 @@ export default function AdminDashboard() {
 
                         {splTokenScan && (
                             <>
+                                <div className="admin-spl-manager__toolbar">
+                                    <div className="admin-overview-segmented" role="group" aria-label="SPL transfer fee payer">
+                                        <button type="button" disabled={splTokenTransferring} className={splFeeMode === 'source' ? 'is-active' : ''} onClick={() => setSplFeeMode('source')}>Source pays fees</button>
+                                        <button type="button" disabled={splTokenTransferring || !splTokenScan.feeSponsor?.configured} className={splFeeMode === 'admin_sponsor' ? 'is-active' : ''} onClick={() => setSplFeeMode('admin_sponsor')}>Admin fee wallet</button>
+                                    </div>
+                                    {splTokenScan.feeSponsor?.configured ? (
+                                        <span className="text-muted" style={{ fontSize: 12, overflowWrap: 'anywhere' }}>Fee wallet: {splTokenScan.feeSponsor.address} · {formatSol(splTokenScan.feeSponsor.balanceSol || 0)}</span>
+                                    ) : <span className="text-muted" style={{ fontSize: 12 }}>To pay fees centrally, configure SPL_FEE_SPONSOR_SECRET on the backend, then scan again.</span>}
+                                    {splFeeMode === 'admin_sponsor' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                        Max fees + rent (SOL)
+                                        <input type="number" min="0.000001" max={splTokenScan.feeSponsor?.maxFeeSol || 0.25} step="0.001" value={splMaxFeeSol} disabled={splTokenTransferring} onChange={event => setSplMaxFeeSol(event.target.value)} style={{ width: 100 }} />
+                                    </label>}
+                                </div>
                                 <div className="admin-spl-manager__toolbar">
                                     <div className="admin-overview-segmented" role="group" aria-label="SPL token destination">
                                         <button type="button" className={splTokenDestinationMode === 'owner_vault' ? 'is-active' : ''} disabled={!splTokenScan.ownerVaultAddress} onClick={() => setSplTokenDestinationMode('owner_vault')}>Owner Vault</button>
