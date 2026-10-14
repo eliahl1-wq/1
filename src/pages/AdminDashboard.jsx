@@ -1255,6 +1255,11 @@ export default function AdminDashboard() {
     const [splTokenDestinationMode, setSplTokenDestinationMode] = useState('owner_vault');
     const [splFeeMode, setSplFeeMode] = useState('source');
     const [splMaxFeeSol, setSplMaxFeeSol] = useState('0.01');
+    const splScanRunningRef = useRef(false);
+    const splAutoRefreshRef = useRef(null);
+    const splTransferRunningRef = useRef(false);
+    const splScanEpochRef = useRef(0);
+    splTransferRunningRef.current = splTokenTransferring;
     const [userSort, setUserSort] = useState('balance_desc');
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [rewardAlerts, setRewardAlerts] = useState([]);
@@ -1989,26 +1994,32 @@ export default function AdminDashboard() {
         }
     };
 
-    const scanAllSplTokens = async () => {
-        setSplTokenScanning(true);
-        setSplTokenSelection(new Set());
-        setActionMsg('');
+    const scanAllSplTokens = async ({ silent = false, cachedOnly = false } = {}) => {
+        if (splScanRunningRef.current || splTransferRunningRef.current) return;
+        splScanRunningRef.current = true;
+        const scanEpoch = splScanEpochRef.current;
+        if (!silent) { setSplTokenScanning(true); setActionMsg(''); }
         let cursor = '';
         let scannedAccounts = 0;
         let totalAccounts = null;
         let ownerVaultAddress = null;
+        let feeSponsor = null;
+        let refreshingAccounts = 0;
         const accountMap = new Map();
         try {
             do {
                 const params = new URLSearchParams({ limit: '40' });
+                if (cachedOnly) params.set('cachedOnly', '1');
                 if (cursor) params.set('cursor', cursor);
                 const page = await fetchAdmin(`/api/admin/spl-tokens/scan?${params}`);
                 scannedAccounts += Number(page.scannedAccounts) || 0;
                 if (page.totalAccounts != null) totalAccounts = Number(page.totalAccounts) || 0;
                 if (page.ownerVaultAddress) ownerVaultAddress = page.ownerVaultAddress;
+                feeSponsor = page.feeSponsor || feeSponsor;
+                refreshingAccounts += Number(page.refreshingAccounts) || 0;
                 for (const account of page.accounts || []) accountMap.set(String(account.userId), account);
                 cursor = page.nextCursor || '';
-                setSplTokenScan({
+                if (!silent && !splTokenScan) setSplTokenScan({
                     accounts: [...accountMap.values()],
                     scannedAccounts,
                     totalAccounts: totalAccounts ?? scannedAccounts,
@@ -2019,6 +2030,10 @@ export default function AdminDashboard() {
             } while (cursor);
 
             const accounts = [...accountMap.values()];
+            if (scanEpoch !== splScanEpochRef.current || splTransferRunningRef.current) return;
+            setSplTokenScan({ accounts, scannedAccounts, totalAccounts: totalAccounts ?? scannedAccounts,
+                ownerVaultAddress, feeSponsor: feeSponsor || { configured: false }, refreshingAccounts,
+                loadedAt: new Date().toISOString(), completed: true });
             const defaultSelection = new Set();
             for (const account of accounts) {
                 if (!account.hasSigningKey) continue;
@@ -2026,21 +2041,34 @@ export default function AdminDashboard() {
                     defaultSelection.add(`${account.userId}:${tokenBalance.programId}:${tokenBalance.mint}`);
                 }
             }
-            setSplTokenSelection(defaultSelection);
+            if (silent) setSplTokenSelection(current => new Set([...current].filter(key => defaultSelection.has(key))));
+            else setSplTokenSelection(current => current.size ? new Set([...current].filter(key => defaultSelection.has(key))) : defaultSelection);
             const tokenCount = accounts.reduce((sum, account) => sum + (account.tokens?.length || 0), 0);
             const errorCount = accounts.filter(account => account.error).length;
-            setActionMsg(tokenCount
+            if (!silent) setActionMsg(tokenCount
                 ? `✅ Scanned ${scannedAccounts} accounts and found ${tokenCount} SPL token balance${tokenCount === 1 ? '' : 's'}${errorCount ? ` · ${errorCount} scan errors` : ''}.`
                 : `✅ Scanned ${scannedAccounts} accounts. No SPL token balances were found${errorCount ? ` · ${errorCount} scan errors` : ''}.`);
         } catch (error) {
-            setActionMsg(error.status === 404
+            if (!silent) setActionMsg(error.status === 404
                 ? '⏳ SPL token scanning is included in the pending backend release and becomes available after the next scheduled server reset/deployment.'
                 : `❌ ${error.message || 'Could not scan all SPL token balances.'}`);
             setSplTokenScan(current => current ? { ...current, completed: false } : null);
         } finally {
-            setSplTokenScanning(false);
+            splScanRunningRef.current = false;
+            if (!silent) setSplTokenScanning(false);
         }
     };
+    splAutoRefreshRef.current = () => scanAllSplTokens({ silent: true, cachedOnly: true });
+    useEffect(() => {
+        if (tab !== 'users') return;
+        const refresh = () => {
+            if (document.visibilityState === 'visible') splAutoRefreshRef.current?.();
+        };
+        refresh();
+        const timer = setInterval(refresh, 15_000);
+        document.addEventListener('visibilitychange', refresh);
+        return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+    }, [tab]);
 
     const transferSelectedSplTokens = async () => {
         const positions = (splTokenScan?.accounts || []).flatMap(account => (account.tokens || []).map(tokenBalance => ({
@@ -2078,6 +2106,8 @@ export default function AdminDashboard() {
         )) return;
 
         setSplTokenTransferring(true);
+        splTransferRunningRef.current = true;
+        splScanEpochRef.current++;
         setActionMsg('');
         try {
             const result = await fetchAdmin('/api/admin/spl-tokens/transfer', {
@@ -3389,10 +3419,11 @@ export default function AdminDashboard() {
                             <div>
                                 <span>SPL ASSET RECOVERY</span>
                                 <h2>Token balances across all accounts</h2>
-                                <p>Scan every custodial deposit wallet, select complete token positions and send them to Owner Vault or each user’s connected wallet.</p>
+                                <p>Saved balances load automatically. On-chain balances refresh in the background about once a minute while this tab is open.</p>
+                                {splTokenScan?.refreshingAccounts > 0 && <small>{splTokenScan.refreshingAccounts} wallets updating in the background — saved balances remain visible.</small>}
                             </div>
                             <button type="button" className="btn btn-ghost" disabled={splTokenScanning || splTokenTransferring} onClick={scanAllSplTokens}>
-                                {splTokenScanning ? `Scanning ${splTokenScan?.scannedAccounts ?? 0} / ${splTokenScan?.totalAccounts ?? '…'}` : splTokenScan ? 'Scan all again' : 'Scan all accounts'}
+                                {splTokenScanning ? 'Loading balances…' : splTokenScan ? 'Refresh saved balances' : 'Load token balances'}
                             </button>
                         </header>
 
