@@ -1326,6 +1326,8 @@ export default function AdminDashboard() {
     const splScanEpochRef = useRef(0);
     const splScanQueuedRef = useRef(null);
     const splManualScanRef = useRef(null);
+    const splScanAbortRef = useRef(null);
+    const splScanSilentRef = useRef(false);
     const [splScanProgress, setSplScanProgress] = useState({ done: 0, total: null, force: false });
     splTransferRunningRef.current = splTokenTransferring;
     const [userSort, setUserSort] = useState('balance_desc');
@@ -2137,11 +2139,17 @@ export default function AdminDashboard() {
             if (!silent) {
                 splScanQueuedRef.current = { silent: false, cachedOnly, force: force || !!splScanQueuedRef.current?.force };
                 setSplTokenScanning(true);
-                setActionMsg('⏳ Finishing the current background request. Your scan is queued and will start automatically.');
+                if (splScanSilentRef.current && splScanAbortRef.current) {
+                    setActionMsg('⏳ Switching from the background load to your scan…');
+                    splScanAbortRef.current.abort();
+                } else {
+                    setActionMsg('⏳ Finishing the current scan page, then starting your request…');
+                }
             }
             return;
         }
         splScanRunningRef.current = true;
+        splScanSilentRef.current = silent;
         const scanEpoch = splScanEpochRef.current;
         if (!silent) {
             setSplTokenScanning(true);
@@ -2157,11 +2165,12 @@ export default function AdminDashboard() {
         const accountMap = new Map();
         try {
             do {
-                const params = new URLSearchParams({ limit: force ? '10' : '40' });
+                const params = new URLSearchParams({ limit: force ? '50' : '500' });
                 if (cachedOnly) params.set('cachedOnly', '1');
                 if (force) params.set('force', '1');
                 if (cursor) params.set('cursor', cursor);
                 const controller = new AbortController();
+                splScanAbortRef.current = controller;
                 const timeout = setTimeout(() => controller.abort(), 90_000);
                 let page;
                 try { page = await fetchAdmin(`/api/admin/spl-tokens/scan?${params}`, { signal: controller.signal }); }
@@ -2204,12 +2213,14 @@ export default function AdminDashboard() {
             const errorCount = accounts.filter(account => account.error).length;
             if (!silent) setActionMsg(`✅ ${force ? 'Rescanned on-chain' : 'Loaded saved balances for'} ${scannedAccounts} accounts. ${tokenCount} token balance${tokenCount === 1 ? '' : 's'} found${errorCount ? ` · ${errorCount} scan errors` : ''}.${refreshingAccounts ? ` ${refreshingAccounts} wallets are updating in the background.` : ''}`);
         } catch (error) {
-            if (!silent || !splTokenScan) setActionMsg(error.status === 404
+            if (error.name !== 'AbortError' || !splScanQueuedRef.current) setActionMsg(error.status === 404
                 ? '❌ This backend is missing the SPL scan endpoint. Deploy the latest backend and try again.'
                 : `❌ ${error.name === 'AbortError' ? 'The scan request timed out. Saved balances are kept; try again.' : error.message || 'Could not load token balances.'}`);
             setSplTokenScan(current => current ? { ...current, completed: false } : null);
         } finally {
             splScanRunningRef.current = false;
+            splScanSilentRef.current = false;
+            splScanAbortRef.current = null;
             if (!silent) setSplTokenScanning(false);
             const queued = splScanQueuedRef.current;
             splScanQueuedRef.current = null;
@@ -2220,13 +2231,7 @@ export default function AdminDashboard() {
     splAutoRefreshRef.current = () => scanAllSplTokens({ silent: true, cachedOnly: true });
     useEffect(() => {
         if (tab !== 'users') return;
-        const refresh = () => {
-            if (document.visibilityState === 'visible') splAutoRefreshRef.current?.();
-        };
-        refresh();
-        const timer = setInterval(refresh, 15_000);
-        document.addEventListener('visibilitychange', refresh);
-        return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+        if (!splTokenScan && !splScanRunningRef.current) splAutoRefreshRef.current?.();
     }, [tab]);
 
     const transferSelectedSplTokens = async () => {
