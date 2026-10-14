@@ -23,6 +23,37 @@ const PREGAME_PLAYING_MODES = [
 
 const EMPTY_PREGAME_PLAYING = Object.freeze(Object.fromEntries(PREGAME_PLAYING_MODES.map(({ key }) => [key, 0])));
 
+const ADMIN_OVERVIEW_RANGES = [1, 7, 30, 90];
+const ADMIN_OVERVIEW_RANGE_KEY = 'arenifi.admin.overview.range';
+const ADMIN_OVERVIEW_CACHE_KEY = 'arenifi.admin.overview.cache.v1';
+const ADMIN_OVERVIEW_CACHE_MAX_AGE_MS = 30_000;
+
+function getSavedOverviewRange() {
+    try {
+        const days = Number(window.localStorage.getItem(ADMIN_OVERVIEW_RANGE_KEY));
+        return ADMIN_OVERVIEW_RANGES.includes(days) ? days : 30;
+    } catch {
+        return 30;
+    }
+}
+
+function getSavedOverviewCache() {
+    try {
+        const parsed = JSON.parse(window.sessionStorage.getItem(ADMIN_OVERVIEW_CACHE_KEY) || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveOverviewCache(cache) {
+    try {
+        window.sessionStorage.setItem(ADMIN_OVERVIEW_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+        // The dashboard still works when storage is unavailable or full.
+    }
+}
+
 const TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: 'Users' },
@@ -345,7 +376,7 @@ function StatCard({ label, value, sub }) {
     );
 }
 
-function OverviewKpiCard({ label, value, sub, change, previous, accent = 'violet', onClick }) {
+function OverviewKpiCard({ label, value, sub, change, previous, accent = 'violet', onClick, selected = false }) {
     const interactive = typeof onClick === 'function';
     const hasChange = change !== undefined;
     const changeLabel = change == null
@@ -356,7 +387,8 @@ function OverviewKpiCard({ label, value, sub, change, previous, accent = 'violet
     return (
         <Component
             type={interactive ? 'button' : undefined}
-            className={`admin-overview-kpi admin-overview-kpi--${accent}${interactive ? ' is-interactive' : ''}`}
+            className={`admin-overview-kpi admin-overview-kpi--${accent}${interactive ? ' is-interactive' : ''}${selected ? ' is-selected' : ''}`}
+            aria-pressed={interactive ? selected : undefined}
             onClick={onClick}
         >
             <div className="admin-overview-kpi__topline">
@@ -366,40 +398,52 @@ function OverviewKpiCard({ label, value, sub, change, previous, accent = 'violet
             <strong>{value}</strong>
             <p>{sub}</p>
             {previous != null && <small>Previous period: {previous}</small>}
-            {interactive && <i aria-hidden="true">↗</i>}
+            {interactive && <i aria-hidden="true">{selected ? '●' : '↘'}</i>}
         </Component>
     );
 }
 
 const OVERVIEW_CHART_METRICS = {
-    users: {
-        label: 'Users',
-        series: [{ key: 'registrations', label: 'Registrations', color: '#9b87ff' }],
+    audience: {
+        label: 'People',
+        description: 'New registrations and distinct players each day.',
+        series: [
+            { key: 'registrations', label: 'Registrations', color: '#9b87ff' },
+            { key: 'uniquePlayers', label: 'Unique players', color: '#e77bd4' },
+        ],
         format: value => formatCompactNumber(value, 0),
     },
     games: {
         label: 'Games',
+        description: 'Completed game entries split between paid and free play.',
         series: [
             { key: 'paidGames', label: 'Real money', color: '#35d69f' },
             { key: 'freeGames', label: 'Free play', color: '#8f78ff' },
         ],
         format: value => formatCompactNumber(value, 0),
     },
-    value: {
-        label: 'Value',
+    money: {
+        label: 'Money',
+        description: 'Daily USD movement. Free play is excluded from played volume.',
         series: [
             { key: 'paidVolumeUsd', label: 'Played', color: '#8f78ff' },
             { key: 'cashoutUsd', label: 'Cashed out', color: '#35d69f' },
             { key: 'depositsUsd', label: 'Deposited', color: '#f2b84b' },
+            { key: 'feesUsd', label: 'Fees', color: '#55cad8' },
         ],
+        format: value => formatUsd(value),
+    },
+    earnings: {
+        label: 'Earnings',
+        description: 'Confirmed owner earnings received through house and game-pool sweeps.',
+        series: [{ key: 'ownerSweepUsd', label: 'Sweep earnings', color: '#35d69f' }],
         format: value => formatUsd(value),
     },
 };
 
-function OverviewTrendChart({ daily = [] }) {
-    const [metric, setMetric] = useState('games');
+function OverviewTrendChart({ daily = [], metric = 'games', onMetricChange, rangeDays = 30, refreshing = false }) {
     const [hoverIndex, setHoverIndex] = useState(null);
-    const config = OVERVIEW_CHART_METRICS[metric];
+    const config = OVERVIEW_CHART_METRICS[metric] || OVERVIEW_CHART_METRICS.games;
     const width = 760;
     const height = 250;
     const left = 46;
@@ -416,8 +460,16 @@ function OverviewTrendChart({ daily = [] }) {
     const areaFor = key => daily.length
         ? `${pathFor(key)} L ${xFor(daily.length - 1).toFixed(2)} ${top + plotHeight} L ${xFor(0).toFixed(2)} ${top + plotHeight} Z`
         : '';
-    const hovered = hoverIndex == null ? null : daily[hoverIndex];
+    const effectiveHoverIndex = hoverIndex == null && daily.length === 1 ? 0 : hoverIndex;
+    const hovered = effectiveHoverIndex == null ? null : daily[effectiveHoverIndex];
     const dateLabel = date => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const summary = config.series.map(series => ({
+        ...series,
+        total: daily.reduce((sum, point) => sum + (Number(point[series.key]) || 0), 0),
+    }));
+    const labelIndexes = daily.length <= 7
+        ? daily.map((_, index) => index)
+        : [...new Set([0, Math.round((daily.length - 1) / 3), Math.round(((daily.length - 1) * 2) / 3), daily.length - 1])];
 
     return (
         <section className="admin-overview-chart-card">
@@ -425,17 +477,21 @@ function OverviewTrendChart({ daily = [] }) {
                 <div>
                     <span>Trend</span>
                     <h2>Platform activity</h2>
-                    <p>Daily totals for the selected period. Hover the graph for exact values.</p>
+                    <p>{config.description} {rangeDays === 1 ? 'Today is shown in UTC.' : 'Hover or tap for exact values.'}</p>
                 </div>
                 <div className="admin-overview-segmented" role="group" aria-label="Chart metric">
                     {Object.entries(OVERVIEW_CHART_METRICS).map(([key, option]) => (
-                        <button key={key} type="button" className={metric === key ? 'is-active' : ''} onClick={() => setMetric(key)}>{option.label}</button>
+                        <button key={key} type="button" className={metric === key ? 'is-active' : ''} onClick={() => onMetricChange?.(key)}>{option.label}</button>
                     ))}
                 </div>
             </header>
+            <div className="admin-overview-chart-summary">
+                {summary.map(series => <span key={series.key}><i style={{ background: series.color }} /><small>{series.label}</small><strong>{config.format(series.total)}</strong></span>)}
+                {refreshing && <em>Updating…</em>}
+            </div>
             <div className="admin-overview-chart-wrap" onMouseLeave={() => setHoverIndex(null)}>
                 <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${config.label} trend chart`}>
-                    {[0, 0.5, 1].map(ratio => {
+                    {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
                         const y = top + plotHeight - ratio * plotHeight;
                         return (
                             <g key={ratio}>
@@ -448,6 +504,9 @@ function OverviewTrendChart({ daily = [] }) {
                         <g key={series.key}>
                             {seriesIndex === 0 && <path d={areaFor(series.key)} fill={`url(#overview-gradient-${metric})`} className="admin-overview-chart__area" />}
                             <path d={pathFor(series.key)} fill="none" stroke={series.color} className="admin-overview-chart__line" />
+                            {daily.length <= 7 && daily.map((point, index) => (
+                                <circle key={`${series.key}-${point.date}`} cx={xFor(index)} cy={yFor(point[series.key])} r={daily.length === 1 ? 5 : 3} fill={series.color} className="admin-overview-chart__point admin-overview-chart__point--visible" />
+                            ))}
                         </g>
                     ))}
                     <defs>
@@ -465,20 +524,22 @@ function OverviewTrendChart({ daily = [] }) {
                             height={plotHeight}
                             fill="transparent"
                             onMouseEnter={() => setHoverIndex(index)}
+                            onClick={() => setHoverIndex(index)}
+                            onTouchStart={() => setHoverIndex(index)}
                         />
                     ))}
                     {hovered && (
                         <g>
-                            <line x1={xFor(hoverIndex)} x2={xFor(hoverIndex)} y1={top} y2={top + plotHeight} className="admin-overview-chart__cursor" />
-                            {config.series.map(series => <circle key={series.key} cx={xFor(hoverIndex)} cy={yFor(hovered[series.key])} r="4" fill={series.color} className="admin-overview-chart__point" />)}
+                            <line x1={xFor(effectiveHoverIndex)} x2={xFor(effectiveHoverIndex)} y1={top} y2={top + plotHeight} className="admin-overview-chart__cursor" />
+                            {config.series.map(series => <circle key={series.key} cx={xFor(effectiveHoverIndex)} cy={yFor(hovered[series.key])} r="4" fill={series.color} className="admin-overview-chart__point" />)}
                         </g>
                     )}
-                    {daily.length > 0 && [0, Math.floor((daily.length - 1) / 2), daily.length - 1].map((index, labelIndex) => (
-                        <text key={`${index}-${labelIndex}`} x={xFor(index)} y={height - 8} textAnchor={labelIndex === 0 ? 'start' : labelIndex === 2 ? 'end' : 'middle'} className="admin-overview-chart__axis">{dateLabel(daily[index].date)}</text>
+                    {labelIndexes.map((index, labelIndex) => (
+                        <text key={`${index}-${labelIndex}`} x={xFor(index)} y={height - 8} textAnchor={labelIndex === 0 ? 'start' : labelIndex === labelIndexes.length - 1 ? 'end' : 'middle'} className="admin-overview-chart__axis">{dateLabel(daily[index].date)}</text>
                     ))}
                 </svg>
                 {hovered && (
-                    <div className="admin-overview-chart-tooltip" style={{ left: `${(xFor(hoverIndex) / width) * 100}%` }}>
+                    <div className="admin-overview-chart-tooltip" style={{ left: `${Math.max(10, Math.min(90, (xFor(effectiveHoverIndex) / width) * 100))}%` }}>
                         <strong>{dateLabel(hovered.date)}</strong>
                         {config.series.map(series => (
                             <span key={series.key}><i style={{ background: series.color }} />{series.label}<b>{config.format(hovered[series.key])}</b></span>
@@ -486,9 +547,7 @@ function OverviewTrendChart({ daily = [] }) {
                     </div>
                 )}
             </div>
-            <footer className="admin-overview-chart-legend">
-                {config.series.map(series => <span key={series.key}><i style={{ background: series.color }} />{series.label}</span>)}
-            </footer>
+            {daily.length === 0 && <p className="admin-overview-empty">No activity in this period yet.</p>}
         </section>
     );
 }
@@ -1214,11 +1273,17 @@ function UserDetailModal({ userId, fetchAdmin, onClose, onExclude, onRestore, on
 export default function AdminDashboard() {
     const { token, user, refreshUser } = useAuth();
     const navigate = useNavigate();
+    const overviewCacheRef = useRef(null);
+    if (overviewCacheRef.current === null) overviewCacheRef.current = getSavedOverviewCache();
     const [tab, setTab] = useState('overview');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [overview, setOverview] = useState(null);
-    const [overviewRangeDays, setOverviewRangeDays] = useState(30);
+    const [overviewRangeDays, setOverviewRangeDays] = useState(getSavedOverviewRange);
+    const initialOverviewCache = overviewCacheRef.current[String(overviewRangeDays)];
+    const [overview, setOverview] = useState(initialOverviewCache?.data || null);
+    const [overviewRefreshing, setOverviewRefreshing] = useState(false);
+    const [overviewUpdatedAt, setOverviewUpdatedAt] = useState(initialOverviewCache?.storedAt || null);
+    const [overviewChartMetric, setOverviewChartMetric] = useState('games');
     const [activeUsers, setActiveUsers] = useState(null);
     const [users, setUsers] = useState([]);
     const [wallets, setWallets] = useState(null);
@@ -1259,6 +1324,9 @@ export default function AdminDashboard() {
     const splAutoRefreshRef = useRef(null);
     const splTransferRunningRef = useRef(false);
     const splScanEpochRef = useRef(0);
+    const splScanQueuedRef = useRef(null);
+    const splManualScanRef = useRef(null);
+    const [splScanProgress, setSplScanProgress] = useState({ done: 0, total: null, force: false });
     splTransferRunningRef.current = splTokenTransferring;
     const [userSort, setUserSort] = useState('balance_desc');
     const [selectedUserId, setSelectedUserId] = useState(null);
@@ -1294,6 +1362,8 @@ export default function AdminDashboard() {
     const liveFeedRequestRef = useRef(null);
     const usersRequestRef = useRef(null);
     const transactionsRequestRef = useRef(null);
+    const overviewRequestRef = useRef(new Map());
+    const overviewRangeRef = useRef(overviewRangeDays);
 
     tabRef.current = tab;
     filterUserIdRef.current = filterUserId;
@@ -1303,6 +1373,7 @@ export default function AdminDashboard() {
     userSearchRef.current = userSearch;
     userAccountTypeRef.current = userAccountType;
     userPageRef.current = userPage;
+    overviewRangeRef.current = overviewRangeDays;
 
     const fetchAdmin = useCallback(async (path, options = {}) => {
         const res = await fetch(`${API_BASE}${path}`, {
@@ -1322,6 +1393,59 @@ export default function AdminDashboard() {
         }
         return data;
     }, [token]);
+
+    const fetchOverview = useCallback(async (days, { force = false } = {}) => {
+        const cacheKey = String(days);
+        const cached = overviewCacheRef.current[cacheKey];
+        const cacheIsFresh = cached && (Date.now() - Number(cached.storedAt || 0)) < ADMIN_OVERVIEW_CACHE_MAX_AGE_MS;
+
+        if (cached && overviewRangeRef.current === days) {
+            setOverview(cached.data);
+            setOverviewUpdatedAt(cached.storedAt);
+        }
+        if (!force && cacheIsFresh) {
+            if (overviewRangeRef.current === days) setOverviewRefreshing(false);
+            return cached.data;
+        }
+        if (overviewRequestRef.current.has(cacheKey)) return overviewRequestRef.current.get(cacheKey);
+
+        setOverviewRefreshing(true);
+        const request = fetchAdmin(`/api/admin/dashboard/overview?days=${days}${force ? '&refresh=1' : ''}`)
+            .then(data => {
+                const storedAt = Date.now();
+                overviewCacheRef.current = {
+                    ...overviewCacheRef.current,
+                    [cacheKey]: { storedAt, data },
+                };
+                saveOverviewCache(overviewCacheRef.current);
+                if (overviewRangeRef.current === days) {
+                    setOverview(data);
+                    setOverviewUpdatedAt(storedAt);
+                }
+                return data;
+            })
+            .finally(() => {
+                overviewRequestRef.current.delete(cacheKey);
+                if (overviewRangeRef.current === days) setOverviewRefreshing(false);
+            });
+        overviewRequestRef.current.set(cacheKey, request);
+        return request;
+    }, [fetchAdmin]);
+
+    const selectOverviewRange = useCallback((days) => {
+        if (!ADMIN_OVERVIEW_RANGES.includes(days)) return;
+        try { window.localStorage.setItem(ADMIN_OVERVIEW_RANGE_KEY, String(days)); } catch { /* optional preference */ }
+        const cached = overviewCacheRef.current[String(days)];
+        if (cached) {
+            setOverview(cached.data);
+            setOverviewUpdatedAt(cached.storedAt);
+        } else {
+            setOverview(null);
+            setOverviewUpdatedAt(null);
+        }
+        setOverviewRefreshing(false);
+        setOverviewRangeDays(days);
+    }, []);
 
     const fetchServerStatus = useCallback(async () => {
         if (serverStatusRequestRef.current) return serverStatusRequestRef.current;
@@ -1548,7 +1672,6 @@ export default function AdminDashboard() {
         const currentTab = tabRef.current;
 
         if (currentTab === 'overview') {
-            add(fetchAdmin(`/api/admin/dashboard/overview?days=${overviewRangeDays}`), setOverview);
             add(fetchAdmin('/api/admin/dashboard/active-users'), setActiveUsers);
             add(fetchAdmin('/api/admin/dashboard/wallets'), setWallets);
             add(fetchAdmin('/api/admin/reward-security-alerts'), security => {
@@ -1595,7 +1718,7 @@ export default function AdminDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [fetchAdmin, fetchLiveFeed, fetchMainHouseLive, fetchRewardOwnership, fetchServerStatus, fetchTransactions, fetchUsers, overviewRangeDays]);
+    }, [fetchAdmin, fetchLiveFeed, fetchMainHouseLive, fetchRewardOwnership, fetchServerStatus, fetchTransactions, fetchUsers]);
 
     useEffect(() => {
         document.title = 'Admin | Arenifi';
@@ -1604,6 +1727,12 @@ export default function AdminDashboard() {
     useEffect(() => {
         loadData();
     }, [tab, loadData]);
+
+    useEffect(() => {
+        if (tab !== 'overview') return;
+        setError('');
+        fetchOverview(overviewRangeDays).catch(err => setError(err.message || 'Could not load overview analytics'));
+    }, [tab, overviewRangeDays, fetchOverview]);
 
     useEffect(() => {
         if (tab !== 'overview' && tab !== 'operations' && tab !== 'main-house') return undefined;
@@ -1994,11 +2123,26 @@ export default function AdminDashboard() {
         }
     };
 
-    const scanAllSplTokens = async ({ silent = false, cachedOnly = false } = {}) => {
-        if (splScanRunningRef.current || splTransferRunningRef.current) return;
+    const scanAllSplTokens = async ({ silent = false, cachedOnly = true, force = false } = {}) => {
+        if (splTransferRunningRef.current) {
+            if (!silent) setActionMsg('⏳ Wait for the current token transfer to finish before scanning.');
+            return;
+        }
+        if (splScanRunningRef.current) {
+            if (!silent) {
+                splScanQueuedRef.current = { silent: false, cachedOnly, force: force || !!splScanQueuedRef.current?.force };
+                setSplTokenScanning(true);
+                setActionMsg('⏳ Finishing the current background request. Your scan is queued and will start automatically.');
+            }
+            return;
+        }
         splScanRunningRef.current = true;
         const scanEpoch = splScanEpochRef.current;
-        if (!silent) { setSplTokenScanning(true); setActionMsg(''); }
+        if (!silent) {
+            setSplTokenScanning(true);
+            setSplScanProgress({ done: 0, total: null, force });
+            setActionMsg(force ? '⏳ Rescanning all accounts on-chain…' : '⏳ Loading saved token balances…');
+        }
         let cursor = '';
         let scannedAccounts = 0;
         let totalAccounts = null;
@@ -2008,12 +2152,20 @@ export default function AdminDashboard() {
         const accountMap = new Map();
         try {
             do {
-                const params = new URLSearchParams({ limit: '40' });
+                const params = new URLSearchParams({ limit: force ? '10' : '40' });
                 if (cachedOnly) params.set('cachedOnly', '1');
+                if (force) params.set('force', '1');
                 if (cursor) params.set('cursor', cursor);
-                const page = await fetchAdmin(`/api/admin/spl-tokens/scan?${params}`);
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 90_000);
+                let page;
+                try { page = await fetchAdmin(`/api/admin/spl-tokens/scan?${params}`, { signal: controller.signal }); }
+                finally { clearTimeout(timeout); }
+                if (!Array.isArray(page.accounts) || !Number.isFinite(Number(page.scannedAccounts))) throw new Error('The backend returned an invalid scan response. Check that the latest backend is deployed.');
+                if (force && !page.forceRescanSupported) throw new Error('This backend does not support full rescans yet. Deploy the latest backend, then try again.');
                 scannedAccounts += Number(page.scannedAccounts) || 0;
                 if (page.totalAccounts != null) totalAccounts = Number(page.totalAccounts) || 0;
+                if (!silent) setSplScanProgress({ done: scannedAccounts, total: totalAccounts, force });
                 if (page.ownerVaultAddress) ownerVaultAddress = page.ownerVaultAddress;
                 feeSponsor = page.feeSponsor || feeSponsor;
                 refreshingAccounts += Number(page.refreshingAccounts) || 0;
@@ -2045,19 +2197,21 @@ export default function AdminDashboard() {
             else setSplTokenSelection(current => current.size ? new Set([...current].filter(key => defaultSelection.has(key))) : defaultSelection);
             const tokenCount = accounts.reduce((sum, account) => sum + (account.tokens?.length || 0), 0);
             const errorCount = accounts.filter(account => account.error).length;
-            if (!silent) setActionMsg(tokenCount
-                ? `✅ Scanned ${scannedAccounts} accounts and found ${tokenCount} SPL token balance${tokenCount === 1 ? '' : 's'}${errorCount ? ` · ${errorCount} scan errors` : ''}.`
-                : `✅ Scanned ${scannedAccounts} accounts. No SPL token balances were found${errorCount ? ` · ${errorCount} scan errors` : ''}.`);
+            if (!silent) setActionMsg(`✅ ${force ? 'Rescanned on-chain' : 'Loaded saved balances for'} ${scannedAccounts} accounts. ${tokenCount} token balance${tokenCount === 1 ? '' : 's'} found${errorCount ? ` · ${errorCount} scan errors` : ''}.${refreshingAccounts ? ` ${refreshingAccounts} wallets are updating in the background.` : ''}`);
         } catch (error) {
-            if (!silent) setActionMsg(error.status === 404
-                ? '⏳ SPL token scanning is included in the pending backend release and becomes available after the next scheduled server reset/deployment.'
-                : `❌ ${error.message || 'Could not scan all SPL token balances.'}`);
+            if (!silent || !splTokenScan) setActionMsg(error.status === 404
+                ? '❌ This backend is missing the SPL scan endpoint. Deploy the latest backend and try again.'
+                : `❌ ${error.name === 'AbortError' ? 'The scan request timed out. Saved balances are kept; try again.' : error.message || 'Could not load token balances.'}`);
             setSplTokenScan(current => current ? { ...current, completed: false } : null);
         } finally {
             splScanRunningRef.current = false;
             if (!silent) setSplTokenScanning(false);
+            const queued = splScanQueuedRef.current;
+            splScanQueuedRef.current = null;
+            if (queued) setTimeout(() => splManualScanRef.current?.(queued), 0);
         }
     };
+    splManualScanRef.current = scanAllSplTokens;
     splAutoRefreshRef.current = () => scanAllSplTokens({ silent: true, cachedOnly: true });
     useEffect(() => {
         if (tab !== 'users') return;
@@ -2318,8 +2472,8 @@ export default function AdminDashboard() {
                                 />
                                 Sandbox free play
                             </label>
-                            <button className="btn btn-ghost admin-header-action" onClick={() => loadData()} disabled={loading}>
-                                {loading ? 'Refreshing…' : 'Refresh'}
+                            <button className="btn btn-ghost admin-header-action" onClick={() => { loadData(); if (tab === 'overview') fetchOverview(overviewRangeDays, { force: true }).catch(err => setError(err.message)); }} disabled={loading || overviewRefreshing}>
+                                {loading || overviewRefreshing ? 'Refreshing…' : 'Refresh'}
                             </button>
                         </>
                     )}
@@ -2357,10 +2511,14 @@ export default function AdminDashboard() {
                                 <h2>Overview</h2>
                                 <p>Growth, engagement and money flow in one place. Free play never counts as paid volume.</p>
                             </div>
-                            <div className="admin-overview-range" role="group" aria-label="Overview period">
-                                {[7, 30, 90].map(days => (
-                                    <button key={days} type="button" className={overviewRangeDays === days ? 'is-active' : ''} onClick={() => setOverviewRangeDays(days)}>{days}D</button>
-                                ))}
+                            <div className="admin-overview-intro__controls">
+                                <span>{overviewRefreshing ? 'Updating…' : overviewUpdatedAt ? `Updated ${new Date(overviewUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Waiting for data'}</span>
+                                <button type="button" className="admin-overview-refresh" disabled={overviewRefreshing} onClick={() => fetchOverview(overviewRangeDays, { force: true }).catch(err => setError(err.message))} aria-label="Refresh overview">↻</button>
+                                <div className="admin-overview-range" role="group" aria-label="Overview period">
+                                    {ADMIN_OVERVIEW_RANGES.map(days => (
+                                        <button key={days} type="button" className={overviewRangeDays === days ? 'is-active' : ''} onClick={() => selectOverviewRange(days)}>{days}D</button>
+                                    ))}
+                                </div>
                             </div>
                         </section>
 
@@ -2380,7 +2538,8 @@ export default function AdminDashboard() {
                                 change={overviewChanges.newUsers}
                                 previous={formatCompactNumber(overviewPrevious.newUsers, 0)}
                                 accent="violet"
-                                onClick={() => { setUserSort('newest'); setUserPage(1); setTab('users'); }}
+                                selected={overviewChartMetric === 'audience'}
+                                onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
                                 label="Active accounts"
@@ -2389,7 +2548,8 @@ export default function AdminDashboard() {
                                 change={overviewChanges.activeUsers}
                                 previous={formatCompactNumber(overviewPrevious.activeUsers, 0)}
                                 accent="blue"
-                                onClick={() => { setUserSort('activity_desc'); setUserPage(1); setTab('users'); }}
+                                selected={overviewChartMetric === 'audience'}
+                                onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
                                 label="Games played"
@@ -2398,7 +2558,8 @@ export default function AdminDashboard() {
                                 change={overviewChanges.games}
                                 previous={formatCompactNumber(overviewPrevious.games, 0)}
                                 accent="green"
-                                onClick={() => { setLiveCategoryFilter('entry'); setTab('activity'); }}
+                                selected={overviewChartMetric === 'games'}
+                                onClick={() => setOverviewChartMetric('games')}
                             />
                             <OverviewKpiCard
                                 label="Unique players"
@@ -2407,7 +2568,8 @@ export default function AdminDashboard() {
                                 change={overviewChanges.uniquePlayers}
                                 previous={formatCompactNumber(overviewPrevious.uniquePlayers, 0)}
                                 accent="pink"
-                                onClick={() => { setUserSort('game_spend_desc'); setUserPage(1); setTab('users'); }}
+                                selected={overviewChartMetric === 'audience'}
+                                onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
                                 label="Played volume"
@@ -2416,7 +2578,8 @@ export default function AdminDashboard() {
                                 change={overviewChanges.paidVolumeUsd}
                                 previous={formatUsd(overviewPrevious.paidVolumeUsd)}
                                 accent="amber"
-                                onClick={() => { setTxFilter(current => ({ ...current, category: 'entry' })); setTab('activity'); }}
+                                selected={overviewChartMetric === 'money'}
+                                onClick={() => setOverviewChartMetric('money')}
                             />
                             <OverviewKpiCard
                                 label="Deposits"
@@ -2425,12 +2588,29 @@ export default function AdminDashboard() {
                                 change={overviewChanges.depositsUsd}
                                 previous={formatUsd(overviewPrevious.depositsUsd)}
                                 accent="cyan"
-                                onClick={() => { setTxFilter(current => ({ ...current, category: 'deposit' })); setTab('activity'); }}
+                                selected={overviewChartMetric === 'money'}
+                                onClick={() => setOverviewChartMetric('money')}
+                            />
+                            <OverviewKpiCard
+                                label="Sweep earnings"
+                                value={formatUsd(overviewTotals.ownerSweepUsd)}
+                                sub={`${overviewTotals.ownerSweepCount ?? 0} confirmed sweeps · ${formatUsd(overviewAverages.ownerSweepUsdPerDay)} / day`}
+                                change={overviewChanges.ownerSweepUsd}
+                                previous={formatUsd(overviewPrevious.ownerSweepUsd)}
+                                accent="green"
+                                selected={overviewChartMetric === 'earnings'}
+                                onClick={() => setOverviewChartMetric('earnings')}
                             />
                         </div>
 
                         <div className="admin-overview-primary-grid">
-                            <OverviewTrendChart daily={overviewAnalytics.daily || []} />
+                            <OverviewTrendChart
+                                daily={overviewAnalytics.daily || []}
+                                metric={overviewChartMetric}
+                                onMetricChange={setOverviewChartMetric}
+                                rangeDays={overviewRangeDays}
+                                refreshing={overviewRefreshing}
+                            />
                             <section className="admin-overview-card admin-overview-engagement">
                                 <header className="admin-overview-card-header"><div><span>Quality</span><h2>Engagement funnel</h2><p>How account growth turns into actual play.</p></div></header>
                                 <div className="admin-overview-funnel">
@@ -3422,15 +3602,16 @@ export default function AdminDashboard() {
                                 <p>Saved balances load automatically. On-chain balances refresh in the background about once a minute while this tab is open.</p>
                                 {splTokenScan?.refreshingAccounts > 0 && <small>{splTokenScan.refreshingAccounts} wallets updating in the background — saved balances remain visible.</small>}
                             </div>
-                            <button type="button" className="btn btn-ghost" disabled={splTokenScanning || splTokenTransferring} onClick={scanAllSplTokens}>
-                                {splTokenScanning ? 'Loading balances…' : splTokenScan ? 'Refresh saved balances' : 'Load token balances'}
-                            </button>
+                            <div className="admin-spl-manager__actions">
+                                <button type="button" className="btn btn-ghost" disabled={splTokenScanning || splTokenTransferring} onClick={() => scanAllSplTokens({ cachedOnly: true })}>Load token balances</button>
+                                <button type="button" className="btn btn-ghost" disabled={splTokenScanning || splTokenTransferring} onClick={() => scanAllSplTokens({ force: true, cachedOnly: false })}>Rescan all accounts</button>
+                            </div>
                         </header>
 
                         {splTokenScanning && (
                             <div className="admin-spl-progress" aria-live="polite">
-                                <i><span style={{ width: `${Math.min(100, ((splTokenScan?.scannedAccounts || 0) / Math.max(1, splTokenScan?.totalAccounts || 1)) * 100)}%` }} /></i>
-                                <span>Scanning wallet {splTokenScan?.scannedAccounts ?? 0} of {splTokenScan?.totalAccounts ?? '…'}</span>
+                                <i><span style={{ width: `${Math.min(100, (splScanProgress.done / Math.max(1, splScanProgress.total || 1)) * 100)}%` }} /></i>
+                                <span>{splScanProgress.force ? 'Rescanning on-chain' : 'Loading balances'} · {splScanProgress.done} / {splScanProgress.total ?? '…'} accounts</span>
                             </div>
                         )}
 
