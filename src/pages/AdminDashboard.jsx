@@ -1391,6 +1391,7 @@ export default function AdminDashboard() {
         if (!res.ok) {
             const error = new Error(data.message || data.error || `Request failed (HTTP ${res.status})`);
             error.status = res.status;
+            error.retryAfterSeconds = Number(res.headers.get('Retry-After')) || null;
             throw error;
         }
         return data;
@@ -2213,9 +2214,14 @@ export default function AdminDashboard() {
             const errorCount = accounts.filter(account => account.error).length;
             if (!silent) setActionMsg(`✅ ${force ? 'Rescanned on-chain' : 'Loaded saved balances for'} ${scannedAccounts} accounts. ${tokenCount} token balance${tokenCount === 1 ? '' : 's'} found${errorCount ? ` · ${errorCount} scan errors` : ''}.${refreshingAccounts ? ` ${refreshingAccounts} wallets are updating in the background.` : ''}`);
         } catch (error) {
-            if (error.name !== 'AbortError' || !splScanQueuedRef.current) setActionMsg(error.status === 404
-                ? '❌ This backend is missing the SPL scan endpoint. Deploy the latest backend and try again.'
-                : `❌ ${error.name === 'AbortError' ? 'The scan request timed out. Saved balances are kept; try again.' : error.message || 'Could not load token balances.'}`);
+            if (error.name !== 'AbortError' || !splScanQueuedRef.current) {
+                const retryMinutes = error.retryAfterSeconds ? Math.max(1, Math.ceil(error.retryAfterSeconds / 60)) : null;
+                setActionMsg(error.status === 404
+                    ? '❌ This backend is missing the SPL scan endpoint. Deploy the latest backend and try again.'
+                    : error.status === 429
+                        ? `⚠️ The old scanner reached its request limit.${retryMinutes ? ` It resets in about ${retryMinutes} minute${retryMinutes === 1 ? '' : 's'}.` : ''} Saved balances are kept.`
+                        : `❌ ${error.name === 'AbortError' ? 'The scan request timed out. Saved balances are kept; try again.' : error.message || 'Could not load token balances.'}`);
+            }
             setSplTokenScan(current => current ? { ...current, completed: false } : null);
         } finally {
             splScanRunningRef.current = false;
