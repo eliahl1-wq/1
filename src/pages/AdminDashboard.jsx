@@ -25,7 +25,7 @@ const EMPTY_PREGAME_PLAYING = Object.freeze(Object.fromEntries(PREGAME_PLAYING_M
 
 const ADMIN_OVERVIEW_RANGES = [1, 7, 30, 90];
 const ADMIN_OVERVIEW_RANGE_KEY = 'arenifi.admin.overview.range';
-const ADMIN_OVERVIEW_CACHE_KEY = 'arenifi.admin.overview.cache.v1';
+const ADMIN_OVERVIEW_CACHE_KEY = 'arenifi.admin.overview.cache.v2';
 const ADMIN_OVERVIEW_CACHE_MAX_AGE_MS = 30_000;
 
 function getSavedOverviewRange() {
@@ -376,7 +376,7 @@ function StatCard({ label, value, sub }) {
     );
 }
 
-function OverviewKpiCard({ label, value, sub, change, previous, accent = 'violet', onClick, selected = false }) {
+function OverviewKpiCard({ label, value, sub, change, previous, previousLabel = 'Previous period', accent = 'violet', onClick, selected = false }) {
     const interactive = typeof onClick === 'function';
     const hasChange = change !== undefined;
     const changeLabel = change == null
@@ -397,7 +397,7 @@ function OverviewKpiCard({ label, value, sub, change, previous, accent = 'violet
             </div>
             <strong>{value}</strong>
             <p>{sub}</p>
-            {previous != null && <small>Previous period: {previous}</small>}
+            {previous != null && <small>{previousLabel}: {previous}</small>}
             {interactive && <i aria-hidden="true">{selected ? '●' : '↘'}</i>}
         </Component>
     );
@@ -1412,6 +1412,11 @@ export default function AdminDashboard() {
         setOverviewRefreshing(true);
         const request = fetchAdmin(`/api/admin/dashboard/overview?days=${days}${force ? '&refresh=1' : ''}`)
             .then(data => {
+                const responseDays = Number(data?.analytics?.days);
+                const responseSchema = Number(data?.analytics?.schemaVersion);
+                if (responseDays !== days || responseSchema < 2) {
+                    throw new Error(`The backend returned ${responseDays || 'unknown'}D data for the ${days}D view. The backend update is still pending.`);
+                }
                 const storedAt = Date.now();
                 overviewCacheRef.current = {
                     ...overviewCacheRef.current,
@@ -2445,6 +2450,8 @@ export default function AdminDashboard() {
     const overviewChanges = overviewAnalytics.changes || {};
     const overviewAverages = overviewAnalytics.averages || {};
     const overviewRates = overviewAnalytics.rates || {};
+    const overviewPeriodSuffix = overviewRangeDays === 1 ? 'today' : `· ${overviewRangeDays}D`;
+    const overviewPreviousLabel = overviewRangeDays === 1 ? 'Yesterday' : `Previous ${overviewRangeDays}D`;
     const pendingAttention = rewardAlerts.filter(alert => alert.status === 'pending').length
         + pendingRewardClaims.length
         + (adminIssueSummary.totalOpen || 0);
@@ -2532,71 +2539,78 @@ export default function AdminDashboard() {
 
                         <div className="admin-overview-kpi-grid">
                             <OverviewKpiCard
-                                label="New registrations"
+                                label={`New registrations ${overviewPeriodSuffix}`}
                                 value={formatCompactNumber(overviewTotals.newUsers, 0)}
                                 sub={`${overviewAverages.registrationsPerDay ?? 0} average per day`}
                                 change={overviewChanges.newUsers}
                                 previous={formatCompactNumber(overviewPrevious.newUsers, 0)}
+                                previousLabel={overviewPreviousLabel}
                                 accent="violet"
                                 selected={overviewChartMetric === 'audience'}
                                 onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
-                                label="Active accounts"
+                                label={`Active accounts ${overviewPeriodSuffix}`}
                                 value={formatCompactNumber(overviewTotals.activeUsers, 0)}
                                 sub={`${overviewRates.activeAccountPct ?? 0}% of ${overviewAnalytics.playerAccountCount ?? 0} player accounts`}
                                 change={overviewChanges.activeUsers}
                                 previous={formatCompactNumber(overviewPrevious.activeUsers, 0)}
+                                previousLabel={overviewPreviousLabel}
                                 accent="blue"
                                 selected={overviewChartMetric === 'audience'}
                                 onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
-                                label="Games played"
+                                label={`Games played ${overviewPeriodSuffix}`}
                                 value={formatCompactNumber(overviewTotals.games, 0)}
                                 sub={`${overviewTotals.paidGames ?? 0} paid · ${overviewTotals.freeGames ?? 0} free`}
                                 change={overviewChanges.games}
                                 previous={formatCompactNumber(overviewPrevious.games, 0)}
+                                previousLabel={overviewPreviousLabel}
                                 accent="green"
                                 selected={overviewChartMetric === 'games'}
                                 onClick={() => setOverviewChartMetric('games')}
                             />
                             <OverviewKpiCard
-                                label="Unique players"
+                                label={`Unique players ${overviewPeriodSuffix}`}
                                 value={formatCompactNumber(overviewTotals.uniquePlayers, 0)}
                                 sub={`${overviewTotals.uniquePaidPlayers ?? 0} played with real money`}
                                 change={overviewChanges.uniquePlayers}
                                 previous={formatCompactNumber(overviewPrevious.uniquePlayers, 0)}
+                                previousLabel={overviewPreviousLabel}
                                 accent="pink"
                                 selected={overviewChartMetric === 'audience'}
                                 onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
-                                label="Played volume"
+                                label={`Played volume ${overviewPeriodSuffix}`}
                                 value={formatUsd(overviewTotals.paidVolumeUsd)}
                                 sub={`${formatUsd(overviewAverages.paidEntryUsd)} average paid entry`}
                                 change={overviewChanges.paidVolumeUsd}
                                 previous={formatUsd(overviewPrevious.paidVolumeUsd)}
+                                previousLabel={overviewPreviousLabel}
                                 accent="amber"
                                 selected={overviewChartMetric === 'money'}
                                 onClick={() => setOverviewChartMetric('money')}
                             />
                             <OverviewKpiCard
-                                label="Deposits"
+                                label={`Deposits ${overviewPeriodSuffix}`}
                                 value={formatUsd(overviewTotals.depositsUsd)}
                                 sub={`${overviewTotals.deposits ?? 0} confirmed deposits`}
                                 change={overviewChanges.depositsUsd}
                                 previous={formatUsd(overviewPrevious.depositsUsd)}
+                                previousLabel={overviewPreviousLabel}
                                 accent="cyan"
                                 selected={overviewChartMetric === 'money'}
                                 onClick={() => setOverviewChartMetric('money')}
                             />
                             <OverviewKpiCard
-                                label="Sweep earnings"
+                                label={`Sweep earnings ${overviewPeriodSuffix}`}
                                 value={formatUsd(overviewTotals.ownerSweepUsd)}
                                 sub={`${overviewTotals.ownerSweepCount ?? 0} confirmed sweeps · ${formatUsd(overviewAverages.ownerSweepUsdPerDay)} / day`}
                                 change={overviewChanges.ownerSweepUsd}
                                 previous={formatUsd(overviewPrevious.ownerSweepUsd)}
+                                previousLabel={overviewPreviousLabel}
                                 accent="green"
                                 selected={overviewChartMetric === 'earnings'}
                                 onClick={() => setOverviewChartMetric('earnings')}
