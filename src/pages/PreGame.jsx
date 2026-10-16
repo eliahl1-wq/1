@@ -2166,6 +2166,21 @@ export default function PreGame() {
                             />
                         </svg>
                     </a>
+                    <a
+                        className="pregame-social-link pregame-social-link--x"
+                        href="https://x.com/agarstake"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Follow Arenifi on X"
+                        title="Follow Arenifi on X"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                                fill="currentColor"
+                                d="M18.9 2H22l-6.77 7.74L23.2 22h-6.24l-4.89-6.39L6.48 22H3.36l7.26-8.3L2.97 2h6.4l4.42 5.84L18.9 2Zm-1.09 17.84h1.73L8.43 4.05H6.58l11.23 15.79Z"
+                            />
+                        </svg>
+                    </a>
                     <button
                         type="button"
                         className="pregame-bug-report-link"
