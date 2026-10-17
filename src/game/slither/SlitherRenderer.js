@@ -16,6 +16,7 @@ import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, g
 import { slitherCanvasDpr, createSlitherQualityGovernor } from './slitherPerformance.js';
 import { decodeSlitherTick } from './snapshotProtocol.js';
 import { GameMinimapCache } from '../minimapCache.js';
+import { budgetedCanvasDpr, createGameFramePacer, RECORDING_MODE_EVENT } from '../renderBudget.js';
 import { drawGoldenBlob, GOLDEN_BLOB_HALO_SCALE } from './goldenBlobVisual.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -304,6 +305,7 @@ export class SlitherRenderer {
         };
 
         window.addEventListener('resize', this._onResize);
+        window.addEventListener(RECORDING_MODE_EVENT, this._onResize);
         window.visualViewport?.addEventListener('resize', this._onResize);
         document.addEventListener('fullscreenchange', this._onResize);
         window.addEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
@@ -325,13 +327,12 @@ export class SlitherRenderer {
         if (this._fixedDpr > 0) return this._fixedDpr;
         // Fullscreen and screen capture make fill-rate the bottleneck. Cap total
         // backing pixels. Cosmetic quality never resizes this surface mid-match.
-        return slitherCanvasDpr({
-            width: this.W || window.innerWidth,
-            height: this.H || window.innerHeight,
-            rawDpr: window.devicePixelRatio || 1,
-            isMobile: this.isMobile,
-            quality: 1,
-        });
+        const width = this.W || window.innerWidth;
+        const height = this.H || window.innerHeight;
+        return budgetedCanvasDpr({ width, height, baseDpr: slitherCanvasDpr({
+            width, height, rawDpr: window.devicePixelRatio || 1,
+            isMobile: this.isMobile, quality: 1,
+        }) });
     }
 
     _applyCanvasDpr(width, height) {
@@ -818,10 +819,16 @@ export class SlitherRenderer {
         if (this.running) return;
         this.running = true;
         this._lastFrameTime = 0;
-        const loop = () => {
+        const framePacer = createGameFramePacer();
+        const loop = (rafTime) => {
             if (!this.running) return;
             if (document.hidden) {
+                framePacer.reset();
                 this._lastFrameTime = 0;
+                this._raf = requestAnimationFrame(loop);
+                return;
+            }
+            if (!framePacer.shouldDraw(rafTime)) {
                 this._raf = requestAnimationFrame(loop);
                 return;
             }
@@ -2511,6 +2518,7 @@ export class SlitherRenderer {
         this.smooth.clear();
         this._holdStartAt = 0;
         window.removeEventListener('resize', this._onResize);
+        window.removeEventListener(RECORDING_MODE_EVENT, this._onResize);
         window.visualViewport?.removeEventListener('resize', this._onResize);
         document.removeEventListener('fullscreenchange', this._onResize);
         window.removeEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);

@@ -1,0 +1,16 @@
+.game-recording-mode {
+    position: fixed; right: 14px; bottom: 14px; z-index: 75;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 8px 11px; border: 1px solid #45404f; border-radius: 7px;
+    background: #242329; color: #d8d6df; font: inherit; font-size: 11px;
+    cursor: pointer; line-height: 1.2;
+}
+.game-recording-mode:hover { background: #302e37; }
+.game-recording-mode.is-active { border-color: #8872bd; color: #e6dcfb; }
+.game-recording-mode__dot { width: 6px; height: 6px; border-radius: 50%; background: #77727f; }
+.game-recording-mode.is-active .game-recording-mode__dot { background: #ae8ee8; }
+.game-recording-mode--inline { position: static; margin-top: 6px; padding: 6px 9px; font-size: 10px; }
+.game-recording-mode:disabled { opacity: .5; cursor: default; }
+@media (max-width: 900px), (pointer: coarse) {
+    .game-recording-mode:not(.game-recording-mode--inline) { display: none; }
+}

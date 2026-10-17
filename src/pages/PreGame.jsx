@@ -37,6 +37,7 @@ import { hasUnlockedFreeTicket } from '../utils/freeTicket';
 import { FREE_MODE_STORAGE_KEY, getFreeModeEntryFee, setPublicFreeModeEnabled } from '../utils/freeMode';
 import { formatGameSolAmount, formatWalletBalanceAmount } from '../utils/displayCurrency';
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
+import GameRecordingMode from '../components/GameRecordingMode.jsx';
 
 const DISCORD_URL = import.meta.env.VITE_DISCORD_URL?.trim() || 'https://discord.gg/m5mWMu8aF';
 // Live cashout/death activity is available beside the main leaderboard.
@@ -1736,6 +1737,7 @@ export default function PreGame() {
                                         />
                                         <span style={{ fontSize: '0.62rem', color: 'var(--text-3)', fontWeight: 500 }}>Turn off names</span>
                                     </label>
+                                    <GameRecordingMode inline />
                                 </div>
 
                                 {/* Stake selection and simulated free room toggle */}

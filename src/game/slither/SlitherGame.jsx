@@ -17,6 +17,7 @@ import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import GamePlusCursor from '../../components/GamePlusCursor';
+import GameRecordingMode from '../../components/GameRecordingMode.jsx';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
 import BrandLogo from '../../components/BrandLogo';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
@@ -516,10 +517,10 @@ export default function SlitherGame() {
             rememberUpgrade: true,
             reconnection: true,
             reconnectionAttempts: Infinity,
-            reconnectionDelay: 2000,
-            reconnectionDelayMax: 5000,
+            reconnectionDelay: 500,
+            reconnectionDelayMax: 3000,
             randomizationFactor: 0.35,
-            timeout: 20000,
+            timeout: 8000,
         });
 
         socketRef.current = socket;
@@ -1047,6 +1048,7 @@ export default function SlitherGame() {
 
             <canvas ref={canvasRef} className="gameplay-cursor-surface" style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none', contain: 'strict' }} />
             <GamePlusCursor />
+            <GameRecordingMode disabled={cashoutPending} />
 
             <MobileGameSession containerRef={viewportRef} />
 

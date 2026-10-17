@@ -4,6 +4,7 @@
 
 import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
+import { budgetedCanvasDpr, createGameFramePacer, RECORDING_MODE_EVENT } from '../renderBudget.js';
 import { drawFarmerOutfit, drawFarmerHat } from '../../constants/signatureSkins.js';
 import { confirmedContactTrace, ingestAirdropTimers, ingestCombatEvents, ingestExplosionEvents } from './worldEvents.js';
 import { presentBRZone } from './brZonePresentation.js';
@@ -2062,6 +2063,7 @@ export class SurvivRenderer {
             }, 90);
         };
         window.addEventListener('resize', this._onResize);
+        window.addEventListener(RECORDING_MODE_EVENT, this._onResize);
         window.addEventListener('gamelayoutchange', this._onResize);
         window.visualViewport?.addEventListener('resize', this._onResize);
         document.addEventListener('fullscreenchange', this._onResize);
@@ -2230,7 +2232,8 @@ export class SurvivRenderer {
         const minimumDpr = nextMobileLayout ? 0.58 : 0.5;
         // Resolution stays stable for the whole match. Dynamically changing the
         // backing canvas made graphics visibly soften a few seconds after join.
-        const dpr = Math.max(minimumDpr, baseDpr);
+        const dpr = budgetedCanvasDpr({ width: w, height: h,
+            baseDpr: Math.max(minimumDpr, baseDpr), pixelBudget: 3_000_000 });
         const backingWidth = Math.round(w * dpr);
         const backingHeight = Math.round(h * dpr);
         const firstResize = !Number.isFinite(this.viewW) || !Number.isFinite(this.viewH);
@@ -2275,6 +2278,7 @@ export class SurvivRenderer {
         if (this.balanceCanvas) this.balanceCanvas.style.visibility = 'hidden';
         if (this._resizeTimer) clearTimeout(this._resizeTimer);
         window.removeEventListener('resize', this._onResize);
+        window.removeEventListener(RECORDING_MODE_EVENT, this._onResize);
         window.removeEventListener('gamelayoutchange', this._onResize);
         window.visualViewport?.removeEventListener('resize', this._onResize);
         document.removeEventListener('fullscreenchange', this._onResize);
@@ -2285,10 +2289,16 @@ export class SurvivRenderer {
         this.running = true;
 
         this._lastFrameAt = performance.now();
+        const framePacer = createGameFramePacer();
         const loop = (now) => {
             if (!this.running) return;
             if (document.hidden) {
+                framePacer.reset();
                 this._lastFrameAt = now;
+                this._raf = requestAnimationFrame(loop);
+                return;
+            }
+            if (!framePacer.shouldDraw(now)) {
                 this._raf = requestAnimationFrame(loop);
                 return;
             }
