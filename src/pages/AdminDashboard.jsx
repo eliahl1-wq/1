@@ -25,7 +25,7 @@ const EMPTY_PREGAME_PLAYING = Object.freeze(Object.fromEntries(PREGAME_PLAYING_M
 
 const ADMIN_OVERVIEW_RANGES = [1, 7, 30, 90];
 const ADMIN_OVERVIEW_RANGE_KEY = 'arenifi.admin.overview.range';
-const ADMIN_OVERVIEW_CACHE_KEY = 'arenifi.admin.overview.cache.v2';
+const ADMIN_OVERVIEW_CACHE_KEY = 'arenifi.admin.overview.cache.v3';
 const ADMIN_OVERVIEW_CACHE_MAX_AGE_MS = 30_000;
 
 function getSavedOverviewRange() {
@@ -376,7 +376,7 @@ function StatCard({ label, value, sub }) {
     );
 }
 
-function OverviewKpiCard({ label, value, sub, change, previous, previousLabel = 'Previous period', accent = 'violet', onClick, selected = false }) {
+function OverviewKpiCard({ label, value, sub, note, change, previous, previousLabel = 'Previous period', accent = 'violet', onClick, selected = false }) {
     const interactive = typeof onClick === 'function';
     const hasChange = change !== undefined;
     const changeLabel = change == null
@@ -397,6 +397,7 @@ function OverviewKpiCard({ label, value, sub, change, previous, previousLabel = 
             </div>
             <strong>{value}</strong>
             <p>{sub}</p>
+            {note && <small className="admin-overview-kpi__note">{note}</small>}
             {previous != null && <small>{previousLabel}: {previous}</small>}
             {interactive && <i aria-hidden="true">{selected ? '●' : '↘'}</i>}
         </Component>
@@ -1417,7 +1418,7 @@ export default function AdminDashboard() {
             .then(data => {
                 const responseDays = Number(data?.analytics?.days);
                 const responseSchema = Number(data?.analytics?.schemaVersion);
-                if (responseDays !== days || responseSchema < 2) {
+                if (responseDays !== days || responseSchema < 3) {
                     throw new Error(`The backend returned ${responseDays || 'unknown'}D data for the ${days}D view. The backend update is still pending.`);
                 }
                 const storedAt = Date.now();
@@ -2608,6 +2609,7 @@ export default function AdminDashboard() {
                                 label={`Deposits ${overviewPeriodSuffix}`}
                                 value={formatUsd(overviewTotals.depositsUsd)}
                                 sub={`${overviewTotals.deposits ?? 0} confirmed deposits`}
+                                note={`${formatUsd(overviewTotals.accountWithdrawalsUsd)} withdrawn from accounts · ${overviewTotals.accountWithdrawals ?? 0} withdrawal${overviewTotals.accountWithdrawals === 1 ? '' : 's'}`}
                                 change={overviewChanges.depositsUsd}
                                 previous={formatUsd(overviewPrevious.depositsUsd)}
                                 previousLabel={overviewPreviousLabel}

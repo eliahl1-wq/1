@@ -45,6 +45,7 @@ try {
         await page.waitForTimeout(500);
         const after = await fixture();
         assert.ok(Math.hypot(after.player.x - before.player.x, after.player.y - before.player.y) > 1, `${mode} movement reaches authority`);
+        if (mode === 'agar') await page.mouse.move(720, 450);
 
         const captures = await page.evaluate(async () => {
             const canvas = document.querySelector('canvas.gameplay-cursor-surface');
@@ -73,19 +74,17 @@ try {
         await page.setViewportSize({ width: 3840, height: 2160 });
         await page.waitForTimeout(400);
         const normalSize = await canvas.evaluate(element => [element.width, element.height]);
-        const recordingToggle = page.getByRole('button', { name: /^Recording mode/ });
-        await recordingToggle.click();
+        assert.equal(await page.getByRole('button', { name: /^Recording mode/ }).count(), 0);
         await page.waitForTimeout(400);
-        assert.equal(await recordingToggle.getAttribute('aria-pressed'), 'true');
         const recordingSize = await canvas.evaluate(element => [element.width, element.height]);
-        assert.ok(recordingSize[0] * recordingSize[1] <= 1_610_000, 'recording mode honors its 4K pixel budget');
-        assert.ok(recordingSize[0] * recordingSize[1] < normalSize[0] * normalSize[1]);
+        assert.ok(recordingSize[0] * recordingSize[1] <= 2_410_000, 'automatic 4K pixel budget');
+        assert.deepEqual(recordingSize, normalSize, 'resolution stays stable without a manual mode');
         const movingBefore = (await fixture()).player;
         await page.mouse.move(3000, 1080); await page.waitForTimeout(450);
         const movingAfter = (await fixture()).player;
         assert.ok(Math.hypot(movingAfter.x - movingBefore.x, movingAfter.y - movingBefore.y) > 1, 'recording mode leaves movement/input live');
-        await recordingToggle.click(); await page.waitForTimeout(400);
-        assert.deepEqual(await canvas.evaluate(element => [element.width, element.height]), normalSize, 'turning off restores original resolution');
+        if (mode === 'agar') await page.mouse.move(1920, 1080);
+        assert.deepEqual(await canvas.evaluate(element => [element.width, element.height]), normalSize, 'live input never resizes the canvas');
         for (const viewport of [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, { width: 844, height: 390 }]) {
             await page.setViewportSize(viewport);
             await page.waitForTimeout(300);

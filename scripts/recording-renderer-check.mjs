@@ -14,19 +14,11 @@ try {
     await page.goto(`${process.env.GAME_PLAYTEST_ORIGIN || 'http://127.0.0.1:5175'}/surviv-playtest.html`);
     await page.locator('#status').filter({ hasText: 'simulation' }).waitFor();
     const results = await page.evaluate(async () => {
-        // Model another tab changing the persisted setting. This also reaches
-        // every HMR module instance in the development renderer harness.
-        const setRecordingMode = enabled => {
-            const value = String(enabled);
-            localStorage.setItem('game_recording_mode', value);
-            window.dispatchEvent(new StorageEvent('storage', { key: 'game_recording_mode', newValue: value }));
-        };
         const game = window.__survivPlaytest;
         game.reset('casino');
         const r = game.renderer;
         const results = [];
-        for (const recording of [false, true, false]) {
-            setRecordingMode(recording);
+        for (const recording of [true, true, true]) {
             await new Promise(resolve => setTimeout(resolve, 600));
             const width = r.canvas.width, height = r.canvas.height;
             const original = r.draw;
@@ -57,8 +49,8 @@ try {
     });
     assert.deepEqual(errors, []);
     assert.ok(results.every(result => result.chunks > 0 && result.frames >= 15 && result.stableSize), JSON.stringify(results));
-    assert.ok(results[1].width * results[1].height <= 1_610_000);
-    assert.ok(results[1].width * results[1].height < results[0].width * results[0].height);
+    assert.ok(results[1].width * results[1].height <= 2_410_000);
+    assert.deepEqual([results[0].width, results[0].height], [results[1].width, results[1].height]);
     assert.deepEqual([results[0].width, results[0].height], [results[2].width, results[2].height]);
     console.log(JSON.stringify({ passed: true, results, errors }));
 } finally { await browser.close(); }

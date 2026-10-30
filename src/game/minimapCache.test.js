@@ -19,3 +19,17 @@ test('radar pixels are reused at display refresh and redraw on viewport/scale ch
     assert.equal(paints, afterResize + 1);
     assert.equal(canvas.width, 138);
 });
+
+test('large radar data is prepared only for an actual radar refresh, never for every world frame', () => {
+    let prepared = 0, paints = 0;
+    const context = { setTransform() {}, clearRect() {} };
+    const cache = new GameMinimapCache({ createCanvas: () => ({ getContext: () => context }),
+        draw: (_ctx, options) => { paints++; assert.equal(options.food[0].x, prepared); } });
+    const ctx = { getTransform: () => ({ a: 1 }), drawImage() {} };
+    for (let frame = 0; frame < 144; frame++) cache.draw(ctx, {
+        screenW: 1920, screenH: 1080, time: frame * 1000 / 144,
+        getData: () => { prepared++; return { food: [{ x: prepared, y: 0 }] }; },
+    });
+    assert.equal(prepared, paints);
+    assert.ok(prepared <= 13);
+});

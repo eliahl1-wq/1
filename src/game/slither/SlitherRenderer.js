@@ -16,7 +16,7 @@ import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, g
 import { slitherCanvasDpr, createSlitherQualityGovernor } from './slitherPerformance.js';
 import { decodeSlitherTick } from './snapshotProtocol.js';
 import { GameMinimapCache } from '../minimapCache.js';
-import { budgetedCanvasDpr, createGameFramePacer, RECORDING_MODE_EVENT } from '../renderBudget.js';
+import { budgetedCanvasDpr, createGameFramePacer } from '../renderBudget.js';
 import { drawGoldenBlob, GOLDEN_BLOB_HALO_SCALE } from './goldenBlobVisual.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -305,7 +305,6 @@ export class SlitherRenderer {
         };
 
         window.addEventListener('resize', this._onResize);
-        window.addEventListener(RECORDING_MODE_EVENT, this._onResize);
         window.visualViewport?.addEventListener('resize', this._onResize);
         document.addEventListener('fullscreenchange', this._onResize);
         window.addEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);
@@ -841,7 +840,9 @@ export class SlitherRenderer {
                 }
             }
             this._frame++;
+            const drawStartedAt = performance.now();
             this.draw();
+            framePacer.recordDraw(performance.now() - drawStartedAt);
             this._raf = requestAnimationFrame(loop);
         };
         this._raf = requestAnimationFrame(loop);
@@ -2483,7 +2484,6 @@ export class SlitherRenderer {
                 }
             }
             const skipMinimapFood = this._foodDrawList.length > 180;
-            const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
             this._minimapCache.draw(ctx, {
                 screenW: W,
                 screenH: H,
@@ -2492,8 +2492,10 @@ export class SlitherRenderer {
                 centerY: cy,
                 viewHalfW,
                 viewHalfH,
-                players: minimap.players,
-                food: skipMinimapFood ? [] : minimap.food,
+                getData: () => {
+                    const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
+                    return { players: minimap.players, food: skipMinimapFood ? [] : minimap.food };
+                },
                 zone: this.state.zone,
             });
         }
@@ -2518,7 +2520,6 @@ export class SlitherRenderer {
         this.smooth.clear();
         this._holdStartAt = 0;
         window.removeEventListener('resize', this._onResize);
-        window.removeEventListener(RECORDING_MODE_EVENT, this._onResize);
         window.visualViewport?.removeEventListener('resize', this._onResize);
         document.removeEventListener('fullscreenchange', this._onResize);
         window.removeEventListener(GAME_LAYOUT_CHANGE, this._onLayoutChange);

@@ -17,7 +17,6 @@ import GameResultModal from '../../components/GameResultModal';
 import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import GamePlusCursor from '../../components/GamePlusCursor';
-import GameRecordingMode from '../../components/GameRecordingMode.jsx';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
 import BrandLogo from '../../components/BrandLogo';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
@@ -1048,7 +1047,6 @@ export default function SlitherGame() {
 
             <canvas ref={canvasRef} className="gameplay-cursor-surface" style={{ display: 'block', position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none', contain: 'strict' }} />
             <GamePlusCursor />
-            <GameRecordingMode disabled={cashoutPending} />
 
             <MobileGameSession containerRef={viewportRef} />
 

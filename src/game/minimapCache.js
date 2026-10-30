@@ -26,7 +26,9 @@ export class GameMinimapCache {
         if (now >= this.nextAt) {
             this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
             this.context.clearRect(0, 0, size, size);
-            this.drawRadar(this.context, { ...options, screenW: size, screenH: size, time: now });
+            const { getData, ...paintOptions } = options;
+            const data = getData?.() || {};
+            this.drawRadar(this.context, { ...paintOptions, ...data, screenW: size, screenH: size, time: now });
             this.nextAt = now + 1000 / 12;
         }
         ctx.drawImage(this.canvas, 0, 0, size, size);

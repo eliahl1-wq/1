@@ -35,8 +35,7 @@ import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
 import { agarInputSignature, createLatestInputSender } from '../latestInput.js';
 import { AgarPresentation } from './presentation.js';
-import { budgetedCanvasDpr, createGameFramePacer, RECORDING_MODE_EVENT } from '../renderBudget.js';
-import GameRecordingMode from '../../components/GameRecordingMode.jsx';
+import { budgetedCanvasDpr, createGameFramePacer } from '../renderBudget.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -944,7 +943,6 @@ export default function Game() {
         };
 
         window.addEventListener('resize', handleResize);
-        window.addEventListener(RECORDING_MODE_EVENT, handleResize);
         window.visualViewport?.addEventListener('resize', handleResize);
         document.addEventListener('fullscreenchange', handleResize);
         window.addEventListener(GAME_LAYOUT_CHANGE, handleResize);
@@ -958,7 +956,6 @@ export default function Game() {
             cancelAnimationFrame(animationFrameId.current);
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('resize', handleResize);
-            window.removeEventListener(RECORDING_MODE_EVENT, handleResize);
             window.visualViewport?.removeEventListener('resize', handleResize);
             document.removeEventListener('fullscreenchange', handleResize);
             window.removeEventListener(GAME_LAYOUT_CHANGE, handleResize);
@@ -983,7 +980,7 @@ export default function Game() {
         const viewZoom = getMobileViewZoom() * cameraZoomRef.current;
         const dpr = budgetedCanvasDpr({ width, height,
             baseDpr: IS_MOBILE ? getMobileCanvasDpr(width, height) : 1,
-            pixelBudget: IS_MOBILE ? 3_200_000 : 2_800_000 });
+            pixelBudget: IS_MOBILE ? 3_200_000 : 2_400_000 });
         canvasDprRef.current = dpr;
         const pixelWidth = Math.round(width * dpr);
         const pixelHeight = Math.round(height * dpr);
@@ -1022,6 +1019,7 @@ export default function Game() {
                 return;
             }
             const brZone = brZoneRef.current;
+            const drawStartedAt = performance.now();
             const { viruses, ejected, zoneSize } = gameData.current;
             const users = presentationRef.current.sample(performance.now());
             const player = users.find(user => user.id === myIdRef.current) || gameData.current.player;
@@ -1215,7 +1213,7 @@ export default function Game() {
                 const rawMinimap = gameData.current.rewardInfo?.minimap;
                 // Server minimap data is normally present. Avoid rebuilding large fallback
                 // arrays every frame, especially after zooming out with a large cell.
-                const minimap = rawMinimap
+                const getMinimap = () => rawMinimap
                     ? normalizeMinimapData(rawMinimap)
                     : normalizeMinimapData(null, {
                         players: users.map(u => ({
@@ -1240,13 +1238,11 @@ export default function Game() {
                     centerY: camY,
                     viewHalfW,
                     viewHalfH,
-                    players: minimap.players,
-                    food: minimap.food,
-                    viruses: minimap.viruses,
-                    ejected: minimap.ejected,
+                    getData: getMinimap,
                     zone: brZone,
                 });
             }
+            framePacer.recordDraw(performance.now() - drawStartedAt);
             if ((!isDead && cashedAmount === null) || isSpectating) {
                 animationFrameId.current = requestAnimationFrame(gameLoop);
             }
@@ -1329,7 +1325,6 @@ export default function Game() {
                 style={{ display: 'block', touchAction: 'none' }}
             />
             <GamePlusCursor />
-            <GameRecordingMode disabled={cashoutPending} />
 
             <MobileGameSession containerRef={viewportRef} />
 
