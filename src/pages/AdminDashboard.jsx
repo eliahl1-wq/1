@@ -1417,9 +1417,8 @@ export default function AdminDashboard() {
         const request = fetchAdmin(`/api/admin/dashboard/overview?days=${days}${force ? '&refresh=1' : ''}`)
             .then(data => {
                 const responseDays = Number(data?.analytics?.days);
-                const responseSchema = Number(data?.analytics?.schemaVersion);
-                if (responseDays !== days || responseSchema < 3) {
-                    throw new Error(`The backend returned ${responseDays || 'unknown'}D data for the ${days}D view. The backend update is still pending.`);
+                if (responseDays !== days) {
+                    throw new Error(`The backend returned ${responseDays || 'unknown'}D data for the ${days}D view. Wait for the pending backend update before using this period.`);
                 }
                 const storedAt = Date.now();
                 overviewCacheRef.current = {
@@ -1430,6 +1429,7 @@ export default function AdminDashboard() {
                 if (overviewRangeRef.current === days) {
                     setOverview(data);
                     setOverviewUpdatedAt(storedAt);
+                    setError('');
                 }
                 return data;
             })
@@ -2609,7 +2609,9 @@ export default function AdminDashboard() {
                                 label={`Deposits ${overviewPeriodSuffix}`}
                                 value={formatUsd(overviewTotals.depositsUsd)}
                                 sub={`${overviewTotals.deposits ?? 0} confirmed deposits`}
-                                note={`${formatUsd(overviewTotals.accountWithdrawalsUsd)} withdrawn from accounts · ${overviewTotals.accountWithdrawals ?? 0} withdrawal${overviewTotals.accountWithdrawals === 1 ? '' : 's'}`}
+                                note={Number(overviewAnalytics.schemaVersion) >= 3
+                                    ? `${formatUsd(overviewTotals.accountWithdrawalsUsd)} withdrawn from accounts · ${overviewTotals.accountWithdrawals ?? 0} withdrawal${overviewTotals.accountWithdrawals === 1 ? '' : 's'}`
+                                    : 'Account withdrawals available after the pending backend update'}
                                 change={overviewChanges.depositsUsd}
                                 previous={formatUsd(overviewPrevious.depositsUsd)}
                                 previousLabel={overviewPreviousLabel}
