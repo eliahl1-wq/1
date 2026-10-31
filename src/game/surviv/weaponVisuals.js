@@ -291,6 +291,23 @@ function buildFirearmSideArt(profile) {
     }
 
     const receiverStart = profile.bullpup ? 22 : (profile.stock === 'none' ? 18 : 31);
+    if (profile.family === 'sniper' || profile.family === 'dmr') {
+        // Shared long-rifle geometry, not a generic assault receiver.
+        add(polygonPath([[4,22],[20,17],[39,19],[46,24],[40,31],[33,30],[29,25],[14,32],[5,33]]), 'furniture');
+        if (profile.stock === 'skeleton') cut(polygonPath([[10,25],[23,21],[27,24],[16,28]]));
+        add(polygonPath([[34,17],[69,17],[74,20],[71,24],[35,24]]));
+        add(rectPath(68,18,28,2.8),'dark');
+        add(polygonPath([[54,23],[63,23],[62,31],[55,31]]),'dark');
+        line('M37 25Q42 32 48 25','metal',1.7);
+        if (profile.family === 'sniper') line('M48 16L52 13L56 16','dark',1.8);
+        if (profile.scope) {
+            add(rectPath(33,10,28,4),'dark');
+            add(rectPath(30,8,5,8),'dark'); add(rectPath(59,8,5,8),'dark');
+            add(rectPath(39,14,3,3),'dark'); add(rectPath(53,14,3,3),'dark');
+        }
+        if (profile.suppressor) add(rectPath(82,16.5,15,6),'dark');
+        return {parts,cuts};
+    }
     const receiverEnd = profile.style === 'shotgun' ? 58 : 62;
     const barrelEnd = profile.suppressor ? 83 : 94;
     const bodyTop = profile.style === 'lmg' ? 12 : 14;
@@ -316,7 +333,7 @@ function buildFirearmSideArt(profile) {
         const pumpX = profile.barrelCount > 1 ? 59 : 62;
         add(rectPath(56, 16, 37, profile.barrelCount > 1 ? 7 : 4), 'dark');
         if (profile.barrelCount > 1) line('M58 23H94', 'dark', 2.5);
-        if (profile.barrelCount <= 1) add(polygonPath([[pumpX, 20], [78, 20], [75, 28], [59, 27]]), 'furniture');
+        if (profile.barrelCount <= 1 && profile.magazine !== 'box') add(polygonPath([[pumpX, 20], [78, 20], [75, 28], [59, 27]]), 'furniture');
     } else if (profile.style === 'special') {
         add(polygonPath([[receiverStart, 12], [62, 12], [68, 18], [62, 27], [receiverStart, 27]]));
         add(ellipsePath(49, 20, 10, 9), 'accent');

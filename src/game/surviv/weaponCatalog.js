@@ -1,3 +1,4 @@
+import { getWeaponRarity } from './lootConfig.js';
 const weapon = (label, family, ammoType, clipSize, rarity = null) => Object.freeze({
     label,
     family,
@@ -10,7 +11,7 @@ const weapon = (label, family, ammoType, clipSize, rarity = null) => Object.free
 
 // The full named firearm roster from classic Surviv.io. Internal ids are kept
 // URL/socket friendly; every player-facing label uses the original spelling.
-export const SURVIV_WEAPON_CATALOG = Object.freeze({
+export const SURVIV_WEAPON_CATALOG = Object.freeze(Object.fromEntries(Object.entries({
     m9: weapon('M9', 'pistol', '9mm', 15),
     p30l: weapon('P30L', 'pistol', '9mm', 15),
     mp5: weapon('MP5', 'smg', '9mm', 30),
@@ -100,7 +101,7 @@ export const SURVIV_WEAPON_CATALOG = Object.freeze({
     lmg: weapon('M249', 'lmg', '556', 100),
     fists: weapon('Fists', 'melee', null, 0),
     knife: weapon('Combat Knife', 'melee', null, 0),
-});
+}).map(([id, definition]) => [id, Object.freeze({ ...definition, rarity: getWeaponRarity(id, definition.rarity) })])));
 
 export const SURVIV_AMMO_CATALOG = Object.freeze({
     '9mm': { label: '9mm', color: '#f5d547', max: 180 },
@@ -125,4 +126,4 @@ export const getSurvivWeaponLabel = id => getSurvivWeapon(id).label;
 export const getSurvivWeaponFamily = id => getSurvivWeapon(id).family;
 export const getSurvivWeaponAmmoType = id => getSurvivWeapon(id).ammoType;
 export const getSurvivWeaponClipSize = id => getSurvivWeapon(id).clipSize;
-export const getSurvivWeaponRarity = id => getSurvivWeapon(id).rarity;
+export const getSurvivWeaponRarity = id => getWeaponRarity(id, getSurvivWeapon(id).rarity);

@@ -518,7 +518,7 @@ export default function PreGame() {
                     : DEFAULT_ENTRY_FEE
     );
     const economy = isSurvivMode
-        ? survivTierEconomy(economyFeeForDisplay)
+        ? survivTierEconomy(economyFeeForDisplay, { freePlay: !!user?.freePlay || publicFreeMode })
         : isCompetitiveSlitherMode
             ? competitiveTierEconomy(economyFeeForDisplay)
             : tierEconomy(economyFeeForDisplay);
@@ -1851,16 +1851,20 @@ export default function PreGame() {
                                                         <span className="mono">{formatUsd(economy.dollarStart)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                        <span>Map loot pool</span>
-                                                        <span className="mono">{formatUsd(economy.lootPoolOnJoin)}</span>
+                                                        <span>Map coins per entry</span>
+                                                        <span className="mono">{formatUsd(economy.lootPoolOnJoin)}–{formatUsd(economy.maxLootPoolOnJoin)}</span>
+                                                    </div>
+                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
+                                                        <span>New bots per entry</span>
+                                                        <span className="mono">0–1 · {formatUsd(economy.botStart)} each</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Cashout fee</span>
                                                         <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
                                                     </div>
                                                     <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                        Top-down battle royale shooter. Your entry seeds cash across the map while you start at $0.
-                                                        Loot weapons, armor, medkits, and cash from chests. Fight players and bots. Cash out anytime, or risk it all for more.
+                                                        Start with {formatUsd(economy.dollarStart)}. Your entry funds at most one bot; unused bot funding becomes map coins.
+                                                        Find coins on the ground or in any crate. Your balance drops on death. Cash out before the final reset zone closes.
                                                     </div>
                                                 </>
                                             ) : isCompetitiveSlitherMode ? (

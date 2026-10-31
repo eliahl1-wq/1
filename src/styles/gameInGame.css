@@ -4027,6 +4027,10 @@ body.game-session-active #root {
     .game-viewport--mobile.surviv-game-page .surviv-weapons-hotbar { right: auto; width: auto; padding: 4px; }
 }
 
+.surviv-game-page .surviv-loadout-rarity { position: absolute; top: 3px; right: 5px; font: 700 7px var(--mono); text-transform: uppercase; letter-spacing: .6px; color: #c5ceca; }
+.surviv-game-page .surviv-loadout-rarity.rare, .weapon-rarity-badge.rare { color: #72acfa; }
+.surviv-game-page .surviv-loadout-rarity.epic, .weapon-rarity-badge.epic { color: #bd85ee; }
+.surviv-game-page .surviv-loadout-rarity.legendary, .weapon-rarity-badge.legendary { color: #e5ba5e; }
 /* Final Surviv phone layout: edge-owned controls with no duplicated actions. */
 @media (pointer: coarse), (max-width: 900px) and (max-height: 560px) {
     .game-viewport--mobile.surviv-game-page .surviv-hud-status-bars {

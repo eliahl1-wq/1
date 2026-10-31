@@ -10,6 +10,7 @@ import { confirmedContactTrace, ingestAirdropTimers, ingestCombatEvents, ingestE
 import { presentBRZone } from './brZonePresentation.js';
 import { drawCraftedFurniture, drawCraftedFixtures, drawRoofCourses, drawRoofWingRelief, drawInteriorAccessories } from './architectureArt.js';
 import { drawCraftedOutdoorProp } from './outdoorPropArt.js';
+import { SURVIV_RARITY_COLORS } from './lootConfig.js';
 import { drawCashoutProgressRing, CASHOUT_HOLD_MS } from '../cashoutRing.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { drawGameMinimap } from '../minimap.js';
@@ -32,6 +33,7 @@ import {
 } from '../../audio/synthSounds.js';
 import {
     getSurvivWeaponFamily,
+    getSurvivWeaponRarity,
     SURVIV_AMMO_CATALOG,
     SURVIV_WEAPON_CATALOG,
 } from './weaponCatalog.js';
@@ -69,6 +71,7 @@ const RARITY_COLORS = {
     common: '#d7c396',
     rare: '#71a7ff',
     military: '#c985ff',
+    ...SURVIV_RARITY_COLORS,
 };
 
 const LOOT_COLORS = {
@@ -2154,6 +2157,8 @@ export class SurvivRenderer {
         this._seenCombatEvents = new Map();
         this._weaponShots = new Map();
         this._authoritativeCombatEvents = false;
+        this._gunfireWarnings = [];
+        this._gunfireWarningsUntil = 0;
         // Weapon switch animation
         this._weaponSwitchT = 0;
         this._weaponSwitchFrom = 'fists';
@@ -2443,6 +2448,8 @@ export class SurvivRenderer {
         this._seenCombatEvents.clear();
         this._weaponShots.clear();
         this._authoritativeCombatEvents = false;
+        this._gunfireWarnings = [];
+        this._gunfireWarningsUntil = 0;
         this._weaponSwitchT = 0;
         this._weaponSwitchFrom = 'fists';
         this._muzzleFlash = 0;
@@ -3284,6 +3291,10 @@ export class SurvivRenderer {
             }
         }
         this.zone = tick.zone || null;
+        if (tick.gunfireWarnings?.length) {
+            this._gunfireWarnings = tick.gunfireWarnings;
+            this._gunfireWarningsUntil = receivedAt + 600;
+        }
         this._zoneReceivedAt = Date.now();
         if (tick.minimap) this.minimap = tick.minimap;
 
@@ -8211,7 +8222,8 @@ export class SurvivRenderer {
         ctx.restore();
     }
     drawLoot(ctx, l) {
-        const color = l.type === 'ammo' ? (AMMO_COLORS[l.ammoType] || LOOT_COLORS.ammo) : (LOOT_COLORS[l.type] || '#d5d5d5');
+        const color = l.type === 'weapon' ? SURVIV_RARITY_COLORS[getSurvivWeaponRarity(l.weaponType)]
+            : l.type === 'ammo' ? (AMMO_COLORS[l.ammoType] || LOOT_COLORS.ammo) : (LOOT_COLORS[l.type] || '#d5d5d5');
         const isChest = l.type === 'chest' || l.type === 'deathCrate';
         const pulse = isChest ? 1 : (1 + Math.sin(this._frameNow / 190 + l.x * 0.03) * 0.06);
         const isBursting = !isChest && l._burstEndAt > this._frameNow && Number.isFinite(l.spawnX) && Number.isFinite(l.spawnY);
@@ -8655,6 +8667,16 @@ export class SurvivRenderer {
                 } else {
                     drawGroundWeaponSideArt(ctx, l.weaponType);
                 }
+            } else if (l.type === 'money') {
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#b18332'; ctx.strokeStyle = '#594723'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.ellipse(2, 4, 9, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#e8cb72';
+                ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.strokeStyle = '#b68d3b'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = '#725927'; ctx.font = '800 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('$', 0, .5);
             } else if (l.type === 'grenade') {
                 ctx.fillStyle = '#334155';
                 ctx.beginPath();
@@ -8780,7 +8802,7 @@ export class SurvivRenderer {
 
             // Weapon name label below ground loot
             if (l.type === 'weapon' && l.weaponType) {
-                const wLabel = WEAPON_LABELS[l.weaponType] || l.weaponType;
+                const wLabel = `${WEAPON_LABELS[l.weaponType] || l.weaponType} · ${getSurvivWeaponRarity(l.weaponType).toUpperCase()}`;
                 ctx.fillStyle = 'rgba(8, 10, 9, 0.82)';
                 ctx.strokeStyle = color + '55';
                 ctx.lineWidth = 1;
@@ -10531,6 +10553,7 @@ export class SurvivRenderer {
             viewHalfW,
             viewHalfH,
             players: this.battleRoyale ? minimapPlayers.filter(player => player.isYou) : minimapPlayers,
+            warnings: now < this._gunfireWarningsUntil ? this._gunfireWarnings : [],
             food: lootDots,
             obstacles: this.minimap.obstacles?.length ? this.minimap.obstacles : this.obstacles,
             zone: this.zone?.radius > 0 ? {

@@ -58,14 +58,16 @@ export function competitiveTierEconomy(entryFeeUsd) {
     };
 }
 
-/** Surviv economy - full entry becomes synchronized map loot; players start at $0. */
-export function survivTierEconomy(entryFeeUsd) {
+/** Funded player + at most one entry bot, with the remainder in map coins. */
+export function survivTierEconomy(entryFeeUsd, { freePlay = false } = {}) {
     const entry = normalizeSurvivEntryFee(entryFeeUsd);
     const cashoutFeePct = 0.08;
     return {
         entryFee: entry,
-        dollarStart: 0,
-        lootPoolOnJoin: entry,
+        dollarStart: entry * .2,
+        botStart: entry * .2,
+        lootPoolOnJoin: (freePlay ? 20 : entry) - entry * .4,
+        maxLootPoolOnJoin: (freePlay ? 20 : entry) - entry * .2,
         cashoutFeePct,
         cashoutPlayerPct: 1 - cashoutFeePct,
     };

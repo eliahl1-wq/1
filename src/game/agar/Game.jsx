@@ -681,6 +681,7 @@ export default function Game() {
                 if (rewardInfo.prizePool != null) setBrPrizePool(rewardInfo.prizePool);
                 if (rewardInfo.aliveCount != null) setBrAliveCount(rewardInfo.aliveCount);
             }
+            if (!rewardInfo?.battleRoyale && rewardInfo && Object.hasOwn(rewardInfo, 'zone')) updateBrZone(rewardInfo.zone);
             if (!rewardInfo?.battleRoyale) {
                 const me = userData.find(p => p.id === myIdRef.current);
                 if (me) {

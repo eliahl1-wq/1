@@ -38,6 +38,7 @@ export function drawGameMinimap(ctx, opts) {
         viewHalfW,
         viewHalfH,
         players = [],
+        warnings = [],
         food = [],
         viruses = [],
         ejected = [],
@@ -258,6 +259,14 @@ export function drawGameMinimap(ctx, opts) {
     // rim threat from enemies outside radar but nearby
     const edgeThreat = new Array(EDGE_BUCKETS).fill(0);
     let maxThreat = 0;
+    for (const warning of warnings.slice(0, 16)) {
+        if (!Number.isFinite(warning.angle)) continue;
+        const normalized = ((warning.angle + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+        const bucket = Math.floor(normalized / (Math.PI * 2) * EDGE_BUCKETS) % EDGE_BUCKETS;
+        const strength = Math.min(1, Math.max(0, Number(warning.strength) || .8));
+        edgeThreat[bucket] = Math.max(edgeThreat[bucket], strength);
+        maxThreat = Math.max(maxThreat, strength);
+    }
     for (const e of enemies) {
         const dx = e.x - centerX;
         const dy = e.y - centerY;
@@ -312,6 +321,7 @@ export function normalizeMinimapData(raw, fallback = {}) {
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
         return {
             players: raw.players || raw.p || fallback.players || [],
+            warnings: raw.warnings || fallback.warnings || [],
             food: raw.food || raw.f || fallback.food || [],
             viruses: raw.viruses || raw.v || fallback.viruses || [],
             ejected: raw.ejected || raw.e || fallback.ejected || [],
@@ -331,6 +341,7 @@ export function normalizeMinimapData(raw, fallback = {}) {
     }
     return {
         players: fallback.players || [],
+        warnings: fallback.warnings || [],
         food: fallback.food || [],
         viruses: fallback.viruses || [],
         ejected: fallback.ejected || [],

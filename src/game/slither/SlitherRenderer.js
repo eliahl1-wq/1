@@ -494,9 +494,7 @@ export class SlitherRenderer {
             snakes: tick.snakes ?? this.state.snakes,
             you: nextYou,
             worldHalf: tick.worldHalf ?? this.state.worldHalf,
-            zone: isCompetitive
-                ? (tick.zone !== undefined ? tick.zone : this.state.zone)
-                : (tick.battleRoyale ? (tick.zone !== undefined ? tick.zone : this.state.zone) : null),
+            zone: tick.zone !== undefined ? tick.zone : this.state.zone,
             minimap: tick.minimap ?? this.state.minimap,
             circularMap: tick.circularMap ?? this.state.circularMap,
             competitiveSlither: isCompetitive,
@@ -2494,7 +2492,7 @@ export class SlitherRenderer {
                 viewHalfH,
                 getData: () => {
                     const minimap = normalizeMinimapData(this.state.minimap, this._minimapFallback);
-                    return { players: minimap.players, food: skipMinimapFood ? [] : minimap.food };
+                    return { players: minimap.players, warnings: minimap.warnings || [], food: skipMinimapFood ? [] : minimap.food };
                 },
                 zone: this.state.zone,
             });

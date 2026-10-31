@@ -1804,6 +1804,7 @@ export default function SurvivGame() {
                                             {renderWeaponIcon(weaponId, isActive ? '#f4f7f6' : '#aeb6b5', 90, { monochrome: true })}
                                         </div>
                                         <span className="hotbar-slot-name-compact">{weaponLabel}</span>
+                                        {slotIdx !== 2 && <span className={`surviv-loadout-rarity ${weaponRarity}`}>{weaponRarity}</span>}
                                         {weaponId === 'fists' || weaponId === 'knife' ? (
                                             <span className="hotbar-slot-ammo">MELEE</span>
                                         ) : (
