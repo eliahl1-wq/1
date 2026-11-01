@@ -105,8 +105,12 @@ export function drawBalanceBadge(ctx, centerX, topY, balance, isMe, options = {}
     }
 
     ctx.font = `800 ${amountFont}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+    if (usesDollarText) {
+        ctx.fillStyle = theme.unitColor;
+        ctx.fillText('$', amountX, midY);
+    }
     ctx.fillStyle = theme.amountColor;
-    ctx.fillText(displayAmount, amountX, midY);
+    ctx.fillText(amount, amountX + (usesDollarText ? ctx.measureText('$').width : 0), midY);
 
     ctx.textAlign = 'center';
     ctx.restore();
