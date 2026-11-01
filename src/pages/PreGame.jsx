@@ -1851,20 +1851,12 @@ export default function PreGame() {
                                                         <span className="mono">{formatUsd(economy.dollarStart)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                        <span>Map coins per entry</span>
-                                                        <span className="mono">{formatUsd(economy.lootPoolOnJoin)}–{formatUsd(economy.maxLootPoolOnJoin)}</span>
-                                                    </div>
-                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                        <span>New bots per entry</span>
-                                                        <span className="mono">0–1 · {formatUsd(economy.botStart)} each</span>
-                                                    </div>
-                                                    <div className="stat-row" style={{ marginBottom: '3px' }}>
                                                         <span>Cashout fee</span>
                                                         <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
                                                     </div>
                                                     <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                        Start with {formatUsd(economy.dollarStart)}. Your entry funds at most one bot; unused bot funding becomes map coins.
-                                                        Find coins on the ground or in any crate. Your balance drops on death. Cash out before the final reset zone closes.
+                                                        Start with {formatUsd(economy.dollarStart)}. The remaining arena funding adds value to the map.
+                                                        Build your balance and cash out before the arena resets. Your balance drops on death.
                                                     </div>
                                                 </>
                                             ) : isCompetitiveSlitherMode ? (
@@ -1874,7 +1866,7 @@ export default function PreGame() {
                                                         <span className="mono">{formatUsd(economyFeeForDisplay)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
-                                                        <span>Starting dollars</span>
+                                                        <span>Starting balance</span>
                                                         <span className="mono">{formatUsd(economy.dollarStart)}</span>
                                                     </div>
                                                     <div className="stat-row" style={{ marginBottom: '3px' }}>
@@ -1886,10 +1878,8 @@ export default function PreGame() {
                                                         <span className="mono">{(economy.cashoutPlayerPct * 100).toFixed(1)}%</span>
                                                     </div>
                                                     <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem', lineHeight: 1.45 }}>
-                                                        Real players only — ${economyFeeForDisplay} matches are a separate pool from other stakes.
-                                                        Your entry becomes your starting dollar balance. Snake size (mass) is separate from dollars.
-                                                        Kill snakes to pick up their dropped dollar loot. Cash out your dollar balance anytime after a short timer.
-                                                        Die and your dollars drop on the map for others. The circular arena shrinks before each reset.
+                                                        Your full entry becomes your starting balance. Each stake has its own arena.
+                                                        Eliminate opponents to collect their balance, or cash out your own. Your balance drops on death.
                                                     </div>
                                                 </>
                                             ) : (
@@ -1903,12 +1893,14 @@ export default function PreGame() {
                                                         <span className="mono">{formatUsd(economy.startBalance)}</span>
                                                     </div>
                                                     <div style={{ marginTop: '8px', marginBottom: '4px', opacity: 0.5, fontSize: '0.6rem' }}>
-                                                        Eat food & other players. Cash out anytime.
+                                                        {isAdminStartingBalanceOnly
+                                                            ? 'Your admin entry covers your starting balance only.'
+                                                            : `Start with ${formatUsd(economy.startBalance)}. The remaining arena funding adds value to the map.`}
+                                                        {' '}Build your balance and cash out anytime.
                                                     </div>
-                                                    <div className="divider" style={{ margin: '6px 0' }} />
                                                     <div className="stat-row">
-                                                        <span>Golden Blob value</span>
-                                                        <span className="mono text-green">{isAdminStartingBalanceOnly ? 'Not funded' : formatUsd(economy.goldenBlobValue)}</span>
+                                                        <span>Cashout fee</span>
+                                                        <span className="mono">{(economy.cashoutFeePct * 100).toFixed(1)}%</span>
                                                     </div>
                                                 </>
                                             )}
