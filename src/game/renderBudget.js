@@ -9,48 +9,55 @@ export function budgetedCanvasDpr({ width, height, baseDpr = 1, pixelBudget = 2_
 
 // Only gates paint work. Input, simulation, packets and animation clocks remain independent.
 export function createGameFramePacer({ maxFps = 144, adaptive = true } = {}) {
-    let last = null, credit = 0, targetFps = maxFps;
-    let averageCost = 0, averageInterval = 16.67, baselineInterval = 16.67;
+    let last = null, lastDraw = null, targetFps = maxFps;
+    let averageCost = 0, averageInterval = null;
     let overloadedAt = null, recoveredAt = null;
     return {
         get targetFps() { return targetFps; },
         recordDraw(ms) {
             if (Number.isFinite(ms) && ms >= 0 && ms < 250) averageCost += (ms - averageCost) * .1;
         },
-        reset() { last = null; credit = 0; overloadedAt = recoveredAt = null; },
+        reset() { last = lastDraw = averageInterval = null; overloadedAt = recoveredAt = null; },
         shouldDraw(now) {
-            if (last === null || now < last || now - last > 250) { last = now; credit = 0; return true; }
+            if (last === null || now < last || now - last > 250) {
+                last = lastDraw = now;
+                averageInterval = overloadedAt = recoveredAt = null;
+                return true;
+            }
             const elapsed = now - last;
             last = now;
             if (elapsed > 1 && elapsed < 100) {
-                averageInterval += (elapsed - averageInterval) * .04;
-                baselineInterval = Math.min(baselineInterval, elapsed);
+                averageInterval ??= elapsed;
+                // A missed callback is not evidence of a new refresh rate on its own.
+                averageInterval += (Math.min(elapsed, averageInterval * 2) - averageInterval) * .04;
             }
             if (adaptive) {
-                const slowCallbacks = averageInterval > Math.max(22, baselineInterval * 1.8);
-                const wanted = averageCost >= 14 || slowCallbacks ? Math.min(maxFps, 60)
-                    : averageCost >= 8 ? Math.min(maxFps, 90) : targetFps;
+                const wanted = averageCost >= 8 ? Math.min(maxFps, 60) : targetFps;
                 if (wanted < targetFps) {
                     overloadedAt ??= now;
                     recoveredAt = null;
-                    if (now - overloadedAt >= 1500) { targetFps = wanted; credit = 0; overloadedAt = null; }
+                    if (now - overloadedAt >= 1500) { targetFps = wanted; overloadedAt = null; }
                 } else {
                     overloadedAt = null;
-                    const healthy = averageCost < 5 && averageInterval < Math.max(18, baselineInterval * 1.3);
+                    const healthy = averageCost < 5;
                     if (targetFps < maxFps && healthy) {
                         recoveredAt ??= now;
                         if (now - recoveredAt >= 15_000) {
-                            targetFps = Math.min(maxFps, targetFps < 90 ? 90 : maxFps);
-                            credit = 0; recoveredAt = null;
+                            targetFps = maxFps;
+                            recoveredAt = null;
                         }
                     } else recoveredAt = null;
                 }
             }
+            // Use whole display ticks (e.g. 120 Hz -> 60, not uneven 90).
+            // At or below the target cadence, paint every callback. After a
+            // stall paint once, without storing credit for a burst of frames.
             const interval = 1000 / targetFps;
-            credit = Math.min(interval * 2, credit + elapsed);
-            const tolerance = Math.min(2, interval * .12);
-            if (credit < interval - tolerance) return false;
-            credit -= interval;
+            const refresh = averageInterval ?? interval;
+            const ticks = Math.max(1, Math.round(interval / refresh + 1e-6));
+            const minimumGap = ticks === 1 ? Math.min(interval, refresh) * .45 : (ticks - .3) * refresh;
+            if (now - lastDraw < Math.min(minimumGap, interval * 1.12)) return false;
+            lastDraw = now;
             return true;
         },
     };

@@ -19,7 +19,8 @@ test('healthy rendering preserves 60/120/144 Hz without painting at 240/360 Hz',
             inputs++;
             if (pacer.shouldDraw(frame * 1000 / hz)) { draws++; pacer.recordDraw(2); }
         }
-        assert.ok(Math.abs(draws - (Math.min(144, hz) * 10 + 1)) < 3, `${hz} Hz: ${draws}`);
+        const expectedHz = hz / Math.max(1, Math.round(hz / 144));
+        assert.ok(Math.abs(draws - (expectedHz * 10 + 1)) < 3, `${hz} Hz: ${draws}`);
         assert.equal(inputs, hz * 10 + 1);
     }
 });
@@ -44,17 +45,36 @@ test('sustained heavy draws automatically reduce paint work, with slow recovery'
     run(500, 20); assert.equal(pacer.targetFps, 144);
     run(3000, 20); assert.equal(pacer.targetFps, 60);
     run(5000, 2); assert.equal(pacer.targetFps, 60);
-    run(16_000, 2); assert.equal(pacer.targetFps, 90);
     run(16_000, 2); assert.equal(pacer.targetFps, 144);
 });
 
-test('capture-like stalled callbacks reduce work; backgrounding never replays missed frames', () => {
+test('slow callbacks alone do not cause an additional FPS penalty', () => {
     const pacer = createGameFramePacer();
-    for (let i = 0; i < 120; i++) { pacer.shouldDraw(i * 33.3); pacer.recordDraw(3); }
-    assert.equal(pacer.targetFps, 60);
+    for (let i = 0; i < 120; i++) {
+        assert.equal(pacer.shouldDraw(i * 33.3), true);
+        pacer.recordDraw(3);
+    }
+    assert.equal(pacer.targetFps, 144);
     assert.equal(pacer.shouldDraw(10000), true);
     assert.equal(pacer.shouldDraw(10001), false);
     pacer.reset(); assert.equal(pacer.shouldDraw(10002), true);
+});
+
+test('under load on 120/144 Hz, every paint lands two display ticks apart', () => {
+    for (const hz of [120, 144]) {
+        for (const cost of [10, 20]) {
+            const pacer = createGameFramePacer();
+            const painted = [];
+            for (let frame = 0; frame < hz * 5; frame++) {
+                if (pacer.shouldDraw(frame * 1000 / hz + Math.sin(frame) * .45)) {
+                    pacer.recordDraw(cost);
+                    if (frame >= hz * 3) painted.push(frame);
+                }
+            }
+            assert.ok(painted.length > 100);
+            assert.ok(painted.slice(1).every((frame, index) => frame - painted[index] === 2));
+        }
+    }
 });
 
 test('retired recording preference is removed and cannot force 60 FPS', async () => {

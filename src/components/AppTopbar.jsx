@@ -6,11 +6,13 @@ import { hasUnseenActiveTournament, TOURNAMENT_SEEN_EVENT } from '../utils/tourn
 import useBalanceCurrency from '../hooks/useBalanceCurrency';
 import CurrencySwitchButton from './CurrencySwitchButton';
 import BrandLogo from './BrandLogo';
+import { useServerReadiness } from '../context/ServerReadinessContext';
 
 export default function AppTopbar({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, token } = useAuth();
+    const { ready: serverReady, phase: serverPhase, latencyMs } = useServerReadiness();
     const [balanceCurrency, setBalanceCurrency] = useBalanceCurrency();
     const [menuOpen, setMenuOpen] = useState(false);
     const [hasTournamentNotification, setHasTournamentNotification] = useState(false);
@@ -101,6 +103,11 @@ export default function AppTopbar({ children }) {
         || (user.sponsoredRewardsCompleted && user.sponsoredRewardsUnlocked && Number(user.sponsoredRewardsBalance) > 0)
         || (user.hasFreeTicket && !user.freeTicketUsed)
     );
+    const serverStatusLabel = serverPhase === 'offline'
+        ? 'Offline'
+        : serverReady
+            ? `EU-West · Online${latencyMs != null ? ` · ${latencyMs} ms` : ''}`
+            : 'EU-West · Reconnecting';
 
     const navItems = (
         <>
@@ -204,7 +211,7 @@ export default function AppTopbar({ children }) {
                         <button type="button" className="gm-nav-link" onClick={() => navigate('/faq')}>FAQ</button>
                         <button type="button" className="gm-nav-link" onClick={() => navigate('/rewards#affiliate-rewards')}>Affiliate</button>
                         <a className="gm-nav-link" href="mailto:support@arenifi.fun">Support</a>
-                        <div className="topbar-mobile-status"><span className="live-dot" />EU-West · Online</div>
+                        <div className={`topbar-mobile-status${serverReady ? '' : ' is-offline'}`}><span className="live-dot" />{serverStatusLabel}</div>
                     </div>
                 </div>
             )}

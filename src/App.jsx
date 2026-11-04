@@ -1,26 +1,26 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import VerifyEmail from './pages/VerifyEmail';
-import Lobby from './pages/Lobby';
 import PreGame from './pages/PreGame';
-import Transactions from './pages/Transactions';
-import Profile from './pages/Profile';
 import { loadAgarGame, loadSlitherGame, loadSurvivGame } from './game/gameModules.js';
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const Lobby = lazy(() => import('./pages/Lobby'));
+const Transactions = lazy(() => import('./pages/Transactions'));
+const Profile = lazy(() => import('./pages/Profile'));
 const Game = lazy(loadAgarGame);
 const SlitherGame = lazy(loadSlitherGame);
 const SurvivGame = lazy(loadSurvivGame);
 const SlitherStudio = lazy(() => import('./game/slither/studio/SlitherStudio'));
 const SlitherStudioRender = lazy(() => import('./game/slither/studio/SlitherStudioRender'));
-import Gamemodes from './pages/Gamemodes';
-import BRLobby from './pages/BRLobby';
+const Gamemodes = lazy(() => import('./pages/Gamemodes'));
+const BRLobby = lazy(() => import('./pages/BRLobby'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
-import HowItWorks from './pages/HowItWorks';
-import Faq from './pages/Faq';
-import Rewards from './pages/Rewards';
-import Tournaments from './pages/Tournaments';
-import Shop from './pages/Shop';
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
+const Faq = lazy(() => import('./pages/Faq'));
+const Rewards = lazy(() => import('./pages/Rewards'));
+const Tournaments = lazy(() => import('./pages/Tournaments'));
+const Shop = lazy(() => import('./pages/Shop'));
 import ReferralCapture from './components/ReferralCapture';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -47,6 +47,10 @@ function RouteSeoPolicy() {
 function SitePresenceRunner() {
   useSitePresence();
   return null;
+}
+
+function LazyPage({ children }) {
+  return <Suspense fallback={<AppLoadingScreen />}>{children}</Suspense>;
 }
 
 function PrivateRoute({ children }) {
@@ -126,10 +130,10 @@ function App() {
               <ReferralCapture />
               <AgarTokenExperience>
               <Routes>
-                <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/lobby" element={<PrivateRoute><Lobby /></PrivateRoute>} />
+                <Route path="/login" element={<PublicRoute><LazyPage><LoginPage /></LazyPage></PublicRoute>} />
+                <Route path="/register" element={<LazyPage><RegisterPage /></LazyPage>} />
+                <Route path="/verify-email" element={<LazyPage><VerifyEmail /></LazyPage>} />
+                <Route path="/lobby" element={<PrivateRoute><LazyPage><Lobby /></LazyPage></PrivateRoute>} />
                 <Route path="/pre-game" element={<PreGame />} />
                 <Route path="/game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><Game /></Suspense></ArenaRoute>} />
                 <Route path="/slither-game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><SlitherGame /></Suspense></ArenaRoute>} />
@@ -147,21 +151,21 @@ function App() {
                 />
 
                 <Route path="/surviv-game" element={<ArenaRoute><Suspense fallback={<AppLoadingScreen />}><SurvivGame /></Suspense></ArenaRoute>} />
-                <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
-                <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-                <Route path="/gamemodes" element={<Gamemodes />} />
+                <Route path="/transactions" element={<PrivateRoute><LazyPage><Transactions /></LazyPage></PrivateRoute>} />
+                <Route path="/profile" element={<PrivateRoute><LazyPage><Profile /></LazyPage></PrivateRoute>} />
+                <Route path="/gamemodes" element={<LazyPage><Gamemodes /></LazyPage>} />
                 <Route path="/agar" element={<PreGame />} />
                 <Route path="/slither" element={<PreGame />} />
-                <Route path="/tournaments" element={<Tournaments />} />
+                <Route path="/tournaments" element={<LazyPage><Tournaments /></LazyPage>} />
                 <Route path="/tournaments/:tournamentId/lobby" element={<PrivateRoute><PreGame /></PrivateRoute>} />
                 <Route path="/surviv" element={<PreGame />} />
-                <Route path="/br-lobby" element={<PrivateRoute><BRLobby /></PrivateRoute>} />
+                <Route path="/br-lobby" element={<PrivateRoute><LazyPage><BRLobby /></LazyPage></PrivateRoute>} />
                 <Route path="/surviv-battle-royale" element={<PreGame />} />
                 <Route path="/admin" element={<AdminRoute><Suspense fallback={<AppLoadingScreen />}><AdminDashboard /></Suspense></AdminRoute>} />
-                <Route path="/how-it-works" element={<HowItWorks />} />
-                <Route path="/faq" element={<Faq />} />
-                <Route path="/rewards" element={<PrivateRoute><Rewards /></PrivateRoute>} />
-                <Route path="/shop" element={<PrivateRoute><Shop /></PrivateRoute>} />
+                <Route path="/how-it-works" element={<LazyPage><HowItWorks /></LazyPage>} />
+                <Route path="/faq" element={<LazyPage><Faq /></LazyPage>} />
+                <Route path="/rewards" element={<PrivateRoute><LazyPage><Rewards /></LazyPage></PrivateRoute>} />
+                <Route path="/shop" element={<PrivateRoute><LazyPage><Shop /></LazyPage></PrivateRoute>} />
                 <Route path="/affiliate-program" element={<Navigate to="/rewards#affiliate-rewards" replace />} />
                 <Route path="/affiliate" element={<Navigate to="/rewards#affiliate-rewards" replace />} />
                 <Route path="/" element={<PreGame />} />

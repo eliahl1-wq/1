@@ -4115,3 +4115,17 @@ body.game-session-active #root {
         height: 17px;
     }
 }
+/* Shared join/reconnect state for Agar and Slither. */
+.game-connection-overlay{position:absolute;z-index:1000;inset:0;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 42%,rgba(124,111,240,.1),transparent 38%),rgba(7,7,11,.97);color:#fff}
+.game-connection-card{display:flex;width:min(100%,430px);box-sizing:border-box;align-items:center;flex-direction:column;padding:30px 28px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:rgba(18,18,24,.88);box-shadow:0 24px 70px rgba(0,0,0,.42);text-align:center}
+.game-connection-card__logo{margin-bottom:22px;transform:scale(.84)}
+.game-connection-card__spinner{width:24px;height:24px;margin-bottom:16px;border:2px solid rgba(255,255,255,.12);border-top-color:#9f8cff;border-radius:50%;animation:game-connection-spin .85s linear infinite}
+.game-connection-card__status{padding:4px 8px;border:1px solid rgba(159,140,255,.2);border-radius:999px;background:rgba(124,111,240,.09);color:#b9aaff;font-size:.6rem;font-weight:780;letter-spacing:.1em;text-transform:uppercase}
+.game-connection-card__status.is-reconnecting{border-color:rgba(242,184,75,.22);background:rgba(242,184,75,.08);color:#e9bd65}
+.game-connection-card h2{margin:13px 0 0;color:#f7f7fa;font-size:1.15rem;font-weight:780;letter-spacing:-.025em}
+.game-connection-card p{max-width:355px;margin:9px 0 0;color:rgba(232,232,240,.6);font-size:.76rem;line-height:1.55}
+.game-connection-card small{margin-top:14px;color:rgba(232,232,240,.42);font-size:.65rem;line-height:1.45}
+.game-connection-card .ui-btn{min-width:150px;margin-top:20px}
+@keyframes game-connection-spin{to{transform:rotate(360deg)}}
+@media (max-width:560px){.game-connection-overlay{padding:14px}.game-connection-card{padding:24px 18px;border-radius:13px}.game-connection-card__logo{margin-bottom:18px}.game-connection-card h2{font-size:1.02rem}}
+@media (prefers-reduced-motion:reduce){.game-connection-card__spinner{animation-duration:1.5s}}

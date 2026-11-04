@@ -7,7 +7,9 @@ import "./index.css";
 import "./styles/ui.css";
 
 window.Buffer = Buffer;
-initMixpanel();
+const startAnalytics = () => { void initMixpanel(); };
+if ('requestIdleCallback' in window) window.requestIdleCallback(startAnalytics, { timeout: 2500 });
+else window.setTimeout(startAnalytics, 800);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

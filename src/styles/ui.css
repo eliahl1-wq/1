@@ -3444,6 +3444,7 @@
     font-size: 0.62rem;
     font-weight: 600;
   }
+  .topbar-mobile-status.is-offline .live-dot{background:#f2b84b;box-shadow:0 0 5px rgba(242,184,75,.25);animation:none}
 
   .logo {
     font-size: 1.15rem;

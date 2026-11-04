@@ -18,6 +18,7 @@ import GameSpectateHud from '../../components/GameSpectateHud';
 import GameCashoutBar from '../../components/GameCashoutBar';
 import GamePlusCursor from '../../components/GamePlusCursor';
 import GameSocialOverlay from '../../components/GameSocialOverlay';
+import GameConnectionOverlay from '../../components/GameConnectionOverlay';
 import BrandLogo from '../../components/BrandLogo';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
@@ -1199,24 +1200,16 @@ export default function SlitherGame() {
 
 
             {(!isConnected || !gameReady) && (
-
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0c', color: 'white', zIndex: 1000 }}>
-
-                    <div style={{ textAlign: 'center' }}>
-
-                        <h2 style={{ marginBottom: '10px' }}>
-                            {isBattleRoyale ? 'Joining Battle Royale…' : joinMessage}
-                        </h2>
-
-                        <p style={{ opacity: 0.5 }}>
-                            {isBattleRoyale
-                                ? 'Syncing match — no cash-out in this mode'
-                                : 'Your entry is being verified. Keep this window open; you will enter automatically when it is ready.'}
-                        </p>
-
-                    </div>
-
-                </div>
+                <GameConnectionOverlay
+                    active
+                    connected={isConnected}
+                    ready={gameReady}
+                    joiningTitle={isBattleRoyale ? 'Joining Battle Royale…' : joinMessage}
+                    joiningMessage={isBattleRoyale
+                        ? 'Syncing the match. Cash-out is disabled in Battle Royale.'
+                        : 'Your entry is being verified. You will enter automatically when it is ready.'}
+                    onExit={handleLobby}
+                />
 
             )}
 
