@@ -2653,7 +2653,24 @@
   transition: none;
 }
 
+.currency-switch-button::before {
+  content: '';
+  position: absolute;
+  inset: var(--currency-switch-pad) auto var(--currency-switch-pad) var(--currency-switch-pad);
+  width: calc((100% - 2 * var(--currency-switch-pad)) / 2);
+  border-radius: inherit;
+  background: var(--control-bg);
+  pointer-events: none;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.currency-switch-button[data-currency="USD"]::before {
+  transform: translateX(100%);
+}
+
 .currency-switch-button__option {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   height: 100%;
   display: inline-flex;
@@ -2672,18 +2689,33 @@
 }
 
 .currency-switch-button__option.is-active {
-  background: var(--control-bg);
+  background: transparent;
   color: #ffffff;
 }
 
-.currency-switch-button__option:hover {
-  background: var(--control-hover);
+@media (hover: hover) {
+  .currency-switch-button__option:hover {
+    background: rgba(166, 153, 195, 0.12);
+    color: #ffffff;
+  }
+}
+
+.currency-switch-button__option:active {
+  background: rgba(166, 153, 195, 0.18);
   color: #ffffff;
 }
 
 .currency-switch-button__option:focus-visible {
-  outline: none;
+  outline: 1px solid rgba(166, 153, 195, 0.6);
+  outline-offset: -1px;
   background: var(--control-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .currency-switch-button::before,
+  .currency-switch-button__option {
+    transition: none;
+  }
 }
 
 .currency-switch-button__sol-logo {

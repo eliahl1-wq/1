@@ -5,6 +5,7 @@ export default function CurrencySwitchButton({ value = 'USD', onChange, classNam
     return (
         <div
             className={`currency-switch-button${className ? ` ${className}` : ''}`}
+            data-currency={currency}
             role="group"
             aria-label="Balance display currency"
         >
