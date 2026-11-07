@@ -16,7 +16,7 @@ import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, g
 import { slitherCanvasDpr, createSlitherQualityGovernor } from './slitherPerformance.js';
 import { decodeSlitherTick } from './snapshotProtocol.js';
 import { GameMinimapCache } from '../minimapCache.js';
-import { budgetedCanvasDpr, createGameFramePacer } from '../renderBudget.js';
+import { budgetedCanvasDpr, getGameCanvasContext } from '../renderBudget.js';
 import { drawGoldenBlob, GOLDEN_BLOB_HALO_SCALE } from './goldenBlobVisual.js';
 // stackblur-canvas removed — sprites use soft gradients instead
 import bgTileUrl from './background_tile.png';
@@ -140,7 +140,7 @@ export class SlitherRenderer {
             : ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
         // Opaque canvas — background is fully painted every frame, so skipping the
         // alpha channel makes page compositing cheaper with no visual change.
-        this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        this.ctx = getGameCanvasContext(canvas);
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.imageSmoothingQuality = 'medium';
         // Body sprites are authored at this supersample factor and blitted down,
@@ -816,16 +816,10 @@ export class SlitherRenderer {
         if (this.running) return;
         this.running = true;
         this._lastFrameTime = 0;
-        const framePacer = createGameFramePacer();
-        const loop = (rafTime) => {
+        const loop = () => {
             if (!this.running) return;
             if (document.hidden) {
-                framePacer.reset();
                 this._lastFrameTime = 0;
-                this._raf = requestAnimationFrame(loop);
-                return;
-            }
-            if (!framePacer.shouldDraw(rafTime)) {
                 this._raf = requestAnimationFrame(loop);
                 return;
             }
@@ -838,9 +832,7 @@ export class SlitherRenderer {
                 }
             }
             this._frame++;
-            const drawStartedAt = performance.now();
             this.draw();
-            framePacer.recordDraw(performance.now() - drawStartedAt);
             this._raf = requestAnimationFrame(loop);
         };
         this._raf = requestAnimationFrame(loop);

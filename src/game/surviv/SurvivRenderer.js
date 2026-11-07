@@ -4,7 +4,7 @@
 
 import { drawBalanceBadge, isBalanceBadgeSolLogoReady } from '../balanceBadge.js';
 import { formatBalanceAmount } from '../../utils/displayCurrency.js';
-import { budgetedCanvasDpr, createGameFramePacer } from '../renderBudget.js';
+import { budgetedCanvasDpr, getGameCanvasContext } from '../renderBudget.js';
 import { drawFarmerOutfit, drawFarmerHat } from '../../constants/signatureSkins.js';
 import { confirmedContactTrace, ingestAirdropTimers, ingestCombatEvents, ingestExplosionEvents } from './worldEvents.js';
 import { presentBRZone } from './brZonePresentation.js';
@@ -1923,9 +1923,9 @@ export class SurvivRenderer {
         void preloadSurvivFootsteps();
         void preloadSurvivGunshots();
         this.canvas = canvas;
-        // The game paints every pixel each frame, so an opaque low-latency
+        // The game paints every pixel each frame, so an opaque synchronized
         // context avoids unnecessary alpha compositing with the DOM.
-        this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        this.ctx = getGameCanvasContext(canvas);
         this.balanceCanvas = balanceCanvas;
         this.balanceCtx = balanceCanvas?.getContext('2d', { alpha: true }) || null;
         this._balanceCanvasCssWidth = 164;
@@ -2292,24 +2292,16 @@ export class SurvivRenderer {
         this.running = true;
 
         this._lastFrameAt = performance.now();
-        const framePacer = createGameFramePacer();
         const loop = (now) => {
             if (!this.running) return;
             if (document.hidden) {
-                framePacer.reset();
                 this._lastFrameAt = now;
-                this._raf = requestAnimationFrame(loop);
-                return;
-            }
-            if (!framePacer.shouldDraw(now)) {
                 this._raf = requestAnimationFrame(loop);
                 return;
             }
             const dt = Math.min(0.05, Math.max(0.001, (now - this._lastFrameAt) / 1000));
             this._lastFrameAt = now;
-            const drawStartedAt = performance.now();
             this.draw(dt);
-            framePacer.recordDraw(performance.now() - drawStartedAt);
             this._raf = requestAnimationFrame(loop);
         };
         this._raf = requestAnimationFrame(loop);

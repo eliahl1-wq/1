@@ -4,7 +4,8 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : {}) });
 try {
-    const page = await browser.newPage({ viewport: { width: 3840, height: 2160 } });
+    const page = await browser.newPage({ viewport: { width: 3840, height: 2160 },
+        screen: { width: 3840, height: 2160 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/*', route => {
@@ -13,13 +14,27 @@ try {
     });
     await page.goto(`${process.env.GAME_PLAYTEST_ORIGIN || 'http://127.0.0.1:5175'}/surviv-playtest.html`);
     await page.locator('#status').filter({ hasText: 'simulation' }).waitFor();
-    const results = await page.evaluate(async () => {
+    await page.evaluate(() => {
+        const toggle = document.createElement('button');
+        toggle.id = 'capture-fullscreen-toggle';
+        toggle.textContent = 'Test fullscreen';
+        toggle.onclick = () => document.fullscreenElement
+            ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+        document.querySelector('nav').append(toggle);
+    });
+    const results = [];
+    for (const phase of ['windowed', 'fullscreen', 'restored']) {
+        if (phase !== 'windowed') {
+            await page.locator('#capture-fullscreen-toggle').click();
+            await page.waitForFunction(expected => !!document.fullscreenElement === expected,
+                phase === 'fullscreen');
+        }
+        const result = await page.evaluate(async () => {
         const game = window.__survivPlaytest;
-        game.reset('casino');
+        if (!window.__captureSceneReady) { game.reset('casino'); window.__captureSceneReady = true; }
         const r = game.renderer;
-        const results = [];
-        for (const recording of [true, true, true]) {
             await new Promise(resolve => setTimeout(resolve, 600));
+            const attributes = r.ctx.getContextAttributes();
             const width = r.canvas.width, height = r.canvas.height;
             const original = r.draw;
             const times = [];
@@ -40,14 +55,17 @@ try {
             clearInterval(requests);
             r.draw = original;
             times.sort((a, b) => a - b);
-            results.push({ recording, width, height, chunks, frames: times.length,
+            return { recording: true, fullscreen: !!document.fullscreenElement, attributes,
+                width, height, chunks, frames: times.length,
                 medianDrawMs: times[Math.floor(times.length / 2)],
                 p95DrawMs: times[Math.floor(times.length * .95)],
-                stableSize: width === r.canvas.width && height === r.canvas.height });
-        }
-        return results;
-    });
+                stableSize: width === r.canvas.width && height === r.canvas.height };
+        });
+        results.push({ phase, ...result });
+    }
     assert.deepEqual(errors, []);
+    assert.deepEqual(results.map(result => result.fullscreen), [false, true, false]);
+    assert.ok(results.every(result => result.attributes.desynchronized === false && result.attributes.alpha === false));
     assert.ok(results.every(result => result.chunks > 0 && result.frames >= 15 && result.stableSize), JSON.stringify(results));
     assert.ok(results[1].width * results[1].height <= 2_410_000);
     assert.deepEqual([results[0].width, results[0].height], [results[1].width, results[1].height]);

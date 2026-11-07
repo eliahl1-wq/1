@@ -18,7 +18,8 @@ const errors = [], results = [];
 try {
     const { token } = await fixture();
     for (const mode of ['agar', 'slither']) {
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5 });
+        const context = await browser.newContext({ viewport: { width: 1440, height: 900 },
+            screen: { width: 3840, height: 2160 }, deviceScaleFactor: 1.5 });
         await context.route('**/*', route => {
             const url = new URL(route.request().url());
             return ['127.0.0.1', 'localhost'].includes(url.hostname) ? route.continue() : route.abort();
@@ -47,6 +48,17 @@ try {
         assert.ok(Math.hypot(after.player.x - before.player.x, after.player.y - before.player.y) > 1, `${mode} movement reaches authority`);
         if (mode === 'agar') await page.mouse.move(720, 450);
 
+        await page.evaluate(() => {
+            const button = document.createElement('button');
+            button.id = 'fullscreen-capture-test';
+            button.textContent = 'Fullscreen capture test';
+            Object.assign(button.style, { position: 'fixed', top: '0', left: '0', zIndex: '2147483647' });
+            button.onclick = () => document.documentElement.requestFullscreen();
+            document.body.append(button);
+        });
+        await page.locator('#fullscreen-capture-test').click();
+        await page.waitForFunction(() => !!document.fullscreenElement);
+        await page.waitForTimeout(400);
         const captures = await page.evaluate(async () => {
             const canvas = document.querySelector('canvas.gameplay-cursor-surface');
             const dimensions = [canvas.width, canvas.height];
@@ -66,11 +78,19 @@ try {
             stream.getTracks().forEach(track => track.stop());
             clearInterval(requestFrames);
             ctx.setTransform = originalTransform;
-            return { dimensions, finalDimensions: [canvas.width, canvas.height], chunks, draws, hidden: document.hidden };
+            return { dimensions, finalDimensions: [canvas.width, canvas.height], chunks, draws,
+                attributes: ctx.getContextAttributes(), fullscreen: !!document.fullscreenElement, hidden: document.hidden };
         });
+        assert.equal(captures.fullscreen, true);
+        assert.equal(captures.attributes.desynchronized, false);
+        assert.equal(captures.attributes.alpha, false);
         assert.deepEqual(captures.dimensions, captures.finalDimensions, 'recording does not repeatedly resize/soften canvas');
         if (!captures.chunks) await page.screenshot({ path: `${output}/${mode}-recording-debug.png` });
         assert.ok(captures.chunks > 0, `actual canvas recording produced frames: ${JSON.stringify({ captures, status: (await fixture()).status })}`);
+        await page.evaluate(async () => {
+            await document.exitFullscreen();
+            document.querySelector('#fullscreen-capture-test').remove();
+        });
         await page.setViewportSize({ width: 3840, height: 2160 });
         await page.waitForTimeout(400);
         const normalSize = await canvas.evaluate(element => [element.width, element.height]);

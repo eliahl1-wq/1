@@ -36,7 +36,7 @@ import { isPublicFreeModeEnabled } from '../../utils/freeMode.js';
 import { formatBalanceAmount, getStoredBalanceCurrency } from '../../utils/displayCurrency.js';
 import { agarInputSignature, createLatestInputSender } from '../latestInput.js';
 import { AgarPresentation } from './presentation.js';
-import { budgetedCanvasDpr, createGameFramePacer } from '../renderBudget.js';
+import { budgetedCanvasDpr, getGameCanvasContext } from '../renderBudget.js';
 
 const IS_MOBILE = isTouchDevice();
 const CASHOUT_SECONDS = 0;
@@ -1005,23 +1005,16 @@ export default function Game() {
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const graph = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        const graph = getGameCanvasContext(canvas);
         const pointScratch = { x: 0, y: 0 };
-        const framePacer = createGameFramePacer();
         
-        const gameLoop = (rafTime) => {
+        const gameLoop = () => {
             if (document.hidden) {
-                framePacer.reset();
                 cameraFrameTimeRef.current = 0;
                 animationFrameId.current = requestAnimationFrame(gameLoop);
                 return;
             }
-            if (!framePacer.shouldDraw(Number.isFinite(rafTime) ? rafTime : performance.now())) {
-                animationFrameId.current = requestAnimationFrame(gameLoop);
-                return;
-            }
             const brZone = brZoneRef.current;
-            const drawStartedAt = performance.now();
             const { viruses, ejected, zoneSize } = gameData.current;
             const users = presentationRef.current.sample(performance.now());
             const player = users.find(user => user.id === myIdRef.current) || gameData.current.player;
@@ -1244,12 +1237,11 @@ export default function Game() {
                     zone: brZone,
                 });
             }
-            framePacer.recordDraw(performance.now() - drawStartedAt);
             if ((!isDead && cashedAmount === null) || isSpectating) {
                 animationFrameId.current = requestAnimationFrame(gameLoop);
             }
         };
-        gameLoop();
+        animationFrameId.current = requestAnimationFrame(gameLoop);
         return () => cancelAnimationFrame(animationFrameId.current);
     }, [isConnected, isDead, cashedAmount, isSpectating, baseViewZoom, getSpectatorCamera, specCamRef]);
 
