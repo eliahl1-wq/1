@@ -16,6 +16,7 @@ import { identifyMixpanelUser, trackMixpanelEvent } from '../utils/mixpanel';
 import { setPageSeo, SEO } from '../utils/seo';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
+import { buildPresenceHeaders, getOrCreatePresenceId } from '../utils/sitePresence';
 import {
     clearStoredReferral,
     getReferralDeviceId,
@@ -46,7 +47,7 @@ export default function RegisterPage() {
         try {
             const response = await fetch(`${API_URL}/api/register`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminders': 'true' },
+                headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminders': 'true', ...buildPresenceHeaders() },
                 body: JSON.stringify({
                     email,
                     username,
@@ -91,6 +92,7 @@ export default function RegisterPage() {
         if (code) params.set('ref', code);
         if (referral?.clickId) params.set('clickId', referral.clickId);
         params.set('deviceId', getReferralDeviceId());
+        params.set('visitorId', getOrCreatePresenceId());
         window.location.href = `${API_URL}/api/auth/google?${params}`;
     };
 

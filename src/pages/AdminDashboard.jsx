@@ -7,6 +7,7 @@ import ProductPageHeader from '../components/ProductPageHeader';
 import TournamentAdminPanel from '../components/TournamentAdminPanel';
 import AffiliateAdminPanel from '../components/AffiliateAdminPanel';
 import TokenLaunchAdminPanel from '../components/TokenLaunchAdminPanel';
+import AdminGrowthPanel from '../components/AdminGrowthPanel';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
 
@@ -25,7 +26,7 @@ const EMPTY_PREGAME_PLAYING = Object.freeze(Object.fromEntries(PREGAME_PLAYING_M
 
 const ADMIN_OVERVIEW_RANGES = [1, 7, 30, 90];
 const ADMIN_OVERVIEW_RANGE_KEY = 'arenifi.admin.overview.range';
-const ADMIN_OVERVIEW_CACHE_KEY = 'arenifi.admin.overview.cache.v3';
+const ADMIN_OVERVIEW_CACHE_KEY = 'arenifi.admin.overview.cache.v4';
 const ADMIN_OVERVIEW_CACHE_MAX_AGE_MS = 30_000;
 
 function getSavedOverviewRange() {
@@ -407,16 +408,17 @@ function OverviewKpiCard({ label, value, sub, note, change, previous, previousLa
 const OVERVIEW_CHART_METRICS = {
     audience: {
         label: 'People',
-        description: 'New registrations and distinct players each day.',
+        description: 'Daily visitors, registrations and depositing accounts. Visitor history starts when tracking is enabled.',
         series: [
+            { key: 'visitors', label: 'Visitors', color: '#55cad8', average: true },
             { key: 'registrations', label: 'Registrations', color: '#9b87ff' },
-            { key: 'uniquePlayers', label: 'Unique players', color: '#e77bd4' },
+            { key: 'depositors', label: 'Depositors', color: '#35d69f', average: true },
         ],
         format: value => formatCompactNumber(value, 0),
     },
     games: {
         label: 'Games',
-        description: 'Completed game entries split between paid and free play.',
+        description: 'Recorded game entries split between real-money entries and free play / free tickets.',
         series: [
             { key: 'paidGames', label: 'Real money', color: '#35d69f' },
             { key: 'freeGames', label: 'Free play', color: '#8f78ff' },
@@ -457,16 +459,26 @@ function OverviewTrendChart({ daily = [], metric = 'games', onMetricChange, rang
     const maxValue = Math.max(1, ...values);
     const xFor = index => left + (daily.length <= 1 ? plotWidth / 2 : (index / (daily.length - 1)) * plotWidth);
     const yFor = value => top + plotHeight - ((Number(value) || 0) / maxValue) * plotHeight;
-    const pathFor = key => daily.map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index).toFixed(2)} ${yFor(point[key]).toFixed(2)}`).join(' ');
-    const areaFor = key => daily.length
-        ? `${pathFor(key)} L ${xFor(daily.length - 1).toFixed(2)} ${top + plotHeight} L ${xFor(0).toFixed(2)} ${top + plotHeight} Z`
-        : '';
+    const pathFor = key => {
+        let connected = false;
+        return daily.map((point, index) => {
+            if (point[key] == null) { connected = false; return ''; }
+            const command = connected ? 'L' : 'M'; connected = true;
+            return `${command} ${xFor(index).toFixed(2)} ${yFor(point[key]).toFixed(2)}`;
+        }).join(' ');
+    };
+    const areaFor = key => {
+        const indexes = daily.map((point, index) => point[key] == null ? -1 : index).filter(index => index >= 0);
+        return indexes.length ? `${pathFor(key)} L ${xFor(indexes.at(-1)).toFixed(2)} ${top + plotHeight} L ${xFor(indexes[0]).toFixed(2)} ${top + plotHeight} Z` : '';
+    };
     const effectiveHoverIndex = hoverIndex == null && daily.length === 1 ? 0 : hoverIndex;
     const hovered = effectiveHoverIndex == null ? null : daily[effectiveHoverIndex];
     const dateLabel = date => new Date(`${date}T12:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const summary = config.series.map(series => ({
         ...series,
-        total: daily.reduce((sum, point) => sum + (Number(point[series.key]) || 0), 0),
+        label: series.average ? `${series.label} / day` : series.label,
+        total: daily.every(point => point[series.key] == null) ? null : daily.reduce((sum, point) => sum + (Number(point[series.key]) || 0), 0)
+            / (series.average ? Math.max(1, daily.filter(point => point[series.key] != null).length) : 1),
     }));
     const labelIndexes = daily.length <= 7
         ? daily.map((_, index) => index)
@@ -487,7 +499,7 @@ function OverviewTrendChart({ daily = [], metric = 'games', onMetricChange, rang
                 </div>
             </header>
             <div className="admin-overview-chart-summary">
-                {summary.map(series => <span key={series.key}><i style={{ background: series.color }} /><small>{series.label}</small><strong>{config.format(series.total)}</strong></span>)}
+                {summary.map(series => <span key={series.key}><i style={{ background: series.color }} /><small>{series.label}</small><strong>{series.total == null ? '—' : config.format(series.total)}</strong></span>)}
                 {refreshing && <em>Updating…</em>}
             </div>
             <div className="admin-overview-chart-wrap" onMouseLeave={() => setHoverIndex(null)}>
@@ -506,7 +518,7 @@ function OverviewTrendChart({ daily = [], metric = 'games', onMetricChange, rang
                             {seriesIndex === 0 && <path d={areaFor(series.key)} fill={`url(#overview-gradient-${metric})`} className="admin-overview-chart__area" />}
                             <path d={pathFor(series.key)} fill="none" stroke={series.color} className="admin-overview-chart__line" />
                             {daily.length <= 7 && daily.map((point, index) => (
-                                <circle key={`${series.key}-${point.date}`} cx={xFor(index)} cy={yFor(point[series.key])} r={daily.length === 1 ? 5 : 3} fill={series.color} className="admin-overview-chart__point admin-overview-chart__point--visible" />
+                                point[series.key] != null && <circle key={`${series.key}-${point.date}`} cx={xFor(index)} cy={yFor(point[series.key])} r={daily.length === 1 ? 5 : 3} fill={series.color} className="admin-overview-chart__point admin-overview-chart__point--visible" />
                             ))}
                         </g>
                     ))}
@@ -532,7 +544,7 @@ function OverviewTrendChart({ daily = [], metric = 'games', onMetricChange, rang
                     {hovered && (
                         <g>
                             <line x1={xFor(effectiveHoverIndex)} x2={xFor(effectiveHoverIndex)} y1={top} y2={top + plotHeight} className="admin-overview-chart__cursor" />
-                            {config.series.map(series => <circle key={series.key} cx={xFor(effectiveHoverIndex)} cy={yFor(hovered[series.key])} r="4" fill={series.color} className="admin-overview-chart__point" />)}
+                            {config.series.map(series => hovered[series.key] != null && <circle key={series.key} cx={xFor(effectiveHoverIndex)} cy={yFor(hovered[series.key])} r="4" fill={series.color} className="admin-overview-chart__point" />)}
                         </g>
                     )}
                     {labelIndexes.map((index, labelIndex) => (
@@ -543,7 +555,7 @@ function OverviewTrendChart({ daily = [], metric = 'games', onMetricChange, rang
                     <div className="admin-overview-chart-tooltip" style={{ left: `${Math.max(10, Math.min(90, (xFor(effectiveHoverIndex) / width) * 100))}%` }}>
                         <strong>{dateLabel(hovered.date)}</strong>
                         {config.series.map(series => (
-                            <span key={series.key}><i style={{ background: series.color }} />{series.label}<b>{config.format(hovered[series.key])}</b></span>
+                            <span key={series.key}><i style={{ background: series.color }} />{series.label}<b>{hovered[series.key] == null ? 'Not tracked' : config.format(hovered[series.key])}</b></span>
                         ))}
                     </div>
                 )}
@@ -2462,6 +2474,7 @@ export default function AdminDashboard() {
     const overviewChanges = overviewAnalytics.changes || {};
     const overviewAverages = overviewAnalytics.averages || {};
     const overviewRates = overviewAnalytics.rates || {};
+    const overviewGrowth = Number(overviewAnalytics.schemaVersion) >= 4 ? overviewAnalytics.growth : null;
     const overviewPeriodSuffix = overviewRangeDays === 1 ? 'today' : `· ${overviewRangeDays}D`;
     const overviewPreviousLabel = overviewRangeDays === 1 ? 'Yesterday' : `Previous ${overviewRangeDays}D`;
     const pendingAttention = rewardAlerts.filter(alert => alert.status === 'pending').length
@@ -2528,7 +2541,7 @@ export default function AdminDashboard() {
                             <div>
                                 <span className="admin-overview-eyebrow">PLATFORM PULSE</span>
                                 <h2>Overview</h2>
-                                <p>Growth, engagement and money flow in one place. Free play never counts as paid volume.</p>
+                                <p>Visitors → accounts → deposits → real play. Customer metrics exclude your accounts and free play money.</p>
                             </div>
                             <div className="admin-overview-intro__controls">
                                 <span>{overviewRefreshing ? 'Updating…' : overviewUpdatedAt ? `Updated ${new Date(overviewUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Waiting for data'}</span>
@@ -2544,16 +2557,28 @@ export default function AdminDashboard() {
                         <div className="admin-overview-live-strip">
                             <button type="button" onClick={() => setTab('activity')}><i className="is-live" /><span>Online now</span><strong>{onlineNow}</strong><small>{activeUsers?.currentlyInGame ?? 0} playing</small></button>
                             <div><span>Avg. players / day</span><strong>{overviewAverages.uniquePlayersPerDay ?? 0}</strong><small>{overviewAverages.gamesPerDay ?? 0} games / day</small></div>
-                            <div><span>New users who played</span><strong>{overviewRates.newUserPlayPct ?? 0}%</strong><small>{overviewTotals.newUsersWhoPlayed ?? 0} of {overviewTotals.newUsers ?? 0}</small></div>
-                            <div><span>New users who paid</span><strong>{overviewRates.newUserPaidPct ?? 0}%</strong><small>{overviewTotals.newUsersWhoPaid ?? 0} converted</small></div>
+                            <div><span>Unique players</span><strong>{overviewTotals.uniquePlayers ?? 0}</strong><small>{overviewTotals.uniquePaidPlayers ?? 0} real-money players</small></div>
+                            <div><span>New account → deposit</span><strong>{overviewGrowth ? `${overviewGrowth.signupDepositPct}%` : '—'}</strong><small>{overviewGrowth?.newUsersWhoDeposited ?? '—'} new depositors</small></div>
                             <button type="button" className={pendingAttention > 0 ? 'has-attention' : ''} onClick={() => setTab('issues')}><i /><span>Needs attention</span><strong>{pendingAttention}</strong><small>issues &amp; reward checks</small></button>
                         </div>
 
                         <div className="admin-overview-kpi-grid">
                             <OverviewKpiCard
+                                label={`Unique visitors ${overviewPeriodSuffix}`}
+                                value={overviewGrowth?.visitors == null ? '—' : formatCompactNumber(overviewGrowth.visitors, 0)}
+                                sub="Distinct browsers, not verified people"
+                                note={overviewGrowth?.visitorTrackingSince
+                                    ? `${overviewGrowth.visitorPeriodComplete ? 'Full period' : 'Partial history'} · tracked since ${new Date(overviewGrowth.visitorTrackingSince).toLocaleDateString()}`
+                                    : overviewGrowth ? 'Waiting for the first tracked visit' : 'Starts collecting after the backend update'}
+                                accent="cyan"
+                                selected={overviewChartMetric === 'audience'}
+                                onClick={() => setOverviewChartMetric('audience')}
+                            />
+                            <OverviewKpiCard
                                 label={`New registrations ${overviewPeriodSuffix}`}
                                 value={formatCompactNumber(overviewTotals.newUsers, 0)}
                                 sub={`${overviewAverages.registrationsPerDay ?? 0} average per day`}
+                                note={overviewGrowth?.signupBrowsers == null ? overviewGrowth ? `${overviewGrowth.unattributedSignups} registrations without browser attribution` : 'Signup browser counts require the backend update' : `${overviewGrowth.signupBrowsers} known signup browsers · ${overviewGrowth.unattributedSignups} older / unattributed accounts`}
                                 change={overviewChanges.newUsers}
                                 previous={formatCompactNumber(overviewPrevious.newUsers, 0)}
                                 previousLabel={overviewPreviousLabel}
@@ -2562,13 +2587,22 @@ export default function AdminDashboard() {
                                 onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
-                                label={`Active accounts ${overviewPeriodSuffix}`}
-                                value={formatCompactNumber(overviewTotals.activeUsers, 0)}
-                                sub={`${overviewRates.activeAccountPct ?? 0}% of ${overviewAnalytics.playerAccountCount ?? 0} player accounts`}
-                                change={overviewChanges.activeUsers}
-                                previous={formatCompactNumber(overviewPrevious.activeUsers, 0)}
+                                label={`Unique depositors ${overviewPeriodSuffix}`}
+                                value={overviewGrowth ? formatCompactNumber(overviewGrowth.depositors, 0) : '—'}
+                                sub="Each depositing account counted once"
+                                previous={overviewGrowth ? formatCompactNumber(overviewGrowth.previousDepositors, 0) : null}
                                 previousLabel={overviewPreviousLabel}
                                 accent="blue"
+                                selected={overviewChartMetric === 'audience'}
+                                onClick={() => setOverviewChartMetric('audience')}
+                            />
+                            <OverviewKpiCard
+                                label={`First-time depositors ${overviewPeriodSuffix}`}
+                                value={overviewGrowth ? formatCompactNumber(overviewGrowth.firstDepositors, 0) : '—'}
+                                sub="First confirmed deposit, ever"
+                                previous={overviewGrowth ? formatCompactNumber(overviewGrowth.previousFirstDepositors, 0) : null}
+                                previousLabel={overviewPreviousLabel}
+                                accent="pink"
                                 selected={overviewChartMetric === 'audience'}
                                 onClick={() => setOverviewChartMetric('audience')}
                             />
@@ -2582,17 +2616,6 @@ export default function AdminDashboard() {
                                 accent="green"
                                 selected={overviewChartMetric === 'games'}
                                 onClick={() => setOverviewChartMetric('games')}
-                            />
-                            <OverviewKpiCard
-                                label={`Unique players ${overviewPeriodSuffix}`}
-                                value={formatCompactNumber(overviewTotals.uniquePlayers, 0)}
-                                sub={`${overviewTotals.uniquePaidPlayers ?? 0} played with real money`}
-                                change={overviewChanges.uniquePlayers}
-                                previous={formatCompactNumber(overviewPrevious.uniquePlayers, 0)}
-                                previousLabel={overviewPreviousLabel}
-                                accent="pink"
-                                selected={overviewChartMetric === 'audience'}
-                                onClick={() => setOverviewChartMetric('audience')}
                             />
                             <OverviewKpiCard
                                 label={`Played volume ${overviewPeriodSuffix}`}
@@ -2640,26 +2663,7 @@ export default function AdminDashboard() {
                                 rangeDays={overviewRangeDays}
                                 refreshing={overviewRefreshing}
                             />
-                            <section className="admin-overview-card admin-overview-engagement">
-                                <header className="admin-overview-card-header"><div><span>Quality</span><h2>Engagement funnel</h2><p>How account growth turns into actual play.</p></div></header>
-                                <div className="admin-overview-funnel">
-                                    {[
-                                        ['Active account rate', overviewRates.activeAccountPct, `${overviewTotals.activeUsers ?? 0} active`],
-                                        ['New users played', overviewRates.newUserPlayPct, `${overviewTotals.newUsersWhoPlayed ?? 0} players`],
-                                        ['New users paid', overviewRates.newUserPaidPct, `${overviewTotals.newUsersWhoPaid ?? 0} paid`],
-                                        ['Paid game share', overviewRates.paidGamePct, `${overviewTotals.paidGames ?? 0} paid games`],
-                                    ].map(([label, value, note]) => (
-                                        <div key={label} className="admin-overview-funnel__row">
-                                            <span>{label}<small>{note}</small></span><strong>{value ?? 0}%</strong>
-                                            <div><i style={{ width: `${Math.max(0, Math.min(100, Number(value) || 0))}%` }} /></div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="admin-overview-mini-finance">
-                                    <div><span>Cashouts</span><strong>{formatUsd(overviewTotals.cashoutUsd)}</strong></div>
-                                    <div><span>Cashout fees</span><strong>{formatUsd(overviewTotals.feesUsd)}</strong></div>
-                                </div>
-                            </section>
+                            <AdminGrowthPanel growth={overviewGrowth} totals={overviewTotals} rates={overviewRates} averages={overviewAverages} formatUsd={formatUsd} />
                         </div>
 
                         <div className="admin-overview-secondary-grid">
@@ -2676,6 +2680,17 @@ export default function AdminDashboard() {
                                 </div>
                             </section>
                         </div>
+
+                        <details className="admin-overview-details admin-growth-definitions">
+                            <summary><span><strong>How these numbers are counted</strong><small>Data coverage, unique people and money definitions · UTC periods</small></span><i>›</i></summary>
+                            <div>
+                                {!overviewGrowth && <p className="admin-growth-warning">The new analytics require the backend update. Missing metrics are shown as —, not zero.</p>}
+                                <p><strong>Visitors &amp; registrations.</strong> Visitors are estimated unique browsers, not verified humans. A browser is counted once per UTC day and deduplicated across the selected period. Clearing storage or changing device can count again; shared browsers can undercount. Registration totals are accounts; known signup browsers group new accounts from the same browser. Older accounts without a browser ID stay unattributed.</p>
+                                <p><strong>Coverage.</strong> Visitor history is retained for 400 days, survives server restarts and starts only after deployment. Partial periods are labeled. Visitor charts leave untracked dates blank. Chart averages are daily averages, not unique people summed across days.</p>
+                                <p><strong>Depositors &amp; conversion.</strong> A depositor is one account with a positive confirmed deposit. First-time means the earliest reportable deposit in its full history. New account conversion only includes accounts created and depositing/playing in the selected period. Returning players played in both this period and the previous one; this is not a retention cohort study.</p>
+                                <p><strong>Money.</strong> Customer period statistics exclude owner/excluded accounts and simulated funds. Real free-ticket games count as free entries, not paid volume. Deposit USD values use the current SOL price; net account funding is deposits minus account withdrawals, never platform profit. All-time wallet figures below are separate platform totals.</p>
+                            </div>
+                        </details>
 
                         <details className="admin-overview-details">
                             <summary><span><strong>On-chain wallets</strong><small>House, rewards, tournaments and owner funds</small></span><i>›</i></summary>

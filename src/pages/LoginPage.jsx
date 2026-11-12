@@ -17,6 +17,7 @@ import { setPageSeo, SEO } from '../utils/seo';
 import '../styles/ui.css';
 import { API_URL } from '../utils/apiBase';
 import { getReferralDeviceId, getStoredReferral } from '../utils/referral';
+import { getOrCreatePresenceId } from '../utils/sitePresence';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -64,6 +65,7 @@ export default function LoginPage() {
         if (referral?.code) params.set('ref', referral.code);
         if (referral?.clickId) params.set('clickId', referral.clickId);
         params.set('deviceId', getReferralDeviceId());
+        params.set('visitorId', getOrCreatePresenceId());
         window.location.href = `${API_URL}/api/auth/google?${params}`;
     };
 

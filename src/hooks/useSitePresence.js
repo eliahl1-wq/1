@@ -15,7 +15,7 @@ export default function useSitePresence() {
     useEffect(() => {
         let alive = true;
         const ping = () => {
-            if (!alive) return;
+            if (!alive || document.hidden) return;
             pingSitePresence(API_URL, {
                 page: location.pathname,
                 username: user?.username,
@@ -24,9 +24,11 @@ export default function useSitePresence() {
         };
         ping();
         const id = setInterval(ping, 30_000);
+        document.addEventListener('visibilitychange', ping);
         return () => {
             alive = false;
             clearInterval(id);
+            document.removeEventListener('visibilitychange', ping);
         };
     }, [location.pathname, user?.username, token]);
 }
