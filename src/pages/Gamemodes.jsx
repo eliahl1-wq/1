@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Background from '../components/Background';
 import AppTopbar from '../components/AppTopbar';
 import AppFooter from '../components/AppFooter';
@@ -9,7 +9,7 @@ import GamemodeBadge from '../components/GamemodeBadge';
 import '../styles/ui.css';
 import { setPageSeo, SEO } from '../utils/seo';
 import { useAuth } from '../context/AuthContext';
-import { isBattleRoyaleAvailable, isBattleRoyaleMode, normalizeGamemodeForLobby } from '../constants/features';
+import { isBattleRoyaleAvailable } from '../constants/features';
 import { getVisibleGamemodes } from '../constants/gamemodes';
 import { API_URL } from '../utils/apiBase';
 
@@ -26,13 +26,9 @@ const PLAYING_KEY = {
 
 export default function Gamemodes() {
     const navigate = useNavigate();
-    const location = useLocation();
     const { user } = useAuth();
     const brAvailable = isBattleRoyaleAvailable(!!user?.isAdmin);
-    const [activeTab, setActiveTab] = useState(() => {
-        const raw = location.state?.selectedMode || localStorage.getItem('selected_gamemode') || 'agar';
-        return normalizeGamemodeForLobby(raw, false);
-    });
+    const [activeTab, setActiveTab] = useState('all');
     const [playersByGamemode, setPlayersByGamemode] = useState({
         agar: 0,
         slither: 0,
@@ -46,14 +42,6 @@ export default function Gamemodes() {
     const agarModes = catalog.filter((m) => m.tab === 'agar');
     const slitherModes = catalog.filter((m) => m.tab === 'slither');
     const survivModes = catalog.filter((m) => m.tab === 'surviv');
-
-    useEffect(() => {
-        if (user == null) return;
-        const raw = location.state?.selectedMode || localStorage.getItem('selected_gamemode');
-        if (raw && isBattleRoyaleMode(raw) && brAvailable) {
-            setActiveTab(raw);
-        }
-    }, [user?.isAdmin, brAvailable, location.state?.selectedMode]);
 
     useEffect(() => {
         let alive = true;
@@ -73,17 +61,8 @@ export default function Gamemodes() {
         return () => { alive = false; clearInterval(id); };
     }, []);
 
-    useEffect(() => {
-        if (location.state?.selectedMode && location.state.selectedMode !== activeTab) {
-            setActiveTab(location.state.selectedMode);
-            navigate(location.pathname, { replace: true, state: {} });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [location.state?.selectedMode]);
-
     const handleTabChange = (mode) => {
         setActiveTab(mode);
-        localStorage.setItem('selected_gamemode', mode);
     };
 
     const isSlitherTab = activeTab === 'slither' || activeTab === 'competitive-slither'
@@ -100,7 +79,7 @@ export default function Gamemodes() {
         navigate('/', { state: { selectedMode: modeId } });
     };
 
-    const activeModes = isAgarTab ? agarModes : isSurvivTab ? survivModes : slitherModes;
+    const activeModes = activeTab === 'all' ? catalog : isAgarTab ? agarModes : isSurvivTab ? survivModes : slitherModes;
 
     return (
         <div className="page-shell page-shell--with-topbar page-shell--scroll">
@@ -121,6 +100,12 @@ export default function Gamemodes() {
                 />
 
                 <div className="gm-tabs">
+                    <button
+                        className={`gm-tab${activeTab === 'all' ? ' gm-tab--active' : ''}`}
+                        onClick={() => handleTabChange('all')}
+                    >
+                        All
+                    </button>
                     <button
                         className={`gm-tab${isAgarTab ? ' gm-tab--active' : ''}`}
                         onClick={() => handleTabChange('agar')}

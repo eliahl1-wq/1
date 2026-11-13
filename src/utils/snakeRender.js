@@ -128,14 +128,31 @@ export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false, ma
             }
             if (material === 'onyx') {
                 const x = dx / s, y = dy / s;
-                // Dark pigment with restrained violet reflected light at the flanks.
-                const edge = Math.exp(-Math.pow((Math.abs(y) - 0.76) / 0.24, 2));
-                const reflection = Math.exp(-Math.pow((y + 0.27) / 0.12, 2)) * (0.68 + 0.32 * Math.max(0, 1 - x*x));
-                const soft = Math.exp(-Math.pow((y + 0.22) / 0.4, 2));
-                red += edge * 53 + reflection * 55 + soft * 9;
-                green += edge * 28 + reflection * 52 + soft * 8;
-                blue += edge * 83 + reflection * 65 + soft * 15;
-                l_final *= 1 - 0.13 * Math.pow(Math.max(0, -x), 3);
+                // Mostly cylindrical lighting keeps the gloss continuous across
+                // overlapping spheres instead of turning each sphere into a rib.
+                const z = Math.sqrt(Math.max(0, 1 - y*y));
+                l_final = 0.46 + z * 0.54 - 0.035 * Math.pow(Math.max(0, -x), 4);
+                const broad = Math.exp(-Math.pow((y + 0.28) / 0.35, 2));
+                const gloss = Math.exp(-Math.pow((y + 0.36) / 0.075, 2));
+                const violet = Math.exp(-Math.pow((y - 0.78) / 0.18, 2));
+                const rim = Math.exp(-Math.pow((y + 0.83) / 0.12, 2));
+                // Small curved staggered scales, compressed around the flanks.
+                // All detail is pigment/roughness inside the original body edge.
+                const row = (Math.asin(y) / Math.PI + 0.5) * 8;
+                const fy = row - Math.floor(row);
+                const u = x / 0.38 + (Math.floor(row) % 2) * 0.5;
+                const fx = ((u % 1) + 1) % 1;
+                const curve = 0.22 + 0.52 * (1 - (fy * 2 - 1)**2);
+                const distance = Math.min(Math.abs(fx-curve), 1-Math.abs(fx-curve));
+                const seam = Math.exp(-Math.pow(distance / 0.085, 2));
+                const lip = Math.exp(-Math.pow((fx - curve - 0.12) / 0.09, 2));
+                const grain = Math.sin(dx*2.37+dy*3.17)*Math.sin(dx*0.83-dy*1.91);
+                const surface = 1 - seam*0.2 + lip*0.08;
+                const shine = (broad*27 + gloss*42) * (1 - seam*0.12 + lip*0.14);
+                const scaleRelief = (lip*18 - seam*10) * (0.35 + broad*0.65);
+                red = red*surface + shine + scaleRelief + violet*15 + rim*7 + grain*0.6;
+                green = green*surface + shine*1.04 + scaleRelief + violet*8 + rim*10 + grain*0.6;
+                blue = blue*surface + shine*1.12 + scaleRelief + violet*24 + rim*15 + grain*0.7;
             }
             if (material === 'leviathan') {
                 // Pigment lives inside each default shaded sphere, not over the body path.

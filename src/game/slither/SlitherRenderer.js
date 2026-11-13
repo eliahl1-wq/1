@@ -1747,7 +1747,7 @@ export class SlitherRenderer {
     _getSnakePrImgs(cs, rPx, needs = {}, preserveTone = false, material = '') {
         const key = `${cs}|${rPx}|${preserveTone ? 'raw' : 'vivid'}|${material}`;
         let pair = this._prImgs.get(key);
-        const bodySS = rPx <= 44 ? this._bodySS : rPx <= 84 ? 1.5 : 1.25;
+        const bodySS = rPx <= 44 ? (material === 'onyx' ? Math.max(2, this._bodySS) : this._bodySS) : rPx <= 84 ? 1.5 : 1.25;
 
         if (!pair) {
             pair = { bodySS };

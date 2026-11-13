@@ -2662,7 +2662,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const rainbowCanvases = rainbowColors.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
         const specialSkinCanvases = new Map(SLITHER_SPECIAL_SKINS.map((skin) => [
             skin.id,
-            skin.classic ? fadeColors(skin.colors).map(c => getSnakeSegmentCanvas(radius, c, true, skin.material || '')) : getSnakeSegmentCanvas(radius, skin.baseColor, skin.id === 'leviathan', skin.id === 'leviathan' ? 'leviathan' : ''),
+            skin.classic ? fadeColors(skin.colors).map(c => getSnakeSegmentCanvas(skin.material === 'onyx' ? radius * 2 : radius, c, true, skin.material || '')) : getSnakeSegmentCanvas(radius, skin.baseColor, skin.id === 'leviathan', skin.id === 'leviathan' ? 'leviathan' : ''),
         ]));
         const detailPoints = Array.from({ length: segmentsCount }, () => ({ x: 0, y: 0 }));
         const randomColorCanvases = RANDOM_PREVIEW_SNAKE_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
@@ -2731,7 +2731,8 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                             : fixedSegmentCanvas;
                 const segmentHalf = segmentCanvas.width / 2;
                 ctx.setTransform(cos, sin, -sin, cos, pointX[i], pointY[i]);
-                ctx.drawImage(segmentCanvas, -segmentHalf, -segmentHalf);
+                if (currentSpecialSkin?.material === 'onyx') ctx.drawImage(segmentCanvas, -radius, -radius, radius * 2, radius * 2);
+                else ctx.drawImage(segmentCanvas, -segmentHalf, -segmentHalf);
             }
 
             ctx.setTransform(1, 0, 0, 1, 0, 0);
