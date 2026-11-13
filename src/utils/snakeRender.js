@@ -126,6 +126,17 @@ export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false, ma
                 const at = (t * flagWidth + ((s - e + flagPixels.offset + flagWidth) % flagWidth)) * 4;
                 red = flagPixels.data[at]; green = flagPixels.data[at+1]; blue = flagPixels.data[at+2];
             }
+            if (material === 'onyx') {
+                const x = dx / s, y = dy / s;
+                // Dark pigment with restrained violet reflected light at the flanks.
+                const edge = Math.exp(-Math.pow((Math.abs(y) - 0.76) / 0.24, 2));
+                const reflection = Math.exp(-Math.pow((y + 0.27) / 0.12, 2)) * (0.68 + 0.32 * Math.max(0, 1 - x*x));
+                const soft = Math.exp(-Math.pow((y + 0.22) / 0.4, 2));
+                red += edge * 53 + reflection * 55 + soft * 9;
+                green += edge * 28 + reflection * 52 + soft * 8;
+                blue += edge * 83 + reflection * 65 + soft * 15;
+                l_final *= 1 - 0.13 * Math.pow(Math.max(0, -x), 3);
+            }
             if (material === 'leviathan') {
                 // Pigment lives inside each default shaded sphere, not over the body path.
                 // Curved, staggered scale seams follow the rounded surface of the segment.

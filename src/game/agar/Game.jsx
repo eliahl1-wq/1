@@ -16,6 +16,7 @@ import GamePlusCursor from '../../components/GamePlusCursor';
 import GameSocialOverlay, { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay';
 import GameConnectionOverlay from '../../components/GameConnectionOverlay';
 import BrandLogo from '../../components/BrandLogo';
+import GameAdminControls from '../../components/GameAdminControls';
 import { useSpectatorCamera } from '../../hooks/useSpectatorCamera';
 import { useSpectatorFollow } from '../../hooks/useSpectatorFollow';
 import GameBRHud from '../../components/GameBRHud';
@@ -1525,37 +1526,7 @@ export default function Game() {
             </div>
             )}
 
-            {user?.isAdmin && (
-                <div className="game-admin-controls" style={{ position: 'absolute', top: '30px', left: '30px', zIndex: 10000, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <button 
-                        className="ui-btn ui-btn-primary" 
-                        style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF3B30', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-                        onClick={() => {
-                            if (socketRef.current && token) {
-                                socketRef.current.emit('adminSpawnBotNearMe', { token, mode: 'agar' });
-                            }
-                        }}
-                    >
-                        [Admin] Spawn Bot
-                    </button>
-                    <button className="ui-btn ui-btn-primary" onClick={() => socketRef.current?.emit('adminFreePlayAction', { token, action: 'food' })}>
-                        [Admin] +250 Food (Free play)
-                    </button>
-                    <button className="ui-btn ui-btn-primary" onClick={() => socketRef.current?.emit('adminFreePlayAction', { token, action: 'grow' })}>
-                        [Admin] Size ×1.5 (Free play)
-                    </button>
-                    <button 
-                        style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF9500', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-                        onClick={() => {
-                            if (socketRef.current && token) {
-                                socketRef.current.emit('adminClearBots', { token });
-                            }
-                        }}
-                    >
-                        [Admin] Clear Bots
-                    </button>
-                </div>
-            )}
+            {user?.isAdmin && <GameAdminControls socketRef={socketRef} token={token} mode="agar" />}
 
             {/* Logo/Name */}
             <div className="game-logo-wrap" style={{ 

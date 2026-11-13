@@ -48,6 +48,7 @@ export const SLITHER_SPECIAL_SKINS = Object.freeze([
 ]);
 
 export function getSlitherSpecialSkin(valueOrId) {
+    if (valueOrId === 'tide' || valueOrId === 'slither:tide') valueOrId = 'onyx';
     return SLITHER_SPECIAL_SKINS.find(
         (skin) => skin.value === valueOrId || skin.id === valueOrId || skin.productId === valueOrId,
     ) || null;

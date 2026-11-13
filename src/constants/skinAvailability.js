@@ -2,4 +2,4 @@
 const hidden = new Set(['prism', 'agar:prism', 'leviathan', 'slither:leviathan']);
 export const isHiddenSkin = value => hidden.has(value);
 export const isVisibleSkinProduct = product => !product.adminOnly && !isHiddenSkin(product.skinId || product.value) && !isHiddenSkin(product.productId || product.id);
-export const visibleSkinSelection = value => isHiddenSkin(value) ? '#c080ff' : value;
+export const visibleSkinSelection = value => value === 'tide' ? 'onyx' : isHiddenSkin(value) ? '#c080ff' : value;

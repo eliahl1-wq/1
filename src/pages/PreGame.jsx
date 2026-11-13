@@ -2290,7 +2290,7 @@ export default function PreGame() {
                 const specialSkin = (customizerTab === 'slither' ? getSlitherSpecialSkin(currentChroma) : null) || getSignatureSkin(currentChroma);
                 const isSpecialSkin = !!specialSkin;
                 const isRandomSelection = currentChroma === 'random' || currentChroma === 'random_color';
-                const displayChroma = specialSkin ? specialSkin.colors[4] : (isRandomSelection || isFlag) ? '#80d0d0' : currentChroma;
+                const displayChroma = specialSkin ? specialSkin.colors[4] || specialSkin.baseColor : (isRandomSelection || isFlag) ? '#80d0d0' : currentChroma;
                 const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
                 const ownsRainbow = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has(rainbowProductId));
                 const ownsFlagPack = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has('flags:bundle'));
@@ -2662,7 +2662,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const rainbowCanvases = rainbowColors.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
         const specialSkinCanvases = new Map(SLITHER_SPECIAL_SKINS.map((skin) => [
             skin.id,
-            skin.classic ? fadeColors(skin.colors).map(c => getSnakeSegmentCanvas(radius, c, true)) : getSnakeSegmentCanvas(radius, skin.baseColor, skin.id === 'leviathan', skin.id === 'leviathan' ? 'leviathan' : ''),
+            skin.classic ? fadeColors(skin.colors).map(c => getSnakeSegmentCanvas(radius, c, true, skin.material || '')) : getSnakeSegmentCanvas(radius, skin.baseColor, skin.id === 'leviathan', skin.id === 'leviathan' ? 'leviathan' : ''),
         ]));
         const detailPoints = Array.from({ length: segmentsCount }, () => ({ x: 0, y: 0 }));
         const randomColorCanvases = RANDOM_PREVIEW_SNAKE_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));

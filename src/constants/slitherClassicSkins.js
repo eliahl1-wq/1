@@ -1,5 +1,5 @@
 export const CLASSIC_FADE_SKINS = Object.freeze([
-    { id: 'tide', value: 'tide', productId: 'slither:tide', name: 'Lagoon Fade', adminOnly: true, classic: true, baseColor: '#62cdbb', colors: ['#526db8', '#6e9fd2', '#78d5d0', '#a0e2bc'], description: 'Soft indigo fading into sea glass and mint, on the classic round segments.', badgeGradient: 'linear-gradient(110deg,#526db8,#78d5d0,#a0e2bc)' },
+    { id: 'onyx', value: 'onyx', productId: 'slither:onyx', name: 'Onyx', adminOnly: true, classic: true, material: 'onyx', baseColor: '#17131f', colors: ['#121118', '#1d1826', '#15121e', '#231a30'], description: 'Glossy black with muted violet edges, rounded depth and a soft satin reflection along the body.', badgeGradient: 'linear-gradient(110deg,#08090e,#34263f,#15101e)' },
     { id: 'sorbet', value: 'sorbet', productId: 'slither:sorbet', name: 'Peach Fade', adminOnly: true, classic: true, baseColor: '#e8ad98', colors: ['#ae82ba', '#db9db9', '#f0b09a', '#f2d18e'], description: 'Muted lilac through rose to warm peach, with the original rounded body and eyes.', badgeGradient: 'linear-gradient(110deg,#ae82ba,#db9db9,#f2d18e)' },
 ]);
 

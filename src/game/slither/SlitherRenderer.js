@@ -1846,7 +1846,7 @@ export class SlitherRenderer {
             const colors = skin.classic ? fadeColors(skin.colors) : [skin.baseColor];
             const stamps = colors.map((color) => skin.id === 'leviathan'
                 ? this._getSnakePrImgs(color, cacheR, prNeeds, true, 'leviathan')
-                : this._getSnakeSegmentStamp(color, cacheR, prNeeds, !!skin.classic));
+                : this._getSnakePrImgs(color, cacheR, prNeeds, !!skin.classic, skin.material || ''));
             pack = { cacheR, prKey, colors, stamps, skinId: skin.id };
             if (this._specialSkinStampPacks.size >= 24) {
                 this._specialSkinStampPacks.delete(this._specialSkinStampPacks.keys().next().value);
