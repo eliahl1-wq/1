@@ -2,7 +2,6 @@
 
 const SEG_SEP = 3.6;
 const BASE_RADIUS = 6.2;
-const MAX_RADIUS_SC = 3.15;
 const MAX_LENGTH_SC = 1.65;
 const SPAWN_SEGMENTS = 12;
 const LENGTH_SC_DIV = 106;
@@ -208,21 +207,21 @@ export function continuousSc(sct, fam = 0) {
     const normalized = Math.max(2, sct) + Math.max(0, fam);
     const baseSegments = Math.min(normalized, SPAWN_SEGMENTS);
     const extraSegments = Math.max(0, normalized - SPAWN_SEGMENTS);
-    return Math.min(
-        MAX_RADIUS_SC,
-        1 + (baseSegments - 2) / LENGTH_SC_DIV
-            + Math.log1p(extraSegments / RADIUS_SC_DIV) * RADIUS_LOG_FACTOR,
-    );
+    return 1 + (baseSegments - 2) / LENGTH_SC_DIV
+        + Math.log1p(extraSegments / RADIUS_SC_DIV) * RADIUS_LOG_FACTOR;
 }
 
 function continuousLengthSc(sct, fam = 0) {
-    const radiusSc = continuousSc(sct, fam);
+    const radiusSc = continuousSc(sct, sct >= 1200 ? 0 : fam);
     return Math.min(MAX_LENGTH_SC, 1 + (radiusSc - 1) * SPACING_GROWTH_FACTOR);
 }
 
 export function continuousArcLength(sct, fam, spacing) {
     const sp = spacing ?? SEG_SEP * continuousLengthSc(sct, fam);
-    return Math.max(sp, (Math.max(1, sct) - 1 + Math.max(0, fam)) * sp);
+    // At the simulation point budget, excess fullness becomes slow width
+    // growth. It must not request a fictitious, ever longer straight tail.
+    const tailFullness = sct >= 1200 ? 0 : Math.max(0, fam);
+    return Math.max(sp, (Math.max(1, sct) - 1 + tailFullness) * sp);
 }
 
 function spineArcLength(segments) {

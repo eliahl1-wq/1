@@ -14,7 +14,6 @@ export const SLITHER = {
     // Length comes mainly from more body points. Width and point spacing flatten
     // out instead of growing linearly until the snake is huge.
     maxScale: 1.65,
-    maxRadiusScale: 3.15,
     scaleDivisor: 106,
     radiusScaleDivisor: 90,
     radiusGrowthLogFactor: 0.59,
@@ -177,11 +176,8 @@ export function radiusScaleForSegmentCount(sct) {
     const normalized = Math.max(2, sct);
     const baseSegments = Math.min(normalized, SLITHER.spawnSegments);
     const extraSegments = Math.max(0, normalized - SLITHER.spawnSegments);
-    return Math.min(
-        SLITHER.maxRadiusScale,
-        1 + (baseSegments - 2) / SLITHER.scaleDivisor
-            + Math.log1p(extraSegments / SLITHER.radiusScaleDivisor) * SLITHER.radiusGrowthLogFactor,
-    );
+    return 1 + (baseSegments - 2) / SLITHER.scaleDivisor
+        + Math.log1p(extraSegments / SLITHER.radiusScaleDivisor) * SLITHER.radiusGrowthLogFactor;
 }
 
 /** Slither.io angular speed scale - thick snakes turn slower, but not too sluggishly. */
@@ -643,7 +639,7 @@ function growSnakeSegments(segments, targetCount, spacing) {
  * one along the head's traveled path, so circles stay round and growth does
  * not collapse the tail when history is still catching up.
  */
-function updateSnakeBodyFromPath(snake, spacing) {
+export function updateSnakeBodyFromPath(snake, spacing) {
     const segments = snake.segments;
     const head = segments[0];
     let path = snake.path;
@@ -661,6 +657,7 @@ function updateSnakeBodyFromPath(snake, spacing) {
         path[0].y = head.y;
     }
 
+    relaxSnakeTrail(path);
     ensurePathArcLength(path, segments, spacing, snake.angle || 0);
 
     let pathIndex = 0;
@@ -2055,6 +2052,22 @@ function eliminateSnake(room, snake, killer, io, User, isHuman, returnToPool = t
 }
 
 const MAX_NETWORK_SEGMENTS = 120;
+
+export function relaxSnakeTrail(path) {
+    if (path.length < 4) return;
+    let prevX = path[1].x;
+    let prevY = path[1].y;
+    for (let i = 2; i < path.length - 1; i++) {
+        const p = path[i];
+        const next = path[i + 1];
+        const oldX = p.x;
+        const oldY = p.y;
+        p.x += ((prevX + next.x) * 0.5 - p.x) * 0.012;
+        p.y += ((prevY + next.y) * 0.5 - p.y) * 0.012;
+        prevX = oldX;
+        prevY = oldY;
+    }
+}
 const MAX_VISIBLE_FOOD = 800;
 // Keep twice as much ambient food available across the arena. The per-player
 // visibility cap stays unchanged so this does not double network/render cost.
@@ -2068,7 +2081,11 @@ const SLITHER_MINIMAP_BROADCAST_INTERVAL = 4;
 const SLITHER_FOOD_VIEW_EXTRA = 200;
 const SLITHER_FOOD_BROADCAST_INTERVAL = 3;
 
-function downsampleSegmentsForNetwork(segments, maxPoints = MAX_NETWORK_SEGMENTS) {
+export function downsampleSegmentsForNetwork(segments, maxPoints = MAX_NETWORK_SEGMENTS) {
+    const radius = headRadiusForSegmentCount(segments.length);
+    const arc = pathArcLength(segments);
+    const required = Math.ceil((arc / Math.max(2.4, radius * 0.6) + 1) / 16) * 16;
+    maxPoints = Math.min(segments.length, Math.max(maxPoints, required));
     if (segments.length <= maxPoints) {
         return segments.map(s => ({ x: Math.round(s.x * 10) / 10, y: Math.round(s.y * 10) / 10 }));
     }
@@ -2085,7 +2102,7 @@ function downsampleSegmentsForNetwork(segments, maxPoints = MAX_NETWORK_SEGMENTS
 
 function serializeSnake(snake, isYou) {
     const sct = snake.segments.length;
-    const sc = radiusScaleForSegmentCount(sct);
+    const sc = radiusScaleForSegmentCount(sct + Math.max(0, snake.fam || 0));
     const lengthSc = scaleForSegmentCount(sct);
     const segments = downsampleSegmentsForNetwork(snake.segments, isYou ? MAX_NETWORK_SEGMENTS : 72);
     return {
@@ -2969,7 +2986,7 @@ export function createCompetitiveSlitherPlayer(socketId, mongoId, username, colo
 
 function serializeCompetitiveSnake(snake, isYou) {
     const sct = snake.segments.length;
-    const sc = radiusScaleForSegmentCount(sct);
+    const sc = radiusScaleForSegmentCount(sct + Math.max(0, snake.fam || 0));
     const lengthSc = scaleForSegmentCount(sct);
     const segments = downsampleSegmentsForNetwork(snake.segments, isYou ? MAX_NETWORK_SEGMENTS : 72);
     return {

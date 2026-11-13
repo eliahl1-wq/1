@@ -23,28 +23,28 @@
   --bg-1: var(--surface);
   --bg-2: #222227;
   --bg-3: #28282d;
-  --bg-hover: #2e2e34;
+  --bg-hover: #303035;
   --bg-elevated: rgba(27, 27, 31, 0.98);
-  --control-bg: rgba(255, 255, 255, 0.075);
-  --control-hover: rgba(255, 255, 255, 0.11);
+  --control-bg: rgba(255, 255, 255, 0.08);
+  --control-hover: rgba(255, 255, 255, 0.12);
 
   /* Borders — razor thin with subtle micro-reflect */
   --border: rgba(255, 255, 255, 0.065);
-  --border-2: rgba(255, 255, 255, 0.105);
+  --border-2: rgba(255, 255, 255, 0.115);
   --border-accent: rgba(173, 152, 255, 0.34);
 
   /* Typography — crisp contrast for human readability */
   --text: rgba(255, 255, 255, 0.68);
   --text-2: rgba(255, 255, 255, 0.50);
-  --text-3: rgba(255, 255, 255, 0.34);
+  --text-3: rgba(255, 255, 255, 0.37);
   --text-h: rgba(255, 255, 255, 0.94);
   --text-bright: rgba(255, 255, 255, 0.98);
-  --text-muted: rgba(255, 255, 255, 0.58);
-  --text-subtle: rgba(255, 255, 255, 0.42);
+  --text-muted: rgba(255, 255, 255, 0.61);
+  --text-subtle: rgba(255, 255, 255, 0.46);
 
   /* Brand accent — reserved for selection and primary action */
   --accent: #ad98ff;
-  --accent-hover: #baa8ff;
+  --accent-hover: #beafff;
   --accent-pressed: #9e87ed;
   --accent-ink: #090a0d;
   --accent-dim: rgba(173, 152, 255, 0.10);
@@ -103,8 +103,8 @@
   --control-sm: 32px;
   --control-md: 40px;
   --control-lg: 44px;
-  --ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --duration-fast: 150ms;
+  --ease-standard: cubic-bezier(0.22, 0.8, 0.25, 1);
+  --duration-fast: 160ms;
   --duration-base: 200ms;
   --focus-ring: 0 0 0 3px rgba(120, 94, 255, 0.18);
 
@@ -207,6 +207,12 @@ h2 {
   to {
     opacity: 1;
   }
+}
+
+/* Small overlays settle into place without scaling/blurring their text. */
+@keyframes menuReveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes spin {

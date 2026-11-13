@@ -65,7 +65,7 @@
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--text);
-  transition: all 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
   white-space: nowrap;
   letter-spacing: 0.01em;
 }
@@ -99,17 +99,17 @@
   border: 1px solid var(--border-2);
   border-radius: var(--r-md);
   padding: 3px;
-  box-shadow: var(--shadow-lg), 0 4px 24px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-overlay);
   opacity: 0;
-  transform: translateY(-4px) scale(0.97);
+  transform: translateY(-3px);
   pointer-events: none;
-  transition: all 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
   z-index: 10001;
 }
 
 .dropdown.open .dropdown-panel {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateY(0);
   pointer-events: auto;
 }
 
@@ -974,7 +974,7 @@
   font-family: var(--ui);
   font-variant-numeric: tabular-nums;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
   letter-spacing: 0;
 }
 .amount-input::placeholder { color: var(--text-3); font-family: var(--ui); font-weight: 400; }
@@ -2411,7 +2411,7 @@
   border: 1px solid var(--border-2);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-xl);
-  animation: fadeUp 0.15s ease-out;
+  animation: menuReveal var(--duration-fast) var(--ease-standard);
   z-index: 1100;
 }
 .user-menu-header {
@@ -2434,7 +2434,7 @@
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
   font-family: var(--ui);
   display: block;
 }
@@ -4796,9 +4796,8 @@
   transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
-.gm-play-btn:hover,
-.btn-primary:hover:not(:disabled),
-.btn-primary:hover {
+.gm-play-btn:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: rgba(255, 255, 255, 0.2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
@@ -5390,16 +5389,16 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   border-color:rgba(255,255,255,.095);
   box-shadow:inset 0 1px 2px rgba(0,0,0,.22);
 }
-.input:hover:not(:disabled),.nickname-input:hover:not(:disabled),.admin-input:hover:not(:disabled),.admin-filter-input:hover:not(:disabled),.admin-filter-select:hover:not(:disabled){background:rgba(10,11,16,.58);border-color:rgba(255,255,255,.14)}
-.input:focus,.nickname-input:focus,.admin-input:focus,.admin-filter-input:focus,.admin-filter-select:focus{box-shadow:var(--focus-ring),inset 0 1px 2px rgba(0,0,0,.2)}
+.input:hover:not(:disabled),.nickname-input:hover:not(:disabled),.admin-input:hover:not(:disabled),.admin-filter-input:hover:not(:disabled),.admin-filter-select:hover:not(:disabled){background:rgba(10,10,13,.58);border-color:rgba(255,255,255,.16)}
+.input:focus,.nickname-input:focus,.admin-input:focus,.admin-filter-input:focus,.admin-filter-select:focus{border-color:rgba(173,152,255,.62);box-shadow:var(--focus-ring),inset 0 1px 2px rgba(0,0,0,.2)}
 
-.wallet-card{width:226px;padding:12px;border-radius:var(--r-md);background:var(--bg-elevated);border-color:var(--border-2);box-shadow:var(--shadow-overlay);animation:fadeUp var(--duration-fast) var(--ease-standard)}
+.wallet-card{width:226px;padding:12px;border-radius:var(--r-md);background:var(--bg-elevated);border-color:var(--border-2);box-shadow:var(--shadow-overlay);animation:menuReveal var(--duration-fast) var(--ease-standard)}
 .wallet-card-header{display:flex;min-height:28px;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .wallet-card-history{min-height:26px;padding:0 7px;border:0;border-radius:5px;background:transparent;color:var(--text-subtle);font:680 .66rem/1 var(--ui);letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:color var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard)}
 .wallet-card-history:hover{background:rgba(255,255,255,.045);color:var(--text-h)}
 .wallet-card .dropdown-trigger{min-height:28px;padding:0 8px;border-radius:5px;font-size:.68rem}
 .wallet-card .dropdown-item{min-height:29px;font-size:.7rem}
-.wallet-card-balance{display:flex;min-height:34px;align-items:center;justify-content:center;font-size:1.42rem;font-weight:760;letter-spacing:-.045em}
+.wallet-card-balance{display:flex;min-height:34px;align-items:center;justify-content:center;font-size:1.42rem;font-weight:760;letter-spacing:-.045em;font-variant-numeric:tabular-nums}
 .wallet-card-sub{margin-top:4px;color:var(--text-subtle);font-size:.69rem;text-align:center}
 .wallet-card-actions{gap:6px;margin-top:10px}
 .wallet-card-actions .btn,.wallet-card-actions .wallet-card-action{min-height:31px;padding:0 9px;border-radius:6px;font-size:.72rem;font-weight:690;gap:5px}
@@ -5510,6 +5509,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
   box-shadow:none;
   white-space:nowrap;
 }
+.profile-tab-btn,.gm-tab,.product-page--admin .admin-tabs .tab-btn{transition:color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard)}
 .profile-tab-btn:hover,.gm-tab:hover,.product-page--admin .admin-tabs .tab-btn:not(.active):hover{background:transparent;color:var(--text-h)}
 .profile-tab-btn--active,.gm-tab--active,.product-page--admin .admin-tabs .tab-btn.active{border-bottom-color:var(--accent);background:transparent;color:var(--text-h);box-shadow:none;font-weight:700}
 
@@ -5581,7 +5581,7 @@ input[type='checkbox']:focus-visible { box-shadow: var(--focus-ring); }
 
   .topbar-nav--desktop .gm-nav-link:not(.gm-nav-link--active):hover {
     border-color: transparent;
-    background: rgba(124, 58, 255, 0.14);
+    background: rgba(173, 152, 255, 0.11);
     color: var(--accent);
     box-shadow: none;
   }
