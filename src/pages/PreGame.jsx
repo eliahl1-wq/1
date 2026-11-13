@@ -26,6 +26,7 @@ import { useServerReadiness } from '../context/ServerReadinessContext';
 import { getSnakeSegmentCanvas, getSnakeShadowCanvas } from '../utils/snakeRender';
 import { clearAllPendingResults } from '../utils/gamePendingResult';
 import { CHROMA_SKIN_COLORS } from '../constants/skins';
+import { fadeColors } from '../constants/slitherClassicSkins';
 import { SIGNATURE_SKINS, getSignatureSkin, drawPrismSkin } from '../constants/signatureSkins';
 import { isVisibleSkinProduct, visibleSkinSelection } from '../constants/skinAvailability';
 import { DEFAULT_FLAG_CODE, FLAG_SKINS, drawFlag, flagSkinValue, getFlagBorderColor, getFlagSegmentColors, getFlagSkin, parseFlagSkin } from '../constants/flagSkins';
@@ -2293,7 +2294,7 @@ export default function PreGame() {
                 const rainbowProductId = customizerTab === 'slither' ? 'slither:rainbow' : 'agar:rainbow';
                 const ownsRainbow = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has(rainbowProductId));
                 const ownsFlagPack = customizerTab !== 'surviv' && (user?.isAdmin || ownedSkinProducts.has('flags:bundle'));
-                const availableSpecialSkins = (customizerTab === 'slither' ? SLITHER_SPECIAL_SKINS : SIGNATURE_SKINS.filter(skin => skin.gameMode === customizerTab)).filter(isVisibleSkinProduct);
+                const availableSpecialSkins = (customizerTab === 'slither' ? SLITHER_SPECIAL_SKINS : SIGNATURE_SKINS.filter(skin => skin.gameMode === customizerTab)).filter(skin => skin.adminOnly ? !!user?.isAdmin : isVisibleSkinProduct(skin));
                 const ownedSpecialSkinIds = new Set(availableSpecialSkins.filter((skin) => user?.isAdmin || ownedSkinProducts.has(skin.productId)).map((skin) => skin.id));
 
                 const cycleChroma = (direction) => {
@@ -2661,7 +2662,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
         const rainbowCanvases = rainbowColors.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
         const specialSkinCanvases = new Map(SLITHER_SPECIAL_SKINS.map((skin) => [
             skin.id,
-            getSnakeSegmentCanvas(radius, skin.baseColor, skin.id === 'leviathan', skin.id === 'leviathan' ? 'leviathan' : ''),
+            skin.classic ? fadeColors(skin.colors).map(c => getSnakeSegmentCanvas(radius, c, true)) : getSnakeSegmentCanvas(radius, skin.baseColor, skin.id === 'leviathan', skin.id === 'leviathan' ? 'leviathan' : ''),
         ]));
         const detailPoints = Array.from({ length: segmentsCount }, () => ({ x: 0, y: 0 }));
         const randomColorCanvases = RANDOM_PREVIEW_SNAKE_COLORS.map(snakeColor => getSnakeSegmentCanvas(radius, snakeColor));
@@ -2702,7 +2703,7 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
             const currentSpecialSkin = getSlitherSpecialSkin(currentColor);
             if (flagCode && flagCode !== fixedFlagCode) {
                 fixedFlagCode = flagCode;
-                flagCanvases = getFlagSegmentColors(flagCode).map((flagColor) => getSnakeSegmentCanvas(radius, flagColor));
+                flagCanvases = Array.from({length:18}, (_, i) => getSnakeSegmentCanvas(radius, getFlagSegmentColors(flagCode)[0], true, `flag:${flagCode}:${i}`));
             }
             if (currentColor !== 'random' && currentColor !== 'random_color' && !currentSpecialSkin && !flagCode && currentColor !== fixedColor) {
                 fixedColor = currentColor;
@@ -2724,9 +2725,9 @@ export function SnakeSkinPreview({ color, isLarge, active = true }) {
                     : currentColor === 'random_color'
                         ? randomColorCanvases[Math.floor((now % RANDOM_PREVIEW_DURATION_MS) / RANDOM_PREVIEW_DURATION_MS * randomColorCanvases.length)]
                         : currentSpecialSkin
-                            ? specialSkinCanvases.get(currentSpecialSkin.id)
+                            ? currentSpecialSkin.classic ? specialSkinCanvases.get(currentSpecialSkin.id)[Math.round(i / (segmentsCount - 1) * 31)] : specialSkinCanvases.get(currentSpecialSkin.id)
                         : flagCode
-                            ? flagCanvases[Math.floor(i * 0.28) % flagCanvases.length]
+                            ? flagCanvases[i % flagCanvases.length]
                             : fixedSegmentCanvas;
                 const segmentHalf = segmentCanvas.width / 2;
                 ctx.setTransform(cos, sin, -sin, cos, pointX[i], pointY[i]);

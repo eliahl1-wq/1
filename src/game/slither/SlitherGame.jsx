@@ -1261,6 +1261,12 @@ export default function SlitherGame() {
                     >
                         [Admin] Spawn Bot
                     </button>
+                    <button className="ui-btn ui-btn-primary" onClick={() => socketRef.current?.emit('adminFreePlayAction', { token: authToken, action: 'food' })}>
+                        [Admin] +250 Food (Free play)
+                    </button>
+                    <button className="ui-btn ui-btn-primary" onClick={() => socketRef.current?.emit('adminFreePlayAction', { token: authToken, action: 'grow' })}>
+                        [Admin] +100 Segments (Free play)
+                    </button>
                     <button 
                         style={{ fontSize: '0.8rem', padding: '8px 16px', background: '#FF9500', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
                         onClick={() => {

@@ -1,6 +1,8 @@
 import { skinAnimationTime } from './signatureSkins.js';
+import { CLASSIC_FADE_SKINS } from './slitherClassicSkins.js';
 
 export const SLITHER_SPECIAL_SKINS = Object.freeze([
+    ...CLASSIC_FADE_SKINS,
     Object.freeze({
         id: 'leviathan', value: 'leviathan', productId: 'slither:leviathan',
         name: 'Leviathan', usdPrice: 2, baseColor: '#123b43',

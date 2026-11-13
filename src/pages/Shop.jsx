@@ -257,7 +257,7 @@ export default function Shop() {
         { id: 'flags:bundle', gameMode: 'all', skinId: 'flags', name: 'Flag Pack', usdPrice: 1 },
         { id: 'agar:rainbow', gameMode: 'agar', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
         { id: 'slither:rainbow', gameMode: 'slither', skinId: 'rainbow', name: 'Rainbow', usdPrice: 3 },
-        ...SLITHER_SPECIAL_SKINS.map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
+        ...SLITHER_SPECIAL_SKINS.filter(skin => !skin.adminOnly).map((skin) => ({ id: skin.productId, gameMode: 'slither', skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
         ...SIGNATURE_SKINS.map((skin) => ({ id: skin.productId, gameMode: skin.gameMode, skinId: skin.id, name: skin.name, usdPrice: skin.usdPrice })),
     ]).filter(isVisibleSkinProduct), [catalog?.products]);
     const filteredProducts = useMemo(() => products.filter((product) => {

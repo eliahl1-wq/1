@@ -113,6 +113,11 @@ export function drawFlag(graph, code, x, y, width, height) {
             graph.fillRect(left, top, width, height);
             graph.fillStyle = '#f1bf00';
             graph.fillRect(left, top + stripeH * 0.7, width, stripeH * 1.6);
+            // Simplified original shield motif, legible at snake scale.
+            graph.fillStyle = '#aa151b'; graph.beginPath();
+            graph.moveTo(left+width*0.28, y-height*0.16); graph.lineTo(left+width*0.39,y-height*0.16);
+            graph.lineTo(left+width*0.39,y+height*0.08); graph.quadraticCurveTo(left+width*0.335,y+height*0.24,left+width*0.28,y+height*0.08); graph.closePath(); graph.fill();
+            graph.fillStyle='#fff0bf'; graph.fillRect(left+width*0.325,y-height*0.12,width*0.025,height*0.22);
             break;
         case 'jp':
             graph.fillStyle = '#ffffff';
@@ -137,13 +142,16 @@ export function drawFlag(graph, code, x, y, width, height) {
             graph.beginPath();
             graph.arc(x, y, Math.min(width, height) * 0.20, 0, Math.PI * 2);
             graph.fill();
+            graph.strokeStyle = '#ffffff'; graph.lineWidth = height * 0.035;
+            graph.beginPath(); graph.moveTo(x-height*0.15,y-height*0.045); graph.quadraticCurveTo(x,y-height*0.1,x+height*0.16,y+height*0.04); graph.stroke();
             break;
         case 'ca':
             verticalStripe(['#d80621', '#ffffff', '#d80621']);
             graph.fillStyle = '#d80621';
+            graph.save(); graph.translate(x,y); graph.scale(height*0.36,height*0.36);
             graph.beginPath();
-            graph.arc(x, y, Math.min(width, height) * 0.15, 0, Math.PI * 2);
-            graph.fill();
+            [[0,-0.9],[0.16,-0.5],[0.4,-0.65],[0.32,-0.15],[0.78,-0.36],[0.65,-0.02],[0.9,0.08],[0.32,0.46],[0.4,0.65],[0.07,0.6],[0.07,0.92],[-0.07,0.92],[-0.07,0.6],[-0.4,0.65],[-0.32,0.46],[-0.9,0.08],[-0.65,-0.02],[-0.78,-0.36],[-0.32,-0.15],[-0.4,-0.65],[-0.16,-0.5]].forEach(([a,b],i)=>i?graph.lineTo(a,b):graph.moveTo(a,b));
+            graph.closePath(); graph.fill(); graph.restore();
             break;
         case 'gb':
             graph.fillStyle = '#012169';
@@ -156,6 +164,7 @@ export function drawFlag(graph, code, x, y, width, height) {
             graph.moveTo(left + width, top);
             graph.lineTo(left, top + height);
             graph.stroke();
+            graph.strokeStyle = '#c8102e'; graph.lineWidth = height * 0.07; graph.stroke();
             graph.fillStyle = '#ffffff';
             graph.fillRect(left + width * 0.42, top, width * 0.16, height);
             graph.fillRect(left, top + height * 0.39, width, height * 0.22);
@@ -167,6 +176,13 @@ export function drawFlag(graph, code, x, y, width, height) {
             horizontalStripe(['#b22234', '#ffffff', '#b22234', '#ffffff', '#b22234', '#ffffff', '#b22234']);
             graph.fillStyle = '#3c3b6e';
             graph.fillRect(left, top, width * 0.44, height * 0.56);
+            graph.fillStyle = '#ffffff';
+            for (let row=0;row<3;row++) for(let col=0;col<5;col++) {
+                const sx=left+width*(0.045+col*0.078), sy=top+height*(0.09+row*0.18), r=height*0.047;
+                graph.beginPath();
+                for(let k=0;k<10;k++){const a=k*Math.PI/5-Math.PI/2, q=k%2?r*0.42:r; const px=sx+Math.cos(a)*q,py=sy+Math.sin(a)*q; k?graph.lineTo(px,py):graph.moveTo(px,py);}
+                graph.closePath(); graph.fill();
+            }
             break;
         default:
             horizontalStripe(getFlagSkin(code).colors);

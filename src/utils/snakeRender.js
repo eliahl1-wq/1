@@ -84,6 +84,16 @@ export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false, ma
     const data = imgData.data;
 
     const col = preserveTone ? parseColorHex(hexColor) : normalizeColor(hexColor);
+    let flagPixels, flagWidth;
+    if (material.startsWith('flag:')) {
+        const [, code, tile] = material.split(':');
+        const flag = document.createElement('canvas');
+        flag.width = s * 8.28; flag.height = canvasSize;
+        const g = flag.getContext('2d');
+        drawFlag(g, code, flag.width / 2, s, flag.width, canvasSize);
+        flagWidth = flag.width;
+        flagPixels = { data: g.getImageData(0,0,flag.width,canvasSize).data, offset: Math.round(Number(tile) * s * 0.46) };
+    }
     const f = 1.416 * s;
 
     for (let t = 0; t < canvasSize; t++) {
@@ -111,6 +121,11 @@ export function getSnakeSegmentCanvas(radius, hexColor, preserveTone = false, ma
             
             const idx = (t * canvasSize + e) * 4;
             let red = col.r, green = col.g, blue = col.b;
+            if (flagPixels) {
+                // Body distance increases toward the tail, opposite local forward X.
+                const at = (t * flagWidth + ((s - e + flagPixels.offset + flagWidth) % flagWidth)) * 4;
+                red = flagPixels.data[at]; green = flagPixels.data[at+1]; blue = flagPixels.data[at+2];
+            }
             if (material === 'leviathan') {
                 // Pigment lives inside each default shaded sphere, not over the body path.
                 // Curved, staggered scale seams follow the rounded surface of the segment.
@@ -171,3 +186,4 @@ export function getSnakeShadowCanvas(radius) {
     snakeShadowCache.set(key, canvas);
     return canvas;
 }
+import { drawFlag } from '../constants/flagSkins.js';

@@ -10,6 +10,7 @@ import { unlockGameAudio } from '../../audio/synthSounds.js';
 import { drawGameEmote, drawChatBubble } from '../../components/GameSocialOverlay.jsx';
 import { rebuildPathFromSegments, resetSnakeBodyTick, resetVisualGrowth, stepSnakeBody, fitSpineToArcLength, densifySpine } from './snakePath.js';
 import { getSnakeSegmentCanvas } from '../../utils/snakeRender.js';
+import { fadeColors } from '../../constants/slitherClassicSkins.js';
 import { getFlagSegmentColors, parseFlagSkin } from '../../constants/flagSkins.js';
 import { adjustPlayerWheelZoom, PLAYER_WHEEL_ZOOM_MIN } from '../../utils/gameWheel.js';
 import { drawSlitherSpecialBody, drawSlitherSpecialDetails, drawLeviathanHead, getSlitherSpecialSkin } from '../../constants/slitherSpecialSkins.js';
@@ -1087,11 +1088,11 @@ export class SlitherRenderer {
         ctx.restore();
     }
 
-    _foodSprite(hue, rPx, golden, deathDrop, arenaDeathDrop = false) {
+    _foodSprite(hue, rPx, golden, deathDrop, arenaDeathDrop = false, tint = null) {
         // Keep arena death food at exactly the normal death-food sprite size.
         // Only its gradient is more golden and less hazy.
         const halo = Math.ceil(rPx * (golden ? GOLDEN_BLOB_HALO_SCALE : deathDrop ? 1.35 : 1.45));
-        const key = `f15|${golden ? 'g' : hue}|${rPx}|${deathDrop ? 1 : 0}|${arenaDeathDrop ? 1 : 0}`;
+        const key = `f16|${golden ? 'g' : tint || hue}|${rPx}|${deathDrop ? 1 : 0}|${arenaDeathDrop ? 1 : 0}`;
         return this._getSprite(key, halo * 2 + 4, (g, sz) => {
             const c = sz / 2;
             if (golden) {
@@ -1099,7 +1100,13 @@ export class SlitherRenderer {
                 return;
             }
             const grad = g.createRadialGradient(c, c, 0, c, c, halo);
-            if (arenaDeathDrop) {
+            if (tint && /^#[0-9a-f]{6}$/i.test(tint)) {
+                const color = parseColor(tint), lit = shadeColor(color, 38);
+                grad.addColorStop(0, rgb(lit, 0.85));
+                grad.addColorStop(deathDrop ? 0.65 : 0.35, rgb(color, 0.6));
+                grad.addColorStop(0.85, rgb(color, 0.15));
+                grad.addColorStop(1, rgb(color, 0));
+            } else if (arenaDeathDrop) {
                 const sat = 92;
                 grad.addColorStop(0, `hsla(55, ${sat}%, 72%, 0.72)`);
                 grad.addColorStop(0.62, `hsla(51, ${sat}%, 60%, 0.32)`);
@@ -1202,6 +1209,7 @@ export class SlitherRenderer {
                             const j = bucket[bi];
                             if (visited[j]) continue;
                             const o = scratch[j];
+                            if (o.tint !== f.tint) continue;
                             const ddx = o.x - f.x;
                             const ddy = o.y - f.y;
                             if (ddx * ddx + ddy * ddy <= mergeR2) {
@@ -1233,6 +1241,7 @@ export class SlitherRenderer {
                 x: sx / n,
                 y: sy / n,
                 hue: Math.round(hueSum / n / 12) * 12,
+                tint: members[0].tint,
                 count: n,
                 radius: Math.min(14, avgR * 0.55 + Math.sqrt(n) * 1.45 + 1.2),
             });
@@ -1252,6 +1261,7 @@ export class SlitherRenderer {
                 false,
                 true,
                 !!this.state.competitiveSlither,
+                c.tint,
             );
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
@@ -1408,7 +1418,7 @@ export class SlitherRenderer {
             const screenScale = isGolden ? 1.65 : (f.deathDrop ? 1.35 : 1.48);
             const screenR = Math.max(f.deathDrop ? 4.5 : 4.2, baseR * safeZoom * screenScale);
 
-            if (simpleFood && !isGolden && !f.deathDrop) {
+            if (simpleFood && !isGolden && !f.deathDrop && !f.tint) {
                 if (!simpleFoodGroups[hue]) {
                     simpleFoodGroups[hue] = [];
                 }
@@ -1425,6 +1435,7 @@ export class SlitherRenderer {
                 isGolden,
                 !!f.deathDrop,
                 isCompetitive && !!f.deathDrop,
+                f.tint,
             );
             const size = sprite.width * (screenR / spriteR);
             const half = size / 2;
@@ -1832,10 +1843,10 @@ export class SlitherRenderer {
         const key = `${skin.id}|${cacheR}|${prKey}`;
         let pack = this._specialSkinStampPacks.get(key);
         if (!pack) {
-            const colors = [skin.baseColor];
+            const colors = skin.classic ? fadeColors(skin.colors) : [skin.baseColor];
             const stamps = colors.map((color) => skin.id === 'leviathan'
                 ? this._getSnakePrImgs(color, cacheR, prNeeds, true, 'leviathan')
-                : this._getSnakeSegmentStamp(color, cacheR, prNeeds));
+                : this._getSnakeSegmentStamp(color, cacheR, prNeeds, !!skin.classic));
             pack = { cacheR, prKey, colors, stamps, skinId: skin.id };
             if (this._specialSkinStampPacks.size >= 24) {
                 this._specialSkinStampPacks.delete(this._specialSkinStampPacks.keys().next().value);
@@ -1846,12 +1857,12 @@ export class SlitherRenderer {
     }
 
     _getFlagStamps(code, cacheR, prNeeds) {
-        const colors = getFlagSegmentColors(code);
+        const colors = Array(18).fill(getFlagSegmentColors(code)[0]);
         const prKey = `${prNeeds.glow}|${prNeeds.boostOverlay}|${prNeeds.trailGlow}`;
         const key = `${code}|${cacheR}|${prKey}`;
         let pack = this._flagStampPacks.get(key);
         if (!pack) {
-            const stamps = colors.map((color) => this._getSnakeSegmentStamp(color, cacheR, prNeeds));
+            const stamps = colors.map((color, i) => this._getSnakePrImgs(color, cacheR, prNeeds, true, `flag:${code}:${i}`));
             pack = { code, cacheR, prKey, colors, stamps };
             if (this._flagStampPacks.size >= 48) this._flagStampPacks.delete(this._flagStampPacks.keys().next().value);
             this._flagStampPacks.set(key, pack);
@@ -1994,8 +2005,8 @@ export class SlitherRenderer {
         const getPatternIndex = (index) => isRainbow
             ? Math.floor((this._frame * 0.048 + index * 0.35) % patternPack.colors.length)
             : specialSkin
-                    ? 0
-                    : Math.floor(index * 0.28) % patternPack.colors.length;
+                    ? specialSkin.classic ? Math.min(patternPack.colors.length - 1, Math.floor(index / Math.max(1, bumps.length - 1) * (patternPack.colors.length - 1))) : 0
+                    : index % patternPack.colors.length;
         let normal, boostBody, glow, trailGlow, bodySS, stampScale;
         if (!isPatternSkin) {
             const stamp = this._getSnakeSegmentStamp(cs, cacheR, prNeeds);
