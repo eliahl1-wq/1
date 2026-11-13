@@ -19,7 +19,7 @@ export default function GameAdminControls({ socketRef, token, mode }) {
     return <div className="game-admin-controls" style={{ position: 'absolute', top: 30, left: 30, zIndex: 10000, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 260, pointerEvents: 'auto' }}
         onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
         <button disabled={pending} className="ui-btn ui-btn-primary" onClick={() => run('adminSpawnBotNearMe')}>Spawn Bot</button>
-        <button disabled={pending} className="ui-btn ui-btn-primary" onClick={() => run('adminFreePlayAction', { action: 'food' })}>+250 Food nearby</button>
+        <button disabled={pending} className="ui-btn ui-btn-primary" onClick={() => run('adminFreePlayAction', { action: 'food' })}>Queue +250 Food</button>
         <button disabled={pending} className="ui-btn ui-btn-primary" onClick={() => run('adminFreePlayAction', { action: 'grow' })}>{mode === 'agar' ? 'Size ×1.5' : '+100 Segments'}</button>
         <button disabled={pending} className="ui-btn ui-btn-primary" onClick={() => run('adminClearBots')}>Clear Bots</button>
         <span role="status" style={{ color: '#fff', fontSize: 12, background: 'rgba(12,12,18,.88)', padding: 8, borderRadius: 6 }}>{message}</span>
