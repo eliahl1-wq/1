@@ -2165,7 +2165,7 @@ export default function PreGame() {
                     </a>
                     <a
                         className="pregame-social-link pregame-social-link--x"
-                        href="https://x.com/agarstake"
+                        href="https://x.com/AreniFidotfun"
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label="Follow Arenifi on X"
