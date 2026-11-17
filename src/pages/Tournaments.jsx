@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppTopbar from '../components/AppTopbar';
+import TournamentPrizeNote from '../components/TournamentPrizeNote';
 import AppFooter from '../components/AppFooter';
 import Background from '../components/Background';
 import ProductPageHeader from '../components/ProductPageHeader';
@@ -158,6 +159,7 @@ export default function Tournaments() {
                                         ) : 'Prize Pool'}
                                     </span>
                                     <strong className="prize-hero-amount">${tournament.prizePotUsd.toFixed(2)}</strong>
+                                    <TournamentPrizeNote ended={tournament.status === 'ended'} />
                                 </div>
                                 
                                 <div className="tournament-details-grid">

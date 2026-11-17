@@ -11,6 +11,7 @@ import PregameGameBackground from '../components/PregameGameBackground';
 import { preloadGameForMode } from '../game/gameModules.js';
 import { drawSurvivPlayerPreview } from '../game/surviv/SurvivRenderer.js';
 import AppTopbar from '../components/AppTopbar';
+import TournamentPrizeNote from '../components/TournamentPrizeNote';
 import AppFooter from '../components/AppFooter';
 import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import PregameGamemodeSelector, { getGamemodePlayingCount } from '../components/PregameGamemodeSelector';
@@ -1972,6 +1973,7 @@ export default function PreGame() {
                                     <div style={{ color: '#f97316', textShadow: '0 0 15px rgba(249, 115, 22, 0.3)', fontSize: '2rem', fontWeight: 950, letterSpacing: '-.04em', margin: '6px 0 12px', textAlign: 'center' }}>
                                         ${(tournament?.prizePotUsd || 0).toFixed(2)}
                                     </div>
+                                    <TournamentPrizeNote ended={tournament?.status === 'ended'} className="tournament-prize-note--lobby" />
                                     <div className="tournament-splits" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: 0 }}>
                                         <div className="tournament-split" style={{ padding: '8px 4px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.03)' }}>1st<strong>60%</strong></div>
                                         <div className="tournament-split" style={{ padding: '8px 4px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.03)' }}>2nd<strong>30%</strong></div>

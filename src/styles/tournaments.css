@@ -714,6 +714,8 @@
 
 /* Custom Highlighted Prize Hero Box for Tournament Cards */
 .tournament-prize-hero-box {
+    flex-wrap: wrap;
+    gap: 6px 12px;
     margin: 8px 0 16px;
     padding: 12px 16px;
     border-radius: 14px;

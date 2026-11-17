@@ -3,6 +3,17 @@
 ══════════════════════════════════════════════ */
 
 /* Wallet adapter override — match our design */
+.tournament-prize-note {
+  display: block;
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font: 400 .69rem/1.5 var(--ui);
+}
+.tournament-prize-note--lobby {
+  margin: -5px 0 13px;
+  text-align: center;
+}
+
 .wallet-adapter-button {
   font-family: var(--ui) !important;
   font-weight: 600 !important;
