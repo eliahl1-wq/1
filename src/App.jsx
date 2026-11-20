@@ -16,6 +16,7 @@ const SlitherStudioRender = lazy(() => import('./game/slither/studio/SlitherStud
 const Gamemodes = lazy(() => import('./pages/Gamemodes'));
 const BRLobby = lazy(() => import('./pages/BRLobby'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+const ExternalGames = lazy(() => import('./pages/ExternalGames.jsx'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 const Faq = lazy(() => import('./pages/Faq'));
 const Rewards = lazy(() => import('./pages/Rewards'));
@@ -119,6 +120,13 @@ function AdminRoute({ children }) {
   return children;
 }
 
+function ExternalGamesRoute() {
+  const { user, isAuthenticated, loading } = useAuth();
+  if (loading) return <AppLoadingScreen />;
+  if (!isAuthenticated || user?.externalGamesAccess !== true) return <Navigate replace to="/" />;
+  return <LazyPage><ExternalGames /></LazyPage>;
+}
+
 function App() {
   return (
     <Router>
@@ -162,6 +170,7 @@ function App() {
                 <Route path="/br-lobby" element={<PrivateRoute><LazyPage><BRLobby /></LazyPage></PrivateRoute>} />
                 <Route path="/surviv-battle-royale" element={<PreGame />} />
                 <Route path="/admin" element={<AdminRoute><Suspense fallback={<AppLoadingScreen />}><AdminDashboard /></Suspense></AdminRoute>} />
+                <Route path="/external-games" element={<ExternalGamesRoute />} />
                 <Route path="/how-it-works" element={<LazyPage><HowItWorks /></LazyPage>} />
                 <Route path="/faq" element={<LazyPage><Faq /></LazyPage>} />
                 <Route path="/rewards" element={<PrivateRoute><LazyPage><Rewards /></LazyPage></PrivateRoute>} />

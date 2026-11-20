@@ -30,6 +30,7 @@ export function isNoIndexPath(pathname = '/') {
     const path = normalizePath(pathname);
     return NOINDEX_EXACT_PATHS.has(path)
         || path === '/admin'
+        || path === '/external-games'
         || path.startsWith('/admin/')
         || path.startsWith('/studio/')
         || /^\/tournaments\/[^/]+\/lobby$/.test(path);

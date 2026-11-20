@@ -138,6 +138,11 @@ export default function AppTopbar({ children }) {
                     Portfolio
                 </button>
             )}
+            {user?.externalGamesAccess === true && (
+                <button type="button" className={linkClass('/external-games')} aria-current={currentPage('/external-games')} onClick={() => navigate('/external-games')}>
+                    External Games
+                </button>
+            )}
             {user?.isAdmin && (
                 <button type="button" className={linkClass('/admin')} aria-current={currentPage('/admin')} onClick={() => navigate('/admin')}>
                     Admin
